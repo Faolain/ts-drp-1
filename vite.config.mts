@@ -8,6 +8,10 @@ const config = defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/protocol-v3/internal/received-vertex-authentication": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/internal/received-vertex-authentication.ts"
+			),
 			"@ts-drp/protocol-v3/creator-author-issuance-frontiers": path.resolve(
 				__dirname,
 				"packages/protocol-v3/src/creator-author-issuance-frontiers.ts"

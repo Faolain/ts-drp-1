@@ -65,10 +65,91 @@ const verifiedHistoricalIssuance = new WeakMap<VerifiedCreatorHistoricalIssuance
 
 type SettlementFrontier = readonly [author: string, admissionEpoch: number, terminalThrough: number | null];
 
+const SETTLEMENT_ADVANCE_KEYS = ["currentAcl", "predecessor", "proposed", "successorAcl"] as const;
+const SETTLEMENT_ACL_KEYS = ["epoch", "kind", "members", "objectId", "permissionless", "version"] as const;
+const SETTLEMENT_MEMBER_KEYS = ["author", "finalityKey", "groups"] as const;
+const SETTLEMENT_PREDECESSOR_KEYS = ["candidateDigest", "closedEpoch", "frontiers", "successorEpoch"] as const;
+const SETTLEMENT_PROPOSED_KEYS = [
+	"closedEpoch",
+	"frontiers",
+	"priorCheckpointDigest",
+	"priorCheckpointKind",
+	"successorEpoch",
+] as const;
+
+function exactSettlementRecord(value: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+	try {
+		if (value === null || typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) {
+			return undefined;
+		}
+		const actual = Reflect.ownKeys(value);
+		if (actual.length !== keys.length || actual.some((key) => typeof key !== "string" || !keys.includes(key))) {
+			return undefined;
+		}
+		const output = Object.create(null) as Record<string, unknown>;
+		for (const key of keys) {
+			const descriptor = Object.getOwnPropertyDescriptor(value, key);
+			if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
+			output[key] = descriptor.value;
+		}
+		return Object.freeze(output);
+	} catch {
+		return undefined;
+	}
+}
+
+function exactSettlementArray(value: unknown): readonly unknown[] | undefined {
+	try {
+		if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return undefined;
+		const length = value.length;
+		if (!Number.isSafeInteger(length) || length < 0) return undefined;
+		const keys = Reflect.ownKeys(value);
+		if (keys.length !== length + 1 || keys[length] !== "length") return undefined;
+		for (let index = 0; index < length; index += 1) {
+			const key = String(index);
+			const descriptor = Object.getOwnPropertyDescriptor(value, key);
+			if (
+				keys[index] !== key ||
+				descriptor === undefined ||
+				descriptor.enumerable !== true ||
+				!("value" in descriptor)
+			) {
+				return undefined;
+			}
+		}
+		return value;
+	} catch {
+		return undefined;
+	}
+}
+
+function exactSettlementAcl(value: unknown): Readonly<Record<string, unknown>> | undefined {
+	const acl = exactSettlementRecord(value, SETTLEMENT_ACL_KEYS);
+	const members = exactSettlementArray(acl?.members);
+	if (acl === undefined || members === undefined) return undefined;
+	for (const memberValue of members) {
+		const member = exactSettlementRecord(memberValue, SETTLEMENT_MEMBER_KEYS);
+		const groups = exactSettlementArray(member?.groups);
+		if (member === undefined || groups === undefined) return undefined;
+	}
+	return acl;
+}
+
+function exactSettlementFrontierArray(value: unknown): readonly unknown[] | undefined {
+	const frontiers = exactSettlementArray(value);
+	if (frontiers === undefined) return undefined;
+	for (const frontier of frontiers) {
+		const tuple = exactSettlementArray(frontier);
+		if (tuple === undefined || tuple.length !== 3) return undefined;
+	}
+	return frontiers;
+}
+
 function settlementMembers(value: unknown): readonly string[] | undefined {
-	if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
-	const epoch = Reflect.get(value, "epoch");
-	const members = Reflect.get(value, "members");
+	if (value === null || typeof value !== "object") return undefined;
+	const acl = value as Readonly<Record<string, unknown>>;
+	const epoch = acl.epoch;
+	const members = exactSettlementArray(acl.members);
 	if (
 		!Number.isSafeInteger(epoch) ||
 		(epoch as number) < 0 ||
@@ -80,9 +161,10 @@ function settlementMembers(value: unknown): readonly string[] | undefined {
 	}
 	const authors: string[] = [];
 	let previous: string | undefined;
-	for (const member of members) {
-		if (member === null || typeof member !== "object" || Array.isArray(member)) return undefined;
-		const author = Reflect.get(member, "author");
+	for (const memberValue of members) {
+		const member = exactSettlementRecord(memberValue, SETTLEMENT_MEMBER_KEYS);
+		if (member === undefined) return undefined;
+		const author = member.author;
 		if (
 			typeof author !== "string" ||
 			!/^[0-9a-f]{64}$/u.test(author) ||
@@ -97,11 +179,12 @@ function settlementMembers(value: unknown): readonly string[] | undefined {
 }
 
 function settlementFrontiers(value: unknown): readonly SettlementFrontier[] | undefined {
-	if (!Array.isArray(value) || value.length > 256) return undefined;
+	const frontiers = exactSettlementFrontierArray(value);
+	if (frontiers === undefined || frontiers.length > 256) return undefined;
 	const output: SettlementFrontier[] = [];
 	let previous: string | undefined;
-	for (const entry of value) {
-		if (!Array.isArray(entry) || entry.length !== 3) return undefined;
+	for (const entry of frontiers) {
+		if (!Array.isArray(entry)) return undefined;
 		const [author, admissionEpoch, terminalThrough] = entry;
 		if (
 			typeof author !== "string" ||
@@ -129,23 +212,36 @@ export function inspectCreatorAuthorSettlementAdvance(
 	input: unknown
 ): Readonly<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> {
 	try {
-		if (input === null || typeof input !== "object" || Array.isArray(input)) {
-			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+		const captured = exactSettlementRecord(input, SETTLEMENT_ADVANCE_KEYS);
+		const currentAcl = exactSettlementAcl(captured?.currentAcl);
+		const successorAcl = exactSettlementAcl(captured?.successorAcl);
+		const predecessor = captured?.predecessor;
+		const proposed = exactSettlementRecord(captured?.proposed, SETTLEMENT_PROPOSED_KEYS);
+		const capturedPredecessor =
+			predecessor === null ? null : exactSettlementRecord(predecessor, SETTLEMENT_PREDECESSOR_KEYS);
+		if (
+			captured === undefined ||
+			currentAcl === undefined ||
+			successorAcl === undefined ||
+			proposed === undefined ||
+			(predecessor !== null && capturedPredecessor === undefined) ||
+			exactSettlementFrontierArray(proposed.frontiers) === undefined ||
+			(capturedPredecessor !== null &&
+				(capturedPredecessor === undefined ||
+					exactSettlementFrontierArray(capturedPredecessor.frontiers) === undefined))
+		) {
+			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_SHAPE_INVALID" });
 		}
-		const currentAcl = Reflect.get(input, "currentAcl");
-		const successorAcl = Reflect.get(input, "successorAcl");
-		const predecessor = Reflect.get(input, "predecessor");
-		const proposed = Reflect.get(input, "proposed");
-		if (proposed === null || typeof proposed !== "object" || Array.isArray(proposed)) {
-			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+		if (capturedPredecessor === undefined) {
+			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_SHAPE_INVALID" });
 		}
 		const currentMembers = settlementMembers(currentAcl);
 		const successorMembers = settlementMembers(successorAcl);
-		const proposedFrontiers = settlementFrontiers(Reflect.get(proposed, "frontiers"));
-		const currentEpoch = Reflect.get(currentAcl, "epoch");
-		const successorEpoch = Reflect.get(successorAcl, "epoch");
-		const closedEpoch = Reflect.get(proposed, "closedEpoch");
-		const proposedSuccessorEpoch = Reflect.get(proposed, "successorEpoch");
+		const proposedFrontiers = settlementFrontiers(proposed.frontiers);
+		const currentEpoch = currentAcl.epoch;
+		const successorEpoch = successorAcl.epoch;
+		const closedEpoch = proposed.closedEpoch;
+		const proposedSuccessorEpoch = proposed.successorEpoch;
 		if (currentMembers === undefined || successorMembers === undefined || proposedFrontiers === undefined) {
 			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_SHAPE_INVALID" });
 		}
@@ -160,11 +256,11 @@ export function inspectCreatorAuthorSettlementAdvance(
 			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
 		}
 		const currentSet = new Set(currentMembers);
-		if (predecessor === null) {
+		if (capturedPredecessor === null) {
 			if (
 				closedEpoch !== 0 ||
-				Reflect.get(proposed, "priorCheckpointKind") !== "genesis" ||
-				Reflect.get(proposed, "priorCheckpointDigest") !== CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL
+				proposed.priorCheckpointKind !== "genesis" ||
+				proposed.priorCheckpointDigest !== CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL
 			) {
 				return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
 			}
@@ -177,16 +273,13 @@ export function inspectCreatorAuthorSettlementAdvance(
 			}
 			return Object.freeze({ ok: true });
 		}
-		if (predecessor === null || typeof predecessor !== "object" || Array.isArray(predecessor)) {
-			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
-		}
-		const predecessorDigest = Reflect.get(predecessor, "candidateDigest");
-		const predecessorClosedEpoch = Reflect.get(predecessor, "closedEpoch");
-		const predecessorSuccessorEpoch = Reflect.get(predecessor, "successorEpoch");
-		const predecessorFrontiers = settlementFrontiers(Reflect.get(predecessor, "frontiers"));
+		const predecessorDigest = capturedPredecessor.candidateDigest;
+		const predecessorClosedEpoch = capturedPredecessor.closedEpoch;
+		const predecessorSuccessorEpoch = capturedPredecessor.successorEpoch;
+		const predecessorFrontiers = settlementFrontiers(capturedPredecessor.frontiers);
 		if (
-			Reflect.get(proposed, "priorCheckpointKind") !== "settled-v1" ||
-			Reflect.get(proposed, "priorCheckpointDigest") !== predecessorDigest ||
+			proposed.priorCheckpointKind !== "settled-v1" ||
+			proposed.priorCheckpointDigest !== predecessorDigest ||
 			typeof predecessorDigest !== "string" ||
 			!/^[0-9a-f]{64}$/u.test(predecessorDigest) ||
 			predecessorFrontiers === undefined ||

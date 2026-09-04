@@ -17,6 +17,7 @@ import type {
 	DurableBuildAndSign,
 	DurableIssuanceOutboxRecord,
 	DurableIssuanceStore,
+	DurableIssueCommit,
 	DurableIssueScope,
 	DurableOutboxPageInput,
 	DurableOutboxPublicationTransitionInput,
@@ -43,6 +44,7 @@ import {
 	openCurrentEpochAuthorAuthorization,
 	resolveCurrentEpochAuthorizedAuthor,
 } from "@ts-drp/protocol-v3/author-authorization";
+import { verifyReceivedVertex } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import {
 	authorizeLatchedApplicationWrite,
 	authorizeLatchedEnvelopeAuthor,
@@ -216,6 +218,7 @@ const BLUEPRINT_BINDING_INPUT_KEYS = ["exactCanonicalInitialStateBytes", "plane"
 const BLUEPRINT_RETRIEVAL_INPUT_KEYS = ["plane"] as const;
 const BLUEPRINT_PROJECTION_BASE_INPUT_KEYS = ["plane", "purpose"] as const;
 const LOCAL_ISSUE_INPUT_KEYS = ["operations", "signRegisteredVertexDigest"] as const;
+const LOCAL_ISSUE_WITH_PLAN_EFFECT_KEYS = ["operations", "planEffect", "signRegisteredVertexDigest"] as const;
 const LOCAL_ISSUE_ENTRY_KEYS = ["logicalTime", "operation"] as const;
 const CANONICAL_APPLICATION_BATCH_ENTRY_KEYS = ["operation", "logicalTime"] as const;
 const APPLICATION_BATCH_KEYS = ["batch", "action"] as const;
@@ -234,6 +237,13 @@ const RESERVED_BATCH_ACTIONS = ObjectFreeze([
 const ISSUANCE_SCOPE_KEYS = ["objectId", "author"] as const;
 const OUTBOX_RECORD_KEYS = ["commit", "publishState"] as const;
 const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outboxEntry"] as const;
+const ISSUE_COMMIT_WITH_PLAN_EFFECT_KEYS = [
+	"authorSequence",
+	"envelope",
+	"issuedRecord",
+	"outboxEntry",
+	"planEffect",
+] as const;
 const ISSUED_RECORD_KEYS = ["authorSequence", "envelope", "scope"] as const;
 const OUTBOX_ENTRY_KEYS = ["authorSequence", "envelope", "scope"] as const;
 const SIGNED_ENVELOPE_KEYS = ["canonicalPreimageBytes", "digest", "signature"] as const;
@@ -1570,7 +1580,7 @@ function isExactOwnedSingleEntryMap(map: unknown, expectedKey: string, expectedV
 	}
 }
 
-function copyApplicationVertices(source: Map<string, EpochVertex>): Map<string, EpochVertex> | undefined {
+function copyCloseVertices(source: Map<string, EpochVertex>): Map<string, EpochVertex> | undefined {
 	try {
 		const copy = new IntrinsicMap<string, EpochVertex>();
 		const iterator = ReflectApply(MapPrototypeEntries, source, []) as unknown;
@@ -1596,16 +1606,14 @@ function copyApplicationVertices(source: Map<string, EpochVertex>): Map<string, 
 	}
 }
 
-interface ApplicationVertexIdentity {
+interface CloseVertexIdentity {
 	readonly author: string;
 	readonly authorSequence: number;
 }
 
-function copyApplicationAuthors(
-	source: Map<string, ApplicationVertexIdentity>
-): Map<string, ApplicationVertexIdentity> | undefined {
+function copyCloseAuthors(source: Map<string, CloseVertexIdentity>): Map<string, CloseVertexIdentity> | undefined {
 	try {
-		const copy = new IntrinsicMap<string, ApplicationVertexIdentity>();
+		const copy = new IntrinsicMap<string, CloseVertexIdentity>();
 		const iterator = ReflectApply(MapPrototypeEntries, source, []) as unknown;
 		for (;;) {
 			const step = nextCapturedMapIterator(iterator);
@@ -1642,9 +1650,9 @@ function copyApplicationAuthors(
 	}
 }
 
-function retainApplicationVertex(
+function retainCloseVertex(
 	vertices: Map<string, EpochVertex>,
-	authors: Map<string, ApplicationVertexIdentity>,
+	authors: Map<string, CloseVertexIdentity>,
 	authorVertexCounts: Map<string, number>,
 	authenticated: AuthenticatedRecoveryVertex,
 	charges?: Map<string, number>
@@ -2646,9 +2654,9 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 interface V3PlaneRegistration {
 	active: boolean;
 	readonly authorVertexCounts: Map<string, number>;
-	readonly applicationAuthors: Map<string, ApplicationVertexIdentity>;
-	readonly applicationCharges: Map<string, number>;
-	readonly applicationVertices: Map<string, EpochVertex>;
+	readonly closeAuthors: Map<string, CloseVertexIdentity>;
+	readonly closeCharges: Map<string, number>;
+	readonly closeVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
 	blueprintClosing: boolean;
 	blueprintFolded: boolean;
@@ -2660,6 +2668,7 @@ interface V3PlaneRegistration {
 	}>;
 	blueprintHandle?: V3BlueprintLiveHandle;
 	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
+	readonly controlVertices: Set<string>;
 	displacedIssuanceBoundary?: number;
 	displacedSource?: V3DisplacedSourceAuthority;
 	epochBytes: number;
@@ -3050,25 +3059,25 @@ function d109dCensus(
 	close: CreatorCloseRuntimeReleaseCensus
 ): D109dRuntimeCensus | undefined {
 	const quarantine = predecessor === undefined ? 0 : d109dSetSize(predecessor.quarantinedDigests);
-	const applicationAuthors = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.applicationAuthors);
-	const applicationCharges = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.applicationCharges);
-	const applicationVertices = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.applicationVertices);
+	const closeAuthors = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.closeAuthors);
+	const closeCharges = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.closeCharges);
+	const closeVertices = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.closeVertices);
 	const latchedOperations = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.latchedOperations);
 	const pendingIngress = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.pendingIngress);
 	if (
 		quarantine === undefined ||
-		applicationAuthors === undefined ||
-		applicationCharges === undefined ||
-		applicationVertices === undefined ||
+		closeAuthors === undefined ||
+		closeCharges === undefined ||
+		closeVertices === undefined ||
 		latchedOperations === undefined ||
 		pendingIngress === undefined
 	) {
 		return undefined;
 	}
 	return ObjectFreeze({
-		applicationAuthors,
-		applicationCharges,
-		applicationVertices,
+		applicationAuthors: closeAuthors,
+		applicationCharges: closeCharges,
+		applicationVertices: closeVertices,
 		blueprintState: predecessor?.blueprintMachine !== undefined,
 		causalityIndex: predecessor?.index.size ?? 0,
 		creatorCloseDerivedCommitment: close.derivedCommitment,
@@ -3203,12 +3212,10 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 			let emptyQuarantine: ReadonlySet<string> | undefined;
 			if (predecessor !== undefined) {
 				anchorDigest = predecessor.payload.provenance.anchorDigest;
-				anchorVertex = ReflectApply(MapPrototypeGet, predecessor.applicationVertices, [anchorDigest]) as
+				anchorVertex = ReflectApply(MapPrototypeGet, predecessor.closeVertices, [anchorDigest]) as
 					| EpochVertex
 					| undefined;
-				anchorCharge = ReflectApply(MapPrototypeGet, predecessor.applicationCharges, [anchorDigest]) as
-					| number
-					| undefined;
+				anchorCharge = ReflectApply(MapPrototypeGet, predecessor.closeCharges, [anchorDigest]) as number | undefined;
 				if (anchorVertex === undefined || !NumberIsSafeInteger(anchorCharge) || (anchorCharge as number) < 1) {
 					return d109dFailure("D109D_INTERNAL_INVARIANT");
 				}
@@ -3249,12 +3256,13 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 				replacementIndex !== undefined &&
 				emptyQuarantine !== undefined
 			) {
-				ReflectApply(MapPrototypeClear, predecessor.applicationAuthors, []);
+				ReflectApply(MapPrototypeClear, predecessor.closeAuthors, []);
 				ReflectApply(MapPrototypeClear, predecessor.authorVertexCounts, []);
-				ReflectApply(MapPrototypeClear, predecessor.applicationCharges, []);
-				ReflectApply(MapPrototypeSet, predecessor.applicationCharges, [anchorDigest, anchorCharge]);
-				ReflectApply(MapPrototypeClear, predecessor.applicationVertices, []);
-				ReflectApply(MapPrototypeSet, predecessor.applicationVertices, [anchorDigest, anchorVertex]);
+				ReflectApply(MapPrototypeClear, predecessor.closeCharges, []);
+				ReflectApply(MapPrototypeSet, predecessor.closeCharges, [anchorDigest, anchorCharge]);
+				ReflectApply(MapPrototypeClear, predecessor.closeVertices, []);
+				ReflectApply(MapPrototypeSet, predecessor.closeVertices, [anchorDigest, anchorVertex]);
+				predecessor.controlVertices.clear();
 				predecessor.index = replacementIndex;
 				predecessor.epochBytes = anchorCharge;
 				predecessor.graphVersion = 1;
@@ -3488,6 +3496,12 @@ function isV3ApplicationAuthorAuthorized(authorization: V3LiveAuthorization, aut
 
 function isAuthorFenceOperation(value: unknown): boolean {
 	return isObject(value) && Reflect.get(value, "action") === AUTHOR_FENCE_ACTION;
+}
+
+function isControlOperation(value: unknown): boolean {
+	if (!isObject(value)) return false;
+	const action = Reflect.get(value, "action");
+	return action === AUTHOR_FENCE_ACTION || action === "causalJoin" || action === "join";
 }
 
 function aclOperation(author: string, digest: string, value: unknown): StagedLatchedAclOperation | null | undefined {
@@ -3887,6 +3901,11 @@ async function handleV3Ingress(
 	if (!currentRegistration(registration)) return false;
 	const authenticated = evidence.authenticated;
 	const authorFence = isAuthorFenceOperation(authenticated.vertex.operation);
+	if (authorFence && settlementProfileFor(registration.payload.trust.trust.profileId) !== "v1") {
+		ingressFailureLog("admission-rejected");
+		return false;
+	}
+	const controlOperation = isControlOperation(authenticated.vertex.operation);
 	const alreadyAccepted = registration.index.has(authenticated.digest);
 	if (!alreadyAccepted && registration.operationAdmissionHalted) {
 		ingressFailureLog("admission-rejected");
@@ -3927,12 +3946,12 @@ async function handleV3Ingress(
 		ingressFailureLog("admission-rejected");
 		return false;
 	}
-	const candidate = authorFence
+	const candidate = controlOperation
 		? null
 		: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
 	if (
 		!alreadyAccepted &&
-		!authorFence &&
+		!controlOperation &&
 		!validateLatchedOperation(registration.authorization, registration.latchedOperations, candidate)
 	) {
 		ingressFailureLog("admission-rejected");
@@ -3944,7 +3963,7 @@ async function handleV3Ingress(
 	}
 	const reservation = alreadyAccepted
 		? undefined
-		: authorFence
+		: controlOperation
 			? undefined
 			: reserveOperation(
 					registration.operationAdmissionPolicy,
@@ -4011,13 +4030,14 @@ async function handleV3Ingress(
 		ingressFailureLog("graph-rejected");
 		return false;
 	}
-	retainApplicationVertex(
-		registration.applicationVertices,
-		registration.applicationAuthors,
+	retainCloseVertex(
+		registration.closeVertices,
+		registration.closeAuthors,
 		registration.authorVertexCounts,
 		authenticated,
-		registration.applicationCharges
+		registration.closeCharges
 	);
+	if (controlOperation) registration.controlVertices.add(authenticated.digest);
 	registration.graphVersion += 1;
 	if (candidate !== null && candidate !== undefined) registration.latchedOperations.set(candidate.digest, candidate);
 	if (!commitOperationReservation(reservation)) {
@@ -4028,7 +4048,7 @@ async function handleV3Ingress(
 	}
 	releasePendingIngress(registration, authenticated.digest);
 	if (!currentRegistration(registration)) return true;
-	if (authorFence) return true;
+	if (controlOperation) return true;
 	const delivery = ObjectFreeze({
 		vertex: authenticated.admitted,
 		exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
@@ -4206,7 +4226,9 @@ function outboxRowSnapshot(value: unknown, selectedScope: DurableIssueScope): Sn
 		const record = snapshotClosedRecord(value, OUTBOX_RECORD_KEYS);
 		if (record === undefined || (record.publishState !== "pending" && record.publishState !== "published"))
 			return undefined;
-		const commit = snapshotClosedRecord(record.commit, ISSUE_COMMIT_KEYS);
+		const commit =
+			snapshotClosedRecord(record.commit, ISSUE_COMMIT_KEYS) ??
+			snapshotClosedRecord(record.commit, ISSUE_COMMIT_WITH_PLAN_EFFECT_KEYS);
 		if (commit === undefined || !NumberIsSafeInteger(commit.authorSequence) || (commit.authorSequence as number) < 0) {
 			return undefined;
 		}
@@ -4294,11 +4316,12 @@ type StagedLatchedAclOperation = Readonly<{
 
 interface RecoveredV3LivePayload {
 	readonly authorVertexCounts: Map<string, number>;
-	readonly applicationAuthors: Map<string, ApplicationVertexIdentity>;
-	readonly applicationCharges: Map<string, number>;
-	readonly applicationVertices: Map<string, EpochVertex>;
+	readonly closeAuthors: Map<string, CloseVertexIdentity>;
+	readonly closeCharges: Map<string, number>;
+	readonly closeVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
 	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
+	readonly controlVertices: Set<string>;
 	readonly displacedIssuanceBoundary?: number;
 	readonly displacedSource?: V3DisplacedSourceAuthority;
 	readonly epochBytes: number;
@@ -4396,6 +4419,12 @@ type ClassifiedPlaneVertex = Readonly<{
 	authenticated: AuthenticatedRecoveryVertex;
 	kind: "covered-historical" | "current" | "displaced" | "pinned-genesis";
 }>;
+
+interface SettlementFrontierContext {
+	readonly admissionEpoch: number;
+	readonly currentEpoch: number;
+	readonly terminalThrough: number | null;
+}
 
 interface HistoricalIssuanceContext {
 	readonly capability: VerifiedCreatorHistoricalIssuance;
@@ -4544,8 +4573,8 @@ async function readCreatorReplayRows(
 			return empty.ok &&
 				empty.rows.length === 0 &&
 				empty.nextSequence === null &&
-				registration.applicationVertices.size === 1 &&
-				registration.applicationCharges.size === 1
+				registration.closeVertices.size === 1 &&
+				registration.closeCharges.size === 1
 				? ObjectFreeze([])
 				: undefined;
 		}
@@ -4596,8 +4625,8 @@ async function readCreatorReplayRows(
 					}
 				}
 				if (authenticated === undefined || authenticated.digest !== row.vertexDigest) return undefined;
-				const retainedVertex = registration.applicationVertices.get(authenticated.digest);
-				const retainedCharge = registration.applicationCharges.get(authenticated.digest);
+				const retainedVertex = registration.closeVertices.get(authenticated.digest);
+				const retainedCharge = registration.closeCharges.get(authenticated.digest);
 				const exactCanonicalVertexBytes = encodeCanonical(authenticated.vertex);
 				if (
 					retainedVertex === undefined ||
@@ -4618,8 +4647,7 @@ async function readCreatorReplayRows(
 			if (page.nextSequence !== expectedNext) return undefined;
 			afterSequence = page.nextSequence;
 		}
-		return registration.applicationVertices.size === rows.length + 1 &&
-			registration.applicationCharges.size === rows.length + 1
+		return registration.closeVertices.size === rows.length + 1 && registration.closeCharges.size === rows.length + 1
 			? ObjectFreeze(rows)
 			: undefined;
 	} catch {
@@ -4663,7 +4691,8 @@ function classifyPlaneVertex(
 	signature: Uint8Array,
 	expectedDigest: Uint8Array,
 	expectedAuthor: string,
-	expectedAuthorSequence: number
+	expectedAuthorSequence: number,
+	settlementFrontier?: SettlementFrontierContext
 ): ClassifiedPlaneVertex | undefined {
 	const matches = (
 		authenticated: AuthenticatedRecoveryVertex | undefined
@@ -4682,6 +4711,34 @@ function classifyPlaneVertex(
 			signature
 		);
 		if (matches(displaced)) return ObjectFreeze({ authenticated: displaced, kind: "displaced" as const });
+		if (settlementProfileFor(payload.trust.trust.profileId) === "v1") {
+			const reservedDisplaced = authenticatedSettlementSourceRow(
+				displacedSource.prepared,
+				displacedSource.authorization,
+				canonicalPreimageBytes,
+				signature,
+				expectedDigest,
+				expectedAuthor,
+				expectedAuthorSequence,
+				undefined
+			);
+			if (matches(reservedDisplaced)) {
+				return ObjectFreeze({ authenticated: reservedDisplaced, kind: "displaced" as const });
+			}
+		}
+	}
+	if (settlementProfileFor(payload.trust.trust.profileId) === "v1" && settlementFrontier !== undefined) {
+		const older = authenticatedSettlementSourceRow(
+			payload,
+			authorization,
+			canonicalPreimageBytes,
+			signature,
+			expectedDigest,
+			expectedAuthor,
+			expectedAuthorSequence,
+			settlementFrontier
+		);
+		if (matches(older)) return ObjectFreeze({ authenticated: older, kind: "displaced" as const });
 	}
 	const row = ObjectFreeze({
 		authorSequence: expectedAuthorSequence,
@@ -4706,6 +4763,131 @@ function classifyPlaneVertex(
 	return matches(historical)
 		? ObjectFreeze({ authenticated: historical, kind: "covered-historical" as const })
 		: undefined;
+}
+
+function authenticatedSettlementSourceRow(
+	payload: PreparedV3LivePayload,
+	authorization: V3LiveAuthorization,
+	canonicalPreimageBytes: Uint8Array,
+	signature: Uint8Array,
+	expectedDigest: Uint8Array,
+	expectedAuthor: string,
+	expectedAuthorSequence: number,
+	settlementFrontier: SettlementFrontierContext | undefined
+): AuthenticatedRecoveryVertex | undefined {
+	try {
+		if (typeof V3_VERTEX_SUITE_ID !== "string") return undefined;
+		const suiteId = V3_VERTEX_SUITE_ID;
+		const decoded = decodeCanonical(canonicalPreimageBytes);
+		if (!isObject(decoded) || !sameBytes(encodeCanonical(decoded), canonicalPreimageBytes)) return undefined;
+		const anchor = Reflect.get(decoded, "anchor");
+		const candidateEpoch = Reflect.get(decoded, "epoch");
+		const operation = Reflect.get(decoded, "operation");
+		const action = isObject(operation) ? Reflect.get(operation, "action") : undefined;
+		const currentEpoch = payload.provenance.epoch;
+		if (
+			!isDigestHex(anchor) ||
+			!NumberIsSafeInteger(candidateEpoch) ||
+			(candidateEpoch as number) < 0 ||
+			(settlementFrontier === undefined &&
+				action !== "acl" &&
+				action !== "join" &&
+				action !== "causalJoin" &&
+				action !== AUTHOR_FENCE_ACTION)
+		) {
+			return undefined;
+		}
+		const epoch = candidateEpoch as number;
+		if (settlementFrontier === undefined) {
+			if (anchor !== payload.provenance.anchorDigest) return undefined;
+		} else if (
+			!validSettlementFrontierContext(payload, settlementFrontier) ||
+			epoch >= currentEpoch ||
+			settlementOwnRowClass(
+				epoch,
+				settlementFrontier.currentEpoch,
+				expectedAuthorSequence,
+				settlementFrontier.admissionEpoch,
+				settlementFrontier.terminalThrough
+			) === "current"
+		) {
+			return undefined;
+		}
+		const verification = verifyReceivedVertex({
+			domain: V3_VERTEX_DOMAIN,
+			expectedAnchor: anchor,
+			receivedCanonicalPreimageBytes: canonicalPreimageBytes,
+			resolveAuthorPublicKey: (author) => resolveV3AuthorizedAuthor(authorization, author),
+			signature,
+			suiteId,
+		});
+		if (
+			verification.digest === undefined ||
+			!verification.accepted ||
+			!sameBytes(verification.digest, expectedDigest)
+		) {
+			return undefined;
+		}
+		const author = Reflect.get(decoded, "author");
+		const authorSequence = Reflect.get(decoded, "authorSequence");
+		const logicalTime = Reflect.get(decoded, "logicalTime");
+		const objectId = Reflect.get(decoded, "objectId");
+		const dependencies = denseArray(Reflect.get(decoded, "dependencies"));
+		const detachedOperation = detachedCanonicalOperation(operation as Readonly<Record<string, unknown>>);
+		if (
+			author !== expectedAuthor ||
+			authorSequence !== expectedAuthorSequence ||
+			objectId !== payload.provenance.objectId ||
+			!NumberIsSafeInteger(logicalTime) ||
+			(logicalTime as number) < 1 ||
+			dependencies === undefined ||
+			dependencies.some((dependency) => typeof dependency !== "string") ||
+			detachedOperation === undefined
+		) {
+			return undefined;
+		}
+		const admitted = ObjectFreeze({
+			anchor,
+			author,
+			authorSequence,
+			dependencies: ObjectFreeze(dependencies as string[]),
+			digest: new Uint8ArrayConstructor(expectedDigest),
+			epoch: epoch as number,
+			kind: "drp-vertex" as const,
+			logicalTime: logicalTime as number,
+			objectId,
+			operation: detachedOperation,
+			protocolMajor: 3 as const,
+		});
+		return authenticatedRecoveryVertex(admitted, canonicalPreimageBytes.byteLength);
+	} catch {
+		return undefined;
+	}
+}
+
+function validSettlementFrontierContext(payload: PreparedV3LivePayload, frontier: SettlementFrontierContext): boolean {
+	return (
+		NumberIsSafeInteger(frontier.currentEpoch) &&
+		frontier.currentEpoch === payload.provenance.epoch &&
+		NumberIsSafeInteger(frontier.admissionEpoch) &&
+		frontier.admissionEpoch >= 0 &&
+		frontier.admissionEpoch <= frontier.currentEpoch &&
+		(frontier.terminalThrough === null ||
+			(NumberIsSafeInteger(frontier.terminalThrough) && frontier.terminalThrough >= 0))
+	);
+}
+
+function settlementOwnRowClass(
+	epoch: number,
+	currentEpoch: number,
+	authorSequence: number,
+	admissionEpoch: number,
+	terminalThrough: number | null
+): "current" | "displaced" | "old-incarnation" | "terminal" {
+	if (terminalThrough !== null && authorSequence <= terminalThrough) return "terminal";
+	if (epoch < admissionEpoch) return "old-incarnation";
+	if (epoch < currentEpoch) return "displaced";
+	return "current";
 }
 
 function authenticatedRecoveryVertex(
@@ -5247,12 +5429,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		} catch {
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be constructed");
 		}
-		const applicationVertices = copyApplicationVertices(payload.vertices);
-		const applicationCharges = new IntrinsicMap<string, number>(payload.charges);
-		if (applicationVertices === undefined || applicationCharges.size !== applicationVertices.size) {
+		const closeVertices = copyCloseVertices(payload.vertices);
+		const closeCharges = new IntrinsicMap<string, number>(payload.charges);
+		if (closeVertices === undefined || closeCharges.size !== closeVertices.size) {
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be retained");
 		}
-		const applicationAuthors = new IntrinsicMap<string, ApplicationVertexIdentity>();
+		const closeAuthors = new IntrinsicMap<string, CloseVertexIdentity>();
 		const authorVertexCounts = new IntrinsicMap<string, number>();
 		let epochBytes = 0;
 		for (const byteCharge of payload.charges.values()) {
@@ -5266,6 +5448,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		const recoveredVertices: AdmittedReceivedVertexView[] = [];
 		const quarantinedDigests = new IntrinsicSet<string>();
 		const latchedOperations = new IntrinsicMap<string, StagedLatchedAclOperation>();
+		const controlVertices = new IntrinsicSet<string>();
 		let journalAfterSequence: number | null = null;
 		if (readiness.rowCount === 0) {
 			let emptyPage;
@@ -5349,7 +5532,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("admission-rejected", "v3 journal row is not authenticated");
 				}
 				if (
-					(!isAuthorFenceOperation(authenticated.vertex.operation) &&
+					(!isControlOperation(authenticated.vertex.operation) &&
 						!acceptedApplicationOperation(
 							payload,
 							authenticated.vertex.operation,
@@ -5394,10 +5577,14 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("admission-rejected", "v3 journal row dependency bound is invalid");
 				}
 				const authorFence = isAuthorFenceOperation(authenticated.vertex.operation);
-				const candidate = authorFence
+				if (authorFence && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+					return recoveryFailure("admission-rejected", "v3 journal fence profile is invalid");
+				}
+				const controlOperation = isControlOperation(authenticated.vertex.operation);
+				const candidate = controlOperation
 					? null
 					: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-				if (!authorFence && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
+				if (!controlOperation && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
 					return recoveryFailure("authorization-rejected", "v3 journal ACL operation is not authorized");
 				}
 				const updatedEpochBytes = nextEpochBytes(
@@ -5408,7 +5595,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				if (updatedEpochBytes === undefined) {
 					return recoveryFailure("graph-rejected", "v3 journal replay is at capacity");
 				}
-				const reservation = authorFence
+				const reservation = controlOperation
 					? undefined
 					: reserveOperation(
 							selectedOperationAdmissionPolicy,
@@ -5423,13 +5610,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
 				}
-				retainApplicationVertex(
-					applicationVertices,
-					applicationAuthors,
-					authorVertexCounts,
-					authenticated,
-					applicationCharges
-				);
+				retainCloseVertex(closeVertices, closeAuthors, authorVertexCounts, authenticated, closeCharges);
+				if (isControlOperation(authenticated.vertex.operation)) controlVertices.add(authenticated.digest);
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -5463,19 +5645,23 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			if (row === undefined || (afterKey !== undefined && row.authorSequence <= afterKey[2])) {
 				return recoveryFailure("issuance-rejected", "v3 recovery outbox record is invalid");
 			}
-			// The predecessor view does not point-read a returned nonfuture row; this consumer owns its sole issued read and exact match.
-			let issuedCommit: unknown;
-			try {
-				issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
-			} catch {
-				return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
-			}
-			const issuedRow = outboxRowSnapshot(
-				ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
-				selectedScope
-			);
-			if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) {
-				return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
+			let issuedRow = row;
+			if (settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+				// Legacy recovery retains the defensive issued/outbox cross-read byte-for-byte.
+				let issuedCommit: unknown;
+				try {
+					issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
+				} catch {
+					return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
+				}
+				const matched = outboxRowSnapshot(
+					ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+					selectedScope
+				);
+				if (matched === undefined || !matchingOutboxRows(row, matched)) {
+					return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
+				}
+				issuedRow = matched;
 			}
 			let classified: ClassifiedPlaneVertex | undefined;
 			try {
@@ -5512,18 +5698,26 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			if (classified?.kind === "displaced") {
 				displacedRecordCount += 1;
 				displacedIssuanceBoundary = row.authorSequence;
-				if (
-					displacedRecordCount > (displacedSource as V3DisplacedSourceAuthority).prepared.parameters.maxEpochVertices
-				) {
+				const displacedPayload = displacedSource?.prepared ?? payload;
+				if (displacedRecordCount > displacedPayload.parameters.maxEpochVertices) {
 					return recoveryFailure("graph-rejected", "v3 displaced recovery graph is at capacity");
 				}
+				const displacedOperation = classified.authenticated.vertex.operation;
+				if (displacedOperation === undefined) {
+					return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
+				}
+				const displacedAction = Reflect.get(displacedOperation, "action");
+				const settlementSourceControl =
+					settlementProfileFor(payload.trust.trust.profileId) === "v1" &&
+					(isControlOperation(displacedOperation) || displacedAction === "acl");
 				if (
-					!acceptedApplicationOperation(
-						(displacedSource as V3DisplacedSourceAuthority).prepared,
-						classified.authenticated.vertex.operation,
-						classified.authenticated.admitted.logicalTime
-					) ||
-					!hasBoundedDependencies((displacedSource as V3DisplacedSourceAuthority).prepared, classified.authenticated)
+					(!settlementSourceControl &&
+						!acceptedApplicationOperation(
+							displacedPayload,
+							displacedOperation,
+							classified.authenticated.admitted.logicalTime
+						)) ||
+					!hasBoundedDependencies(displacedPayload, classified.authenticated)
 				) {
 					return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
 				}
@@ -5538,8 +5732,14 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				return recoveryFailure("graph-rejected", "v3 current recovery graph is at capacity");
 			}
 			const authenticated = classified.authenticated;
+			const authorFence = isAuthorFenceOperation(authenticated.vertex.operation);
+			if (authorFence && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+				return recoveryFailure("admission-rejected", "v3 recovery fence profile is invalid");
+			}
+			const controlOperation = isControlOperation(authenticated.vertex.operation);
 			if (
-				!acceptedApplicationOperation(payload, authenticated.vertex.operation, authenticated.admitted.logicalTime) ||
+				(!controlOperation &&
+					!acceptedApplicationOperation(payload, authenticated.vertex.operation, authenticated.admitted.logicalTime)) ||
 				authenticated.vertex.dependencies.some(
 					(dependency) => ReflectApply(SetPrototypeHas, quarantinedDigests, [dependency]) === true
 				)
@@ -5573,8 +5773,14 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("authorization-rejected", "v3 recovery terminal sequence is invalid");
 				}
 			}
-			const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-			if (!alreadyRecovered && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
+			const candidate = controlOperation
+				? null
+				: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+			if (
+				!alreadyRecovered &&
+				!controlOperation &&
+				!validateLatchedOperation(authorization, latchedOperations, candidate)
+			) {
 				return recoveryFailure("authorization-rejected", "v3 recovery ACL operation is not authorized");
 			}
 			let updatedEpochBytes = epochBytes;
@@ -5588,12 +5794,13 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				}
 				updatedEpochBytes = nextBytes;
 			}
-			const reservation = alreadyRecovered
-				? undefined
-				: reserveOperation(
-						selectedOperationAdmissionPolicy,
-						authenticated.vertex.operation as Readonly<Record<string, unknown>>
-					);
+			const reservation =
+				alreadyRecovered || controlOperation
+					? undefined
+					: reserveOperation(
+							selectedOperationAdmissionPolicy,
+							authenticated.vertex.operation as Readonly<Record<string, unknown>>
+						);
 			if (reservation === null) {
 				return recoveryFailure("admission-rejected", "v3 recovery operation was rejected");
 			}
@@ -5623,13 +5830,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
 				}
-				retainApplicationVertex(
-					applicationVertices,
-					applicationAuthors,
-					authorVertexCounts,
-					authenticated,
-					applicationCharges
-				);
+				retainCloseVertex(closeVertices, closeAuthors, authorVertexCounts, authenticated, closeCharges);
+				if (isControlOperation(authenticated.vertex.operation)) controlVertices.add(authenticated.digest);
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -5768,13 +5970,14 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			capability,
 			ObjectFreeze({
 				authorVertexCounts,
-				applicationAuthors,
-				applicationCharges,
-				applicationVertices,
+				closeAuthors,
+				closeCharges,
+				closeVertices,
 				authorization,
 				classifyTerminalVertex:
 					typeof terminalClassifier === "function" ? (terminalClassifier as V3TerminalVertexClassifier) : undefined,
 				displacedSource,
+				controlVertices,
 				displacedIssuanceBoundary,
 				epochBytes,
 				historicalIssuance,
@@ -5817,6 +6020,7 @@ interface CapturedLocalIssueInput {
 		readonly logicalTime: number;
 		readonly operation: Readonly<Record<string, unknown>>;
 	}>[];
+	readonly planEffect?: NonNullable<DurableIssueCommit["planEffect"]>;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 }
 
@@ -5981,9 +6185,28 @@ function capturedLocalIssueInput(
 	payload: PreparedV3LivePayload,
 	rawInput: V3LocalIssueInput
 ): CapturedLocalIssueInput | V3LocalIssueResult {
-	const input = snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS);
+	const input =
+		snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS) ??
+		snapshotClosedRecord(rawInput, LOCAL_ISSUE_WITH_PLAN_EFFECT_KEYS);
 	if (input === undefined || typeof input.signRegisteredVertexDigest !== "function") {
 		return localIssueFailure("malformed-input", "v3 local issue input is invalid");
+	}
+	let planEffect: NonNullable<DurableIssueCommit["planEffect"]> | undefined;
+	if (ObjectGetOwnPropertyDescriptor(input, "planEffect") !== undefined) {
+		const fence = snapshotClosedRecord(input.planEffect, ["kind"]);
+		const replacement =
+			fence === undefined ? snapshotClosedRecord(input.planEffect, ["kind", "sourceSequence"]) : undefined;
+		if (fence?.kind === "fence") {
+			planEffect = ObjectFreeze({ kind: "fence" as const });
+		} else if (
+			replacement?.kind === "replacement" &&
+			NumberIsSafeInteger(replacement.sourceSequence) &&
+			(replacement.sourceSequence as number) >= 0
+		) {
+			planEffect = ObjectFreeze({ kind: "replacement" as const, sourceSequence: replacement.sourceSequence as number });
+		} else {
+			return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+		}
 	}
 	const values = denseArray(input.operations);
 	if (values === undefined || values.length === 0) {
@@ -6016,6 +6239,11 @@ function capturedLocalIssueInput(
 		if (typeof action !== "string") {
 			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
 		}
+		const settlementProfile = settlementProfileFor(payload.trust.trust.profileId);
+		const authorFence = action === AUTHOR_FENCE_ACTION;
+		if (authorFence && (settlementProfile !== "v1" || values.length !== 1 || planEffect !== undefined)) {
+			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+		}
 		if (
 			action === APPLICATION_BATCH_ACTION ||
 			action === "causalJoin" ||
@@ -6023,14 +6251,18 @@ function capturedLocalIssueInput(
 		) {
 			return localIssueFailure("authorization-rejected", "v3 local issue operation is reserved to the node");
 		}
-		if (typeof Reflect.get(payload.runtime.reducers, action) !== "function") {
+		if (!authorFence && typeof Reflect.get(payload.runtime.reducers, action) !== "function") {
 			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
 		}
 		priorLogicalTime = entry.logicalTime as number;
 		operations.push(ObjectFreeze({ logicalTime: priorLogicalTime, operation }));
 	}
+	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
+	}
 	return ObjectFreeze({
 		operations: ObjectFreeze(operations),
+		...(planEffect === undefined ? {} : { planEffect }),
 		signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
 	});
 }
@@ -6041,7 +6273,8 @@ async function issueOneVertex(
 	dependencies: readonly string[],
 	logicalTime: number,
 	operation: Readonly<Record<string, unknown>>,
-	requireTerminalAuthorization = false
+	requireTerminalAuthorization = false,
+	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>
 ): Promise<InternalLocalIssueResult> {
 	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
 	if (registration.operationAdmissionHalted) {
@@ -6061,11 +6294,15 @@ async function issueOneVertex(
 	if (authorized === undefined) {
 		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
 	}
-	const proposedAcl = aclOperation(scope.author, "0".repeat(64), operation);
-	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)) {
+	const controlOperation = isControlOperation(operation);
+	const proposedAcl = controlOperation ? null : aclOperation(scope.author, "0".repeat(64), operation);
+	if (
+		!controlOperation &&
+		!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)
+	) {
 		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
 	}
-	const reservation = reserveOperation(registration.operationAdmissionPolicy, operation);
+	const reservation = controlOperation ? undefined : reserveOperation(registration.operationAdmissionPolicy, operation);
 	if (reservation === null) {
 		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
 	}
@@ -6075,6 +6312,58 @@ async function issueOneVertex(
 	let signerResolved = false;
 	let terminalTransactionStarted = false;
 	try {
+		const transactWithPlanEffect = async (
+			selectedScope: DurableIssueScope,
+			buildAndSign: DurableBuildAndSign
+		): Promise<DurableIssueCommit> => {
+			const protocolCommit = (committed: DurableIssueCommit): DurableIssueCommit => {
+				if (planEffect === undefined) return committed;
+				return ObjectFreeze({
+					authorSequence: committed.authorSequence,
+					envelope: committed.envelope,
+					issuedRecord: committed.issuedRecord,
+					outboxEntry: committed.outboxEntry,
+				});
+			};
+			const commitOutsideTransaction = async (authorSequence: number): Promise<DurableIssueCommit> => {
+				if (planEffect?.kind === "fence" && Reflect.get(operation, "fenceSequence") !== authorSequence) {
+					throw new TypeError("v3 author fence does not match the issuance lineage");
+				}
+				const builtCommit = await buildAndSign(authorSequence);
+				const candidateCommit = planEffect === undefined ? builtCommit : ObjectFreeze({ ...builtCommit, planEffect });
+				const candidateRow = outboxRowSnapshot(
+					ObjectFreeze({ commit: candidateCommit, publishState: "pending" as const }),
+					selectedScope
+				);
+				if (
+					candidateRow !== undefined &&
+					!hasGraphCapacity(registration, selectedScope.author, candidateRow.canonicalPreimageBytes.byteLength)
+				) {
+					capacityRejected = true;
+					throw new TypeError("v3 local issue graph is at capacity");
+				}
+				return candidateCommit;
+			};
+			if (requireTerminalAuthorization) {
+				const lineage = await registration.issuanceStore.readLineage(selectedScope);
+				if (!NumberIsSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
+					throw new TypeError("v3 terminal issuance lineage is unavailable");
+				}
+				const expectedSequence = lineage.next;
+				const candidate = await commitOutsideTransaction(expectedSequence);
+				terminalTransactionStarted = true;
+				const committed = await registration.issuanceStore.transactIssue(selectedScope, (authorSequence) => {
+					if (authorSequence !== expectedSequence) {
+						throw new TypeError("v3 terminal issuance lineage changed");
+					}
+					return Promise.resolve(candidate as never);
+				});
+				return protocolCommit(committed);
+			}
+			return protocolCommit(
+				await registration.issuanceStore.transactIssue(selectedScope, commitOutsideTransaction as never)
+			);
+		};
 		const issuer = createAdmissionBoundTransactionalVertexIssuer({
 			author: scope.author,
 			preparedBlueprintAdmission: registration.payload.admission,
@@ -6084,48 +6373,49 @@ async function issueOneVertex(
 				signerResolved = true;
 				return signature;
 			},
-			transactIssue: async (selectedScope, buildAndSign) => {
-				const commitOutsideTransaction = async (authorSequence: number): Promise<unknown> => {
-					const candidateCommit = await buildAndSign(authorSequence);
-					const candidateRow = outboxRowSnapshot(
-						ObjectFreeze({ commit: candidateCommit, publishState: "pending" as const }),
-						selectedScope
-					);
-					if (
-						candidateRow !== undefined &&
-						!hasGraphCapacity(registration, selectedScope.author, candidateRow.canonicalPreimageBytes.byteLength)
-					) {
-						capacityRejected = true;
-						throw new TypeError("v3 local issue graph is at capacity");
-					}
-					return candidateCommit;
-				};
-				if (requireTerminalAuthorization) {
-					const lineage = await registration.issuanceStore.readLineage(selectedScope);
-					if (!NumberIsSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
-						throw new TypeError("v3 terminal issuance lineage is unavailable");
-					}
-					const expectedSequence = lineage.next;
-					const candidate = await commitOutsideTransaction(expectedSequence);
-					terminalTransactionStarted = true;
-					return registration.issuanceStore.transactIssue(selectedScope, (authorSequence) => {
-						if (authorSequence !== expectedSequence) {
-							throw new TypeError("v3 terminal issuance lineage changed");
-						}
-						return Promise.resolve(candidate as never);
-					});
+			transactIssue: transactWithPlanEffect,
+		});
+		if (planEffect?.kind === "fence") {
+			commit = await transactWithPlanEffect(scope, async (authorSequence) => {
+				const canonicalPreimageBytes = encodeCanonical(
+					ObjectFreeze({
+						anchor: registration.payload.provenance.anchorDigest,
+						author: scope.author,
+						authorSequence,
+						dependencies: ObjectFreeze([...dependencies].sort()),
+						epoch: registration.payload.provenance.epoch,
+						kind: "drp-vertex",
+						logicalTime,
+						objectId: registration.payload.provenance.objectId,
+						operation,
+						protocolMajor: 3,
+					})
+				);
+				const digest = hashDomain(V3_VERTEX_DOMAIN, canonicalPreimageBytes);
+				const signed = await input.signRegisteredVertexDigest(new Uint8ArrayConstructor(digest));
+				signerResolved = true;
+				const signature = copyDetachedBytes(signed);
+				if (signature === undefined || signature.byteLength !== 64) {
+					throw new TypeError("v3 author fence signature is invalid");
 				}
-				return registration.issuanceStore.transactIssue(selectedScope, commitOutsideTransaction as never);
-			},
-		});
-		commit = await issuer.issue({
-			anchor: registration.payload.provenance.anchorDigest,
-			dependencies,
-			epoch: registration.payload.provenance.epoch,
-			logicalTime,
-			objectId: registration.payload.provenance.objectId,
-			operation,
-		});
+				const envelope = ObjectFreeze({ canonicalPreimageBytes, digest, signature });
+				return ObjectFreeze({
+					authorSequence,
+					envelope,
+					issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
+					outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
+				});
+			});
+		} else {
+			commit = await issuer.issue({
+				anchor: registration.payload.provenance.anchorDigest,
+				dependencies,
+				epoch: registration.payload.provenance.epoch,
+				logicalTime,
+				objectId: registration.payload.provenance.objectId,
+				operation,
+			});
+		}
 	} catch (error) {
 		const issuanceOutcomeUnknown =
 			error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
@@ -6133,6 +6423,9 @@ async function issueOneVertex(
 			releaseOperationReservation(reservation);
 		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
 			registration.operationAdmissionHalted = true;
+		}
+		if (issuanceOutcomeUnknown) {
+			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
 		}
 		if (requireTerminalAuthorization && terminalTransactionStarted) {
 			return internalLocalIssueFailure(
@@ -6246,13 +6539,14 @@ async function issueOneVertex(
 	} catch {
 		return committedFailure("graph-rejected", "v3 local issue graph append failed");
 	}
-	retainApplicationVertex(
-		registration.applicationVertices,
-		registration.applicationAuthors,
+	retainCloseVertex(
+		registration.closeVertices,
+		registration.closeAuthors,
 		registration.authorVertexCounts,
 		authenticated,
-		registration.applicationCharges
+		registration.closeCharges
 	);
+	if (controlOperation) registration.controlVertices.add(authenticated.digest);
 	registration.graphVersion += 1;
 	if (acceptedAcl !== null && acceptedAcl !== undefined) {
 		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
@@ -6262,7 +6556,7 @@ async function issueOneVertex(
 		return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
 	}
 	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
-	if (currentRegistration(registration)) {
+	if (currentRegistration(registration) && !controlOperation) {
 		try {
 			const disposition = await registration.onAdmittedVertex(
 				ObjectFreeze({
@@ -6283,6 +6577,49 @@ async function issueOneVertex(
 	});
 }
 
+async function issueAuthorFence(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput
+): Promise<V3LocalIssueResult> {
+	if (settlementProfileFor(registration.payload.trust.trust.profileId) !== "v1") {
+		return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+	}
+	const first = input.operations[0];
+	if (input.operations.length !== 1 || first === undefined || !isAuthorFenceOperation(first.operation)) {
+		return localIssueFailure("malformed-input", "v3 author fence input is invalid");
+	}
+	let plan;
+	try {
+		plan = await registration.issuanceStore.readSettlementPlan(registration.issuanceScope);
+	} catch {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("issuance-rejected", "v3 author fence plan read failed");
+	}
+	if (
+		plan === null ||
+		plan.fenceSequence !== null ||
+		plan.entries.some((entry) => entry.disposition === "manual-review")
+	) {
+		return localIssueFailure("issuance-rejected", "v3 author fence requires a complete durable plan");
+	}
+	// issueOneVertex owns the transactIssue call; this dedicated path supplies the atomic fence planEffect.
+	const tips = registration.index.tips();
+	if (tips.length === 0 || tips.length > registration.payload.parameters.maxDependencies) {
+		return localIssueFailure("graph-rejected", "v3 author fence frontier is invalid");
+	}
+	const issued = await issueOneVertex(
+		registration,
+		input,
+		tips,
+		first.logicalTime,
+		first.operation,
+		false,
+		ObjectFreeze({ kind: "fence" as const })
+	);
+	if (issued.ok) await drainPendingIngress(registration);
+	return issued;
+}
+
 async function issueLocal(
 	registration: V3PlaneRegistration,
 	input: CapturedLocalIssueInput
@@ -6297,6 +6634,13 @@ async function issueLocal(
 	}
 	const first = input.operations[0];
 	if (first === undefined) return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
+	if (isAuthorFenceOperation(first.operation)) return issueAuthorFence(registration, input);
+	if (
+		input.planEffect !== undefined &&
+		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+	) {
+		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+	}
 	let applicationOperation = first.operation;
 	if (input.operations.length > 1) {
 		if (typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") {
@@ -6337,7 +6681,15 @@ async function issueLocal(
 	for (;;) {
 		const tips = registration.index.tips();
 		if (tips.length <= maxDependencies) {
-			const issued = await issueOneVertex(registration, input, tips, first.logicalTime, applicationOperation);
+			const issued = await issueOneVertex(
+				registration,
+				input,
+				tips,
+				first.logicalTime,
+				applicationOperation,
+				false,
+				input.planEffect
+			);
 			if (issued.ok) await drainPendingIngress(registration);
 			return issued;
 		}
@@ -6375,7 +6727,8 @@ type ClassifiedRebaseRow = Readonly<{
 
 function classifyRebaseRow(
 	registration: V3PlaneRegistration,
-	row: SnapshottedOutboxRow
+	row: SnapshottedOutboxRow,
+	settlementFrontier?: SettlementFrontierContext
 ): ClassifiedRebaseRow | undefined {
 	const classified = classifyPlaneVertex(
 		registration.payload,
@@ -6388,7 +6741,8 @@ function classifyRebaseRow(
 		row.signature,
 		row.digest,
 		row.scope.author,
-		row.authorSequence
+		row.authorSequence,
+		settlementFrontier
 	);
 	return classified === undefined ? undefined : ObjectFreeze({ ...classified, row });
 }
@@ -6400,15 +6754,16 @@ function validRebaseRow(registration: V3PlaneRegistration, classified: Classifie
 			? registration.payload
 			: historical
 				? registration.payload
-				: registration.displacedSource?.prepared;
+				: (registration.displacedSource?.prepared ?? registration.payload);
+	if (source === undefined || !hasBoundedDependencies(source, classified.authenticated)) return false;
+	const operation = classified.authenticated.vertex.operation;
+	if (operation === undefined) return false;
+	const settlementSourceControl =
+		settlementProfileFor(registration.payload.trust.trust.profileId) === "v1" &&
+		(isControlOperation(operation) || Reflect.get(operation, "action") === "acl");
 	return (
-		source !== undefined &&
-		acceptedApplicationOperation(
-			source,
-			classified.authenticated.vertex.operation,
-			classified.authenticated.admitted.logicalTime
-		) &&
-		hasBoundedDependencies(source, classified.authenticated)
+		settlementSourceControl ||
+		acceptedApplicationOperation(source, operation, classified.authenticated.admitted.logicalTime)
 	);
 }
 
@@ -6432,7 +6787,14 @@ function rebaseIntents(
 			ObjectFreeze({ ...entry, operationCount: batch.length, operationIndex })
 		);
 	}
-	if (typeof action === "string" && isReservedBatchAction(action)) return ObjectFreeze([]);
+	if (
+		isControlOperation(sourceOperation) ||
+		(typeof action === "string" &&
+			isReservedBatchAction(action) &&
+			settlementProfileFor(payload.trust.trust.profileId) !== "v1")
+	) {
+		return ObjectFreeze([]);
+	}
 	const operation = detachedCanonicalOperation(sourceOperation);
 	return operation === undefined
 		? undefined
@@ -6450,18 +6812,23 @@ async function authenticatedOutboxRow(
 	registration: V3PlaneRegistration,
 	rawRow: unknown,
 	issuanceStore: DurableIssuanceStore = registration.issuanceStore,
-	issuanceScope: DurableIssueScope = registration.issuanceScope
+	issuanceScope: DurableIssueScope = registration.issuanceScope,
+	settlementFrontier?: SettlementFrontierContext
 ): Promise<ClassifiedRebaseRow | undefined> {
 	const row = outboxRowSnapshot(rawRow, issuanceScope);
 	if (row === undefined) return undefined;
 	const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
 	const issuedRow = outboxRowSnapshot(ObjectFreeze({ commit: issued, publishState: row.publishState }), issuanceScope);
 	return issuedRow !== undefined && matchingOutboxRows(row, issuedRow)
-		? classifyRebaseRow(registration, row)
+		? classifyRebaseRow(registration, row, settlementFrontier)
 		: undefined;
 }
 
-async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3RebaseOutboxResult> {
+async function readRebaseOutbox(
+	registration: V3PlaneRegistration,
+	includePublishedSources = false,
+	settlementFrontier?: SettlementFrontierContext
+): Promise<V3RebaseOutboxResult> {
 	if (!currentRegistration(registration)) {
 		return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
 	}
@@ -6506,7 +6873,7 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 			if (page === null) break;
 			let classified: ClassifiedRebaseRow | undefined;
 			try {
-				classified = await authenticatedOutboxRow(registration, page, selectedStore, selectedScope);
+				classified = await authenticatedOutboxRow(registration, page, selectedStore, selectedScope, settlementFrontier);
 			} catch {
 				return ObjectFreeze({
 					detail: "v3 rebase outbox record read failed",
@@ -6522,6 +6889,16 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 				});
 			}
 			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, classified.row.authorSequence] as const);
+			if (settlementFrontier !== undefined) {
+				const ownRowClass = settlementOwnRowClass(
+					classified.authenticated.admitted.epoch,
+					settlementFrontier.currentEpoch,
+					classified.row.authorSequence,
+					settlementFrontier.admissionEpoch,
+					settlementFrontier.terminalThrough
+				);
+				if (ownRowClass === "terminal" || ownRowClass === "old-incarnation") continue;
+			}
 			const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
 			if (historical && !countHistoricalIssuanceRow(registration.historicalIssuance, classified.row.authorSequence)) {
 				return ObjectFreeze({
@@ -6550,12 +6927,11 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 				});
 			}
 			if (classified.kind === "displaced" || historical) {
-				if (historical && classified.row.publishState === "published") continue;
-				if (crossSource === undefined && classified.row.publishState !== "pending") continue;
-				const intents = rebaseIntents(
-					historical ? registration.payload : (registration.displacedSource as V3DisplacedSourceAuthority).prepared,
-					classified.authenticated
-				);
+				if (!includePublishedSources && historical && classified.row.publishState === "published") continue;
+				if (!includePublishedSources && crossSource === undefined && classified.row.publishState !== "pending")
+					continue;
+				const displacedPayload = registration.displacedSource?.prepared ?? registration.payload;
+				const intents = rebaseIntents(historical ? registration.payload : displacedPayload, classified.authenticated);
 				if (intents === undefined) {
 					return ObjectFreeze({
 						detail: "v3 rebase outbox intent is invalid",
@@ -6565,16 +6941,15 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 				}
 				if (
 					!historical &&
-					crossSource !== undefined &&
 					(classified.row.authorSequence === 0 ||
-						classified.authenticated.digest === crossSource.activationVertexDigest)
+						(crossSource !== undefined && classified.authenticated.digest === crossSource.activationVertexDigest))
 				) {
 					continue;
 				}
 				displacedRecordCount += 1;
 				const displacedLimit = historical
 					? registration.payload.parameters.maxEpochVertices
-					: (registration.displacedSource as V3DisplacedSourceAuthority).prepared.parameters.maxEpochVertices;
+					: displacedPayload.parameters.maxEpochVertices;
 				if (displacedRecordCount > displacedLimit) {
 					return ObjectFreeze({
 						detail: "v3 rebase displaced plane is at capacity",
@@ -6593,9 +6968,12 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 	);
 	if (selected === undefined) return ObjectFreeze({ kind: "empty" as const, ok: true as const });
 	registration.rebaseCursor = selected.row.authorSequence;
-	const source = registration.displacedSource as V3DisplacedSourceAuthority;
+	const source = registration.displacedSource;
 	const historical = selected.kind === "covered-historical" || selected.kind === "pinned-genesis";
-	const intents = rebaseIntents(historical ? registration.payload : source.prepared, selected.authenticated);
+	const intents = rebaseIntents(
+		historical ? registration.payload : (source?.prepared ?? registration.payload),
+		selected.authenticated
+	);
 	if (intents === undefined) {
 		return ObjectFreeze({
 			detail: "v3 rebase outbox intent is invalid",
@@ -6609,7 +6987,7 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 		intents: ObjectFreeze(intents),
 		vertexDigest: selected.authenticated.digest,
 	};
-	return source.issuanceStore === undefined
+	return source?.issuanceStore === undefined
 		? ObjectFreeze({
 				kind: "displaced" as const,
 				ok: true as const,
@@ -6746,6 +7124,9 @@ async function completeRebaseSource(
 	input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
 ): Promise<V3EgressResult> {
 	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+	if (settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
+		return egressFailure("not-active", "v3 displaced source completion is unavailable under settlement");
+	}
 	if (
 		!NumberIsSafeInteger(input.authorSequence) ||
 		input.authorSequence < 0 ||
@@ -7132,9 +7513,10 @@ function signedInitialStateDigest(payload: PreparedV3LivePayload): string | unde
 
 function applicationProjectionVertices(
 	source: Map<string, EpochVertex>,
+	controlVertices: ReadonlySet<string>,
 	causality: CausalityIndex
 ): Map<string, EpochVertex> | undefined {
-	const projected = copyApplicationVertices(source);
+	const projected = copyCloseVertices(source);
 	if (projected === undefined) return undefined;
 	const resolvedFences = new IntrinsicMap<string, readonly string[]>();
 	const minimalDependencies = (dependencies: readonly string[]): readonly string[] => {
@@ -7155,7 +7537,7 @@ function applicationProjectionVertices(
 			ReflectApply(SetPrototypeAdd, visited, [selectedDigest]);
 			const vertex = ReflectApply(MapPrototypeGet, projected, [selectedDigest]) as EpochVertex | undefined;
 			if (vertex === undefined) return undefined;
-			if (isAuthorFenceOperation(vertex.operation)) pending.push(...vertex.dependencies);
+			if (ReflectApply(SetPrototypeHas, controlVertices, [selectedDigest])) pending.push(...vertex.dependencies);
 			else expanded.push(selectedDigest);
 		}
 		const result = minimalDependencies(expanded);
@@ -7163,7 +7545,7 @@ function applicationProjectionVertices(
 		return result;
 	};
 	for (const [digest, vertex] of projected) {
-		if (isAuthorFenceOperation(vertex.operation)) continue;
+		if (ReflectApply(SetPrototypeHas, controlVertices, [digest])) continue;
 		const dependencies: string[] = [];
 		for (const dependency of vertex.dependencies) {
 			const selected = resolveDependency(dependency);
@@ -7175,8 +7557,8 @@ function applicationProjectionVertices(
 			ObjectFreeze({ ...vertex, dependencies: minimalDependencies(dependencies) }),
 		]);
 	}
-	for (const [digest, vertex] of projected) {
-		if (isAuthorFenceOperation(vertex.operation)) ReflectApply(MapPrototypeDelete, projected, [digest]);
+	for (const [digest] of projected) {
+		if (ReflectApply(SetPrototypeHas, controlVertices, [digest])) ReflectApply(MapPrototypeDelete, projected, [digest]);
 	}
 	return projected;
 }
@@ -7194,13 +7576,17 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 	const graphVersion = registration.graphVersion;
 	let staged;
 	try {
-		const vertices = applicationProjectionVertices(registration.applicationVertices, registration.index);
+		const vertices = applicationProjectionVertices(
+			registration.closeVertices,
+			registration.controlVertices,
+			registration.index
+		);
 		if (vertices === undefined) return blueprintFoldFailure("fold-rejected", "v3 blueprint graph is unavailable");
 		staged = foldBlueprintEpoch({
 			anchorHash: registration.payload.provenance.anchorDigest,
 			authorize: ({ hash }) => {
-				const identity = ReflectApply(MapPrototypeGet, registration.applicationAuthors, [hash]) as
-					| ApplicationVertexIdentity
+				const identity = ReflectApply(MapPrototypeGet, registration.closeAuthors, [hash]) as
+					| CloseVertexIdentity
 					| undefined;
 				return identity !== undefined && isV3ApplicationAuthorAuthorized(registration.authorization, identity.author);
 			},
@@ -7587,9 +7973,9 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 		},
 		captureCloseGraph: () => {
 			if (!currentRegistration(registration) || !registration.blueprintFolded) return undefined;
-			const vertices = copyApplicationVertices(registration.applicationVertices);
-			const authors = copyApplicationAuthors(registration.applicationAuthors);
-			const charges = new IntrinsicMap<string, number>(registration.applicationCharges);
+			const vertices = copyCloseVertices(registration.closeVertices);
+			const authors = copyCloseAuthors(registration.closeAuthors);
+			const charges = new IntrinsicMap<string, number>(registration.closeCharges);
 			ReflectApply(MapPrototypeDelete, charges, [registration.payload.provenance.anchorDigest]);
 			if (
 				vertices === undefined ||
@@ -7692,7 +8078,13 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 				? Promise.resolve(
 						ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const })
 					)
-				: enqueueRegistrationTask(registration, () => () => readRebaseOutbox(registration)),
+				: enqueueRegistrationTask(
+						registration,
+						() => () =>
+							settlementProfileFor(registration.payload.trust.trust.profileId) === "v1"
+								? readSettlementSources(registration)
+								: readRebaseOutbox(registration)
+					),
 		completeRebaseSource: (
 			input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
 		): Promise<V3EgressResult> =>
@@ -7885,9 +8277,9 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			registration = {
 				active: true,
 				authorVertexCounts: recovered.authorVertexCounts,
-				applicationAuthors: recovered.applicationAuthors,
-				applicationCharges: recovered.applicationCharges,
-				applicationVertices: recovered.applicationVertices,
+				closeAuthors: recovered.closeAuthors,
+				closeCharges: recovered.closeCharges,
+				closeVertices: recovered.closeVertices,
 				authorization: recovered.authorization,
 				blueprintClosing: mode === "snapshot-closed",
 				blueprintFolded: mode === "snapshot-closed",
@@ -7895,13 +8287,14 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				blueprintMachine: snapshotMachine,
 				blueprintMachineIdentity,
 				classifyTerminalVertex: recovered.classifyTerminalVertex,
+				controlVertices: recovered.controlVertices,
 				displacedIssuanceBoundary: recovered.displacedIssuanceBoundary,
 				displacedSource: recovered.displacedSource,
 				drainingPendingIngress: false,
 				epochBytes: recovered.epochBytes,
 				exactCanonicalPinnedGenesisBootstrapOperationBytes:
 					recovered.exactCanonicalPinnedGenesisBootstrapOperationBytes,
-				graphVersion: intrinsicMapSize(recovered.applicationAuthors) ?? -1,
+				graphVersion: intrinsicMapSize(recovered.closeAuthors) ?? -1,
 				handle: undefined as unknown as V3PlaneHandle,
 				hotPredecessor: undefined,
 				historicalIssuance: recovered.historicalIssuance,
@@ -8236,6 +8629,14 @@ export function republishV3RetainedTo(handle: V3PlaneHandle, targetPeerId: strin
 		return Promise.resolve(egressFailure("not-active", "v3 retained target is unavailable"));
 	}
 	return enqueueTargetedRetainedPublication(registration, targetPeerId);
+}
+
+async function readSettlementSources(
+	registration: V3PlaneRegistration,
+	settlementFrontier?: SettlementFrontierContext
+): Promise<V3RebaseOutboxResult> {
+	// Until the checkpoint/room owner supplies its verified frontier, retain every authenticated source candidate.
+	return readRebaseOutbox(registration, true, settlementFrontier);
 }
 
 export { prepareV3LiveGeneration };

@@ -70,6 +70,10 @@
 			"types": "./dist/src/internal/creator-issuance-retirement-signing-request.d.ts",
 			"import": "./dist/src/internal/creator-issuance-retirement-signing-request.js"
 		},
+		"./internal/received-vertex-authentication": {
+			"types": "./dist/src/internal/received-vertex-authentication.d.ts",
+			"import": "./dist/src/internal/received-vertex-authentication.js"
+		},
 		"./internal/seal-authority-identity": {
 			"types": "./dist/src/internal/seal-authority-identity.d.ts",
 			"import": "./dist/src/internal/seal-authority-identity.js"
