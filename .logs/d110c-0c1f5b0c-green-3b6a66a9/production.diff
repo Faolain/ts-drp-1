@@ -1,0 +1,265 @@
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index 3983a066..939665a0 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -1569,6 +1569,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	const invite =
+ 		typeof input.creatorInvite === "string" ? input.creatorInvite : encodeCreatorInvite(input.creatorInvite);
+ 	const material = decodeCreatorInvite(invite);
++	const profileCarrier = decodeCanonical(material.exactCanonicalProfileBytes, {
++		maxBytes: 65_536,
++		maxDepth: 4,
++		maxItems: 128,
++	});
++	const profileId =
++		profileCarrier !== null && typeof profileCarrier === "object" && !Array.isArray(profileCarrier)
++			? Reflect.get(profileCarrier, "profileId")
++			: undefined;
++	const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
+ 	const sourceInvite = input.rebaseSourceInvite;
+ 	const sourceMaterial =
+ 		sourceInvite === undefined
+@@ -1979,6 +1989,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	let creatorSuccessorAdoptionTask: Promise<void> | undefined;
+ 	let redirectedSession: V3RoomSession<Projection> | undefined;
+ 	let redirectPromise: Promise<V3RoomSession<Projection>> | undefined;
++	let releaseSettlementHold: (() => void) | undefined;
++	const settlementHold = new Promise<void>((resolve) => {
++		releaseSettlementHold = resolve;
++	});
+ 	let retainedBootstrapReady = !retainedBootstrapHeld;
+ 	let resolveRetainedBootstrap: (() => void) | undefined;
+ 	let rejectRetainedBootstrap: ((reason: unknown) => void) | undefined;
+@@ -2815,6 +2829,191 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		publishState?: "pending" | "published";
+ 		vertexDigest: string;
+ 	}>;
++	type RoomSettlementPlan = NonNullable<Awaited<ReturnType<typeof issuanceStore.readSettlementPlan>>>;
++	type RoomSettlementPlanEntry = RoomSettlementPlan["entries"][number];
++	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
++	const sameSettlementEntry = (left: RoomSettlementPlanEntry, right: RoomSettlementPlanEntry): boolean =>
++		left.sourceSequence === right.sourceSequence &&
++		left.disposition === right.disposition &&
++		left.replacementSequence === right.replacementSequence &&
++		sameBytes(left.sourceDigest, right.sourceDigest);
++	const settlementDisposition = (source: DisplacedSource): RoomSettlementPlanEntry["disposition"] | undefined => {
++		if (source.intents.length === 0) return undefined;
++		const policies = source.intents.map((intent) => {
++			const operation = detachedRoomOperation(intent.operation);
++			const action = operation === undefined ? undefined : Reflect.get(operation, "action");
++			if (operation === undefined || typeof action !== "string") {
++				throw new TypeError("v3 room displaced operation is invalid");
++			}
++			const policy = input.application.displacementPolicies[action];
++			if (policy === undefined) throw new TypeError("v3 room displacement policy is unavailable");
++			const identity = input.application.displacedOperationIdentity(operation);
++			if (
++				typeof identity !== "string" ||
++				identity.length === 0 ||
++				input.application.displacedOperationIdentity(operation) !== identity
++			) {
++				throw new TypeError("v3 room displaced operation identity is invalid");
++			}
++			return policy;
++		});
++		if (redirectSource !== undefined || policies.includes("manual-review")) return "manual-review";
++		if (policies.every((policy) => policy === "expire")) return "expire";
++		return policies.includes("transform") ? "transform" : "rebase";
++	};
++	const writeMergedSettlementPlan = async (sources: readonly DisplacedSource[]): Promise<RoomSettlementPlan> => {
++		const current = await issuanceStore.readSettlementPlan(settlementScope);
++		const priorEntries = new Map(current?.entries.map((entry) => [entry.sourceSequence, entry] as const));
++		const entries: RoomSettlementPlanEntry[] = [];
++		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
++			const disposition = settlementDisposition(source);
++			if (disposition === undefined) continue;
++			const sourceDigest = bytes(source.vertexDigest);
++			if (sourceDigest.byteLength !== 32) throw new TypeError("v3 room displaced source digest is invalid");
++			const prior = priorEntries.get(source.authorSequence);
++			if (prior !== undefined && (!sameBytes(prior.sourceDigest, sourceDigest) || prior.disposition !== disposition)) {
++				throw new TypeError("v3 room settlement plan source differs");
++			}
++			entries.push(
++				Object.freeze({
++					disposition,
++					replacementSequence: prior?.replacementSequence ?? null,
++					sourceDigest,
++					sourceSequence: source.authorSequence,
++				})
++			);
++		}
++		const displacedSequences = new Set(sources.map((source) => source.authorSequence));
++		const fenceSequence =
++			current?.fenceSequence !== null &&
++			current?.fenceSequence !== undefined &&
++			displacedSequences.has(current.fenceSequence)
++				? null
++				: (current?.fenceSequence ?? null);
++		const unchanged =
++			current !== null &&
++			current.fenceSequence === fenceSequence &&
++			current.entries.length === entries.length &&
++			current.entries.every((entry, index) => {
++				const candidate = entries[index];
++				return candidate !== undefined && sameSettlementEntry(entry, candidate);
++			});
++		if (unchanged) return current;
++		const expectedRevision = current?.revision ?? null;
++		const plan = Object.freeze({
++			entries: Object.freeze(entries),
++			fenceSequence,
++			revision: expectedRevision === null ? 0 : expectedRevision + 1,
++			scope: settlementScope,
++		});
++		return issuanceStore.transactWriteSettlementPlan({ expectedRevision, plan, scope: settlementScope });
++	};
++	const readSettlementEffect = async (
++		effect: Readonly<{ readonly kind: "fence" } | { readonly kind: "replacement"; readonly sourceSequence: number }>
++	): Promise<boolean> => {
++		const plan = await issuanceStore.readSettlementPlan(settlementScope);
++		if (plan === null) return false;
++		if (effect.kind === "fence") return plan.fenceSequence !== null;
++		return plan.entries.some(
++			(entry) => entry.sourceSequence === effect.sourceSequence && entry.replacementSequence !== null
++		);
++	};
++	const issueSettlement = async (
++		operations: readonly Readonly<{
++			readonly logicalTime: number;
++			readonly operation: Readonly<Record<string, unknown>>;
++		}>[],
++		effect: Readonly<{ readonly kind: "fence" } | { readonly kind: "replacement"; readonly sourceSequence: number }>
++	): Promise<void> => {
++		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
++		const issued = await activeHandle.issueLocal({
++			operations: Object.freeze(operations),
++			...(effect.kind === "replacement" ? { planEffect: effect } : {}),
++			signRegisteredVertexDigest: input.signRegisteredVertexDigest,
++		} as Parameters<RoomPlaneHandle["issueLocal"]>[0]);
++		if (!issued.ok) {
++			const linked = await readSettlementEffect(effect);
++			throw new TypeError(
++				linked
++					? `v3 room settlement issue outcome is unknown: ${issued.kind}`
++					: `v3 room settlement issue failed: ${issued.kind}`
++			);
++		}
++		await publishAccepted();
++	};
++	const drainSettlementOutbox = async (sources: readonly DisplacedSource[]): Promise<void> => {
++		let plan = await writeMergedSettlementPlan(sources);
++		if (plan.entries.some((entry) => entry.disposition === "manual-review")) {
++			await settlementHold;
++			return;
++		}
++		if (plan.fenceSequence === null) {
++			const lineage = await issuanceStore.readLineage(settlementScope);
++			if (!Number.isSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
++				throw new TypeError("v3 room settlement fence lineage is unavailable");
++			}
++			const fenceLogicalTime = logicalTime;
++			logicalTime += 2;
++			await issueSettlement(
++				Object.freeze([
++					Object.freeze({
++						logicalTime: fenceLogicalTime,
++						operation: Object.freeze({
++							action: "$drp.author-fence.v1",
++							fenceSequence: lineage.next,
++							version: 1,
++						}),
++					}),
++				]),
++				Object.freeze({ kind: "fence" })
++			);
++			plan = (await issuanceStore.readSettlementPlan(settlementScope)) ?? plan;
++		}
++		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
++		for (const entry of plan.entries) {
++			if (entry.disposition === "expire" || entry.replacementSequence !== null) continue;
++			const source = sourceBySequence.get(entry.sourceSequence);
++			if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
++			const operations = source.intents.flatMap((intent) => {
++				const operation = detachedRoomOperation(intent.operation);
++				const action = operation === undefined ? undefined : Reflect.get(operation, "action");
++				if (operation === undefined || typeof action !== "string") {
++					throw new TypeError("v3 room displaced operation is invalid");
++				}
++				const policy = input.application.displacementPolicies[action];
++				if (policy === "expire") return [];
++				if (policy !== "rebase" && policy !== "transform") {
++					throw new TypeError("v3 room settlement replacement policy is invalid");
++				}
++				let selected = operation;
++				if (policy === "transform") {
++					const transform = input.application.transformDisplacedOperation;
++					if (transform === undefined) throw new TypeError("v3 room displaced transform is unavailable");
++					const first = detachedRoomOperation(transform(operation));
++					const second = detachedRoomOperation(transform(operation));
++					const identity = input.application.displacedOperationIdentity(operation);
++					if (
++						first === undefined ||
++						second === undefined ||
++						!sameBytes(encodeCanonical(first), encodeCanonical(second)) ||
++						Reflect.get(first, "action") !== action ||
++						input.application.displacedOperationIdentity(first) !== identity
++					) {
++						throw new TypeError("v3 room displaced transform is unstable");
++					}
++					selected = first;
++				}
++				const selectedLogicalTime = logicalTime;
++				logicalTime += 2;
++				return [Object.freeze({ logicalTime: selectedLogicalTime, operation: selected })];
++			});
++			if (operations.length === 0) throw new TypeError("v3 room settlement replacement is empty");
++			await issueSettlement(
++				Object.freeze(operations),
++				Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence })
++			);
++		}
++	};
+ 	const drainRebaseOutbox = async (): Promise<void> => {
+ 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+ 		const sources: DisplacedSource[] = [];
+@@ -2832,7 +3031,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			) {
+ 				throw new TypeError("v3 room rebase outbox did not advance");
+ 			}
+-			if (page.source.intents.length === 0 && page.source.publishState !== "published") {
++			if (
++				settlementProfile === "none" &&
++				page.source.intents.length === 0 &&
++				page.source.publishState !== "published"
++			) {
+ 				const completed = await activeHandle.completeRebaseSource({
+ 					authorSequence: page.source.authorSequence,
+ 					digest: page.source.vertexDigest,
+@@ -2840,6 +3043,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 				if (!completed.ok) throw new TypeError(`v3 room rebase completion failed: ${completed.kind}`);
+ 			}
+ 		}
++		if (settlementProfile === "v1") {
++			await drainSettlementOutbox(sources);
++			return;
++		}
+ 		const acceptedRows = acceptedIdentityRows();
+ 		const migrationImportRows = migrationImportIdentityRows();
+ 		if (redirectSource === undefined && sourceMaterial !== undefined) {
+@@ -2999,7 +3206,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		}
+ 	};
+ 	const rebasePromise =
+-		sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
++		settlementProfile === "none" && sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
+ 			? Promise.resolve()
+ 			: Promise.resolve().then(async () => {
+ 					await waitForRetainedBootstrap();
+@@ -3778,6 +3985,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		if (sessionCloseTask !== undefined) return sessionCloseTask;
+ 		closed = true;
+ 		cancelRedirectCreation();
++		releaseSettlementHold?.();
+ 		const task = (async (): Promise<void> => {
+ 			let primaryFailure: unknown;
+ 			let primaryFailed = false;
