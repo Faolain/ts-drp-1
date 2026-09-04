@@ -99029,7 +99029,7 @@ matrix. Deadline: implemented and retained before f5b, parent 0c1/0c, the
 The exact design is `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, pinning
 signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its two-entry
 self-excluding manifest `manifest.sha256` records design SHA-256
-`82f3ce0f7b31a1387164d8a6e5a83b55f0f2c3f045c9d607d98b33965cbbf099` and
+`f906810ee738d20c6e2d414d6dfbb43ec4a80e3bf86ab51fffd94644d99fefa7` and
 pre-review SHA-256
 `8784104f0753b45b5a3b8906cb9313ebc4786746e13b40beeaa58154aa6282b0`. The
 sibling `pre-review.md` is a read-only consistency pass by one Fable 5.1
@@ -99097,8 +99097,9 @@ authorized by their predecessors' GREEN in the dependency order above. Each
 slice keeps its causal tests-only RED before GREEN with focused, static,
 retained and isolated gates, signed commits and pushed refs. Stop rules are
 unchanged: a finding during RED/GREEN that the checkpoint-carried
-`admissionEpoch` is insufficient falls back to `admissionEpoch` in a version-3
-latched-ACL member record, never to the dictionary; a finding against
+`admissionEpoch` is insufficient falls back to `admissionEpoch` in a later
+latched-ACL member-record version (version 4 in D.110c-0c1k W2; version 3 is
+W1's constants-only bump), never to the dictionary; a finding against
 contiguity, plan authority or anchor fencing stops and reslices rather than
 reintroducing the per-source grammar or the global floor. P2 findings receive
 an owner/disposition without prose-only recursion.
