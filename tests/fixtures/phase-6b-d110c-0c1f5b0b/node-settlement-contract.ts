@@ -1,7 +1,7 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DurableIssuanceStore, DurableIssueScope, SettlementPlan } from "@ts-drp/issuance-store";
 import { MessageQueueManager } from "@ts-drp/message-queue";
-import { openAuthorFenceOperation, verifyEd25519RegisteredDigest } from "@ts-drp/protocol-v3";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,6 +22,36 @@ import { createGenuinePreparedV3Fixture } from "../phase-3a1b-p3/live-fixture.js
 import { fakeNetwork, recover } from "../phase-4b-v3/live-snapshot.js";
 
 export const AUTHOR_FENCE_ACTION = "$drp.author-fence.v1";
+
+function isExactFenceOperation(value: unknown, fenceSequence: number): boolean {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+	const prototype = Object.getPrototypeOf(value) as object | null;
+	if (prototype !== Object.prototype && prototype !== null) return false;
+	const keys = Reflect.ownKeys(value);
+	if (
+		keys.length !== 3 ||
+		!keys.every((key) => typeof key === "string" && ["action", "fenceSequence", "version"].includes(key))
+	) {
+		return false;
+	}
+	const action = Object.getOwnPropertyDescriptor(value, "action");
+	const sequence = Object.getOwnPropertyDescriptor(value, "fenceSequence");
+	const version = Object.getOwnPropertyDescriptor(value, "version");
+	return (
+		action !== undefined &&
+		Object.hasOwn(action, "value") &&
+		action.enumerable === true &&
+		action.value === AUTHOR_FENCE_ACTION &&
+		sequence !== undefined &&
+		Object.hasOwn(sequence, "value") &&
+		sequence.enumerable === true &&
+		sequence.value === fenceSequence &&
+		version !== undefined &&
+		Object.hasOwn(version, "value") &&
+		version.enumerable === true &&
+		version.value === 1
+	);
+}
 
 export interface OpenSettlementNode {
 	readonly blueprint: Extract<ReturnType<typeof bindV3BlueprintLivePlane>, { readonly ok: true }>["handle"];
@@ -344,7 +374,7 @@ export async function runDurableFenceRestart(): Promise<DurableFenceRestartResul
 			) {
 				return false;
 			}
-			if (!verifyEd25519RegisteredDigest(envelope.signature, digest, fixture.authorPublicKey)) return false;
+			if (!ed25519.verify(envelope.signature, digest, fixture.authorPublicKey, { zip215: false })) return false;
 			const preimage = decodeCanonical(envelope.canonicalPreimageBytes);
 			if (
 				typeof preimage !== "object" ||
@@ -355,11 +385,7 @@ export async function runDurableFenceRestart(): Promise<DurableFenceRestartResul
 			) {
 				return false;
 			}
-			const opened = openAuthorFenceOperation({
-				authorSequence: fenceSequence,
-				operation: Reflect.get(preimage, "operation"),
-			});
-			return opened.ok && opened.operation.fenceSequence === fenceSequence;
+			return isExactFenceOperation(Reflect.get(preimage, "operation"), fenceSequence);
 		}).length;
 		return Object.freeze({
 			fenceSequence: plan?.fenceSequence,
