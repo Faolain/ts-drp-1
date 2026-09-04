@@ -360,6 +360,11 @@ latches as corruption (`browser-issuance-store.ts:443-447`,
   the current signed state (`lineage-profiles-impact.md` §2.E). Rotated closing
   authority is `D.110c-0c1j`; author sets beyond the 64-member vector are
   `D.110c-0c1k`; neither is absorbed here.
+- Across lineage profiles the plan, fence and incarnation handling are
+  mandatory safety (a reconnect after a crash mid-match in an ephemeral-chain
+  room is exactly the lost-work trace); pruning cadence, the ≥100-transition
+  census and archive cadence are per-profile policy
+  (`lineage-profiles-impact.md` §4).
 
 ## Crash, attack and failure matrix
 

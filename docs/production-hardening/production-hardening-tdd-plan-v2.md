@@ -98880,7 +98880,7 @@ matrix. Deadline: implemented and retained before f5b, parent 0c1/0c, the
 The exact design is `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, pinning
 signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its two-entry
 self-excluding manifest `manifest.sha256` records design SHA-256
-`ecf5fef86810fcedc02b484b2685d514288a043f5c85d3b2749e6b35fadb6f57` and
+`514320138f86adad803e3ed3ee654c7a1d0b0bb5aef4856e3fde88bce68d0228` and
 pre-review SHA-256
 `8784104f0753b45b5a3b8906cb9313ebc4786746e13b40beeaa58154aa6282b0`. The
 sibling `pre-review.md` is a read-only consistency pass by one Fable 5.1
