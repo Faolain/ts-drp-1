@@ -32,8 +32,10 @@ Task. Start the two independent slices, in parallel or in either order:
    rules (genesis members 0, added members `successorEpoch`, keyed on the
    current ACL), signer-agnostic prepare/open (sign under successor material,
    verify under floor trust, no current-key comparison), shape-only predecessor
-   validation, `frontierFor`/`frontierCount`, re-measured 64-member ceiling
-   under 8,192 bytes; `settlementProfileFor(profileId)` and its seven
+   validation, `frontierFor`/`frontierCount`, 256-line frontier under a
+   32,768-byte ceiling and version-3 ACL constants under the profile
+   (D.110c-0c1k W1, `.logs/d110c-0c1k-fable51-research-20260903/solution.md`
+   §3); `settlementProfileFor(profileId)` and its seven
    consumers; same-anchor equivocation rule. RED cases 17, 18, 22, 26, 27 and
    the codec halves of 5, 12.
 2. f5b0s settlement plan store (item 2): the `SettlementPlan` /
@@ -45,6 +47,12 @@ Task. Start the two independent slices, in parallel or in either order:
    fence-already-set and entry-absent/linked/manual-review failures, ambiguous
    outcome readback, corruption refusal, and the prune gate that refuses rows
    referenced by an unlinked entry. RED cases 3, 5, 10, 13, 25 store halves.
+3. D.110c-0c1k stage W0 defects (independent; solution.md §3 W0): staging
+   enforces the open path's decode limits and 31/64/65 members agree across
+   stage, close, adoption and recovery; the duplicated `SCANNABLE_BYTES`
+   filter becomes a loud per-kind rejection; per-snapshot O(1) membership
+   lookup with an identical accept/reject set; per-author epoch share so one
+   writer cannot exhaust a shared epoch. W0 RED cases 1-4.
 
 Method. Each slice is one causal tests-only RED commit before any GREEN: the
 tests must fail for the reason the design names, not for a missing import.

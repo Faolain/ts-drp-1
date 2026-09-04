@@ -97010,37 +97010,108 @@ bound ACL digests, never on the closing-authority key. Evidence:
 
 ###### D.110c-0c1k ACL member ceiling versus chat-profile writer count
 
-**Status: explicit blocking Discord-path capability debt; independent of the
-settlement design.** Owner: one reviewed decision on the latched-ACL member
-ceiling, re-deriving together the 64-member cap
-(`packages/protocol-v3/src/latched-acl.ts:133-134`), the ACL's own 8,192-byte
-canonical ceiling (`:206`, `:218`), the author-list cap
-(`packages/protocol-v3/src/index.ts:774`), the frontier-vector cap
-(`packages/protocol-v3/src/creator-author-issuance-frontiers.ts:165`) and the
-tests that pin 65 as the rejection boundary. Deadline: before D.110c-d or
-Phase 7 may claim the Discord-style ≥100-transition golden path; not required
-for the MMORPG zone profile, whose ≤ 64 durable writers per zone is a stated
-decision (this plan, "reachable target" paragraph; Profile M active-writer
-row).
+**Status: research complete and a staged construction decided on 2026-09-03.
+Stage W1 rides f5b0a/f5b under the accepted D.110c-0c1f5b0r design; stage W0
+tests-only RED is authorized as a bounded defect correction; stage W2 needs its
+own design checkpoint before RED. No production edit before its slice's RED.**
+Owner: W0 the latched-ACL decoder/staging parity, the duplicated
+`SCANNABLE_BYTES` filter, O(1) membership lookup and the per-author epoch
+share; W1 the version-3 ACL constants and the 256-line settlement frontier;
+W2 the sparse boundary frontier, version-4 admissioned ACL, ACL delta record,
+idle rotation and the mandatory durable own boundary. Deadline: W0 GREEN
+before f5b GREEN and before any production room is grown past 30 members; W1
+with f5b0a/f5b; W2 before D.110c-d or Phase 7 may claim the Discord-style
+≥100-transition golden path. Not required for the MMORPG zone profile, whose
+≤ 64 durable writers per zone is a stated decision.
 
-Profile D states active writers ≤ 128 per five-minute window with ≥ 1,000
-online replicas per object, and the chat golden path grants Writer through the
-ACL, yet every author must be an ACL member even in permissionless mode
-(`packages/protocol-v3/src/latched-acl.ts:334-336`). A channel with 128
-distinct writers in five minutes cannot exist under a 64-member ACL. The cap
-is also shape-dependent: measured with the workspace canonical encoder, 64
-members each holding a finality key and all four groups encode to 12,888
-bytes, above the 8,192-byte ceiling, while 64 writer-only members encode to
-7,064 bytes; the effective full-shape ceiling is roughly 40 members. If the
-decision raises the member count beyond what an 8,192-byte checkpoint vector
-can carry, the per-author settlement frontier must move to an authenticated
-author-state map (codec `version: 2`, per-author O(log N) paths, a new proof
-carrier to authors at open); that is a wire/API change and a stop-rule trigger
-for any settlement slice that attempts it, so it is recorded here as the
-Phase-7/Train-S evolution rather than absorbed. Evidence:
-`.logs/d110c-0c1f5b0-fable51-research-20260903/lineage-profiles-impact.md`
-§2.C and §4.
+Evidence: `.logs/d110c-0c1k-fable51-research-20260903/` (`solution.md` is the
+adjudication; four Fable 5.1 read-only reports on code constraints, design
+alternatives, adversarial impact and requirements/prior art; measurement
+scripts under `measurements/`). Requirement: Profile D's "≤ 128 active writers
+per 5-minute window" is a rate of distinct posters, and at 25 ops/s an
+8,192-vertex epoch lasts about 5.5 minutes, so the protocol metric is 128
+distinct authors per epoch with headroom to 256 in one object; authors-ever
+must be irrelevant; readers cost zero membership bytes.
 
+Verified defects, independent of any redesign (W0): the operational ACL cap is
+about 30 writer-only or 22 full-shape members, not 64, because
+`openCanonicalLatchedAclSnapshot` decodes with `maxItems: 512`
+(`packages/protocol-v3/src/latched-acl.ts:219`) and a member costs 16 or 22
+decoded items; `stageLatchedAclOperations` (`:376-451`) enforces only the
+64-member rule, so grants can grow an ACL past 30, after which close throws at
+`packages/node/src/creator-close.ts:437-441` and adoption/recovery fail the same
+way (`packages/node/src/v3-live.ts:4926`, `creator-adoption.ts:874`, `:1145`,
+`:1478`); no test constructs a 65-member ACL. `SCANNABLE_BYTES = 8192`
+(`node/creator-close.ts:69`) is a silent filter at `:620` and `:994`.
+Per-vertex authorization re-validates and re-allocates the full member list
+(`latched-acl.ts:279-290` → `:120-181`), O(V × N) per fold;
+`writeAuthorizedAuthors` is O(N²) (`node/creator-close.ts:404-412`). The epoch
+budget is global with no per-author share (`v3-live.ts:6227`), so one writer
+can exhaust a shared epoch today.
+
+Measured with the workspace canonical encoder (ACL writer-only / full-shape /
+settlement checkpoint at maximum integer widths): 64 → 7,014 / 12,838 / 6,593
+bytes; 128 → 13,927 / 25,575 / 12,098; 256 → 27,751 / 51,047 / 23,106;
+1,024 → 110,695 / 203,879 / 89,154; 10,000 → 1,080,103 / 1,990,103 / 861,090.
+The 8,192-byte checkpoint ceiling crosses at 89 members. No flat vector reaches
+128 under any current ceiling.
+
+Construction. **W1 (in f5b0a/f5b):** settlement checkpoint `version: 1` with a
+256-line frontier under a 32,768-byte ceiling; latched ACL `version: 3`
+accepted only under the settlement profile, changing only constants (cap 256,
+ceiling 65,536 bytes, decode limits `{maxBytes: 65_536, maxDepth: 4, maxItems:
+8_192}`); the author-list cap at `packages/protocol-v3/src/index.ts:774` rises
+to 256 under the same predicate; versions 1 and 2 and every 65-pin untouched;
+genesis-bound with the profile. No settlement rule changes; fence load at 256
+reopeners is 3.1% of an epoch. **W2 (Train S / Phase 7, own design checkpoint):**
+ACL `version: 4` member record gains `admissionEpoch` (the f5b0r design's named
+fallback, selected because a sparse frontier cannot state every member's
+incarnation), member cap 10,240 under a 2 MiB ceiling with admin/finality/referee
+holders ≤ 64 combined; an ACL delta record `{baseAclDigest, targetAclDigest,
+removed, upserts}` verified by recomputing the successor anchor's `aclDigest`,
+full fetch through the existing 131,072-byte chunk transport as fallback;
+settlement checkpoint `version: 2` whose `boundaries: [author, lastActiveEpoch,
+terminalThrough][]` (cap 2,048, ceiling 262,144 bytes) carry a line only for
+authors with a non-null boundary in their current incarnation; the creator scan
+runs over (active in the close graph ∪ carried) ∩ successor ACL; idle rotation
+evicts the smallest-`lastActiveEpoch` author by bumping its ACL `admissionEpoch`
+(byte-for-byte the existing same-key re-entry path); the deferred plan-change
+B.4 durable own boundary becomes mandatory so an evicted author's in-flight rows
+surface as `manual-review` rather than terminalize silently;
+`settlementProfileFor` gains `"v2"`. Costs at 10,000 members with 128 active:
+checkpoint ≤ 177 KB, delta ≈ 16 KB per close, ≈ 640 B/s per peer, cold join
++1.3 MB, per-vertex auth O(1), fence ≤ 1.6% of an epoch.
+
+Rejected with the failing number (solution.md §4): raising caps beyond about
+256 (861 KB checkpoint plus up to 1.99 MB ACL per close at 10,000; the
+collision returns at cap+1 with no rotation escape); an authenticated author
+map at any product scale (the hot path never reads the frontier,
+`latched-acl.ts:336`; at 10,000 members it saves a 1.3 MB one-time fetch and
+costs about 57 KB of proofs per close against a 16 KB delta, plus a proof
+carrier that does not exist; break-even near 10^5 members); a separate roster
+object or offline tickets (needs an anchor field the codec has no slot for,
+`packages/protocol-v3/src/creator-close.ts:205-224`; tickets must live in the
+graph, which is mid-epoch admission); channel sharding (one channel is one
+object, Profile D fabric row; lanes lose causal order and each accumulates every
+author); truly permissionless writers (about 8,192 fresh keys per epoch each
+earn a monotone line forever for under a second of attacker CPU). Deferred and
+named: mid-epoch writer admission as a creator-signed control vertex (candidate
+D.110c-0c1k2; must still latch at closes for incarnation or anchor fencing
+breaks); the authenticated map at ≥ 10^5 members behind
+`frontierFor`/`frontierCount`.
+
+RED (solution.md §6): W0 cases 1–4 (decoder/staging parity at 31/64/65 across
+stage, close, adoption and recovery; loud oversized-record rejection; O(1)
+membership with an identical accept/reject set on 8,192 vertices; per-author
+share holds with fences counted and the epoch still closes). W1 cases 5–8
+(ACL v3 at 256 both shapes round-trips, 257 and 65,537 bytes reject, v1/v2
+keep 65; checkpoint at 256 max-width triples accepted, 257 and 32,769 bytes
+reject; old decoder fails closed on v3 bytes; 200 reopeners yield exactly 200
+fences and 200 advanced lines). W2 cases 9–18 as listed. What is lost: W0
+nothing; W1 retained records up to about 52 KB per close; W2 an author idle
+past the rotation horizon loses protocol-level replay of unpublished displaced
+rows, surfaced as manual-review candidates, and re-admission waits one close
+until the deferred admission vertex exists.
 
 ###### D.110c-0c1f multi-author historical-issuance authority prerequisite
 
@@ -98880,7 +98951,7 @@ matrix. Deadline: implemented and retained before f5b, parent 0c1/0c, the
 The exact design is `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, pinning
 signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its two-entry
 self-excluding manifest `manifest.sha256` records design SHA-256
-`514320138f86adad803e3ed3ee654c7a1d0b0bb5aef4856e3fde88bce68d0228` and
+`82f3ce0f7b31a1387164d8a6e5a83b55f0f2c3f045c9d607d98b33965cbbf099` and
 pre-review SHA-256
 `8784104f0753b45b5a3b8906cb9313ebc4786746e13b40beeaa58154aa6282b0`. The
 sibling `pre-review.md` is a read-only consistency pass by one Fable 5.1
@@ -98915,7 +98986,9 @@ outer sequence, issued first with `m = lineage.next`, replacements issued after
 it so every replacement causally follows the fence; (3) a creator-signed
 checkpoint whose frontier is exactly the successor ACL's members as
 `[author, admissionEpoch, terminalThrough | null]`, `admissionEpoch` derived
-from the ACL diff and carried only in the checkpoint. No ACL schema change, no
+from the ACL diff and carried only in the checkpoint. No ACL member-record
+change (a version-3 snapshot raises only constants under the profile,
+D.110c-0c1k W1), no
 issuance-store scope change, no lineage jump, no global floor, no K bound. A
 null-boundary member's first accountable vertex is a fence or slot 0, replacing
 the shipped `D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED` throw under the
@@ -98927,7 +99000,8 @@ rotated-authority lineage profile (D.110c-0c1j) without a second codec.
 
 Slices, replacing f5b0p-a/b and the earlier f5b0a-d list: f5b0a protocol codecs
 (fence, checkpoint, `settlementProfileFor` predicate and its seven consumers,
-signer-agnostic codec, re-measured 64-member ceiling); f5b0s settlement plan
+signer-agnostic codec, 256-line frontier under a 32,768-byte ceiling and
+version-3 ACL constants per D.110c-0c1k W1); f5b0s settlement plan
 store (independent of f5b0a); f5b0b Node (fence issuer, anchor-agnostic own-row
 classification, `readSettlementSources` regardless of `publishState`,
 close-graph split with the `applicationVertices` rename); f5b0c room

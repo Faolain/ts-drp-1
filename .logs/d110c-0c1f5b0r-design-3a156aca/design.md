@@ -57,7 +57,7 @@ were admitted (at or below the boundary) and which were not (above it).
    `[author, admissionEpoch, terminalThrough]` for exactly the successor ACL's
    members, with `admissionEpoch` derived from the ACL diff and carried only
    in the checkpoint. No retired-author registry, no `sequenceFloor`, no
-   `admittedThrough`, no ACL schema change, no issuance-store scope change, no
+   `admittedThrough`, no ACL member-record change, no issuance-store scope change, no
    lineage jump.
 
 The construction is the Kafka producer-epoch / Zab ballot / MLS epoch fencing
@@ -69,7 +69,8 @@ inside the existing v3 envelope, and one closure record kind.
 ## Settlement checkpoint
 
 Kind `drp-creator-author-settlement-state`, version `1`, domain
-`ts-drp/creator-author-settlement/v1`, maximum 8,192 canonical bytes:
+`ts-drp/creator-author-settlement/v1`, maximum 32,768 canonical bytes
+(D.110c-0c1k stage W1; measured 23,937 bytes at 256 max-width triples):
 
 ```ts
 {
@@ -85,7 +86,7 @@ Kind `drp-creator-author-settlement-state`, version `1`, domain
 ```
 
 - `frontiers` are strictly code-unit sorted, unique, and exactly the successor
-  ACL's members of every role (at most 64). A member present in the prior
+  ACL's members of every role (at most 256). A member present in the prior
   checkpoint carries its `admissionEpoch` unchanged and a monotone
   `terminalThrough` (`null → n` allowed; `n → null` or lower rejected). A member absent from the **current ACL** (added at this close) carries
   `admissionEpoch = successorEpoch` and `terminalThrough = null`. When the
@@ -120,10 +121,12 @@ Kind `drp-creator-author-settlement-state`, version `1`, domain
   `frontierCount(identity)`; consumers outside protocol-v3 use them rather than
   indexing `frontiers`. This is the only preparation for a later map-backed
   carrier (`D.110c-0c1k`); no field is reserved.
-- f5b0a re-measures the 64-member maximum shape (the prior two-boundary
-  measurement was 6,959 bytes with the same triple width) and pins it plus the
-  adjacent over-limit rejections as executable vectors; the 8,192-byte ceiling
-  is not raised.
+- f5b0a measures the 256-member maximum shape (about 23,937 bytes at maximum
+  integer widths; 6,593 bytes at 64) and pins it plus the 257-line and
+  32,769-byte rejections as executable vectors. The cap and ceiling come from
+  D.110c-0c1k stage W1 (`.logs/d110c-0c1k-fable51-research-20260903/solution.md`
+  §3), which found that no flat vector reaches Profile D's 128 distinct authors
+  under an 8,192-byte ceiling (crossing at 89 members at maximum widths).
 
 ## Fence carrier
 
@@ -302,7 +305,13 @@ latches as corruption (`browser-issuance-store.ts:443-447`,
   rejects (`v3-live.ts:3800-3829`).
 - `LatchedAclMember` stays `{author, finalityKey, groups}`
   (`packages/protocol-v3/src/latched-acl.ts:8`); snapshot versions 1 and 2 are
-  untouched. The incarnation is a checkpoint fact. Authority membership
+  untouched. Under the settlement profile the ACL is a version-3 snapshot that
+  changes only constants (member cap 256, canonical ceiling 65,536 bytes,
+  decode limits `{maxBytes: 65_536, maxDepth: 4, maxItems: 8_192}`), accepted
+  only when `settlementProfileFor(profileId) !== "none"`; the author-list cap
+  at `packages/protocol-v3/src/index.ts:774` rises to 256 under the same
+  predicate (D.110c-0c1k W1). Staging enforces exactly the open path's decode
+  limits (D.110c-0c1k W0). The incarnation is a checkpoint fact. Authority membership
   (profile/signer-set carriers) and application membership (latched ACL) remain
   separate; a player join is an ACL grant and never an authority change.
 
@@ -326,7 +335,7 @@ latches as corruption (`browser-issuance-store.ts:443-447`,
   expected-head checks, plus the recovery-scan cap correction
   (`v3-live.ts:4349-4355`: `(rollback + 1) × maxEpochVertices` or scan from the
   settled watermark).
-- Active control state is one checkpoint of at most 64 triples plus the
+- Active control state is one checkpoint of at most 256 triples plus the
   existing rollback generations and history peaks; nothing grows with epoch
   count, rebase count or distinct-key churn. Control vertices in the current
   epoch are bounded by `maxEpochVertices`/`maxEpochBytes`; the exposure is one
@@ -358,7 +367,7 @@ latches as corruption (`browser-issuance-store.ts:443-447`,
   slot 0.
 - The settlement layer composes with any authority-lineage profile as part of
   the current signed state (`lineage-profiles-impact.md` §2.E). Rotated closing
-  authority is `D.110c-0c1j`; author sets beyond the 64-member vector are
+  authority is `D.110c-0c1j`; author sets beyond the 256-member vector are
   `D.110c-0c1k`; neither is absorbed here.
 - Across lineage profiles the plan, fence and incarnation handling are
   mandatory safety (a reconnect after a crash mid-match in an ephemeral-chain
@@ -430,8 +439,8 @@ isolated gates, signed commits and pushed refs.
 
 1. **f5b0a — protocol codecs.** Fence codec and global reservation; settlement
    checkpoint codec with the triple frontier, derivation/binding rules,
-   signer-agnostic prepare/open, shape-only predecessor validation, per-author
-   accessor, re-measured ceiling; `settlementProfileFor` predicate and its
+   signer-agnostic prepare/open, shape-only predecessor validation, per-author accessor, 256-line frontier under the 32,768-byte ceiling and
+   the version-3 ACL constants; `settlementProfileFor` predicate and its
    seven consumers; equivocation canonicaliser same-anchor rule
    (`packages/protocol-v3/src/index.ts:3648-3665`).
 2. **f5b0s — settlement plan store.** The contract above; memory, browser and
@@ -459,7 +468,10 @@ isolated gates, signed commits and pushed refs.
    for the creator and one non-creator writer.
 
 Dependency order: 1 and 2 in parallel; 3 needs both; 4 needs 3; 5 needs 1-2;
-6 needs 1-5. D.110c-c, D.110c-d and Phase 7 follow unchanged.
+6 needs 1-5. D.110c-0c1k stage W0 (decoder/staging parity, loud oversized-record
+rejection, O(1) membership lookup, per-author epoch share) runs independently
+and must be GREEN before slice 6 GREEN. D.110c-c, D.110c-d and Phase 7 follow
+unchanged.
 
 ## Deterministic RED cases
 
