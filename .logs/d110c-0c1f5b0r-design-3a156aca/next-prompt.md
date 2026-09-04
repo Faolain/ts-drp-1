@@ -32,7 +32,7 @@ Entry point. Read, in this order:
    "Settlement plan store contract" and "Compatibility", before writing any
    test.
 
-Task. Three independent slices, tests-only RED first, runnable in parallel:
+Task. Four independent slices, tests-only RED first, runnable in parallel:
 
 1. **f5b0a protocol codecs** (design "TDD implementation slices" item 1): fence
    codec and global action reservation; settlement checkpoint codec with the
@@ -69,6 +69,11 @@ Task. Three independent slices, tests-only RED first, runnable in parallel:
    `members.find` on 8,192 vertices, permissionless and not; a per-author epoch
    share so one writer cannot exhaust a shared epoch, fences counted, epoch
    still closes. 0c1k RED cases 1 to 4.
+4. **D.110c-0c1j-0 genesis lineage-policy reservation** (end of the 0c1j plan
+   record): one optional `parameters.lineagePolicy` key in the registry
+   `parameters` kind and the genesis builders; absent key is byte-identical
+   to today's parameters and digest; only `fixed-creator` is room-accepted at
+   genesis; no protocol-v3 or Node change. 0c1j-0 RED cases 1 to 5.
 
 Pipeline per slice. One RED agent writes the tests-only RED commit; the tests
 must fail for the reason the design names, not for a missing import or a
@@ -101,7 +106,7 @@ for old incarnations, stop and reslice; do not reintroduce the per-source
 grammar or a global floor. Never raise `maxEpochVertices` without fixing the
 quadratic `sequences.includes` in the close scan first.
 
-After these three: f5b0b Node (needs f5b0a and f5b0s GREEN), then f5b0c room,
+After the first three (0c1j-0 gates nothing): f5b0b Node (needs f5b0a and f5b0s GREEN), then f5b0c room,
 f5b0d reclamation (needs f5b0a and f5b0s GREEN), then f5b creator settlement
 and recovery integration (needs f5b0a to f5b0d and W0 GREEN) with design RED
 case 14 across at least three closes with restart and cold reopen. Stage W2 is

@@ -18402,6 +18402,9 @@ Authorized now (tests-only RED first, then GREEN, per slice):
 - **D.110c-0c1k stage W0** defect corrections (decoder/staging parity, loud
   oversized-record rejection, O(1) membership lookup, per-author epoch share),
   independent of the two above (record `D.110c-0c1k`, solution.md §3 W0).
+- **D.110c-0c1j-0** genesis lineage-policy reservation: one optional
+  `parameters.lineagePolicy` key whose absence is byte-identical to today;
+  independent of the three above (end of record `D.110c-0c1j`).
 
 Blocked, and on what:
 
@@ -96977,6 +96980,57 @@ it returned `CONTINUE_NARROW_RESLICE`, P0/P1/P2 `0/2/4`, session
 It does not substitute for the governing review and authorizes no production
 edit. No further Fable run is authorized unless the user expressly requests
 one.
+
+**0c1j-0 genesis lineage-policy reservation (specified 2026-09-04; tests-only
+RED authorized by user decision; bounded and independent of the rest of 0c1j).**
+Why now: the parameters record is a registry kind whose digest is bound into
+the genesis anchor and copied unchanged by every close
+(`packages/protocol-v3/src/creator-close.ts:218`, checked at `:380`;
+adoption `packages/node/src/creator-adoption.ts:1133`, `:1469`), so
+parameters are immutable for a room's life and a room born without this key
+can never gain it. Shape: one optional key in the `parameters` kind
+(`packages/protocol-v2/src/registry.ts:255-259`, validator `:501`):
+
+```
+lineagePolicy: {
+  mode: "fixed-creator" | "ephemeral-chain" | "durable-pinned" | "durable-recursive",
+  maximumEpochs: number | null,          // ephemeral-chain only; else null
+  allowedUpgrade: "none" | "recursive-v1",
+  recursiveVerificationKeyId: string | null
+}
+```
+
+Absent key ≡ `{ mode: "fixed-creator", maximumEpochs: null, allowedUpgrade:
+"none", recursiveVerificationKeyId: null }`, and an absent key produces exactly
+today's canonical parameters bytes and digest, so every existing room, fixture
+and pinned digest is unchanged. In this slice every mode other than
+`fixed-creator` is accepted by the codec and rejected by the room at genesis
+with a stable error (no rotation exists yet; D.110c-0c1j proper implements
+`ephemeral-chain` first, `durable-pinned` second, and `durable-recursive` only
+if a product requires rooms that outlive every operator). `allowedUpgrade`
+names the only conversion a later close may perform; a room with `"none"` can
+never be upgraded, by construction. `recursiveVerificationKeyId` is a
+registry-pinned identifier, never key bytes. The key is read by nothing on the
+hot path; `settlementProfileFor` stays the single profile predicate and the
+design's stated decomposition into (authority profile, lineage policy,
+settlement policy) later reads this key. Owners: registry schema and
+validator; genesis builders (`examples/grid/src/v3-zone.ts:28-36`,
+v3-room, v3-chat) accept the optional key; no protocol-v3 or Node change. RED:
+(1) absent key round-trips to byte-identical parameters and digest against the
+pinned genesis vectors; (2) `fixed-creator` declared explicitly produces a
+different digest, binds into the anchor and survives a close unchanged;
+(3) each non-fixed mode is codec-valid and room-rejected at genesis with the
+stable error; (4) unknown mode, negative or non-integer `maximumEpochs`,
+`maximumEpochs` with a non-ephemeral mode, unknown `allowedUpgrade`, or key
+bytes in `recursiveVerificationKeyId` fail closed; (5) old-binary behavior on a
+carrier with the key is pinned either way (reject as unknown key, or accept and
+ignore), and the chosen behavior is documented. Evidence:
+`.logs/d110c-0c1f5b0-fable51-research-20260903/peer-lineage-profiles-notes.md`
+("Start simple, enable WRAPS later") and `lineage-profiles-impact.md` §2.A,
+§3 Delta 2. WRAPS itself (HIP-1200-style recursive authority proofs) is not
+adopted: new cryptography, an elected prover as an availability dependency,
+no browser package, and no product profile that needs genesis-only verifiable
+rooms; this key is the whole cost of keeping it possible.
 
 ###### D.110c-0c1h grid successor projection-authority carrier prerequisite
 
