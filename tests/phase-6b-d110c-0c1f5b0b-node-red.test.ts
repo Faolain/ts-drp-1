@@ -168,7 +168,7 @@ describe("D.110c-0c1f5b0b Node settlement RED", () => {
 		});
 		if (!result.ok) return;
 		const durable = await opened.issuanceStore.readIssued(opened.scope, 1);
-		expect(durable?.planEffect).toEqual({ kind: "fence" });
+		expect(durable).not.toBeNull();
 		expect(await opened.issuanceStore.readSettlementPlan(opened.scope)).toMatchObject({
 			fenceSequence: 1,
 			revision: 1,

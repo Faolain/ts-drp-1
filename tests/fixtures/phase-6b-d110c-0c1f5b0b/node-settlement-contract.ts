@@ -1,6 +1,7 @@
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DurableIssuanceStore, DurableIssueScope, SettlementPlan } from "@ts-drp/issuance-store";
 import { MessageQueueManager } from "@ts-drp/message-queue";
+import { openAuthorFenceOperation, verifyEd25519RegisteredDigest } from "@ts-drp/protocol-v3";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -331,12 +332,40 @@ export async function runDurableFenceRestart(): Promise<DurableFenceRestartResul
 		const plan = await issuanceStore.readSettlementPlan(scope);
 		const lineage = await issuanceStore.readLineage(scope);
 		const rows = await issuanceStore.readOutboxPage({ scope });
+		const fenceSequence = plan?.fenceSequence;
+		const pendingFenceCount = rows.filter((row) => {
+			if (fenceSequence === null || fenceSequence === undefined) return false;
+			if (row.publishState !== "pending" || row.commit.authorSequence !== fenceSequence) return false;
+			const envelope = row.commit.envelope;
+			const digest = hashDomain("ts-drp/vertex/v3", envelope.canonicalPreimageBytes);
+			if (
+				digest.byteLength !== envelope.digest.byteLength ||
+				!digest.every((byte, index) => byte === envelope.digest[index])
+			) {
+				return false;
+			}
+			if (!verifyEd25519RegisteredDigest(envelope.signature, digest, fixture.authorPublicKey)) return false;
+			const preimage = decodeCanonical(envelope.canonicalPreimageBytes);
+			if (
+				typeof preimage !== "object" ||
+				preimage === null ||
+				Reflect.get(preimage, "author") !== scope.author ||
+				Reflect.get(preimage, "objectId") !== scope.objectId ||
+				Reflect.get(preimage, "authorSequence") !== fenceSequence
+			) {
+				return false;
+			}
+			const opened = openAuthorFenceOperation({
+				authorSequence: fenceSequence,
+				operation: Reflect.get(preimage, "operation"),
+			});
+			return opened.ok && opened.operation.fenceSequence === fenceSequence;
+		}).length;
 		return Object.freeze({
 			fenceSequence: plan?.fenceSequence,
 			firstIssue,
 			lineageNext: lineage.next,
-			pendingFenceCount: rows.filter((row) => row.commit.planEffect?.kind === "fence" && row.publishState === "pending")
-				.length,
+			pendingFenceCount,
 			replayedFence: reopened.descriptor.recoveredVertices.some(
 				(vertex) => vertex.authorSequence === firstIssue.authorSequence
 			),
