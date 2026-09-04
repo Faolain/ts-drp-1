@@ -18436,20 +18436,21 @@ Closed in the 2026-09-04 checkpoint:
 
 Authorized now (tests-only RED first, then GREEN):
 
-- **f5b creator settlement and recovery integration** from accepted design
-  item 6, with all f5b0a/f5b0s/f5b0b/f5b0c/f5b0d/W0 dependencies closed. Its
-  causal RED must cover the complete 27-case design matrix plus every
-  parent-owned P2 and resliced reclamation obligation: genuine hot, restart and
-  cold reopen; authenticated frontier/terminal suppression; multi-intent
-  `split-required`; exact checkpoint boundary; real every-peer authenticated
-  deletion before any legacy prune; bounded prune scheduling; legacy
-  8,192-success/8,193-refusal recovery; settlement rollback-window recovery;
-  and the explicit same-room 64-active-writer, every-writer-every-epoch,
-  three-close composition acceptance. No production edit before that RED.
+- **f5b0t segmented replacement-progress prerequisite** below. The first
+  parent f5b RED stopped before any edit because the one-link plan schema
+  cannot represent crash-safe `split-required` progress. Complete the exact
+  high-risk plan review, then one causal tests-only RED and GREEN for the
+  device-local plan/progress contract, memory/browser/Node stores and room
+  resume owner. No f5b integration or production edit is authorized before
+  that checkpoint.
 
 Blocked, and on what:
 
-- Stage W1 (256-line frontier, version-3 ACL) is inside the authorized f5b
+- **f5b creator settlement and recovery integration** → f5b0t GREEN and empty
+  P0/P1 review union. It then retains the full 27-case design matrix, all
+  resliced reclamation gates, and the same-room 64-active-writer,
+  every-writer-every-epoch, three-close acceptance unchanged.
+- Stage W1 (256-line frontier, version-3 ACL) is inside the blocked parent f5b
   integration, not a separate slice.
 - **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
   five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
@@ -99435,12 +99436,153 @@ Node output must retain the selected built-output path/hash/shape identity in
 the evidence pack; f5b0b's final detached checkout rebuilt and passed, so this
 is nonblocking prospective evidence guidance.
 
+###### D.110c-0c1f5b0t segmented settlement replacement-progress prerequisite
+
+**Status: BLOCKING PLAN CHECKPOINT on 2026-09-04.** The first parent f5b RED
+stopped before any test or production edit under the accepted design stop rule:
+the persisted `SettlementPlanEntry` has only one scalar
+`replacementSequence`, `applySettlementPlanEffect` may fill it only once, the
+room currently submits all detached replacement intents to one `issueLocal`
+call, and Node returns `split-required` before issuing anything. Linking the
+first chunk would falsely mark the plan complete; linking only the last would
+make earlier issued chunks unauthenticated and unresumable; reusing the scalar
+effect is rejected. A room-only retry loop therefore cannot provide exact-once,
+crash-safe multi-vertex settlement. This is a demonstrated stored-contract
+gap, not permission to weaken the multi-intent acceptance.
+
+Owners: `@ts-drp/issuance-store` contract plus memory/browser/Node backends,
+the Node settlement-effect validation seam, and the v3-room settlement drain
+owner. Deadline: GREEN and an empty P0/P1 final review union before parent f5b
+RED resumes, D.110c-c/d, the same-room 64-writer and at-least-100-transition
+gates, the MMORPG golden-path claim, Phase-6 exit, or Phase 7. Because this is
+an additive public TypeScript and durable-value contract adjacent to issuance,
+one exact Grok 4.6/high, Kimi K3 100-step and Opus xhigh design review is
+required before its causal tests-only RED. No production edit precedes RED.
+
+Selected bounded contract:
+
+- Preserve the legacy `SettlementPlanEntry` four-key form and scalar
+  `replacementSequence` semantics exactly when the new optional member is
+  absent. Add optional `replacementProgress` only for an unlinked
+  `rebase-required` or `transform-required` entry. Its exact public shapes are:
+
+  - `SettlementReplacementChunk` has readonly numeric
+    `replacementSequence` and `throughIntent` members.
+  - `SettlementReplacementProgress` has readonly literal `version: 1`, numeric
+    `intentCount`, `Uint8Array` `intentDigest`, and readonly
+    `SettlementReplacementChunk[]` `chunks` members.
+
+- Export one settlement bound,
+  `SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16`, and use it for both the progress
+  validator and Node's existing application-batch entry ceiling so the two
+  cannot drift. A progress record has `intentCount` in `1..16`, an exact
+  32-byte digest and
+  zero through `intentCount` chunks. Chunk sequence numbers and
+  `throughIntent` values are each strictly increasing; every
+  `throughIntent` is in `1..intentCount`. The consumed prefix is zero for no
+  chunks and otherwise the final `throughIntent`. The legacy scalar remains
+  `null` while the prefix is partial and becomes exactly the final chunk's
+  sequence only when the prefix reaches `intentCount`. Expire/manual-review
+  entries cannot carry progress.
+- The room derives the complete ordered detached replacement-operation list
+  before fencing and binds it with the following expression:
+
+  ```ts
+  hashDomain("ts-drp/settlement-replacement-intents/v1", encodeCanonical(orderedReplacementOperations));
+  ```
+
+  The digest covers the
+  ordered application operations themselves, not allocation-dependent logical
+  time or sequence. Restart/reopen must rederive the list and exact digest;
+  mismatch fails closed and does not issue, relink, rebuild or downgrade.
+
+- Preserve the existing two-key legacy replacement `planEffect` for a legacy
+  entry. A progress entry requires the exact additive effect fields
+  `sourceSequence`, `intentDigest`, `fromIntent` and `throughIntent` alongside
+  its replacement kind. `fromIntent` must equal the durable consumed prefix;
+  `throughIntent` must be greater, no greater than `intentCount`, and the Node
+  issue owner must reject before issuance unless
+  `throughIntent - fromIntent` equals the exact `input.operations.length`.
+  This validation is internal to the existing issue path and does not add a
+  public `V3LocalIssueInput` member. The store atomically appends the chunk,
+  updates the scalar only at completion, advances the plan revision, and
+  commits issued/outbox/lineage/plan state in the existing transaction.
+- A wrong digest, stale revision or prefix, skipped, duplicate, out-of-order,
+  zero-length or overrun range, legacy/progress effect mismatch, or a range
+  inconsistent with the issued operation count refuses before mutation.
+  Malformed durable values use `ISSUANCE_RECOVERY_CORRUPT`; invalid caller
+  effect shape uses `ISSUANCE_COMMIT_INVALID`; a structurally valid but stale
+  plan comparison uses `ISSUANCE_RETRY_REQUIRED`. Ambiguous transaction
+  outcomes are resolved only by reading back the exact digest, prefix, chunk
+  sequence, final scalar and plan revision.
+- The room resumes at the durable consumed prefix. It submits the remaining
+  suffix once; `split-required(p)` remains nonmutating, after which it submits
+  the exact prefix that fits with the matching progress effect, publishes it,
+  rereads the plan, and continues. An unknown outcome halts and requires
+  readback/reopen. The settlement fence remains the first issued control
+  action, and only the completed scalar permits the existing maintenance gate.
+- Compatibility is additive and fail closed. Old entries, commits and
+  one-chunk settlement vectors decode, clone and behave byte-for-byte as
+  before. An old unlinked rebase/transform entry may be CAS-upgraded to the
+  progress form only after the source and ordered replacement list are
+  rederived and before replacement issue; an old linked entry is already
+  complete and can never become partial. Browser retains the existing fourth
+  object store and database version; Node retains its existing settlement-plan
+  table/JSON column. Both backends accept exact old and new value grammars and
+  refuse corruption. An older binary encountering the new member fails closed;
+  it must not silently retry, rebuild or downgrade.
+- No wire envelope, protobuf, checkpoint, anchor, authority, cryptography,
+  dependency, threshold, workload or public Node issue-input change is
+  authorized. The durable/public issuance-store type addition is the entire
+  compatibility cost. Do not persist the replacement operations themselves.
+  Reject duplicate source-plan entries, one plan entry per intent, linking
+  only the first or last chunk, scalar reuse, and converting a valid
+  multi-intent replacement to manual review or unsupported status.
+
+Tests-only RED acceptance, with controls written so failure is behavioral and
+not a missing import/export:
+
+1. Preserve exact legacy entry/effect codec and one-chunk vectors, then prove
+   all new shape, bound, ordering, digest, completion-projection and
+   corruption refusals.
+2. In memory, real Chromium and Node conformance, issue a two-or-more-chunk
+   replacement: the first transaction is durable partial progress and the
+   final transaction alone fills the scalar. Prove revision CAS, atomic
+   outbox/lineage/plan updates, rollback on injected failure, exact ambiguous
+   outcome readback, and pre-mutation refusal of the full mismatch matrix.
+3. Prove legacy migration and downgrade refusal, unchanged browser store names
+   and database version, unchanged Node table shape, and exact old-value
+   decoding.
+4. Through the real room and Node issue path, make both a multi-intent rebase
+   and transform growth provoke genuine `split-required`, produce at least two
+   real replacement vertices, and apply each detached operation exactly once;
+   the existing one-chunk path remains unchanged.
+5. Crash/restart before and after the first partial chunk and before and after
+   the final chunk, in the same epoch and after close/reopen. Prove no skipped,
+   duplicated or substituted intent, preserved fence-first order, digest
+   mismatch refusal, and monotonic merge/readback.
+
+GREEN is limited to issuance-store types/contract/conformance, the three
+backends, bounded test fixtures, the internal Node effect/range validation and
+the room settlement-drain loop. Focused tests, affected builds/typechecks,
+exact-owner lint/format/diff, retained issuance/room/recovery suites and an
+isolated clean-checkout gate are mandatory. Evidence lives under the usual
+self-excluding RED/GREEN manifests. The final Grok/Kimi/Opus implementation
+review examines plan through causal RED through GREEN; only P0/P1 blocks and
+each P2 receives an owner and disposition. Parent f5b retains genuine
+checkpoint/close/adopt, every-peer authenticated pruning, 8,192/8,193 recovery,
+three-close restart/cold-reopen and explicit 64-active-writer composition; this
+prerequisite neither satisfies nor weakens any of them.
+
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: AUTHORIZED for one causal tests-only f5b integration RED under the
+**Status: BLOCKED on f5b0t GREEN and its empty P0/P1 review union.** The first
+causal RED stopped before any edit when the accepted split-required case
+demonstrated that the scalar replacement link cannot represent crash-safe
+multi-vertex progress. After f5b0t closes, this record resumes under the
 accepted D.110c-0c1f5b0r design and the prospective 64-writer composition
-amendment; f5b0a, f5b0s, f5b0b, f5b0c, f5b0d and W0 are closed, f5b0p-a/b are
-deleted, and no f5b production edit runs before that RED.**
+amendment; f5b0a, f5b0s, f5b0b, f5b0c, f5b0d and W0 remain closed, f5b0p-a/b
+remain deleted, and no parent f5b production edit precedes its resumed RED.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
