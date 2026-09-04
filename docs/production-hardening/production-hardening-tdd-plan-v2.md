@@ -18386,6 +18386,45 @@ signer-profile eviction matrix are all green.
 
 ---
 
+### Current frontier — author settlement and writer capacity (as of 2026-09-03, commit e5bec209)
+
+This subsection is the entry point for an agent resuming the D.110c-0c1f /
+D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
+superseded record's "Prior status" text disagrees with this list, this list and
+the superseding record win.
+
+Authorized now (tests-only RED first, then GREEN, per slice):
+
+- **f5b0a** protocol codecs and **f5b0s** settlement plan store, in parallel,
+  from the accepted design `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`
+  (record `D.110c-0c1f5b0r`). The exact resume prompt is
+  `.logs/d110c-0c1f5b0r-design-3a156aca/next-prompt.md`.
+- **D.110c-0c1k stage W0** defect corrections (decoder/staging parity, loud
+  oversized-record rejection, O(1) membership lookup, per-author epoch share),
+  independent of the two above (record `D.110c-0c1k`, solution.md §3 W0).
+
+Blocked, and on what:
+
+- **f5b0b** Node → needs f5b0a and f5b0s GREEN. **f5b0c** room → f5b0b GREEN.
+  **f5b0d** reclamation → f5b0a and f5b0s GREEN. **f5b** creator settlement →
+  f5b0a–f5b0d GREEN and W0 GREEN. Stage W1 (256-line frontier, version-3 ACL)
+  is inside f5b0a/f5b, not a separate slice.
+- **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
+  five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
+  migration → separate design; not started. **D.110c-c / D.110c-d / Phase 7**
+  → after f5b.
+
+Method for every slice in this lineage: one causal tests-only RED commit whose
+tests fail for the reason the design names; GREEN only after; focused, static,
+retained and isolated gates; evidence under `.logs/<record-id>-red-<sha>/` and
+`.logs/<record-id>-green-<sha>/` with a self-excluding `manifest.sha256`; signed
+conventional commits with `git commit --only <paths>`; pushed refs before a
+slice is called closed; the slice's status paragraph and this subsection
+updated in the same commit that closes it. Stop rules are in the f5b0r design
+"Acceptance and stop rules" and the 0c1k record; a P0 against contiguity, plan
+authority or anchor fencing stops and reslices rather than reintroducing the
+per-source grammar, the global floor or the retired-key dictionary.
+
 ## Appendix A — traceability against `deep-analysis-migration.md`
 
 Its §11 roadmap (15 items) and §12 blockers (10 items), each mapped to a slice. This is the coverage
@@ -98997,7 +99036,8 @@ sibling `pre-review.md` is a read-only consistency pass by one Fable 5.1
 subagent over the design, this record, the superseded records and every code
 citation at HEAD; it found no P0/P1 against the construction and seven
 navigability/consistency items, all folded into the design and this plan. It is
-not the governing review. The
+not the governing review. The handoff prompt for a fresh session is the sibling
+`next-prompt.md`, listed in the same manifest. The
 evidence base is the Fable 5.1 research checkpoint
 `.logs/d110c-0c1f5b0-fable51-research-20260903/` (signed `d5b8168e`,
 `c9289c6a`, `cb2e723d`); the adjudicated crash walk is its `plan-change.md`
