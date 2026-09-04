@@ -36,15 +36,12 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
 		expect(result.stagedOutputs).toContain(null);
 	});
 
-	it("[control] local frontier generation preserves causalJoin reserved-ABI refusal", async () => {
+	it("[control] preserves causalJoin ABI refusal on local generation and genuine signed ingress", async () => {
 		for (const causalJoin of ["missing", "altered-abi"] as const) {
 			const result = await runFrontierScenario(17, { causalJoin });
 			expect(result.result).toMatchObject({ ok: false });
 			expect(result.issued.some(({ operation }) => operation.action === "add")).toBe(false);
 		}
-	});
-
-	it("[RED] preserves legacy causalJoin reservation on genuine signed ingress", async () => {
 		const opened = await openSettlementNode("creator-trusted-v1");
 		activeNodes.push(opened);
 		const routed = await routeSignedOperation(opened, Object.freeze({ action: "causalJoin" }), 1);
@@ -60,7 +57,11 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
 			ok: true,
 			source: {
 				authorSequence: 1,
-				intents: [expect.objectContaining({ operation: { action: "join" } })],
+				intents: [
+					expect.objectContaining({
+						operation: { action: "join", clientId: "phase-3g-displaced-client" },
+					}),
+				],
 			},
 		});
 	});
@@ -74,20 +75,33 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
 		});
 	});
 
-	it.each([false, true] as const)(
-		"[RED] surfaces an ordinary same-store non-creator sequence-zero row (settlement=%s)",
-		async (settlementProfile) => {
-			const result = await runSharedPlaneScenario({ nonCreatorWriter: true, settlementProfile });
-			expect(result.rebaseOutbox).toMatchObject({
-				kind: "displaced",
-				ok: true,
-				source: {
-					authorSequence: 0,
-					vertexDigest: result.sourceBootstrapDigest,
-				},
-			});
-		}
-	);
+	it.each([
+		["legacy pending", { leaveSourceBootstrapPending: true, settlementProfile: false }],
+		["settlement published", { leaveSourceBootstrapPending: false, settlementProfile: true }],
+	] as const)("[RED] surfaces an ordinary same-store non-creator sequence-zero row: %s", async (_label, scenario) => {
+		const result = await runSharedPlaneScenario({ nonCreatorWriter: true, ...scenario });
+		expect(result.rebaseOutbox).toMatchObject({
+			kind: "displaced",
+			ok: true,
+			source: {
+				authorSequence: 0,
+				vertexDigest: result.sourceBootstrapDigest,
+			},
+		});
+	});
+
+	it("[control] excludes the creator bootstrap by its authenticated activation identity", async () => {
+		const result = await runSharedPlaneScenario({ settlementProfile: true });
+		expect(result.rebaseOutbox).toMatchObject({
+			kind: "displaced",
+			ok: true,
+			source: {
+				authorSequence: 1,
+				vertexDigest: result.sourceDigest,
+			},
+		});
+		expect(result.sourceDigest).not.toBe(result.sourceBootstrapDigest);
+	});
 
 	it("[RED] refuses a settlement issued/outbox mismatch with the existing corruption classification", async () => {
 		const opened = await node();

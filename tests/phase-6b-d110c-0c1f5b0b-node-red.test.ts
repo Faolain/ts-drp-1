@@ -233,14 +233,15 @@ describe("D.110c-0c1f5b0b Node settlement RED", () => {
 
 	it("[RED] makes completeRebaseSource unreachable under settlement while keeping the callable legacy seam", async () => {
 		const opened = await node();
-		const readIssued = opened.issuanceStore.readIssued;
+		const readIssued = opened.issuanceStore.readIssued as Mock;
+		const recoveryReadCount = readIssued.mock.calls.length;
 		const result = await opened.plane.completeRebaseSource({ authorSequence: 0, digest: "0".repeat(64) });
 		expect(result).toEqual({
 			detail: "v3 displaced source completion is unavailable under settlement",
 			kind: "not-active",
 			ok: false,
 		});
-		expect(readIssued).not.toHaveBeenCalled();
+		expect(readIssued).toHaveBeenCalledTimes(recoveryReadCount);
 	});
 
 	it("[control] keeps creator-trusted-v1 fence issuance rejected before plan or issuance work", async () => {

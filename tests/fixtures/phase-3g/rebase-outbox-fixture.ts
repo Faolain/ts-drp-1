@@ -73,6 +73,7 @@ interface PreparedPlane {
 }
 
 export interface SharedPlaneScenarioOptions {
+	readonly leaveSourceBootstrapPending?: boolean;
 	readonly nonCreatorWriter?: boolean;
 	readonly omitTargetBootstrap?: boolean;
 	readonly omitSourceAuthority?: boolean;
@@ -466,7 +467,12 @@ function sourceOperations(profile: SourceOperationProfile): readonly Readonly<{
 		]);
 	}
 	if (profile === "join") {
-		return Object.freeze([Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "join" }) })]);
+		return Object.freeze([
+			Object.freeze({
+				logicalTime: 3,
+				operation: Object.freeze({ action: "join", clientId: "phase-3g-displaced-client" }),
+			}),
+		]);
 	}
 	if (profile === "structural") {
 		return Object.freeze([
@@ -711,14 +717,17 @@ export async function runSharedPlaneScenario(
 	options: SharedPlaneScenarioOptions = {}
 ): Promise<SharedPlaneScenarioResult> {
 	const objectId = `creator:${"d".repeat(32)}`;
+	const joinCatalog = options.sourceOperationProfile === "join";
 	const nonCreatorAnchorSeed = options.nonCreatorWriter === true ? "56".repeat(32) : undefined;
 	const source = await preparePlane(objectId, "7".repeat(64), "source", {
 		...(nonCreatorAnchorSeed === undefined ? {} : { anchorPrivateKeySeedHex: nonCreatorAnchorSeed }),
 		settlementProfile: options.settlementProfile,
+		terminalCatalog: joinCatalog,
 	});
 	const target = await preparePlane(objectId, "8".repeat(64), "target", {
 		...(nonCreatorAnchorSeed === undefined ? {} : { anchorPrivateKeySeedHex: nonCreatorAnchorSeed }),
 		settlementProfile: options.settlementProfile,
+		terminalCatalog: joinCatalog,
 	});
 	const mismatchedSource =
 		options.sourceAuthorityMutation === "object-context"
@@ -746,7 +755,19 @@ export async function runSharedPlaneScenario(
 		const scope = Object.freeze({ author: source.author, objectId });
 		sourceStore = createNodeDurableIssuanceStore({ primaryFilename: lineageFilename });
 		const sourceBootstrap = await sourceStore.transactIssue(scope, (authorSequence) =>
-			Promise.resolve(commitFor(source, authorSequence, Object.freeze({ action: "add", value: 0 })))
+			Promise.resolve(
+				commitFor(
+					source,
+					authorSequence,
+					joinCatalog
+						? Object.freeze({
+								action: "message",
+								clientOperationId: "phase-3g-source-bootstrap",
+								text: "source-bootstrap",
+							})
+						: Object.freeze({ action: "add", value: 0 })
+				)
+			)
 		);
 		sourceJournal = await installJournal(source);
 		const sourceRecovery = await recoverV3LiveReplica({
@@ -765,9 +786,11 @@ export async function runSharedPlaneScenario(
 			onAdmittedVertex: () => undefined,
 		});
 		if (!sourceActivated.ok) throw new TypeError(`Phase 3g source activation failed: ${sourceActivated.kind}`);
-		const bootstrapPublication = await sourceActivated.handle.publishPending();
-		if (!bootstrapPublication.ok || bootstrapPublication.kind !== "published") {
-			throw new TypeError("Phase 3g source bootstrap publication failed");
+		if (options.leaveSourceBootstrapPending !== true) {
+			const bootstrapPublication = await sourceActivated.handle.publishPending();
+			if (!bootstrapPublication.ok || bootstrapPublication.kind !== "published") {
+				throw new TypeError("Phase 3g source bootstrap publication failed");
+			}
 		}
 		const profile = options.sourceOperationProfile ?? "singleton";
 		const operations: ReturnType<typeof sourceOperations> = sourceOperations(profile);
@@ -836,7 +859,19 @@ export async function runSharedPlaneScenario(
 			options.omitTargetBootstrap === true
 				? undefined
 				: await targetStore.transactIssue(scope, (authorSequence) =>
-						Promise.resolve(commitFor(target, authorSequence, Object.freeze({ action: "add", value: 0 })))
+						Promise.resolve(
+							commitFor(
+								target,
+								authorSequence,
+								joinCatalog
+									? Object.freeze({
+											action: "message",
+											clientOperationId: "phase-3g-target-bootstrap",
+											text: "target-bootstrap",
+										})
+									: Object.freeze({ action: "add", value: 0 })
+							)
+						)
 					);
 		let recoveryIssuanceStore: DurableIssuanceStore = targetStore;
 		const syntheticRowCount = options.syntheticCurrentQuarantinedRowCount ?? options.syntheticDisplacedRowCount;
