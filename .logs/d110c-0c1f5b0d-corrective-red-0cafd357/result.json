@@ -1,0 +1,23 @@
+{
+	"baseCommit": "adab0f56428bf0290a4437c83083db18e17eb2dc",
+	"browser": {
+		"expected": 0,
+		"flaky": 0,
+		"skipped": 0,
+		"unexpected": 1
+	},
+	"changedPaths": [
+		"packages/storage-browser/tests/assets/phase-6b-issuance-retention-entry.ts",
+		"packages/storage-browser/tests/phase-6b-issuance-retention-red.pw.ts",
+		"tests/fixtures/phase-6b-d110c-0c1f5b0s/settlement-plan-contract.ts",
+		"tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts"
+	],
+	"failed": 3,
+	"files": 1,
+	"passed": 9,
+	"redCommit": "0cafd35762a8a1c3c5767c89227f9f42c5e89729",
+	"skipped": 0,
+	"stopRuleFired": false,
+	"tests": 12,
+	"topLevelErrors": 0
+}
