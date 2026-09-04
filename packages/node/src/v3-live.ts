@@ -13,14 +13,15 @@ import {
 } from "@ts-drp/compaction/blueprint-fold";
 import { exportBlueprintSnapshotPayload, importBlueprintSnapshotPayload } from "@ts-drp/compaction/blueprint-snapshot";
 import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
-import type {
-	DurableBuildAndSign,
-	DurableIssuanceOutboxRecord,
-	DurableIssuanceStore,
-	DurableIssueCommit,
-	DurableIssueScope,
-	DurableOutboxPageInput,
-	DurableOutboxPublicationTransitionInput,
+import {
+	copySettlementPlan,
+	type DurableBuildAndSign,
+	type DurableIssuanceOutboxRecord,
+	type DurableIssuanceStore,
+	type DurableIssueCommit,
+	type DurableIssueScope,
+	type DurableOutboxPageInput,
+	type DurableOutboxPublicationTransitionInput,
 } from "@ts-drp/issuance-store";
 import { durableIssuanceLineageConsumed, type DurableIssuancePruningReceipt } from "@ts-drp/issuance-store/maintenance";
 import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
@@ -3498,7 +3499,8 @@ function isAuthorFenceOperation(value: unknown): boolean {
 	return isObject(value) && Reflect.get(value, "action") === AUTHOR_FENCE_ACTION;
 }
 
-function isControlOperation(value: unknown): boolean {
+function isControlOperation(value: unknown, profileId: string): boolean {
+	if (settlementProfileFor(profileId) !== "v1") return false;
 	if (!isObject(value)) return false;
 	const action = Reflect.get(value, "action");
 	return action === AUTHOR_FENCE_ACTION || action === "causalJoin" || action === "join";
@@ -3905,7 +3907,10 @@ async function handleV3Ingress(
 		ingressFailureLog("admission-rejected");
 		return false;
 	}
-	const controlOperation = isControlOperation(authenticated.vertex.operation);
+	const controlOperation = isControlOperation(
+		authenticated.vertex.operation,
+		registration.payload.trust.trust.profileId
+	);
 	const alreadyAccepted = registration.index.has(authenticated.digest);
 	if (!alreadyAccepted && registration.operationAdmissionHalted) {
 		ingressFailureLog("admission-rejected");
@@ -5532,7 +5537,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("admission-rejected", "v3 journal row is not authenticated");
 				}
 				if (
-					(!isControlOperation(authenticated.vertex.operation) &&
+					(!isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId) &&
 						!acceptedApplicationOperation(
 							payload,
 							authenticated.vertex.operation,
@@ -5580,7 +5585,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				if (authorFence && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
 					return recoveryFailure("admission-rejected", "v3 journal fence profile is invalid");
 				}
-				const controlOperation = isControlOperation(authenticated.vertex.operation);
+				const controlOperation = isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId);
 				const candidate = controlOperation
 					? null
 					: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
@@ -5611,7 +5616,9 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
 				}
 				retainCloseVertex(closeVertices, closeAuthors, authorVertexCounts, authenticated, closeCharges);
-				if (isControlOperation(authenticated.vertex.operation)) controlVertices.add(authenticated.digest);
+				if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
+					controlVertices.add(authenticated.digest);
+				}
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -5645,23 +5652,18 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			if (row === undefined || (afterKey !== undefined && row.authorSequence <= afterKey[2])) {
 				return recoveryFailure("issuance-rejected", "v3 recovery outbox record is invalid");
 			}
-			let issuedRow = row;
-			if (settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
-				// Legacy recovery retains the defensive issued/outbox cross-read byte-for-byte.
-				let issuedCommit: unknown;
-				try {
-					issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
-				} catch {
-					return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
-				}
-				const matched = outboxRowSnapshot(
-					ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
-					selectedScope
-				);
-				if (matched === undefined || !matchingOutboxRows(row, matched)) {
-					return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
-				}
-				issuedRow = matched;
+			let issuedCommit: unknown;
+			try {
+				issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
+			} catch {
+				return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
+			}
+			const issuedRow = outboxRowSnapshot(
+				ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+				selectedScope
+			);
+			if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) {
+				return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
 			}
 			let classified: ClassifiedPlaneVertex | undefined;
 			try {
@@ -5709,7 +5711,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				const displacedAction = Reflect.get(displacedOperation, "action");
 				const settlementSourceControl =
 					settlementProfileFor(payload.trust.trust.profileId) === "v1" &&
-					(isControlOperation(displacedOperation) || displacedAction === "acl");
+					(isControlOperation(displacedOperation, payload.trust.trust.profileId) || displacedAction === "acl");
 				if (
 					(!settlementSourceControl &&
 						!acceptedApplicationOperation(
@@ -5736,7 +5738,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			if (authorFence && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
 				return recoveryFailure("admission-rejected", "v3 recovery fence profile is invalid");
 			}
-			const controlOperation = isControlOperation(authenticated.vertex.operation);
+			const controlOperation = isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId);
 			if (
 				(!controlOperation &&
 					!acceptedApplicationOperation(payload, authenticated.vertex.operation, authenticated.admitted.logicalTime)) ||
@@ -5831,7 +5833,9 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
 				}
 				retainCloseVertex(closeVertices, closeAuthors, authorVertexCounts, authenticated, closeCharges);
-				if (isControlOperation(authenticated.vertex.operation)) controlVertices.add(authenticated.digest);
+				if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
+					controlVertices.add(authenticated.digest);
+				}
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -6294,7 +6298,7 @@ async function issueOneVertex(
 	if (authorized === undefined) {
 		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
 	}
-	const controlOperation = isControlOperation(operation);
+	const controlOperation = isControlOperation(operation, registration.payload.trust.trust.profileId);
 	const proposedAcl = controlOperation ? null : aclOperation(scope.author, "0".repeat(64), operation);
 	if (
 		!controlOperation &&
@@ -6424,15 +6428,15 @@ async function issueOneVertex(
 		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
 			registration.operationAdmissionHalted = true;
 		}
-		if (issuanceOutcomeUnknown) {
-			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
-		}
 		if (requireTerminalAuthorization && terminalTransactionStarted) {
 			return internalLocalIssueFailure(
 				"issuance-rejected",
 				"v3 terminal issue transaction outcome is unknown",
 				"outcome-unknown"
 			);
+		}
+		if (issuanceOutcomeUnknown) {
+			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
 		}
 		return capacityRejected
 			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
@@ -6590,13 +6594,16 @@ async function issueAuthorFence(
 	}
 	let plan;
 	try {
-		plan = await registration.issuanceStore.readSettlementPlan(registration.issuanceScope);
+		plan = copySettlementPlan(
+			await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
+			registration.issuanceScope
+		);
 	} catch {
 		registration.operationAdmissionHalted = true;
 		return localIssueFailure("issuance-rejected", "v3 author fence plan read failed");
 	}
 	if (
-		plan === null ||
+		plan === undefined ||
 		plan.fenceSequence !== null ||
 		plan.entries.some((entry) => entry.disposition === "manual-review")
 	) {
@@ -6760,7 +6767,8 @@ function validRebaseRow(registration: V3PlaneRegistration, classified: Classifie
 	if (operation === undefined) return false;
 	const settlementSourceControl =
 		settlementProfileFor(registration.payload.trust.trust.profileId) === "v1" &&
-		(isControlOperation(operation) || Reflect.get(operation, "action") === "acl");
+		(isControlOperation(operation, registration.payload.trust.trust.profileId) ||
+			Reflect.get(operation, "action") === "acl");
 	return (
 		settlementSourceControl ||
 		acceptedApplicationOperation(source, operation, classified.authenticated.admitted.logicalTime)
@@ -6788,10 +6796,12 @@ function rebaseIntents(
 		);
 	}
 	if (
-		isControlOperation(sourceOperation) ||
+		isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
 		(typeof action === "string" &&
 			isReservedBatchAction(action) &&
-			settlementProfileFor(payload.trust.trust.profileId) !== "v1")
+			settlementProfileFor(payload.trust.trust.profileId) !== "v1" &&
+			action !== "causalJoin" &&
+			action !== "join")
 	) {
 		return ObjectFreeze([]);
 	}
@@ -6941,8 +6951,8 @@ async function readRebaseOutbox(
 				}
 				if (
 					!historical &&
-					(classified.row.authorSequence === 0 ||
-						(crossSource !== undefined && classified.authenticated.digest === crossSource.activationVertexDigest))
+					((crossSource !== undefined && classified.row.authorSequence === 0) ||
+						classified.authenticated.digest === registration.displacedSource?.activationVertexDigest)
 				) {
 					continue;
 				}
