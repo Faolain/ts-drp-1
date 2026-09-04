@@ -284,7 +284,11 @@ describe("Phase -1e(ii) golden-vector and oracle-freeze gates", () => {
 			const preimage = build(input);
 			expect(preimage, `${vector.id}: vector value must be the registry-normalized preimage`).toEqual(expectedPreimage);
 			for (const field of definition?.fields ?? []) {
-				expect(Object.hasOwn(input, field.name), `${vector.id}: input omits registered field ${field.name}`).toBe(true);
+				const supplied = Object.hasOwn(input, field.name);
+				if (field.required) {
+					expect(supplied, `${vector.id}: input omits required registered field ${field.name}`).toBe(true);
+				}
+				if (!supplied) continue;
 				if (field.type === "bytes") {
 					expect(
 						input[field.name],

@@ -12,6 +12,14 @@ import coverageVectors from "./fixtures/registry-coverage-vectors.json" with { t
 
 function placeholder(field: RegistryField): unknown {
 	if (field.const !== null && field.const !== undefined) return field.const;
+	if (field.name === "lineagePolicy") {
+		return {
+			mode: "fixed-creator",
+			maximumEpochs: null,
+			allowedUpgrade: "none",
+			recursiveVerificationKeyId: null,
+		};
+	}
 	if (field.type === "enum") {
 		const values = field.constraints.values;
 		return Array.isArray(values) ? values[0] : "value";

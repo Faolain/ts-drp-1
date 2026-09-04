@@ -104,6 +104,14 @@
 					"constraints": { "minimum": 65536, "maximum": 1073741824 },
 					"required": true,
 					"sortRule": null
+				},
+				{
+					"name": "lineagePolicy",
+					"type": "canonical-object",
+					"const": null,
+					"constraints": {},
+					"required": false,
+					"sortRule": null
 				}
 			]
 		},

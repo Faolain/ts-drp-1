@@ -18,6 +18,11 @@
 		]
 	},
 	{
+		"id": "parameters-lineage-policy-coverage",
+		"kind": "parameters",
+		"covers": ["lineagePolicy"]
+	},
+	{
 		"id": "vertex-coverage",
 		"kind": "vertex",
 		"covers": [

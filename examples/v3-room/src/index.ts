@@ -70,6 +70,7 @@ const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
 	"exactCanonicalSignerSetBytes",
 ] as const);
 const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
+const UNSUPPORTED_LINEAGE_POLICY = "D110C_LINEAGE_POLICY_UNSUPPORTED";
 // Object framing plus the nine encoded keys and the fixed kind, digest and version values.
 // The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
 const CREATOR_INVITE_FIXED_CANONICAL_BYTE_LENGTH = 346;
@@ -624,6 +625,22 @@ function encodeCreatorInvite(material: V3RoomCreatorInviteMaterial): string {
 	);
 }
 
+function assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes: Uint8Array): void {
+	const parameters = decodeCanonical(exactCanonicalParametersCarrierBytes);
+	if (parameters === null || typeof parameters !== "object" || Array.isArray(parameters)) return;
+	if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+	const lineagePolicy = (parameters as Readonly<Record<string, unknown>>).lineagePolicy;
+	if (lineagePolicy === null || typeof lineagePolicy !== "object" || Array.isArray(lineagePolicy)) {
+		throw new TypeError("v3 room genesis lineage policy is invalid");
+	}
+	const mode = (lineagePolicy as Readonly<Record<string, unknown>>).mode;
+	if (mode === "fixed-creator") return;
+	if (mode === "ephemeral-chain" || mode === "durable-pinned" || mode === "durable-recursive") {
+		throw new TypeError(UNSUPPORTED_LINEAGE_POLICY);
+	}
+	throw new TypeError("v3 room genesis lineage policy is invalid");
+}
+
 function inviteBytes(values: Record<string, unknown>, field: string): Uint8Array {
 	const value = values[field];
 	if (!(value instanceof Uint8Array) || value.byteLength === 0) {
@@ -673,11 +690,13 @@ function decodeCreatorInvite(invite: string): V3RoomCreatorInviteMaterial {
 	if (detachedGenesisSignature.byteLength !== 64) {
 		throw new TypeError("v3 room creator invite signature is invalid");
 	}
+	const exactCanonicalParametersCarrierBytes = inviteBytes(values, "exactCanonicalParametersCarrierBytes");
+	assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes);
 	return Object.freeze({
 		detachedGenesisSignature,
 		exactCanonicalLatchedAclBytes: inviteBytes(values, "exactCanonicalLatchedAclBytes"),
 		exactCanonicalGenesisAnchorPreimageBytes: inviteBytes(values, "exactCanonicalGenesisAnchorPreimageBytes"),
-		exactCanonicalParametersCarrierBytes: inviteBytes(values, "exactCanonicalParametersCarrierBytes"),
+		exactCanonicalParametersCarrierBytes,
 		exactCanonicalProfileBytes: inviteBytes(values, "exactCanonicalProfileBytes"),
 		exactCanonicalSignerSetBytes: inviteBytes(values, "exactCanonicalSignerSetBytes"),
 		pinnedGenesisAnchorDigest: values.pinnedGenesisAnchorDigest,
@@ -728,6 +747,7 @@ export async function createV3RoomCreatorInviteMaterial(
 		record.exactCanonicalParametersCarrierBytes,
 		"exactCanonicalParametersCarrierBytes"
 	);
+	assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes);
 	const exactCanonicalProfileBytes = strictCanonicalBytes(
 		record.exactCanonicalProfileBytes,
 		"exactCanonicalProfileBytes"

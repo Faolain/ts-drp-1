@@ -489,6 +489,35 @@ function assertProfileConstraints(document: RegistryDocument, output: Readonly<R
 	}
 }
 
+const lineagePolicyKeys = Object.freeze(["mode", "maximumEpochs", "allowedUpgrade", "recursiveVerificationKeyId"]);
+const lineagePolicyModes = new Set(["fixed-creator", "ephemeral-chain", "durable-pinned", "durable-recursive"]);
+
+function assertLineagePolicy(value: unknown): void {
+	const policy = assertPlainObject(value, "parameters.lineagePolicy");
+	const keys = Object.keys(policy);
+	if (keys.length !== lineagePolicyKeys.length || lineagePolicyKeys.some((key) => !Object.hasOwn(policy, key))) {
+		throw new TypeError("parameters.lineagePolicy must contain exactly the registered fields");
+	}
+	if (typeof policy.mode !== "string" || !lineagePolicyModes.has(policy.mode)) {
+		throw new TypeError("parameters.lineagePolicy.mode is invalid");
+	}
+	if (
+		policy.maximumEpochs !== null &&
+		(!Number.isSafeInteger(policy.maximumEpochs) || (policy.maximumEpochs as number) < 0)
+	) {
+		throw new TypeError("parameters.lineagePolicy.maximumEpochs must be null or a non-negative safe integer");
+	}
+	if (policy.mode !== "ephemeral-chain" && policy.maximumEpochs !== null) {
+		throw new TypeError("parameters.lineagePolicy.maximumEpochs is available only for ephemeral-chain");
+	}
+	if (policy.allowedUpgrade !== "none" && policy.allowedUpgrade !== "recursive-v1") {
+		throw new TypeError("parameters.lineagePolicy.allowedUpgrade is invalid");
+	}
+	if (policy.recursiveVerificationKeyId !== null && typeof policy.recursiveVerificationKeyId !== "string") {
+		throw new TypeError("parameters.lineagePolicy.recursiveVerificationKeyId must be a string or null");
+	}
+}
+
 function assertKindConstraints(
 	document: RegistryDocument,
 	kind: string,
@@ -502,6 +531,7 @@ function assertKindConstraints(
 		if ((output.snapshotChunkBytes as number) > (output.maxSnapshotBytes as number)) {
 			throw new TypeError("parameters.snapshotChunkBytes cannot exceed maxSnapshotBytes");
 		}
+		if (Object.hasOwn(output, "lineagePolicy")) assertLineagePolicy(output.lineagePolicy);
 		return;
 	}
 	if (kind === "cutValue") {

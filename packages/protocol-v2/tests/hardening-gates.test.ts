@@ -22,6 +22,14 @@ function hex(bytes: Uint8Array): string {
 
 function validFieldValue(kind: string, field: RegistryField): unknown {
 	if (field.const !== null && field.const !== undefined) return field.const;
+	if (kind === "parameters" && field.name === "lineagePolicy") {
+		return {
+			mode: "fixed-creator",
+			maximumEpochs: null,
+			allowedUpgrade: "none",
+			recursiveVerificationKeyId: null,
+		};
+	}
 	if (field.type.includes("array")) {
 		if (field.sortRule === "index-ascending") {
 			return [
