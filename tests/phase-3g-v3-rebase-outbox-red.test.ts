@@ -75,7 +75,14 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 			source: {
 				author: structural.sourceRowAuthor,
 				authorSequence: 1,
-				intents: [{ logicalTime: 3, operation: { action: "causalJoin" } }],
+				intents: [
+					{
+						logicalTime: 3,
+						operation: { action: "causalJoin" },
+						operationCount: 1,
+						operationIndex: 0,
+					},
+				],
 				vertexDigest: structural.sourceDigest,
 			},
 		});
