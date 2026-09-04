@@ -1,0 +1,54 @@
+{
+	"verdict": "BLOCK",
+	"summary": "RED is genuinely causal (21 selected, 2 controls pass, 19 fail at the intended seams with the exact expected diagnostics; no import/export/mock/stale-build failures) and custody is clean (signed G GREEN, exactly the five declared production paths, legacy prunePublishedPrefix byte-equivalent, no schema/wire/crypto/dependency change). The three backends correctly implement one storage-neutral authenticated compare-and-delete owner: transaction-local full-scope plan gate (absent plan, null fence, manual-review, unlinked non-expire entries anywhere), monotone watermark CAS with expected lineage/prior watermark, mixed-epoch and pending/published deletion, idempotent replay, and full rollback on partial deletion. The recovery bound is exactly (active + 2 rollback) = maxEpochVertices * 3. Closure is blocked by the production wiring: pruneAuthenticatedSettledPrefix is invoked only as a post-hoc, non-deleting replay of a legacy prunePublishedPrefix receipt inside reclaimV3RuntimeKernel (v3-live.ts:3181-3213), so the deleting mutation on every reachable path remains the legacy single-epoch published-only pruner with the range-local plan gate, the full-scope gate runs only after rows are already deleted, and mixed-epoch/pending authenticated reclamation is unreachable in production; the kernel itself is reachable only via reclaimInstalledV3Runtime, which has no production caller. The GREEN README itself describes this as a replay, and the 'production invocation' evidence is a source-substring assertion that cannot distinguish replay from deletion.",
+	"p0_count": 0,
+	"p1_count": 2,
+	"p2_count": 4,
+	"findings": [
+		{
+			"severity": "P1",
+			"title": "Authenticated prune is a post-hoc replay, not the deleting mutation; the full-scope plan gate runs after deletion (delete-then-gate)",
+			"evidence": "packages/node/src/v3-live.ts:3184-3202 derives an expected prior watermark from receipts.issuance.deletedAuthorSequenceRange and calls maintenance.pruneAuthenticatedSettledPrefix, then requires replay.deletedAuthorSequenceRange === null (v3-live.ts:3203-3209) — the call is expected to delete nothing. The receipt is produced by legacy prunePublishedPrefix (tests/fixtures/phase-6b/runtime-reclamation-contract.ts:337,468), whose plan gate remains range-local (packages/storage-node/src/internal/node-issuance-store.ts:835-845: only entries with sourceSequence inside [from, through] refuse; entries outside the selected prefix are ignored) and which still enforces single-epoch/published-only (:875-880). Consequently a plan with an unlinked or manual-review entry outside the selected prefix does not stop the legacy deletion; the authenticated full-scope gate (settlementPlanPermitsAuthenticatedPruning, node-issuance-store.ts:795-801) fires only afterward on the replay, which then throws ISSUANCE_RETRY_REQUIRED mapped to D109D_RUNTIME_NOT_READY (v3-live.ts:3210-3212) with the rows already gone. This violates design.md 'pruneAuthenticatedSettledPrefix refuses any row referenced by an unlinked plan entry', crash-matrix row 'prune with an unlinked plan entry | refused', and the review requirement that the gate reject every unlinked non-expire entry anywhere before deleting. Governing plan (:98806) requires the method to BE the 'monotone CAS deletion across old epochs and pending/published rows'.",
+			"required_action": "Make the authenticated method the mutation that performs the deletion on the receipt path: under settlementProfileFor(...) === 'v1', the cleanup/reclamation owner must call pruneAuthenticatedSettledPrefix to delete (and accept its non-null deletedAuthorSequenceRange), not replay a legacy prunePublishedPrefix receipt; the legacy pruner must not run first for settlement-profile scopes. Re-run focused/retained/isolated gates with the invocation test strengthened so it fails on the replay shape.",
+			"owner": "f5b0d"
+		},
+		{
+			"severity": "P1",
+			"title": "No production invocation exists and mixed-epoch pending/published reclamation is unreachable in production",
+			"evidence": "reclaimInstalledV3Runtime (packages/node/src/internal/runtime-reclamation.ts:152) — the only route to reclaimV3RuntimeKernel — has zero production callers: repo-wide search finds references only in tests/phase-6b-runtime-reclamation-red.test.ts, tests/fixtures/phase-6b/runtime-reclamation-contract.ts, tests/fixtures/phase-6c/retained-heap-worker.ts and its own definition; creator-close.ts imports only the release-owner functions. No product path invokes prunePublishedPrefix either (confirmed by the prior audit quoted in .logs/d110c-0c1-plan-confirmation-617c3cfa and by search). Even if the kernel were called, the receipt facts it consumes are constrained by planClosedEpochCleanup's copiedIssuance (packages/node/src/internal/closed-epoch-cleanup.ts:416-420) to epoch === closedEpoch and publishState === 'published' only, so the authenticated method's mixed-epoch/pending capability can never be exercised by this path. The 'production invocation' RED/GREEN test (tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts:300-304) is a source-substring check satisfied by the replay call. Design f5b0d requires 'its production invocation on every peer after durable checkpoint staging, verified adoption, rollback-generation retention, availability and expected-head checks'; the retained finding 'nothing prunes in production; recovery-scan cap fails with age: f5b0d' therefore remains unfixed — with the new 3*maxEpochVertices cap (v3-live.ts:4492) and no real pruning, rooms older than three epochs still hit an age-dependent recovery failure, merely postponed from one epoch to three.",
+			"required_action": "Wire the authenticated deletion into the real closed-epoch cleanup execution path on every peer (or, if D109d caller wiring is genuinely a later slice's scope, obtain an explicit accepted-design amendment moving 'production invocation' out of f5b0d and record the deferral with an owner); prove reachability with a behavioral test, not a source-shape assertion.",
+			"owner": "f5b0d"
+		},
+		{
+			"severity": "P2",
+			"title": "Authenticated prune drops all epoch validation, including future/current-epoch rows",
+			"evidence": "In all three backends the authenticated path skips the legacy epoch check with no replacement ceiling: node-issuance-store.ts:875, browser-issuance-store.ts:798-800, conformance.ts:434 guard decoded.epoch !== captured.closedEpoch behind !authenticatedSettled; captureDurableIssuancePruningInput (packages/issuance-store/src/maintenance.ts:175-213) validates closedEpoch only as a safe integer. A caller holding the maintenance capability can therefore delete rows whose decoded epoch is greater than the claimed closedEpoch (current open epoch included) whenever the plan gate passes. Latent today because production never deletes via this method, but the storage-neutral contract should fail closed outside the authenticated window (e.g. decoded.epoch <= closedEpoch). No RED case pins it.",
+			"required_action": "Add a fail-closed per-row epoch ceiling (decoded.epoch <= captured.closedEpoch, or the exact window the accepted design names) to the authenticated path in all three backends plus a conformance vector, or record an explicit design citation that caller-authenticated epoch trust is intended.",
+			"owner": "f5b0d"
+		},
+		{
+			"severity": "P2",
+			"title": "Registry boundary: 'package-internal' hooks are publicly exported, and a pre-existing Symbol.for global is trusted without shape validation",
+			"evidence": "packages/issuance-store/package.json exports './maintenance' publicly, so bindDurableIssuancePruningMaintenance and durableIssuancePruningMaintenanceForStore (maintenance.ts:78-98) are importable by any consumer despite the 'package-internal owner hook' docstrings; any same-realm holder of an exact facade can resolve the full mutation capability (equivalent in reach to the pre-existing per-backend resolvers, so no new authority class, and identity binding plus first-bind-wins with backend throw-on-duplicate at node-issuance-store.ts:1338-1341, browser-issuance-store.ts:1369-1372, conformance.ts:483-495 prevents replacement). Separately, maintenance.ts:55-56 adopts maintenanceGlobal[Symbol.for(...)] verbatim if present: same-realm code evaluated before this module can pre-install an interposed registry whose bind/resolve it controls, and the non-configurable defineProperty guard (maintenance.ts:67-75) only applies when this module installs first. Same-realm code is already inside the trust boundary, so this is a hardening/disposition item, not a live exploit.",
+			"required_action": "Either restrict the export surface (or correct the docstrings and record the capability model as accepted), and validate the shape of a pre-existing global registry (or fail closed on one) with a short disposition note in the slice evidence.",
+			"owner": "f5b0d"
+		},
+		{
+			"severity": "P2",
+			"title": "Inherited f5b0a corrective suite fails 3/4 at GREEN",
+			"evidence": ".logs/d110c-0c1f5b0d-green-1063feca/inherited-f5b0a-corrective.json (+ .exit=1): tests/d110c-0c1f5b0a-corrective-red.test.ts 'binds genesis advance to the exported settlement sentinel and retains settled-v1 digest adjacency' fails expecting ok:true from inspectCreatorAuthorSettlementAdvance (packages/node/src/internal/creator-transition-advance.ts:211). Verified the changed paths cannot cause it: creator-transition-advance.ts imports only canonical/control-plane/protocol-v3/storage (no v3-live, no issuance-store), and the GREEN commit touched none of those. Genuinely inherited, but it is a red test in the tree and needs its owning slice's disposition rather than silent carry.",
+			"required_action": "Route to the f5b0a owner for fix or documented acceptance; keep the inherited.json evidence attached to that slice, not this one.",
+			"owner": "inherited"
+		},
+		{
+			"severity": "P2",
+			"title": "Broad package typecheck scripts remain red on historical test-tree diagnostics",
+			"evidence": "typecheck-status.txt: storage-browser=1, storage-node=1, node=1; the diagnostics are TS6059/TS6307 rootDir/file-list and TS2307 test-alias errors in tests/ trees (e.g. tests/browser/fixtures/blueprint-fold.page.ts, tests/assets/phase-6b-issuance-retention-entry.ts), none in the five changed owners; all four production build configs pass (build-status.txt all 0), including in the isolated clean checkout. Inheritance claim verified credible.",
+			"required_action": "None for f5b0d; keep the per-config production typecheck as the gate and leave the historical test-tree cleanup to its owner.",
+			"owner": "inherited"
+		}
+	],
+	"causal_red_confirmed": true,
+	"scope_preserved": true,
+	"evidence_sufficient": false
+}
