@@ -4774,6 +4774,9 @@ function decideReceivedVertex(input: AdmitReceivedVertexInput): ReceivedVertexDe
 		return { kind: "admission-rejected" };
 	}
 	const operation = authenticated.preimage.operation;
+	if (isPlainRecord(operation) && operation.action === AUTHOR_FENCE_ACTION) {
+		return { authenticated, kind: "admitted" };
+	}
 	const schema = operationSchemaForPreparedAdmission(operation, preparedState);
 	if (
 		schema === undefined ||

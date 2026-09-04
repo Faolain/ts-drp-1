@@ -16,6 +16,7 @@ interface RegistryField {
 	readonly const: unknown;
 	readonly constraints: Readonly<Record<string, unknown>>;
 	readonly name: string;
+	readonly required: boolean;
 	readonly sortRule: string | null;
 	readonly type: string;
 }
@@ -187,17 +188,17 @@ function validateSignedVotes(value: unknown): boolean {
 
 function validateRegisteredRecord(kindName: string, value: unknown): value is Readonly<Record<string, unknown>> {
 	const kind = registry.kinds[kindName];
+	if (kind === undefined || !plainRecord(value)) return false;
+	const actualKeys = Reflect.ownKeys(value);
+	const allowedKeys = kind.fields.map(({ name }) => name);
 	if (
-		kind === undefined ||
-		!plainRecord(value) ||
-		!exactRecordKeys(
-			value,
-			kind.fields.map(({ name }) => name)
-		)
+		actualKeys.some((key) => typeof key !== "string" || !allowedKeys.includes(key)) ||
+		kind.fields.some(({ name, required }) => required && !Object.hasOwn(value, name))
 	) {
 		return false;
 	}
 	for (const field of kind.fields) {
+		if (!Object.hasOwn(value, field.name)) continue;
 		const candidate = value[field.name];
 		if (field.const !== null && !Object.is(candidate, field.const)) return false;
 		switch (field.type) {

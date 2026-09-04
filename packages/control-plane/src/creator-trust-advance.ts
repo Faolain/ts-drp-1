@@ -1,7 +1,7 @@
 import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { GenerationRef } from "@ts-drp/storage";
 
-import { type DetachedClosureCandidate, inspectTrustClosure } from "./anchor-trust.js";
+import { type DetachedClosureCandidate, inspectTrustClosure, trustScannableClosure } from "./anchor-trust.js";
 
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 
@@ -154,8 +154,10 @@ export function inspectCreatorTrustAdvance(input: InspectCreatorTrustAdvanceInpu
 	try {
 		if (input === null || typeof input !== "object" || Array.isArray(input)) return rejected("TRUST_CLOSURE_INVALID");
 		const currentClosure = Object.freeze([...input.current.closure].sort(compareRef));
-		const current = inspectTrustClosure({ candidates: input.current.candidates, closure: currentClosure });
-		const proposed = inspectTrustClosure(input.proposed);
+		const current = inspectTrustClosure(
+			trustScannableClosure({ candidates: input.current.candidates, closure: currentClosure })
+		);
+		const proposed = inspectTrustClosure(trustScannableClosure(input.proposed));
 		const proofRefs = copyProofRefs(input.proofRefs);
 		if (!current.ok || !proposed.ok || proofRefs === undefined) return rejected("TRUST_CLOSURE_INVALID");
 		const combined = exactCombinedClosure(currentClosure, current.trustRef, proofRefs, proposed.trustRef);

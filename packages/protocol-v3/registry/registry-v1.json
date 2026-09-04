@@ -54,6 +54,17 @@
 			"encoding": "canonical-object",
 			"fields": [
 				{
+					"name": "authorShareMultiplier",
+					"type": "safe-integer",
+					"const": null,
+					"constraints": {
+						"minimum": 1,
+						"maximum": 1000000
+					},
+					"required": false,
+					"sortRule": null
+				},
+				{
 					"name": "maxEpochVertices",
 					"type": "safe-integer",
 					"const": null,

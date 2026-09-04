@@ -432,6 +432,18 @@ export function inspectTrustClosure(input: InspectTrustClosureInput): InspectTru
 }
 
 /**
+ * Keeps auxiliary large-record candidates opaque to the trust-only closure scan.
+ * @param input - A closure whose auxiliary candidates may exceed the trust scan ceiling.
+ * @returns The same closure with only trust-scannable candidates attached.
+ */
+export function trustScannableClosure(input: InspectTrustClosureInput): InspectTrustClosureInput {
+	return Object.freeze({
+		candidates: Object.freeze(input.candidates.filter(({ ref }) => ref.byteLength <= MAX_SCANNABLE_BYTES)),
+		closure: input.closure,
+	});
+}
+
+/**
  * Establishes that a previously selected trust reference survives a proposed detached closure.
  * @param input - Proposed closure data and the previously selected trust reference.
  * @returns The preserved trust-state bytes and reference, or the first closed rejection.

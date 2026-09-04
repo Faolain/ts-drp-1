@@ -8,11 +8,14 @@ import { inspectTrustClosure } from "@ts-drp/control-plane";
 import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import { type FinalitySigner, signCreatorIssuanceRetirementRequest } from "@ts-drp/keychain/finality";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
-import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import { ANCHOR_TRUST_STATE_MAX_RECORD_BYTES, type CurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import {
 	completeCreatorAuthorIssuanceFrontiers,
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_GENESIS_SENTINEL,
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
+	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES,
+	CREATOR_AUTHOR_SETTLEMENT_KIND,
+	CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES,
 	type CreatorAuthorIssuanceFrontier,
 	openCreatorAuthorIssuanceFrontiers,
 	prepareCreatorAuthorIssuanceFrontiers,
@@ -23,6 +26,7 @@ import {
 	completeCreatorIssuanceRetirement,
 	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
 	CREATOR_ISSUANCE_RETIREMENT_KIND,
+	CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES,
 	CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE,
 	openCreatorIssuanceRetirement,
 	prepareCreatorIssuanceRetirement,
@@ -67,7 +71,16 @@ const PROFILE: SnapshotTransferProfile = Object.freeze({
 	maxSnapshotBytes: 268_435_456,
 	snapshotChunkBytes: 131_072,
 });
-const SCANNABLE_BYTES = 8192;
+const CREATOR_CLOSE_RECORD_CEILINGS: Readonly<Record<string, number>> = Object.freeze({
+	"drp-anchor-trust-state": ANCHOR_TRUST_STATE_MAX_RECORD_BYTES,
+	[CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND]: CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES,
+	[CREATOR_AUTHOR_SETTLEMENT_KIND]: CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES,
+	[CREATOR_ISSUANCE_RETIREMENT_KIND]: CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES,
+	"drp-hard-epoch-cut": ANCHOR_TRUST_STATE_MAX_RECORD_BYTES,
+	"drp-seal-qc": ANCHOR_TRUST_STATE_MAX_RECORD_BYTES,
+});
+const LEGACY_ACL_MAX_RECORD_BYTES = 8192;
+const SETTLEMENT_ACL_MAX_RECORD_BYTES = 65_536;
 const LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED = "D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED";
 const AUTHOR_REENTRY_PROOF_REQUIRED = "D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED";
 const bindings = new WeakMap<V3PlaneHandle, CreatorLiveCloseHandle>();
@@ -399,6 +412,7 @@ function openedLatchedAcl(
 		expectedAclDigest,
 		expectedEpoch: trust.currentEpoch,
 		expectedObjectId: trust.objectId,
+		expectedProfileId: trust.profileId,
 	});
 	return opened.ok ? opened.snapshot : undefined;
 }
@@ -601,6 +615,100 @@ function generationId(): GenerationId {
 	return parsed.value;
 }
 
+function canonicalVarUint(
+	bytes: Uint8Array,
+	offset: number
+): Readonly<{ readonly nextOffset: number; readonly value: number }> | undefined {
+	let value = 0;
+	let multiplier = 1;
+	for (let count = 0; count < 9 && offset < bytes.byteLength; count += 1) {
+		const byte = bytes[offset] as number;
+		offset += 1;
+		value += (byte & 0x7f) * multiplier;
+		if (!Number.isSafeInteger(value)) return undefined;
+		if ((byte & 0x80) === 0) {
+			if (count > 0 && (byte & 0x7f) === 0) return undefined;
+			return Object.freeze({ nextOffset: offset, value });
+		}
+		multiplier *= 128;
+	}
+	return undefined;
+}
+
+function canonicalRootKind(bytes: Uint8Array): string | undefined {
+	if (bytes[0] !== 0x08) return undefined;
+	const fieldCount = canonicalVarUint(bytes, 1);
+	if (fieldCount === undefined || fieldCount.value < 1 || bytes[fieldCount.nextOffset] !== 0x05) return undefined;
+	const keyLength = canonicalVarUint(bytes, fieldCount.nextOffset + 1);
+	if (keyLength?.value !== 4) return undefined;
+	const keyOffset = keyLength.nextOffset;
+	if (
+		bytes[keyOffset] !== 0x6b ||
+		bytes[keyOffset + 1] !== 0x69 ||
+		bytes[keyOffset + 2] !== 0x6e ||
+		bytes[keyOffset + 3] !== 0x64 ||
+		bytes[keyOffset + 4] !== 0x05
+	) {
+		return undefined;
+	}
+	const kindLength = canonicalVarUint(bytes, keyOffset + 5);
+	if (kindLength === undefined || kindLength.value < 1 || kindLength.value > 128) return undefined;
+	const end = kindLength.nextOffset + kindLength.value;
+	if (end > bytes.byteLength) return undefined;
+	let kind = "";
+	for (let index = kindLength.nextOffset; index < end; index += 1) {
+		const byte = bytes[index] as number;
+		if (byte > 0x7f) return undefined;
+		kind += String.fromCharCode(byte);
+	}
+	return kind;
+}
+
+function latchedAclRecordCeiling(bytes: Uint8Array): number {
+	if (bytes.byteLength <= SETTLEMENT_ACL_MAX_RECORD_BYTES) {
+		try {
+			const decoded = decodeCanonical(bytes, {
+				maxBytes: SETTLEMENT_ACL_MAX_RECORD_BYTES,
+				maxDepth: 4,
+				maxItems: 8192,
+			});
+			if (plainRecord(decoded) && decoded.version === 3) return SETTLEMENT_ACL_MAX_RECORD_BYTES;
+		} catch {
+			// A malformed recognized ACL remains subject to the legacy ceiling here
+			// and will fail its canonical opener if it fits that ceiling.
+		}
+	}
+	return LEGACY_ACL_MAX_RECORD_BYTES;
+}
+
+function creatorCloseCandidate(
+	bytes: Uint8Array,
+	ref: GenerationRef
+): Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }> | undefined {
+	const kind = canonicalRootKind(bytes);
+	const ceiling =
+		kind === "drp-v3-latched-acl"
+			? latchedAclRecordCeiling(bytes)
+			: kind === undefined
+				? undefined
+				: CREATOR_CLOSE_RECORD_CEILINGS[kind];
+	if (ceiling !== undefined && ref.byteLength > ceiling) {
+		throw new TypeError(`creator close ${kind} record exceeds its canonical byte ceiling`);
+	}
+	if (ceiling === undefined && ref.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES) return undefined;
+	return Object.freeze({ bytes: Uint8Array.from(bytes), ref });
+}
+
+function creatorCloseCandidates(
+	candidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[]
+): readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[] {
+	const selected = candidates.map(({ bytes, ref }) => creatorCloseCandidate(bytes, ref));
+	if (selected.some((candidate) => candidate === undefined)) {
+		throw new TypeError("creator close generated record exceeds its canonical byte ceiling");
+	}
+	return Object.freeze(selected as readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[]);
+}
+
 async function inspectHead(
 	store: AheDurableStore,
 	objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0]
@@ -619,12 +727,15 @@ async function inspectHead(
 	const references = Object.freeze((recovered.references as GenerationRef[]).map(copiedRef));
 	const candidates: Array<Readonly<{ bytes: Uint8Array; ref: GenerationRef }>> = [];
 	for (const ref of references) {
-		if (ref.byteLength > SCANNABLE_BYTES) continue;
 		const bytes = successfulValue<Uint8Array | null>(await store.getBlob(ref.digest));
 		if (!(bytes instanceof Uint8Array)) throw new TypeError("creator close generation blob is unavailable");
-		candidates.push(Object.freeze({ bytes: Uint8Array.from(bytes), ref }));
+		const candidate = creatorCloseCandidate(bytes, ref);
+		if (candidate !== undefined) candidates.push(candidate);
 	}
-	const inspected = inspectTrustClosure({ candidates, closure: references });
+	const inspected = inspectTrustClosure({
+		candidates: candidates.filter(({ ref }) => ref.byteLength <= ANCHOR_TRUST_STATE_MAX_RECORD_BYTES),
+		closure: references,
+	});
 	if (!inspected.ok) throw new TypeError(`creator close trust scan failed: ${inspected.reason}`);
 	return Object.freeze({
 		candidates: Object.freeze(candidates),
@@ -981,7 +1092,7 @@ export async function bindCreatorLiveClose(
 							aggregate.ref,
 						].sort(compareRef)
 					);
-					const proposedCandidates = [
+					const proposedCandidates = creatorCloseCandidates([
 						...current.candidates.filter(
 							({ ref }) =>
 								ref.digest !== current.trustRef.digest &&
@@ -993,7 +1104,7 @@ export async function bindCreatorLiveClose(
 						{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
 						{ bytes: retirement.bytes, ref: retirement.ref },
 						{ bytes: aggregate.bytes, ref: aggregate.ref },
-					].filter(({ ref }) => ref.byteLength <= SCANNABLE_BYTES);
+					]);
 					const advance = inspectCreatorTransitionAdvance({
 						current: { candidates: current.candidates, closure: current.references },
 						currentTrust: registration.currentTrust,

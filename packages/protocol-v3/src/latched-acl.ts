@@ -17,7 +17,9 @@ const OPEN_KEYS = ["exactCanonicalLatchedAclBytes", "expectedAclDigest", "expect
 const OPEN_KEYS_WITH_PROFILE = [...OPEN_KEYS, "expectedProfileId"] as const;
 const DIGEST = /^[0-9a-f]{64}$/u;
 const MAX_CANONICAL_BYTES = 8192;
+const MAX_CANONICAL_ITEMS = 2048;
 const SETTLEMENT_MAX_CANONICAL_BYTES = 65_536;
+const SETTLEMENT_MAX_CANONICAL_ITEMS = 8192;
 
 export type LatchedAclGroup = (typeof GROUPS_V2)[number];
 
@@ -78,6 +80,12 @@ interface MutableMember {
 	readonly groups: Set<LatchedAclGroup>;
 }
 
+interface OpenedSnapshotState {
+	readonly membersByAuthor: ReadonlyMap<string, LatchedAclMember>;
+}
+
+const openedSnapshots = new WeakMap<LatchedAclSnapshot, OpenedSnapshotState>();
+
 function exactDataRecord(value: unknown, keys: readonly string[]): Record<string, unknown> | undefined {
 	if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
 	const prototype = Object.getPrototypeOf(value);
@@ -113,8 +121,8 @@ function groupsForVersion(version: LatchedAclSnapshot["version"]): readonly Latc
 	return version === 1 ? GROUPS_V1 : GROUPS_V2;
 }
 
-function groupIndex(group: LatchedAclGroup, version: LatchedAclSnapshot["version"]): number {
-	return groupsForVersion(version).indexOf(group);
+function snapshotGroupsForVersion(version: LatchedAclSnapshot["version"]): readonly LatchedAclGroup[] {
+	return version === 1 ? GROUPS_V2 : groupsForVersion(version);
 }
 
 function isGroup(value: unknown, version: LatchedAclSnapshot["version"]): value is LatchedAclGroup {
@@ -122,6 +130,9 @@ function isGroup(value: unknown, version: LatchedAclSnapshot["version"]): value 
 }
 
 function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
+	if (typeof value === "object" && value !== null && openedSnapshots.has(value as LatchedAclSnapshot)) {
+		return value as LatchedAclSnapshot;
+	}
 	const record = exactDataRecord(value, SNAPSHOT_KEYS);
 	if (
 		record === undefined ||
@@ -140,7 +151,7 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		return undefined;
 	}
 	const version = record.version;
-	const groupsForSnapshot = groupsForVersion(version);
+	const groupsForSnapshot = snapshotGroupsForVersion(version);
 	const members: LatchedAclMember[] = [];
 	let previousAuthor = "";
 	for (const valueMember of record.members) {
@@ -161,12 +172,15 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		const groups: LatchedAclGroup[] = [];
 		let previousGroup = -1;
 		for (const valueGroup of selected.groups) {
-			if (!isGroup(valueGroup, version)) return undefined;
-			const index = groupIndex(valueGroup, version);
+			if (typeof valueGroup !== "string" || !groupsForSnapshot.includes(valueGroup as LatchedAclGroup)) {
+				return undefined;
+			}
+			const index = groupsForSnapshot.indexOf(valueGroup as LatchedAclGroup);
 			if (index <= previousGroup) return undefined;
 			previousGroup = index;
-			groups.push(valueGroup);
+			groups.push(valueGroup as LatchedAclGroup);
 		}
+		if (version === 1 && groups.includes("referee") && groups.join(",") !== GROUPS_V2.join(",")) return undefined;
 		if (selected.finalityKey !== null && !groups.includes("finality")) return undefined;
 		previousAuthor = selected.author;
 		members.push(
@@ -178,7 +192,7 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		);
 	}
 	if (!members.some(({ groups }) => groups.includes("admin"))) return undefined;
-	return Object.freeze({
+	const snapshot = Object.freeze({
 		epoch: record.epoch,
 		kind: "drp-v3-latched-acl",
 		members: Object.freeze(members),
@@ -186,6 +200,11 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		permissionless: record.permissionless,
 		version,
 	});
+	openedSnapshots.set(
+		snapshot,
+		Object.freeze({ membersByAuthor: new Map(members.map((member) => [member.author, member])) })
+	);
+	return snapshot;
 }
 
 /**
@@ -228,8 +247,8 @@ export function openCanonicalLatchedAclSnapshot(
 		const decoded = decodeCanonical(
 			exactBytes,
 			settlementProfile === "v1"
-				? { maxBytes: SETTLEMENT_MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: 8192 }
-				: { maxBytes: MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: 512 }
+				? { maxBytes: SETTLEMENT_MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: SETTLEMENT_MAX_CANONICAL_ITEMS }
+				: { maxBytes: MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: MAX_CANONICAL_ITEMS }
 		);
 		if (!sameBytes(encodeCanonical(decoded), exactBytes)) {
 			return Object.freeze({ ok: false, reason: "malformed-input" });
@@ -292,18 +311,26 @@ function copyOperation(value: unknown, version: LatchedAclSnapshot["version"]): 
 	return Object.freeze({ actor: record.actor, group: record.group, kind: record.kind, target: record.target });
 }
 
-function authorityInput(value: unknown): Readonly<{ author: string; snapshot: LatchedAclSnapshot }> | undefined {
+function authorityInput(value: unknown):
+	| Readonly<{
+			author: string;
+			membersByAuthor: ReadonlyMap<string, LatchedAclMember>;
+			snapshot: LatchedAclSnapshot;
+	  }>
+	| undefined {
 	const record = exactDataRecord(value, AUTHORITY_INPUT_KEYS);
 	const snapshot = record === undefined ? undefined : copySnapshot(record.snapshot);
+	const state = snapshot === undefined ? undefined : openedSnapshots.get(snapshot);
 	if (
 		record === undefined ||
 		snapshot === undefined ||
+		state === undefined ||
 		typeof record.author !== "string" ||
 		!AUTHOR.test(record.author)
 	) {
 		return undefined;
 	}
-	return Object.freeze({ author: record.author, snapshot });
+	return Object.freeze({ author: record.author, membersByAuthor: state.membersByAuthor, snapshot });
 }
 
 function authorityFailure(): LatchedAclAuthorityResult {
@@ -325,7 +352,7 @@ export function authorizeLatchedEnvelopeAuthor(
 		const selected = authorityInput(input);
 		if (selected === undefined) return authorityFailure();
 		return Object.freeze({
-			authorized: selected.snapshot.members.some(({ author }) => author === selected.author),
+			authorized: selected.membersByAuthor.has(selected.author),
 			ok: true,
 		});
 	} catch {
@@ -347,7 +374,7 @@ export function authorizeLatchedApplicationWrite(
 	try {
 		const selected = authorityInput(input);
 		if (selected === undefined) return authorityFailure();
-		const member = selected.snapshot.members.find(({ author }) => author === selected.author);
+		const member = selected.membersByAuthor.get(selected.author);
 		return Object.freeze({
 			authorized: member !== undefined && (selected.snapshot.permissionless || member.groups.includes("writer")),
 			ok: true,
@@ -377,7 +404,10 @@ function freezeMembers(
 					author,
 					finalityKey,
 					groups: Object.freeze(
-						[...groups].sort((left, right) => groupIndex(left, version) - groupIndex(right, version))
+						[...groups].sort(
+							(left, right) =>
+								snapshotGroupsForVersion(version).indexOf(left) - snapshotGroupsForVersion(version).indexOf(right)
+						)
 					),
 				})
 			)
@@ -420,30 +450,30 @@ export function stageLatchedAclOperations(
 			}
 		}
 
-		const next = mutableMembers(snapshot);
+		const nextMembers = mutableMembers(snapshot);
 		for (const operation of operations) {
 			if (operation.kind !== "grant") continue;
-			const target = next.get(operation.target) ?? {
+			const target = nextMembers.get(operation.target) ?? {
 				author: operation.target,
 				finalityKey: null,
 				groups: new Set<LatchedAclGroup>(),
 			};
 			target.groups.add(operation.group);
-			next.set(operation.target, target);
+			nextMembers.set(operation.target, target);
 		}
 		for (const operation of operations) {
 			if (operation.kind !== "set-finality-key") continue;
-			const actor = next.get(operation.actor);
+			const actor = nextMembers.get(operation.actor);
 			if (actor === undefined) return failedStage(0, "operation-invalid");
 			actor.finalityKey = operation.finalityKey;
 		}
 		for (const operation of operations) {
 			if (operation.kind !== "revoke") continue;
-			const target = next.get(operation.target);
+			const target = nextMembers.get(operation.target);
 			target?.groups.delete(operation.group);
 			if (target !== undefined && operation.group === "finality") target.finalityKey = null;
 		}
-		const frozenMembers = freezeMembers(next, snapshot.version);
+		const frozenMembers = freezeMembers(nextMembers, snapshot.version);
 		if (!frozenMembers.some(({ groups }) => groups.includes("admin"))) {
 			const index = operations.findIndex((operation) => operation.kind === "revoke" && operation.group === "admin");
 			return failedStage(Math.max(0, index), "last-admin");
@@ -451,17 +481,27 @@ export function stageLatchedAclOperations(
 		if (snapshot.epoch === Number.MAX_SAFE_INTEGER) {
 			return failedStage(0, "operation-invalid");
 		}
-		return Object.freeze({
-			next: Object.freeze({
+		const next = copySnapshot(
+			Object.freeze({
 				epoch: snapshot.epoch + 1,
 				kind: "drp-v3-latched-acl",
 				members: frozenMembers,
 				objectId: snapshot.objectId,
 				permissionless: snapshot.permissionless,
 				version: snapshot.version,
-			}),
-			ok: true,
+			})
+		);
+		if (next === undefined) return failedStage(0, "operation-invalid");
+		const settlement = next.version === 3;
+		const exactBytes = encodeCanonical(next);
+		const maximumBytes = settlement ? SETTLEMENT_MAX_CANONICAL_BYTES : MAX_CANONICAL_BYTES;
+		if (exactBytes.byteLength > maximumBytes) return failedStage(0, "operation-invalid");
+		decodeCanonical(exactBytes, {
+			maxBytes: maximumBytes,
+			maxDepth: 4,
+			maxItems: settlement ? SETTLEMENT_MAX_CANONICAL_ITEMS : MAX_CANONICAL_ITEMS,
 		});
+		return Object.freeze({ next, ok: true });
 	} catch {
 		return failedStage(0, "malformed-input");
 	}

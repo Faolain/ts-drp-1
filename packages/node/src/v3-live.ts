@@ -198,7 +198,8 @@ const PROVENANCE_KEYS = [
 ] as const;
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
-	parametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
+	legacyParametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
+	parametersDigest: "c92ee60718d7a593e0809e56ddef0c9d55a3015c27ecba8d54dd16547553044a",
 	runtimeProfile: "ecmascript-2024-sync-v1" as const,
 });
 const ACTIVATION_INPUT_KEYS = ["capability", "messageQueueManager", "networkNode", "onAdmittedVertex"] as const;
@@ -220,9 +221,16 @@ const CANONICAL_APPLICATION_BATCH_ENTRY_KEYS = ["operation", "logicalTime"] as c
 const APPLICATION_BATCH_KEYS = ["batch", "action"] as const;
 const APPLICATION_BATCH_PAYLOAD_KEYS = ["entries", "version"] as const;
 const APPLICATION_BATCH_ACTION = "applicationBatch";
+const AUTHOR_FENCE_ACTION = "$drp.author-fence.v1";
 const APPLICATION_BATCH_MAX_ENTRIES = 16;
 const APPLICATION_BATCH_LIMITS = ObjectFreeze({ maxBytes: 65_536, maxDepth: 8, maxItems: 1_024 });
-const RESERVED_BATCH_ACTIONS = ObjectFreeze(["acl", APPLICATION_BATCH_ACTION, "causalJoin", "join"] as const);
+const RESERVED_BATCH_ACTIONS = ObjectFreeze([
+	"acl",
+	APPLICATION_BATCH_ACTION,
+	AUTHOR_FENCE_ACTION,
+	"causalJoin",
+	"join",
+] as const);
 const ISSUANCE_SCOPE_KEYS = ["objectId", "author"] as const;
 const OUTBOX_RECORD_KEYS = ["commit", "publishState"] as const;
 const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outboxEntry"] as const;
@@ -850,6 +858,7 @@ interface PreparedV3LivePayload {
 }
 
 interface AcceptedParameters {
+	readonly authorShareMultiplier: number;
 	readonly maxDependencies: number;
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
@@ -1082,6 +1091,7 @@ interface ParameterFieldSchema {
 	readonly maximum: number;
 	readonly minimum: number;
 	readonly name: string;
+	readonly required: boolean;
 }
 
 interface ParameterSchema {
@@ -1178,7 +1188,7 @@ function snapshotPublishedParameterSchema(value: unknown): ParameterSchema | und
 		) {
 			return undefined;
 		}
-		const fields = snapshotDenseArray(parameters.fields, 7);
+		const fields = snapshotDenseArray(parameters.fields, 8);
 		if (fields === undefined) return undefined;
 		const captured: ParameterFieldSchema[] = [];
 		for (let index = 0; index < fields.length; index += 1) {
@@ -1196,7 +1206,7 @@ function snapshotPublishedParameterSchema(value: unknown): ParameterSchema | und
 				field.name.length === 0 ||
 				field.type !== "safe-integer" ||
 				field.const !== null ||
-				field.required !== true ||
+				typeof field.required !== "boolean" ||
 				field.sortRule !== null
 			) {
 				return undefined;
@@ -1223,6 +1233,7 @@ function snapshotPublishedParameterSchema(value: unknown): ParameterSchema | und
 						maximum: constraints.maximum,
 						minimum: constraints.minimum,
 						name: field.name,
+						required: field.required,
 					})
 				)
 			) {
@@ -1242,7 +1253,9 @@ function snapshotParameterRecord(value: unknown, schema: ParameterSchema): Plain
 	try {
 		if (!isObject(value) || ObjectGetPrototypeOf(value) !== null) return undefined;
 		const keys = ReflectOwnKeys(value);
-		if (keys.length !== schema.fields.length) return undefined;
+		if (keys.some((key) => typeof key !== "string" || !schema.fields.some(({ name }) => name === key))) {
+			return undefined;
+		}
 		const output = ObjectCreate(null) as Record<string, unknown>;
 		for (let fieldIndex = 0; fieldIndex < schema.fields.length; fieldIndex += 1) {
 			const field = schema.fields[fieldIndex] as ParameterFieldSchema;
@@ -1250,7 +1263,10 @@ function snapshotParameterRecord(value: unknown, schema: ParameterSchema): Plain
 			for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
 				if (keys[keyIndex] === field.name) keyFound = true;
 			}
-			if (!keyFound) return undefined;
+			if (!keyFound) {
+				if (field.required) return undefined;
+				continue;
+			}
 			const descriptor = ObjectGetOwnPropertyDescriptor(value, field.name);
 			if (
 				descriptor === undefined ||
@@ -1279,14 +1295,23 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 		const reencoded = encodeCanonical(snapshot);
 		if (!sameBytes(reencoded, bytes)) return undefined;
 		const digest = bytesToLowerHex(hashDomain(PARAMETER_SCHEMA.domain, reencoded));
-		if (digest !== expectedDigest || digest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest) return undefined;
+		if (
+			digest !== expectedDigest ||
+			(digest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest &&
+				digest !== SUPPORTED_PARAMETER_PROFILE.legacyParametersDigest)
+		) {
+			return undefined;
+		}
+		const authorShareMultiplier = snapshot.authorShareMultiplier ?? 4;
 		const maxDependencies = snapshot.maxDependencies;
 		const maxEpochBytes = snapshot.maxEpochBytes;
 		const maxEpochVertices = snapshot.maxEpochVertices;
 		const maxPendingBytes = snapshot.maxPendingBytes;
 		const maxPendingEntries = snapshot.maxPendingEntries;
 		const maxSnapshotBytes = snapshot.maxSnapshotBytes;
-		return typeof maxDependencies === "number" &&
+		return typeof authorShareMultiplier === "number" &&
+			NumberIsSafeInteger(authorShareMultiplier) &&
+			typeof maxDependencies === "number" &&
 			NumberIsSafeInteger(maxDependencies) &&
 			typeof maxEpochBytes === "number" &&
 			NumberIsSafeInteger(maxEpochBytes) &&
@@ -1299,6 +1324,7 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 			typeof maxSnapshotBytes === "number" &&
 			NumberIsSafeInteger(maxSnapshotBytes)
 			? ObjectFreeze({
+					authorShareMultiplier,
 					maxDependencies,
 					maxEpochBytes,
 					maxEpochVertices,
@@ -1619,6 +1645,7 @@ function copyApplicationAuthors(
 function retainApplicationVertex(
 	vertices: Map<string, EpochVertex>,
 	authors: Map<string, ApplicationVertexIdentity>,
+	authorVertexCounts: Map<string, number>,
 	authenticated: AuthenticatedRecoveryVertex,
 	charges?: Map<string, number>
 ): void {
@@ -1627,6 +1654,8 @@ function retainApplicationVertex(
 		authenticated.digest,
 		ObjectFreeze({ author: authenticated.author, authorSequence: authenticated.authorSequence }),
 	]);
+	const current = ReflectApply(MapPrototypeGet, authorVertexCounts, [authenticated.author]) as number | undefined;
+	ReflectApply(MapPrototypeSet, authorVertexCounts, [authenticated.author, (current ?? 0) + 1]);
 	if (charges !== undefined) ReflectApply(MapPrototypeSet, charges, [authenticated.digest, authenticated.byteCharge]);
 }
 
@@ -2616,6 +2645,7 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 
 interface V3PlaneRegistration {
 	active: boolean;
+	readonly authorVertexCounts: Map<string, number>;
 	readonly applicationAuthors: Map<string, ApplicationVertexIdentity>;
 	readonly applicationCharges: Map<string, number>;
 	readonly applicationVertices: Map<string, EpochVertex>;
@@ -3220,6 +3250,7 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 				emptyQuarantine !== undefined
 			) {
 				ReflectApply(MapPrototypeClear, predecessor.applicationAuthors, []);
+				ReflectApply(MapPrototypeClear, predecessor.authorVertexCounts, []);
 				ReflectApply(MapPrototypeClear, predecessor.applicationCharges, []);
 				ReflectApply(MapPrototypeSet, predecessor.applicationCharges, [anchorDigest, anchorCharge]);
 				ReflectApply(MapPrototypeClear, predecessor.applicationVertices, []);
@@ -3455,6 +3486,10 @@ function isV3ApplicationAuthorAuthorized(authorization: V3LiveAuthorization, aut
 	return authority.ok && authority.authorized;
 }
 
+function isAuthorFenceOperation(value: unknown): boolean {
+	return isObject(value) && Reflect.get(value, "action") === AUTHOR_FENCE_ACTION;
+}
+
 function aclOperation(author: string, digest: string, value: unknown): StagedLatchedAclOperation | null | undefined {
 	if (!isObject(value)) return null;
 	const action = ObjectGetOwnPropertyDescriptor(value, "action");
@@ -3617,6 +3652,7 @@ function sameActivation(
 		registration.onAdmittedVertex === input.onAdmittedVertex &&
 		registration.operationAdmissionPolicy === recovered.operationAdmissionPolicy &&
 		registration.authorization === recovered.authorization &&
+		registration.authorVertexCounts === recovered.authorVertexCounts &&
 		registration.historicalIssuance === recovered.historicalIssuance &&
 		registration.index === recovered.index &&
 		registration.issuanceStore === recovered.issuanceStore &&
@@ -3731,10 +3767,24 @@ function nextEpochBytes(current: number, byteCharge: number, maximum: number): n
 	return current + byteCharge;
 }
 
-function hasGraphCapacity(registration: V3PlaneRegistration, byteCharge: number): boolean {
+function hasGraphCapacity(
+	registration: V3PlaneRegistration,
+	author: string,
+	byteCharge?: number,
+	additionalVertices = 1
+): boolean {
+	const writerCount = Math.max(1, registration.authorization.writerCount);
+	const authorShare =
+		Math.ceil(registration.payload.parameters.maxEpochVertices / writerCount) *
+		registration.payload.parameters.authorShareMultiplier;
+	const current = (ReflectApply(MapPrototypeGet, registration.authorVertexCounts, [author]) as number | undefined) ?? 0;
 	return (
-		registration.index.size < registration.payload.parameters.maxEpochVertices &&
-		nextEpochBytes(registration.epochBytes, byteCharge, registration.payload.parameters.maxEpochBytes) !== undefined
+		NumberIsSafeInteger(additionalVertices) &&
+		additionalVertices > 0 &&
+		registration.index.size <= registration.payload.parameters.maxEpochVertices - additionalVertices &&
+		current <= authorShare - additionalVertices &&
+		(byteCharge === undefined ||
+			nextEpochBytes(registration.epochBytes, byteCharge, registration.payload.parameters.maxEpochBytes) !== undefined)
 	);
 }
 
@@ -3836,6 +3886,7 @@ async function handleV3Ingress(
 ): Promise<boolean> {
 	if (!currentRegistration(registration)) return false;
 	const authenticated = evidence.authenticated;
+	const authorFence = isAuthorFenceOperation(authenticated.vertex.operation);
 	const alreadyAccepted = registration.index.has(authenticated.digest);
 	if (!alreadyAccepted && registration.operationAdmissionHalted) {
 		ingressFailureLog("admission-rejected");
@@ -3866,6 +3917,7 @@ async function handleV3Ingress(
 	}
 	if (
 		!alreadyAccepted &&
+		!authorFence &&
 		!acceptedApplicationOperation(
 			registration.payload,
 			authenticated.vertex.operation,
@@ -3875,24 +3927,29 @@ async function handleV3Ingress(
 		ingressFailureLog("admission-rejected");
 		return false;
 	}
-	const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+	const candidate = authorFence
+		? null
+		: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
 	if (
 		!alreadyAccepted &&
+		!authorFence &&
 		!validateLatchedOperation(registration.authorization, registration.latchedOperations, candidate)
 	) {
 		ingressFailureLog("admission-rejected");
 		return false;
 	}
-	if (!alreadyAccepted && !hasGraphCapacity(registration, authenticated.byteCharge)) {
+	if (!alreadyAccepted && !hasGraphCapacity(registration, authenticated.author, authenticated.byteCharge)) {
 		ingressFailureLog("graph-rejected");
 		return false;
 	}
 	const reservation = alreadyAccepted
 		? undefined
-		: reserveOperation(
-				registration.operationAdmissionPolicy,
-				authenticated.vertex.operation as Readonly<Record<string, unknown>>
-			);
+		: authorFence
+			? undefined
+			: reserveOperation(
+					registration.operationAdmissionPolicy,
+					authenticated.vertex.operation as Readonly<Record<string, unknown>>
+				);
 	if (reservation === null) {
 		ingressFailureLog("admission-rejected");
 		return false;
@@ -3957,6 +4014,7 @@ async function handleV3Ingress(
 	retainApplicationVertex(
 		registration.applicationVertices,
 		registration.applicationAuthors,
+		registration.authorVertexCounts,
 		authenticated,
 		registration.applicationCharges
 	);
@@ -3970,6 +4028,7 @@ async function handleV3Ingress(
 	}
 	releasePendingIngress(registration, authenticated.digest);
 	if (!currentRegistration(registration)) return true;
+	if (authorFence) return true;
 	const delivery = ObjectFreeze({
 		vertex: authenticated.admitted,
 		exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
@@ -4209,8 +4268,12 @@ function onePage(value: unknown): DurableIssuanceOutboxRecord | null | undefined
 }
 
 type V3LiveAuthorization =
-	| Readonly<{ readonly kind: "author-list"; readonly value: CurrentEpochAuthorAuthorization }>
-	| Readonly<{ readonly kind: "latched-acl"; readonly value: LatchedAclSnapshot }>;
+	| Readonly<{
+			readonly kind: "author-list";
+			readonly value: CurrentEpochAuthorAuthorization;
+			readonly writerCount: number;
+	  }>
+	| Readonly<{ readonly kind: "latched-acl"; readonly value: LatchedAclSnapshot; readonly writerCount: number }>;
 
 interface V3DisplacedSourceAuthority {
 	readonly activationVertexDigest?: string;
@@ -4230,6 +4293,7 @@ type StagedLatchedAclOperation = Readonly<{
 }>;
 
 interface RecoveredV3LivePayload {
+	readonly authorVertexCounts: Map<string, number>;
 	readonly applicationAuthors: Map<string, ApplicationVertexIdentity>;
 	readonly applicationCharges: Map<string, number>;
 	readonly applicationVertices: Map<string, EpochVertex>;
@@ -4811,6 +4875,7 @@ function creatorFilteredIssuanceStore(
 			issuanceStore.compareAndMarkOutboxPublished(input),
 		readIssued: (scope: DurableIssueScope, authorSequence: number) => issuanceStore.readIssued(scope, authorSequence),
 		readLineage: (scope: DurableIssueScope) => issuanceStore.readLineage(scope),
+		readSettlementPlan: (scope: DurableIssueScope) => issuanceStore.readSettlementPlan(scope),
 		readOutboxPage: async (input?: DurableOutboxPageInput) => {
 			const requestedLimit = input?.limit ?? 1;
 			if (!NumberIsSafeInteger(requestedLimit) || requestedLimit < 1) {
@@ -4905,6 +4970,8 @@ function creatorFilteredIssuanceStore(
 		},
 		transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
 			issuanceStore.transactIssue(scope, buildAndSign),
+		transactWriteSettlementPlan: (input: Parameters<DurableIssuanceStore["transactWriteSettlementPlan"]>[0]) =>
+			issuanceStore.transactWriteSettlementPlan(input),
 	});
 }
 
@@ -4920,7 +4987,12 @@ function openRecoveryAuthorization(
 			exactCanonicalAuthorAuthorizationBytes: exactAuthorizationBytes,
 			trust: payload.trust.trust,
 		});
-		return opened.ok ? ObjectFreeze({ kind: "author-list" as const, value: opened.authorization }) : undefined;
+		if (!opened.ok) return undefined;
+		const decoded = decodeCanonical(exactAuthorizationBytes);
+		const authors = isObject(decoded) ? Reflect.get(decoded, "authors") : undefined;
+		return ArrayIsArray(authors) && authors.length > 0
+			? ObjectFreeze({ kind: "author-list" as const, value: opened.authorization, writerCount: authors.length })
+			: undefined;
 	}
 	const anchor = decodeCanonical(payload.input.exactCanonicalAnchorPreimageBytes);
 	const aclDigest = isObject(anchor) ? Reflect.get(anchor, "aclDigest") : undefined;
@@ -4929,8 +5001,14 @@ function openRecoveryAuthorization(
 		expectedAclDigest: typeof aclDigest === "string" ? aclDigest : "",
 		expectedEpoch: payload.provenance.epoch,
 		expectedObjectId: payload.provenance.objectId,
+		expectedProfileId: payload.trust.trust.profileId,
 	});
-	return opened.ok ? ObjectFreeze({ kind: "latched-acl" as const, value: opened.snapshot }) : undefined;
+	if (!opened.ok) return undefined;
+	let writerCount = 0;
+	for (const member of opened.snapshot.members) {
+		if (opened.snapshot.permissionless || member.groups.includes("writer")) writerCount += 1;
+	}
+	return ObjectFreeze({ kind: "latched-acl" as const, value: opened.snapshot, writerCount });
 }
 
 /**
@@ -5175,6 +5253,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be retained");
 		}
 		const applicationAuthors = new IntrinsicMap<string, ApplicationVertexIdentity>();
+		const authorVertexCounts = new IntrinsicMap<string, number>();
 		let epochBytes = 0;
 		for (const byteCharge of payload.charges.values()) {
 			const updated = nextEpochBytes(epochBytes, byteCharge, payload.parameters.maxEpochBytes);
@@ -5270,7 +5349,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("admission-rejected", "v3 journal row is not authenticated");
 				}
 				if (
-					!acceptedApplicationOperation(payload, authenticated.vertex.operation, authenticated.admitted.logicalTime) ||
+					(!isAuthorFenceOperation(authenticated.vertex.operation) &&
+						!acceptedApplicationOperation(
+							payload,
+							authenticated.vertex.operation,
+							authenticated.admitted.logicalTime
+						)) ||
 					authenticated.vertex.dependencies.some(
 						(dependency) => ReflectApply(SetPrototypeHas, quarantinedDigests, [dependency]) === true
 					)
@@ -5309,8 +5393,11 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				if (!hasBoundedDependencies(payload, authenticated)) {
 					return recoveryFailure("admission-rejected", "v3 journal row dependency bound is invalid");
 				}
-				const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-				if (!validateLatchedOperation(authorization, latchedOperations, candidate)) {
+				const authorFence = isAuthorFenceOperation(authenticated.vertex.operation);
+				const candidate = authorFence
+					? null
+					: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+				if (!authorFence && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
 					return recoveryFailure("authorization-rejected", "v3 journal ACL operation is not authorized");
 				}
 				const updatedEpochBytes = nextEpochBytes(
@@ -5321,10 +5408,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				if (updatedEpochBytes === undefined) {
 					return recoveryFailure("graph-rejected", "v3 journal replay is at capacity");
 				}
-				const reservation = reserveOperation(
-					selectedOperationAdmissionPolicy,
-					authenticated.vertex.operation as Readonly<Record<string, unknown>>
-				);
+				const reservation = authorFence
+					? undefined
+					: reserveOperation(
+							selectedOperationAdmissionPolicy,
+							authenticated.vertex.operation as Readonly<Record<string, unknown>>
+						);
 				if (reservation === null) {
 					return recoveryFailure("admission-rejected", "v3 journal replay operation was rejected");
 				}
@@ -5334,7 +5423,13 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
 				}
-				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated, applicationCharges);
+				retainApplicationVertex(
+					applicationVertices,
+					applicationAuthors,
+					authorVertexCounts,
+					authenticated,
+					applicationCharges
+				);
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -5528,7 +5623,13 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
 				}
-				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated, applicationCharges);
+				retainApplicationVertex(
+					applicationVertices,
+					applicationAuthors,
+					authorVertexCounts,
+					authenticated,
+					applicationCharges
+				);
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -5666,6 +5767,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		installRecoveredV3LiveAuthority(
 			capability,
 			ObjectFreeze({
+				authorVertexCounts,
 				applicationAuthors,
 				applicationCharges,
 				applicationVertices,
@@ -5991,7 +6093,7 @@ async function issueOneVertex(
 					);
 					if (
 						candidateRow !== undefined &&
-						!hasGraphCapacity(registration, candidateRow.canonicalPreimageBytes.byteLength)
+						!hasGraphCapacity(registration, selectedScope.author, candidateRow.canonicalPreimageBytes.byteLength)
 					) {
 						capacityRejected = true;
 						throw new TypeError("v3 local issue graph is at capacity");
@@ -6103,7 +6205,7 @@ async function issueOneVertex(
 	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, acceptedAcl)) {
 		return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
 	}
-	if (!hasGraphCapacity(registration, authenticated.byteCharge)) {
+	if (!hasGraphCapacity(registration, authenticated.author, authenticated.byteCharge)) {
 		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
 	}
 
@@ -6147,6 +6249,7 @@ async function issueOneVertex(
 	retainApplicationVertex(
 		registration.applicationVertices,
 		registration.applicationAuthors,
+		registration.authorVertexCounts,
 		authenticated,
 		registration.applicationCharges
 	);
@@ -6227,6 +6330,9 @@ async function issueLocal(
 			: Math.ceil((initialTips.length - maxDependencies) / (maxDependencies - 1));
 	if (registration.index.size + requiredJoins + 1 > registration.payload.parameters.maxEpochVertices) {
 		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	if (!hasGraphCapacity(registration, registration.issuanceScope.author, undefined, requiredJoins + 1)) {
+		return localIssueFailure("graph-rejected", "v3 local issue author share is at capacity");
 	}
 	for (;;) {
 		const tips = registration.index.tips();
@@ -7024,6 +7130,57 @@ function signedInitialStateDigest(payload: PreparedV3LivePayload): string | unde
 	}
 }
 
+function applicationProjectionVertices(
+	source: Map<string, EpochVertex>,
+	causality: CausalityIndex
+): Map<string, EpochVertex> | undefined {
+	const projected = copyApplicationVertices(source);
+	if (projected === undefined) return undefined;
+	const resolvedFences = new IntrinsicMap<string, readonly string[]>();
+	const minimalDependencies = (dependencies: readonly string[]): readonly string[] => {
+		const unique = [...new IntrinsicSet(dependencies)];
+		return ObjectFreeze(
+			unique.filter((candidate) => !unique.some((other) => causality.isAncestor(candidate, other))).sort()
+		);
+	};
+	const resolveDependency = (digest: string): readonly string[] | undefined => {
+		const cached = ReflectApply(MapPrototypeGet, resolvedFences, [digest]) as readonly string[] | undefined;
+		if (cached !== undefined) return cached;
+		const expanded: string[] = [];
+		const pending = [digest];
+		const visited = new IntrinsicSet<string>();
+		while (pending.length > 0) {
+			const selectedDigest = pending.pop() as string;
+			if (ReflectApply(SetPrototypeHas, visited, [selectedDigest])) continue;
+			ReflectApply(SetPrototypeAdd, visited, [selectedDigest]);
+			const vertex = ReflectApply(MapPrototypeGet, projected, [selectedDigest]) as EpochVertex | undefined;
+			if (vertex === undefined) return undefined;
+			if (isAuthorFenceOperation(vertex.operation)) pending.push(...vertex.dependencies);
+			else expanded.push(selectedDigest);
+		}
+		const result = minimalDependencies(expanded);
+		ReflectApply(MapPrototypeSet, resolvedFences, [digest, result]);
+		return result;
+	};
+	for (const [digest, vertex] of projected) {
+		if (isAuthorFenceOperation(vertex.operation)) continue;
+		const dependencies: string[] = [];
+		for (const dependency of vertex.dependencies) {
+			const selected = resolveDependency(dependency);
+			if (selected === undefined) return undefined;
+			dependencies.push(...selected);
+		}
+		ReflectApply(MapPrototypeSet, projected, [
+			digest,
+			ObjectFreeze({ ...vertex, dependencies: minimalDependencies(dependencies) }),
+		]);
+	}
+	for (const [digest, vertex] of projected) {
+		if (isAuthorFenceOperation(vertex.operation)) ReflectApply(MapPrototypeDelete, projected, [digest]);
+	}
+	return projected;
+}
+
 function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3BlueprintFoldResult {
 	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
 		return blueprintFoldFailure("not-active", "v3 blueprint fold is not active");
@@ -7037,7 +7194,7 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 	const graphVersion = registration.graphVersion;
 	let staged;
 	try {
-		const vertices = copyApplicationVertices(registration.applicationVertices);
+		const vertices = applicationProjectionVertices(registration.applicationVertices, registration.index);
 		if (vertices === undefined) return blueprintFoldFailure("fold-rejected", "v3 blueprint graph is unavailable");
 		staged = foldBlueprintEpoch({
 			anchorHash: registration.payload.provenance.anchorDigest,
@@ -7727,6 +7884,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			}
 			registration = {
 				active: true,
+				authorVertexCounts: recovered.authorVertexCounts,
 				applicationAuthors: recovered.applicationAuthors,
 				applicationCharges: recovered.applicationCharges,
 				applicationVertices: recovered.applicationVertices,

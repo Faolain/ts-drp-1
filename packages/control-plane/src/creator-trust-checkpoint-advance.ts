@@ -2,7 +2,7 @@ import { compareBytes, decodeCanonical, encodeCanonical } from "@ts-drp/canonica
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import type { GenerationRef } from "@ts-drp/storage";
 
-import { type DetachedClosureCandidate, inspectTrustClosure } from "./anchor-trust.js";
+import { type DetachedClosureCandidate, inspectTrustClosure, trustScannableClosure } from "./anchor-trust.js";
 import {
 	type CreatorTrustAdvanceRejection,
 	type CreatorTrustAdvanceResult,
@@ -141,8 +141,8 @@ export function inspectBoundedCreatorTrustAdvance(input: unknown): BoundedCreato
 	try {
 		if (!plainRecord(input) || !exactKeys(input, INPUT_KEYS)) return rejected("TRUST_CLOSURE_INVALID");
 		const typed = input as unknown as InspectBoundedCreatorTrustAdvanceInput;
-		const current = inspectTrustClosure(typed.current);
-		const proposed = inspectTrustClosure(typed.proposed);
+		const current = inspectTrustClosure(trustScannableClosure(typed.current));
+		const proposed = inspectTrustClosure(trustScannableClosure(typed.proposed));
 		const proofRefs = copyPair(typed.proofRefs);
 		const retiringProofRefs = copyPair(typed.retiringProofRefs);
 		const retiringAclRef = copyRef(typed.retiringPredecessorAclRef);
