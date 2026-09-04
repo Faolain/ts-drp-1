@@ -6,9 +6,14 @@ import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import {
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_GENESIS_SENTINEL,
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
+	CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL,
+	CREATOR_AUTHOR_SETTLEMENT_KIND,
 	type CreatorAuthorIssuanceFrontiersIdentity,
+	type CreatorAuthorSettlementIdentity,
 	openCreatorAuthorIssuanceFrontiers,
+	openCreatorAuthorSettlement,
 	resolveCreatorAuthorIssuanceFrontiers,
+	resolveCreatorAuthorSettlement,
 } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import {
 	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
@@ -57,7 +62,6 @@ export interface CreatorHistoricalIssuanceIdentity {
 }
 
 const verifiedHistoricalIssuance = new WeakMap<VerifiedCreatorHistoricalIssuance, CreatorHistoricalIssuanceIdentity>();
-const SETTLEMENT_PROFILE = settlementProfileFor("creator-trusted-settlement-v1");
 
 type SettlementFrontier = readonly [author: string, admissionEpoch: number, terminalThrough: number | null];
 
@@ -125,7 +129,7 @@ export function inspectCreatorAuthorSettlementAdvance(
 	input: unknown
 ): Readonly<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> {
 	try {
-		if (SETTLEMENT_PROFILE !== "v1" || input === null || typeof input !== "object" || Array.isArray(input)) {
+		if (input === null || typeof input !== "object" || Array.isArray(input)) {
 			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
 		}
 		const currentAcl = Reflect.get(input, "currentAcl");
@@ -157,7 +161,11 @@ export function inspectCreatorAuthorSettlementAdvance(
 		}
 		const currentSet = new Set(currentMembers);
 		if (predecessor === null) {
-			if (closedEpoch !== 0 || Reflect.get(proposed, "priorCheckpointKind") !== "genesis") {
+			if (
+				closedEpoch !== 0 ||
+				Reflect.get(proposed, "priorCheckpointKind") !== "genesis" ||
+				Reflect.get(proposed, "priorCheckpointDigest") !== CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL
+			) {
 				return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
 			}
 			for (const [author, admissionEpoch, terminalThrough] of proposedFrontiers) {
@@ -267,8 +275,48 @@ function aggregateCandidates(closure: CreatorTransitionClosure): readonly Detach
 	return closure.candidates.filter((candidate) => record(candidate)?.kind === CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND);
 }
 
+function settlementCandidates(closure: CreatorTransitionClosure): readonly DetachedClosureCandidate[] {
+	return closure.candidates.filter((candidate) => record(candidate)?.kind === CREATOR_AUTHOR_SETTLEMENT_KIND);
+}
+
 function exactClosureOccurrence(closure: readonly GenerationRef[], candidate: DetachedClosureCandidate): boolean {
 	return closure.filter((ref) => sameRef(ref, candidate.ref)).length === 1;
+}
+
+function currentAnchorAclDigest(closure: CreatorTransitionClosure, trust: CurrentAnchorTrust): string | undefined {
+	const trustCandidate = uniqueCandidate(closure.candidates, "drp-anchor-trust-state", trust.currentEpoch);
+	if (
+		trustCandidate === undefined ||
+		!exactCandidate(trustCandidate) ||
+		!exactClosureOccurrence(closure.closure, trustCandidate)
+	) {
+		return undefined;
+	}
+	const trustRecord = record(trustCandidate);
+	const anchorBytes = trustRecord?.exactCanonicalCurrentAnchorPreimageBytes;
+	if (!(anchorBytes instanceof Uint8Array)) return undefined;
+	let anchor: Readonly<Record<string, unknown>> | undefined;
+	try {
+		const decoded = decodeCanonical(anchorBytes);
+		anchor =
+			decoded !== null && typeof decoded === "object" && !Array.isArray(decoded)
+				? (decoded as Readonly<Record<string, unknown>>)
+				: undefined;
+	} catch {
+		return undefined;
+	}
+	return trustRecord?.currentAnchorDigest !== trust.currentAnchorDigest ||
+		trustRecord.currentEpoch !== trust.currentEpoch ||
+		trustRecord.genesisAnchorDigest !== trust.genesisAnchorDigest ||
+		trustRecord.objectId !== trust.objectId ||
+		trustRecord.profileId !== trust.profileId ||
+		hex(hashDomain("ts-drp/epoch-anchor/v3", anchorBytes)) !== trust.currentAnchorDigest ||
+		anchor?.kind !== "drp-epoch-anchor" ||
+		anchor.objectId !== trust.objectId ||
+		anchor.epoch !== trust.currentEpoch ||
+		typeof anchor.aclDigest !== "string"
+		? undefined
+		: anchor.aclDigest;
 }
 
 function openedRetirement(
@@ -363,6 +411,51 @@ function openedAggregate(
 		decodedCut.previousAnchor !== identity.closedAnchorDigest ||
 		(decodedAcl !== undefined &&
 			(decodedAcl.objectId !== identity.objectId || decodedAcl.epoch !== identity.closedEpoch))
+		? undefined
+		: Object.freeze({ candidate, identity });
+}
+
+function openedSettlement(
+	candidate: DetachedClosureCandidate,
+	floorTrust: CurrentAnchorTrust,
+	cut: DetachedClosureCandidate,
+	qc: DetachedClosureCandidate,
+	expectedCurrentAclDigest: string
+):
+	| Readonly<{
+			readonly candidate: DetachedClosureCandidate;
+			readonly identity: CreatorAuthorSettlementIdentity;
+	  }>
+	| undefined {
+	const decodedCut = record(cut);
+	const decodedSettlement = record(candidate);
+	if (
+		!exactCandidate(candidate) ||
+		!exactCandidate(cut) ||
+		!exactCandidate(qc) ||
+		typeof decodedCut?.snapshotManifestDigest !== "string" ||
+		typeof decodedSettlement?.successorAclDigest !== "string"
+	) {
+		return undefined;
+	}
+	const opened = openCreatorAuthorSettlement({
+		exactCanonicalRecordBytes: candidate.bytes,
+		expectedCommitQcRef: qc.ref,
+		expectedCurrentAclDigest,
+		expectedCutValueDigest: hex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
+		expectedSnapshotManifestDigest: decodedCut.snapshotManifestDigest,
+		expectedSuccessorAclDigest: decodedSettlement.successorAclDigest,
+		floorTrust,
+	});
+	if (!opened.ok) return undefined;
+	const identity = resolveCreatorAuthorSettlement(opened.capability);
+	return identity === undefined ||
+		decodedCut.kind !== "drp-hard-epoch-cut" ||
+		decodedCut.objectId !== identity.objectId ||
+		decodedCut.epoch !== identity.closedEpoch ||
+		decodedCut.previousAnchor !== identity.closedAnchorDigest ||
+		identity.successorAnchorDigest !== floorTrust.currentAnchorDigest ||
+		identity.successorEpoch !== floorTrust.currentEpoch
 		? undefined
 		: Object.freeze({ candidate, identity });
 }
@@ -598,6 +691,78 @@ function authenticatedAggregatePair(
 	return Object.freeze({ current, proposed });
 }
 
+function authenticatedSettlementPair(input: InspectCreatorTransitionAdvanceInput):
+	| Readonly<{
+			readonly current?: DetachedClosureCandidate;
+			readonly proposed: DetachedClosureCandidate;
+	  }>
+	| undefined {
+	if (
+		settlementProfileFor(input.currentTrust.profileId) !== "v1" ||
+		settlementProfileFor(input.successorTrust.profileId) !== "v1" ||
+		input.successorTrust.currentEpoch !== input.currentTrust.currentEpoch + 1 ||
+		input.currentTrust.objectId !== input.successorTrust.objectId ||
+		input.currentTrust.genesisAnchorDigest !== input.successorTrust.genesisAnchorDigest ||
+		input.proofRefs.length !== 2 ||
+		retirementCandidates(input.current).length !== 0 ||
+		retirementCandidates(input.proposed).length !== 0 ||
+		aggregateCandidates(input.current).length !== 0 ||
+		aggregateCandidates(input.proposed).length !== 0
+	) {
+		return undefined;
+	}
+	const currentMatches = settlementCandidates(input.current);
+	const proposedMatches = settlementCandidates(input.proposed);
+	if (currentMatches.length !== (input.currentTrust.currentEpoch === 0 ? 0 : 1) || proposedMatches.length !== 1) {
+		return undefined;
+	}
+	const proposed = proposedMatches[0] as DetachedClosureCandidate;
+	if (!exactClosureOccurrence(input.proposed.closure, proposed)) return undefined;
+	const proposedCut = input.proposed.candidates.find((candidate) =>
+		sameRef(candidate.ref, input.proofRefs[0] as GenerationRef)
+	);
+	const proposedQc = input.proposed.candidates.find((candidate) =>
+		sameRef(candidate.ref, input.proofRefs[1] as GenerationRef)
+	);
+	const currentAclDigest = currentAnchorAclDigest(input.current, input.currentTrust);
+	if (proposedCut === undefined || proposedQc === undefined || currentAclDigest === undefined) return undefined;
+	const openedProposed = openedSettlement(proposed, input.successorTrust, proposedCut, proposedQc, currentAclDigest);
+	if (
+		openedProposed === undefined ||
+		openedProposed.identity.closedEpoch !== input.currentTrust.currentEpoch ||
+		openedProposed.identity.closedAnchorDigest !== input.currentTrust.currentAnchorDigest
+	) {
+		return undefined;
+	}
+	if (input.currentTrust.currentEpoch === 0) {
+		return openedProposed.identity.priorCheckpointKind === "genesis" &&
+			openedProposed.identity.priorCheckpointDigest === CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL
+			? Object.freeze({ proposed })
+			: undefined;
+	}
+	const current = currentMatches[0] as DetachedClosureCandidate;
+	if (!exactClosureOccurrence(input.current.closure, current)) return undefined;
+	const closedEpoch = input.currentTrust.currentEpoch - 1;
+	const currentCut = uniqueCandidate(input.current.candidates, "drp-hard-epoch-cut", closedEpoch);
+	const currentQc = uniqueCandidate(input.current.candidates, "drp-seal-qc", closedEpoch, "commit");
+	const currentAcl = uniqueCandidate(input.current.candidates, "drp-v3-latched-acl", closedEpoch);
+	if (currentCut === undefined || currentQc === undefined || currentAcl === undefined || !exactCandidate(currentAcl)) {
+		return undefined;
+	}
+	const openedCurrent = openedSettlement(
+		current,
+		input.currentTrust,
+		currentCut,
+		currentQc,
+		hex(hashDomain("ts-drp/latched-acl/v3", currentAcl.bytes))
+	);
+	return openedCurrent !== undefined &&
+		openedProposed.identity.priorCheckpointKind === "settled-v1" &&
+		openedProposed.identity.priorCheckpointDigest === current.ref.digest
+		? Object.freeze({ current, proposed })
+		: undefined;
+}
+
 /**
  * Selects the compatibility or bounded transition predicate and owns stale-ref derivation.
  * @param input - Current/proposed closure pair, new proof refs, and staging/verification mode.
@@ -607,10 +772,6 @@ export function inspectCreatorTransitionAdvance(
 	input: InspectCreatorTransitionAdvanceInput
 ): InspectCreatorTransitionAdvanceResult {
 	try {
-		const retirement = authenticatedRetirementPair(input);
-		if (retirement === undefined) return failure("TRUST_CLOSURE_INVALID");
-		const aggregate = authenticatedAggregatePair(input, retirement);
-		if (aggregate === undefined) return failure("TRUST_CLOSURE_INVALID");
 		const withoutControlCandidates = (
 			closure: CreatorTransitionClosure,
 			candidates: readonly (DetachedClosureCandidate | undefined)[]
@@ -627,8 +788,26 @@ export function inspectCreatorTransitionAdvance(
 					)
 				),
 			});
-		const normalizedCurrent = withoutControlCandidates(input.current, [retirement.current, aggregate.current]);
-		const normalizedProposed = withoutControlCandidates(input.proposed, [retirement.proposed, aggregate.proposed]);
+		let normalizedCurrent: CreatorTransitionClosure;
+		let normalizedProposed: CreatorTransitionClosure;
+		let proposedControls: readonly DetachedClosureCandidate[];
+		const currentSettlementProfile = settlementProfileFor(input.currentTrust.profileId);
+		const successorSettlementProfile = settlementProfileFor(input.successorTrust.profileId);
+		if (currentSettlementProfile !== "none" || successorSettlementProfile !== "none") {
+			const settlement = authenticatedSettlementPair(input);
+			if (settlement === undefined) return failure("TRUST_CLOSURE_INVALID");
+			normalizedCurrent = withoutControlCandidates(input.current, [settlement.current]);
+			normalizedProposed = withoutControlCandidates(input.proposed, [settlement.proposed]);
+			proposedControls = Object.freeze([settlement.proposed]);
+		} else {
+			const retirement = authenticatedRetirementPair(input);
+			if (retirement === undefined) return failure("TRUST_CLOSURE_INVALID");
+			const aggregate = authenticatedAggregatePair(input, retirement);
+			if (aggregate === undefined) return failure("TRUST_CLOSURE_INVALID");
+			normalizedCurrent = withoutControlCandidates(input.current, [retirement.current, aggregate.current]);
+			normalizedProposed = withoutControlCandidates(input.proposed, [retirement.proposed, aggregate.proposed]);
+			proposedControls = Object.freeze([retirement.proposed, aggregate.proposed]);
+		}
 		const trustCandidates = input.current.candidates.filter(
 			(candidate) => record(candidate)?.kind === "drp-anchor-trust-state"
 		);
@@ -679,12 +858,12 @@ export function inspectCreatorTransitionAdvance(
 				? input.proposed
 				: Object.freeze({
 						candidates: Object.freeze(
-							[...proposedWithoutRetiring.candidates, retirement.proposed, aggregate.proposed].sort((left, right) =>
+							[...proposedWithoutRetiring.candidates, ...proposedControls].sort((left, right) =>
 								compareRef(left.ref, right.ref)
 							)
 						),
 						closure: Object.freeze(
-							[...proposedWithoutRetiring.closure, retirement.proposed.ref, aggregate.proposed.ref].sort(compareRef)
+							[...proposedWithoutRetiring.closure, ...proposedControls.map(({ ref }) => ref)].sort(compareRef)
 						),
 					});
 		return Object.freeze({ kind: result.kind, ok: true as const, proposed });

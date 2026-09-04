@@ -132,7 +132,7 @@ export interface CurrentAnchorTrust {
 	readonly currentEpoch: number;
 	readonly genesisAnchorDigest: string;
 	readonly objectId: string;
-	readonly profileId: "creator-trusted-v1";
+	readonly profileId: "creator-trusted-settlement-v1" | "creator-trusted-v1";
 }
 
 export interface CertifiedAnchorTrust {
@@ -410,6 +410,7 @@ const AUTHOR_AUTHORIZATION_DOMAIN = "ts-drp/author-authorization/v3";
 const AUTHOR_AUTHORIZATION_KIND = "drp-author-authorization";
 const AUTHOR_AUTHORIZATION_PROFILE = "creator-author-authorization-v1";
 const AUTHOR_AUTHORIZATION_MAX_BYTES = 8192;
+const SETTLEMENT_AUTHOR_AUTHORIZATION_MAX_BYTES = 65_536;
 const ZERO_DIGEST = "0".repeat(64);
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 const PUBLIC_KEY_HEX = /^[0-9a-f]{64}$/u;
@@ -832,6 +833,10 @@ function decodeCreatorCarriers(signerSetBytes: Uint8Array, profileBytes: Uint8Ar
 		quorum: profile.quorum,
 		signerSetMatchesProfile: signerSetMatchesProfile && profile.cryptoSuiteId === ACTIVE_ANCHOR_SUITE,
 	};
+}
+
+function isCreatorTrustProfile(profileId: string): profileId is CurrentAnchorTrust["profileId"] {
+	return profileId === CREATOR_PROFILE || settlementProfileFor(profileId) !== "none";
 }
 
 function decodedProfileId(profileBytes: Uint8Array): string | undefined {
@@ -1332,11 +1337,16 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 				return anchorTrustFailure("profile-digest-mismatch");
 			}
 			const profileId = decodedProfileId(profileBytes);
-			if (profileId !== undefined && profileId !== CREATOR_PROFILE) {
+			if (profileId !== undefined && !isCreatorTrustProfile(profileId)) {
 				return anchorTrustFailure("unsupported-trust-profile");
 			}
 			const carriers = decodeCreatorCarriers(signerSetBytes, profileBytes);
-			if (carriers === undefined || carriers.quorum !== 1 || !carriers.signerSetMatchesProfile) {
+			if (
+				carriers === undefined ||
+				!isCreatorTrustProfile(carriers.profileId) ||
+				carriers.quorum !== 1 ||
+				!carriers.signerSetMatchesProfile
+			) {
 				return anchorTrustFailure("signer-set-profile-mismatch");
 			}
 			const recordBytes = encodeCanonical({
@@ -1349,7 +1359,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 				genesisAnchorDigest: anchorDigest,
 				kind: "drp-anchor-trust-state",
 				objectId: anchor.objectId,
-				profileId: CREATOR_PROFILE,
+				profileId: carriers.profileId,
 				quorum: 1,
 				version: 1,
 			});
@@ -1366,7 +1376,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 					currentEpoch: 0,
 					genesisAnchorDigest: anchorDigest,
 					objectId: anchor.objectId,
-					profileId: CREATOR_PROFILE,
+					profileId: carriers.profileId,
 				},
 				{
 					detachedCurrentAnchorSignature: signature,
@@ -1420,7 +1430,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 			if (record.objectId !== values.expectedObjectId) return anchorTrustFailure("object-id-mismatch");
 			if (record.genesisAnchorDigest !== values.pinnedGenesisAnchorDigest)
 				return anchorTrustFailure("genesis-pin-mismatch");
-			if (record.profileId !== CREATOR_PROFILE) return anchorTrustFailure("unsupported-trust-profile");
+			if (!isCreatorTrustProfile(record.profileId)) return anchorTrustFailure("unsupported-trust-profile");
 
 			const anchorBytes = new Uint8Array(record.exactCanonicalCurrentAnchorPreimageBytes);
 			const signature = new Uint8Array(record.detachedCurrentAnchorSignature);
@@ -1428,7 +1438,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 			const profileBytes = new Uint8Array(record.exactCanonicalProfileBytes);
 			const anchorDecoded = decodeExact(anchorBytes);
 			const profileId = decodedProfileId(profileBytes);
-			if (profileId !== undefined && profileId !== CREATOR_PROFILE) {
+			if (profileId !== undefined && !isCreatorTrustProfile(profileId)) {
 				return anchorTrustFailure("unsupported-trust-profile");
 			}
 			const carriers = decodeCreatorCarriers(signerSetBytes, profileBytes);
@@ -1449,6 +1459,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 				!DIGEST_HEX.test(record.currentAnchorDigest) ||
 				record.quorum !== 1 ||
 				carriers === undefined ||
+				carriers.profileId !== record.profileId ||
 				carriers.quorum !== 1 ||
 				!carriers.signerSetMatchesProfile ||
 				record.currentAnchorDigest !== record.genesisAnchorDigest ||
@@ -1474,7 +1485,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 					currentEpoch: record.currentEpoch,
 					genesisAnchorDigest: record.genesisAnchorDigest,
 					objectId: record.objectId,
-					profileId: CREATOR_PROFILE,
+					profileId: record.profileId,
 				},
 				{
 					detachedCurrentAnchorSignature: signature,
@@ -1555,15 +1566,19 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 			const detachedAnchorSignature = values.detachedAnchorSignature as Uint8Array;
 			const exactCanonicalAnchorPreimageBytes = values.exactCanonicalAnchorPreimageBytes as Uint8Array;
 			const exactCanonicalAuthorAuthorizationBytes = values.exactCanonicalAuthorAuthorizationBytes as Uint8Array;
+			const trust = values.trust as CurrentAnchorTrust;
+			const authorizationMaxBytes =
+				registry.get(trust) !== undefined && settlementProfileFor(trust.profileId) !== "none"
+					? SETTLEMENT_AUTHOR_AUTHORIZATION_MAX_BYTES
+					: AUTHOR_AUTHORIZATION_MAX_BYTES;
 			if (
 				detachedAnchorSignature.byteLength !== 64 ||
 				exactCanonicalAnchorPreimageBytes.byteLength === 0 ||
 				exactCanonicalAuthorAuthorizationBytes.byteLength === 0 ||
-				exactCanonicalAuthorAuthorizationBytes.byteLength > AUTHOR_AUTHORIZATION_MAX_BYTES
+				exactCanonicalAuthorAuthorizationBytes.byteLength > authorizationMaxBytes
 			) {
 				return anchorTrustFailure("malformed-input");
 			}
-			const trust = values.trust as CurrentAnchorTrust;
 			const authenticated = authenticateCurrentEpochAnchor({
 				detachedSignature: detachedAnchorSignature,
 				exactCanonicalAnchorPreimageBytes,
@@ -1714,7 +1729,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 					currentEpoch: anchor.epoch,
 					genesisAnchorDigest: genesisTrust.genesisAnchorDigest,
 					objectId: genesisTrust.objectId,
-					profileId: CREATOR_PROFILE,
+					profileId: genesisTrust.profileId,
 				},
 				{
 					detachedCurrentAnchorSignature: signature,
@@ -1765,7 +1780,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 					currentEpoch: anchor.epoch,
 					genesisAnchorDigest: currentTrust.genesisAnchorDigest,
 					objectId: currentTrust.objectId,
-					profileId: CREATOR_PROFILE,
+					profileId: currentTrust.profileId,
 				},
 				{
 					detachedCurrentAnchorSignature: signature,
