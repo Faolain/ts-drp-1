@@ -72,13 +72,18 @@ async function run() {
 	const store = candidate.createNodeDurableIssuanceStore({ primaryFilename });
 	await store.close();
 	if (originalSend !== undefined) {
-		originalSend({
-			allResultBearingConfigured:
-				resultBearing.length > 0 && resultBearing.every((statement) => configured.has(statement)),
-			constructorCalls,
-			events,
-			kind: "observation",
-			observedSql: [...new Set(resultBearing.map((statement) => sqlByStatement.get(statement) ?? ""))].join("\n"),
+		await new Promise((resolve, reject) => {
+			originalSend(
+				{
+					allResultBearingConfigured:
+						resultBearing.length > 0 && resultBearing.every((statement) => configured.has(statement)),
+					constructorCalls,
+					events,
+					kind: "observation",
+					observedSql: [...new Set(resultBearing.map((statement) => sqlByStatement.get(statement) ?? ""))].join("\n"),
+				},
+				(error) => (error === null ? resolve() : reject(error))
+			);
 		});
 	}
 	process.disconnect?.();

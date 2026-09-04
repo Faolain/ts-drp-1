@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -50,6 +51,24 @@ async function runtimeNames(relative: string): Promise<readonly string[]> {
 
 function sha256(text: string): string {
 	return createHash("sha256").update(text).digest("hex");
+}
+
+function durableIssuanceStoreMethodNames(text: string): readonly string[] {
+	const unit = ts.createSourceFile(ISSUANCE_TYPES, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const declaration = unit.statements.find(
+		(statement): statement is ts.InterfaceDeclaration =>
+			ts.isInterfaceDeclaration(statement) && statement.name.text === "DurableIssuanceStore"
+	);
+	if (declaration === undefined) throw new TypeError("missing DurableIssuanceStore interface declaration");
+	return declaration.members
+		.map((member) => {
+			if (!ts.isMethodSignature(member) && !ts.isPropertySignature(member)) {
+				throw new TypeError("unexpected DurableIssuanceStore interface member shape");
+			}
+			if (!ts.isIdentifier(member.name)) throw new TypeError("non-identifier DurableIssuanceStore member");
+			return member.name.text;
+		})
+		.sort();
 }
 
 async function rejected(run: () => unknown): Promise<unknown> {
@@ -352,12 +371,10 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 		expect(types).toMatch(
 			/export interface DurableOutboxPublicationTransitionInput\s*\{\s*readonly authorSequence: number;\s*readonly digest: Uint8Array;\s*readonly scope: DurableIssueScope;\s*\}/u
 		);
-		const interfaceBody = /export interface DurableIssuanceStore\s*\{(?<body>[\s\S]*?)\n\}/u.exec(types)?.groups?.body;
-		expect(interfaceBody).toBeDefined();
-		expect(interfaceBody).toContain(
+		expect(types).toContain(
 			"compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void>;"
 		);
-		expect(interfaceBody?.match(/^\s*(?:readonly )?[A-Za-z][A-Za-z0-9]*[(:]/gmu)).toHaveLength(8);
+		expect(durableIssuanceStoreMethodNames(types)).toEqual(PHASE_3A1B_P2_METHODS);
 
 		const terminal = fs.readFileSync(ISSUANCE_TERMINAL, "utf8");
 		const index = fs.readFileSync(ISSUANCE_INDEX, "utf8");
