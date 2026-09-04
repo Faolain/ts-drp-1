@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-04, review 6919a6a8)
+### Current frontier — author settlement and writer capacity (as of 2026-09-04, review e7c59191)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18427,16 +18427,33 @@ Closed in the 2026-09-04 checkpoint:
 
 Authorized now (tests-only RED first, then GREEN):
 
-- **f5b0d reclamation** from accepted design
-  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 5. Its f5b0a/f5b0s
-  dependencies are closed and the requested f5b0c-first ordering is now
-  satisfied. Begin with one causal tests-only RED before any reclamation
-  production edit.
+- **f5b0d reclamation correction** from accepted design
+  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 5, narrowed at the
+  design stop rule after rejected review `e7c59191`. The first GREEN
+  `1063feca` and evidence `352db789`/`307825ef` are preserved, but they do not
+  close the slice: all three reviewers found that authenticated pruning was a
+  post-delete no-op replay and that neither cleanup owner had a production
+  caller. Corrective f5b0d RED/GREEN owns the storage-neutral deleting
+  transaction, complete-plan/fence/link gate, mixed-epoch pending/published
+  deletion, epoch ceiling, crash/replay/watermark behavior, backend parity,
+  and corruption classification. It does not claim real close/adopt
+  reachability or a behaviorally unreachable recovery-scan correction.
 
 Blocked, and on what:
 
-- **f5b** creator settlement → f5b0d GREEN; f5b0a/f5b0s/f5b0b/f5b0c/W0 are
-  already closed. Stage W1
+- **f5b** creator settlement → corrective f5b0d GREEN;
+  f5b0a/f5b0s/f5b0b/f5b0c/W0 are already closed. Its causal RED now also owns
+  the first real, every-peer invocation of the authenticated deleting owner
+  after durable checkpoint staging, verified close/adoption, rollback,
+  availability and expected-head eligibility. The integrated hot, restart and
+  cold-reopen path must prove no legacy deletion occurs first, incomplete
+  settlement plans preserve rows and the watermark before mutation, and the
+  settlement-profile recovery scan is bounded by the reviewed rollback window
+  while the legacy one-epoch bound remains unchanged. This
+  ownership moved because the pre-integration settlement fixtures stop at
+  `CERTIFIED_VALUE_MISMATCH`, while both cleanup functions otherwise have no
+  product caller; accepting a comment, source substring or fixture-only call
+  would repeat the rejected GREEN rather than establish causality. Stage W1
   (256-line frontier, version-3 ACL) is inside f5b0a/f5b, not a separate slice.
 - **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
   five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
@@ -99297,6 +99314,52 @@ stop and reslice if that schema cannot represent the split. Authenticated
 frontier/terminal suppression likewise remains f5b-owned because f5b0c has no
 verified checkpoint frontier. These findings neither reopen f5b0c nor authorize
 an unreviewed retry, schema change, or public API change.
+
+f5b0d remains OPEN after a rejected first GREEN. Tests-only RED `9ab5924a`
+and evidence `f05048f9` were followed by production `1063feca` and evidence
+`352db789`/`307825ef`; the three-model review is preserved at signed/pushed
+`e7c59191` under `.logs/d110c-0c1f5b0d-review-307825ef/`. Its blocking union
+identified one call-graph defect: `pruneAuthenticatedSettledPrefix` was invoked
+only after a caller-supplied legacy deletion receipt, so it could be a no-op,
+and the purported production seam for `planClosedEpochCleanup` was only a
+comment while neither cleanup owner had a non-test caller. The evidence
+therefore proves backend mechanics, not production reachability, and its
+closure claim is rejected without rewriting the commits or evidence.
+
+The corrective ownership is intentionally split at the existing f5b boundary.
+Corrective f5b0d owns the actual storage-neutral deleting transaction and its
+backend invariants: no deletion or watermark movement without a complete
+linked plan and accepted fence state; deletion of every eligible old-epoch
+pending and published row; rejection of any row newer than the authenticated
+closed epoch; atomic crash/rollback, idempotent replay and monotone watermark;
+memory, Node and real IndexedDB parity; and permanent corruption distinguished
+from a retryable refusal. The frozen corrective RED selects twelve Vitest
+cases: nine controls pass and exactly the memory, browser and Node
+future-epoch-ceiling cases fail because an epoch-8 row is deleted under
+`closedEpoch = 7` instead of returning `ISSUANCE_INVALID_ARGUMENT` with rows
+and watermark intact. The real Chromium IndexedDB case fails with the same
+matrix. A corrective causal tests-only RED must precede its production
+correction.
+
+The parent f5b integration owns the part that cannot exist before its genuine
+settlement close/adopt path: the first production call on every peer after
+durable checkpoint staging, verified adoption, rollback-generation retention,
+availability and expected-head eligibility. Its RED must demonstrate through
+real hot, restart and cold-reopen behavior that this authenticated owner is the
+first deleting issuance mutation, that no legacy prune runs first, that an
+incomplete plan preserves rows and watermark, and that a complete plan deletes
+the eligible mixed pending/published prefix. It also owns the behavioral
+recovery-scan proof: the settlement profile uses the reviewed rollback-window
+bound without raising the legacy one-epoch bound. This is a dependency
+correction, not a weakening of accepted design item 5: exploratory hot and cold
+`creator-trusted-settlement-v1` fixtures stopped earlier at
+`CERTIFIED_VALUE_MISMATCH`, exactly the integration behavior f5b has not yet
+implemented. A source-text assertion, direct fixture call or manufactured
+receipt cannot substitute for the parent RED. If the parent cannot provide
+this internal call without a wire/schema/public-API/authority/dependency or
+threshold change, it stops and reslices under the existing high-risk rule.
+The final f5b0d confirmation reviews this ownership correction and corrective
+RED/GREEN together; no separate review-only slice is created.
 
 f5b0b P2 disposition is explicit. Authenticated frontier threading and
 classifier-local terminal suppression, replacement `planEffect` authority,
