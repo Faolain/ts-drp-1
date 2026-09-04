@@ -98435,7 +98435,7 @@ The first exact design and its amendment are
 `fc4b8fc7` is
 `a5dbd4f4bfd4df8d8b838ce057ac524706ab583a93e63cf527dd2a941ca87011`.
 The twice-amended two-entry self-excluding manifest validates and has SHA-256
-`039defd111934dbad3a3f22300ad3058e6db0a5abfcdc77e9dae27683210ea5c`.
+`ed2d39526ac99e709632a2636f70c146dd2772d62cc59834a2bb9d36813fbcee`.
 The governing raw review and ledger are under
 `.logs/d110c-0c1f5b0-plan-review-fc4b8fc7/`. Grok completed normally with a
 substantive `CHANGES_REQUIRED` JSON verdict, although its wrapper labeled the
@@ -98520,8 +98520,8 @@ collaboration subagents without new express user authorization.
 
 ###### D.110c-0c1f5b0p bounded removed-author identity-history prerequisite
 
-**Status: exact source audit and design drafted; blocking on the combined
-f5b0p/f5b0 Grok/Kimi/Opus confirmation. No RED or production edit is
+**Status: combined confirmation completed with a blocking P0/P1 union; the
+bounded design correction is being closed and no RED or production edit is
 authorized.** Owner: the creator-authenticated retired-key dictionary,
 genesis-bound settlement profile, pure proof/update verifier, strict-durability
 registry store, current/two-rollback reachability and explicit archive-tier
@@ -98535,7 +98535,29 @@ The bounded audit is
 `e6a67013b1f64b7ea2155f59a3d578f52ed84ed6`.
 
 Their two-entry self-excluding manifest validates and has SHA-256
-`696f0fbc14dd738663fbee077c3427e16bd014d549f5a6807c11e2783282a932`.
+`bbe10989220332019dad9e9d9a5c66d567241944ca28578a2db091e88643aff7`.
+
+The combined confirmation is preserved at
+`.logs/d110c-0c1f5b0p-confirmation-7ecd5f19/`. Grok completed normally with
+runner classification `NO_VERDICT` because its public stream mixed inspection
+prose with terminal JSON; that terminal JSON was `APPROVED` with zero P0/P1 and
+four P2, so the non-cancelled session was not resumed. Direct Kimi K3 completed
+with one P1/four P2. Opus xhigh completed with two P1/five P2. The three-item
+blocking union is registry adoption/rollback lifecycle transitions, missing AVL
+deletion-rebalance evidence/bounds, and dual ownership of the signed settlement
+checkpoint codec. `review-ledger.md` preserves each finding and disposition.
+The correction accepts all three P1s and every actionable P2 without altering
+the original streams or claiming that mechanical correction rewrites their
+verdicts. No RED ran. The fourteen-entry self-excluding confirmation manifest
+validates and has SHA-256
+`cc51d7f05569d74de919c8e7e79f15e99ac384b6035963400ec76e7e0ac3805b`.
+The bounded deterministic correction audit is
+`.logs/d110c-0c1f5b0p-confirmation-correction-7ecd5f19/`; its one-entry
+self-excluding manifest validates and has SHA-256
+`869653e23f2659f0ad28040ed7d7973a58e58c7bb007df98941c178a0638e40b`.
+That audit proves the corrected shapes and bounds but does not manufacture an
+accepted reviewer verdict; the high-risk accepted-design gate remains required
+before RED.
 
 The audit establishes:
 
@@ -98559,38 +98581,43 @@ Membership/nonmembership proofs rehash the exact root-to-terminal path and
 validate canonical bytes, digest/length, BST ordering/extrema, heights, sizes
 and AVL balance. Batch witnesses bind a canonical digest-keyed node set and an
 ordered path schedule against each evolving intermediate root; a two-child
-delete also opens its deterministic in-order-successor path. Safe-integer entry
-count bounds a path to 76 nodes. A maximum 64-insert/64-delete transition
-therefore schedules no more than 14,592 visits or 14,942,208 canonical node
-bytes under the 1,024-byte node ceiling, with shared node bytes carried once.
-Deterministic AVL rotations derive one successor root/count.
+delete also opens its deterministic in-order-successor path plus the exact
+off-path sibling/inner-child nodes needed for deletion rebalancing. Safe-
+integer entry count bounds a path to 76 nodes. A conservative maximum 64-
+insert/64-delete transition therefore schedules no more than 24,320 visits or
+24,903,680 canonical node bytes under the 1,024-byte node ceiling, with shared
+node bytes carried once. Exact single/double and sibling-balance-zero rules
+derive one successor root/count.
 The exact internal batch witness is a canonical
 `drp-retired-author-registry-batch-witness` v1 record binding prior root/count,
 mutation digest, sorted unique digest→node-byte entries and one ordered
-lookup/successor path schedule per mutation. The witness is capped at
-20,971,520 bytes with node/path limits checked before allocation; it is not a
+lookup/successor/rebalance schedule per mutation. The witness is capped at
+33,554,432 bytes with node/path limits checked before allocation; it is not a
 vertex, checkpoint or network record. Fresh additions use an exact
 `assert-absent` no-state-change mutation so their proof cannot disappear from
 the transaction transcript.
 
 At current→successor ACL transition, retained keys keep active boundaries;
 removed keys are inserted with their exact boundaries; a re-added key must be
-found, deleted and restored strictly above its admitted boundary; and only
+found and deleted, then continue strictly above a non-null admitted boundary
+or start at zero for a restored null boundary; and only
 verified nonmembership lets a genuinely new key begin at zero. The creator
 verifies paths from the prior checkpoint root and strictly commits/registers
 the successor root before signing the successor settlement checkpoint. Missing,
 stale, corrupt or unavailable paths stop the membership-changing close; they
 never imply freshness. ACL-unchanged close copies the root/count.
 
-Add a storage-neutral `RetiredAuthorRegistryStore` with pure-proof input and
-strict `prove`, expected-root `transactTransition`, ambiguous-outcome recovery
-and current/two-rollback `reclaim` contracts. Memory and dedicated IndexedDB
-implementations are conformant. They do not reuse AHE's non-recursive blob GC.
-Content-addressed nodes are reverified on every read; unknown outcomes resolve
-only by authenticating the exact registered root/count/mutation/witness digest.
-Each object has at most one serialized candidate, one current and two rollback
-root registrations; a different transition cannot bypass an unresolved
-candidate. Old copy-on-write nodes are pruned after authenticated adoption,
+Add a storage-neutral `RetiredAuthorRegistryStore` with pure proof/transition,
+signed-candidate binding, authenticated adoption/rollback lifecycle install,
+safe candidate discard and exact candidate/current/two-rollback reclamation.
+Bindings include checkpoint digest and epoch so equal roots in adjacent epochs
+do not conflate lifecycle roles. Memory and dedicated IndexedDB implementations
+are conformant and do not reuse AHE's non-recursive blob GC. Unknown outcomes
+resolve only by authenticating the monotone store revision, exact role bindings
+and receipt/checkpoint digests. Adoption atomically promotes candidate to
+current; genuine room rollback atomically promotes the retained authenticated
+checkpoint and reconciles the remaining roles. An omitted unresolved candidate
+blocks reclamation. Old copy-on-write nodes are pruned only after authenticated
 room-head, snapshot, rollback and availability gates.
 
 The active checkpoint holds one root/count plus at most 64 current frontier
@@ -98619,6 +98646,14 @@ remain unchanged and cannot late-opt-in here; old binaries reject the unknown
 profile. A future legacy migration requires separately reviewed authenticated
 full-history author-index construction.
 
+Settlement-profile permissionless mode does not create non-ACL writers:
+application authorization still requires exact ACL membership, and the active/
+retired identity lifecycle therefore covers every authorized author. Fixed
+profile literals are dispositioned explicitly: protocol-v3 codecs/registry
+widen where needed; Node and v3-room reject until f5b integration; v3-chat and
+grid keep emitting the old profile by default; protocol-v2, historical assets
+and old vectors remain unchanged.
+
 This is a prospective profile-inventory amendment: completed Phase-3 evidence
 for the three then-supported profiles remains immutable, while successful
 f5b0p/f5b GREEN would add this fourth creator-only sibling for newly created
@@ -98629,24 +98664,31 @@ The settlement checkpoint therefore adds exact
 `retiredAuthorRegistryRoot/Size`, permits only `genesis | settled-v1`
 predecessors and must fit the unchanged 8,192-byte ceiling with 64 maximum
 frontiers. Direct workspace canonical measurement is 7,064 bytes including the
-64-byte creator signature, leaving 1,128 bytes. The maximum-shaped two-child
-registry node is 792 bytes, leaving 232 bytes under its 1,024-byte ceiling. The invite envelope, vertex envelope, CutValue, QC, signer, authority
-and third-party dependencies do not change. The sibling profile identifier,
-checkpoint schema and registry store are explicit high-risk public/storage
-compatibility changes, not silent implementation details.
+64-byte creator signature, leaving 1,128 bytes. f5b0a solely owns this signed
+codec and pins the domain-separated genesis predecessor digest. The maximum-
+shaped two-child registry node is 792 bytes, leaving 232 bytes under its
+1,024-byte ceiling. The invite envelope, vertex envelope, CutValue, QC, signer,
+authority and third-party dependencies do not change. The sibling profile
+identifier, checkpoint schema and registry store are explicit high-risk public/
+storage compatibility changes, not silent implementation details.
 
 Implementation is two bounded prerequisite slices before the existing f5b0
 owners:
 
 1. **f5b0p-a protocol dictionary/profile:** causal tests-only RED for exact
-   node/proof/update codecs, deterministic rotations, member/nonmember and
-   corrupt/stale/substituted paths, 128-mutation boundary, profile rejection,
-   genesis-empty state and measured 64-frontier checkpoint bytes; then pure
-   protocol GREEN.
+   node/proof/update/rebalance codecs, deterministic rotation vectors,
+   member/nonmember and corrupt/stale/substituted/surplus paths, the corrected
+   visit/node-byte/witness bounds, 128-mutation boundary and low-level profile
+   parsing/rejection; then pure protocol GREEN. The signed checkpoint and its
+   64-frontier measurement are excluded and owned wholly by f5b0a. All product
+   close/adopt/open paths remain fail-closed on the new profile until f5b.
 2. **f5b0p-b registry storage:** causal tests-only RED for neutral memory/
    browser conformance, strict write-before-sign, idempotence, ambiguous commit,
-   corruption poison, unavailable-node refusal and current/two-rollback
-   reachability GC; then store/schema GREEN without creator-close integration.
+   candidate binding, adoption promotion, genuine rollback reversion, safe
+   candidate discard, corruption poison, unavailable-node refusal and exact
+   candidate/current/two-rollback reachability GC; then store/schema GREEN with
+   construction/disposal plumbing only and no room policy, issue, rebase-outbox
+   or creator-close integration.
 
 The resumed genuine functional RED uses a real
 `creator-trusted-settlement-v1` room and real ACL/creator path: activity,

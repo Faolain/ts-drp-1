@@ -47,12 +47,15 @@ docs/production-hardening/production-hardening-tdd-plan-v2.md
    checkpoint, not an already-implemented claim.
 5. Current-source seam checks found blueprint-only operation admission at
    `packages/protocol-v3/src/index.ts:3414,4693`; the proposed-v1 aggregate
-   requirement at
-   `packages/node/src/internal/creator-transition-advance.ts:398`; issuance
+   aggregate requirement at
+   `packages/node/src/internal/creator-transition-advance.ts:398` and the
+   separately required retirement pair at line 327; issuance
    publication ownership at `packages/issuance-store/src/types.ts:85`; and the
    current `completeRebaseSource()` owner/callers in `v3-live.ts` and the room.
-   The review corrected this citation: the requirement is the
-   `proposedMatches.length !== 1` check, not the retirement check at line 327.
+   The review corrected the original aggregate citation to the
+   `proposedMatches.length !== 1` check. The settlement-profile branch must
+   deliberately own both that check and the distinct retirement check at line
+   327; neither may be dropped implicitly.
 6. Source SHA-256 values exactly match the preceding audit:
    - creator close:
      `770add5766018e6db251602f7a479df5e310b8d2176fdbba67b67107cc943bb2`;

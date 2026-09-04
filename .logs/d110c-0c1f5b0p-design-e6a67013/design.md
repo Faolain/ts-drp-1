@@ -85,9 +85,14 @@ prior boundaries; nonmembership returns no boundaries.
 A batch witness is a canonical digest-keyed set of node bytes plus an ordered
 mutation-to-path schedule. Each mutation path is verified against the root
 produced by the preceding mutation, not only the original root. Deleting a node
-with two children additionally opens the deterministic in-order-successor path;
-missing or surplus scheduled nodes fail. Shared nodes appear once in the node
-set and may be referenced repeatedly by digest.
+with two children additionally opens the deterministic in-order-successor path.
+Every deletion step also carries the exact ordered off-path rebalance nodes
+needed by the frozen rotation algorithm: bottom-up by rebalanced ancestor,
+sibling first and the sibling's inner child second only for a double rotation.
+Every such node is rehashed and checked against the same evolving intermediate
+root as the lookup/successor paths; missing, reordered or surplus scheduled
+nodes fail. Shared nodes appear once in the node set and may be referenced
+repeatedly by digest.
 
 The detached canonical witness has this exact tests-and-store boundary (it is
 not a vertex, checkpoint field or public network record):
@@ -102,6 +107,7 @@ type RetiredAuthorBatchWitness = {
 	steps: readonly {
 		author: string;
 		lookupPath: readonly string[];
+		rebalanceNodes: readonly string[];
 		successorPath: readonly string[];
 	}[];
 	version: 1;
@@ -111,11 +117,12 @@ type RetiredAuthorBatchWitness = {
 `nodes` are strictly digest-sorted and unique. Every path item names one entry
 in that map or one node computed by an earlier step. `steps` correspond one-to-
 one with mutations in the same order. `successorPath` is empty except for a
-two-child delete. The witness digest is
+two-child delete and `rebalanceNodes` is empty for assertions/inserts and for a
+delete that needs no off-path node. The witness digest is
 `hashDomain("ts-drp/retired-author-registry-batch-witness/v1", bytes)` and the
 mutation digest uses
 `ts-drp/retired-author-registry-mutations/v1`. Witness canonical bytes are
-capped at 20,971,520; node count, path count and node-byte limits are checked
+capped at 33,554,432; node count, path count and node-byte limits are checked
 before allocation.
 
 A transition is an exact code-unit-sorted, unique batch of at most 128
@@ -143,7 +150,11 @@ No assertion/insertion accepts an occupied key, no update overwrites an
 occupied key and no delete accepts absent or different boundaries. An
 `assert-absent` step leaves the root/count unchanged. The pure transition
 verifier applies mutations in order using canonical AVL insertion/deletion and
-deterministic single/double rotations.
+this exact deterministic rotation selection: balance `> 1` with left-child
+balance `>= 0` is one right rotation, otherwise left-right; balance `< -1`
+with right-child balance `<= 0` is one left rotation, otherwise right-left.
+Thus the deletion sibling-balance-zero case always uses the single rotation.
+Two-child deletion always substitutes the in-order successor.
 Given the prior root/count, exact verified path nodes and mutations, every
 conforming implementation must derive the same successor root/count and the
 same newly reachable node bytes. The successor count must equal prior count
@@ -152,10 +163,14 @@ plus inserts minus deletes and remain a safe integer.
 Proof length is O(log R), where `R` is the prior retired-key count; update work
 and newly written nodes are O(M log R) for `M <= 128`. With safe-integer
 `subtreeSize`, an AVL path has at most 76 nodes. One maximum transition has at
-most 64 insertions and 64 deletions; a two-child deletion may need two paths.
-It therefore schedules at most 14,592 node visits and at most 14,942,208
+most 64 insertions and 64 deletions. Conservatively, every delete may need a
+76-node lookup path, a 76-node in-order-successor path and two off-path
+rebalance nodes at each of 76 levels. It therefore schedules at most 24,320
+node visits (`64 * 76 + 64 * (76 + 76 + 152)`) and at most 24,903,680
 canonical node bytes under the 1,024-byte node ceiling; shared node bytes are
-transmitted once.
+transmitted once. The 33,554,432-byte whole-witness cap leaves 8,650,752 bytes
+for the closed canonical schedule/map structure above that worst-case node-byte
+total.
 The record does not set a room-age-dependent proof-byte threshold. Existing
 epoch byte/capacity limits remain unchanged because proofs are creator/store
 inputs, not vertices, checkpoint fields or application operations.
@@ -173,7 +188,8 @@ For each authenticated current/successor ACL pair, derive sets by public key:
   `{admittedThrough,settledThrough}` into an absent dictionary key;
 - added member with dictionary membership: delete the exact entry and restore
   those boundaries into the active successor frontier; its next authored
-  sequence must be strictly above `admittedThrough`;
+  sequence must be strictly above a non-null `admittedThrough`; restored null
+  uses the same first-sequence-zero rule as genesis;
 - added member with verified dictionary nonmembership: require an
   `assert-absent` step and begin with both boundaries null, so its first
   sequence is zero; and
@@ -183,8 +199,11 @@ No key may be active and retired in the same successor state. A key removed and
 re-added by multiple operations within one staged ACL is classified only from
 the authenticated current and final successor snapshots; if present in both it
 is retained and cannot reset. Permission changes that leave any role/finality
-key retain the active frontier. Permissionless writer behavior does not bypass
-identity continuity.
+key retain the active frontier. Settlement-profile rooms may remain
+permissionless, but `authorizeLatchedApplicationWrite` still requires the
+author to be an ACL member; every authorized writer is therefore in the active
+frontier or retired dictionary lifecycle. There is no authorized non-ACL
+writer and permissionless mode does not bypass identity continuity.
 
 The creator settlement owner verifies the prior checkpoint and dictionary root,
 derives this exact diff, asks the registry store for proofs, independently runs
@@ -204,18 +223,47 @@ anchors, ACLs, close cut/QC, snapshot and history.
 ## Store contract and custody
 
 Add a storage-neutral `RetiredAuthorRegistryStore` capability with opaque,
-closed inputs/results for:
+closed inputs/results. A `RegistryCheckpointBinding` is constructible only by
+the settlement-checkpoint verifier and binds checkpoint digest, object,
+genesis-anchor digest, settlement profile, epoch, root and root size. A
+`RegistryLifecycleDecision` is constructible only by the Node adoption/rollback
+owner after authenticating the AHE head/generation and contains its exact
+monotone state revision, current checkpoint binding and zero to two rollback
+checkpoint bindings. Root roles are keyed by checkpoint digest and epoch, not
+only by root digest, because ACL-unchanged adjacent epochs may share a root.
+The closed store operations are:
 
-1. `prove({objectId,root,rootSize,authors})`: return detached canonical path
-   nodes for sorted unique authors without mutating state;
-2. `transactTransition({objectId,expectedRoot,expectedRootSize,retainRoots,mutations})`:
-   strict-durability CAS from one registered current root, validate/rederive the
-   pure transition, write all new content-addressed nodes, register the new
-   root/count, and return an immutable receipt containing prior/successor
-   root/count, mutation digest and exact batch-witness digest; and
-3. `reclaim({objectId,currentRoot,rollbackRoots})`: mark from exactly the
-   authenticated current root plus at most two authenticated rollback roots and
-   delete other nodes/root registrations atomically.
+1. `prove({binding,authors})`: return detached canonical path nodes for sorted
+   unique authors without mutating state;
+2. `transactTransition({expectedRevision,current,mutations,witness})`:
+   strict-durability CAS from the registered current checkpoint binding,
+   validate/rederive the pure transition, write all new content-addressed
+   nodes, register one candidate keyed by the prior checkpoint plus immutable
+   receipt digest, and return prior/successor root/count, mutation digest and
+   exact batch-witness digest;
+3. `bindSignedCandidate({expectedRevision,receiptDigest,checkpoint})`: require
+   the verifier-produced adjacent successor checkpoint binding to name the
+   receipt's exact object/genesis/profile/epoch/root/count, then durably bind
+   that checkpoint digest to the candidate without making it current;
+4. `installLifecycle({expectedRevision,decision,candidateReceiptDigest})`:
+   atomically replace registrations with exactly the authenticated lifecycle
+   decision. Adoption promotes its matching bound candidate to current and
+   demotes the former current into the supplied rollback set. Rollback promotes
+   the exact retained rollback checkpoint to current and reconciles the
+   abandoned current/remaining rollback registrations to the authenticated AHE
+   generations. The oldest registration becomes reclaim-eligible only when it
+   is absent from that verified rollback set. An ACL-unchanged adoption uses a
+   null candidate receipt and the adjacent checkpoint binding with the same
+   root/count;
+5. `discardCandidate({expectedRevision,current,receiptDigest,roomHead})`:
+   remove only an unbound candidate when an opaque authenticated room-head
+   decision proves the prior checkpoint remains current and no signed/adopted
+   checkpoint references the candidate; and
+6. `reclaim({expectedRevision,decision,candidateReceiptDigest})`: mark from the
+   exact authenticated current and rollback bindings plus any still-registered
+   candidate, then atomically delete only unreachable nodes and obsolete root
+   registrations. A missing/mismatched lifecycle binding or unresolved
+   candidate omitted from the mark set refuses reclamation.
 
 The in-memory reference implementation and the browser IndexedDB implementation
 are conformant. The browser owner uses a dedicated derived database/schema with
@@ -223,10 +271,12 @@ strict transactions, content-addressed `nodes` and object-scoped `roots`; it is
 not an untracked side table inside AHE. Opening validates schema/incarnation.
 Every read rechecks canonical bytes/digest/length. Root registrations are
 exactly `candidate | current | rollback`; one serialized object may have at
-most one candidate, one current and two rollback roots. Conflicting bytes for
-one digest, root/count disagreement, an unclassified registered root, partial
-writes, CAS mismatch or ambiguous commit poison/fail closed until authenticated
-recovery determines whether the exact transition committed.
+most one candidate, one current checkpoint binding and two rollback checkpoint
+bindings. Conflicting bytes for one digest, root/count disagreement, an
+unclassified registered root, partial writes, CAS mismatch or ambiguous commit
+poison/fail closed until authenticated recovery reads the exact state revision,
+role bindings and receipt/checkpoint digests. No caller label can promote,
+revert, discard or reclaim a root.
 
 Write-before-sign ordering is mandatory:
 
@@ -234,9 +284,10 @@ Write-before-sign ordering is mandatory:
 2. derive mutations and verify prior paths;
 3. strictly commit/register successor root;
 4. stage/sign/publish close and successor checkpoint;
-5. adopt and install the authenticated successor;
-6. retain current plus two rollback registry roots while matching rollback
-   generations remain required; and
+5. bind the signed candidate, then adopt and atomically install the
+   authenticated lifecycle decision;
+6. retain current plus two rollback registry checkpoint bindings while the
+   matching authenticated AHE generations remain required; and
 7. reclaim unreachable old nodes only after adoption, room-head/freshness,
    snapshot, rollback and availability gates pass.
 
@@ -244,11 +295,18 @@ A crash after step 3 but before signature leaves the sole inert candidate root;
 retry with the same expected root/mutations/witness digest is idempotent and
 may reuse it. A different transition is refused until the candidate is
 authenticated and either matched to a checkpoint or discarded from the still-
-current prior root. A crash
-after signature but before adoption retains both roots. A missing current-root
+current prior root. A crash after signature/binding but before adoption retains
+the old current plus the bound candidate. A crash during lifecycle installation
+is resolved by reading the monotone state revision and exact checkpoint-role
+set: either the entire prior set or the entire requested set exists, never a
+partial promotion/reversion. A genuine room rollback supplies a new
+verifier-produced lifecycle decision and atomically makes the selected retained
+checkpoint current before later creator close can use it. A missing current-root
 node after restart is corruption/availability failure, never nonmembership.
-Unknown write outcome is resolved by authenticating the registered exact
-successor root/count/mutation/witness digest; blind retry is forbidden.
+Unknown transition, bind, adoption, rollback, discard or reclamation outcome is
+resolved by authenticating the exact persisted revision, role bindings and
+receipt/checkpoint digests; blind retry and caller-invented repair are
+forbidden.
 
 Reachable nodes under the current root grow O(R). They are explicitly counted
 as an archive-tier control index. They are not loaded for ordinary issue,
@@ -301,6 +359,18 @@ fourth creator-only sibling for newly created settlement rooms. It does not
 reinterpret a prior profile, reopen its tests or claim old binaries support the
 new ID.
 
+The fixed-literal owner roster is closed explicitly. Protocol-v3 `index.ts`,
+`creator-close.ts`, `creator-checkpoint.ts`, registry JSON/schema and generated
+conformance reference widen only where parsing/encoding the sibling profile is
+required. Node `v3-live.ts` and `creator-close.ts`, and v3-room's trust/open
+checks, remain fail-closed on the new profile until the f5b integration installs
+its mandatory settlement behavior. v3-chat and grid creation continue emitting
+`creator-trusted-v1` by default; f5b0c must make any new-profile selection
+explicit rather than silently changing those golden paths. Protocol-v2,
+protocol-v2 registries/vectors, storage-browser historical test assets and all
+old-profile golden vectors remain unchanged. f5b0a RED enumerates this roster
+from a repository-wide fixed-string search and pins each widen-or-reject result.
+
 ## Settlement checkpoint amendment
 
 Replace the previously proposed checkpoint's migration fields with this exact
@@ -339,6 +409,14 @@ The profile must be `creator-trusted-settlement-v1`. Genesis is the sole
 sentinel predecessor; every non-genesis predecessor is one adjacent settlement
 checkpoint under the same profile/object/genesis. There is no
 `admitted-v1` predecessor, v1 migration branch or legacy-retirement bridge.
+When `priorCheckpointKind === "genesis"`, `priorCheckpointDigest` is the named
+`CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL`, exactly
+`hex(hashDomain("ts-drp/creator-author-settlement-genesis/v1",
+encodeCanonical({genesisAnchorDigest, kind:
+"drp-creator-author-settlement-genesis", objectId, profileId:
+"creator-trusted-settlement-v1", protocolMajor: 3, version: 1})))`. f5b0a is
+the sole owner of this signed checkpoint codec, signature/domain, predecessor
+rule, root/count fields and byte/count ceiling.
 The maximum-shaped signed checkpoint with 64 full frontier entries, a 256-code-
 unit object ID, maximum safe integers, full digests and a 64-byte creator
 signature encodes to 7,064 bytes with the workspace canonical implementation,
@@ -351,7 +429,8 @@ not raised.
 | Case                                                         | Required result                                                                             |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | globally fresh key                                           | verified nonmembership; null boundaries; first sequence zero                                |
-| removed key re-added                                         | membership restores exact boundaries; next sequence strictly greater than admitted boundary |
+| removed key re-added, non-null boundary                      | membership restores exact boundaries; next sequence strictly greater than admitted boundary |
+| removed never-authored key re-added, null boundary           | membership restores null/null; first sequence zero                                          |
 | key retained across ACL roles                                | active boundary copied; no dictionary mutation                                              |
 | remove then re-add within one staged ACL                     | retained by current/final membership; no reset                                              |
 | active key also found in retired root                        | checkpoint/transition invalid                                                               |
@@ -364,6 +443,9 @@ not raised.
 | crash after registry commit before checkpoint signature      | inert candidate root; idempotent exact retry or later GC                                    |
 | crash after signature before adoption                        | both roots retained; old checkpoint authoritative                                           |
 | adoption succeeds before reclamation                         | new root authoritative; rollback roots still retained                                       |
+| room rolls back to retained checkpoint                       | authenticated lifecycle CAS promotes that binding to current and reconciles rollback roles  |
+| crash/unknown outcome during adoption or rollback            | read exact revision/roles; whole old or whole new set; no blind retry                       |
+| discard bound/referenced candidate                           | refuse; no registration or node deletion                                                    |
 | premature/misbound reclamation                               | CAS/reachability refusal; no live-node deletion                                             |
 | old profile receives new carrier                             | unsupported/mixed-profile rejection                                                         |
 | new profile omits settlement/registry carrier                | fail closed                                                                                 |
@@ -389,31 +471,42 @@ not raised.
   keeps current-root logical entries bounded by that set, while obsolete path
   nodes are reclaimable after rollback gates.
 - The ≥100 same-room transition test includes remove/re-add, fresh additions,
-  restarts before/after registry commit and adoption, selected prune boundaries,
-  exact root/count recomputation, current/rollback reachability census and a
-  fresh-process post-GC memory gate. It does not claim O(1) archival registry
-  bytes under unbounded distinct-key churn.
+  permissionless-member continuity, restarts before/after registry commit and
+  adoption, genuine room rollback/reversion, selected prune boundaries, exact
+  root/count recomputation, current/rollback reachability census and a fresh-
+  process post-GC memory gate. It does not claim O(1) archival registry bytes
+  under unbounded distinct-key churn.
 
 ## TDD slices and gates
 
 After the combined design confirmation is empty at P0/P1:
 
 1. **f5b0p-a protocol dictionary/profile RED→GREEN.** Tests-only RED exercises
-   empty/member/nonmember proofs, deterministic AVL rotations, batch updates,
-   stale/substituted proofs, root/count/metadata corruption, maximum 128-key
-   transition, profile acceptance/rejection and the measured 64-frontier
-   checkpoint ceiling. GREEN is confined to pure codecs/verifiers/profile
-   unions/exports and adds no storage or room behavior.
+   empty/member/nonmember proofs, exact single/double/zero-balance deletion
+   rotation vectors, lookup/successor/rebalance schedules, batch updates,
+   stale/substituted/surplus proofs, root/count/metadata corruption, the exact
+   24,320-visit/24,903,680-node-byte/33,554,432-witness caps, maximum 128-key
+   transition and low-level profile parsing/rejection. The signed settlement
+   checkpoint and its 64-frontier measurement are excluded and owned wholly by
+   f5b0a. GREEN is confined to pure dictionary codecs/verifiers/profile
+   unions/exports, and all product close/adopt/open paths must continue to reject
+   the new profile until f5b installs the mandatory settlement carrier.
 2. **f5b0p-b store RED→GREEN.** Tests-only RED freezes in-memory and browser
    conformance, strict write-before-sign receipt semantics, idempotence,
-   ambiguous commit recovery, corruption poison, current/two-rollback
-   reachability GC and unavailable-node refusal. GREEN adds the neutral store,
-   memory implementation, dedicated IndexedDB implementation/schema and
-   internal room construction plumbing; it does not integrate creator close.
+   ambiguous outcomes for every state transition, bound-candidate adoption,
+   current-to-rollback rotation, genuine room-rollback reversion, oldest-
+   rollback eligibility, safe candidate discard, corruption poison, candidate/
+   current/two-rollback reachability GC and unavailable-node refusal. GREEN adds
+   only the neutral store, memory implementation, dedicated IndexedDB schema and
+   store construction/disposal plumbing. It adds no room policy, issue path,
+   rebase-outbox behavior or creator-close integration.
 3. **f5b0a-d and f5b.** Resume the already frozen settlement carrier, Node,
    room and pruning slices, amended so new-profile genesis has no v1 migration
    or legacy retirement. Creator integration uses the genuine ACL diff and
-   registry store before signing. Each retains its causal RED and focused,
+   registry store before signing. f5b also owns the profile branch at both the
+   retirement requirement and aggregate requirement in
+   `creator-transition-advance.ts`, preserving both old-profile paths byte-for-
+   byte. Each retains its causal RED and focused,
    static, retained and isolated GREEN gates.
 
 The combined functional RED must fail through the real product path: create a

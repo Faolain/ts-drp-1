@@ -81,11 +81,14 @@ fresh.
 
 Every child reference also authenticates its height, subtree size and min/max
 key bounds, allowing a root-to-terminal proof to recompute parent balance,
-ordering and metadata without opening an entire sibling subtree. Safe-integer
-entry count bounds an AVL path to 76 nodes. A maximum 64-insert/64-delete
-transition, allowing a second in-order-successor path for every two-child
-deletion, schedules at most 14,592 visits / 14,942,208 canonical node bytes;
-shared node bytes are carried once.
+ordering and metadata without opening an entire sibling subtree. An update must
+nevertheless open the off-path sibling and, for a double rotation, its inner
+child at each deletion-rebalance level. Safe-integer entry count bounds an AVL
+path to 76 nodes. A conservative maximum 64-insert/64-delete transition allows
+one 76-node insertion path and, per deletion, a 76-node lookup path, 76-node
+in-order-successor path and 152 off-path rebalance nodes. It therefore schedules
+at most 24,320 visits / 24,903,680 canonical node bytes; shared node bytes are
+carried once. The whole-witness cap is 33,554,432 bytes.
 
 This choice is honest about storage. Reachable dictionary nodes are a separately
 counted archive-tier control index of O(R) entries, not active bootstrap state
@@ -178,9 +181,9 @@ the registry root/count is 7,064 bytes (1,128 bytes below the unchanged
 6. The exact workspace-canonical maximum-shape commands report 792 bytes for a
    two-child registry node and 7,064 bytes for the signed 64-frontier
    checkpoint. The arithmetic path bound is 76 nodes at safe-integer maximum
-   AVL size, hence at most 14,592 scheduled visits / 14,942,208 canonical node
-   bytes for 64 insertion paths and 64 two-path deletions under the node
-   ceiling.
+   AVL size. Including lookup, successor and worst-case off-path deletion
+   rebalance nodes gives at most 24,320 scheduled visits / 24,903,680 canonical
+   node bytes under the node ceiling and a 33,554,432-byte whole-witness cap.
 7. Protected `.agents`, `.claude` and `.pnpm-store` are present and untouched;
    stash count is 27. Ports 4174, 4175, 51000 and 51002 are clear. The
    executable-restricted process predicate finds no ts-drp reviewer, test or

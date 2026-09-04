@@ -514,14 +514,19 @@ After the combined design confirmation has an empty P0/P1 union,
 implementation is split at natural owners without repeated plan ceremony:
 
 1. **f5b0p-a — protocol dictionary/profile.** RED freezes the exact Merkle AVL
-   node/proof/update grammar, deterministic rotations, profile union,
-   genesis-empty state, root/count checkpoint fields and the measured
-   64-frontier byte ceiling. GREEN is pure codecs/verifiers/profile plumbing;
-   no store or creator-close behavior.
+   node/proof/update/rebalance grammar, deterministic rotations and low-level
+   profile union. The signed settlement checkpoint, genesis predecessor,
+   root/count fields and measured 64-frontier byte ceiling are excluded and
+   wholly owned by f5b0a. GREEN is pure dictionary codecs/verifiers/profile
+   plumbing; every product close/adopt/open owner remains fail-closed on the new
+   profile until f5b installs settlement behavior.
 2. **f5b0p-b — retired-author registry store.** RED freezes the neutral
    contract plus memory/browser strict durability, idempotence, ambiguous
-   outcome recovery, corruption refusal and current/two-rollback reachability
-   GC. GREEN adds the dedicated store/schema; it does not hide nodes in AHE.
+   outcome recovery, authenticated adoption promotion, genuine room-rollback
+   reversion, candidate discard, corruption refusal and candidate/current/two-
+   rollback reachability GC. GREEN adds the dedicated store/schema and only its
+   construction/disposal plumbing; it does not hide nodes in AHE or own room
+   policy, issue, rebase-outbox or creator-close behavior.
 3. **f5b0a — protocol carrier and checkpoint codecs.** RED freezes exact
    canonical shapes, byte/count limits, signature/domain behavior,
    genesis/settled predecessor rules, global reservation, old/mixed-profile
