@@ -96973,6 +96973,75 @@ and source-operation accounting, and preserve every migration authority and
 failure gate. It may not reconstruct retired vertices, invent provenance, or
 silently change migration record/schema bytes.
 
+###### D.110c-0c1j rotated closing-authority (host migration) capability debt
+
+**Status: explicit blocking FPS-path capability debt; out of scope for every
+D.110c settlement slice.** Owner: a separately reviewed high-risk authority
+model in which the epoch-N+1 closing authority may differ from the epoch-N
+closing authority (game host migration A → B), including the trust-record
+signing rule (closer of N versus installer of N+1), successor signer-set
+staging, and the openers' signer-set comparison. Deadline: before any FPS or
+host-migration golden-path claim; not required for the fixed-creator
+`creator-trusted-v1`/settlement rollover gates.
+
+The current protocol-v3 close path cannot represent it: the successor anchor
+copies `parametersDigest`, `profileDigest` and `signerSetDigest` from the
+current anchor (`packages/protocol-v3/src/creator-close.ts:218-222`),
+`prepareCreatorClose` requires the next signer-set bytes to equal the current
+material (`:379`), `openCreatorSuccessorTrust` requires byte-identical profile
+and signer-set bytes (`:598-601`), anchor advance requires equal
+`profileDigest`/`signerSetDigest` (`packages/protocol-v3/src/index.ts:1744-1745`),
+and the Node close passes the current signer set as the next one
+(`packages/node/src/creator-close.ts:902`). The only rotation-shaped hook,
+`deriveNextLatchedSignerSet` → `nextSigners`
+(`packages/protocol-v3/src/latched-acl.ts:459-480`,
+`packages/node/src/v3-live.ts:3521-3527`), has no consumer. The D.110c-0b
+decision already classifies rotated authority as a separate high-risk design;
+this record names the owner so the FPS path is not silently assumed covered.
+
+The author-settlement layer must not be re-cut when this lands: the settlement
+checkpoint is signed under the successor (installing) authority and verified
+under floor trust only, with no current-versus-successor key equality, and
+every settlement rule (fence, durable plan, admission epoch, terminal boundary,
+creator scan, author recovery) keys on the author's own signature and the
+bound ACL digests, never on the closing-authority key. Evidence:
+`.logs/d110c-0c1f5b0-fable51-research-20260903/lineage-profiles-impact.md`
+§2.A and Delta 1.
+
+###### D.110c-0c1k ACL member ceiling versus chat-profile writer count
+
+**Status: explicit blocking Discord-path capability debt; independent of the
+settlement design.** Owner: one reviewed decision on the latched-ACL member
+ceiling, re-deriving together the 64-member cap
+(`packages/protocol-v3/src/latched-acl.ts:133-134`), the ACL's own 8,192-byte
+canonical ceiling (`:206`, `:218`), the author-list cap
+(`packages/protocol-v3/src/index.ts:774`), the frontier-vector cap
+(`packages/protocol-v3/src/creator-author-issuance-frontiers.ts:165`) and the
+tests that pin 65 as the rejection boundary. Deadline: before D.110c-d or
+Phase 7 may claim the Discord-style ≥100-transition golden path; not required
+for the MMORPG zone profile, whose ≤ 64 durable writers per zone is a stated
+decision (this plan, "reachable target" paragraph; Profile M active-writer
+row).
+
+Profile D states active writers ≤ 128 per five-minute window with ≥ 1,000
+online replicas per object, and the chat golden path grants Writer through the
+ACL, yet every author must be an ACL member even in permissionless mode
+(`packages/protocol-v3/src/latched-acl.ts:334-336`). A channel with 128
+distinct writers in five minutes cannot exist under a 64-member ACL. The cap
+is also shape-dependent: measured with the workspace canonical encoder, 64
+members each holding a finality key and all four groups encode to 12,888
+bytes, above the 8,192-byte ceiling, while 64 writer-only members encode to
+7,064 bytes; the effective full-shape ceiling is roughly 40 members. If the
+decision raises the member count beyond what an 8,192-byte checkpoint vector
+can carry, the per-author settlement frontier must move to an authenticated
+author-state map (codec `version: 2`, per-author O(log N) paths, a new proof
+carrier to authors at open); that is a wire/API change and a stop-rule trigger
+for any settlement slice that attempts it, so it is recorded here as the
+Phase-7/Train-S evolution rather than absorbed. Evidence:
+`.logs/d110c-0c1f5b0-fable51-research-20260903/lineage-profiles-impact.md`
+§2.C and §4.
+
+
 ###### D.110c-0c1f multi-author historical-issuance authority prerequisite
 
 **Status: blocking product-capability debt; bounded source/architecture audit is
