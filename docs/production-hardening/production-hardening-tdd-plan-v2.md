@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-04, review 1f02d605)
+### Current frontier — author settlement and writer capacity (as of 2026-09-04, review 6919a6a8)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18418,20 +18418,25 @@ Closed in the 2026-09-04 checkpoint:
   fence/join/causalJoin remains control-only. The earlier stale-`dist` child
   result is preserved as an invalid runtime-identity diagnostic, followed by
   build-before-child and isolated-checkout passes.
+- **f5b0c room** is GREEN and reviewed with an empty P0/P1 union. Causal RED
+  `d062c5f6`/evidence `9f55370c` became production `3b6a66a9`/evidence
+  `6f8e80ca`; the final review is `6919a6a8` at
+  `.logs/d110c-0c1f5b0c-review-6f8e80ca/`. The room now durably writes its
+  plan before issue, fences before replacement, links replacement issue
+  atomically, and leaves `creator-trusted-v1` unchanged.
 
 Authorized now (tests-only RED first, then GREEN):
 
-- **f5b0c room** from accepted design
-  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 4. Its f5b0b
-  dependency is now closed. Begin with one causal tests-only RED before any
-  room production edit. The exact resume prompt remains
-  `.logs/d110c-0c1f5b0r-design-3a156aca/next-prompt.md`.
+- **f5b0d reclamation** from accepted design
+  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 5. Its f5b0a/f5b0s
+  dependencies are closed and the requested f5b0c-first ordering is now
+  satisfied. Begin with one causal tests-only RED before any reclamation
+  production edit.
 
 Blocked, and on what:
 
-- **f5b0d** reclamation is dependency-ready but follows the requested f5b0c
-  execution order. **f5b** creator settlement → f5b0c and f5b0d GREEN;
-  f5b0a/f5b0s/f5b0b/W0 are already closed. Stage W1
+- **f5b** creator settlement → f5b0d GREEN; f5b0a/f5b0s/f5b0b/f5b0c/W0 are
+  already closed. Stage W1
   (256-line frontier, version-3 ACL) is inside f5b0a/f5b, not a separate slice.
 - **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
   five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
@@ -99264,10 +99269,43 @@ shared consumers, and the built-child and detached-checkout gates. The final
 Grok 4.6/high, Kimi K3/100 and Opus xhigh review at signed/pushed commit
 `1f02d605` has an empty P0/P1 union.
 
+f5b0c is CLOSED. Tests-only RED `d062c5f6` selected one file and nine tests:
+eight failed at the intended missing room plan/fence/replacement orchestration
+and the `creator-trusted-v1` control passed, with zero fixture/import/export
+failures; evidence is `9f55370c`. One-file room GREEN `3b6a66a9` with evidence
+`6f8e80ca` passed 9/9 focused, example build and typecheck, exact-source
+lint/format/diff, 87/87 retained settlement/lifecycle, 26/26 legacy, and a
+freshly built detached checkout at 9/9 plus 87/87. The final Grok 4.6/high,
+standard Kimi K3/100 and Opus xhigh review is signed/pushed at `6919a6a8` under
+`.logs/d110c-0c1f5b0c-review-6f8e80ca/`; its manifest SHA-256 is
+`0402bd1fcef9b0e4966b0a8ddfe83ba9303e60082a52383d5aa0af8debdd8947` and its
+P0/P1 union is empty. Grok's strict wrapper honestly retains `NO_VERDICT` for
+leading prose, while the same normal exit-0/end-turn output contains the
+explicit PASS JSON; it was neither canceled nor timed out. Two rejected local
+Kimi CLI forms are preserved before the successful configured
+`kimi-code/k3` run.
+
+The five nonblocking review findings have explicit disposition. The workspace
+reporter's two-suite aggregate is identical in RED/GREEN while `testResults`
+contains exactly one file, so it changes no evidence claim. Direct fence
+outcome-unknown coverage, verified-profile gating parity, and a genuine
+same-store activation-digest runtime case belong to f5b's existing restart and
+adoption integration. That integration must also RED a genuine multi-intent or
+transform-growth replacement that reaches `split-required`; it must prove
+recoverable exact-once replacement under the existing one-link plan schema, or
+stop and reslice if that schema cannot represent the split. Authenticated
+frontier/terminal suppression likewise remains f5b-owned because f5b0c has no
+verified checkpoint frontier. These findings neither reopen f5b0c nor authorize
+an unreviewed retry, schema change, or public API change.
+
 f5b0b P2 disposition is explicit. Authenticated frontier threading and
 classifier-local terminal suppression, replacement `planEffect` authority,
-and same-store activation-digest runtime coverage belong to f5b0c; the
-payload-seeded settlement control set belongs to f5b. Historical misleading
+and same-store activation-digest runtime coverage were assigned to f5b0c; room
+typecheck and replacement `planEffect` authority are now discharged by f5b0c.
+Authenticated frontier/terminal suppression and same-store activation-digest
+runtime coverage move to f5b because only that integration owns the verified
+checkpoint frontier and genuine adoption fixture. The payload-seeded
+settlement control set also belongs to f5b. Historical misleading
 `[control]` titles remain immutable with a recorded naming caveat. The Node
 typecheck exit 2 is inherited and byte-identical to the untouched parent after
 root normalization. Future GREEN evidence that runs children against built
@@ -99277,10 +99315,10 @@ is nonblocking prospective evidence guidance.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED on f5b0c and f5b0d RED/GREEN under the accepted
-D.110c-0c1f5b0r design; f5b0a, f5b0s, f5b0b and W0 are closed, f5b0p-a/b are deleted,
-the f5b RED itself is authorized by f5b0d GREEN, and no production edit runs
-before that RED.**
+**Status: BLOCKED only on f5b0d RED/GREEN under the accepted
+D.110c-0c1f5b0r design; f5b0a, f5b0s, f5b0b, f5b0c and W0 are closed,
+f5b0p-a/b are deleted, the f5b RED itself is authorized by f5b0d GREEN, and no
+production edit runs before that RED.**
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
