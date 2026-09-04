@@ -58,9 +58,12 @@ Task. Three independent slices, tests-only RED first, runnable in parallel:
    outcome readback, corruption refusal, and the prune gate that refuses rows
    referenced by an unlinked entry. Design RED cases 3, 5, 10, 13, 25 store
    halves.
-3. **D.110c-0c1k stage W0 defects** (solution.md §3 W0): staging enforces the
-   open path's decode limits and 31, 64 and 65 members agree across stage,
-   close, adoption and recovery; the duplicated `SCANNABLE_BYTES` filter in
+3. **D.110c-0c1k stage W0 defects** (solution.md §3 W0): staging enforces the open path's decode limits; 31, 64 and 65 writer-only
+   members and 41 full-shape members agree across stage, close, adoption and
+   recovery under the unchanged 8,192-byte ceiling of ACL versions 1 and 2
+   (raise `maxItems` so it never binds below the byte ceiling; never raise the
+   byte ceiling; 64 full-shape members are impossible in v1 and belong to W1's
+   version-3 snapshot); the duplicated `SCANNABLE_BYTES` filter in
    `packages/node/src/creator-close.ts` becomes a loud per-kind rejection;
    per-snapshot O(1) membership lookup with an accept/reject set identical to
    `members.find` on 8,192 vertices, permissionless and not; a per-author epoch

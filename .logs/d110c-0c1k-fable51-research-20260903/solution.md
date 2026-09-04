@@ -128,12 +128,23 @@ Target: 128 distinct authors per epoch with headroom to 256 in one object
 ### W0. Defects and preconditions (own slice, before or with f5b0a)
 
 1. **Decoder limit and staging parity.** Staging enforces exactly the open
-   path's decode limits, and the limits are raised so that 64 full-shape
-   members decode (`maxItems` ≥ 64 × 22 + 25). A RED constructs 31, 64 and 65
-   members through grant staging and proves close, adoption and recovery all
-   agree with open. This is a fix to `creator-trusted-v1` behavior only in the
-   sense that a currently impossible state becomes possible; existing rooms
-   under 30 members are unchanged.
+   path's decode limits, so a grant that open would refuse is refused at
+   staging, never discovered at close. The decoder's item limit is raised so
+   that it is never the binding constraint below the unchanged 8,192-byte
+   ceiling: 64 writer-only members cost 64 × 16 + 25 = 1,049 items and 7,014
+   bytes, so `maxItems` ≥ 2,048 lets every ACL that fits the byte ceiling
+   decode. **The byte ceiling of versions 1 and 2 is not raised.** 64
+   full-shape members (12,838 bytes) remain impossible in `creator-trusted-v1`;
+   the full-shape cap stays about 40 by bytes, and W1's version-3 snapshot is
+   the only way past it. A RED constructs 31, 64 and 65 writer-only members and
+   41 full-shape members through grant staging and proves stage, close,
+   adoption and recovery agree with open (31 and 64 open; 65 rejected by the
+   member cap; 41 full-shape rejected at staging by the byte ceiling). The
+   only `creator-trusted-v1` behavior change is that an ACL which already fits
+   the byte ceiling now opens when staging admitted it (correction 2026-09-04:
+   the earlier wording "so that 64 full-shape members decode" was arithmetically
+   impossible under 8,192 bytes and led a GREEN attempt to raise the ceiling;
+   that is forbidden).
 2. **`SCANNABLE_BYTES` sweep.** The duplicated constant at
    `node/creator-close.ts:69` is replaced by per-kind ceilings from the codecs
    it scans; an oversized record is a loud rejection, never a silent skip.
@@ -280,7 +291,8 @@ Target: 128 distinct authors per epoch with headroom to 256 in one object
 
 - **W0** (`packages/protocol-v3/src/latched-acl.ts`, `packages/node/src/creator-close.ts`,
   `packages/node/src/v3-live.ts`, genesis builders for the share parameter):
-  RED 1 decoder parity through staging at 31/64/65; RED 2 loud rejection of an
+  RED 1 decoder parity through staging at 31/64/65 writer-only and 41
+  full-shape under the unchanged 8,192-byte ceiling; RED 2 loud rejection of an
   oversized closure record; RED 3 O(1) membership with identical accept/reject
   set on 8,192 vertices under `permissionless` and not; RED 4 one writer cannot
   exceed its share, fences included, and the epoch still closes.

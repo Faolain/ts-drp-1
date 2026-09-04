@@ -97144,8 +97144,12 @@ D.110c-0c1k2; must still latch at closes for incarnation or anchor fencing
 breaks); the authenticated map at ≥ 10^5 members behind
 `frontierFor`/`frontierCount`.
 
-RED (solution.md §6): W0 cases 1–4 (decoder/staging parity at 31/64/65 across
-stage, close, adoption and recovery; loud oversized-record rejection; O(1)
+RED (solution.md §6): W0 cases 1–4 (decoder/staging parity at 31/64/65
+writer-only and 41 full-shape members across stage, close, adoption and
+recovery under the unchanged 8,192-byte ceiling of ACL versions 1 and 2, whose
+byte ceiling W0 must not raise (a GREEN attempt that raised it to 16,384 was
+correctly aborted on 2026-09-04; 64 full-shape members are impossible in
+`creator-trusted-v1` and belong to W1's version-3 snapshot); loud oversized-record rejection; O(1)
 membership with an identical accept/reject set on 8,192 vertices; per-author
 share holds with fences counted and the epoch still closes). W1 cases 5–8
 (ACL v3 at 256 both shapes round-trips, 257 and 65,537 bytes reject, v1/v2
