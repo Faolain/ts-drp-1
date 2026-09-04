@@ -269,6 +269,72 @@ export async function reopenSettlementNode(node: OpenSettlementNode): Promise<V3
 	return activation.handle;
 }
 
+/**
+ * Reopens settlement recovery over an outbox row whose issued twin was corrupted after commit.
+ * @param node - Active settlement fixture with genuine durable owners.
+ * @returns The shipped recovery decision.
+ */
+export async function recoverSettlementIssuedOutboxMismatch(
+	node: OpenSettlementNode
+): Promise<Awaited<ReturnType<typeof recoverV3LiveReplica>>> {
+	const bootstrap = await node.issuanceStore.readIssued(node.scope, 0);
+	if (bootstrap === null) throw new TypeError("settlement mismatch bootstrap is unavailable");
+	await node.issuanceStore.transactIssue(node.scope, async (authorSequence) => {
+		const canonicalPreimageBytes = encodeCanonical({
+			anchor: node.fixture.anchorDigest,
+			author: node.fixture.author,
+			authorSequence,
+			dependencies: [Buffer.from(bootstrap.envelope.digest).toString("hex")],
+			epoch: 0,
+			kind: "drp-vertex",
+			logicalTime: 3,
+			objectId: node.fixture.objectId,
+			operation: Object.freeze({ action: "add", value: 9 }),
+			protocolMajor: 3,
+		});
+		const digest = hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes);
+		const signature = await node.fixture.signRegisteredVertexDigest(digest);
+		const envelope = Object.freeze({ canonicalPreimageBytes, digest, signature });
+		return Object.freeze({
+			authorSequence,
+			envelope,
+			issuedRecord: Object.freeze({ authorSequence, envelope, scope: node.scope }),
+			outboxEntry: Object.freeze({ authorSequence, envelope, scope: node.scope }),
+		});
+	});
+	node.plane.deactivate();
+	const prepared = await node.fixture.prepareAgain();
+	const mismatchedStore: DurableIssuanceStore = Object.freeze({
+		close: () => Promise.resolve(),
+		compareAndMarkOutboxPublished: (input) => node.issuanceStore.compareAndMarkOutboxPublished(input),
+		readIssued: async (scope, authorSequence) => {
+			const current = await node.issuanceStore.readIssued(scope, authorSequence);
+			if (current === null || authorSequence !== 1) return current;
+			const digest = new Uint8Array(current.envelope.digest);
+			digest[0] = (digest[0] ?? 0) ^ 1;
+			const envelope = Object.freeze({ ...current.envelope, digest });
+			return Object.freeze({
+				...current,
+				envelope,
+				issuedRecord: Object.freeze({ ...current.issuedRecord, envelope }),
+				outboxEntry: Object.freeze({ ...current.outboxEntry, envelope }),
+			});
+		},
+		readLineage: (scope) => node.issuanceStore.readLineage(scope),
+		readOutboxPage: (input) => node.issuanceStore.readOutboxPage(input),
+		readSettlementPlan: (scope) => node.issuanceStore.readSettlementPlan(scope),
+		transactIssue: (scope, buildAndSign) => node.issuanceStore.transactIssue(scope, buildAndSign),
+		transactWriteSettlementPlan: (input) => node.issuanceStore.transactWriteSettlementPlan(input),
+	});
+	return recoverV3LiveReplica({
+		capability: prepared.capability,
+		exactCanonicalLatchedAclBytes: node.fixture.exactCanonicalLatchedAclBytes,
+		issuanceScope: node.scope,
+		issuanceStore: mismatchedStore,
+		liveJournalStore: node.journal,
+	} as Parameters<typeof recoverV3LiveReplica>[0]);
+}
+
 export interface DurableFenceRestartResult {
 	readonly fenceSequence?: number | null;
 	readonly firstIssue: V3LocalIssueResult;

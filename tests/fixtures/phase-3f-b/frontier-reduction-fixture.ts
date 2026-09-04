@@ -23,6 +23,7 @@ import path from "node:path";
 import type { TrustedBlueprintCatalog } from "../../../packages/blueprint-catalog/src/index.js";
 import {
 	activateV3LivePlane,
+	bindV3BlueprintLivePlane,
 	prepareV3LiveGeneration,
 	recoverV3LiveReplica,
 	type RecoverV3LiveReplicaResult,
@@ -76,6 +77,7 @@ interface PreparedFixture {
 		readonly parametersDigest: string;
 	}>;
 	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+	readonly exactCanonicalInitialStateBytes?: Uint8Array;
 	close(): Promise<void>;
 }
 
@@ -91,6 +93,7 @@ export interface FrontierScenarioResult {
 	readonly admittedDigests: readonly string[];
 	readonly initialTips: readonly string[];
 	readonly issued: readonly IssuedVertexFact[];
+	readonly stagedOutputs?: readonly unknown[];
 	readonly journalAppends: number;
 	readonly nestedResult?: V3LocalIssueResult;
 	readonly result: V3LocalIssueResult;
@@ -117,6 +120,7 @@ export interface FrontierScenarioOptions {
 	readonly recoveryOrder?: "forward" | "reverse";
 	readonly reenterFromSigner?: boolean;
 	readonly retryAfterFailure?: boolean;
+	readonly stageAfterIssue?: boolean;
 	readonly seedOperation?: Readonly<Record<string, unknown>>;
 	readonly wrongSignatureAtIssuedOrdinal?: number;
 }
@@ -212,6 +216,7 @@ async function prepareFixture(
 		readonly batchBoundaryProfile?: boolean;
 		readonly causalJoin?: "admitted" | "altered-abi" | "missing" | "unknown-abi";
 		readonly maxDependencies?: number;
+		readonly stageAfterIssue?: boolean;
 	}> = {}
 ): Promise<PreparedFixture> {
 	const directory = mkdtempSync(path.join(tmpdir(), "drp-phase-3f-b-"));
@@ -356,12 +361,16 @@ async function prepareFixture(
 				? PARAMETERS
 				: Object.freeze({ ...PARAMETERS, maxDependencies: options.maxDependencies })
 		);
+		const exactCanonicalInitialStateBytes = options.stageAfterIssue === true ? encodeCanonical(0) : undefined;
 		const anchor = Object.freeze({
 			...base.anchor,
 			objectId: String(base.anchor.objectId),
 			aclDigest: lowerHex(hashDomain("ts-drp/author-authorization/v3", exactCanonicalAuthorAuthorizationBytes)),
 			blueprintDigest,
 			parametersDigest: lowerHex(hashDomain("ts-drp/parameters/v3", parametersBytes)),
+			...(exactCanonicalInitialStateBytes === undefined
+				? {}
+				: { stateDigest: lowerHex(hashDomain("ts-drp/state/v3", exactCanonicalInitialStateBytes)) }),
 		});
 		const anchorBytes = encodeCanonical(anchor);
 		const anchorDigest = bytesHex(independentHashDomain(contract.anchorDigestDomain, anchorBytes));
@@ -394,6 +403,7 @@ async function prepareFixture(
 			capability: prepared.capability,
 			descriptor: prepared.descriptor,
 			exactCanonicalAuthorAuthorizationBytes,
+			...(exactCanonicalInitialStateBytes === undefined ? {} : { exactCanonicalInitialStateBytes }),
 			async close() {
 				await store.close();
 				rmSync(directory, { force: true, recursive: true });
@@ -790,6 +800,14 @@ export async function runFrontierScenario(
 			},
 		});
 		if (!activated.ok) throw new TypeError(`frontier activation failed: ${activated.kind}`);
+		const binding =
+			options.stageAfterIssue === true
+				? bindV3BlueprintLivePlane({
+						exactCanonicalInitialStateBytes: fixture.exactCanonicalInitialStateBytes ?? encodeCanonical(0),
+						plane: activated.handle,
+					})
+				: undefined;
+		if (binding !== undefined && !binding.ok) throw new TypeError(`frontier binding failed: ${binding.kind}`);
 		let signerActive = false;
 		let signerCalls = 0;
 		let synchronousReentry = false;
@@ -845,6 +863,8 @@ export async function runFrontierScenario(
 							Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(contract.privateKeySeedHex))),
 					} as never)
 				: undefined;
+		const staged = binding?.ok === true ? await binding.handle.stageBlueprintEpoch() : undefined;
+		if (staged !== undefined && !staged.ok) throw new TypeError(`frontier fold failed: ${staged.kind}`);
 		activated.handle.deactivate();
 		const issued = commits.slice(width).map((commit) => {
 			const decoded = decodeCanonical(commit.envelope.canonicalPreimageBytes);
@@ -866,6 +886,7 @@ export async function runFrontierScenario(
 			result,
 			retryResult,
 			signerCalls,
+			...(staged?.ok === true ? { stagedOutputs: Object.freeze([...staged.outputs]) } : {}),
 			synchronousReentry,
 		});
 	} finally {

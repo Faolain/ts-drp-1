@@ -73,6 +73,7 @@ interface PreparedPlane {
 }
 
 export interface SharedPlaneScenarioOptions {
+	readonly nonCreatorWriter?: boolean;
 	readonly omitTargetBootstrap?: boolean;
 	readonly omitSourceAuthority?: boolean;
 	readonly reopenTarget?: boolean;
@@ -124,6 +125,7 @@ export interface SharedPlaneScenarioResult {
 	readonly recovery: Readonly<Record<string, unknown>>;
 	readonly reopenRecovery?: Readonly<Record<string, unknown>>;
 	readonly sourceAnchor: string;
+	readonly sourceBootstrapDigest: string;
 	readonly sourceAuthorityPrepared: boolean;
 	readonly sourceContextAuthor: string;
 	readonly sourceDigest: string;
@@ -224,6 +226,12 @@ export interface TerminalSinkDispositionScenarioResult {
 	readonly reopenedBegin: unknown;
 }
 
+export interface TerminalOutcomeUnknownScenarioResult {
+	readonly beginAfterUnknown: unknown;
+	readonly publishTerminal: unknown;
+	readonly resumeAfterUnknown: unknown;
+}
+
 function lowerHex(value: Uint8Array): string {
 	return Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -258,6 +266,7 @@ async function preparePlane(
 	stateDigest: string,
 	label: string,
 	options: Readonly<{
+		readonly anchorPrivateKeySeedHex?: string;
 		readonly authorizationAuthors?: readonly string[];
 		readonly blueprintVariant?: string;
 		readonly privateKeySeedHex?: string;
@@ -272,9 +281,10 @@ async function preparePlane(
 		const selectedCatalog =
 			options.terminalCatalog === true ? terminalBatchCatalog() : counterBatchCatalog(options.blueprintVariant);
 		const privateKeySeedHex = options.privateKeySeedHex ?? contract.privateKeySeedHex;
+		const anchorPrivateKeySeedHex = options.anchorPrivateKeySeedHex ?? privateKeySeedHex;
 		const base = makeCreatorMaterial({
 			objectId: objectIdValue,
-			privateKeySeedHex,
+			privateKeySeedHex: anchorPrivateKeySeedHex,
 			...(options.settlementProfile === true ? { profileId: "creator-trusted-settlement-v1" as const } : {}),
 		});
 		const author = bytesHex(ed25519.getPublicKey(hexBytes(privateKeySeedHex)));
@@ -322,7 +332,7 @@ async function preparePlane(
 		});
 		const anchorBytes = encodeCanonical(anchor);
 		const anchorDigest = bytesHex(independentHashDomain(contract.anchorDigestDomain, anchorBytes));
-		const detachedAnchorSignature = ed25519.sign(hexBytes(anchorDigest), hexBytes(privateKeySeedHex));
+		const detachedAnchorSignature = ed25519.sign(hexBytes(anchorDigest), hexBytes(anchorPrivateKeySeedHex));
 		const objectId = mustObjectId(objectIdValue);
 		const trust = createCurrentAnchorTrustStore({ objectId, pinnedGenesisAnchorDigest: anchorDigest, store });
 		const installed = await trust.install({
@@ -515,6 +525,110 @@ function terminalMessage(label: string): Readonly<Record<string, unknown>> {
 	return Object.freeze({ action: "message", clientOperationId: `phase-3h-${label}`, text: label });
 }
 
+/**
+ * Commits a terminal row and then reports an indeterminate transaction outcome.
+ * @returns Terminal publication and state-latch observations.
+ */
+export async function runTerminalOutcomeUnknownScenario(): Promise<TerminalOutcomeUnknownScenarioResult> {
+	const objectId = `creator:${"b".repeat(32)}`;
+	const plane = await preparePlane(objectId, "5".repeat(64), "terminal-outcome-unknown", {
+		terminalCatalog: true,
+		useLatchedAcl: true,
+	});
+	const directory = mkdtempSync(path.join(tmpdir(), "drp-phase-3h-terminal-outcome-unknown-"));
+	let store: DurableIssuanceStore | undefined;
+	let journal: DurableLiveJournalStore | undefined;
+	try {
+		const scope = Object.freeze({ author: plane.author, objectId });
+		store = createNodeDurableIssuanceStore({ primaryFilename: path.join(directory, "issuance") });
+		journal = await installJournal(plane);
+		const bootstrap = await store.transactIssue(scope, (authorSequence) =>
+			Promise.resolve(commitFor(plane, authorSequence, terminalMessage("outcome-unknown-bootstrap")))
+		);
+		await appendLocalIssued(journal, plane, bootstrap);
+		await store.compareAndMarkOutboxPublished({
+			authorSequence: bootstrap.authorSequence,
+			digest: new Uint8Array(bootstrap.envelope.digest),
+			scope,
+		});
+		const durableStore = store;
+		let injectUnknown = true;
+		const observedStore: DurableIssuanceStore = Object.freeze({
+			close: () => Promise.resolve(),
+			compareAndMarkOutboxPublished: (input) => durableStore.compareAndMarkOutboxPublished(input),
+			readIssued: (selectedScope, authorSequence) => durableStore.readIssued(selectedScope, authorSequence),
+			readLineage: (selectedScope) => durableStore.readLineage(selectedScope),
+			readOutboxPage: (input) => durableStore.readOutboxPage(input),
+			readSettlementPlan: (selectedScope) => durableStore.readSettlementPlan(selectedScope),
+			transactIssue: async (selectedScope, buildAndSign) => {
+				const commit = await durableStore.transactIssue(selectedScope, buildAndSign);
+				if (injectUnknown) {
+					injectUnknown = false;
+					throw Object.assign(new Error("controlled terminal transaction outcome"), {
+						code: "ISSUANCE_OUTCOME_UNKNOWN",
+					});
+				}
+				return commit;
+			},
+			transactWriteSettlementPlan: (input) => durableStore.transactWriteSettlementPlan(input),
+		});
+		const capability = await plane.prepareAgain();
+		if (capability === undefined || plane.exactCanonicalLatchedAclBytes === undefined) {
+			throw new TypeError("Phase 3h outcome-unknown authority is unavailable");
+		}
+		const recovery = await recoverV3LiveReplica({
+			capability,
+			classifyTerminalVertex: (input: never): ReturnType<typeof terminalClassifier> =>
+				terminalClassifier(plane.author, input),
+			exactCanonicalLatchedAclBytes: plane.exactCanonicalLatchedAclBytes,
+			issuanceScope: scope,
+			issuanceStore: observedStore,
+			liveJournalStore: journal,
+		} as never);
+		if (!recovery.ok) throw new TypeError(`Phase 3h outcome-unknown recovery failed: ${recovery.kind}`);
+		const activated = activateV3LivePlane({
+			capability: recovery.capability,
+			messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
+			networkNode: network("terminal-outcome-unknown", []),
+			onAdmittedVertex: ({ vertex }) =>
+				Object.freeze({
+					kind:
+						Reflect.get(vertex.operation, "action") === "migrationActivation"
+							? ("terminal-accepted" as const)
+							: ("continue" as const),
+				}),
+		});
+		if (!activated.ok) throw new TypeError(`Phase 3h outcome-unknown activation failed: ${activated.kind}`);
+		try {
+			const begun = await activated.handle.beginTerminalTransition();
+			if (!begun.ok) throw new TypeError(`Phase 3h outcome-unknown begin failed: ${begun.kind}`);
+			const publishTerminal = await begun.capability.publishTerminal({
+				operations: Object.freeze([
+					Object.freeze({
+						logicalTime: 3,
+						operation: Object.freeze({
+							action: "migrationActivation",
+							decision: Object.freeze({ version: 1 }),
+						}),
+					}),
+				]),
+				signRegisteredVertexDigest: (digest) =>
+					Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(plane.privateKeySeedHex))),
+			});
+			const resumeAfterUnknown = begun.capability.resume();
+			const beginAfterUnknown = await activated.handle.beginTerminalTransition();
+			return Object.freeze({ beginAfterUnknown, publishTerminal, resumeAfterUnknown });
+		} finally {
+			activated.handle.deactivate();
+		}
+	} finally {
+		await journal?.close();
+		await store?.close();
+		await plane.close();
+		rmSync(directory, { force: true, recursive: true });
+	}
+}
+
 function messageForCommit(commit: DurableIssueCommit, topic: string): Message {
 	return Message.create({
 		data: V3Envelope.encode({
@@ -597,10 +711,13 @@ export async function runSharedPlaneScenario(
 	options: SharedPlaneScenarioOptions = {}
 ): Promise<SharedPlaneScenarioResult> {
 	const objectId = `creator:${"d".repeat(32)}`;
+	const nonCreatorAnchorSeed = options.nonCreatorWriter === true ? "56".repeat(32) : undefined;
 	const source = await preparePlane(objectId, "7".repeat(64), "source", {
+		...(nonCreatorAnchorSeed === undefined ? {} : { anchorPrivateKeySeedHex: nonCreatorAnchorSeed }),
 		settlementProfile: options.settlementProfile,
 	});
 	const target = await preparePlane(objectId, "8".repeat(64), "target", {
+		...(nonCreatorAnchorSeed === undefined ? {} : { anchorPrivateKeySeedHex: nonCreatorAnchorSeed }),
 		settlementProfile: options.settlementProfile,
 	});
 	const mismatchedSource =
@@ -628,7 +745,7 @@ export async function runSharedPlaneScenario(
 	try {
 		const scope = Object.freeze({ author: source.author, objectId });
 		sourceStore = createNodeDurableIssuanceStore({ primaryFilename: lineageFilename });
-		await sourceStore.transactIssue(scope, (authorSequence) =>
+		const sourceBootstrap = await sourceStore.transactIssue(scope, (authorSequence) =>
 			Promise.resolve(commitFor(source, authorSequence, Object.freeze({ action: "add", value: 0 })))
 		);
 		sourceJournal = await installJournal(source);
@@ -1039,6 +1156,7 @@ export async function runSharedPlaneScenario(
 				recovery,
 				reopenRecovery,
 				sourceAnchor: source.anchorDigest,
+				sourceBootstrapDigest: lowerHex(sourceBootstrap.envelope.digest),
 				sourceAuthorityPrepared,
 				sourceContextAuthor: selectedSourcePlane.author,
 				sourceDigest: lowerHex(sourceCommit.envelope.digest),
