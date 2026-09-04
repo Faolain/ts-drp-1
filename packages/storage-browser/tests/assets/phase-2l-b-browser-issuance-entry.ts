@@ -229,6 +229,71 @@ async function primaryOpacitySchemaAdmission(): Promise<unknown> {
 	};
 }
 
+async function v1UpgradePreservesCommittedRows(): Promise<unknown> {
+	const primary = `phase-2l-b-v1-upgrade-${crypto.randomUUID()}`;
+	const derived = `${primary}${SUFFIX}`;
+	const source = commit(SCOPE, 0, 37);
+	const legacy = await openRaw(derived, 1, (database) => {
+		database.createObjectStore("lineages", { keyPath: ["objectId", "author"] });
+		database.createObjectStore("issuedRecords", { keyPath: ["objectId", "author", "authorSequence"] });
+		database.createObjectStore("issuanceOutbox", { keyPath: ["objectId", "author", "authorSequence"] });
+	});
+	const seed = legacy.transaction(["lineages", "issuedRecords", "issuanceOutbox"], "readwrite", {
+		durability: "strict",
+	});
+	seed.objectStore("lineages").add({ ...SCOPE, exhausted: false, next: 1 });
+	seed.objectStore("issuedRecords").add({
+		...SCOPE,
+		authorSequence: source.authorSequence,
+		canonicalPreimageBytes: source.envelope.canonicalPreimageBytes,
+		digest: source.envelope.digest,
+		signature: source.envelope.signature,
+	});
+	seed.objectStore("issuanceOutbox").add({
+		...SCOPE,
+		authorSequence: source.authorSequence,
+		digest: source.envelope.digest,
+		publishState: "published",
+	});
+	await transactionComplete(seed);
+	legacy.close();
+
+	const beforeSchema = await rawSchema(derived);
+	const readable = await withStore(primary, async (store) => {
+		const issued = await store.readIssued(SCOPE, 0);
+		const outbox = await store.readOutboxPage({ scope: SCOPE });
+		return {
+			issued:
+				issued === null
+					? null
+					: {
+							authorSequence: issued.authorSequence,
+							canonicalPreimageBytes: [...issued.envelope.canonicalPreimageBytes],
+							digest: [...issued.envelope.digest],
+							issuedScope: issued.issuedRecord.scope,
+							outboxScope: issued.outboxEntry.scope,
+							signature: [...issued.envelope.signature],
+						},
+			lineage: await store.readLineage(SCOPE),
+			outbox: outbox.map((row) => ({
+				authorSequence: row.commit.authorSequence,
+				digest: [...row.commit.envelope.digest],
+				publishState: row.publishState,
+				scope: row.commit.outboxEntry.scope,
+			})),
+			settlementPlan: await store.readSettlementPlan(SCOPE),
+		};
+	});
+	const afterSchema = await rawSchema(derived);
+	await deleteDatabase(derived);
+	return {
+		afterSchema,
+		beforeSchema,
+		expectedCanonicalPreimageBytes: [...source.envelope.canonicalPreimageBytes],
+		readable,
+	};
+}
+
 async function issueReadCopyPaging(): Promise<unknown> {
 	const primary = `phase-2l-b-issue-${crypto.randomUUID()}`;
 	const result = await withStore(primary, async (store) => {
@@ -403,6 +468,8 @@ async function runFastCase(caseId: FastCase): Promise<unknown> {
 			return surfaceOptionsIdentity();
 		case "primary-opacity-schema-admission":
 			return primaryOpacitySchemaAdmission();
+		case "v1-upgrade-preserves-committed-rows":
+			return v1UpgradePreservesCommittedRows();
 		case "issue-read-copy-paging":
 			return issueReadCopyPaging();
 		case "same-scope-race-and-cross-scope-progress":
