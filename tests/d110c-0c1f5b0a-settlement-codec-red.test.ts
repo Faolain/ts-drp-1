@@ -296,8 +296,15 @@ function settlementOpenInput(bytes: Uint8Array): Readonly<Record<string, unknown
 
 async function completeSettlement(
 	input: Readonly<Record<string, unknown>> = settlementPrepareInput(),
-	seed: Uint8Array = SUCCESSOR_SEED
-): Promise<Readonly<{ readonly bytes?: Uint8Array; readonly prepared: Result }>> {
+	seed: Uint8Array = SUCCESSOR_SEED,
+	expectCompletionSuccess = true
+): Promise<
+	Readonly<{
+		readonly bytes?: Uint8Array;
+		readonly completed?: Result & { readonly exactCanonicalRecordBytes?: Uint8Array };
+		readonly prepared: Result;
+	}>
+> {
 	const surface = await settlementSurface();
 	const prepared = surface.prepareCreatorAuthorSettlement(input);
 	expect(prepared, prepared.reason).toMatchObject({ ok: true });
@@ -306,8 +313,8 @@ async function completeSettlement(
 		detachedSignature: ed25519.sign(fromHex(prepared.digest), seed),
 		preparation: prepared.preparation,
 	});
-	expect(completed, completed.reason).toMatchObject({ ok: true });
-	return { bytes: completed.exactCanonicalRecordBytes, prepared };
+	if (expectCompletionSuccess) expect(completed, completed.reason).toMatchObject({ ok: true });
+	return { bytes: completed.exactCanonicalRecordBytes, completed, prepared };
 }
 
 function aclMember(author: string, version: 1 | 2 | 3, full: boolean): Readonly<Record<string, unknown>> {
@@ -509,7 +516,8 @@ describe("D.110c-0c1f5b0a settlement protocol codecs RED", () => {
 		expect(openInput).not.toHaveProperty("predecessor");
 		expect(surface.openCreatorAuthorSettlement(openInput)).toMatchObject({ ok: true });
 
-		const signedByCurrent = await completeSettlement(settlementPrepareInput(), CURRENT_SEED);
+		const signedByCurrent = await completeSettlement(settlementPrepareInput(), CURRENT_SEED, false);
+		expect(signedByCurrent.completed).toMatchObject({ ok: false, reason: "SIGNATURE_INVALID" });
 		expect(signedByCurrent.bytes).toBeUndefined();
 	});
 
@@ -531,17 +539,26 @@ describe("D.110c-0c1f5b0a settlement protocol codecs RED", () => {
 
 	it("puts ACL membership, genesis admission, adjacency, and monotonicity in the bounded advance predicate", async () => {
 		const surface = await advanceSurface();
-		const currentAcl = Object.freeze({ ...aclSnapshot(3, 2), epoch: 0 });
+		const currentAuthors = Object.freeze(["0".repeat(64), "1".repeat(64)] as const);
+		const successorAuthors = Object.freeze([...currentAuthors, "2".repeat(64)] as const);
+		const membersFor = (authors: readonly string[]): readonly Readonly<Record<string, unknown>>[] =>
+			Object.freeze(authors.map((author, index) => aclMember(author, 3, index === 0)));
+		const currentAcl = Object.freeze({
+			...aclSnapshot(3, currentAuthors.length),
+			epoch: 0,
+			members: membersFor(currentAuthors),
+		});
 		const successorAcl = Object.freeze({
-			...aclSnapshot(3, 3),
+			...aclSnapshot(3, successorAuthors.length),
 			epoch: 1,
+			members: membersFor(successorAuthors),
 		});
 		const proposed = Object.freeze({
 			closedEpoch: 0,
 			frontiers: Object.freeze([
-				Object.freeze(["0".repeat(64), 0, 0]),
-				Object.freeze(["1".repeat(64), 0, null]),
-				Object.freeze(["2".repeat(64), 1, null]),
+				Object.freeze([successorAuthors[0], 0, 0]),
+				Object.freeze([successorAuthors[1], 0, null]),
+				Object.freeze([successorAuthors[2], 1, null]),
 			]),
 			priorCheckpointDigest: "f".repeat(64),
 			priorCheckpointKind: "genesis",
