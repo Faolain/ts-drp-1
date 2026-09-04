@@ -86,7 +86,7 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 				vertexDigest: structural.sourceDigest,
 			},
 		});
-		expect(structural.completion).toEqual({ kind: "published", ok: true });
+		expect(structural.completion).toBeUndefined();
 	});
 
 	it("fails closed before exposing an 8,193rd authenticated displaced source row", async () => {
