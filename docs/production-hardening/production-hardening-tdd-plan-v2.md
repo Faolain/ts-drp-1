@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-04, commit a7a643ce)
+### Current frontier — author settlement and writer capacity (as of 2026-09-04, review 1f02d605)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18408,19 +18408,30 @@ Closed in the 2026-09-04 checkpoint:
   optional lineage-policy key is byte/digest/anchor absent-compatible; only
   fixed-creator is room-accepted. Evidence:
   `.logs/d110c-0c1j0-review-b136a603/`.
+- **f5b0b Node** is GREEN and reviewed with an empty P0/P1 union. Its final
+  causal compatibility RED is `a19e8454` with evidence `eb302c07`; production
+  GREEN is `802a647e`, evidence is `52d1819f`, and the final review is
+  `1f02d605` at `.logs/d110c-0c1f5b0b-final-review-52d1819f/`. The reviewed
+  distinction is exact: valid legacy `join`/`causalJoin` remains visible to
+  live application admission and folding, while displaced legacy reserved
+  rows retain their pre-f5b0b empty-intent retirement behavior; settlement
+  fence/join/causalJoin remains control-only. The earlier stale-`dist` child
+  result is preserved as an invalid runtime-identity diagnostic, followed by
+  build-before-child and isolated-checkout passes.
 
 Authorized now (tests-only RED first, then GREEN):
 
-- **f5b0b Node** from accepted design
-  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 3. Its f5b0a and
-  f5b0s dependencies are closed. The exact resume prompt remains
+- **f5b0c room** from accepted design
+  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 4. Its f5b0b
+  dependency is now closed. Begin with one causal tests-only RED before any
+  room production edit. The exact resume prompt remains
   `.logs/d110c-0c1f5b0r-design-3a156aca/next-prompt.md`.
 
 Blocked, and on what:
 
-- **f5b0c** room → f5b0b GREEN. **f5b0d** reclamation is dependency-ready but
-  follows the immediate f5b0b execution order above. **f5b** creator
-  settlement → f5b0b–f5b0d GREEN; f5b0a/f5b0s/W0 are already closed. Stage W1
+- **f5b0d** reclamation is dependency-ready but follows the requested f5b0c
+  execution order. **f5b** creator settlement → f5b0c and f5b0d GREEN;
+  f5b0a/f5b0s/f5b0b/W0 are already closed. Stage W1
   (256-line frontier, version-3 ACL) is inside f5b0a/f5b, not a separate slice.
 - **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
   five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
@@ -99104,9 +99115,9 @@ Do not invoke Fable or a collaboration subagent.
 
 ###### D.110c-0c1f5b0r author fence and membership-incarnation settlement reslice
 
-**Status: exact superseding design signed and ACCEPTED; f5b0a and f5b0s are
-CLOSED GREEN and reviewed as of 2026-09-04, so f5b0b tests-only RED is now
-authorized. The three-model
+**Status: exact superseding design signed and ACCEPTED; f5b0a, f5b0s and
+f5b0b are CLOSED GREEN and reviewed as of 2026-09-04, so f5b0c tests-only RED
+is now authorized. The three-model
 (Grok 4.6/high, Kimi K3, Opus xhigh) design-review gate is waived for f5b0r by
 explicit user decision on 2026-09-03; the recorded `pre-review.md` pass is the
 accepted design review. Completed slice evidence is preserved below; no
@@ -99212,10 +99223,36 @@ epoch-greater-than-zero adjacency, strict Node input shapes and fence restart;
 f5b0c owns room typecheck; W1 owns enlarged decode-limit parity and its ACL
 version decision. No P2 widens these closed slices.
 
+f5b0b closed after two rejected GREEN checkpoints were preserved rather than
+rewritten. The initial production `93585bf3`/evidence `9b02f9c2` was rejected
+at review `8225ffc7` for one P0 and three P1 findings. Corrective production
+`e07f8a94`/evidence `bb94a03f` closed those findings but its final review
+`fa4ee8f3` correctly found one remaining P1: it changed the frozen legacy
+displaced `join`/`causalJoin` rebase contract. Final tests-only RED `a19e8454`
+(`eb302c07`) selected 27 tests with 24 passing and exactly three causal
+failures: legacy `join` retirement, legacy `causalJoin` retirement and the
+legacy nonterminal ambiguous-outcome result kind. Final one-file GREEN
+`802a647e` with evidence `52d1819f` passed 27/27 focused, 40/40 expanded
+focused, 14/14 Phase-3g, 87/87 retained, 26/26 legacy consumers, 64/64 rebuilt
+shared consumers, and the built-child and detached-checkout gates. The final
+Grok 4.6/high, Kimi K3/100 and Opus xhigh review at signed/pushed commit
+`1f02d605` has an empty P0/P1 union.
+
+f5b0b P2 disposition is explicit. Authenticated frontier threading and
+classifier-local terminal suppression, replacement `planEffect` authority,
+and same-store activation-digest runtime coverage belong to f5b0c; the
+payload-seeded settlement control set belongs to f5b. Historical misleading
+`[control]` titles remain immutable with a recorded naming caveat. The Node
+typecheck exit 2 is inherited and byte-identical to the untouched parent after
+root normalization. Future GREEN evidence that runs children against built
+Node output must retain the selected built-output path/hash/shape identity in
+the evidence pack; f5b0b's final detached checkout rebuilt and passed, so this
+is nonblocking prospective evidence guidance.
+
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED on f5b0b, f5b0c and f5b0d RED/GREEN under the accepted
-D.110c-0c1f5b0r design; f5b0a, f5b0s and W0 are closed, f5b0p-a/b are deleted,
+**Status: BLOCKED on f5b0c and f5b0d RED/GREEN under the accepted
+D.110c-0c1f5b0r design; f5b0a, f5b0s, f5b0b and W0 are closed, f5b0p-a/b are deleted,
 the f5b RED itself is authorized by f5b0d GREEN, and no production edit runs
 before that RED.**
 
