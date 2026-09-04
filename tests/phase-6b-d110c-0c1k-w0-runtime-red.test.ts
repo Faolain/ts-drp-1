@@ -2,12 +2,16 @@ import "fake-indexeddb/auto";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { stageOpenBoundary } from "./fixtures/phase-6b-d110c-0c1k/w0-contract.js";
+import {
+	encodedAclBoundary,
+	stageOpenBoundary,
+	W0_LEGACY_ACL_MAX_CANONICAL_BYTES,
+} from "./fixtures/phase-6b-d110c-0c1k/w0-contract.js";
 import {
 	exerciseAcceptedAclLifecycle,
 	exerciseAuthorShareRuntime,
 	exerciseCreatorCloseOversize,
-	rejectedAclLifecycleAt65,
+	rejectedAclLifecycle,
 	W0_AUTHOR_SHARE,
 	W0_FRONTIERS_CEILING,
 	W0_FRONTIERS_KIND,
@@ -22,28 +26,33 @@ beforeAll(() => {
 });
 
 describe("D.110c-0c1k W0 real lifecycle and capacity RED", () => {
-	for (const memberCount of [31, 64] as const) {
-		it(`stages, opens, recovers, closes, and adopts a genuine ${memberCount}-member full ACL`, async () => {
-			const lifecycle = await exerciseAcceptedAclLifecycle(memberCount).then(
-				(value) => value,
-				(error: unknown) => (error instanceof Error ? error.message : String(error))
-			);
-			expect.soft(stageOpenBoundary(memberCount), "stage/open parity").toEqual({ openOk: true, stageOk: true });
-			expect(lifecycle).toEqual({
-				closeCount: 2,
-				committedRecovery: "active-new",
-			});
-		});
-	}
-
-	it("rejects 65 members at the same staged/open lifecycle boundary", async () => {
-		const rejected = await rejectedAclLifecycleAt65();
-		expect.soft(stageOpenBoundary(65), "stage/open parity").toEqual({ openOk: false, stageOk: false });
-		expect(rejected).toMatch(
-			/(?:live preparation failed: invalid-input|durable recovery failed: authorization-rejected)/iu
+	it("stages, opens, recovers, closes, and adopts a genuine 31-member full legacy ACL", async () => {
+		const lifecycle = await exerciseAcceptedAclLifecycle(31).then(
+			(value) => value,
+			(error: unknown) => (error instanceof Error ? error.message : String(error))
 		);
+		expect(encodedAclBoundary(31)).toEqual({ byteLength: 6_297, fitsLegacyCeiling: true });
+		expect(W0_LEGACY_ACL_MAX_CANONICAL_BYTES).toBe(8_192);
+		expect.soft(stageOpenBoundary(31), "stage/open parity").toEqual({ openOk: true, stageOk: true });
+		expect(lifecycle).toEqual({
+			closeCount: 2,
+			committedRecovery: "active-new",
+		});
 	});
 
+	for (const [memberCount, byteLength, authority] of [
+		[64, 12_864, "legacy byte ceiling"],
+		[65, 13_063, "legacy cardinality"],
+	] as const) {
+		it(`rejects ${memberCount} full members consistently by ${authority}`, async () => {
+			const rejected = await rejectedAclLifecycle(memberCount);
+			expect(encodedAclBoundary(memberCount)).toEqual({ byteLength, fitsLegacyCeiling: false });
+			expect.soft(stageOpenBoundary(memberCount), "stage/open parity").toEqual({ openOk: false, stageOk: false });
+			expect(rejected).toMatch(
+				/(?:live preparation failed: invalid-input|durable recovery failed: authorization-rejected)/iu
+			);
+		});
+	}
 	it("accepts a fitting recognized close record and rejects its oversized kind loudly at runtime", async () => {
 		await expect(exerciseCreatorCloseOversize()).resolves.toEqual({
 			fittingAccepted: true,

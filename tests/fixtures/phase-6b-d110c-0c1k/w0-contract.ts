@@ -13,6 +13,7 @@ import { resolve } from "node:path";
 import ts from "typescript";
 
 export const W0_VERTEX_SAMPLE_COUNT = 8_192;
+export const W0_LEGACY_ACL_MAX_CANONICAL_BYTES = 8_192;
 
 const KNOWN_PARAMETER_FIELDS = new Set([
 	"maxDependencies",
@@ -60,6 +61,23 @@ function genesisSnapshot(permissionless = false): LatchedAclSnapshot {
 		permissionless,
 		version: 2,
 	});
+}
+
+/**
+ * Measures one exact full-member legacy version-2 ACL snapshot.
+ * @param memberCount - Boundary member count.
+ * @returns Exact canonical byte length and legacy-ceiling disposition.
+ */
+export function encodedAclBoundary(memberCount: 31 | 64 | 65): Readonly<{
+	readonly byteLength: number;
+	readonly fitsLegacyCeiling: boolean;
+}> {
+	const snapshot: LatchedAclSnapshot = Object.freeze({
+		...genesisSnapshot(),
+		members: Object.freeze(Array.from({ length: memberCount }, (_, index) => fullMember(index))),
+	});
+	const byteLength = encodeCanonical(snapshot).byteLength;
+	return Object.freeze({ byteLength, fitsLegacyCeiling: byteLength <= W0_LEGACY_ACL_MAX_CANONICAL_BYTES });
 }
 
 export function stageOpenBoundary(memberCount: 31 | 64 | 65): Readonly<{

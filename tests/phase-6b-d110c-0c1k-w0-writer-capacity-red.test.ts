@@ -2,14 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
 	auditPerAuthorCapacitySource,
+	encodedAclBoundary,
 	measureMembershipLookups,
 	silentCreatorCloseOversizeSites,
 	source,
 	stageOpenBoundary,
+	W0_LEGACY_ACL_MAX_CANONICAL_BYTES,
 } from "./fixtures/phase-6b-d110c-0c1k/w0-contract.js";
 
 describe("D.110c-0c1k W0 writer-capacity RED", () => {
-	it("keeps grant staging inside the one open limit used by close, adoption, and recovery at 31/64/65", () => {
+	it("keeps the legacy 8,192-byte ACL ceiling and aligns stage/open at 31/64/65", () => {
 		const lifecycleConsumers = [
 			"packages/node/src/creator-close.ts",
 			"packages/node/src/creator-adoption.ts",
@@ -20,9 +22,23 @@ describe("D.110c-0c1k W0 writer-capacity RED", () => {
 				"openCanonicalLatchedAclSnapshot"
 			);
 		}
+		const expectedByCount = new Map<31 | 64 | 65, boolean>([
+			[31, true],
+			[64, false],
+			[65, false],
+		]);
+		expect(W0_LEGACY_ACL_MAX_CANONICAL_BYTES).toBe(8_192);
+		const aclSource = source("packages/protocol-v3/src/latched-acl.ts");
+		expect(aclSource).toContain("const MAX_CANONICAL_BYTES = 8192;");
+		expect(aclSource).toContain("record.members.length > (record.version === 3 ? 256 : 64)");
+		expect([31, 64, 65].map((count) => encodedAclBoundary(count as 31 | 64 | 65))).toEqual([
+			{ byteLength: 6_297, fitsLegacyCeiling: true },
+			{ byteLength: 12_864, fitsLegacyCeiling: false },
+			{ byteLength: 13_063, fitsLegacyCeiling: false },
+		]);
 		for (const memberCount of [31, 64, 65] as const) {
 			const result = stageOpenBoundary(memberCount);
-			const expected = memberCount <= 64;
+			const expected = expectedByCount.get(memberCount);
 			expect.soft(result.stageOk, `${memberCount} members: staging boundary`).toBe(expected);
 			expect.soft(result.openOk, `${memberCount} members: close/adoption/recovery open boundary`).toBe(expected);
 			expect.soft(result.stageOk, `${memberCount} members: stage/open parity`).toBe(result.openOk);

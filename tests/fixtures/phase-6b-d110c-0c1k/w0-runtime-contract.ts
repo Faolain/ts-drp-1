@@ -31,7 +31,7 @@ export function deterministicAuthorSeeds(count: number): readonly string[] {
  * @param memberCount - Accepted W0 boundary size.
  * @returns Real close count and committed recovery disposition.
  */
-export async function exerciseAcceptedAclLifecycle(memberCount: 31 | 64): Promise<
+export async function exerciseAcceptedAclLifecycle(memberCount: 31): Promise<
 	Readonly<{
 		readonly closeCount: number;
 		readonly committedRecovery: unknown;
@@ -53,13 +53,15 @@ export async function exerciseAcceptedAclLifecycle(memberCount: 31 | 64): Promis
 }
 
 /**
- * Returns the real preparation failure at the forbidden 65-member boundary.
+ * Returns the real preparation/recovery failure at a forbidden legacy boundary.
+ * @param memberCount - Byte- or cardinality-rejected member count.
  * @returns Failure detail, or undefined if the invalid lifecycle opened.
  */
-export async function rejectedAclLifecycleAt65(): Promise<string | undefined> {
+export async function rejectedAclLifecycle(memberCount: 64 | 65): Promise<string | undefined> {
 	try {
 		const fixture = await openGenuineCreatorAdoptionFixture({
-			authorizedPrivateKeySeedHexes: deterministicAuthorSeeds(65),
+			authorizedPrivateKeySeedHexes: deterministicAuthorSeeds(memberCount),
+			latchedAclGroups: Object.freeze(["admin", "finality", "referee", "writer"]),
 		});
 		await fixture.close();
 		return undefined;
