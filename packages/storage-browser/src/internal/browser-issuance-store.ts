@@ -33,6 +33,7 @@ import {
 	type SettlementPlan,
 } from "@ts-drp/issuance-store";
 import {
+	bindDurableIssuancePruningMaintenance,
 	captureDurableIssuancePruningInput,
 	createDurableIssuancePruningReceipt,
 	createDurableIssuancePruningState,
@@ -44,6 +45,7 @@ import {
 	type DurableIssuancePruningReceipt,
 	type DurableIssuancePruningState,
 	DurableIssuanceRecordPrunedError,
+	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
 
 const DATABASE_SUFFIX = "--drp-issuance-v1";
@@ -689,7 +691,15 @@ class BrowserIssuanceImplementation {
 		}
 	}
 
+	async pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+		return this.#prunePrefix(input, true);
+	}
+
 	async prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+		return this.#prunePrefix(input, false);
+	}
+
+	async #prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
 		const captured = captureDurableIssuancePruningInput(input);
 		this.#assertAvailable();
 		const transaction = this.#startTransaction("readwrite");
@@ -707,6 +717,17 @@ class BrowserIssuanceImplementation {
 					: copyNativeLineage(rawLineage, captured.scope);
 			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
 			const lineage = { exhausted: current.exhausted, next: current.next };
+			let plan: SettlementPlan | null | undefined;
+			if (authenticatedSettled) {
+				const rawPlan = await requestResult(settlementPlans.get([captured.scope.objectId, captured.scope.author]));
+				plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
+				if (rawPlan !== undefined && plan === undefined) {
+					throw this.#latchCorruption("stored settlement plan is malformed");
+				}
+				if (!settlementPlanPermitsAuthenticatedPruning(plan ?? null)) {
+					throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan is incomplete");
+				}
+			}
 			if (
 				captured.expectedPrunedThroughAuthorSequence !== null &&
 				(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
@@ -735,12 +756,15 @@ class BrowserIssuanceImplementation {
 				throw invalid("selected pruning boundary is invalid");
 			}
 			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
-			const rawPlan = await requestResult(settlementPlans.get([captured.scope.objectId, captured.scope.author]));
-			const plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
-			if (rawPlan !== undefined && plan === undefined) {
-				throw this.#latchCorruption("stored settlement plan is malformed");
+			if (!authenticatedSettled) {
+				const rawPlan = await requestResult(settlementPlans.get([captured.scope.objectId, captured.scope.author]));
+				plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
+				if (rawPlan !== undefined && plan === undefined) {
+					throw this.#latchCorruption("stored settlement plan is malformed");
+				}
 			}
 			if (
+				!authenticatedSettled &&
 				plan?.entries.some(
 					(entry) =>
 						entry.replacementSequence === null &&
@@ -772,10 +796,10 @@ class BrowserIssuanceImplementation {
 					}
 					const decoded = decodeDurableIssuancePreimage(issued.canonicalPreimageBytes, captured.scope, authorSequence);
 					if (decoded === undefined) throw this.#latchCorruption("selected issuance preimage is malformed");
-					if (decoded.epoch !== captured.closedEpoch) {
+					if (!authenticatedSettled && decoded.epoch !== captured.closedEpoch) {
 						throw invalid("selected issuance row belongs to another epoch");
 					}
-					if (outbox.publishState === "pending") {
+					if (!authenticatedSettled && outbox.publishState === "pending") {
 						throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
 					}
 				}
@@ -1338,6 +1362,14 @@ export async function createBrowserDurableIssuanceStoreImplementation(options: u
 			transactWriteSettlementPlan: (input: unknown) => implementation.transactWriteSettlementPlan(input),
 		});
 		implementationByStore.set(store, implementation);
+		const maintenance = Object.freeze({
+			inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
+			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+			prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+		});
+		if (!bindDurableIssuancePruningMaintenance(store, maintenance)) {
+			throw new TypeError("browser issuance maintenance was already bound");
+		}
 		return store;
 	} catch (error) {
 		database.onversionchange = null;
@@ -1366,6 +1398,7 @@ export function browserIssuanceImplementationForTest(
 export function browserIssuancePruningMaintenanceForStore(store: DurableIssuanceStore):
 	| Readonly<{
 			inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
+			pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
 			prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
 	  }>
 	| undefined {
@@ -1373,6 +1406,7 @@ export function browserIssuancePruningMaintenanceForStore(store: DurableIssuance
 	if (implementation === undefined) return undefined;
 	return Object.freeze({
 		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
+		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
 	});
 }

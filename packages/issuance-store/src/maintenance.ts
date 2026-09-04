@@ -7,7 +7,7 @@ import {
 	isClosedDurableIssuanceRecord,
 	isValidDurableAuthorSequence,
 } from "./contract.js";
-import type { DurableIssuanceError, DurableIssueScope, DurableLineage } from "./types.js";
+import type { DurableIssuanceError, DurableIssuanceStore, DurableIssueScope, DurableLineage } from "./types.js";
 
 const HEX_DIGEST = /^[0-9a-f]{64}$/u;
 
@@ -39,7 +39,91 @@ export interface DurableIssuancePruningReceipt {
 
 export interface DurableIssuancePruningMaintenance {
 	inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
+	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
 	prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+}
+
+const MAINTENANCE_REGISTRY = Symbol.for("@ts-drp/issuance-store/pruning-maintenance-v1");
+interface MaintenanceRegistry {
+	bind(store: DurableIssuanceStore, maintenance: DurableIssuancePruningMaintenance): boolean;
+	resolve(store: DurableIssuanceStore): DurableIssuancePruningMaintenance | undefined;
+}
+type MaintenanceGlobal = typeof globalThis & {
+	[MAINTENANCE_REGISTRY]?: MaintenanceRegistry;
+};
+const maintenanceGlobal = globalThis as MaintenanceGlobal;
+const maintenanceRegistry =
+	maintenanceGlobal[MAINTENANCE_REGISTRY] ??
+	((): MaintenanceRegistry => {
+		const maintenanceByStore = new WeakMap<DurableIssuanceStore, DurableIssuancePruningMaintenance>();
+		return Object.freeze({
+			bind(store: DurableIssuanceStore, maintenance: DurableIssuancePruningMaintenance): boolean {
+				if (maintenanceByStore.has(store)) return false;
+				maintenanceByStore.set(store, maintenance);
+				return true;
+			},
+			resolve(store: DurableIssuanceStore): DurableIssuancePruningMaintenance | undefined {
+				return maintenanceByStore.get(store);
+			},
+		});
+	})();
+if (maintenanceGlobal[MAINTENANCE_REGISTRY] === undefined) {
+	Object.defineProperty(maintenanceGlobal, MAINTENANCE_REGISTRY, {
+		configurable: false,
+		enumerable: false,
+		value: maintenanceRegistry,
+		writable: false,
+	});
+}
+
+/**
+ * Binds a backend-owned maintenance capability to its exact ordinary facade.
+ * This is a package-internal owner hook and is not re-exported by the ordinary store facade.
+ * @param store - Exact frozen store facade.
+ * @param maintenance - Backend-owned maintenance capability.
+ * @returns Whether this was the first binding for the facade.
+ */
+export function bindDurableIssuancePruningMaintenance(
+	store: DurableIssuanceStore,
+	maintenance: DurableIssuancePruningMaintenance
+): boolean {
+	return maintenanceRegistry.bind(store, maintenance);
+}
+
+/**
+ * Resolves maintenance for the exact facade without exposing mutation on it.
+ * This is a package-internal owner hook and is not re-exported by the ordinary store facade.
+ * @param store - Candidate ordinary store facade.
+ * @returns Its identity-bound backend maintenance capability.
+ */
+export function durableIssuancePruningMaintenanceForStore(
+	store: DurableIssuanceStore
+): DurableIssuancePruningMaintenance | undefined {
+	return maintenanceRegistry.resolve(store);
+}
+
+/**
+ * Tests whether one durable settlement plan permits authenticated prefix reclamation.
+ * @param plan - The transactionally observed plan, or no durable plan.
+ * @returns Whether every non-expiring source and the mandatory fence are linked.
+ */
+export function settlementPlanPermitsAuthenticatedPruning(
+	plan: Readonly<{
+		readonly entries: readonly Readonly<{
+			readonly disposition: "expire" | "manual-review" | "rebase" | "transform";
+			readonly replacementSequence: number | null;
+		}>[];
+		readonly fenceSequence: number | null;
+	}> | null
+): boolean {
+	return (
+		plan !== null &&
+		plan.fenceSequence !== null &&
+		plan.entries.every(
+			(entry) =>
+				entry.disposition === "expire" || (entry.disposition !== "manual-review" && entry.replacementSequence !== null)
+		)
+	);
 }
 
 /** Exact non-poisoning evidence that a caller-known ordinal was already pruned. */

@@ -21,6 +21,7 @@ import {
 	isValidDurableScopeField as validScopeField,
 } from "./contract.js";
 import {
+	bindDurableIssuancePruningMaintenance,
 	captureDurableIssuancePruningInput,
 	createDurableIssuancePruningReceipt,
 	createDurableIssuancePruningState,
@@ -32,6 +33,7 @@ import {
 	type DurableIssuancePruningMaintenance,
 	type DurableIssuancePruningReceipt,
 	type DurableIssuancePruningState,
+	settlementPlanPermitsAuthenticatedPruning,
 } from "./maintenance.js";
 import { DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT, MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT } from "./types.js";
 import type {
@@ -353,13 +355,25 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		);
 	}
 
+	async pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+		return this.#prunePrefix(input, true);
+	}
+
 	async prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+		return this.#prunePrefix(input, false);
+	}
+
+	async #prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
 		const captured = captureDurableIssuancePruningInput(input);
 		await Promise.resolve();
 		this.#assertAvailable();
 		const key = scopeKey(captured.scope);
 		const lineage = cloneLineage(this.#lineages.get(key) ?? { exhausted: false, next: 0 });
 		const watermark = this.#watermarks.get(key) ?? null;
+		const plan = this.#plans.get(key);
+		if (authenticatedSettled && !settlementPlanPermitsAuthenticatedPruning(plan ?? null)) {
+			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is incomplete");
+		}
 		if (
 			captured.expectedPrunedThroughAuthorSequence !== null &&
 			(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
@@ -386,8 +400,8 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 			throw new InvalidArgumentFailure("selected pruning boundary is invalid");
 		}
 		const from = watermark === null ? 0 : watermark + 1;
-		const plan = this.#plans.get(key);
 		if (
+			!authenticatedSettled &&
 			plan?.entries.some(
 				(entry) =>
 					entry.replacementSequence === null &&
@@ -417,10 +431,10 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 			) {
 				throw this.#latchCorruption();
 			}
-			if (decoded.epoch !== captured.closedEpoch) {
+			if (!authenticatedSettled && decoded.epoch !== captured.closedEpoch) {
 				throw new InvalidArgumentFailure("selected issuance row belongs to another epoch");
 			}
-			if (outbox.publishState === "pending") {
+			if (!authenticatedSettled && outbox.publishState === "pending") {
 				throw failure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
 			}
 		}
@@ -466,6 +480,18 @@ export function createEphemeralDurableIssuanceStore(
 		transactWriteSettlementPlan: (input) => implementation.transactWriteSettlementPlan(input),
 	};
 	implementationByStore.set(store, implementation);
+	if (
+		!bindDurableIssuancePruningMaintenance(
+			store,
+			Object.freeze({
+				inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
+				pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+				prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+			})
+		)
+	) {
+		throw new TypeError("ephemeral issuance maintenance was already bound");
+	}
 	return store;
 }
 
@@ -481,6 +507,7 @@ export function resolveEphemeralDurableIssuancePruningMaintenance(
 	if (implementation === undefined) return undefined;
 	return Object.freeze({
 		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
+		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
 	});
 }

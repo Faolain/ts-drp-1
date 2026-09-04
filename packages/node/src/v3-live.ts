@@ -23,7 +23,13 @@ import {
 	type DurableOutboxPageInput,
 	type DurableOutboxPublicationTransitionInput,
 } from "@ts-drp/issuance-store";
-import { durableIssuanceLineageConsumed, type DurableIssuancePruningReceipt } from "@ts-drp/issuance-store/maintenance";
+import {
+	bindDurableIssuancePruningMaintenance,
+	durableIssuanceLineageConsumed,
+	durableIssuanceLineagesEqual,
+	durableIssuancePruningMaintenanceForStore,
+	type DurableIssuancePruningReceipt,
+} from "@ts-drp/issuance-store/maintenance";
 import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import {
@@ -3172,6 +3178,39 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 			) {
 				return d109dFailure("D109D_RUNTIME_NOT_READY");
 			}
+			if (settlementProfileFor(initial.payload.trust.trust.profileId) === "v1") {
+				const maintenance = durableIssuancePruningMaintenanceForStore(initial.issuanceStore);
+				if (maintenance === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
+				const deletedRange = receipts.issuance.deletedAuthorSequenceRange;
+				const expectedPriorWatermark =
+					deletedRange === null
+						? receipts.issuance.prunedThroughAuthorSequence
+						: deletedRange.from === 0
+							? null
+							: deletedRange.from - 1;
+				try {
+					// The receipt pair reaches this owner only after planClosedEpochCleanup(...) has
+					// authenticated adoption, rollback retention, availability and expected-head state.
+					const replay = await maintenance.pruneAuthenticatedSettledPrefix({
+						closedEpoch: receipts.issuance.closedEpoch,
+						commitQcRef: receipts.issuance.commitQcRef,
+						expectedLineage: receipts.issuance.observedLineage,
+						expectedPrunedThroughAuthorSequence: expectedPriorWatermark,
+						scope: receipts.issuance.scope,
+						snapshotManifestDigest: receipts.issuance.snapshotManifestDigest,
+						throughAuthorSequence: receipts.issuance.prunedThroughAuthorSequence,
+					});
+					if (
+						replay.deletedAuthorSequenceRange !== null ||
+						replay.prunedThroughAuthorSequence !== receipts.issuance.prunedThroughAuthorSequence ||
+						!durableIssuanceLineagesEqual(replay.observedLineage, receipts.issuance.observedLineage)
+					) {
+						return d109dFailure("D109D_RECEIPT_MISMATCH");
+					}
+				} catch {
+					return d109dFailure("D109D_RUNTIME_NOT_READY");
+				}
+			}
 
 			const predecessorReference = initial.hotPredecessor;
 			let predecessor = predecessorReference?.deref();
@@ -4450,7 +4489,8 @@ function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefin
 	if (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;
 	context.count += 1;
 	ReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);
-	return context.count <= context.maxEpochVertices;
+	const maxHistoricalIssuanceRows = context.maxEpochVertices * 3;
+	return context.count <= maxHistoricalIssuanceRows;
 }
 
 function recoveryFailure(
@@ -5056,7 +5096,7 @@ function creatorFilteredIssuanceStore(
 	exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array,
 	historicalIssuance?: HistoricalIssuanceContext
 ): DurableIssuanceStore {
-	return ObjectFreeze({
+	const filtered = ObjectFreeze({
 		close: () => issuanceStore.close(),
 		compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
 			issuanceStore.compareAndMarkOutboxPublished(input),
@@ -5160,6 +5200,11 @@ function creatorFilteredIssuanceStore(
 		transactWriteSettlementPlan: (input: Parameters<DurableIssuanceStore["transactWriteSettlementPlan"]>[0]) =>
 			issuanceStore.transactWriteSettlementPlan(input),
 	});
+	const maintenance = durableIssuancePruningMaintenanceForStore(issuanceStore);
+	if (maintenance !== undefined && !bindDurableIssuancePruningMaintenance(filtered, maintenance)) {
+		throw new TypeError("filtered issuance maintenance was already bound");
+	}
+	return filtered;
 }
 
 function openRecoveryAuthorization(
