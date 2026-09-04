@@ -214,17 +214,38 @@ async function attemptIssue(store: TestPlanStore, effect: TestPlanEffect): Promi
 	);
 }
 
+interface ExpectedRejectedIssueState {
+	readonly issued: readonly Awaited<ReturnType<TestPlanStore["readIssued"]>>[];
+	readonly lineage: Awaited<ReturnType<TestPlanStore["readLineage"]>>;
+	readonly plan: unknown;
+	readonly selected: Awaited<ReturnType<TestPlanStore["readIssued"]>>;
+}
+
+async function captureExpectedRejectedIssueState(store: TestPlanStore): Promise<ExpectedRejectedIssueState> {
+	const lineage = await store.readLineage(F5B0S_SCOPE);
+	return {
+		issued: await Promise.all(
+			Array.from({ length: lineage.next }, (_, authorSequence) => store.readIssued(F5B0S_SCOPE, authorSequence))
+		),
+		lineage,
+		plan: planSnapshot(await store.readSettlementPlan(F5B0S_SCOPE)),
+		selected: await store.readIssued(F5B0S_SCOPE, lineage.next),
+	};
+}
+
 async function assertRejectedWithoutIssue(
 	store: TestPlanStore,
 	effect: TestPlanEffect,
-	expectedPlan: TestSettlementPlan | null
+	expected: ExpectedRejectedIssueState
 ): Promise<void> {
-	const before = planSnapshot(expectedPlan);
 	const error = await attemptIssue(store, effect);
 	expect(error, "D110C_0C1F5B0S_PLAN_EFFECT_PRECONDITION_NOT_ENFORCED").toBeDefined();
-	expect(await store.readLineage(F5B0S_SCOPE)).toEqual({ exhausted: false, next: 0 });
-	expect(await store.readIssued(F5B0S_SCOPE, 0)).toBeNull();
-	expect(planSnapshot(await store.readSettlementPlan(F5B0S_SCOPE))).toEqual(before);
+	expect(await store.readLineage(F5B0S_SCOPE)).toEqual(expected.lineage);
+	expect(
+		await Promise.all(expected.issued.map((_, authorSequence) => store.readIssued(F5B0S_SCOPE, authorSequence)))
+	).toEqual(expected.issued);
+	expect(await store.readIssued(F5B0S_SCOPE, expected.lineage.next)).toEqual(expected.selected);
+	expect(planSnapshot(await store.readSettlementPlan(F5B0S_SCOPE))).toEqual(expected.plan);
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -377,7 +398,8 @@ describe("D.110c-0c1f5b0s settlement-plan contract RED", () => {
 				const linked = await store.readSettlementPlan(F5B0S_SCOPE);
 				expect(linked?.entries[0]).toMatchObject({ replacementSequence: 0, sourceSequence: 10 });
 				expect(linked?.revision).toBeGreaterThan(0);
-				await assertRejectedWithoutIssue(store, { kind: "replacement", sourceSequence: 10 }, linked);
+				const expected = await captureExpectedRejectedIssueState(store);
+				await assertRejectedWithoutIssue(store, { kind: "replacement", sourceSequence: 10 }, expected);
 			});
 		}
 	);
@@ -386,7 +408,8 @@ describe("D.110c-0c1f5b0s settlement-plan contract RED", () => {
 		"%s refuses a fence when the durable plan is absent",
 		async (adapter) => {
 			await withAdapter(adapter, "fence_plan_missing", async ({ store }) => {
-				await assertRejectedWithoutIssue(store, { kind: "fence" }, null);
+				const expected = await captureExpectedRejectedIssueState(store);
+				await assertRejectedWithoutIssue(store, { kind: "fence" }, expected);
 			});
 		}
 	);
@@ -395,8 +418,9 @@ describe("D.110c-0c1f5b0s settlement-plan contract RED", () => {
 		"%s refuses a fence when fenceSequence is already set",
 		async (adapter) => {
 			await withAdapter(adapter, "fence_already_set", async ({ store }) => {
-				const plan = await writePlan(store, settlementPlan({ entries: [], fenceSequence: 7 }));
-				await assertRejectedWithoutIssue(store, { kind: "fence" }, plan);
+				await writePlan(store, settlementPlan({ entries: [], fenceSequence: 7 }));
+				const expected = await captureExpectedRejectedIssueState(store);
+				await assertRejectedWithoutIssue(store, { kind: "fence" }, expected);
 			});
 		}
 	);
@@ -405,23 +429,26 @@ describe("D.110c-0c1f5b0s settlement-plan contract RED", () => {
 		"%s refuses a fence while manual review is unresolved",
 		async (adapter) => {
 			await withAdapter(adapter, "fence_manual_review", async ({ store }) => {
-				const plan = await writePlan(store, settlementPlan({ entries: [settlementEntry(10, "manual-review")] }));
-				await assertRejectedWithoutIssue(store, { kind: "fence" }, plan);
+				await writePlan(store, settlementPlan({ entries: [settlementEntry(10, "manual-review")] }));
+				const expected = await captureExpectedRejectedIssueState(store);
+				await assertRejectedWithoutIssue(store, { kind: "fence" }, expected);
 			});
 		}
 	);
 
 	it.each(["memory", "browser", "node"] as const)("%s refuses a replacement for an absent entry", async (adapter) => {
 		await withAdapter(adapter, "replacement_entry_absent", async ({ store }) => {
-			const plan = await writePlan(store, settlementPlan({ entries: [] }));
-			await assertRejectedWithoutIssue(store, { kind: "replacement", sourceSequence: 10 }, plan);
+			await writePlan(store, settlementPlan({ entries: [] }));
+			const expected = await captureExpectedRejectedIssueState(store);
+			await assertRejectedWithoutIssue(store, { kind: "replacement", sourceSequence: 10 }, expected);
 		});
 	});
 
 	it.each(["memory", "browser", "node"] as const)("%s refuses an already-linked replacement", async (adapter) => {
 		await withAdapter(adapter, "replacement_already_linked", async ({ store }) => {
-			const plan = await writePlan(store, settlementPlan({ entries: [settlementEntry(10, "rebase", 44)] }));
-			await assertRejectedWithoutIssue(store, { kind: "replacement", sourceSequence: 10 }, plan);
+			await writePlan(store, settlementPlan({ entries: [settlementEntry(10, "rebase", 44)] }));
+			const expected = await captureExpectedRejectedIssueState(store);
+			await assertRejectedWithoutIssue(store, { kind: "replacement", sourceSequence: 10 }, expected);
 		});
 	});
 
@@ -429,8 +456,9 @@ describe("D.110c-0c1f5b0s settlement-plan contract RED", () => {
 		"%s refuses a replacement for a manual-review entry",
 		async (adapter) => {
 			await withAdapter(adapter, "replacement_manual_review", async ({ store }) => {
-				const plan = await writePlan(store, settlementPlan({ entries: [settlementEntry(10, "manual-review")] }));
-				await assertRejectedWithoutIssue(store, { kind: "replacement", sourceSequence: 10 }, plan);
+				await writePlan(store, settlementPlan({ entries: [settlementEntry(10, "manual-review")] }));
+				const expected = await captureExpectedRejectedIssueState(store);
+				await assertRejectedWithoutIssue(store, { kind: "replacement", sourceSequence: 10 }, expected);
 			});
 		}
 	);
