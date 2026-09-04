@@ -20,8 +20,13 @@ The evidence base is the Fable 5.1 research checkpoint
 five agent reports), signed at `d5b8168e`, `c9289c6a`, `cb2e723d`. The
 adjudicated crash walk and code citations live in `plan-change.md` Parts A-C;
 this document freezes the exact construction, matrix, slices and stop rules.
-This is a design checkpoint only: no production edit, RED, campaign, long
-workload or subagent invocation is authorized by it.
+A pre-review consistency pass by one Fable 5.1 subagent is recorded as the
+sibling `pre-review.md`; its seven integrated items (genesis `admissionEpoch`
+key, fence-at-every-open rule, incarnation-scoped terminal rule, plan-entry
+retirement, stale plan cite, four near-miss line cites, two deferred notes) are
+folded into this text and it is not the governing review. This is a design
+checkpoint only: no production edit, RED, campaign, long workload or subagent
+invocation is authorized by it.
 
 ### The fact that drives the design
 
@@ -82,11 +87,12 @@ Kind `drp-creator-author-settlement-state`, version `1`, domain
 - `frontiers` are strictly code-unit sorted, unique, and exactly the successor
   ACL's members of every role (at most 64). A member present in the prior
   checkpoint carries its `admissionEpoch` unchanged and a monotone
-  `terminalThrough` (`null → n` allowed; `n → null` or lower rejected). A
-  member absent from the prior checkpoint carries
-  `admissionEpoch = successorEpoch` and `terminalThrough = null`. The verifier
-  recomputes membership from the two bound ACL digests. Genesis members receive
-  `admissionEpoch = 0` in the first checkpoint.
+  `terminalThrough` (`null → n` allowed; `n → null` or lower rejected). A member absent from the **current ACL** (added at this close) carries
+  `admissionEpoch = successorEpoch` and `terminalThrough = null`. When the
+  predecessor is the genesis sentinel, members of the current (genesis) ACL
+  receive `admissionEpoch = 0` and members added at this close receive
+  `successorEpoch`. The verifier recomputes membership from the two bound ACL
+  digests; "absent from the prior checkpoint" is never the key.
 - The record binds the current and successor anchors and ACLs, cut, commit QC,
   snapshot manifest, history root/size and pinned genesis exactly as the
   superseded design did; any mismatch fails closed.
@@ -154,8 +160,9 @@ member absent from the current ACL:
    regression keeps its existing fail-closed error
    (`packages/node/src/creator-close.ts:486-497`, `:528-546`).
 2. Among `A`'s fence vertices take the largest `m` with `m <= f` and
-   (`s === null` or `m > s`); set `s := m − 1` (`m = 0` means the base is
-   before slot 0). Invalid fences are ignored; nothing aborts.
+   (`s === null` or `m > s`); set `s := m − 1` (`m = 0` means the base is before slot 0; by contiguity
+   the fence's own slot then advances `s` to at least 0 in step 4, so a
+   negative `terminalThrough` is never emitted). Invalid fences are ignored; nothing aborts.
 3. If `s === null` and no valid fence exists, scan from slot 0 if it is in the
    graph; otherwise emit `null`. This replaces, under the settlement profile,
    the close-aborting throw `D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED`
@@ -179,9 +186,9 @@ existing rebase startup barrier, `examples/v3-room/src/index.ts:2796-2990`,
 
 1. Read own `(e, s)` from the authenticated checkpoint. A key absent from the
    vector is not a member and may not issue.
-2. Classify every own durable row regardless of `publishState` (replacing the
-   pending-only predicate at `v3-live.ts:6446` and the published-must-be-present
-   path at `examples/v3-room/src/index.ts:2852-2857`), authenticating by own
+2. Classify every own durable row regardless of `publishState` (replacing the pending-only predicate at `v3-live.ts:6447`, whose
+   published-skip at `:6446` is the historical defect, and the
+   published-must-be-present path at `examples/v3-room/src/index.ts:2852-2857`), authenticating by own
    signature, scope and row digest against the anchor/epoch decoded from the
    row (the shape at `v3-live.ts:4762-4769`, not the single-predecessor
    classifier at `:4611-4619`), for any `epoch < current`:
@@ -198,15 +205,20 @@ existing rebase startup barrier, `examples/v3-room/src/index.ts:2796-2990`,
 3. Build or merge the plan: one entry per displaced application source with the
    room's policy (`expire | rebase | transform | manual-review`). Entries that
    already carry a `replacementSequence` are fulfilled; a replacement row that
-   is itself displaced becomes a new source entry; a displaced fence clears
-   `fenceSequence`. Write it with `transactWriteSettlementPlan` (CAS on
+   is itself displaced becomes a new source entry; a displaced fence clears `fenceSequence`. An entry whose source row now
+   classifies terminal (`seq <= s`, or `row.epoch < e`) is removed from the
+   plan at merge (the boundary, not the plan, settled it) and no longer holds
+   the prune gate or a `manual-review` hold. Write it with `transactWriteSettlementPlan` (CAS on
    `revision`) **before any issue**.
 4. If any entry is `manual-review`: no fence, no replacements; the barrier
    holds; only this author's boundary stalls.
 5. Issue the fence through the dedicated control issuer with
    `m = lineage.next` and `planEffect: { kind: "fence" }`. Node refuses a fence
    unless a durable plan exists with no `manual-review` entry and a null
-   `fenceSequence`. Publish it.
+   `fenceSequence`. Publish it. A fence is issued at every open/adopt under
+   the profile once the drain completes, including with an empty plan (a
+   returning member whose only old rows are terminal old-incarnation rows);
+   Node's refusal rule accepts a durable empty-entries plan.
 6. Issue each `rebase`/`transform` replacement as an ordinary application
    vertex with `planEffect: { kind: "replacement", sourceSequence }`; the link
    is durable in the same transaction as the row. `expire` entries need no
@@ -266,8 +278,8 @@ the entry is absent, already linked or `manual-review`. The exact-key commit
 validator (`packages/issuance-store/src/contract.ts:281`) widens to accept the
 optional key. The plan lives in a fourth object store `settlementPlans` keyed
 by `[objectId, author]`: browser schema version bump with the exact store-name
-check updated (`browser-issuance-store.ts:116-120`, `:1036-1038`); node table
-migration in the style of `node-issuance-store.ts:249-254`; in-memory model
+check updated (`browser-issuance-store.ts:115-119`, `:1036-1038`); node table
+migration in the style of `node-issuance-store.ts:248-255`; in-memory model
 and conformance vectors. `pruneAuthenticatedSettledPrefix` refuses any row
 referenced by an unlinked plan entry. No `transactAdvanceLineage` exists: a
 lineage jump manufactures consumed-but-absent ordinals that `readIssued`
@@ -300,8 +312,11 @@ latches as corruption (`browser-issuance-store.ts:443-447`,
   `terminalThrough` is terminal regardless of digest; the checkpoint
   authenticates a decision boundary, not membership of arbitrary row bytes.
   Same-slot equivocation remains evidence and cannot advance a boundary.
-- Rows above the boundary from an older epoch are displaced sources for the
-  plan; they are never silently terminal.
+- Rows above the boundary from an older epoch of the current incarnation
+  (`admissionEpoch <= epoch < current`) are displaced sources for the plan;
+  they are never silently terminal. Old-incarnation rows
+  (`epoch < admissionEpoch`) are terminal at re-admission and covered by the
+  first fence.
 - f5b0d adds the storage-neutral `pruneAuthenticatedSettledPrefix` contract
   from the superseded design unchanged in shape (compare-and-delete across any
   number of old epochs, monotone pruned watermark, expected lineage-next and
@@ -338,8 +353,9 @@ latches as corruption (`browser-issuance-store.ts:443-447`,
   (authority profile, lineage policy, settlement policy) carried in
   `parameters` changes only this predicate.
 - Under the profile: exactly one settlement checkpoint per close; zero
-  retirement/aggregate records; the fence action is mandatory from the first
-  epoch in which a displaced source exists.
+  retirement/aggregate records; every member issues one fence at every open/adopt (one control vertex per
+  author per epoch); a null-boundary member cannot advance without a fence or
+  slot 0.
 - The settlement layer composes with any authority-lineage profile as part of
   the current signed state (`lineage-profiles-impact.md` §2.E). Rotated closing
   authority is `D.110c-0c1j`; author sets beyond the 64-member vector are
@@ -384,8 +400,8 @@ latches as corruption (`browser-issuance-store.ts:443-447`,
 From `solution.md` §4 and the adjudication, each with its owning slice:
 
 - inverted `admittedThrough`/`settledThrough` rules: resolved by one boundary (f5b0a, f5b);
-- `readRebaseOutbox` skips published rows (`v3-live.ts:6446`, plan
-  `:98815-98823` predicate reopened): f5b0b;
+- `readRebaseOutbox` skips published rows (`v3-live.ts:6446`; the D.110c-0c1d record's state-selection-predicate
+  freeze is deliberately reopened for the settlement profile only): f5b0b;
 - rows older than one predecessor unclassifiable (`v3-live.ts:4611-4619`,
   `:5436-5438`): f5b0b;
 - no owner for the returning author's lineage: resolved as no jump (f5b0s);
@@ -393,10 +409,13 @@ From `solution.md` §4 and the adjudication, each with its owning slice:
 - prior-less writer check aborts close (`creator-close.ts:517-524`): f5b;
 - `completeRebaseSource` is a second completion owner: f5b0b/f5b0c;
 - `closeVertices/closeAuthors/closeCharges` do not exist; the complete maps are
-  `applicationVertices/...` (`v3-live.ts:7433-7435`): rename in f5b0b;
+  `applicationVertices/...` (`v3-live.ts:7432-7434`): rename in f5b0b;
 - nothing prunes in production; recovery-scan cap fails with age: f5b0d;
 - non-creator hot follow, journal/snapshot/seal scope retirement, ≥100-transition
-  gate, archive-root producer: D.110c-c, D.110c-d, Phase 7, unchanged.
+  gate, archive-root producer: D.110c-c, D.110c-d, Phase 7, unchanged;
+- durable own last-adopted `terminalThrough` so that old-incarnation rows above
+  it become `manual-review` candidates at re-admission (plan-change.md B.4, P2):
+  deferred and unowned; not in this slice set.
 
 ## TDD implementation slices
 

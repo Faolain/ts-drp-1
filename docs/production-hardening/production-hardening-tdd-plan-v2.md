@@ -98563,7 +98563,10 @@ application archive or bootstrap. If confirmation requires O(1) durable bytes
 under unbounded distinct-key churn, the hash-only design stops and reslices to
 a cryptographic accumulator/recursive-proof prerequisite.
 
-After an empty combined confirmation, implementation remains split by owner:
+(Superseded slice definitions: the f5b0a–f5b0d/f5b descriptions below carry
+the retired per-source grammar and are retained as evidence only; the
+authoritative slice list is design.md "TDD implementation slices" under
+D.110c-0c1f5b0r.) After an empty combined confirmation, implementation remains split by owner:
 f5b0p-a pure registry/profile codecs and f5b0p-b neutral memory/browser registry
 storage; f5b0a protocol carrier/checkpoint codecs/reservation/compatibility;
 f5b0b Node settlement authentication,
@@ -98872,9 +98875,16 @@ edit, f5b, the ≥100-transition gate, Phase-6 exit or Phase-7 long-lived-room
 cold join.
 
 The exact design is `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, pinning
-signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its one-entry
+signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its two-entry
 self-excluding manifest `manifest.sha256` records design SHA-256
-`251d37995bad58e2b1959dbb35d780722a0692a4eab81e9f389507e3193fde5b`. The
+`2ed53e02878d38dc536361cf46f9b03e81701d135faca9267f55fcacfedd7137` and
+pre-review SHA-256
+`8784104f0753b45b5a3b8906cb9313ebc4786746e13b40beeaa58154aa6282b0`. The
+sibling `pre-review.md` is a read-only consistency pass by one Fable 5.1
+subagent over the design, this record, the superseded records and every code
+citation at HEAD; it found no P0/P1 against the construction and seven
+navigability/consistency items, all folded into the design and this plan. It is
+not the governing review. The
 evidence base is the Fable 5.1 research checkpoint
 `.logs/d110c-0c1f5b0-fable51-research-20260903/` (signed `d5b8168e`,
 `c9289c6a`, `cb2e723d`); the adjudicated crash walk is its `plan-change.md`
@@ -98939,6 +98949,15 @@ recursion.
 **Status: BLOCKED on D.110c-0c1f5b0r accepted design review and subsequent
 f5b0a, f5b0s, f5b0b, f5b0c and f5b0d RED/GREEN; f5b0p-a/b are deleted; no RED
 or production edit is authorized.**
+
+Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
+three-proposal reconciliation and the
+`D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` terminus below describe the
+pre-f5b0r candidate families and are historical audit record only; that token
+exists nowhere under `packages/` or `examples/`. The authoritative f5b slice
+definition and RED obligations are design.md "TDD implementation slices" item
+6 and RED cases 1–27; the no-rebase trigger is replaced by delayed-dependency
+case 1.
 Owner: the cross-epoch relationship among creator-admitted
 per-author identities, aggregate coverage, historical outbox classification,
 rebase source→replacement/disposition correlation, close-set/history proofs,
