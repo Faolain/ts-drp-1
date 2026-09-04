@@ -556,8 +556,9 @@ the author's own abandonment, that anchor fencing is not the admission check
 for old incarnations, or that contiguity does not hold on a path this document
 missed, stop and reslice rather than reintroducing the per-source grammar, the
 global floor or the retired-key dictionary. The named fallback for the
-incarnation carrier alone is `admissionEpoch` in a version-3 latched-ACL member
-record; it is not selected here because ingress is already anchor-fenced.
+incarnation carrier alone is `admissionEpoch` in a later latched-ACL member-record
+version (version 4 in D.110c-0c1k stage W2; version 3 is the constants-only
+bump of W1); it is not selected here because ingress is already anchor-fenced.
 
 The complete GREEN must demonstrate genuine plans, fences and replacements
 through ordinary publication, close/adopt, restart and cold reopen; exact
