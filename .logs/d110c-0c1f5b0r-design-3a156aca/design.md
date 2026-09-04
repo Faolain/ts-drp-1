@@ -24,9 +24,9 @@ A pre-review consistency pass by one Fable 5.1 subagent is recorded as the
 sibling `pre-review.md`; its seven integrated items (genesis `admissionEpoch`
 key, fence-at-every-open rule, incarnation-scoped terminal rule, plan-entry
 retirement, stale plan cite, four near-miss line cites, two deferred notes) are
-folded into this text and it is not the governing review. This is a design
-checkpoint only: no production edit, RED, campaign, long workload or subagent
-invocation is authorized by it.
+folded into this text and it is not the governing review. This checkpoint authorizes the f5b0a and f5b0s tests-only REDs (see
+"Acceptance and stop rules"); it authorizes no production edit, campaign, long
+workload or subagent invocation.
 
 ### The fact that drives the design
 
@@ -518,10 +518,14 @@ Dependency order: 1 and 2 in parallel; 3 needs both; 4 needs 3; 5 needs 1-2;
 
 ## Acceptance and stop rules
 
-No production edit or RED runs before this design receives one material
-Grok 4.6/high, direct Kimi K3 (`KIMI_LOOP_MAX_STEPS_PER_TURN=100`) and Opus
-xhigh confirmation with an empty P0/P1 union. P2 receives an owner/disposition
-without prose-only recursion. No new cryptography; no protobuf/wire-envelope
+The three-model (Grok 4.6/high, Kimi K3, Opus xhigh) design-review gate that
+governed f5b0, f5b0p and f5b0q is waived for this design by explicit user
+decision on 2026-09-03. The recorded `pre-review.md` pass, with its seven items
+folded in, is the accepted design review. The f5b0a and f5b0s tests-only REDs
+are authorized from this checkpoint; every later slice is authorized by its
+predecessor's GREEN. No production edit runs before its slice's RED. P2
+findings surfaced during RED/GREEN receive an owner/disposition without
+prose-only recursion. No new cryptography; no protobuf/wire-envelope
 change (the fence is an operation inside the existing envelope; the plan is
 device-local); genesis-bound `creator-trusted-settlement-v1` with no v1
 migration or late opt-in; `creator-trusted-v1` behavior byte-for-byte
@@ -529,7 +533,8 @@ unchanged. "Creator-trusted" constrains who may close; it does not license
 the settlement codec or verifier to compare closing-authority keys across
 epochs.
 
-If review shows that a durable device-local plan is insufficient authority for
+If RED, GREEN or a later review shows that a durable device-local plan is
+insufficient authority for
 the author's own abandonment, that anchor fencing is not the admission check
 for old incarnations, or that contiguity does not hold on a path this document
 missed, stop and reslice rather than reintroducing the per-source grammar, the

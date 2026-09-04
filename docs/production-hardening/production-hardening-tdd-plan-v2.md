@@ -98406,7 +98406,8 @@ campaign was authorized or run by f5a.
 **Status: SUPERSEDED by D.110c-0c1f5b0r, which replaces the per-source
 disposition carrier with an author fence and a membership-incarnation
 checkpoint; this record and its review evidence are retained, not
-reinterpreted. Prior status: the first exact design was signed/pushed at `fc4b8fc7`; its governing
+reinterpreted, and its deadline clause is void: RED authorization now flows
+from the f5b0r record. Prior status: the first exact design was signed/pushed at `fc4b8fc7`; its governing
 Grok/Kimi/Opus review completed with a nonempty blocking union, so f5b0a RED and
 all production edits remain unauthorized. The bounded carrier/lifecycle
 corrections are integrated. D.110c-0c1f5b0p's source audit now selects an exact
@@ -98598,7 +98599,8 @@ collaboration subagents without new express user authorization.
 **Status: SUPERSEDED by D.110c-0c1f5b0r, which drops the Merkle AVL
 retired-author dictionary in favor of an `admissionEpoch` carried in the
 settlement checkpoint frontier; the signed checkpoint and its blocking union are
-retained as evidence. Prior status: combined confirmation completed with a
+retained as evidence, and its deadline clause is void: RED authorization now
+flows from the f5b0r record. Prior status: combined confirmation completed with a
 blocking P0/P1 union; the bounded design correction is being closed and no RED
 or production edit is authorized.** Owner: the creator-authenticated retired-key dictionary,
 genesis-bound settlement profile, pure proof/update verifier, strict-durability
@@ -98789,8 +98791,8 @@ authorized here.
 **Status: CLOSED AS SUPERSEDED by D.110c-0c1f5b0r before any review ran; its
 three executable gaps (deletion-rebalance witnesses, codec ownership, registry
 state transitions) are moot without a dictionary, and single ownership of the
-settlement checkpoint codec is carried into f5b0a. No RED or production edit is
-authorized. Prior status: exact material reslice drafted; awaiting one bounded
+settlement checkpoint codec is carried into f5b0a. Its deadline clause is void:
+RED authorization now flows from the f5b0r record. Prior status: exact material reslice drafted; awaiting one bounded
 Grok/Kimi/Opus plan review before f5b0p-a RED.**
 Owner: only the three executable gaps first demonstrated by the consumed
 f5b0p confirmation: deletion-rebalance witness completeness/resource bounds,
@@ -98863,21 +98865,22 @@ Do not invoke Fable or a collaboration subagent.
 
 ###### D.110c-0c1f5b0r author fence and membership-incarnation settlement reslice
 
-**Status: exact superseding design drafted and signed; awaiting one bounded
-Grok 4.6/high, direct Kimi K3 (`KIMI_LOOP_MAX_STEPS_PER_TURN=100`) and Opus
-xhigh design review. No RED or production edit is authorized.** Owner: the
+**Status: exact superseding design signed and ACCEPTED. The three-model
+(Grok 4.6/high, Kimi K3, Opus xhigh) design-review gate is waived for f5b0r by
+explicit user decision on 2026-09-03; the recorded `pre-review.md` pass is the
+accepted design review. f5b0a and f5b0s tests-only RED are authorized; no
+production edit before its slice's RED.** Owner: the
 author fence control operation, the durable settlement plan store contract, the
 `[author, admissionEpoch, terminalThrough]` settlement checkpoint with its
 signer-agnostic codec and predicate-enforced predecessor rules, the creator
 close scan, the author drain order, the ACL transition law and the crash/attack
-matrix. Deadline: accepted design before f5b0a or f5b0s RED, any production
-edit, f5b, the ≥100-transition gate, Phase-6 exit or Phase-7 long-lived-room
-cold join.
+matrix. Deadline: implemented and retained before f5b, parent 0c1/0c, the
+≥100-transition gate, Phase-6 exit or Phase-7 long-lived-room cold join.
 
 The exact design is `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, pinning
 signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its two-entry
 self-excluding manifest `manifest.sha256` records design SHA-256
-`2ed53e02878d38dc536361cf46f9b03e81701d135faca9267f55fcacfedd7137` and
+`ecf5fef86810fcedc02b484b2685d514288a043f5c85d3b2749e6b35fadb6f57` and
 pre-review SHA-256
 `8784104f0753b45b5a3b8906cb9313ebc4786746e13b40beeaa58154aa6282b0`. The
 sibling `pre-review.md` is a read-only consistency pass by one Fable 5.1
@@ -98935,20 +98938,23 @@ recovery integration. Dependency order: f5b0a and f5b0s in parallel, then
 f5b0b, then f5b0c; f5b0d after f5b0a and f5b0s; f5b after all five. The design
 lists 27 deterministic RED cases.
 
-Review instruction: one bounded material review of the design by Grok
-4.6/high, direct Kimi K3 (100 steps) and Opus xhigh, not a Fable or
-collaboration subagent. Only an empty P0/P1 union authorizes the f5b0a and
-f5b0s tests-only REDs. A P0 against the checkpoint-carried `admissionEpoch`
-falls back to `admissionEpoch` in a version-3 latched-ACL member record, never
-to the dictionary. A P0 against contiguity, plan authority or anchor fencing
-stops and reslices. P2 findings receive an owner/disposition without prose-only
-recursion.
+Authorization: the f5b0a and f5b0s tests-only REDs may begin from this record
+without a further design review; f5b0b, f5b0c, f5b0d and f5b are each
+authorized by their predecessors' GREEN in the dependency order above. Each
+slice keeps its causal tests-only RED before GREEN with focused, static,
+retained and isolated gates, signed commits and pushed refs. Stop rules are
+unchanged: a finding during RED/GREEN that the checkpoint-carried
+`admissionEpoch` is insufficient falls back to `admissionEpoch` in a version-3
+latched-ACL member record, never to the dictionary; a finding against
+contiguity, plan authority or anchor fencing stops and reslices rather than
+reintroducing the per-source grammar or the global floor. P2 findings receive
+an owner/disposition without prose-only recursion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED on D.110c-0c1f5b0r accepted design review and subsequent
-f5b0a, f5b0s, f5b0b, f5b0c and f5b0d RED/GREEN; f5b0p-a/b are deleted; no RED
-or production edit is authorized.**
+**Status: BLOCKED on f5b0a, f5b0s, f5b0b, f5b0c and f5b0d RED/GREEN under the
+accepted D.110c-0c1f5b0r design; f5b0p-a/b are deleted; the f5b RED itself is
+authorized by f5b0d GREEN, and no production edit runs before that RED.**
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
