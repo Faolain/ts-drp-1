@@ -15,6 +15,12 @@ export const PHASE_2L_C_DDL = Object.freeze({
 		"CREATE TABLE issuance_outbox (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  author_sequence INTEGER NOT NULL CHECK(author_sequence BETWEEN 0 AND 9007199254740991),\n  digest BLOB NOT NULL CHECK(typeof(digest) = 'blob' AND length(digest) > 0),\n  publish_state TEXT NOT NULL CHECK(publish_state IN ('pending','published')),\n  PRIMARY KEY (object_id,author,author_sequence)\n) WITHOUT ROWID",
 } as const);
 
+export const PHASE_2L_C_V3_DDL = Object.freeze({
+	...PHASE_2L_C_DDL,
+	settlement_plans:
+		"CREATE TABLE settlement_plans (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  revision INTEGER NOT NULL CHECK(revision BETWEEN 0 AND 9007199254740991),\n  fence_sequence INTEGER CHECK(fence_sequence IS NULL OR fence_sequence BETWEEN 0 AND 9007199254740991),\n  entries_json TEXT NOT NULL CHECK(typeof(entries_json) = 'text' AND length(entries_json) > 0),\n  PRIMARY KEY (object_id,author)\n) WITHOUT ROWID",
+} as const);
+
 export const PHASE_2L_C_SCENARIOS = Object.freeze(["fresh", "existing-lineage"] as const);
 export const PHASE_2L_C_EDGES = Object.freeze([
 	"suspended-build",

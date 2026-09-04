@@ -23,7 +23,9 @@ export const PHASE_3A1B_P2_METHODS = Object.freeze([
 	"readIssued",
 	"readLineage",
 	"readOutboxPage",
+	"readSettlementPlan",
 	"transactIssue",
+	"transactWriteSettlementPlan",
 ] as const);
 
 export const PHASE_3A1B_P2_NODE_TRACE = Object.freeze([
@@ -173,10 +175,12 @@ export interface Phase3a1bP2Store {
 		readonly limit?: number;
 		readonly scope?: Phase3a1bP2Scope;
 	}): Promise<readonly Phase3a1bP2OutboxRecord[]>;
+	readSettlementPlan(scope: Phase3a1bP2Scope): Promise<unknown>;
 	transactIssue(
 		scope: Phase3a1bP2Scope,
 		buildAndSign: (authorSequence: number) => Promise<Phase3a1bP2Commit>
 	): Promise<Phase3a1bP2Commit>;
+	transactWriteSettlementPlan(input: unknown): Promise<unknown>;
 }
 
 export interface Phase3a1bP2PublicationSnapshot {

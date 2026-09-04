@@ -156,7 +156,7 @@ async function tracedNodeMark(
 }
 
 describe("D.93.29 Seam 2 Node durable publication", () => {
-	it("freezes the six-member facade and exact synchronous writer/readback source trace", async () => {
+	it("freezes the eight-member facade and exact synchronous writer/readback source trace", async () => {
 		const store = await open(primary("surface"));
 		expect(Object.keys(store).sort()).toEqual(PHASE_3A1B_P2_METHODS);
 		expect(Reflect.ownKeys(store).sort()).toEqual(PHASE_3A1B_P2_METHODS);

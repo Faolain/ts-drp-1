@@ -8,7 +8,7 @@ import readline from "node:readline";
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
 import { executePinnedCampaignSignalSequence } from "./fixtures/phase-2e6-process-death-runner.js";
 import {
-	assertPhase2lBDeathArmEvidence,
+	assertPhase2lBSettlementDeathArmEvidence,
 	type Phase2lBDeathTuple,
 	PHASE_2L_B_DEATH_TUPLES,
 } from "./fixtures/phase-2l-b-browser-issuance-contract.js";
@@ -215,7 +215,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => server.close());
 
-test("all 16 literal issuance edges hard-kill detached Chromium and reopen old XOR exact-new", async () => {
+test("all 16 literal four-store issuance edges hard-kill detached Chromium and reopen old XOR exact-new", async () => {
 	const evidence: Array<Record<string, unknown>> = [];
 	for (const [ordinal, edge] of PHASE_2L_B_DEATH_TUPLES.entries()) {
 		let row: Record<string, unknown>;
@@ -227,7 +227,7 @@ test("all 16 literal issuance edges hard-kill detached Chromium and reopen old X
 		expect(row).toMatchObject({ armCount: 1, candidateAvailable: true });
 		expect(row.frozenCount).toBeGreaterThan(1);
 		expect(row.armed).toMatchObject({ cellValue: 1, observation: { edgeId: edge.id } });
-		assertPhase2lBDeathArmEvidence(edge, (row.armed as Record<string, unknown>).observation);
+		assertPhase2lBSettlementDeathArmEvidence(edge, (row.armed as Record<string, unknown>).observation);
 		const recovery = row.recovery as { exactNew: boolean; old: boolean };
 		expect(Number(recovery.old) + Number(recovery.exactNew)).toBe(1);
 		if (edge.terminalFate === "old") expect(recovery.old).toBe(true);

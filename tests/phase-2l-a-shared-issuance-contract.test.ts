@@ -58,7 +58,9 @@ interface DurableIssuanceStore {
 		readonly limit?: number;
 		readonly scope?: DurableIssueScope;
 	}): Promise<readonly DurableIssuanceOutboxRecord[]>;
+	readSettlementPlan(scope: DurableIssueScope): Promise<unknown>;
 	readLineage(scope: DurableIssueScope): Promise<DurableLineage>;
+	transactWriteSettlementPlan(input: unknown): Promise<unknown>;
 	close(): Promise<void>;
 }
 
@@ -112,7 +114,9 @@ const ABSENT_STORE: DurableIssuanceStore = {
 	readIssued: () => Promise.reject(missingOwnerError()),
 	readLineage: () => Promise.reject(missingOwnerError()),
 	readOutboxPage: () => Promise.reject(missingOwnerError()),
+	readSettlementPlan: () => Promise.reject(missingOwnerError()),
 	transactIssue: () => Promise.reject(missingOwnerError()),
+	transactWriteSettlementPlan: () => Promise.reject(missingOwnerError()),
 };
 
 const ABSENT_SURFACE: ConformanceSurface = {
@@ -258,7 +262,9 @@ describe("Phase 2l-a package and closed contract", () => {
 			"readIssued",
 			"readLineage",
 			"readOutboxPage",
+			"readSettlementPlan",
 			"transactIssue",
+			"transactWriteSettlementPlan",
 		]);
 		const result = await store.transactIssue(SCOPE, (selected) => Promise.resolve(commitFor(SCOPE, selected, 19)));
 		expect(result.authorSequence).toBe(0);

@@ -22,6 +22,19 @@ export const PHASE_2L_B_SCHEMA = Object.freeze({
 	]),
 });
 
+export const PHASE_2L_B_SETTLEMENT_SCHEMA = Object.freeze({
+	databaseVersion: 2,
+	stores: Object.freeze([
+		...PHASE_2L_B_SCHEMA.stores,
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "author"]),
+			name: "settlementPlans",
+		}),
+	]),
+});
+
 export interface Phase2lBScope {
 	readonly author: string;
 	readonly objectId: string;
@@ -52,6 +65,8 @@ export interface Phase2lBStore {
 		readonly limit?: number;
 		readonly scope?: Phase2lBScope;
 	}): Promise<readonly Readonly<{ commit: Phase2lBCommit; publishState: "pending" | "published" }>[]>;
+	readSettlementPlan(scope: Phase2lBScope): Promise<unknown>;
+	transactWriteSettlementPlan(input: unknown): Promise<unknown>;
 	close(): Promise<void>;
 }
 
@@ -80,6 +95,11 @@ export interface Phase2lBDeathTuple {
 
 const PHASE_2L_B_TRANSACTION_STORES = Object.freeze(["issuanceOutbox", "issuedRecords", "lineages"] as const);
 
+const PHASE_2L_B_SETTLEMENT_TRANSACTION_STORES = Object.freeze([
+	...PHASE_2L_B_TRANSACTION_STORES,
+	"settlementPlans",
+] as const);
+
 interface Phase2lBTraceEvent {
 	readonly kind: string;
 	readonly method?: string;
@@ -101,21 +121,19 @@ function traceEvent(value: unknown): Phase2lBTraceEvent {
 	return record(value, "trace event") as unknown as Phase2lBTraceEvent;
 }
 
-function exactStores(value: unknown): boolean {
+function exactStores(value: unknown, expectedStores: readonly string[]): boolean {
 	return (
 		Array.isArray(value) &&
-		value.length === PHASE_2L_B_TRANSACTION_STORES.length &&
-		value.every((store, index) => store === PHASE_2L_B_TRANSACTION_STORES[index])
+		value.length === expectedStores.length &&
+		value.every((store, index) => store === expectedStores[index])
 	);
 }
 
-/**
- * Validates that a death arm was caused by the declared native event rather
- * than by a worker-supplied semantic label.
- * @param tuple - Frozen tuple whose physical edge must be demonstrated.
- * @param value - Untrusted evidence relayed from the killed browser worker.
- */
-export function assertPhase2lBDeathArmEvidence(tuple: Phase2lBDeathTuple, value: unknown): void {
+function assertPhase2lBDeathArmEvidenceForStores(
+	tuple: Phase2lBDeathTuple,
+	value: unknown,
+	expectedStores: readonly string[]
+): void {
 	const evidence = record(value, "death-arm evidence");
 	if (evidence.edgeId !== tuple.id) throw new TypeError("wrong Phase 2l-b edge label");
 	if (!Array.isArray(evidence.trace)) throw new TypeError("missing Phase 2l-b native trace");
@@ -134,7 +152,7 @@ export function assertPhase2lBDeathArmEvidence(tuple: Phase2lBDeathTuple, value:
 			if (
 				target === null ||
 				target.mode !== "readwrite" ||
-				!exactStores(target.stores) ||
+				!exactStores(target.stores, expectedStores) ||
 				trigger.transactionId !== target.transactionId
 			)
 				throw new TypeError("terminal event did not belong to the issuance mutation transaction");
@@ -145,7 +163,7 @@ export function assertPhase2lBDeathArmEvidence(tuple: Phase2lBDeathTuple, value:
 	if (
 		target === null ||
 		target.mode !== "readwrite" ||
-		!exactStores(target.stores) ||
+		!exactStores(target.stores, expectedStores) ||
 		typeof target.transactionId !== "string"
 	)
 		throw new TypeError("missing exact Phase 2l-b mutation transaction");
@@ -192,10 +210,29 @@ export function assertPhase2lBDeathArmEvidence(tuple: Phase2lBDeathTuple, value:
 				event.method === "get" &&
 				event.store === "lineages" &&
 				event.mode === "readonly" &&
-				exactStores(event.stores)
+				exactStores(event.stores, expectedStores)
 		);
 		if (earlierSnapshot < 0) throw new TypeError("missing unarmed pre-build lineage snapshot control");
 	}
+}
+
+/**
+ * Validates that a death arm was caused by the declared native event rather
+ * than by a worker-supplied semantic label.
+ * @param tuple - Frozen tuple whose physical edge must be demonstrated.
+ * @param value - Untrusted evidence relayed from the killed browser worker.
+ */
+export function assertPhase2lBDeathArmEvidence(tuple: Phase2lBDeathTuple, value: unknown): void {
+	assertPhase2lBDeathArmEvidenceForStores(tuple, value, PHASE_2L_B_TRANSACTION_STORES);
+}
+
+/**
+ * Validates the settlement-plan death arm against the four-store transaction.
+ * @param tuple - Frozen tuple whose physical edge must be demonstrated.
+ * @param value - Untrusted evidence relayed from the killed browser worker.
+ */
+export function assertPhase2lBSettlementDeathArmEvidence(tuple: Phase2lBDeathTuple, value: unknown): void {
+	assertPhase2lBDeathArmEvidenceForStores(tuple, value, PHASE_2L_B_SETTLEMENT_TRANSACTION_STORES);
 }
 
 function nativeRequest(scenario: Phase2lBScenario, edge: Phase2lBEdge): Phase2lBDeathTuple["nativeRequest"] {

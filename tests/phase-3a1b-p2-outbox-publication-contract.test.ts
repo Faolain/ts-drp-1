@@ -347,7 +347,7 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 		expect(new ReferencePublicationStore(CORRECT_POLICY).mark(OBSERVATIONS.published)).toBe("published");
 	});
 
-	it("freezes the erased input and exact six-method owner without widening runtime registries", () => {
+	it("freezes the erased input and exact eight-method owner without widening runtime registries", () => {
 		const types = fs.readFileSync(ISSUANCE_TYPES, "utf8");
 		expect(types).toMatch(
 			/export interface DurableOutboxPublicationTransitionInput\s*\{\s*readonly authorSequence: number;\s*readonly digest: Uint8Array;\s*readonly scope: DurableIssueScope;\s*\}/u
@@ -357,7 +357,7 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 		expect(interfaceBody).toContain(
 			"compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void>;"
 		);
-		expect(interfaceBody?.match(/^\s*(?:readonly )?[A-Za-z][A-Za-z0-9]*[(:]/gmu)).toHaveLength(6);
+		expect(interfaceBody?.match(/^\s*(?:readonly )?[A-Za-z][A-Za-z0-9]*[(:]/gmu)).toHaveLength(8);
 
 		const terminal = fs.readFileSync(ISSUANCE_TERMINAL, "utf8");
 		const index = fs.readFileSync(ISSUANCE_INDEX, "utf8");
@@ -368,7 +368,7 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 		expect(source("packages/node/src/index.ts")).not.toContain("compareAndMarkOutboxPublished");
 	});
 
-	it("updates all genuine facade and pin owners to six while retaining the named stale mutant", () => {
+	it("updates all genuine facade owners to eight while retaining the named stale mutant", () => {
 		const owners = [
 			"tests/phase-2l-a-shared-issuance-contract.test.ts",
 			"packages/storage-browser/tests/phase-2l-b-browser-issuance-red.pw.ts",
@@ -379,13 +379,12 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 		for (const owner of owners) {
 			expect(source(owner), owner).toContain("compareAndMarkOutboxPublished");
 		}
-		for (const owner of [
-			"packages/storage-node/src/issuance.ts",
-			"packages/storage-browser/src/issuance.ts",
-			"packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
-		]) {
-			expect(source(owner), owner).toContain("six-method");
+		for (const owner of ["packages/storage-node/src/issuance.ts", "packages/storage-browser/src/issuance.ts"]) {
+			expect(source(owner), owner).toContain("eight-method");
 		}
+		expect(source("packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts")).toContain(
+			"six-method"
+		);
 		const mutant = source("packages/storage-node/tests/fixtures/phase-2l-c-five-method-mutant.mjs");
 		expect(mutant).not.toContain("compareAndMarkOutboxPublished");
 		expect(mutant).toContain("five-method");
@@ -564,16 +563,21 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"DurableIssuanceUnknownOutcomeError",
 			"MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT",
 			"MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS",
+			"applySettlementPlanEffect",
 			"assertDurableIssueScope",
+			"captureSettlementPlanWriteInput",
 			"classifyDurableIssuanceTerminalSuppression",
 			"cloneDurableIssueCommit",
 			"cloneDurableSignedEnvelope",
+			"cloneSettlementPlan",
 			"compareDurableIssuanceCompoundKeys",
 			"copyAndValidateDurableIssueCommit",
 			"copyDurableIssuanceBytes",
 			"copyDurableIssueScope",
 			"copyDurableIssuedRecord",
 			"copyDurableSignedEnvelope",
+			"copySettlementPlan",
+			"copySettlementPlanEffect",
 			"createDurableIssuanceFailure",
 			"durableIssuanceBytesEqual",
 			"durableIssueScopesEqual",
@@ -583,7 +587,7 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"isValidDurableScopeField",
 		]);
 		expect(sha256(source("packages/issuance-store/src/contract.ts"))).toBe(
-			"67a7520e324677d3cf9786956ec565e54eda32b2a60c56f344dd921e56613928"
+			"49ac5a1d2b44f69a6becc3f3bcd4e44c2d4e178512a0d8489ae28766fa636cf7"
 		);
 		expect(sha256(source("packages/issuance-store/src/terminal.ts"))).toBe(
 			"a71b32967ca152c12b10adad4f3303696fb42d4379892cc27c4937af19d42a4a"

@@ -63,7 +63,7 @@ test("[RED readiness] requires the browser identity-gated pruning owner", async 
 	}
 });
 
-test("prunes, reopens and preserves v1 plus later numeric-watermark issuance in Chromium", async ({ page }) => {
+test("prunes, reopens and preserves v2 plus later numeric-watermark issuance in Chromium", async ({ page }) => {
 	test.skip(process.env.D109B_BROWSER_MAINTENANCE_READY !== "true", "D109B_BROWSER_MAINTENANCE_MISSING");
 	const issued = transition();
 	try {
@@ -85,7 +85,9 @@ test("prunes, reopens and preserves v1 plus later numeric-watermark issuance in 
 				"readIssued",
 				"readLineage",
 				"readOutboxPage",
+				"readSettlementPlan",
 				"transactIssue",
+				"transactWriteSettlementPlan",
 			],
 			lineage: { exhausted: false, next: 3 },
 			lateExact: "ISSUANCE_RECORD_PRUNED",
@@ -104,7 +106,7 @@ test("prunes, reopens and preserves v1 plus later numeric-watermark issuance in 
 			prunedRead: null,
 			replayRange: null,
 			state: { lineage: { exhausted: false, next: 2 }, prunedThroughAuthorSequence: 0 },
-			version: 1,
+			version: 2,
 		});
 	} finally {
 		tokens.delete(issued.token);

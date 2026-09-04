@@ -1,7 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
-import { PHASE_2L_B_FAST_CASES, PHASE_2L_B_SCHEMA } from "./fixtures/phase-2l-b-browser-issuance-contract.js";
+import {
+	PHASE_2L_B_FAST_CASES,
+	PHASE_2L_B_SETTLEMENT_SCHEMA,
+} from "./fixtures/phase-2l-b-browser-issuance-contract.js";
 
 let server: AssetServer;
 
@@ -39,7 +42,9 @@ test("exact two-symbol surface, closed options and opaque identity are promise-o
 		"readIssued",
 		"readLineage",
 		"readOutboxPage",
+		"readSettlementPlan",
 		"transactIssue",
+		"transactWriteSettlementPlan",
 	]);
 	expect(value.prototypeKeys).toEqual([]);
 	expect(value.closeSamePromise).toBe(true);
@@ -55,18 +60,18 @@ test("exact two-symbol surface, closed options and opaque identity are promise-o
 	expect(derived[1]).toHaveLength(1025 + "--drp-issuance-v1".length);
 });
 
-test("derived v1 schema is exact while primary identity remains completely opaque", async ({ page }) => {
+test("derived v2 schema is exact while primary identity remains completely opaque", async ({ page }) => {
 	const value = await runCase(page, "primary-opacity-schema-admission");
 	expect(value.absentPrimaryCreated).toBe(false);
 	expect(value.primaryObservation).toEqual({ stores: ["sentinel"], version: 7 });
-	expect(value.nativeSchemaControl).toEqual(PHASE_2L_B_SCHEMA);
-	expect(value.schema).toEqual(PHASE_2L_B_SCHEMA);
+	expect(value.nativeSchemaControl).toEqual(PHASE_2L_B_SETTLEMENT_SCHEMA);
+	expect(value.schema).toEqual(PHASE_2L_B_SETTLEMENT_SCHEMA);
 	expect(value.badError).toMatchObject({ code: "ISSUANCE_UNSUPPORTED_SCHEMA" });
 });
 
 test("real adapter commits one detached closure and pages in shared UTF-16 order", async ({ page }) => {
 	const value = await runCase(page, "issue-read-copy-paging");
-	expect(value.schema).toEqual(PHASE_2L_B_SCHEMA);
+	expect(value.schema).toEqual(PHASE_2L_B_SETTLEMENT_SCHEMA);
 	expect(value.lineage).toEqual({ exhausted: false, next: 1 });
 	expect(value.copy).toEqual({ digest: [23, 209], freshEnvelope: true, freshGraph: true, signature: [23, 81] });
 	expect(value.order).toEqual([

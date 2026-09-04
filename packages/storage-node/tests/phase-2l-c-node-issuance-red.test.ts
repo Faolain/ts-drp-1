@@ -13,6 +13,7 @@ import {
 	PHASE_2L_C_AMBIGUITY_CASES,
 	PHASE_2L_C_DDL,
 	PHASE_2L_C_SCOPE,
+	PHASE_2L_C_V3_DDL,
 } from "./fixtures/phase-2l-c-node-issuance-contract.js";
 import { encodeCanonical } from "../../canonical/dist/src/index.js";
 import type {
@@ -114,7 +115,7 @@ async function withStore<T>(primaryFilename: string, run: (store: DurableIssuanc
 }
 
 describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
-	it("exports one runtime factory and returns the frozen six-member capability synchronously", async () => {
+	it("exports one runtime factory and returns the frozen eight-member capability synchronously", async () => {
 		const namespace = await loadPhase2lCNodeModule();
 		expect(Object.keys(namespace)).toEqual(["createNodeDurableIssuanceStore"]);
 		const result = namespace.createNodeDurableIssuanceStore({ primaryFilename: primary("surface") });
@@ -125,7 +126,9 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			"readIssued",
 			"readLineage",
 			"readOutboxPage",
+			"readSettlementPlan",
 			"transactIssue",
+			"transactWriteSettlementPlan",
 		]);
 		expect(Reflect.ownKeys(result).sort()).toEqual([
 			"close",
@@ -133,7 +136,9 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			"readIssued",
 			"readLineage",
 			"readOutboxPage",
+			"readSettlementPlan",
 			"transactIssue",
+			"transactWriteSettlementPlan",
 		]);
 		expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
 		expect(Object.isFrozen(result)).toBe(true);
@@ -296,7 +301,7 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		expect(fs.existsSync(derivedFilename(whitespace.trim()))).toBe(false);
 	});
 
-	it("creates, byte-verifies and reopens exactly one authority at schema v2 in the stable v1-derived file", async () => {
+	it("creates, byte-verifies and reopens exactly one authority at schema v3 in the stable v1-derived file", async () => {
 		const primaryFilename = primary("schema");
 		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
 		const first = createNodeDurableIssuanceStore({ primaryFilename });
@@ -308,11 +313,12 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			rows: Record<string, unknown>[];
 			userVersion: number;
 		};
-		expect(observed).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 2 });
+		expect(observed).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 3 });
 		expect(observed.rows).toEqual([
 			expect.objectContaining({ name: "issuance_outbox", sql: PHASE_2L_C_DDL.issuance_outbox, type: "table" }),
 			expect.objectContaining({ name: "issued_records", sql: PHASE_2L_C_DDL.issued_records, type: "table" }),
 			expect.objectContaining({ name: "lineages", sql: PHASE_2L_C_DDL.lineages, type: "table" }),
+			expect.objectContaining({ name: "settlement_plans", sql: PHASE_2L_C_V3_DDL.settlement_plans, type: "table" }),
 		]);
 		const reopened = createNodeDurableIssuanceStore({ primaryFilename });
 		await reopened.close();
@@ -352,6 +358,9 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		]);
 		expect(observation.allResultBearingConfigured).toBe(true);
 		const events = observation.events as Array<{ kind: string; result?: Record<string, unknown>; sql: string }>;
+		expect(
+			events.filter(({ kind, sql }) => kind === "exec" && /^CREATE TABLE\b/u.test(sql)).map(({ sql }) => sql)
+		).toEqual(Object.values(PHASE_2L_C_V3_DDL));
 		const busyWrite = events.findIndex(({ sql }) => /^\s*PRAGMA\s+busy_timeout\s*=\s*1000\s*$/iu.test(sql));
 		const busyRead = events.findIndex(
 			({ result, sql }, index) =>
@@ -377,12 +386,12 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		empty.close();
 		const recovered = createNodeDurableIssuanceStore({ primaryFilename: retryPrimary });
 		await recovered.close();
-		expect(schema(retryFilename)).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 2 });
+		expect(schema(retryFilename)).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 3 });
 
 		for (const [label, statements] of [
 			["partial", [PHASE_2L_C_DDL.lineages]],
 			["ahe", ["CREATE TABLE objects (object_id TEXT PRIMARY KEY)"]],
-			["extra", [...Object.values(PHASE_2L_C_DDL), "CREATE TABLE foreign_table (id TEXT PRIMARY KEY)"]],
+			["extra", [...Object.values(PHASE_2L_C_V3_DDL), "CREATE TABLE foreign_table (id TEXT PRIMARY KEY)"]],
 		] as const) {
 			const primaryFilename = primary(label);
 			const filename = derivedFilename(primaryFilename);
@@ -400,12 +409,13 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 					PHASE_2L_C_DDL.lineages.replace("next INTEGER", "next  INTEGER"),
 					PHASE_2L_C_DDL.issued_records,
 					PHASE_2L_C_DDL.issuance_outbox,
+					PHASE_2L_C_V3_DDL.settlement_plans,
 				],
-				{},
+				{ userVersion: 3 },
 			],
-			["wrong-version", Object.values(PHASE_2L_C_DDL), { userVersion: 3 }],
-			["wrong-page", Object.values(PHASE_2L_C_DDL), { pageSize: 8192 }],
-			["wrong-journal", Object.values(PHASE_2L_C_DDL), { journalMode: "DELETE" }],
+			["wrong-version", Object.values(PHASE_2L_C_V3_DDL), { userVersion: 4 }],
+			["wrong-page", Object.values(PHASE_2L_C_V3_DDL), { pageSize: 8192, userVersion: 3 }],
+			["wrong-journal", Object.values(PHASE_2L_C_V3_DDL), { journalMode: "DELETE", userVersion: 3 }],
 		] as const) {
 			const primaryFilename = primary(label);
 			const filename = derivedFilename(primaryFilename);

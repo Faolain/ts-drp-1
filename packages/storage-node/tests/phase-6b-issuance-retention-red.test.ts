@@ -8,7 +8,11 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PHASE_2L_C_DDL, PHASE_2L_C_V1_LINEAGES_DDL } from "./fixtures/phase-2l-c-node-issuance-contract.js";
+import {
+	PHASE_2L_C_DDL,
+	PHASE_2L_C_V1_LINEAGES_DDL,
+	PHASE_2L_C_V3_DDL,
+} from "./fixtures/phase-2l-c-node-issuance-contract.js";
 import {
 	D109B_CRASH_EDGES,
 	D109B_NODE_MIGRATION_CASES,
@@ -184,7 +188,7 @@ describe("D.109b Node issuance-retention RED", () => {
 		]);
 	});
 
-	it("[RED readiness] requires the Node maintenance owner and v2 watermark schema", () => {
+	it("[RED readiness] requires the Node maintenance owner and v3 settlement schema", () => {
 		expect(state, "D109B_NODE_MAINTENANCE_MISSING").toEqual({ missing: [], ready: true });
 	});
 
@@ -486,8 +490,11 @@ describe("D.109b Node issuance-retention RED", () => {
 		expect(fs.statSync(filename).ino).toBe(inode);
 		const after = new DatabaseSync(filename, { readOnly: true });
 		try {
-			expect(scalar(after, "PRAGMA user_version")).toBe(2);
+			expect(scalar(after, "PRAGMA user_version")).toBe(3);
 			expect(catalog(after).find(({ name }) => name === "lineages")?.sql).toBe(PHASE_2L_C_DDL.lineages);
+			expect(catalog(after).find(({ name }) => name === "settlement_plans")?.sql).toBe(
+				PHASE_2L_C_V3_DDL.settlement_plans
+			);
 			expect(scalar(after, "SELECT count(*) FROM issued_records")).toBe(2);
 			expect(scalar(after, "SELECT count(*) FROM issuance_outbox")).toBe(2);
 			expect(scalar(after, "SELECT count(*) FROM lineages WHERE pruned_through_author_sequence IS NULL")).toBe(1);
@@ -540,8 +547,11 @@ describe("D.109b Node issuance-retention RED", () => {
 			);
 			const raced = new DatabaseSync(derived(racingPrimary), { readOnly: true });
 			try {
-				expect(scalar(raced, "PRAGMA user_version")).toBe(2);
+				expect(scalar(raced, "PRAGMA user_version")).toBe(3);
 				expect(catalog(raced).find(({ name }) => name === "lineages")?.sql).toBe(PHASE_2L_C_DDL.lineages);
+				expect(catalog(raced).find(({ name }) => name === "settlement_plans")?.sql).toBe(
+					PHASE_2L_C_V3_DDL.settlement_plans
+				);
 				expect(scalar(raced, "SELECT count(*) FROM issued_records")).toBe(1);
 				expect(scalar(raced, "SELECT count(*) FROM lineages WHERE pruned_through_author_sequence IS NULL")).toBe(1);
 			} finally {
@@ -555,14 +565,14 @@ describe("D.109b Node issuance-retention RED", () => {
 		const unknownVersion = primary("unknown-version");
 		createV1Authority(unknownVersion, 0);
 		const versionDatabase = new DatabaseSync(derived(unknownVersion));
-		versionDatabase.exec("PRAGMA user_version=3");
+		versionDatabase.exec("PRAGMA user_version=4");
 		versionDatabase.close();
 		expect(() => issuance.createNodeDurableIssuanceStore({ primaryFilename: unknownVersion })).toThrow(
 			expect.objectContaining({ code: "ISSUANCE_UNSUPPORTED_SCHEMA" })
 		);
 		const versionAfter = new DatabaseSync(derived(unknownVersion), { readOnly: true });
 		try {
-			expect(scalar(versionAfter, "PRAGMA user_version")).toBe(3);
+			expect(scalar(versionAfter, "PRAGMA user_version")).toBe(4);
 			expect(catalog(versionAfter).find(({ name }) => name === "lineages")?.sql).toBe(PHASE_2L_C_V1_LINEAGES_DDL);
 		} finally {
 			versionAfter.close();
