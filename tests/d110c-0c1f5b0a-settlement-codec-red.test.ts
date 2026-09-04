@@ -560,7 +560,7 @@ describe("D.110c-0c1f5b0a settlement protocol codecs RED", () => {
 				Object.freeze([successorAuthors[1], 0, null]),
 				Object.freeze([successorAuthors[2], 1, null]),
 			]),
-			priorCheckpointDigest: "f".repeat(64),
+			priorCheckpointDigest: surface.CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL,
 			priorCheckpointKind: "genesis",
 			successorEpoch: 1,
 		});
