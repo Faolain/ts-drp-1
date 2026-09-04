@@ -1,0 +1,61 @@
+^D
+> @ts-drp/node@0.11.0 typecheck /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
+> tsc --noEmit
+
+tests/browser/fixtures/blueprint-fold.page.ts(2,34): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+tests/browser/fixtures/blueprint-fold.page.ts(2,34): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+tests/browser/fixtures/blueprint-fold.worker.ts(2,56): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+tests/browser/fixtures/blueprint-fold.worker.ts(2,56): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+tests/ephemeral-webrtc-e3-02-red.test.ts(523,12): error TS2339: Property 'emit' does not exist on type 'DRPUnreliableWebRtcRoute'.
+tests/helpers/compact-history-scale-1i-b.ts(152,4): error TS1360: Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' does not satisfy the expected type 'DRPObjectConfig'.
+  Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+    Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+      Types of property 'history_storage' are incompatible.
+        Type '"full" | "compact"' is not assignable to type '"compact"'.
+          Type '"full"' is not assignable to type '"compact"'.
+tests/helpers/compact-history-scale-1i-b.ts(157,3): error TS2322: Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfig | undefined'.
+  Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '(DRPObjectConfigBase & { history_storage?: "full" | undefined; replica_mode?: ReplicaMode | undefined; }) | (DRPObjectConfigBase & { ...; })'.
+    Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+      Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+        Types of property 'history_storage' are incompatible.
+          Type '"full" | "compact"' is not assignable to type '"compact"'.
+            Type '"full"' is not assignable to type '"compact"'.
+../worker-host/src/host.ts(1,62): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/error.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts'
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/wire.ts'
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts'
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+../worker-host/src/host.ts(1,62): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/error.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts'
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/wire.ts'
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts'
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+../worker-host/src/host.ts(2,35): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+../worker-host/src/host.ts(2,35): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+../worker-host/src/host.ts(13,8): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/wire.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts'
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+../worker-host/src/host.ts(13,8): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/wire.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts'
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/node:
+[41m[30m ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL [39m[49m [31m@ts-drp/node@0.11.0 typecheck: `tsc --noEmit`[39m
+[31mExit status 1[39m
