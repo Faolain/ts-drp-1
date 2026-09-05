@@ -18455,8 +18455,13 @@ Authorized now (tests-only RED; production GREEN remains gated):
 - **D.110c-0c1f5b0w settlement manual-review hold semantics** below. The
   governing high-risk plan review found a bounded sequencing/store-law P1
   union; the signed correction's one material confirmation has an empty P0/P1
-  union. One Astra-high tests-only RED and then a separate Astra-high GREEN are
-  authorized. This prerequisite adds no public method, field or authority: it
+  union. The first Astra-high tests-only checkpoint and its sole 219-test run
+  are rejected and preserved at `8f91396a`/`9cc5cdb0`: the store RED and
+  f5b0c supersession were causal, but two fixture oracles and redirect cleanup
+  made the complete matrix differ. One bounded Astra-high corrective
+  tests-only RED is authorized; only after its exact matrix is accepted may a
+  separate Astra-high GREEN begin. This prerequisite adds no public method,
+  field or authority: it
   makes a held public `issue()` refuse promptly, prevents the hold from
   blocking the existing creator-close owner, preserves same-epoch durable
   reopen and freezes retained store entries.
@@ -100352,9 +100357,9 @@ workload change is authorized here.
 
 ###### D.110c-0c1f5b0w settlement manual-review hold semantics prerequisite
 
-**Status: plan gate closed with an empty P0/P1 confirmation union; one
-Astra-high tests-only RED is authorized next. Parent f5b production GREEN
-remains blocked on this slice.** Owner:
+**Status: plan gate closed; first tests-only RED rejected and preserved; one
+bounded Astra-high corrective tests-only RED is authorized next. Parent f5b
+production GREEN remains blocked on this slice.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the settlement
 plan merge, `drainSettlementOutbox()`, startup `rebasePromise`, public
 `issue()` and creator `sealEpoch()` waits; and
@@ -100550,6 +100555,47 @@ Evidence is `.logs/d110c-0c1f5b0w-plan-confirmation-8bca2f67/`; its sixteen-
 entry self-excluding manifest SHA-256 is
 `60d4c63ee1e858b72af642947c44a31f4b101a696808abcd905eae4beddc3579`.
 The plan gate is closed; proceed directly to Astra-high tests-only RED.
+
+The first signed/pushed tests-only checkpoint is `8f91396a`; its sole focused
+execution is immutably recorded by signed/pushed evidence commit `9cc5cdb0`
+under `.logs/d110c-0c1f5b0w-red-8f91396a/`, whose 29-entry self-excluding
+manifest SHA-256 is
+`5113c5bab9d698e98360d8039f11e04fb9d5c691640a1f5ae212fa536595a498`.
+That run selected exactly 219 tests/eight files and returned 154 passed, 65
+failed, zero skipped. It is **not accepted RED**. The native store matrix was
+exactly causal at 57 failures/36 controls, the superseded f5b0c test reached
+`D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG`, the no-hold creator control reached
+the exact unchanged `CERTIFIED_VALUE_MISMATCH` owner, and all nine prior f5b0u
+runtime controls passed. The runtime group instead exposed three bounded test
+expectation/cleanup discrepancies: the observer's absolute transaction count
+included one startup transaction before the durable-hold boundary; the
+changed-policy input used an unfrozen application dictionary and was rejected
+by the existing displacement-policy validator before the retained-source
+owner; and the genuine single-generation redirect did reach a durable hold and
+the causal redirect-hang token, but its source then inherited the same held
+lifetime during `afterEach` and hit the unchanged test hook timeout. No test,
+production source, timeout or reviewer was changed after that stop.
+
+The corrective RED is tests-only and does not reopen the accepted plan review.
+In one commit it must (a) snapshot transaction/effect counters at the exact
+durable-hold boundary and assert zero **subsequent delta**, while retaining
+byte-exact plan/source/lineage/outbox custody; (b) freeze the changed-policy
+application and dictionary so the existing
+`TypeError("v3 room settlement plan source differs")` owner is reached as a
+passing retained control; and (c) keep the now-proven-reachable
+single-generation redirect in scope. Its bounded RED oracle must preserve the
+exact `D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG` causal failure without allowing
+the deliberately pending RED lifetime to create a second hook timeout or
+claim clean shutdown. The future GREEN path must then prove prompt redirect
+refusal and orderly source cleanup. The correction may isolate the redirect
+probe in a short-lived child or use an equally bounded parent-owned cleanup
+oracle, but it must not mutate a product store, resolve the hold privately,
+raise a timeout, drop the redirect case, or leave an unclassified top-level
+error. Before the new sole focused execution, freeze the exact selected count
+and failure-token matrix. If any other count, token, loader failure, timeout or
+top-level error appears, stop again. This is diagnostic/fixture correction,
+not new API, product, wire, authority, dependency, workload or threshold
+scope, so deterministic validation replaces another plan-review round.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
