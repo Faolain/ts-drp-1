@@ -18472,9 +18472,13 @@ Authorized now (tests-only RED; production GREEN remains gated):
   `8fcbc039`/`aea679ba` remain immutable. Its review accepted causality but
   found coverage corrections in cases 1, 12, 17, 22 and 25, universal
   64-writer plan/fence accounting, final canonical-state bytes, bounded
-  rollback/prune assertions and the test-only timeout. One tests-only
-  correction is authorized; parent production GREEN remains blocked until
-  both that correction and f5b0w are closed. The retained golden-path contract
+  rollback/prune assertions and the test-only timeout. Corrective tests commit
+  `c1d04d31` is signed/pushed; its first execution is rejected and preserved
+  at `e9015cff` because the genuine 64-writer version-3 ACL exposed a second
+  causal room decode seam before the expected successor token. One exact
+  same-commit causal RED execution with that diagnosed error in the pre-frozen
+  matrix is authorized; parent production GREEN remains blocked until it is
+  accepted. The retained golden-path contract
   remains one real room with 64 active writers, every writer issuing in every
   epoch, rotating offline cohorts, at least three genuine close/adopt
   transitions, restart and cold reopen, followed later by at least 100 genuine
@@ -100690,9 +100694,10 @@ completion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: CAUSAL RED ESTABLISHED; f5b0w is GREEN/finally reviewed and one
-coverage-corrective Astra-high tests-only RED is authorized next. Parent GREEN
-is blocked on that correction.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+**Status: corrective tests are signed/pushed; their first focused execution is
+rejected/preserved after exposing a second causal room decode seam; one exact
+same-commit Astra-high RED execution with the corrected frozen matrix is
+authorized next. Parent GREEN remains blocked.** The f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
@@ -100760,6 +100765,38 @@ The separate user-required API decision consultation is
 `.logs/d110c-0c1f5b-manual-review-api-fable-high-b7751f72/`; its five-entry
 self-excluding manifest SHA-256 is
 `3d9bee48ce28e589d9f025e596d830356277cfbfc99b9011b1584838d5dba9ab`.
+
+Coverage-corrective tests-only commit
+`c1d04d31149cd4ed1e8631203213df99852036a2` is signed and pushed. Its first
+sole focused execution selected 26 active tests across the parent integration
+and f5b0u runtime files, with 23 failures, three passes and 17 explicitly
+filtered existing tests. Nineteen successor-codec failures, the private
+manual-review-provenance collision, both closed-versus-held precedence cases,
+the unchanged v1/source-guard/closed-issue controls and all top-level/timeout
+predicates matched. The 64-writer case instead stopped during genuine room
+bootstrap with exact `TypeError("canonical value exceeds item limit")` at
+`migrationInviteAuthority()`. The run is rejected, not retrospectively
+accepted; signed/pushed evidence `e9015cff` remains immutable under
+`.logs/d110c-0c1f5b-red-corrective-c1d04d31/`, with a 16-entry self-excluding
+manifest SHA-256 of
+`acc11788eb3fafcc358fb6178fc8bdecc3740d9c97653163d51d6032016eedad`.
+
+Read-only attribution found no design stop condition. The room's
+`migrationInviteAuthority()` unconditionally decodes the latched ACL with
+`maxItems: 512`, and adjacent `migrationCreatorAuthor()` repeats that ceiling,
+while the already-closed protocol-v3 settlement profile accepts version 3
+with `maxItems: 8_192` and cap 256. This is the missing room composition seam
+for the intended 64-writer settlement profile, not malformed fixture input,
+`maxEpochVertices` pressure, admission-epoch insufficiency, noncontiguity,
+device-local authority, anchor fencing, or an API question. Parent GREEN owns
+profile-consistent bounded room decoding at these two existing private
+helpers; versions 1/2 and creator-trusted-v1 limits remain untouched. One
+fresh, same-tests-commit RED execution is authorized without another tests
+edit or model review. Before execution, freeze exactly 26 active tests, 23
+failures and three passes: 19 successor-codec failures, one exact 64-writer
+room item-limit failure, and the three f5b0w P2 failures, with the unchanged
+three controls. Any other error, count, timeout, loader or top-level anomaly
+stops again. The rejected invocation is never overwritten or reclassified.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
