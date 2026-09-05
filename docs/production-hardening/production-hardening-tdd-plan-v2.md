@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b state-oracle consistency correction)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b oracle consistency RED accepted)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,7 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Authorized now (durable-row corrective RED accepted; same-parent test-oracle consistency batch):
+Authorized now (oracle consistency RED accepted; separate parent GREEN resumes):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18499,14 +18499,15 @@ Authorized now (durable-row corrective RED accepted; same-parent test-oracle con
   That narrow correction is accepted at tests `689c6948` / evidence `e25aa11e`:
   the isolated source-built run exactly reproduced 23 fail / 3 pass / 17
   filtered without the partial GREEN patch. The same-parent source audit now
-  authorizes one tests-only consistency batch for the authoritative snapshot
-  oracle, physical rollback census and two obsolete retained codec-error
-  expectations, as specified in the f5b record. It does not change production
-  ordering or substitute semantic equality for exact snapshot bytes. Resume
-  the separate GREEN owner only after that batch is signed, pushed and its
-  causal RED evidence accepted. Post-codec recovery, the complete 64-writer
-  continuation and the later long campaign remain unproved. Product state,
-  batch, epoch and snapshot ceilings remain unchanged.
+  is closed by tests `97c0836b` / evidence `88fef442`: the isolated source-built
+  run exactly matched 28 active / 23 fail / 5 pass / 17 filtered, with both
+  pure oracle controls passing and no anomalies. The separate Astra-high GREEN
+  owner may now resume the accepted parent implementation, including the
+  explicitly named private cleanup gate below. This does not change production
+  ordering or substitute semantic equality for exact snapshot bytes.
+  Post-codec recovery, the complete 64-writer continuation and the later long
+  campaign remain unproved. Product state, batch, epoch and snapshot ceilings
+  remain unchanged.
 
 Blocked, and on what:
 
@@ -100730,9 +100731,9 @@ completion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: durable-row corrective RED accepted at tests `689c6948` and evidence
-`e25aa11e`; one same-parent tests-only state-oracle/physical-census/retained-
-terminus consistency batch is authorized before the stopped GREEN resumes.** The
+**Status: oracle consistency RED accepted at signed/pushed tests `97c0836b`
+and evidence `88fef442`; the separate Astra-high parent GREEN may resume.
+The prior stopped production patch is diagnostic, not accepted GREEN.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
@@ -101066,6 +101067,57 @@ golden-path claim. Readmission still requires successor-authorized custody
 without granting retroactive predecessor membership; admissionEpoch has not
 been shown insufficient. Segmented admission still needs bounded runtime
 attribution after RED acceptance. Neither defect is declared closed here.
+
+The consistency batch is now accepted at signed/pushed tests
+`97c0836bd92f2f045534852c991824fb9529b71c` and evidence
+`88fef44293e688220e554c0bab9a7f3e0b68ae25`. The isolated checkout
+`/private/tmp/d110c-f5b-oracle-red-DlOSng/checkout` used its own frozen offline
+install and complete source build at the signed test commit; no partial GREEN
+overlay or copied dist was used. Its sole execution matches 45 total / 28
+active / 23 fail / 5 pass / 17 filtered, with zero violations. The original
+26-case matrix is unchanged, and both new pure controls pass. Focused evidence,
+complete collection and result sets, build/static gates, exact protected
+functions, source/runtime identities and unchanged seven-file diagnostic /
+27-stash custody are at `.logs/d110c-0c1f5b-red-oracle-97c0836b/`. Its
+64-entry self-excluding manifest validates with SHA-256
+`45be504889e8735915336082c88247b0a5a4f3069023e47ec2db905e1c2789cf`.
+The same three external `live-snapshot.ts` type diagnostics remain; no
+repository-wide typecheck pass or genuine wide GREEN is claimed.
+
+Production-owner clarification before resuming GREEN: the seven preserved
+dirty files describe custody of the stopped patch, not a seven-file ceiling
+on the accepted parent integration. The inherited f5b0d-to-f5b disposition
+already assigns the first genuine authenticated cleanup/pruning invocation to
+this parent. Explicitly include
+`packages/node/src/internal/closed-epoch-cleanup.ts` as an eighth private
+owner where truthful settlement-profile gate adaptation is necessary. Its
+default/legacy branch must remain unchanged. The old gate requires each row
+to be published in exactly `closedEpoch`; settlement's already-accepted
+terminal prefix can contain eligible older pending and published rows. Use
+existing authenticated checkpoint/frontier custody and the backend linked-plan
+and fence checks, never fabricated publication state, relabeled epochs,
+caller-invented authority or a post-delete no-op receipt. Preserve exact
+closed-epoch/terminal ceilings, two complete physical rollback ancestors, QC,
+snapshot, verified adoption, local-only availability, expected-head and
+lineage/watermark gates. A generation cleanup with no eligible issuance prefix
+must perform no issuance deletion and invent no issuance row. If this cannot
+be expressed by internal composition using existing capabilities, stop with
+the exact missing prerequisite; this clarification authorizes no new public
+API, authority carrier, durable schema, wire field, dependency, cryptography,
+resource ceiling or availability/pruning policy. D.110c-c's separate scope
+retirement work is not pulled forward.
+
+The separate GREEN owner must finish the real readmission, segmented recovery,
+checkpoint advance and cleanup paths; preserve all corrected tests; run the
+complete 45-test parent/retained selection including both successful-seal
+controls and the broader specified retained/static/isolated gates; and record
+all results before signed/pushed GREEN and final Grok / Sol-high / Fable-xhigh
+review. For segmented failure attribution only, a bounded tests-only observer
+of the genuine `issueLocal` result may record its existing kind/detail and
+phase/epoch/count/progress facts without changing handle identity or results,
+dumping payload text, adding product telemetry or relaxing assertions. Preserve
+that diagnostic separately; no acceptance claim may depend on an unrecorded
+test overlay. No full campaign or ≥100-transition run is authorized here.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
