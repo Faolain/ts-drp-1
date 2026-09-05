@@ -8,7 +8,13 @@ import { REPOSITORY_ROOT } from "./fixtures/phase-6a-v3/creator-successor-activa
 const guidance = [
 	"Authenticated replayable notification attempt, not an exactly-once external commit.",
 	"Persistent consumers deduplicate side effects by authenticated vertex digest.",
-	"Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.",
+];
+const roomRejectionGuidance =
+	"Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.";
+const nodeRejectionGuidance = [
+	"Successor-recovery callback rejection rejects and deactivates activation.",
+	"Ordinary authenticated ingress and local issue retain legacy log-and-continue behavior on rejection.",
+	"Failure, crash or cold reopen may replay notifications.",
 ];
 
 function productionFiles(directory: string): string[] {
@@ -49,6 +55,18 @@ describe("D.110c-0c1f5b0v replayable callback contract", () => {
 		] as const) {
 			const comment = surface?.getFullText(source).slice(0, surface.getStart(source) - surface.pos) ?? "";
 			for (const line of guidance) expect(comment).toContain(line);
+			if (surface === callback)
+				expect(comment, "ROOM_CALLBACK_REJECTION_CLOSES_ROOM_SESSION").toContain(roomRejectionGuidance);
+			else
+				expect
+					.soft(
+						{
+							exactSurfaceGuidance: nodeRejectionGuidance.map((line) => comment.includes(line)),
+							noBlanketSessionClosureClaim: !comment.includes(roomRejectionGuidance),
+						},
+						"NODE_CALLBACK_REJECTION_GUIDANCE_IS_SURFACE_SPECIFIC"
+					)
+					.toEqual({ exactSurfaceGuidance: [true, true, true], noBlanketSessionClosureClaim: true });
 		}
 		expect(normalized(callback?.getText(room) ?? "")).toBe(
 			"onAcceptedVertex(vertex: AdmittedReceivedVertexView): void | Promise<void>;"
