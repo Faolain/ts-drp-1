@@ -1,0 +1,33 @@
+{
+  "time": "2026-09-05T07:59:10.640Z",
+  "listeners": [
+    {
+      "port": 4174,
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "port": 4175,
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "port": 51000,
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "port": 51002,
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "relevantProcesses": [
+    "38292 38178 node /Users/aristotle/Documents/Projects/f/heimdall.feat-duplicate-upload-preflight/apps/marketing/node_modules/.bin/../../../../node_modules/.pnpm/next@16.2.3_@opentelemetry+api@1.9.1_@playwright+test@1.59.1_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/next/dist/bin/next dev --webpack --port 3200",
+    "43684 43656 node /Users/aristotle/Documents/Projects/f/heimdall.feat-duplicate-upload-preflight/apps/web/node_modules/.bin/../../../../node_modules/.pnpm/next@16.2.3_@opentelemetry+api@1.9.1_@playwright+test@1.59.1_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/next/dist/bin/next dev --webpack --port 3100"
+  ]
+}

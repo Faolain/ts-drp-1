@@ -1,0 +1,88 @@
+{
+  "head": "c938038298b912875f2a8e7b717256fb34370df6",
+  "tree": "c81da1b9f33d790a49fb32ec7eb4f3f0f5f524a8",
+  "signature": "G",
+  "branch": "codex/phase3a1b-p6-golden-path",
+  "runtime": {
+    "node": "v22.15.0",
+    "execPath": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "pnpm": "10.24.0",
+    "imports": {
+      "@ts-drp/node/v3-live": {
+        "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/dist/src/v3-live.js",
+        "sha256": "221334d451a1b4402fa0736cd3511d7e4485c7ca9cc3f7f9ba5fa082324de0b8"
+      },
+      "@ts-drp/issuance-store": {
+        "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/issuance-store/dist/src/index.js",
+        "sha256": "62b3b2c62e7cc230820ba56e8867be76f17861dde3b45d645c2855a11b6afa93"
+      },
+      "@ts-drp/protocol-v3": {
+        "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/dist/src/public.js",
+        "sha256": "e03c81e8a730064872bf4246ac97fff427c4d18af5bdc29ca7a323891ff8b572"
+      }
+    }
+  },
+  "lockfile": "56e8b9b56d7e76d4651daec66b6ff8c0bc8150ce9fab588b97b1887f417d1251",
+  "stashes": {
+    "count": 27,
+    "hash": "382adffafb1bcaaff7def4d01213b0b0f70f7a446e60d9ac1225b8d6b81b5fc7"
+  },
+  "protected": {
+    ".agents": {
+      "skills": {
+        "claude": {
+          "SKILL.md": {
+            "bytes": 10995,
+            "sha256": "37bc6e2d0e34c7cd7526908de7ec96ecb7a503c3204571fb69e14539e48ea257"
+          },
+          "agents": {
+            "openai.yaml": {
+              "bytes": 260,
+              "sha256": "cb19d1683a5c8dcd2b497ba5bd75e24a8d0f0b06d25653a5c3ed20725cc9a0b3"
+            }
+          },
+          "index.html": {
+            "bytes": 280,
+            "sha256": "810c1e61aaf42e1c8afb7414581b630eba68e30bafa3b83a05b3967d8b79fcdf"
+          }
+        }
+      }
+    },
+    ".claude": {
+      ".DS_Store": {
+        "bytes": 6148,
+        "sha256": "ff394afe0939d718d5ec9456e006150f6520beddef249151aff88aebd7b4c4f4"
+      },
+      "scheduled_tasks.lock": {
+        "bytes": 129,
+        "sha256": "a725cd62552593ff4a30cd2379ee26811762672de0058e80a0baab07b2777adf"
+      },
+      "skills": {
+        "claude": {
+          "symlink": true
+        }
+      }
+    },
+    "packages/protocol-v2/tests/author-sequence-0g2.test.ts": {
+      "bytes": 9939,
+      "sha256": "d92cf2c515b40b9c04d2f0f1fb59926c0f2df082a30b3c2c806c8fd8b8698692"
+    },
+    "packages/protocol-v2/tests/local-author-sequence-issuance-0g2.test.ts": {
+      "bytes": 5398,
+      "sha256": "23af3b601d1576a5e4f6ad0f1cb584c68fc13b6074afe1e58fa4591847ec01a3"
+    },
+    "CPU.20260901.090022.81530.0.001.cpuprofile": {
+      "bytes": 6478,
+      "sha256": "7cf8b4caadf5217e6dd98eb60193d7b67a268df003a152619d1b3471d1c1e7eb"
+    },
+    "skills-lock.json": {
+      "bytes": 1422,
+      "sha256": "1ff0ab91a6f4e1db3670d59eb8c955a87066e77c77371ba5fb557322ca89baed"
+    }
+  },
+  "otherProtectedExistence": {
+    ".pnpm-store": true,
+    "_apalache-out": true
+  },
+  "trackedStatus": ""
+}

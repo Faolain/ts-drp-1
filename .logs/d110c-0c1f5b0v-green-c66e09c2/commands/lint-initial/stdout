@@ -1,0 +1,12 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts
+    8:51  error  Unable to resolve path to module '@ts-drp/storage-browser/issuance'                                                                                                                                                                                                                                                import/no-unresolved
+  412:9   error  Replace `.soft([...fixture.accepted],·"REPLAY_SECOND_FAILURE_OBSERVED_NOTIFICATION_PREFIX").toEqual([⏎↹↹↹required(expectedDigests[0]),⏎↹↹` with `⏎↹↹↹.soft([...fixture.accepted],·"REPLAY_SECOND_FAILURE_OBSERVED_NOTIFICATION_PREFIX")⏎↹↹↹.toEqual([required(expectedDigests[0])`                                 prettier/prettier
+  419:9   error  Replace `.soft(fixture.accepted,·"REPLAY_COLD_REOPEN_REPEATED_NOTIFICATION_ATTEMPTS").toEqual([⏎↹↹↹required(expectedDigests[0]),⏎↹↹↹...expectedDigests,⏎↹↹` with `⏎↹↹↹.soft(fixture.accepted,·"REPLAY_COLD_REOPEN_REPEATED_NOTIFICATION_ATTEMPTS")⏎↹↹↹.toEqual([required(expectedDigests[0]),·...expectedDigests`  prettier/prettier
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts
+  46:36  error  Replace `[callback,·room],·[sink,·node]` with `⏎↹↹↹[callback,·room],⏎↹↹↹[sink,·node],⏎↹↹`  prettier/prettier
+
+✖ 4 problems (4 errors, 0 warnings)
+  3 errors and 0 warnings potentially fixable with the `--fix` option.
+
