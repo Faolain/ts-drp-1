@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b-oracle-red-DlOSng/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-05T17:44:08.231Z"
+}
