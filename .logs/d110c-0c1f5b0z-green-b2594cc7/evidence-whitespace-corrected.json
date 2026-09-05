@@ -1,0 +1,41 @@
+{
+  "results": [
+    {
+      "file": "baseline-typecheck-storage/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/baseline-typecheck-storage/stdout:4: new blank line at EOF.\n",
+      "stderr": ""
+    },
+    {
+      "file": "browser-process-preflight/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:516: trailing whitespace.\n+37127 37084       00:01 node (vitest)      \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:519: trailing whitespace.\n+37156 37127       00:00 node (vitest 1)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:520: trailing whitespace.\n+37157 37127       00:00 node (vitest 2)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:521: trailing whitespace.\n+37158 37127       00:00 node (vitest 3)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:522: trailing whitespace.\n+37159 37127       00:00 node (vitest 4)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:523: trailing whitespace.\n+37160 37127       00:00 node (vitest 5)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:524: trailing whitespace.\n+37162 37127       00:00 node (vitest 6)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:525: trailing whitespace.\n+37163 37127       00:00 node (vitest 7)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:526: trailing whitespace.\n+37164 37127       00:00 node (vitest 8)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:527: trailing whitespace.\n+37165 37127       00:00 node (vitest 9)     \n",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/initial-typecheck-storage/stdout:4: new blank line at EOF.\n",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/main-eslint/stdout:7: new blank line at EOF.\n",
+      "stderr": ""
+    },
+    {
+      "file": "production.patch",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:6: space before tab in indent.\n+ \ttype AheReclamationPromotion,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:7: space before tab in indent.\n+ \ttype AheReclamationReceipt,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:8: space before tab in indent.\n+ \ttype AheReclamationSnapshot,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:10: space before tab in indent.\n+ \tcaptureAheReclamationInput,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:11: space before tab in indent.\n+ \tclassifyAheReclamation,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:12: space before tab in indent.\n+ \tcreateAheReclamationError,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:14: space before tab in indent.\n+ \tlifecycle: BrowserAheReclamationLifecycle,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:15: space before tab in indent.\n+ \tdatabaseName: string\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:24: trailing whitespace.\n+ \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:31: space before tab in indent.\n+ \ttype AheReclamationPromotion,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:32: space before tab in indent.\n+ \ttype AheReclamationReceipt,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:33: space before tab in indent.\n+ \ttype AheReclamationSnapshot,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:35: space before tab in indent.\n+ \tcaptureAheReclamationInput,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:36: space before tab in indent.\n+ \tclassifyAheReclamation,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:37: space before tab in indent.\n+ \tcreateAheReclamationError,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:39: space before tab in indent.\n+ \tconnection: DatabaseSync,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:40: space before tab in indent.\n+ \tlifecycle: Lifecycle\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:49: trailing whitespace.\n+ \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:56: space before tab in indent.\n+ \tisStorageObjectId,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:60: space before tab in indent.\n+ \tBlobDigest,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:61: space before tab in indent.\n+ \tExpectedHead,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:62: space before tab in indent.\n+ \tGenerationId,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:64: space before tab in indent.\n+ \treclaimClosedEpoch(input: unknown): Promise<AheReclamationReceipt>;\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:66: trailing whitespace.\n+ \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:152: space before tab in indent.\n+ \tdigest: BlobDigest;\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:153: space before tab in indent.\n+ \tgenerationId: GenerationId;\n",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/signed-typecheck-storage/stdout:4: new blank line at EOF.\n",
+      "stderr": ""
+    }
+  ],
+  "disposition": "git diff --no-index status1 means ordinary differences; status3 includes whitespace errors. Exact production.patch and raw command stdout (except explicitly sanitized process snapshot) are preserved. No source whitespace waiver."
+}

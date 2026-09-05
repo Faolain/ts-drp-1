@@ -1,0 +1,155 @@
+{
+  "kind": "issuance",
+  "root": "/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout",
+  "status": 0,
+  "total": 12,
+  "files": 1,
+  "passed": 12,
+  "violations": [],
+  "assertions": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED pins exact-store identity and the trusted same-realm public maintenance subpath",
+      "status": "passed",
+      "title": "pins exact-store identity and the trusted same-realm public maintenance subpath",
+      "duration": 20.720957999999996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED memory refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "status": "passed",
+      "title": "memory refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "duration": 8.926333,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED browser refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "status": "passed",
+      "title": "browser refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "duration": 133.18329099999994,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED node refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "status": "passed",
+      "title": "node refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "duration": 62.27820799999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED memory deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "memory deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "duration": 2.569582999999966,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED browser deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "browser deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "duration": 12.782000000000039,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED node deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "node deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "duration": 7.4537499999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED memory refuses a row newer than closedEpoch before either table or watermark mutates",
+      "status": "passed",
+      "title": "memory refuses a row newer than closedEpoch before either table or watermark mutates",
+      "duration": 1.1032920000000104,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED browser refuses a row newer than closedEpoch before either table or watermark mutates",
+      "status": "passed",
+      "title": "browser refuses a row newer than closedEpoch before either table or watermark mutates",
+      "duration": 6.3475839999999835,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED node refuses a row newer than closedEpoch before either table or watermark mutates",
+      "status": "passed",
+      "title": "node refuses a row newer than closedEpoch before either table or watermark mutates",
+      "duration": 7.187290999999959,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED node rolls back both tables and the watermark when authenticated deletion is partial",
+      "status": "passed",
+      "title": "node rolls back both tables and the watermark when authenticated deletion is partial",
+      "duration": 10.41054100000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED does not relabel a permanently poisoned store as a retryable plan refusal",
+      "status": "passed",
+      "title": "does not relabel a permanently poisoned store as a retryable plan refusal",
+      "duration": 0.3963330000000269,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

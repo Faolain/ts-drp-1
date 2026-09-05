@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout",
+  "command": "lsof",
+  "args": [
+    "-nP",
+    "-iTCP",
+    "-sTCP:LISTEN"
+  ],
+  "start": "2026-09-05T20:01:39.756Z"
+}
