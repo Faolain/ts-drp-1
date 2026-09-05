@@ -1,0 +1,112 @@
+{
+  "disposition": "REJECTED_UNEXPECTED_FAILURE_MATRIX_STOP_NO_RERUN",
+  "acceptedF5b0wRed": false,
+  "testCommit": "8f91396a77cdd9a1f40fee4f1f0f0be844ca1bb7",
+  "focusedRunCount": 1,
+  "selected": 219,
+  "total": 219,
+  "passed": 154,
+  "failed": 65,
+  "skipped": 0,
+  "process": {
+    "status": 1,
+    "signal": null,
+    "started": "2026-09-05T13:19:28.712Z",
+    "finished": "2026-09-05T13:19:51.386Z"
+  },
+  "files": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "total": 24,
+      "passed": 23,
+      "failed": 1
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "total": 45,
+      "passed": 45,
+      "failed": 0
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "total": 22,
+      "passed": 22,
+      "failed": 0
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "total": 17,
+      "passed": 10,
+      "failed": 7
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "total": 12,
+      "passed": 12,
+      "failed": 0
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "total": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+      "total": 93,
+      "passed": 36,
+      "failed": 57
+    }
+  ],
+  "expectedIndependentFailures": 62,
+  "expectedIndependentPasses": 157,
+  "store": {
+    "total": 93,
+    "failed": 57,
+    "passed": 36,
+    "unexpected": []
+  },
+  "causalF5b0cIssueToken": true,
+  "realRuntime": {
+    "requiredTokensNotReached": [
+      "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_REHEARSAL_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_ACTIVATION_HANG"
+    ],
+    "custodyFailures": [
+      "D.110c-0c1f5b0w durable manual-review hold semantics refuses held issue promptly after the real durable plan write without an issuance effect",
+      "D.110c-0c1f5b0w durable manual-review hold semantics creator-held seal reaches the existing close owner and exact successor-codec terminus",
+      "D.110c-0c1f5b0w durable manual-review hold semantics same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+      "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses rehearsal without target import or terminal effect",
+      "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses activation without target import or terminal effect"
+    ],
+    "custodyObservation": "issueTransactions is 1, not 0; observer counter includes target startup before durable hold. Earlier exact plan/source/lineage/outbox readback assertions passed, but prompt issue/close sentinels and later custody assertions were not reached.",
+    "policyFixtureRejectedBeforeSourceMerge": true,
+    "policyFixtureCause": "Replacement displacementPolicies dictionary is not frozen; validateDisplacementPolicy rejects it before retained-entry merge.",
+    "singleGenerationRedirectDurableHoldReached": true,
+    "redirectDeferred": false,
+    "cleanupHookTimeout": true
+  },
+  "loaderFailure": false,
+  "typecheck": {
+    "baseline": 4,
+    "current": 4,
+    "added": []
+  },
+  "custody": {
+    "stashCount": 27,
+    "stashesUnchanged": true,
+    "untrackedAdded": [],
+    "untrackedRemoved": [],
+    "trackedStatus": "",
+    "sourceAndTestHashesUnchanged": true,
+    "testedSignedPushedHead": true
+  }
+}

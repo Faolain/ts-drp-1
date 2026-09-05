@@ -1,0 +1,8 @@
+docs/production-hardening/production-hardening-tdd-plan-v2.md
+packages/node/src/v3-live.ts
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+tests/phase-6b-d110c-a-repeat-close-red.test.ts

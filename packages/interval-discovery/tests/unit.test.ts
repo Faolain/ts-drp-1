@@ -1,7 +1,10 @@
+import { privateKeyFromRaw } from "@libp2p/crypto/keys";
+import { type PeerId } from "@libp2p/interface";
+import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import {
 	DRPDiscovery,
 	type DRPIntervalDiscoveryOptions,
-	type DRPNetworkNode,
+	type DRPNetworkNode as DRPNetworkNodeContract,
 	IntervalRunnerState,
 	Message,
 	MessageType,
@@ -11,10 +14,30 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createDRPDiscovery, DRPIntervalDiscovery } from "../src/index.js";
 
 type MockedDRPNetworkNode = {
-	[K in keyof DRPNetworkNode]: DRPNetworkNode[K] extends (...args: unknown[]) => unknown
+	[K in keyof DRPNetworkNodeContract]: DRPNetworkNodeContract[K] extends (...args: unknown[]) => unknown
 		? ReturnType<typeof vi.fn>
-		: DRPNetworkNode[K];
+		: DRPNetworkNodeContract[K];
 };
+
+interface ConcreteNetworkNode {
+	getPeerSelectionSnapshot(): Readonly<{ charged: number; denied: number; selected: number }>;
+	start(): Promise<void>;
+	stop(): Promise<void>;
+}
+
+interface ConcreteNetworkNodeConstructor {
+	new (config: unknown, dependencies?: unknown): ConcreteNetworkNode;
+	readonly prototype: object;
+}
+
+const networkSourceModuleUrl = new URL("../../network/src/node.ts", import.meta.url).href;
+
+function peer(index: number): PeerId {
+	const bytes = new Uint8Array(32);
+	bytes[0] = 0x49;
+	new DataView(bytes.buffer).setUint32(28, index + 1, false);
+	return peerIdFromPublicKey(privateKeyFromRaw(bytes).publicKey);
+}
 
 describe("DRPIntervalDiscovery Unit Tests", () => {
 	let mockNetworkNode: MockedDRPNetworkNode;
@@ -37,7 +60,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 		// Create discovery instance with mocked dependencies
 		const options: DRPIntervalDiscoveryOptions = {
 			id: testId,
-			networkNode: mockNetworkNode as unknown as DRPNetworkNode,
+			networkNode: mockNetworkNode as unknown as DRPNetworkNodeContract,
 			interval: 1000,
 			searchDuration: 5000,
 			logConfig: { level: "silent" },
@@ -54,7 +77,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 		test("should initialize with default search duration if not provided", () => {
 			const instance = new DRPIntervalDiscovery({
 				id: testId,
-				networkNode: mockNetworkNode as unknown as DRPNetworkNode,
+				networkNode: mockNetworkNode as unknown as DRPNetworkNodeContract,
 				interval: 1000,
 				logConfig: { level: "silent" },
 			});
@@ -65,7 +88,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			const customDuration = 10000;
 			const instance = new DRPIntervalDiscovery({
 				id: testId,
-				networkNode: mockNetworkNode as unknown as DRPNetworkNode,
+				networkNode: mockNetworkNode as unknown as DRPNetworkNodeContract,
 				interval: 1000,
 				searchDuration: customDuration,
 				logConfig: { level: "silent" },
@@ -113,10 +136,72 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 				peer1: {
 					multiaddrs: ["/ip4/127.0.0.1/tcp/1234/p2p/peer1"],
 				},
+				peer2: {
+					multiaddrs: ["/ip4/127.0.0.1/tcp/1235/p2p/peer2"],
+				},
 			};
 
 			await discoveryInstance.handleDiscoveryResponse("sender", subscribers);
-			expect(mockNetworkNode.connect).toHaveBeenCalledWith(["/ip4/127.0.0.1/tcp/1234/p2p/peer1"]);
+			expect(mockNetworkNode.connect).toHaveBeenNthCalledWith(1, ["/ip4/127.0.0.1/tcp/1234/p2p/peer1"]);
+			expect(mockNetworkNode.connect).toHaveBeenNthCalledWith(2, ["/ip4/127.0.0.1/tcp/1235/p2p/peer2"]);
+			expect(mockNetworkNode.connect).toHaveBeenCalledTimes(2);
+		});
+
+		test("routes a genuine remote discovery response through selector capacity rather than explicit headroom", async (context) => {
+			const { DRPNetworkNode } = (await import(networkSourceModuleUrl)) as {
+				DRPNetworkNode: ConcreteNetworkNodeConstructor;
+			};
+			if (
+				typeof Object.getOwnPropertyDescriptor(DRPNetworkNode.prototype, "getPeerSelectionSnapshot")?.value !==
+				"function"
+			) {
+				context.skip();
+				return;
+			}
+			const node = new DRPNetworkNode(
+				{
+					bootstrap_peers: [],
+					connection_budget: { max_connections: 2, max_parallel_dials: 1 },
+					control_plane: { peer_selection: { expected_replicas: 2 } },
+					listen_addresses: [],
+					log_config: { level: "silent" },
+				} as never,
+				{
+					hostPolicy: {
+						bootstrapDiscovery: false,
+						coldStartPubsubDiscovery: false,
+						denyDialMultiaddr: (): true => true,
+						gossipSubPeerExchange: false,
+					},
+				}
+			);
+			await node.start();
+			try {
+				const first = peer(100);
+				const second = peer(101);
+				const realDiscovery = new DRPIntervalDiscovery({
+					id: "t3-real-remote-response",
+					interval: 1_000,
+					logConfig: { level: "silent" },
+					networkNode: node as unknown as DRPNetworkNodeContract,
+				});
+				await realDiscovery.handleDiscoveryResponse("remote-sender", {
+					[first.toString()]: {
+						multiaddrs: [`/ip4/127.0.0.1/tcp/35100/p2p/${first}`],
+					},
+					[second.toString()]: {
+						multiaddrs: [`/ip4/127.0.0.1/tcp/35101/p2p/${second}`],
+					},
+				});
+				const selectorSnapshot = (
+					node as unknown as {
+						getPeerSelectionSnapshot(): Readonly<{ charged: number; denied: number; selected: number }>;
+					}
+				).getPeerSelectionSnapshot();
+				expect(selectorSnapshot).toMatchObject({ charged: 1, denied: 1, selected: 0 });
+			} finally {
+				await node.stop();
+			}
 		});
 
 		test("should handle error in discovery response", async () => {
@@ -169,7 +254,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			await DRPIntervalDiscovery.handleDiscoveryRequest(
 				"sender",
 				mockDataMessage,
-				mockNetworkNode as unknown as DRPNetworkNode
+				mockNetworkNode as unknown as DRPNetworkNodeContract
 			);
 
 			expect(mockNetworkNode.sendMessage).toHaveBeenCalled();
@@ -188,7 +273,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			await DRPIntervalDiscovery.handleDiscoveryRequest(
 				"sender",
 				mockDataMessage,
-				mockNetworkNode as unknown as DRPNetworkNode
+				mockNetworkNode as unknown as DRPNetworkNodeContract
 			);
 
 			expect(mockNetworkNode.sendMessage).not.toHaveBeenCalled();
@@ -210,7 +295,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			await DRPIntervalDiscovery.handleDiscoveryRequest(
 				"sender",
 				mockDataMessage,
-				mockNetworkNode as unknown as DRPNetworkNode
+				mockNetworkNode as unknown as DRPNetworkNodeContract
 			);
 
 			expect(mockNetworkNode.sendMessage).not.toHaveBeenCalled();
@@ -233,7 +318,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			await DRPIntervalDiscovery.handleDiscoveryRequest(
 				"sender",
 				mockDataMessage,
-				mockNetworkNode as unknown as DRPNetworkNode
+				mockNetworkNode as unknown as DRPNetworkNodeContract
 			);
 
 			expect(mockNetworkNode.sendMessage).toHaveBeenCalled();
@@ -250,7 +335,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			await DRPIntervalDiscovery.handleDiscoveryRequest(
 				"sender",
 				invalidDataMessage,
-				mockNetworkNode as unknown as DRPNetworkNode
+				mockNetworkNode as unknown as DRPNetworkNodeContract
 			);
 
 			expect(mockNetworkNode.sendMessage).not.toHaveBeenCalled();
@@ -278,7 +363,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			await DRPIntervalDiscovery.handleDiscoveryRequest(
 				"sender",
 				mockData,
-				mockNetworkNode as unknown as DRPNetworkNode
+				mockNetworkNode as unknown as DRPNetworkNodeContract
 			);
 
 			// Verify that sendMessage was called with a response containing our peer ID
@@ -312,7 +397,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			await DRPIntervalDiscovery.handleDiscoveryRequest(
 				"sender",
 				mockData,
-				mockNetworkNode as unknown as DRPNetworkNode
+				mockNetworkNode as unknown as DRPNetworkNodeContract
 			);
 
 			// Verify that sendMessage was not called since we have no peers
@@ -358,7 +443,7 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 		test("should create a new instance via factory function", () => {
 			const instance = createDRPDiscovery({
 				id: testId,
-				networkNode: mockNetworkNode as unknown as DRPNetworkNode,
+				networkNode: mockNetworkNode as unknown as DRPNetworkNodeContract,
 				interval: 1000,
 				logConfig: { level: "silent" },
 			});

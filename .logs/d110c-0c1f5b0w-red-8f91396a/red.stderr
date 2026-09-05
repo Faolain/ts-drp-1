@@ -1,0 +1,1959 @@
+stderr | tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock
+::v3-ingress sink-rejected
+
+(node:19372) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19378) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19380) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19382) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 65 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0w RED] keeps manual-review durable and promptly refuses public issue before any fence or replacement
+AssertionError: D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:915:76
+    913|    expect(probe.settlementPlanWrites).toHaveLength(writes);
+    914|    expect(probe.issueInputs).toEqual([]);
+    915|    expect(result.result().settled, "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HA…
+       |                                                                            ^
+    916|    expect(result.result().error).toEqual(new TypeError("v3 room settle…
+    917|   } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > refuses held issue promptly after the real durable plan write without an issuance effect
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ holdCustody tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:488:40
+    486|  expect(await store.readLineage(plan.scope)).toEqual(fixture.lineage);
+    487|  expect(await store.readOutboxPage({ scope: plan.scope, limit: 128 }))…
+    488|  expect(observation.issueTransactions).toBe(0);
+       |                                        ^
+    489|  expect(observation.commits).toEqual([]);
+    490|  expect(observation.accepted).toBe(0);
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:511:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > creator-held seal reaches the existing close owner and exact successor-codec terminus
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ holdCustody tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:488:40
+    486|  expect(await store.readLineage(plan.scope)).toEqual(fixture.lineage);
+    487|  expect(await store.readOutboxPage({ scope: plan.scope, limit: 128 }))…
+    488|  expect(observation.issueTransactions).toBe(0);
+       |                                        ^
+    489|  expect(observation.commits).toEqual([]);
+    490|  expect(observation.accepted).toBe(0);
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:521:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ holdCustody tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:488:40
+    486|  expect(await store.readLineage(plan.scope)).toEqual(fixture.lineage);
+    487|  expect(await store.readOutboxPage({ scope: plan.scope, limit: 128 }))…
+    488|  expect(observation.issueTransactions).toBe(0);
+       |                                        ^
+    489|  expect(observation.commits).toEqual([]);
+    490|  expect(observation.accepted).toBe(0);
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:542:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > held source refuses rehearsal without target import or terminal effect
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > held source refuses activation without target import or terminal effect
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ holdCustody tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:488:40
+    486|  expect(await store.readLineage(plan.scope)).toEqual(fixture.lineage);
+    487|  expect(await store.readOutboxPage({ scope: plan.scope, limit: 128 }))…
+    488|  expect(observation.issueTransactions).toBe(0);
+       |                                        ^
+    489|  expect(observation.commits).toEqual([]);
+    490|  expect(observation.accepted).toBe(0);
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:565:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > changed retained held policy remains terminal source-diff refusal rather than redisposition
+TypeError: v3 room displacement policy is invalid
+ ❯ validateDisplacementPolicy examples/v3-room/src/index.ts:1353:9
+    1351|   (Object.getPrototypeOf(policies) !== Object.prototype && Object.getP…
+    1352|  ) {
+    1353|   throw new TypeError("v3 room displacement policy is invalid");
+       |         ^
+    1354|  }
+    1355|  const keys = Reflect.ownKeys(policies);
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1556:46
+ ❯ Module.createV3RoomSession examples/v3-room/src/index.ts:1517:9
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:574:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > single-generation internal redirect pins target hold refusal or the deferred parent frontier terminus
+AssertionError: D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectPromptRefusal tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:499:41
+    497| 
+    498| function expectPromptRefusal(result: ReturnType<typeof observeResult>,…
+    499|  expect(result.result().settled, token).toBe(true);
+       |                                         ^
+    500|  expect(result.result().error).toBeInstanceOf(TypeError);
+    501|  expect((result.result().error as Error).message).toBe(manualReviewMes…
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:613:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > single-generation internal redirect pins target hold refusal or the deferred parent frontier terminus
+Error: Hook timed out in 10000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:633:1
+    631|  });
+    632| });
+    633| afterEach(async () => {
+       | ^
+    634|  try {
+    635|   for (const session of sessions.splice(0)) await session.close().catc…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses progress direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses progress direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses progress direct CAS
+AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+
+- Expected: 
+"ISSUANCE_RETRY_REQUIRED"
+
++ Received: 
+undefined
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75
+    112|   })
+    113|  );
+    114|  expect.soft(code(error), "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTE…
+       |                                                                           ^
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses source-digest direct CAS
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+
+- Expected
++ Received
+
+@@ -138,42 +138,42 @@
+    101,
+    115,
+    116,
+    6,
+    32,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
+    5,
+    14,
+    115,
+    111,
+    117,
+@@ -221,11 +221,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses disposition direct CAS
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+
+- Expected
++ Received
+
+@@ -115,17 +115,20 @@
+    116,
+    105,
+    111,
+    110,
+    5,
+-   6,
++   9,
++   116,
+    114,
+-   101,
+-   98,
+    97,
++   110,
+    115,
+-   101,
++   102,
++   111,
++   114,
++   109,
+    5,
+    12,
+    115,
+    111,
+    117,
+@@ -221,11 +224,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses link direct CAS
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+
+- Expected
++ Received
+
+@@ -209,11 +209,12 @@
+    117,
+    101,
+    110,
+    99,
+    101,
+-   0,
++   3,
++   22,
+    5,
+    8,
+    114,
+    101,
+    118,
+@@ -221,11 +222,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses link direct CAS
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+
+- Expected
++ Received
+
+@@ -138,42 +138,42 @@
+    101,
+    115,
+    116,
+    6,
+    32,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
+    5,
+    14,
+    115,
+    111,
+    117,
+@@ -222,11 +222,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses disposition direct CAS
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+
+- Expected
++ Received
+
+@@ -115,17 +115,20 @@
+    116,
+    105,
+    111,
+    110,
+    5,
+-   6,
++   9,
++   116,
+    114,
+-   101,
+-   98,
+    97,
++   110,
+    115,
+-   101,
++   102,
++   111,
++   114,
++   109,
+    5,
+    12,
+    115,
+    111,
+    117,
+@@ -222,11 +225,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses progress direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses progress direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses source-digest direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses link direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses progress direct CAS
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+
+- Expected
++ Received
+
+@@ -138,42 +138,42 @@
+    101,
+    115,
+    116,
+    6,
+    32,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
++   3,
+    5,
+    14,
+    115,
+    111,
+    117,
+@@ -390,11 +390,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses disposition direct CAS
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses disposition direct CAS
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+
+- Expected
++ Received
+
+@@ -115,17 +115,20 @@
+    116,
+    105,
+    111,
+    110,
+    5,
+-   6,
++   9,
++   116,
+    114,
+-   101,
+-   98,
+    97,
++   110,
+    115,
+-   101,
++   102,
++   111,
++   114,
++   109,
+    5,
+    12,
+    115,
+    111,
+    117,
+@@ -390,11 +393,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final expire to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final rebase to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final transform to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final expire to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final rebase to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final transform to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final expire to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final rebase to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final transform to manual-review redisposition
+AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+
+- Expected: 
+"ISSUANCE_RETRY_REQUIRED"
+
++ Received: 
+undefined
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75
+    112|   })
+    113|  );
+    114|  expect.soft(code(error), "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTE…
+       |                                                                           ^
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final expire to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final rebase to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final expire to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final rebase to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final expire to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final rebase to manual-review redisposition
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+
+- Expected
++ Received
+
+@@ -115,17 +115,24 @@
+    116,
+    105,
+    111,
+    110,
+    5,
+-   6,
++   13,
++   109,
++   97,
++   110,
++   117,
++   97,
++   108,
++   45,
++   114,
+    101,
+-   120,
+-   112,
++   118,
+    105,
+-   114,
+    101,
++   119,
+    5,
+    12,
+    115,
+    111,
+    117,
+@@ -221,11 +228,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final transform to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final transform to manual-review redisposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final transform to manual-review redisposition
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]
+
+- Expected
++ Received
+
+@@ -115,20 +115,24 @@
+    116,
+    105,
+    111,
+    110,
+    5,
+-   9,
+-   116,
+-   114,
++   13,
++   109,
+    97,
+    110,
+-   115,
+-   102,
+-   111,
++   117,
++   97,
++   108,
++   45,
+    114,
+-   109,
++   101,
++   118,
++   105,
++   101,
++   119,
+    5,
+    12,
+    115,
+    111,
+    117,
+@@ -224,11 +228,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link
+AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+
+- Expected: 
+"ISSUANCE_RETRY_REQUIRED"
+
++ Received: 
+undefined
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75
+    112|   })
+    113|  );
+    114|  expect.soft(code(error), "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTE…
+       |                                                                           ^
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:146:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+
+- Expected
++ Received
+
+@@ -115,17 +115,24 @@
+    116,
+    105,
+    111,
+    110,
+    5,
+-   6,
++   13,
++   109,
++   97,
++   110,
++   117,
++   97,
++   108,
++   45,
+    114,
+    101,
+-   98,
+-   97,
+-   115,
++   118,
++   105,
+    101,
++   119,
+    5,
+    12,
+    115,
+    111,
+    117,
+@@ -222,11 +229,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:146:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped
+AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+
+- Expected: 
+"ISSUANCE_RETRY_REQUIRED"
+
++ Received: 
+undefined
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75
+    112|   })
+    113|  );
+    114|  expect.soft(code(error), "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTE…
+       |                                                                           ^
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:149:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+
+- Expected
++ Received
+
+@@ -100,11 +100,11 @@
+    101,
+    115,
+    7,
+    1,
+    8,
+-   5,
++   4,
+    5,
+    11,
+    100,
+    105,
+    115,
+@@ -115,17 +115,24 @@
+    116,
+    105,
+    111,
+    110,
+    5,
+-   6,
++   13,
++   109,
++   97,
++   110,
++   117,
++   97,
++   108,
++   45,
+    114,
+    101,
+-   98,
+-   97,
+-   115,
++   118,
++   105,
+    101,
++   119,
+    5,
+    12,
+    115,
+    111,
+    117,
+@@ -198,84 +205,13 @@
+    108,
+    97,
+    99,
+    101,
+    109,
+-   101,
+-   110,
+-   116,
+-   80,
+-   114,
+-   111,
+-   103,
+-   114,
+    101,
+-   115,
+-   115,
+-   8,
+-   4,
+-   5,
+-   6,
+-   99,
+-   104,
+-   117,
+    110,
+-   107,
+-   115,
+-   7,
+-   1,
+-   8,
+-   3,
+-   5,
+-   13,
+    116,
+-   104,
+-   114,
+-   111,
+-   117,
+-   103,
+-   104,
+-   73,
+-   110,
+-   116,
+-   101,
+-   110,
+-   116,
+-   3,
+-   6,
+-   5,
+-   15,
+-   108,
+-   97,
+-   115,
+-   116,
+-   76,
+-   111,
+-   103,
+-   105,
+-   99,
+-   97,
+-   108,
+-   84,
+-   105,
+-   109,
+-   101,
+-   3,
+-   18,
+-   5,
+-   19,
+-   114,
+-   101,
+-   112,
+-   108,
+-   97,
+-   99,
+-   101,
+-   109,
+-   101,
+-   110,
+-   116,
+    83,
+    101,
+    113,
+    117,
+    101,
+@@ -283,118 +219,21 @@
+    99,
+    101,
+    3,
+    20,
+    5,
+-   7,
+-   118,
+-   101,
+-   114,
+-   115,
+-   105,
+-   111,
+-   110,
+-   3,
+-   2,
+-   5,
+-   11,
+-   105,
+-   110,
+-   116,
+-   101,
+-   110,
+-   116,
+-   67,
+-   111,
+-   117,
+-   110,
+-   116,
+-   3,
+-   6,
+-   5,
+-   12,
+-   105,
+-   110,
+-   116,
+-   101,
+-   110,
+-   116,
+-   68,
+-   105,
+-   103,
+-   101,
+-   115,
+-   116,
+-   6,
+-   32,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   5,
+-   19,
+-   114,
+-   101,
+-   112,
+-   108,
+-   97,
+-   99,
+-   101,
+-   109,
+-   101,
+-   110,
+-   116,
+-   83,
+-   101,
+-   113,
+-   117,
+-   101,
+-   110,
+-   99,
+-   101,
+-   3,
+-   20,
+-   5,
+    8,
+    114,
+    101,
+    118,
+    105,
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:149:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > manual-review retains its exact digest
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > manual-review retains its exact disposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > manual-review retains its exact digest
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > manual-review retains its exact disposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > manual-review retains its exact digest
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > manual-review retains its exact disposition
+AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+
+- Expected: 
+"ISSUANCE_RETRY_REQUIRED"
+
++ Received: 
+undefined
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75
+    112|   })
+    113|  );
+    114|  expect.soft(code(error), "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTE…
+       |                                                                           ^
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > manual-review retains its exact digest
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > manual-review retains its exact digest
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > manual-review retains its exact digest
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]
+
+- Expected
++ Received
+
+@@ -145,42 +145,42 @@
+    101,
+    115,
+    116,
+    6,
+    32,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
+-   1,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
++   8,
+    5,
+    14,
+    115,
+    111,
+    117,
+@@ -228,11 +228,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > manual-review retains its exact disposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > manual-review retains its exact disposition
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > manual-review retains its exact disposition
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]
+
+- Expected
++ Received
+
+@@ -115,24 +115,17 @@
+    116,
+    105,
+    111,
+    110,
+    5,
+-   13,
+-   109,
+-   97,
+-   110,
+-   117,
+-   97,
+-   108,
+-   45,
++   6,
+    114,
+    101,
+-   118,
+-   105,
++   98,
++   97,
++   115,
+    101,
+-   119,
+    5,
+    12,
+    115,
+    111,
+    117,
+@@ -228,11 +221,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress cannot be removed while retaining its source and link
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress cannot be removed while retaining its source and link
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress cannot be removed while retaining its source and link
+AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+
+- Expected: 
+"ISSUANCE_RETRY_REQUIRED"
+
++ Received: 
+undefined
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75
+    112|   })
+    113|  );
+    114|  expect.soft(code(error), "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTE…
+       |                                                                           ^
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:170:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress cannot be removed while retaining its source and link
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress cannot be removed while retaining its source and link
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress cannot be removed while retaining its source and link
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+
+- Expected
++ Received
+
+@@ -100,11 +100,11 @@
+    101,
+    115,
+    7,
+    1,
+    8,
+-   5,
++   4,
+    5,
+    11,
+    100,
+    105,
+    115,
+@@ -188,179 +188,11 @@
+    110,
+    99,
+    101,
+    3,
+    14,
+-   5,
+-   19,
+-   114,
+-   101,
+-   112,
+-   108,
+-   97,
+-   99,
+-   101,
+-   109,
+-   101,
+-   110,
+-   116,
+-   80,
+-   114,
+-   111,
+-   103,
+-   114,
+-   101,
+-   115,
+-   115,
+-   8,
+-   4,
+-   5,
+-   6,
+-   99,
+-   104,
+-   117,
+-   110,
+-   107,
+-   115,
+-   7,
+-   1,
+-   8,
+-   3,
+-   5,
+-   13,
+-   116,
+-   104,
+-   114,
+-   111,
+-   117,
+-   103,
+-   104,
+-   73,
+-   110,
+-   116,
+-   101,
+-   110,
+-   116,
+-   3,
+-   6,
+-   5,
+-   15,
+-   108,
+-   97,
+-   115,
+-   116,
+-   76,
+-   111,
+-   103,
+-   105,
+-   99,
+-   97,
+-   108,
+-   84,
+-   105,
+-   109,
+-   101,
+-   3,
+-   18,
+-   5,
+-   19,
+-   114,
+-   101,
+-   112,
+-   108,
+-   97,
+-   99,
+-   101,
+-   109,
+-   101,
+-   110,
+-   116,
+-   83,
+-   101,
+-   113,
+-   117,
+-   101,
+-   110,
+-   99,
+-   101,
+-   3,
+-   20,
+-   5,
+-   7,
+-   118,
+-   101,
+-   114,
+-   115,
+-   105,
+-   111,
+-   110,
+-   3,
+-   2,
+-   5,
+-   11,
+-   105,
+-   110,
+-   116,
+-   101,
+-   110,
+-   116,
+-   67,
+-   111,
+-   117,
+-   110,
+-   116,
+-   3,
+-   6,
+    5,
+-   12,
+-   105,
+-   110,
+-   116,
+-   101,
+-   110,
+-   116,
+-   68,
+-   105,
+-   103,
+-   101,
+-   115,
+-   116,
+-   6,
+-   32,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   2,
+-   5,
+    19,
+    114,
+    101,
+    112,
+    108,
+@@ -390,11 +222,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:170:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress freezes every chunk field and completion bounds
+AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+
+- Expected: 
+"ISSUANCE_RETRY_REQUIRED"
+
++ Received: 
+undefined
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75
+    112|   })
+    113|  );
+    114|  expect.soft(code(error), "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTE…
+       |                                                                           ^
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress freezes every chunk field and completion bounds
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+
+- Expected
++ Received
+
+@@ -239,11 +239,11 @@
+    116,
+    101,
+    110,
+    116,
+    3,
+-   6,
++   8,
+    5,
+    15,
+    108,
+    97,
+    115,
+@@ -307,11 +307,11 @@
+    111,
+    117,
+    110,
+    116,
+    3,
+-   6,
++   8,
+    5,
+    12,
+    105,
+    110,
+    116,
+@@ -390,11 +390,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/135]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress freezes every chunk field and completion bounds
+ FAIL  tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress freezes every chunk field and completion bounds
+AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+
+- Expected
++ Received
+
+@@ -220,11 +220,72 @@
+    117,
+    110,
+    107,
+    115,
+    7,
+-   1,
++   2,
++   8,
++   3,
++   5,
++   13,
++   116,
++   104,
++   114,
++   111,
++   117,
++   103,
++   104,
++   73,
++   110,
++   116,
++   101,
++   110,
++   116,
++   3,
++   2,
++   5,
++   15,
++   108,
++   97,
++   115,
++   116,
++   76,
++   111,
++   103,
++   105,
++   99,
++   97,
++   108,
++   84,
++   105,
++   109,
++   101,
++   3,
++   16,
++   5,
++   19,
++   114,
++   101,
++   112,
++   108,
++   97,
++   99,
++   101,
++   109,
++   101,
++   110,
++   116,
++   83,
++   101,
++   113,
++   117,
++   101,
++   110,
++   99,
++   101,
++   3,
++   18,
+    8,
+    3,
+    5,
+    13,
+    116,
+@@ -390,11 +451,11 @@
+    115,
+    105,
+    111,
+    110,
+    3,
+-   0,
++   2,
+    5,
+    13,
+    102,
+    101,
+    110,
+
+ ❯ refuseMutation tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4
+    115|  expect
+    116|   .soft(encodeCanonical(await store.readSettlementPlan(scope)), "D110C…
+    117|   .toEqual(encodeCanonical(before));
+       |    ^
+    118|  expect(await store.readLineage(scope)).toEqual({ exhausted: false, ne…
+    119|  expect(await store.readIssued(scope, 0)).toBeNull();
+ ❯ withStore tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3
+ ❯ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/135]⎯
+

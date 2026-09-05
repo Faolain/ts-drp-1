@@ -1,0 +1,18 @@
+{
+  "session_id": "1486167a-aa1b-4356-b5a5-5d619dc8e214",
+  "is_error": false,
+  "stop_reason": "end_turn",
+  "total_cost_usd": 4.958702499999999,
+  "models": [
+    "claude-fable-5-1"
+  ],
+  "status": {
+    "status": 0,
+    "signal": null,
+    "start": "2026-09-05T18:03:25.060Z",
+    "finish": "2026-09-05T18:09:44.302Z"
+  },
+  "permissionDenials": [],
+  "spawnedSubagents": 0,
+  "formalReview": false
+}

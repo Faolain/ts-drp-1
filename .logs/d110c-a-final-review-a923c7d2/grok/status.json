@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 330.136,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-a-final-review-a923c7d2/grok/events.jsonl",
+  "exit_code": 1,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-a-final-review-a923c7d2/grok/public.txt",
+  "stop_reason": "cancelled",
+  "timed_out": false
+}

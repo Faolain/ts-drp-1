@@ -1,0 +1,11 @@
+The first Opus launcher invocation exited before model/session creation because
+`--mcp-config '{}'` was not a valid configuration for this CLI build:
+
+Error: Invalid MCP configuration:
+mcpServers: Invalid input: expected record, received undefined
+
+The controller then removed only that rejected option and launched the sole
+actual Opus review. The original stderr path was truncated by the corrected
+invocation before this custody file was created; this file is a verbatim
+reconstruction from the controller's captured tool output, not the original
+raw stderr artifact.

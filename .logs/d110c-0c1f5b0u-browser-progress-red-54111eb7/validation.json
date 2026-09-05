@@ -1,0 +1,16 @@
+{
+  "acceptance": "CAUSAL_NATIVE_BROWSER_RED",
+  "commit": "54111eb767c53e360b17d002382ae5c7a59dba8b",
+  "browser": "151.0.7922.34",
+  "tests": 1,
+  "files": 1,
+  "vectors": 6,
+  "expectedSoftFailures": 4,
+  "runtimeInvocations": 1,
+  "skipped": 0,
+  "flaky": 0,
+  "topLevelErrors": 0,
+  "candidateUnchanged": true,
+  "stashes": 27,
+  "protectedEntries": 81
+}

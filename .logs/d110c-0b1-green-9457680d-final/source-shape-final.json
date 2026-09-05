@@ -1,0 +1,19 @@
+{
+  "controlRootWidened": false,
+  "controlSubpathExports": [
+    "inspectBoundedCreatorTrustAdvance"
+  ],
+  "nodeConsumers": [
+    "close",
+    "hot-verify",
+    "commit",
+    "active-cold-reopen"
+  ],
+  "pendingRecoveryPinsPreserved": true,
+  "protocolRootWidened": false,
+  "protocolSubpathExports": [
+    "openCreatorCheckpointTrust"
+  ],
+  "standaloneBuiltImportInitialized": true,
+  "viteAliasesPresent": true
+}

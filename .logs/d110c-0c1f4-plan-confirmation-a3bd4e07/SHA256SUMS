@@ -1,0 +1,13 @@
+8ad1552cb528b12af37b267f0821541a41a31619fa0b4a05ef679c857f7d8732  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/commands.md
+126c6f1182b5a8977c25e7e515bcb9ae2c7e8584c81478cac1287bad8c6118c0  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/external-transcript-hashes.txt
+0fc29d19180456e71d5a929bf12a5e91bf4196b68ea11e59eb417bbf2b18a7cb  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/command.json
+742c31d6656097634e9a2bc88638cd79fb819f45cf01e6580a4527075929fc57  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/events.jsonl
+2dfab2e8cff066ec22d9c4cd20c8fe2c702a0adc21656fe05576e11fcb49eee7  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/input-packet.md
+6c8465c0899321551ddc7cb64dc1cea0a70f73039539b2d74b89b2559570c13e  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/public.txt
+72d262d3479b1f9a1ae87e497161a8def6fbba8e3c6516c178e283907995f549  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/review.diff
+3f7c6d5b22ed766431e5d39bbb540e893d8865ed3def9bc86adf10b27cd560c6  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/status.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/stderr.log
+23d4460537529c0c1e4dab3cd16b37e6ab7d3d6fc54b6b226706b4bdbb2612a0  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/local-audit.md
+b95b61d7c4074ad9faf05a8b6d452ad6a14176e55dd8c5fc593f2ad69bc927e5  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/prompt.md
+e90910134f18c576066d6ec651a8f5198955fd59613a8870b4db0f3d34640d20  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/review-results.md
+c0f3a80e733332002bc443aa626f3978106bc9bc1438d41968c4f92fcd85b02a  .logs/d110c-0c1f4-plan-confirmation-a3bd4e07/schema.json

@@ -1,0 +1,8 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts
+     5:46  error  Member 'SETTLEMENT_REPLACEMENT_DIGEST_LIMITS' of the import declaration should be sorted alphabetically  sort-imports
+  2427:28  error  Missing return type on function                                                                          @typescript-eslint/explicit-function-return-type
+
+✖ 2 problems (2 errors, 0 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+

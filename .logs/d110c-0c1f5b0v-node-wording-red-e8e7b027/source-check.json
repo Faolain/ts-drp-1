@@ -1,0 +1,7 @@
+{
+  "chunk_id": "a6b5c1",
+  "wall_time_seconds": 0.271310084,
+  "exit_code": 0,
+  "original_token_count": 73,
+  "output": "{\"syntax\":\"PASS\",\"productionChanges\":0,\"consumerInventory\":\"UNCHANGED\",\"productionHashes\":{\"packages/node/src/v3-live.ts\":\"dc59309e61f3b86e6904c91380f81cc83223dc3559fbaa4b3a2e14b8961eb8c3\",\"examples/v3-room/src/index.ts\":\"0115f9aea7d7e76fb4ee1550e38cf97cd6b5b533c9338ef389404a1e6b831322\"}}\n"
+}

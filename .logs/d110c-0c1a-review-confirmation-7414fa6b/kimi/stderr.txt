@@ -1,0 +1,877 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+7414fa6b test: close D110c retirement review findings
+d77ee315 feat: authenticate creator issuance retirement
+7e2f2694 test: capture D110c issuance checkpoint red
+add7f7dc docs: confirm D110c issuance checkpoint plan
+037b8244 docs: correct D110c issuance checkpoint plan
+fc384d1f docs: freeze D110c issuance retirement checkpoint plan
+d6f5de26 test: preserve D110c pending authenticator diagnostic
+907a0499 docs: reslice D110c pending reopen prerequisite
+7414fa6bad30edc34de162f274ecee1504637579
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+?? .logs/d108e4ab-campaign/
+?? .logs/d108e4ab-freeze/
+?? .logs/d108e4ab-plan-review/
+?? .logs/d108e4ac-green-review-correction/
+?? .logs/d108e4ac-green-review/
+?? .logs/d108e4ac-green/
+?? .logs/d108e4ac-plan-review/
+?? .logs/d108e4ac-red-review/
+?? .logs/d108e4ac-red/
+?? .logs/d108e4ad-campaign/
+codex/phase3a1b-p6-golden-path
+ .../grok/command.json                              |   26 +
+ .../grok/events.jsonl                              | 1071 ++++++
+ .../grok/input-packet.md                           | 3496 ++++++++++++++++++++
+ .../grok/public.txt                                |    1 +
+ .../grok/reemit-prompt.md                          |    3 +
+ .../grok/reemit.events.jsonl                       |  161 +
+ .../grok/reemit.stderr.txt                         |    0
+ .../grok/review.diff                               | 1946 +++++++++++
+ .../grok/status.json                               |    9 +
+ .../kimi/stderr.txt                                | 3278 ++++++++++++++++++
+ .../kimi/stream.jsonl                              |   96 +
+ .../manifest.sha256                                |   17 +
+ .../d110c-0c1a-final-review-d77ee315/opus/raw.json |    1 +
+ .../opus/stderr.txt                                |    0
+ .../review-prompt.md                               |  101 +
+ .../review-summary.md                              |   24 +
+ .logs/d110c-0c1a-final-review-d77ee315/schema.json |   43 +
+ .../exit.status                                    |    1 +
+ .../manifest.sha256                                |    3 +
+ .../vitest.json                                    |    1 +
+ .logs/d110c-0c1a-green-closure-7e2f2694/ledger.md  |   88 +
+ .../manifest.sha256                                |    1 +
+ .../manifest.sha256                                |   24 +
+ .../phase-5e-live-close-corrected/exit.status      |    1 +
+ .../phase-5e-live-close/exit.status                |    1 +
+ .../phase-6a-adoption-commit/exit.status           |    1 +
+ .../phase-6a-successor-activation/exit.status      |    1 +
+ .../phase-6a-successor-epoch/exit.status           |    1 +
+ .../exit.status                                    |    1 +
+ .../phase-6b-ahe-reclamation/exit.status           |    1 +
+ .../phase-6b-issuance-retention/exit.status        |    1 +
+ .../d110c-b-hot-loop/exit.status                   |    1 +
+ .../manifest.sha256                                |    6 +
+ .../phase-5e-live-close/exit.status                |    1 +
+ .../exit.status                                    |    1 +
+ .../manifest.sha256                                |    3 +
+ .../vitest.json                                    |    1 +
+ .../diff-check-final.status                        |    1 +
+ .../diff-check.status                              |    1 +
+ .../eslint-final.status                            |    1 +
+ .../eslint.status                                  |    1 +
+ .../focused.json                                   |    1 +
+ .../focused.status                                 |    1 +
+ .../ledger.md                                      |   47 +
+ .../manifest.sha256                                |   23 +
+ .../node-build.status                              |    1 +
+ .../node-production-typecheck.status               |    1 +
+ .../prettier-final.status                          |    1 +
+ .../prettier.status                                |    1 +
+ .../retained.json                                  |    1 +
+ .../retained.status                                |    1 +
+ .../diff-check-closure.status                      |    1 +
+ .../diff-check-final.status                        |    1 +
+ .../diff-check.status                              |    1 +
+ .../eslint-closure.status                          |    1 +
+ .../eslint-final.status                            |    1 +
+ .../eslint.status                                  |    1 +
+ .../keychain-build.status                          |    1 +
+ .../keychain-typecheck.status                      |    1 +
+ .../manifest.sha256                                |   50 +
+ .../node-build-post-refactor.status                |    1 +
+ .../node-build.status                              |    1 +
+ .../node-production-typecheck-post-refactor.status |    1 +
+ .../node-production-typecheck.status               |    1 +
+ .../prettier-closure.status                        |    1 +
+ .../prettier-final.status                          |    1 +
+ .../prettier.status                                |    1 +
+ .../protected-state-corrected.status               |    1 +
+ .../protected-state-final.status                   |    1 +
+ .../protected-state.status                         |    1 +
+ .../protocol-v3-build.status                       |    1 +
+ .../protocol-v3-built-subpath-consumer.status      |    1 +
+ .../protocol-v3-built-subpath.status               |    1 +
+ .../protocol-v3-public-audit.status                |    1 +
+ .../protocol-v3-typecheck.status                   |    1 +
+ .../source-shape.status                            |    1 +
+ .../storage-browser-build.status                   |    1 +
+ .../production-hardening-tdd-plan-v2.md            |  109 +-
+ packages/node/src/creator-close.ts                 |  118 +-
+ .../creator-issuance-retirement-boundary.ts        |  134 +
+ .../manifest.sha256                                |    8 +
+ .../phase-5e-live-close-corrected/playwright.json  |  420 +++
+ .../phase-5e-live-close/playwright.json            |  525 +++
+ .../phase-6a-adoption-commit/playwright.json       |  318 ++
+ .../phase-6a-successor-activation/playwright.json  |  942 ++++++
+ .../phase-6a-successor-epoch/playwright.json       |  216 ++
+ .../playwright.json                                | 1148 +++++++
+ .../phase-6b-ahe-reclamation/playwright.json       |  218 ++
+ .../phase-6b-issuance-retention/playwright.json    |  218 ++
+ .../d110c-b-hot-loop/playwright.json               |  230 ++
+ .../manifest.sha256                                |    2 +
+ .../phase-5e-live-close/playwright.json            |  420 +++
+ .../retirement-checkpoint-contract.ts              |    9 +-
+ ...6b-d110c-0c1a-retirement-checkpoint-red.test.ts |   95 +
+ 94 files changed, 15588 insertions(+), 111 deletions(-)
+diff --git a/packages/node/src/creator-close.ts b/packages/node/src/creator-close.ts
+index cdef2f86..e9777f84 100644
+--- a/packages/node/src/creator-close.ts
++++ b/packages/node/src/creator-close.ts
+@@ -1,17 +1,11 @@
+-import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
++import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+ import { type AccumulatorSnapshot, deriveCloseSetHistoryCommitment, type EpochVertex } from "@ts-drp/compaction";
+ import {
+ 	type SnapshotVerificationReceipt,
+ 	verifySnapshotStreamWithReceipt,
+ } from "@ts-drp/compaction/snapshot-quarantine-receipt";
+ import { inspectTrustClosure } from "@ts-drp/control-plane";
+-import {
+-	type DurableIssuanceOutboxRecord,
+-	type DurableIssuanceStore,
+-	type DurableIssueCommit,
+-	type DurableIssueScope,
+-	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
+-} from "@ts-drp/issuance-store";
++import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
+ import { type FinalitySigner, signCreatorIssuanceRetirementRequest } from "@ts-drp/keychain/finality";
+ import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
+ import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+@@ -44,6 +38,7 @@ import {
+ import type { SnapshotQuarantineDeclaration, SnapshotQuarantineStore } from "@ts-drp/storage/snapshot-transfer";
+ 
+ import { installCreatorAdoptionFacts, revokeCreatorAdoptionFacts } from "./internal/creator-adoption-intent.js";
++import { deriveCreatorIssuanceRetirementBoundary } from "./internal/creator-issuance-retirement-boundary.js";
+ import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";
+ import {
+ 	type CreatorCloseRuntimeReleaseCensus,
+@@ -263,42 +258,6 @@ function uniqueRecordCandidate(
+ 	return matches.length === 1 ? matches[0] : undefined;
+ }
+ 
+-function sameIssuanceScope(left: DurableIssueScope, right: DurableIssueScope): boolean {
+-	return left.author === right.author && left.objectId === right.objectId;
+-}
+-
+-function exactIssuanceCommit(commit: DurableIssueCommit, scope: DurableIssueScope, authorSequence: number): boolean {
+-	return (
+-		commit.authorSequence === authorSequence &&
+-		commit.issuedRecord.authorSequence === authorSequence &&
+-		commit.outboxEntry.authorSequence === authorSequence &&
+-		sameIssuanceScope(commit.issuedRecord.scope, scope) &&
+-		sameIssuanceScope(commit.outboxEntry.scope, scope) &&
+-		compareBytes(commit.envelope.canonicalPreimageBytes, commit.issuedRecord.envelope.canonicalPreimageBytes) === 0 &&
+-		compareBytes(commit.envelope.canonicalPreimageBytes, commit.outboxEntry.envelope.canonicalPreimageBytes) === 0 &&
+-		compareBytes(commit.envelope.digest, commit.issuedRecord.envelope.digest) === 0 &&
+-		compareBytes(commit.envelope.digest, commit.outboxEntry.envelope.digest) === 0 &&
+-		compareBytes(commit.envelope.signature, commit.issuedRecord.envelope.signature) === 0 &&
+-		compareBytes(commit.envelope.signature, commit.outboxEntry.envelope.signature) === 0
+-	);
+-}
+-
+-function exactIssuancePair(
+-	left: DurableIssuanceOutboxRecord,
+-	right: Awaited<ReturnType<DurableIssuanceStore["readIssued"]>>,
+-	scope: DurableIssueScope,
+-	authorSequence: number
+-): boolean {
+-	return (
+-		right !== null &&
+-		exactIssuanceCommit(left.commit, scope, authorSequence) &&
+-		exactIssuanceCommit(right, scope, authorSequence) &&
+-		compareBytes(left.commit.envelope.canonicalPreimageBytes, right.envelope.canonicalPreimageBytes) === 0 &&
+-		compareBytes(left.commit.envelope.digest, right.envelope.digest) === 0 &&
+-		compareBytes(left.commit.envelope.signature, right.envelope.signature) === 0
+-	);
+-}
+-
+ async function issuanceRetirementCandidate(
+ 	input: Readonly<{
+ 		current: InspectedHead;
+@@ -354,71 +313,22 @@ async function issuanceRetirementCandidate(
+ 		priorRetirementCandidateDigest = candidate.ref.digest;
+ 		priorRef = candidate.ref;
+ 	}
+-	const lineage = await input.issuanceStore.readLineage(input.issuanceScope);
+-	if (lineage.exhausted) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
+-	const rows: DurableIssuanceOutboxRecord[] = [];
+-	let afterKey: readonly [string, string, number] | null =
+-		priorAdmittedAuthorSequence === null
+-			? null
+-			: [input.issuanceScope.objectId, input.issuanceScope.author, priorAdmittedAuthorSequence];
+-	while (rows.length <= input.maxEpochVertices) {
+-		const page = await input.issuanceStore.readOutboxPage({
+-			afterKey,
+-			limit: Math.min(MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT, input.maxEpochVertices + 1 - rows.length),
+-			scope: input.issuanceScope,
+-		});
+-		if (page.length === 0) break;
+-		rows.push(...page);
+-		const last = page[page.length - 1] as DurableIssuanceOutboxRecord;
+-		afterKey = [input.issuanceScope.objectId, input.issuanceScope.author, last.commit.authorSequence];
+-		if (
+-			page.length <
+-			Math.min(MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT, input.maxEpochVertices + 1 - (rows.length - page.length))
+-		)
+-			break;
+-	}
+-	const firstExpected = priorAdmittedAuthorSequence === null ? 0 : priorAdmittedAuthorSequence + 1;
+-	if (rows.length > input.maxEpochVertices || lineage.next !== firstExpected + rows.length) {
+-		throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
+-	}
+-	let admitted = priorAdmittedAuthorSequence;
+-	let expected = firstExpected;
+-	let truncated = false;
+-	for (const row of rows) {
+-		if (row.commit.authorSequence !== expected) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
+-		const issued = await input.issuanceStore.readIssued(input.issuanceScope, expected);
+-		if (!exactIssuancePair(row, issued, input.issuanceScope, expected)) {
+-			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
+-		}
+-		const bytes = row.commit.envelope.canonicalPreimageBytes;
+-		const digest = hex(row.commit.envelope.digest);
+-		const decoded = decodeCanonical(bytes);
+-		if (
+-			!plainRecord(decoded) ||
+-			compareBytes(encodeCanonical(decoded), bytes) !== 0 ||
+-			hex(hashDomain("ts-drp/vertex/v3", bytes)) !== digest ||
+-			decoded.anchor !== input.currentTrust.currentAnchorDigest ||
+-			decoded.author !== input.issuanceScope.author ||
+-			decoded.epoch !== input.currentTrust.currentEpoch ||
+-			decoded.objectId !== input.issuanceScope.objectId ||
+-			decoded.authorSequence !== expected
+-		) {
+-			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
+-		}
+-		const inGraph = input.graph.vertices.has(digest);
+-		if (inGraph && truncated) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
+-		if (inGraph) admitted = expected;
+-		else truncated = true;
+-		expected += 1;
+-	}
+-	if (admitted === null || lineage.next <= admitted) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	const boundary = await deriveCreatorIssuanceRetirementBoundary({
++		currentAnchorDigest: input.currentTrust.currentAnchorDigest,
++		currentEpoch: input.currentTrust.currentEpoch,
++		graphVertexDigests: input.graph.vertices,
++		issuanceScope: input.issuanceScope,
++		issuanceStore: input.issuanceStore,
++		maxEpochVertices: input.maxEpochVertices,
++		priorAdmittedAuthorSequence,
++	});
+ 	const prepared = prepareCreatorIssuanceRetirement({
+-		admittedAuthorSequence: admitted,
++		admittedAuthorSequence: boundary.admittedAuthorSequence,
+ 		author: input.issuanceScope.author,
+ 		commitQcRef: input.qcRef,
+ 		currentTrust: input.currentTrust,
+ 		cutValueDigest: input.cutValueDigest,
+-		observedLineage: lineage,
++		observedLineage: boundary.observedLineage,
+ 		priorAdmittedAuthorSequence,
+ 		priorRetirementCandidateDigest,
+ 		snapshotManifestDigest: input.snapshotManifestDigest,
+diff --git a/packages/node/src/internal/creator-issuance-retirement-boundary.ts b/packages/node/src/internal/creator-issuance-retirement-boundary.ts
+new file mode 100644
+index 00000000..6ae2dce1
+--- /dev/null
++++ b/packages/node/src/internal/creator-issuance-retirement-boundary.ts
+@@ -0,0 +1,134 @@
++import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
++import {
++	type DurableIssuanceOutboxRecord,
++	type DurableIssuanceStore,
++	type DurableIssueCommit,
++	type DurableIssueScope,
++	type DurableLineage,
++	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
++} from "@ts-drp/issuance-store";
++import { CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE } from "@ts-drp/protocol-v3/creator-issuance-retirement";
++
++export interface CreatorIssuanceRetirementBoundaryInput {
++	readonly currentAnchorDigest: string;
++	readonly currentEpoch: number;
++	readonly graphVertexDigests: Readonly<{ has(digest: string): boolean }>;
++	readonly issuanceScope: DurableIssueScope;
++	readonly issuanceStore: DurableIssuanceStore;
++	readonly maxEpochVertices: number;
++	readonly priorAdmittedAuthorSequence: number | null;
++}
++
++export interface CreatorIssuanceRetirementBoundary {
++	readonly admittedAuthorSequence: number;
++	readonly observedLineage: DurableLineage;
++}
++
++function plainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
++	return value !== null && typeof value === "object" && !Array.isArray(value);
++}
++
++function hex(bytes: Uint8Array): string {
++	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
++}
++
++function sameIssuanceScope(left: DurableIssueScope, right: DurableIssueScope): boolean {
++	return left.author === right.author && left.objectId === right.objectId;
++}
++
++function exactIssuanceCommit(commit: DurableIssueCommit, scope: DurableIssueScope, authorSequence: number): boolean {
++	return (
++		commit.authorSequence === authorSequence &&
++		commit.issuedRecord.authorSequence === authorSequence &&
++		commit.outboxEntry.authorSequence === authorSequence &&
++		sameIssuanceScope(commit.issuedRecord.scope, scope) &&
++		sameIssuanceScope(commit.outboxEntry.scope, scope) &&
++		compareBytes(commit.envelope.canonicalPreimageBytes, commit.issuedRecord.envelope.canonicalPreimageBytes) === 0 &&
++		compareBytes(commit.envelope.canonicalPreimageBytes, commit.outboxEntry.envelope.canonicalPreimageBytes) === 0 &&
++		compareBytes(commit.envelope.digest, commit.issuedRecord.envelope.digest) === 0 &&
++		compareBytes(commit.envelope.digest, commit.outboxEntry.envelope.digest) === 0 &&
++		compareBytes(commit.envelope.signature, commit.issuedRecord.envelope.signature) === 0 &&
++		compareBytes(commit.envelope.signature, commit.outboxEntry.envelope.signature) === 0
++	);
++}
++
++function exactIssuancePair(
++	left: DurableIssuanceOutboxRecord,
++	right: Awaited<ReturnType<DurableIssuanceStore["readIssued"]>>,
++	scope: DurableIssueScope,
++	authorSequence: number
++): boolean {
++	return (
++		right !== null &&
++		exactIssuanceCommit(left.commit, scope, authorSequence) &&
++		exactIssuanceCommit(right, scope, authorSequence) &&
++		compareBytes(left.commit.envelope.canonicalPreimageBytes, right.envelope.canonicalPreimageBytes) === 0 &&
++		compareBytes(left.commit.envelope.digest, right.envelope.digest) === 0 &&
++		compareBytes(left.commit.envelope.signature, right.envelope.signature) === 0
++	);
++}
++
++/**
++ * Derives the largest dense admitted issuance prefix for one authenticated close.
++ * This internal seam exists so every fail-closed derivation branch is directly executable.
++ * @param input - Authenticated room head, exact issuance scope/store, and captured graph membership.
++ * @returns The exact admitted boundary and observed non-exhausted lineage.
++ */
++export async function deriveCreatorIssuanceRetirementBoundary(
++	input: CreatorIssuanceRetirementBoundaryInput
++): Promise<CreatorIssuanceRetirementBoundary> {
++	const lineage = await input.issuanceStore.readLineage(input.issuanceScope);
++	if (lineage.exhausted) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	const rows: DurableIssuanceOutboxRecord[] = [];
++	let afterKey: readonly [string, string, number] | null =
++		input.priorAdmittedAuthorSequence === null
++			? null
++			: [input.issuanceScope.objectId, input.issuanceScope.author, input.priorAdmittedAuthorSequence];
++	while (rows.length <= input.maxEpochVertices) {
++		const limit = Math.min(MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT, input.maxEpochVertices + 1 - rows.length);
++		const page = await input.issuanceStore.readOutboxPage({ afterKey, limit, scope: input.issuanceScope });
++		if (page.length === 0) break;
++		rows.push(...page);
++		const last = page[page.length - 1] as DurableIssuanceOutboxRecord;
++		afterKey = [input.issuanceScope.objectId, input.issuanceScope.author, last.commit.authorSequence];
++		if (page.length < limit) break;
++	}
++	const firstExpected = input.priorAdmittedAuthorSequence === null ? 0 : input.priorAdmittedAuthorSequence + 1;
++	if (rows.length > input.maxEpochVertices || lineage.next !== firstExpected + rows.length) {
++		throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	}
++	let admitted = input.priorAdmittedAuthorSequence;
++	let expected = firstExpected;
++	let truncated = false;
++	for (const row of rows) {
++		if (row.commit.authorSequence !== expected) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		const issued = await input.issuanceStore.readIssued(input.issuanceScope, expected);
++		if (!exactIssuancePair(row, issued, input.issuanceScope, expected)) {
++			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		}
++		const bytes = row.commit.envelope.canonicalPreimageBytes;
++		const digest = hex(row.commit.envelope.digest);
++		const decoded = decodeCanonical(bytes);
++		if (
++			!plainRecord(decoded) ||
++			compareBytes(encodeCanonical(decoded), bytes) !== 0 ||
++			hex(hashDomain("ts-drp/vertex/v3", bytes)) !== digest ||
++			decoded.anchor !== input.currentAnchorDigest ||
++			decoded.author !== input.issuanceScope.author ||
++			decoded.epoch !== input.currentEpoch ||
++			decoded.objectId !== input.issuanceScope.objectId ||
++			decoded.authorSequence !== expected
++		) {
++			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		}
++		const inGraph = input.graphVertexDigests.has(digest);
++		if (inGraph && truncated) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		if (inGraph) admitted = expected;
++		else truncated = true;
++		expected += 1;
++	}
++	if (admitted === null || lineage.next <= admitted) {
++		throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	}
++	return Object.freeze({ admittedAuthorSequence: admitted, observedLineage: Object.freeze({ ...lineage }) });
++}
+ .../production-hardening-tdd-plan-v2.md            |  109 +-
+ packages/node/src/creator-close.ts                 |  118 +-
+ .../creator-issuance-retirement-boundary.ts        |  134 +++
+ .../manifest.sha256                                |    8 +
+ .../phase-5e-live-close-corrected/playwright.json  |  420 +++++++
+ .../phase-5e-live-close/playwright.json            |  525 +++++++++
+ .../phase-6a-adoption-commit/playwright.json       |  318 ++++++
+ .../phase-6a-successor-activation/playwright.json  |  942 ++++++++++++++++
+ .../phase-6a-successor-epoch/playwright.json       |  216 ++++
+ .../playwright.json                                | 1148 ++++++++++++++++++++
+ .../phase-6b-ahe-reclamation/playwright.json       |  218 ++++
+ .../phase-6b-issuance-retention/playwright.json    |  218 ++++
+ .../d110c-b-hot-loop/playwright.json               |  230 ++++
+ .../manifest.sha256                                |    2 +
+ .../phase-5e-live-close/playwright.json            |  420 +++++++
+ .../retirement-checkpoint-contract.ts              |    9 +-
+ ...6b-d110c-0c1a-retirement-checkpoint-red.test.ts |   95 ++
+ 17 files changed, 5019 insertions(+), 111 deletions(-)
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index f07a16b7..b2687e47 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -95500,8 +95500,8 @@ RED-to-GREEN closure and is prohibited.
+ ##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
+ 
+ **Status: bounded architecture decision complete; implementation and causal RED
+-remain blocked on D.110c-0c1a GREEN before any `v3-live.ts` or issuance-store
+-production edit.** Owner: the predecessor and successor issuance
++remain blocked on D.110c-0c1a closure and D.110c-0c1b GREEN before any
++`v3-live.ts` or issuance-store production edit.** Owner: the predecessor and successor issuance
+ views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
+ `creatorFilteredIssuanceStore()`, their exact outbox classification inside
+ `recoverV3LiveReplica()`, and the registered view's `publishPending` and
+@@ -95543,7 +95543,7 @@ bounded signed-control form of option 2 and freezes its exact high-risk
+ protocol-contract prerequisite as D.110c-0c1a before implementation. A signed
+ claimed epoch alone remains insufficient.
+ 
+-After D.110c-0c1a GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
++After D.110c-0c1a closure and D.110c-0c1b GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
+ diagnostic invocation must retain
+ both old-AHE and new-AHE orderings after `active-new`, proving exact floor/AHE
+ effects and the identical post-commit reopen classification without aborting
+@@ -95834,9 +95834,11 @@ SHA-256 is
+ 
+ ###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
+ 
+-**Status: causal RED is signed/pushed; bounded production GREEN and retained
+-gates pass locally; the signed/pushed GREEN checkpoint and governing final
+-plan→RED→GREEN review remain before closure.** Owner:
++**Status: causal RED and initial production GREEN are signed/pushed; focused and
++retained gates pass, but the governing final review found a reachable
++committed-issuance hole and missing derivation-branch coverage. The tests-only
++review correction and explicit D.110c-0c1b prerequisite remain before one
++material confirmation may close this slice.** Owner:
+ protocol-v3 creator retirement record/opener and one-use signing request,
+ keychain finality signing dispatch, the creator-close row/graph/replay capture,
+ the Node-private
+@@ -96128,6 +96130,101 @@ behavior gates pass. The signed downstream D.110c-0c failure remains owned by
+ D.110c-0c1 and was neither rerun nor weakened. D.110a and campaign identities
+ remain excluded.
+ 
++The initial final review inspected signed/pushed GREEN commit
++`d77ee315a7688cffb5fd55870c38231403ecc41f`, tree
++`1c907ac05acb6cd844fb5dbb4f15e7c1ee8940af`. Grok 4.6/high session
++`01a0651a-343b-7f60-a4d7-f05ee3f628c3` returned `APPROVED`, P0=0/P1=0/P2=0;
++the first wrapper classification was `NO_VERDICT` only because progress prose
++preceded its valid terminal JSON, so the exact session re-emitted the unchanged
++schema-only verdict without another inspection. Standard direct Kimi K3
++session `session_33a04ee3-e4d3-48aa-9156-0277699281c2`, with the exact 100-step
++control, returned `APPROVED`, P0=0/P1=0/P2=2. Its claimed-missing reporter JSON
++manifests are in the Playwright-relative
++`packages/storage-browser/.logs/d110c-0c1a-green-retained-browser-*` roots and
++validate exactly; its remaining evidence-custody P2 is accepted by committing
++the final GREEN/evidence roots with closure. Opus xhigh session
++`515198a9-6310-4637-bf97-196a4fe28420` returned P0=0/P1=2/P2=1. The P2 is
++assigned to D.110c-0c1: before consuming the boundary it must compare the
++opened carrier author with its independently resolved issuance scope.
++
++Both Opus P1s are accepted. First, the close-boundary derivation is extracted
++without behavior change into one Node-internal seam and receives direct
++deterministic cases for a valid full prefix, valid unadmitted suffix, gap,
++duplicate, issued/outbox substitution, graph omission followed by re-entry,
++lineage mismatch, exhausted lineage, over-limit scan, and empty initialization.
++Second, source inspection demonstrates the plan's existing stop condition:
++`issueOneVertex()` durably commits issuance before live-journal and graph
++admission, and its post-commit failure branches can leave a genuine row absent
++from the close graph. Such a row may safely truncate the current close, but
++after adoption it retains the old epoch/anchor above the authenticated boundary
++and therefore freezes later closes. The strict dense frontier is not weakened.
++D.110c-0c1b below owns the product outcome before the boundary consumer or
++another repeated-epoch claim proceeds. Because these corrections change
++executable coverage and slice sequencing, exactly one material Grok/Kimi/Opus
++confirmation reviews the signed correction; no P2/prose-only round follows.
++The corrected focused reporter passes 3/3 with the complete derivation matrix;
++the unchanged retained 24-file set passes 230/230. Node production-source
++typecheck/build, exact-owner ESLint/Prettier, and diff checks pass. The initial
++review root's validating manifest SHA-256 is
++`21ffaab1f04a7a83ebbd9b5a4b477f7a974e94facda6e99476df0daf4a562c1e`;
++the correction evidence root
++`.logs/d110c-0c1a-green-review-correction-d77ee315/` has validating manifest
++SHA-256
++`e62e8ec6f3c3aa854cb8fdacb0984f801b2972451ad8484e820bb08b888bf7bd`.
++The first extraction omitted an import still used elsewhere and the first
++evidence wrapper used zsh's reserved `status` name; both diagnostic-only errors
++and their corrected proofs are preserved without changing acceptance. One
++audit also omitted the established 8-GiB formatting heap and met the default
++4-GiB ceiling; the corrected 8-GiB Prettier gate passes.
++
++###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
++
++**Status: blocking bounded audit and causal RED are next after D.110c-0c1a
++closure; no production repair is selected or authorized.** Owner: the
++post-`transactIssue()` outcome window in
++`packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
++admission, restart recovery of pending issuance/outbox rows, and the close-time
++retirement-boundary input. Deadline: GREEN before D.110c-0c1 changes either
++registered issuance view, before D.110c-0c resumes, and before D.110c-c/d or
++Phase 7 claims repeatable epochs.
++
++The bounded source/architecture audit must determine whether existing restart
++recovery can safely finish admission of a committed row, whether the issuance
++transaction needs a durable outcome/reconciliation marker, or whether another
++explicit store contract is required. The store is untrusted bytes: deletion,
++publication, epoch reassignment, or a database-only watermark cannot establish
++admission. Preserve author signature, exact object/sequence, original
++epoch/anchor authority, dependency and ACL checks, pending publication and
++rebase custody, operation-reservation semantics, graph capacity, journal
++ordering, and at-most-once application. If repair requires a schema, public
++API, wire field, dependency, authority rule, or threshold change, stop after
++the audit and reslice that exact high-risk prerequisite.
++
++Tests-only RED must use the real product issue path to force one deterministic
++post-commit journal or graph-admission failure. It must prove the issue reports
++the existing committed-failure class, the exact issued/outbox row survives,
++the row is absent from the authenticated close graph/journal, the genuine 0→1
++close can only truncate above the prior admitted boundary, and after verified
++adoption/restart the next genuine close refuses with exact
++`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE` because that same row carries
++the old authenticated epoch/anchor. No test may insert, delete, republish,
++rewrite, or privately classify the row to manufacture the failure.
++
++GREEN must deterministically reconcile every durably committed outcome before
++it can obstruct a later close: either authenticate and complete its original
++admission exactly once under the preserved original authority, or fail closed
++with a durable, bounded, explicitly reviewed resolution that preserves dense
++sequence and outbox truth. It must then prove restart, genuine 0→1 and 1→2
++close/adoption, continued issue/publish, exact application state and operation
++accounting, no duplicate journal/graph/application entry, no skipped sequence,
++and no hidden pending row. Adversarial gates cover crash at each boundary,
++substituted row, stale authority/ACL, invalid dependency, graph capacity,
++ambiguous transaction outcome, replay, and repeated recovery. Retain all
++D.110c-0c1a carrier, Phase-6a recovery, issuance/outbox/rebase, AHE rollback,
++snapshot, and D.109 reclamation gates. This is a high-risk production-lifecycle
++slice and receives the governing plan review, causal RED custody, signed GREEN,
++and one final Grok/Kimi/Opus review. No campaign or D.110a invocation runs.
++
+ The complete confirmation evidence is retained under
+ `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+ self-excluding manifest SHA-256 is
+diff --git a/tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts b/tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts
+index 89f3c5cb..83c2c7a2 100644
+--- a/tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts
+@@ -1,6 +1,11 @@
+ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+ import type { CloseSetHistoryCommitment } from "@ts-drp/compaction";
+-import type { DurableIssuanceOutboxRecord, DurableIssueCommit, DurableLineage } from "@ts-drp/issuance-store";
++import type {
++	DurableIssuanceOutboxRecord,
++	DurableIssueCommit,
++	DurableIssueScope,
++	DurableLineage,
++} from "@ts-drp/issuance-store";
+ import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+ 
+ import type { CreatorLiveCloseResult } from "../../../packages/node/src/creator-close.js";
+@@ -48,6 +53,7 @@ export interface D110c0c1aRetirementCheckpointEvidence {
+ 	readonly currentTrust: CurrentAnchorTrust;
+ 	readonly durableReplayVerified: boolean;
+ 	readonly history: CloseSetHistoryCommitment;
++	readonly issuanceScope: DurableIssueScope;
+ 	readonly lineage: DurableLineage;
+ 	readonly rows: readonly D110c0c1aIssuedRowEvidence[];
+ 	readonly retirementCandidates: readonly Readonly<{
+@@ -192,6 +198,7 @@ export async function openD110c0c1aRetirementCheckpointFixture(): Promise<D110c0
+ 				currentTrust,
+ 				durableReplayVerified,
+ 				history,
++				issuanceScope,
+ 				lineage,
+ 				proposed,
+ 				retirementCandidates: Object.freeze(retirementCandidates),
+diff --git a/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts b/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+index e8b77d1c..e1550968 100644
+--- a/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
++++ b/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+@@ -1,6 +1,12 @@
+ import "fake-indexeddb/auto";
+ 
+ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
++import type {
++	DurableIssuanceOutboxRecord,
++	DurableIssuanceStore,
++	DurableIssueCommit,
++	DurableLineage,
++} from "@ts-drp/issuance-store";
+ import { digestBlob } from "@ts-drp/storage";
+ import { describe, expect, it } from "vitest";
+ 
+@@ -16,6 +22,7 @@ import {
+ 	signCreatorAnchorRequest,
+ 	signCreatorIssuanceRetirementRequest,
+ } from "../packages/keychain/src/finality.js";
++import { deriveCreatorIssuanceRetirementBoundary } from "../packages/node/src/internal/creator-issuance-retirement-boundary.js";
+ import { inspectCreatorTransitionAdvance } from "../packages/node/src/internal/creator-transition-advance.js";
+ import { openCreatorCheckpointTrust } from "../packages/protocol-v3/src/creator-checkpoint.js";
+ import {
+@@ -31,6 +38,23 @@ interface Candidate {
+ 	readonly ref: Readonly<{ readonly byteLength: number; readonly digest: string }>;
+ }
+ 
++function derivationStore(
++	input: Readonly<{
++		issued: ReadonlyMap<number, DurableIssueCommit>;
++		lineage: DurableLineage;
++		rows: readonly DurableIssuanceOutboxRecord[];
++	}>
++): DurableIssuanceStore {
++	return Object.freeze({
++		close: () => Promise.resolve(),
++		compareAndMarkOutboxPublished: () => Promise.resolve(),
++		readIssued: (_scope, authorSequence) => Promise.resolve(input.issued.get(authorSequence) ?? null),
++		readLineage: () => Promise.resolve(input.lineage),
++		readOutboxPage: () => Promise.resolve(input.rows),
++		transactIssue: () => Promise.reject(new TypeError("D110C_0C1A_TEST_STORE_READ_ONLY")),
++	});
++}
++
+ function record(value: Uint8Array): Readonly<Record<string, unknown>> {
+ 	const decoded = decodeCanonical(value);
+ 	if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
+@@ -495,4 +519,75 @@ describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
+ 			await fixture.close();
+ 		}
+ 	});
++
++	it("fails closed for every frozen issuance-boundary derivation mutant", async () => {
++		const fixture = await openD110c0c1aRetirementCheckpointFixture();
++		try {
++			const { currentTrust, issuanceScope, lineage, rows } = fixture.evidence;
++			const [row0, row1, row2] = rows;
++			if (row0 === undefined || row1 === undefined || row2 === undefined) {
++				throw new TypeError("D110C_0C1A_DERIVATION_FIXTURE_INCOMPLETE");
++			}
++			const outboxRows = rows.map(({ outbox }) => outbox);
++			const issued = new Map(rows.map((row) => [row.authorSequence, row.issued] as const));
++			const graph = new Set(rows.map(({ digest }) => digest));
++			const derive = (
++				input: Readonly<{
++					graph?: ReadonlySet<string>;
++					issued?: ReadonlyMap<number, DurableIssueCommit>;
++					lineage?: DurableLineage;
++					maxEpochVertices?: number;
++					rows?: readonly DurableIssuanceOutboxRecord[];
++				}>
++			): ReturnType<typeof deriveCreatorIssuanceRetirementBoundary> =>
++				deriveCreatorIssuanceRetirementBoundary({
++					currentAnchorDigest: currentTrust.currentAnchorDigest,
++					currentEpoch: currentTrust.currentEpoch,
++					graphVertexDigests: input.graph ?? graph,
++					issuanceScope,
++					issuanceStore: derivationStore({
++						issued: input.issued ?? issued,
++						lineage: input.lineage ?? lineage,
++						rows: input.rows ?? outboxRows,
++					}),
++					maxEpochVertices: input.maxEpochVertices ?? 8,
++					priorAdmittedAuthorSequence: null,
++				});
++
++			await expect(derive({})).resolves.toEqual({
++				admittedAuthorSequence: 2,
++				observedLineage: { exhausted: false, next: 3 },
++			});
++			await expect(derive({ graph: new Set([row0.digest, row1.digest]) })).resolves.toEqual({
++				admittedAuthorSequence: 1,
++				observedLineage: { exhausted: false, next: 3 },
++			});
++
++			const substituted = new Map(issued);
++			substituted.set(1, row2.issued);
++			const rejectionCases = Object.freeze([
++				Object.freeze({
++					lineage: { exhausted: false, next: 2 },
++					name: "gapped-address",
++					rows: [row0.outbox, row2.outbox],
++				}),
++				Object.freeze({
++					lineage: { exhausted: false, next: 4 },
++					name: "duplicate-address",
++					rows: [row0.outbox, row0.outbox, row1.outbox, row2.outbox],
++				}),
++				Object.freeze({ issued: substituted, name: "issued-outbox-substitution" }),
++				Object.freeze({ graph: new Set([row0.digest, row2.digest]), name: "graph-reentry-after-omission" }),
++				Object.freeze({ lineage: { exhausted: false, next: 4 }, name: "incomplete-lineage" }),
++				Object.freeze({ lineage: { exhausted: true, next: 3 }, name: "exhausted-lineage" }),
++				Object.freeze({ maxEpochVertices: 2, name: "over-limit-scan" }),
++				Object.freeze({ lineage: { exhausted: false, next: 0 }, name: "empty-initialization", rows: [] }),
++			] as const);
++			for (const rejection of rejectionCases) {
++				await expect(derive(rejection)).rejects.toThrow(D110C_0C1A_RED_TOKEN);
++			}
++		} finally {
++			await fixture.close();
++		}
++	});
+ });
+tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts:22:export const D110C_0C1A_RED_TOKEN = "D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE" as const;
+diff-check-final.log
+diff-check-final.status
+diff-check.log
+diff-check.status
+eslint-final.log
+eslint-final.status
+eslint.log
+eslint.status
+focused.json
+focused.log
+focused.status
+ledger.md
+manifest.sha256
+node-build.log
+node-build.status
+node-production-typecheck.log
+node-production-typecheck.status
+prettier-final.log
+prettier-final.status
+prettier.log
+prettier.status
+retained.json
+retained.log
+retained.status
+./prettier.log: OK
+./prettier.status: OK
+./retained.json: OK
+./retained.log: OK
+./retained.status: OK
+{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":3,"numPassedTests":3,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788404359504,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["D.110c-0c1a creator issuance-retirement checkpoint RED"],"fullName":"D.110c-0c1a creator issuance-retirement checkpoint RED requires one authenticated retirement carrier after a genuine dense creator close","status":"passed","title":"requires one authenticated retirement carrier after a genuine dense creator close","duration":317.6678750000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.110c-0c1a creator issuance-retirement checkpoint RED"],"fullName":"D.110c-0c1a creator issuance-retirement checkpoint RED replaces the authenticated epoch-one carrier when the admitted boundary does not advance","status":"passed","title":"replaces the authenticated epoch-one carrier when the admitted boundary does not advance","duration":882.59025,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.110c-0c1a creator issuance-retirement checkpoint RED"],"fullName":"D.110c-0c1a creator issuance-retirement checkpoint RED fails closed for every frozen issuance-boundary derivation mutant","status":"passed","title":"fails closed for every frozen issuance-boundary derivation mutant","duration":121.84779200000003,"failureMessages":[],"meta":{}}],"startTime":1788404360666,"endTime":1788404361987.848,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts"}]}0
+0
+{
+	"name": "@ts-drp/node",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		},
+		"./runtime": {
+			"types": "./dist/src/runtime.d.ts",
+			"import": "./dist/src/runtime.js"
+		},
+		"./v3-live": {
+			"types": "./dist/src/v3-live.d.ts",
+			"import": "./dist/src/v3-live.js"
+		},
+		"./snapshot-transfer": {
+			"types": "./dist/src/snapshot-transfer.d.ts",
+			"import": "./dist/src/snapshot-transfer.js"
+		},
+		"./creator-seal": {
+			"types": "./dist/src/creator-seal.d.ts",
+			"import": "./dist/src/creator-seal.js"
+		},
+		"./creator-close": {
+			"types": "./dist/src/creator-close.d.ts",
+			"import": "./dist/src/creator-close.js"
+		},
+		"./creator-adoption": {
+			"types": "./dist/src/creator-adoption.d.ts",
+			"import": "./dist/src/creator-adoption.js"
+		},
+		"./creator-adoption-commit": {
+			"types": "./dist/src/creator-adoption-commit.d.ts",
+			"import": "./dist/src/creator-adoption-commit.js"
+		},
+		"./creator-adoption-stage": {
+			"types": "./dist/src/creator-adoption-stage.d.ts",
+			"import": "./dist/src/creator-adoption-stage.js"
+		},
+		"./creator-adoption-recover": {
+			"types": "./dist/src/creator-adoption-recover.d.ts",
+			"import": "./dist/src/creator-adoption-recover.js"
+		},
+		"./creator-adoption-activate": {
+			"types": "./dist/src/creator-adoption-activate.d.ts",
+			"import": "./dist/src/creator-adoption-activate.js"
+e62e8ec6f3c3aa854cb8fdacb0984f801b2972451ad8484e820bb08b888bf7bd  .logs/d110c-0c1a-green-review-correction-d77ee315/manifest.sha256
+21ffaab1f04a7a83ebbd9b5a4b477f7a974e94facda6e99476df0daf4a562c1e  .logs/d110c-0c1a-final-review-d77ee315/manifest.sha256
+23
+"numTotalTestSuites":52
+"numTotalTests":230
+"numPassedTests":230
+"success":true
+diff-check-final.status 0
+diff-check.status 0
+eslint-final.status 0
+eslint.status 0
+focused.status 0
+node-build.status 0
+node-production-typecheck.status 0
+prettier-final.status 0
+prettier.status 0
+retained.status 0
+correction manifest check exit: 0
+initial review manifest check exit: 0
+1c907ac05acb6cd844fb5dbb4f15e7c1ee8940af
+4daa440035ba8cde11719701d0fcc8e4a807d7c8
+7414fa6bad30edc34de162f274ecee1504637579
+7414fa6bad30edc34de162f274ecee1504637579
+      24
+.logs/d110c-0c1a-final-review-d77ee315/manifest.sha256
+.logs/d110c-0c1a-green-adversarial-final-7e2f2694/manifest.sha256
+.logs/d110c-0c1a-green-closure-7e2f2694/manifest.sha256
+.logs/d110c-0c1a-green-retained-browser-7e2f2694/manifest.sha256
+.logs/d110c-0c1a-green-retained-browser-post-refactor-7e2f2694/manifest.sha256
+.logs/d110c-0c1a-green-retained-post-refactor-7e2f2694/manifest.sha256
+.logs/d110c-0c1a-green-review-correction-d77ee315/manifest.sha256
+.logs/d110c-0c1a-green-static-final-7e2f2694/manifest.sha256
+packages/storage-browser/.logs/d110c-0c1a-green-retained-browser-7e2f2694/manifest.sha256
+packages/storage-browser/.logs/d110c-0c1a-green-retained-browser-post-refactor-7e2f2694/manifest.sha256
+OK  .logs/d110c-0c1a-final-review-d77ee315
+OK  .logs/d110c-0c1a-green-adversarial-final-7e2f2694
+OK  .logs/d110c-0c1a-green-closure-7e2f2694
+OK  .logs/d110c-0c1a-green-retained-browser-7e2f2694
+OK  .logs/d110c-0c1a-green-retained-browser-post-refactor-7e2f2694
+OK  .logs/d110c-0c1a-green-retained-post-refactor-7e2f2694
+OK  .logs/d110c-0c1a-green-review-correction-d77ee315
+OK  .logs/d110c-0c1a-green-static-final-7e2f2694
+OK  packages/storage-browser/.logs/d110c-0c1a-green-retained-browser-7e2f2694
+OK  packages/storage-browser/.logs/d110c-0c1a-green-retained-browser-post-refactor-7e2f2694

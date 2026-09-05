@@ -1,0 +1,14 @@
+{
+  "head": "1eba4f9065d220afb0d77d90aac4a05b250a05bb",
+  "signature": "G",
+  "mainRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "evidenceDestination": ".logs/d110c-0c1f5b0z-red-1eba4f90",
+  "matrixSha256": "464e04a81d2d3e798f9cdcb43321b28b0070009b4291f0ed1fd79c98ca7f422d",
+  "productionEdits": 0,
+  "runtimeTestsBeforePush": 0,
+  "testPaths": [
+    "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0c1f5b0z/native-registry-child.mjs",
+    "tests/fixtures/phase-6b-d110c-0c1f5b0z/source-custody.json"
+  ]
+}

@@ -1,0 +1,397 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 34,
+  "passed": 34,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": false,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-issuance-retention-red.test.ts",
+      "message": ""
+    },
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED freezes the exact RED/GREEN owners, semantic matrix, page edges, native mutants, migration cases and crash edges",
+      "status": "passed",
+      "title": "freezes the exact RED/GREEN owners, semantic matrix, page edges, native mutants, migration cases and crash edges",
+      "duration": 2.300042000000019,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED [RED readiness] requires the shared maintenance owner, resolver, watermark observation and pruned error",
+      "status": "passed",
+      "title": "[RED readiness] requires the shared maintenance owner, resolver, watermark observation and pruned error",
+      "duration": 0.3728749999999934,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED resolves only the exact genuine facade and returns detached frozen inspection state",
+      "status": "passed",
+      "title": "resolves only the exact genuine facade and returns detached frozen inspection state",
+      "duration": 49.80804200000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED atomically removes a published prefix and replays the same lost-receipt input as a no-op",
+      "status": "passed",
+      "title": "atomically removes a published prefix and replays the same lost-receipt input as a no-op",
+      "duration": 5.89795799999996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED keeps a valid pending prefix non-poisoning and a newer pending suffix outside the selected range",
+      "status": "passed",
+      "title": "keeps a valid pending prefix non-poisoning and a newer pending suffix outside the selected range",
+      "duration": 2.2891670000000204,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED rejects accessor input before mutation and captures mutable input by value",
+      "status": "passed",
+      "title": "rejects accessor input before mutation and captures mutable input by value",
+      "duration": 0.6232079999999769,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED refuses stale lineage and stale watermark without poisoning the store",
+      "status": "passed",
+      "title": "refuses stale lineage and stale watermark without poisoning the store",
+      "duration": 1.1467910000000074,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED supports a later closed epoch after a prior prefix was pruned",
+      "status": "passed",
+      "title": "supports a later closed epoch after a prior prefix was pruned",
+      "duration": 0.8551669999999945,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED preserves null-watermark polarity across the complete absence matrix",
+      "status": "passed",
+      "title": "preserves null-watermark polarity across the complete absence matrix",
+      "duration": 3.784667000000013,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED walks the exact bounded-page edge 64 without retaining the selected prefix",
+      "status": "passed",
+      "title": "walks the exact bounded-page edge 64 without retaining the selected prefix",
+      "duration": 7.219665999999961,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED walks the exact bounded-page edge 65 without retaining the selected prefix",
+      "status": "passed",
+      "title": "walks the exact bounded-page edge 65 without retaining the selected prefix",
+      "duration": 6.245374999999967,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED walks the exact bounded-page edge 128 without retaining the selected prefix",
+      "status": "passed",
+      "title": "walks the exact bounded-page edge 128 without retaining the selected prefix",
+      "duration": 8.25,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b issuance-retention causal RED"
+      ],
+      "fullName": "D.109b issuance-retention causal RED walks the exact bounded-page edge 129 without retaining the selected prefix",
+      "status": "passed",
+      "title": "walks the exact bounded-page edge 129 without retaining the selected prefix",
+      "duration": 8.081624999999974,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED freezes the ten migration cases and six genuine process-death boundaries",
+      "status": "passed",
+      "title": "freezes the ten migration cases and six genuine process-death boundaries",
+      "duration": 2.3087920000000395,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED [RED readiness] requires the Node maintenance owner and v3 settlement schema",
+      "status": "passed",
+      "title": "[RED readiness] requires the Node maintenance owner and v3 settlement schema",
+      "duration": 0.2727080000000228,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED prunes and reopens the same derived authority without changing its facade",
+      "status": "passed",
+      "title": "prunes and reopens the same derived authority without changing its facade",
+      "duration": 149.62762500000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant canonical-malformed with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant canonical-malformed with zero pruning writes",
+      "duration": 12.827875000000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant vertex-kind-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant vertex-kind-wrong with zero pruning writes",
+      "duration": 14.267458999999974,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant protocol-major-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant protocol-major-wrong with zero pruning writes",
+      "duration": 10.916125000000022,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant scope-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant scope-wrong with zero pruning writes",
+      "duration": 12.718624999999975,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant ordinal-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant ordinal-wrong with zero pruning writes",
+      "duration": 14.056624999999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant epoch-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant epoch-wrong with zero pruning writes",
+      "duration": 12.709541999999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant issued-only with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant issued-only with zero pruning writes",
+      "duration": 12.626292000000035,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant outbox-only with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant outbox-only with zero pruning writes",
+      "duration": 22.609041000000047,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant digest-mismatch with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant digest-mismatch with zero pruning writes",
+      "duration": 11.900709000000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant sequence-gap with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant sequence-gap with zero pruning writes",
+      "duration": 18.171749999999975,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant epoch-regression with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant epoch-regression with zero pruning writes",
+      "duration": 15.76400000000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED rolls back the injected delete-count-mismatch owner-count mutant",
+      "status": "passed",
+      "title": "rolls back the injected delete-count-mismatch owner-count mutant",
+      "duration": 10.284167000000025,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED rolls back the injected watermark-update-count-mismatch owner-count mutant",
+      "status": "passed",
+      "title": "rolls back the injected watermark-update-count-mismatch owner-count mutant",
+      "duration": 6.767458000000033,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED serializes two live handles and rejects a genuinely stale watermark extension",
+      "status": "passed",
+      "title": "serializes two live handles and rejects a genuinely stale watermark extension",
+      "duration": 10.56412499999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED migrates the exact v1 authority in place and preserves every issuance row",
+      "status": "passed",
+      "title": "migrates the exact v1 authority in place and preserves every issuance row",
+      "duration": 13.107708000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED rolls back a failed v1 migration and admits two racing v1 openers exactly once",
+      "status": "passed",
+      "title": "rolls back a failed v1 migration and admits two racing v1 openers exactly once",
+      "duration": 101.14575000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED rejects unknown versions and catalogs without repairing either authority",
+      "status": "passed",
+      "title": "rejects unknown versions and catalogs without repairing either authority",
+      "duration": 13.655875000000037,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED recovers old XOR complete-new state at every frozen hard-kill edge",
+      "status": "passed",
+      "title": "recovers old XOR complete-new state at every frozen hard-kill edge",
+      "duration": 445.2556249999999,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

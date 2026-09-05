@@ -1,0 +1,15 @@
+{
+  "record": "D.110c-0c1j-0",
+  "checkpoint": "RED",
+  "commit": "507e5541f6831cfc39d0963efc0d8c5f7233b64b",
+  "agentSourceCommit": "0d10ceea0b431efedb52a25acc03e1520e33354a",
+  "files": 1,
+  "tests": 5,
+  "passed": 1,
+  "failed": 4,
+  "skipped": 0,
+  "causal": true,
+  "moduleResolutionFailure": false,
+  "fixtureFailure": false,
+  "oldBinaryCompatibilityControlPassed": true
+}

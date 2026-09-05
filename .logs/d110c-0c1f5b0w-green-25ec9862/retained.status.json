@@ -1,0 +1,32 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "tests/phase-3g-v3-rebase-outbox-red.test.ts",
+    "tests/phase-3h-v3-room-rehearsal-red.test.ts",
+    "tests/phase-3h-v3-room-activation-red.test.ts",
+    "tests/phase-3h-v3-migration-record-red.test.ts",
+    "tests/phase-3a1b-d9346-shared-v3-room-red.test.ts",
+    "tests/phase-3f-c-v3-room-batching-red.test.ts",
+    "tests/phase-2l-a-shared-issuance-contract.test.ts",
+    "tests/phase-6b-issuance-retention-red.test.ts",
+    "packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+    "packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+    "packages/storage-browser/tests/phase-2l-b-browser-issuance-registry-red.test.ts",
+    "--no-file-parallelism",
+    "--maxWorkers=1",
+    "--minWorkers=1",
+    "--coverage.enabled=false",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile.json=.logs/d110c-0c1f5b0w-green-25ec9862/retained.json"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:06:31.530Z",
+  "finished": "2026-09-05T14:07:23.947Z",
+  "status": 1,
+  "signal": null
+}

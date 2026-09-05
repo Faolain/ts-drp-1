@@ -1,0 +1,3 @@
+[warn] tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts
+[warn] tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts
+[warn] Code style issues found in 2 files. Run Prettier with --write to fix.

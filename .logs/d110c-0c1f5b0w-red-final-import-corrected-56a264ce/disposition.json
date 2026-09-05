@@ -1,0 +1,77 @@
+{
+  "disposition": "ACCEPTED_CAUSAL_TESTS_ONLY_RED_EXACT_PREFROZEN_MATRIX",
+  "acceptedF5b0wRed": true,
+  "testCommit": "8154c9cb292862b450bf88610dc58d5140f1072b",
+  "parent": "56a264ce1c6888e317a04d9435ef8c4f34b72d2d",
+  "changedTestsOnly": ["tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"],
+  "soleFocusedRun": {
+    "files": 8,
+    "selected": 219,
+    "passed": 156,
+    "failed": 63,
+    "skipped": 0,
+    "todo": 0,
+    "started": "2026-09-05T13:54:05.910Z",
+    "finished": "2026-09-05T13:54:17.778Z",
+    "exit": 1,
+    "signal": null,
+    "exactFrozenMatrixSha256": "76643d0012301bc1d99e469d9a90a03032f89f17501c5725f03797ffd0bcd348"
+  },
+  "exactCausalFailures": {
+    "nativeStoreCases": 57,
+    "nativeStoreTokens": ["D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED", "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"],
+    "supersededF5b0cIssueCases": 1,
+    "supersededF5b0cToken": "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG",
+    "runtimeCases": 5,
+    "runtimeTokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_REHEARSAL_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_ACTIVATION_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG"
+    ]
+  },
+  "passingCorrectedControls": {
+    "sameEpochReopen": "Exact full projection and application canonical bytes before/after restart and after bounded turns; exact held plan/source/lineage/outbox; accepted notification replay permitted only across restart, fresh hold read-boundary counters enforce no later effects. Shared same-session custody helper remains byte-identical.",
+    "changedPolicy": "Exact source-diff issue refusal and terminal projection error precede readback. Ordinary public createBrowserDurableIssuanceStore opens the same issuance database solely for byte-exact held-plan readback and is closed in finally. No session revival or mutation. Exact pre-terminal commit snapshot and no subsequent non-notification effect delta are preserved.",
+    "creatorNoHold": "Exact existing TypeError creator close actor failed: CERTIFIED_VALUE_MISMATCH remains a passing retained control.",
+    "priorF5b0uRuntimeControls": "All nine prior genuine room Node composition controls pass."
+  },
+  "redirect": {
+    "oracleByteUnchanged": true,
+    "durableHoldReached": true,
+    "publicCloseObservedPending": true,
+    "orderlyRedShutdownClaimed": false,
+    "futureGreenOrderlyCleanupAssertionsRetained": true,
+    "hookTimeout": false,
+    "unclassifiedTopLevelError": false
+  },
+  "preflight": {
+    "lint": "PASS",
+    "eightGiBFormat": "PASS",
+    "collection": "PASS exact 219 tests/eight-file title matrix",
+    "sourceAndDiffChecks": "PASS",
+    "sourceMappedTypecheck": { "baselineDiagnostics": 3, "currentDiagnostics": 3, "addedDiagnostics": 0 },
+    "cleanRepositoryWideTypecheckClaimed": false,
+    "initialImportDiagnostic": {
+      "evidence": ".logs/d110c-0c1f5b0w-red-final-56a264ce",
+      "manifestEntries": 11,
+      "manifestSha256": "b864bff29cd3830ce2cf85f5da25f3094f9136b5a8939a4bd26903078471e74c",
+      "focusedExecutions": 0,
+      "disposition": "Precommit authoring lint resolution failure preserved; parent authorized the existing relative public source-entry import and a fresh preflight. No focused run was consumed or repeated."
+    }
+  },
+  "custody": {
+    "signedPushedTestsOnlyBeforeExecution": true,
+    "all27ExactStashIdentitiesUnchanged": true,
+    "protectedUntrackedInventoryUnchanged": true,
+    "allTrackedPackagesExamplesTestsHashesUnchangedDuringRun": true,
+    "bothRejectedRedManifestHashesVerified": true,
+    "productionDocsApiWireSchemaDependencyTimeoutEdits": false,
+    "postRunTestEditsOrReruns": false,
+    "reviewersSubagentsOrFableInvoked": false,
+    "campaignLongRunOrIsolatedRerun": false
+  },
+  "evidence": "The pre-frozen expected-matrix.json is unchanged. complete-matrix.json and failed-titles.json retain all exact titles, messages, tokens and durations. initial.json, before.json and after.json retain exact custody snapshots. The self-excluding manifest covers every file in this fresh evidence root except itself.",
+  "next": "This establishes f5b0w causal RED only. Separate narrow GREEN remains the next authorized stage; no parent f5b lifecycle/codec/frontier/close-adopt or per-source resolution completion is claimed."
+}

@@ -1,0 +1,1 @@
+cd packages/storage-browser && pnpm exec playwright test --config=playwright.d110c-0c-red.config.ts --list

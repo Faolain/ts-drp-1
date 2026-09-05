@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 import { SetDRP } from "@ts-drp/blueprints";
 import { type Hash, SemanticsType } from "@ts-drp/types";
 import { bench, describe } from "vitest";
@@ -47,23 +50,23 @@ describe("AreCausallyDependent benchmark", async () => {
 	});
 
 	obj1.drp?.add(1);
-	await obj2.applyVertices(hg.getAllVertices());
+	await obj2.applyVertices(trustedTestVertices(hg.getAllVertices()));
 
 	obj1.drp?.add(1);
 	obj1.drp?.delete(2);
 	obj2.drp?.delete(2);
 	obj2.drp?.add(2);
 
-	await obj3.applyVertices(hg.getAllVertices());
+	await obj3.applyVertices(trustedTestVertices(hg.getAllVertices()));
 	obj3.drp?.add(3);
 	obj1.drp?.delete(1);
 
-	await obj1.applyVertices(hg2.getAllVertices());
+	await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
 	obj1.drp?.delete(3);
 	obj2.drp?.delete(1);
 
-	await obj1.applyVertices(hg2.getAllVertices());
-	await obj1.applyVertices(hg3.getAllVertices());
+	await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
+	await obj1.applyVertices(trustedTestVertices(hg3.getAllVertices()));
 
 	const vertices = hg.getAllVertices();
 	for (let i = 0; i < samples; i++) {

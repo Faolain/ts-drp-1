@@ -1,0 +1,14 @@
+{
+  "reviewed_anchor": "bb94a03ff81dfedb9d7ae1865c6adaed6c05fc58",
+  "verdict": "BLOCK",
+  "p0_count": 0,
+  "p1_count": 1,
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Legacy displaced join/causalJoin rebase behavior changed despite byte-for-byte compatibility requirement",
+      "owner": "f5b0b",
+      "required_action": "Restore empty-intent automatic-retirement behavior only in legacy rebaseIntents; correct rewritten retained/corrective expectations under tests-only RED; preserve all other GREEN repairs."
+    }
+  ]
+}

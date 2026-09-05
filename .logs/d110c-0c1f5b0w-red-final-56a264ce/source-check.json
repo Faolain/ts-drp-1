@@ -1,0 +1,23 @@
+{
+  "testsOnly": [
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  ],
+  "unchangedTokens": true,
+  "unchangedRedirect": true,
+  "unchangedSameSessionCustody": true,
+  "exactCanonicalProjection": true,
+  "freshReopenBoundary": true,
+  "publicReadback": true,
+  "closedReadback": true,
+  "originalHoldPresent": true,
+  "noWallClockProbe": true,
+  "boundarySnapshot": true,
+  "zeroDelta": true,
+  "frozenPolicy": true,
+  "singleGeneration": true,
+  "pendingPublicCleanup": true,
+  "noCleanShutdownClaim": true,
+  "futureOrderlyCleanup": true,
+  "unchangedProbe": true,
+  "noTimeoutChange": true
+}

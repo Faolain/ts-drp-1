@@ -19,6 +19,18 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./shadow-comparison": {
+			"types": "./dist/src/shadow-comparison.d.ts",
+			"import": "./dist/src/shadow-comparison.js"
+		},
+		"./shadow-runner": {
+			"types": "./dist/src/shadow-runner.d.ts",
+			"import": "./dist/src/shadow-runner.js"
+		},
+		"./shadow-telemetry": {
+			"types": "./dist/src/shadow-telemetry.d.ts",
+			"import": "./dist/src/shadow-telemetry.js"
 		}
 	},
 	"scripts": {
@@ -30,6 +42,7 @@
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
+		"@ts-drp/canonical": "0.11.0",
 		"@ts-drp/types": "0.11.0",
 		"vitest": "^3.0.5"
 	}

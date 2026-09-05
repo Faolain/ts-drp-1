@@ -1,0 +1,136 @@
+{
+	"schemaVersion": 1,
+	"ruleId": "drp/no-ambient-in-reducer",
+	"messages": {
+		"implementationApproximated": "Implementation-approximated numeric operation '{{name}}' is forbidden in a consensus reducer module.",
+		"localeSensitive": "Locale-sensitive operation '{{name}}' is forbidden in a consensus reducer module.",
+		"dynamicCall": "A non-literal computed call target is forbidden in a consensus reducer module."
+	},
+	"syntaxKinds": ["source", "artifact"],
+	"mathUseForms": ["direct", "optional", "static-computed", "assigned", "destructured", "passed"],
+	"localeUseForms": ["direct", "optional", "static-computed", "extracted", "destructured"],
+	"dynamicCallForms": ["direct", "optional", "extracted", "destructured", "passed", "tagged", "call", "apply", "bind"],
+	"forbiddenMathMembers": [
+		"acos",
+		"acosh",
+		"asin",
+		"asinh",
+		"atan",
+		"atan2",
+		"atanh",
+		"cbrt",
+		"cos",
+		"cosh",
+		"exp",
+		"expm1",
+		"hypot",
+		"log",
+		"log1p",
+		"log10",
+		"log2",
+		"pow",
+		"sin",
+		"sinh",
+		"sqrt",
+		"tan",
+		"tanh"
+	],
+	"retainedMathMembers": [
+		"E",
+		"LN10",
+		"LN2",
+		"LOG10E",
+		"LOG2E",
+		"PI",
+		"SQRT1_2",
+		"SQRT2",
+		"abs",
+		"ceil",
+		"clz32",
+		"floor",
+		"fround",
+		"imul",
+		"max",
+		"min",
+		"round",
+		"sign",
+		"trunc"
+	],
+	"localeSensitiveMembers": [
+		"localeCompare",
+		"toLocaleString",
+		"toLocaleDateString",
+		"toLocaleTimeString",
+		"toLocaleLowerCase",
+		"toLocaleUpperCase"
+	],
+	"cases": [
+		{
+			"id": "shadowed-math-control-source",
+			"kind": "source",
+			"text": "export function value(Math: { sin(input: number): number }, input: number) { return Math.sin(input); }",
+			"diagnostics": []
+		},
+		{
+			"id": "shadowed-math-control-artifact",
+			"kind": "artifact",
+			"text": "export function value(Math, input) { return Math.sin(input); }",
+			"diagnostics": []
+		},
+		{
+			"id": "computed-data-read-write-control-source",
+			"kind": "source",
+			"text": "export function value(state: Record<string, number>, key: string, next: number) { const prior = state[key]; state[key] = next; return prior; }",
+			"diagnostics": []
+		},
+		{
+			"id": "computed-data-read-write-control-artifact",
+			"kind": "artifact",
+			"text": "export function value(state, key, next) { const prior = state[key]; state[key] = next; return prior; }",
+			"diagnostics": []
+		},
+		{
+			"id": "static-computed-call-control-source",
+			"kind": "source",
+			"text": "export function value(state: { add(value: number): number }) { return state['add'](1); }",
+			"diagnostics": []
+		},
+		{
+			"id": "static-computed-call-control-artifact",
+			"kind": "artifact",
+			"text": "export function value(state) { return state['add'](1); }",
+			"diagnostics": []
+		},
+		{
+			"id": "ordinary-arithmetic-and-order-control-source",
+			"kind": "source",
+			"text": "export function value(left: number, right: number, values: string[]) { values.sort(); return left < right ? left + right * 2 : left - right / 2; }",
+			"diagnostics": []
+		},
+		{
+			"id": "ordinary-arithmetic-and-order-control-artifact",
+			"kind": "artifact",
+			"text": "export function value(left, right, values) { values.sort(); return left < right ? left + right * 2 : left - right / 2; }",
+			"diagnostics": []
+		}
+	],
+	"mutantControls": {
+		"reallow-one-math-member": ["math-source-direct-sin"],
+		"reallow-exponentiation": ["exponentiation-source-binary"],
+		"reallow-exponentiation-assignment": ["exponentiation-artifact-assignment"],
+		"reallow-bigint-exponentiation": ["bigint-exponentiation-source-binary"],
+		"reallow-bigint-exponentiation-assignment": ["bigint-exponentiation-artifact-assignment"],
+		"drop-one-locale-member": ["locale-source-direct-localeCompare"],
+		"source-only-policy": ["math-artifact-direct-sin", "locale-artifact-direct-localeCompare"],
+		"accept-math-alias": ["math-source-assigned-sin"],
+		"accept-math-destructuring": ["math-artifact-destructured-sin"],
+		"locale-destructuring": ["locale-source-destructured-localeCompare"],
+		"treat-dynamic-call-as-data": ["dynamic-source-direct"],
+		"computed-callee-extraction": ["dynamic-source-extracted"],
+		"computed-callee-destructuring": ["dynamic-artifact-destructured"],
+		"computed-callee-tagging": ["dynamic-source-tagged"],
+		"computed-receiver-call": ["dynamic-artifact-call"],
+		"computed-receiver-apply": ["dynamic-artifact-apply"],
+		"computed-receiver-bind": ["dynamic-artifact-bind"]
+	}
+}

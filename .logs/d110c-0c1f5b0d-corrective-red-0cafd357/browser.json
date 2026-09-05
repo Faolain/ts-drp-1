@@ -1,0 +1,152 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6b-issuance-retention.config.ts",
+      "--grep",
+      "authenticates settlement refusal",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-6b-issuance-retention.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6b-issuance-retention-global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 120000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6b-issuance-retention-red.pw.ts"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6b-issuance-retention-red.pw.ts",
+      "file": "phase-6b-issuance-retention-red.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "authenticates settlement refusal, mixed-prefix deletion, replay and future-epoch refusal in Chromium",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 283,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 3\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[33m@@ -2,13 +2,13 @@\u001b[39m\n\u001b[2m    \"absentPlanCode\": \"ISSUANCE_RETRY_REQUIRED\",\u001b[22m\n\u001b[2m    \"firstRange\": Object {\u001b[22m\n\u001b[2m      \"from\": 0,\u001b[22m\n\u001b[2m      \"through\": 2,\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[32m-   \"futureCode\": \"ISSUANCE_INVALID_ARGUMENT\",\u001b[39m\n\u001b[32m-   \"futureRowsPresent\": true,\u001b[39m\n\u001b[32m-   \"futureWatermark\": null,\u001b[39m\n\u001b[31m+   \"futureCode\": undefined,\u001b[39m\n\u001b[31m+   \"futureRowsPresent\": false,\u001b[39m\n\u001b[31m+   \"futureWatermark\": 2,\u001b[39m\n\u001b[2m    \"refusalRowPresent\": true,\u001b[22m\n\u001b[2m    \"refusalWatermark\": null,\u001b[22m\n\u001b[2m    \"replayRange\": null,\u001b[22m\n\u001b[2m    \"successRemaining\": 0,\u001b[22m\n\u001b[2m  }\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 3\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[33m@@ -2,13 +2,13 @@\u001b[39m\n\u001b[2m    \"absentPlanCode\": \"ISSUANCE_RETRY_REQUIRED\",\u001b[22m\n\u001b[2m    \"firstRange\": Object {\u001b[22m\n\u001b[2m      \"from\": 0,\u001b[22m\n\u001b[2m      \"through\": 2,\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[32m-   \"futureCode\": \"ISSUANCE_INVALID_ARGUMENT\",\u001b[39m\n\u001b[32m-   \"futureRowsPresent\": true,\u001b[39m\n\u001b[32m-   \"futureWatermark\": null,\u001b[39m\n\u001b[31m+   \"futureCode\": undefined,\u001b[39m\n\u001b[31m+   \"futureRowsPresent\": false,\u001b[39m\n\u001b[31m+   \"futureWatermark\": 2,\u001b[39m\n\u001b[2m    \"refusalRowPresent\": true,\u001b[22m\n\u001b[2m    \"refusalWatermark\": null,\u001b[22m\n\u001b[2m    \"replayRange\": null,\u001b[22m\n\u001b[2m    \"successRemaining\": 0,\u001b[22m\n\u001b[2m  }\u001b[22m\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6b-issuance-retention-red.pw.ts:207:17",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6b-issuance-retention-red.pw.ts",
+                      "column": 17,
+                      "line": 207
+                    },
+                    "snippet": "  205 | \t\t\treturn fixture.authenticatedSettlementCase(`d110c-f5b0d-${crypto.randomUUID()}`);\n  206 | \t\t});\n> 207 | \t\texpect(value).toEqual({\n      | \t\t              ^\n  208 | \t\t\tabsentPlanCode: \"ISSUANCE_RETRY_REQUIRED\",\n  209 | \t\t\tfirstRange: { from: 0, through: 2 },\n  210 | \t\t\tfutureCode: \"ISSUANCE_INVALID_ARGUMENT\","
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6b-issuance-retention-red.pw.ts",
+                        "column": 17,
+                        "line": 207
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 3\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[33m@@ -2,13 +2,13 @@\u001b[39m\n\u001b[2m    \"absentPlanCode\": \"ISSUANCE_RETRY_REQUIRED\",\u001b[22m\n\u001b[2m    \"firstRange\": Object {\u001b[22m\n\u001b[2m      \"from\": 0,\u001b[22m\n\u001b[2m      \"through\": 2,\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[32m-   \"futureCode\": \"ISSUANCE_INVALID_ARGUMENT\",\u001b[39m\n\u001b[32m-   \"futureRowsPresent\": true,\u001b[39m\n\u001b[32m-   \"futureWatermark\": null,\u001b[39m\n\u001b[31m+   \"futureCode\": undefined,\u001b[39m\n\u001b[31m+   \"futureRowsPresent\": false,\u001b[39m\n\u001b[31m+   \"futureWatermark\": 2,\u001b[39m\n\u001b[2m    \"refusalRowPresent\": true,\u001b[22m\n\u001b[2m    \"refusalWatermark\": null,\u001b[22m\n\u001b[2m    \"replayRange\": null,\u001b[22m\n\u001b[2m    \"successRemaining\": 0,\u001b[22m\n\u001b[2m  }\u001b[22m\n\n  205 | \t\t\treturn fixture.authenticatedSettlementCase(`d110c-f5b0d-${crypto.randomUUID()}`);\n  206 | \t\t});\n> 207 | \t\texpect(value).toEqual({\n      | \t\t              ^\n  208 | \t\t\tabsentPlanCode: \"ISSUANCE_RETRY_REQUIRED\",\n  209 | \t\t\tfirstRange: { from: 0, through: 2 },\n  210 | \t\t\tfutureCode: \"ISSUANCE_INVALID_ARGUMENT\",\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6b-issuance-retention-red.pw.ts:207:17"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-04T22:03:51.344Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6b-issuance-retentio-f45fd-e-epoch-refusal-in-Chromium-chromium/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6b-issuance-retentio-f45fd-e-epoch-refusal-in-Chromium-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6b-issuance-retention-red.pw.ts",
+                    "column": 17,
+                    "line": 207
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "f9a45affc987d20dc3a5-0267a280c1ee6b92be1d",
+          "file": "phase-6b-issuance-retention-red.pw.ts",
+          "line": 190,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-04T22:03:50.864Z",
+    "duration": 1059.167,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

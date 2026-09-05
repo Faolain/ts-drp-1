@@ -1,0 +1,12 @@
+{
+  "executable": "node",
+  "args": [
+    ".logs/d110c-0c1f5b0w-green-25ec9862/verify.mjs",
+    "types"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:08:22.284Z",
+  "finished": "2026-09-05T14:08:43.525Z",
+  "status": 0,
+  "signal": null
+}

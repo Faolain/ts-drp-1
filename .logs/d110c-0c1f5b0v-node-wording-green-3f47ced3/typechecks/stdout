@@ -1,0 +1,67 @@
+Scope: 2 of 48 workspace projects
+packages/node typecheck$ tsc --noEmit
+packages/node typecheck: tests/browser/fixtures/blueprint-fold.page.ts(2,34): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: tests/browser/fixtures/blueprint-fold.page.ts(2,34): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: tests/browser/fixtures/blueprint-fold.worker.ts(2,56): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: tests/browser/fixtures/blueprint-fold.worker.ts(2,56): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: tests/ephemeral-webrtc-e3-02-red.test.ts(523,12): error TS2339: Property 'emit' does not exist on type 'DRPUnreliableWebRtcRoute'.
+packages/node typecheck: tests/helpers/compact-history-scale-1i-b.ts(152,4): error TS1360: Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' does not satisfy the expected type 'DRPObjectConfig'.
+packages/node typecheck:   Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+packages/node typecheck:     Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+packages/node typecheck:       Types of property 'history_storage' are incompatible.
+packages/node typecheck:         Type '"full" | "compact"' is not assignable to type '"compact"'.
+packages/node typecheck:           Type '"full"' is not assignable to type '"compact"'.
+packages/node typecheck: tests/helpers/compact-history-scale-1i-b.ts(157,3): error TS2322: Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfig | undefined'.
+packages/node typecheck:   Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '(DRPObjectConfigBase & { history_storage?: "full" | undefined; replica_mode?: ReplicaMode | undefined; }) | (DRPObjectConfigBase & { ...; })'.
+packages/node typecheck:     Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+packages/node typecheck:       Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+packages/node typecheck:         Types of property 'history_storage' are incompatible.
+packages/node typecheck:           Type '"full" | "compact"' is not assignable to type '"compact"'.
+packages/node typecheck:             Type '"full"' is not assignable to type '"compact"'.
+packages/node typecheck: ../worker-host/src/host.ts(1,62): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/error.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   The file is in the program because:
+packages/node typecheck:     Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/wire.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts'
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(1,62): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/error.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   The file is in the program because:
+packages/node typecheck:     Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/wire.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts'
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(2,35): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(2,35): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(13,8): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/wire.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   The file is in the program because:
+packages/node typecheck:     Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts'
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(13,8): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/wire.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   The file is in the program because:
+packages/node typecheck:     Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts'
+packages/node typecheck:   File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: Failed
+examples/v3-room typecheck$ tsc --noEmit
+examples/v3-room typecheck: Done
+ ERR_PNPM_RECURSIVE_FAIL  
+
+
+Summary: 1 fails, 1 passes
+
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/node:
+ ERROR  @ts-drp/node@0.11.0 typecheck: `tsc --noEmit`
+Exit status 2

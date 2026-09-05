@@ -1,0 +1,41 @@
+{
+  "status": "CAUSAL_SUCCESSOR_REPLAY_RED_NOT_GREEN",
+  "testCorrectionCommit": "87c3c836",
+  "sourceCommit": "8af5561c48f8b8d2d3767c33d613c2e1ec33c2f3",
+  "selectedFiles": 1,
+  "selectedTests": 3,
+  "passed": 0,
+  "failed": 3,
+  "skipped": 0,
+  "completeSoftFailureCount": 18,
+  "tokens": [
+    [
+      "REPLAY_EXACT_ORDER",
+      "REPLAY_EXACT_BYTES_SIGNATURES",
+      "REPLAY_EXACTLY_ONCE_COMMIT",
+      "REPLAY_RECOVERS_PROJECTION",
+      "REPLAY_SINK_PRESENT",
+      "REPLAY_COMMIT_AFTER_VALIDATION",
+      "REPLAY_SINK_PRESENT",
+      "REPLAY_COMMIT_AFTER_VALIDATION",
+      "REPLAY_BEFORE_PUBLIC_ISSUE",
+      "REPLAY_NO_DUPLICATE_COMMIT"
+    ],
+    [
+      "REPLAY_FAILURE_REFUSED",
+      "REPLAY_FAILURE_SEAM_REACHED",
+      "REPLAY_FAILURE_NO_ACTIVE_OWNER",
+      "REPLAY_FAILURE_TRANSPORT_RELEASED"
+    ],
+    [
+      "REPLAY_FAILURE_REFUSED",
+      "REPLAY_FAILURE_SEAM_REACHED",
+      "REPLAY_FAILURE_NO_ACTIVE_OWNER",
+      "REPLAY_FAILURE_TRANSPORT_RELEASED"
+    ]
+  ],
+  "unexpectedFailureCount": 0,
+  "invocationCount": 1,
+  "frozenNinePathOverlayUnchanged": true,
+  "stashCount": 27
+}

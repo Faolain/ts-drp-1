@@ -1,0 +1,95 @@
+[
+  {
+    "name": "worktree",
+    "command": "git",
+    "args": [
+      "-C",
+      "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "worktree",
+      "add",
+      "--detach",
+      "/tmp/d110c-f5b0u-successor-replay-red-KC0tfQ/checkout",
+      "fad19ef785d75e0f5231e1ddc1f8c78e6da0d31d"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "startedAt": "2026-09-05T05:37:41.168Z",
+    "finishedAt": "2026-09-05T05:37:45.792Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "apply",
+    "command": "git",
+    "args": [
+      "-C",
+      "/tmp/d110c-f5b0u-successor-replay-red-KC0tfQ/checkout",
+      "apply",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-successor-replay-red-fad19ef7/rejected-candidate.patch"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-successor-replay-red-KC0tfQ/checkout",
+    "startedAt": "2026-09-05T05:37:45.794Z",
+    "finishedAt": "2026-09-05T05:37:45.832Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "install",
+    "command": "pnpm",
+    "args": [
+      "install",
+      "--offline",
+      "--frozen-lockfile",
+      "--ignore-scripts"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-successor-replay-red-KC0tfQ/checkout",
+    "startedAt": "2026-09-05T05:37:46.269Z",
+    "finishedAt": "2026-09-05T05:37:58.658Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "build",
+    "command": "pnpm",
+    "args": [
+      "build:packages"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-successor-replay-red-KC0tfQ/checkout",
+    "startedAt": "2026-09-05T05:37:58.658Z",
+    "finishedAt": "2026-09-05T05:38:46.497Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "list",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "list",
+      "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-successor-replay-red-KC0tfQ/checkout",
+    "startedAt": "2026-09-05T05:38:46.498Z",
+    "finishedAt": "2026-09-05T05:38:50.886Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "focused",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "run",
+      "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "--coverage.enabled=false",
+      "--reporter=json",
+      "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-successor-replay-red-fad19ef7/reporter.json"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-successor-replay-red-KC0tfQ/checkout",
+    "startedAt": "2026-09-05T05:38:50.887Z",
+    "finishedAt": "2026-09-05T05:38:56.053Z",
+    "status": 1,
+    "signal": null
+  }
+]

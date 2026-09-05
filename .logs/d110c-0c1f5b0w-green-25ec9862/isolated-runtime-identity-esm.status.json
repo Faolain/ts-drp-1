@@ -1,0 +1,17 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "--dir",
+    "/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+    "exec",
+    "node",
+    "--input-type=module",
+    "-e",
+    "import {realpathSync,readFileSync} from \"node:fs\"; import {pathToFileURL} from \"node:url\"; import {createHash} from \"node:crypto\"; const contract=realpathSync(process.cwd()+\"/packages/storage-browser/node_modules/@ts-drp/issuance-store/dist/src/index.js\"); const loaded=await import(pathToFileURL(contract)); const implementation=realpathSync(process.cwd()+\"/packages/storage-browser/node_modules/@ts-drp/issuance-store/dist/src/contract.js\"); console.log(JSON.stringify({cwd:process.cwd(),contract,implementation,validator:typeof loaded.assertSettlementPlanProgressTransition,sha256:createHash(\"sha256\").update(readFileSync(implementation)).digest(\"hex\")}));"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:15:59.332Z",
+  "finished": "2026-09-05T14:15:59.715Z",
+  "status": 0,
+  "signal": null
+}

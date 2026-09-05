@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-05T19:41:49.738Z"
+}

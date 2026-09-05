@@ -1,0 +1,22 @@
+{
+	"verdict": "APPROVED",
+	"summary": "Signed/pushed correction cd665103dc178d4b6428eebd405f7b7d000285de resolves Opus's sole accepted P1. Scope is tests-only plus additive evidence and plan history; no production source, API, dependency, wire, workload, threshold, or campaign path changed. Each delivered carrier starts from genuine adoption evidence, traverses the real commit/activation owners, reaches the real close binder, and returns exact CREATOR_CLOSE_UNAVAILABLE before room-head or durable-head mutation. The isolated child proves the real MAX_SAFE_INTEGER bind guard fires before store access. The genuine 0->1->2 path is unchanged, the final focused reporter passes 1/1, the retained set matches the original 16-file GREEN set and passes 128/128, the coverage-wrapper diagnostic is recorded honestly, and the 15-entry manifest verifies.",
+	"findings": [
+		{
+			"severity": "P2",
+			"title": "reset and earlier-epoch carriers execute byte-identical mutations",
+			"evidence": "Both use the empty CompactMerkleAccumulator snapshot. At epoch 1 this is both reset and the only epoch-0 prefix history, and both traverse the real path and fail closed.",
+			"required_action": "Accept for D.110c-a; any later non-empty prefix distinction belongs to D.110c-c."
+		},
+		{
+			"severity": "P2",
+			"title": "Plan-named aliased and cross-anchor carriers are not separately executed",
+			"evidence": "Canonical decoding destroys aliases. At epoch 1, cross-anchor history reduces to the authenticated accumulator root/size mismatch already exercised by the foreign-history carrier.",
+			"required_action": "Accept the equivalent failure-mode coverage; do not reopen this correction."
+		}
+	],
+	"counts": { "P0": 0, "P1": 0, "P2": 2 },
+	"next_slice": "D110C_A_GREEN_ACCEPTED",
+	"session": "session_95ab9cd1-6226-4607-8c83-76a2bd562d25",
+	"note": "The exported session ZIP is the authoritative complete Kimi transcript; this file is its terminal result normalized for direct inspection."
+}

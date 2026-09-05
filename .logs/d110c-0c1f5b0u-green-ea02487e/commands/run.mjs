@@ -1,0 +1,22 @@
+import { spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync, openSync, closeSync, writeSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+const [label, cwd, command, ...args] = process.argv.slice(2);
+if (!label || !cwd || !command || !/^[a-z0-9-]+$/.test(label)) throw new Error('invalid capture invocation');
+const root = dirname(new URL(import.meta.url).pathname);
+const output = resolve(root, label);
+mkdirSync(output);
+const start = new Date().toISOString();
+writeFileSync(resolve(output, 'command.json'), JSON.stringify({cwd, command, args, start}, null, 2)+'\n', {flag:'wx'});
+const out = openSync(resolve(output,'stdout'),'wx');
+const err = openSync(resolve(output,'stderr'),'wx');
+const child = spawn(command, args, {cwd, env: process.env});
+child.stdout.on('data', chunk => { writeSync(out, chunk); process.stdout.write(chunk); });
+child.stderr.on('data', chunk => { writeSync(err, chunk); process.stderr.write(chunk); });
+let spawnError;
+child.on('error', error => { spawnError = String(error); });
+child.on('close', (code, signal) => {
+  closeSync(out); closeSync(err);
+  writeFileSync(resolve(output, 'status.json'), JSON.stringify({code, signal, spawnError, start, finish:new Date().toISOString(), pid:child.pid}, null, 2)+'\n', {flag:'wx'});
+  process.exitCode = code ?? 1;
+});

@@ -1,0 +1,100 @@
+# D.109a — Closed-Epoch Cleanup Eligibility
+
+## Question
+
+Can one package-internal owner deterministically refuse unsafe cleanup before
+any physical store is allowed to mutate?
+
+## Seam
+
+Add one package-internal `@ts-drp/node` cleanup-planning module. It accepts
+already verified, detached facts from the existing close/adoption owners and
+returns either an immutable stage plan or one closed refusal code. It exposes
+no package export and performs no I/O or deletion.
+
+The plan identifies, by exact value rather than ordering inference:
+
+- object and closed epoch;
+- verified commit-QC and adopted-head bindings;
+- expected current head/revision;
+- active generation and exactly the two complete rollback generations reached
+  by following `baseExpectedHead` twice from that active adopted generation;
+- the exact oldest-retained lineage floor, its expected original base (present
+  when an older prefix exists), and the complete connected older prefix eligible
+  for atomic floor normalization and deletion;
+- adopted local snapshot plus the adopted CutValue’s exact
+  `availabilityPolicyDigest`;
+- the issuance scope and upper epoch boundary to classify; and
+- exact durable identities later stages must recheck.
+
+## RED
+
+One tests-only owner drives the genuine Phase-6a close/adoption material into
+the missing module and requires:
+
+- a complete local-only positive control with the active generation plus both
+  immediate `baseExpectedHead` rollback ancestors and all three closures;
+- refusal for missing/unverified QC, non-adopted or mismatched head, fewer than
+  two distinct usable rollbacks, a wrong-but-countable pair of non-ancestor
+  superseded generations, either missing ancestor row or incomplete ancestor
+  closure, missing local snapshot, mismatched policy, incomplete outbox
+  classification, malformed/duplicate identities, and stale expected revision;
+- refusal when the proposed older deletion set is gapped, when any surviving
+  generation other than the exact floor points into it, or when simulating the
+  floor's sole `baseExpectedHead` normalization still leaves a dangling parent;
+- a causal mutant proving that deleting the parent of the oldest retained
+  ancestor without that exact normalization makes subsequent creator adoption
+  return `chain-invalid`;
+- permutation invariance of unordered facts;
+- detached immutable output;
+- exact refusal precedence; and
+- source guards proving zero calls to delete/clear/discard and no exported API.
+
+The RED must fail only because the package-internal planner and its exact
+closed result union do not yet exist. Existing Phase-6a retained tests stay
+green.
+
+## GREEN
+
+Implement only validation, canonical ordering, copying, and immutable planning.
+Reuse existing canonical bytes/digests and Phase-6a fact owners. The only
+accepted availability policy is exact equality with literal digest
+`53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b`,
+independently derived as `hashDomain("ts-drp/availability-policy/v3", bytes)`
+over canonical bytes
+`080405046d6f6465050a6c6f63616c2d6f6e6c79050e6d696e4c6f63616c436f70696573030205116d696e4d6972726f725265636569707473030005166d696e526f6c6c6261636b47656e65726174696f6e730304`.
+The planner never accepts or decodes policy bytes; any other digest receives a
+closed refusal and retains data for Phase 7b. Do not verify signatures again,
+open a store, add schema, schedule work, or reclaim memory.
+
+The immutable positive result carries an exact lineage-floor rewrite intent:
+the floor generation identity, its expected original base, the existing no-head
+replacement scoped to the same object, and the complete older prefix. D.109a
+only simulates the post-state graph and never mutates a record.
+When the floor is already the original no-head generation, the expected base is
+that existing no-head value, the deletion prefix is empty, and the later stage
+is an idempotent no-op rather than a fabricated rewrite.
+
+## Acceptance
+
+- Focused RED/GREEN executes once per color with an exact test count and exact
+  failure token at RED.
+- Node/object/storage affected typechecks, exact-owner lint/format/diff, and
+  retained Phase-6a semantic tests pass.
+- The changed production path set is the one internal planner only; the tests
+  and plan/evidence paths are enumerated separately.
+- A source-shape check proves no delete-like operation and no package export.
+
+The frozen owner is
+`tests/phase-6b-cleanup-eligibility-red.test.ts`; its sole GREEN source is
+`packages/node/src/internal/closed-epoch-cleanup.ts`. The closed refusal
+precedence is `D109A_QC_INVALID`, `D109A_ADOPTION_INVALID`,
+`D109A_HEAD_MISMATCH`, `D109A_REVISION_STALE`, `D109A_IDENTITY_INVALID`,
+`D109A_LINEAGE_INVALID`, `D109A_ROLLBACK_INSUFFICIENT`,
+`D109A_SNAPSHOT_MISSING`, `D109A_POLICY_UNSUPPORTED`, then
+`D109A_OUTBOX_INCOMPLETE`.
+
+## Handoff
+
+D.109b may consume the immutable plan only after its own store-local
+transaction revalidates the issuance facts. This slice authorizes no deletion.

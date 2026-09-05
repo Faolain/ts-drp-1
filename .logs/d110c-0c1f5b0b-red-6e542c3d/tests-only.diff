@@ -1,0 +1,13 @@
+diff --git a/tests/phase-3g-v3-rebase-outbox-red.test.ts b/tests/phase-3g-v3-rebase-outbox-red.test.ts
+index c519711e..c387bbf2 100644
+--- a/tests/phase-3g-v3-rebase-outbox-red.test.ts
++++ b/tests/phase-3g-v3-rebase-outbox-red.test.ts
+@@ -86,7 +86,7 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
+ 				vertexDigest: structural.sourceDigest,
+ 			},
+ 		});
+-		expect(structural.completion).toEqual({ kind: "published", ok: true });
++		expect(structural.completion).toBeUndefined();
+ 	});
+ 
+ 	it("fails closed before exposing an 8,193rd authenticated displaced source row", async () => {

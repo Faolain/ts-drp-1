@@ -1,0 +1,219 @@
+{
+  "productionCommit": "6f3d3049942c29f547f5cefdda628a3a01078077",
+  "signatures": {
+    "1eba4f9065d220afb0d77d90aac4a05b250a05bb": "G",
+    "5ab259fedeea24a102d1e3309d7282da81a3b224": "G",
+    "b2594cc7734d4e61c1cc3bff49f6996c4bbddc77": "G",
+    "6f3d3049942c29f547f5cefdda628a3a01078077": "G"
+  },
+  "remote": "6f3d3049942c29f547f5cefdda628a3a01078077\trefs/heads/codex/phase3a1b-p6-golden-path",
+  "owners": [
+    "packages/storage-browser/src/internal/ahe-reclamation.ts",
+    "packages/storage-node/src/internal/ahe-reclamation.ts",
+    "packages/storage/src/maintenance.ts"
+  ],
+  "ownerHashes": {
+    "packages/storage-browser/src/internal/ahe-reclamation.ts": "3453cebd61639ab6a2c323635786148ded14901b6e981946e6c55109b0005262",
+    "packages/storage-node/src/internal/ahe-reclamation.ts": "0067512d2a915e60c7f3ac9d360618d821e33d56fb298e896b64c6a99e675a3e",
+    "packages/storage/src/maintenance.ts": "7cf230854ecc4b8213bb016591372a7bdb0e72a0ab81e750fd53b2a5b24c76bb"
+  },
+  "productionPatchSha256": "7b954dfbfc78ebe2db49fbfe88e05bebd7da82ae7f03ed690ad712b8573a3b1b",
+  "outcomes": [
+    {
+      "label": "initial-focused",
+      "processStatus": 0,
+      "files": 1,
+      "total": 16,
+      "passed": 16,
+      "failed": 0,
+      "skippedTodoPending": 0,
+      "topLevelErrors": 0,
+      "reporterSha256": "7c809f85a5fd397e6d5d0215958875a5cb8a2b834c83e3c0e3a9f6db6bbc57d1"
+    },
+    {
+      "label": "initial-retained",
+      "processStatus": 0,
+      "files": 7,
+      "total": 125,
+      "passed": 125,
+      "failed": 0,
+      "skippedTodoPending": 0,
+      "topLevelErrors": 0,
+      "reporterSha256": "9124e7a0c7ceabcceb181f9f0eaff94bbe1db05d50544a268b95737f6f87507d"
+    },
+    {
+      "label": "initial-issuance",
+      "processStatus": 0,
+      "files": 1,
+      "total": 12,
+      "passed": 12,
+      "failed": 0,
+      "skippedTodoPending": 0,
+      "topLevelErrors": 0,
+      "reporterSha256": "5f8092ad4207ef322ed929a4df604ff248810adb943a9440dab040a436a708ac"
+    },
+    {
+      "label": "signed-focused",
+      "processStatus": 0,
+      "files": 1,
+      "total": 16,
+      "passed": 16,
+      "failed": 0,
+      "skippedTodoPending": 0,
+      "topLevelErrors": 0,
+      "reporterSha256": "6688aec0fd4d433ea03891463961302f40d2881c0759d5ab2ce71ad3b8184347"
+    }
+  ],
+  "browser": {
+    "passed": 4,
+    "skipped": 0,
+    "failed": 0,
+    "flaky": 0,
+    "topLevelErrors": 0,
+    "tests": [
+      "  ✓  1 [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:50:1 › [RED readiness] requires the browser identity owner and strict reclamation transaction (289ms)",
+      "  ✓  2 [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:65:1 › reclaims and replays a genuine five-generation IndexedDB lineage (229ms)",
+      "  ✓  3 [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:102:1 › refuses the frozen native mutant matrix without partial deletion (1.1s)",
+      "  ✓  4 [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:129:1 › terminates at every live IndexedDB mutation edge and reopens old XOR complete-new (10.4s)"
+    ],
+    "ephemeralPort": true,
+    "precedingIssuanceFinished": true
+  },
+  "native": [
+    {
+      "mode": "duplicate",
+      "status": 0,
+      "completed": true,
+      "token": null,
+      "premises": [
+        "genuine SQLite facade",
+        "existing backend resolver",
+        "ordinary read",
+        "distinct native ESM namespaces sharing one global"
+      ],
+      "stdoutSha256": "7e0404bf575219a5dd65c17a8cfe3979ee8304a9322432f148b43075f8ae4fe3",
+      "stderrSha256": "71f5ffa0fcab80f482b437278aadcb358aa59932d4c9b260246367f626b618e5"
+    },
+    {
+      "mode": "value",
+      "status": 0,
+      "completed": true,
+      "token": null,
+      "premises": [
+        "fresh preoccupied global",
+        "unchanged descriptor",
+        "zero accessor invocations"
+      ],
+      "stdoutSha256": "df9ec7d44ec921711e82cab949f047545cb113df455e7f806ab3fd4de70038e5",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "mode": "accessor",
+      "status": 0,
+      "completed": true,
+      "token": null,
+      "premises": [
+        "fresh preoccupied global",
+        "unchanged descriptor",
+        "zero accessor invocations"
+      ],
+      "stdoutSha256": "fc615fc88939cc56b131a6f550401e3a78dce9f94a06039a828497903ad64326",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "mode": "descriptor",
+      "status": 0,
+      "completed": true,
+      "token": null,
+      "premises": [
+        "fresh preoccupied global",
+        "unchanged descriptor",
+        "zero accessor invocations"
+      ],
+      "stdoutSha256": "87f1f5c0f04854dfacd8835d228b7724daf409ed7744305c4dc13c8125336042",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "sourceCustody": {
+    "wholeFiles": 12,
+    "statementSpans": 66,
+    "initialAndSignedSourcesIdentical": true,
+    "allEightNativeRuntimeHashesIdentical": true
+  },
+  "typecheck": {
+    "storagePass": true,
+    "browserPass": false,
+    "nodePass": false,
+    "browserInherited": 74,
+    "nodeInherited": 144,
+    "targetDiagnostics": 0,
+    "externalSourceMappedDiagnostic": "TS2322 tests/fixtures/phase-6b/ahe-reclamation-contract.ts:234, BlobDigest/ClosureDigest"
+  },
+  "custody": {
+    "parentFiles": 7,
+    "stashes": 27,
+    "protectedPaths": 86522
+  },
+  "commandStatuses": {
+    "baseline-build": 0,
+    "baseline-source-check": 0,
+    "baseline-typecheck-storage-browser": 2,
+    "baseline-typecheck-storage-node": 2,
+    "baseline-typecheck-storage": 0,
+    "browser-port-preflight": 0,
+    "browser-process-preflight": 0,
+    "initial-browser": 0,
+    "initial-checkout": 0,
+    "initial-clone": 0,
+    "initial-focused-revalidation": 0,
+    "initial-focused": 0,
+    "initial-green-build": 0,
+    "initial-install": 0,
+    "initial-issuance": 0,
+    "initial-patch-check": 0,
+    "initial-retained": 0,
+    "initial-source-check": 0,
+    "initial-sparse": 0,
+    "initial-type-delta": 0,
+    "initial-typecheck-storage-browser": 2,
+    "initial-typecheck-storage-node": 2,
+    "initial-typecheck-storage": 0,
+    "main-diff-check": 0,
+    "main-eslint-corrected": 0,
+    "main-eslint": 1,
+    "main-prettier-corrected": 0,
+    "main-prettier": 1,
+    "production-changed-paths": 0,
+    "production-commit": 0,
+    "production-push": 0,
+    "production-remote": 0,
+    "production-signature": 0,
+    "signed-build": 0,
+    "signed-checkout": 0,
+    "signed-clone": 0,
+    "signed-focused-gate": 0,
+    "signed-focused": 0,
+    "signed-install": 0,
+    "signed-native-accessor": 0,
+    "signed-native-descriptor": 0,
+    "signed-native-duplicate": 0,
+    "signed-native-value": 0,
+    "signed-source-check": 0,
+    "signed-sparse": 0,
+    "signed-type-delta": 0,
+    "signed-typecheck-storage-browser": 2,
+    "signed-typecheck-storage-node": 2,
+    "signed-typecheck-storage": 0
+  },
+  "recorderDiagnostic": {
+    "initialFocusedWrapperStatus": 1,
+    "initialFocusedProcessStatus": 0,
+    "cause": "Absent optional numRuntimeErrorTestSuites field compared strictly to 0",
+    "sameReporterRevalidated": true,
+    "noRuntimeRerunForValidator": true
+  },
+  "focusedGreenRuns": 2,
+  "redRuntimeRuns": 0,
+  "formalReviewPending": true,
+  "parentIntegrationNotPerformed": true
+}

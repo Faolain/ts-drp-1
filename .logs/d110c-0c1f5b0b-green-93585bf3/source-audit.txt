@@ -1,0 +1,15 @@
+changed_paths=5
+production_source_paths=3
+package_or_resolution_paths=2
+root_has_verifyReceivedVertex=false
+internal_verifyReceivedVertex_type=function
+root_export_count=12
+hardcoded_terminalThrough_minus_one_count=0
+hardcoded_admission_zero_terminal_null_classifier_count=0
+verified_frontier_context_required=true
+close_map_names=closeVertices,closeAuthors,closeCharges
+control_subset_owner=controlVertices
+public_issue_type_planEffect_field=false
+wire_or_protobuf_paths_changed=0
+dependency_version_changes=0
+

@@ -1,0 +1,15 @@
+0403b9901fcc361dbe4a93a4b84f27ce04d8dd051cd0c7c8a8078faf514bf332  docs/production-hardening/production-hardening-tdd-plan-v2.md
+3926bbd008fb6b5791d2b0df3fed11cc7110c1b682ead0d3b17ba5f3c1281292  examples/v3-room/src/index.ts
+0c57932b8336fbe9e98f244d57118d8b95944934edf04cf2fe0598c74abc93c9  packages/node/src/creator-adoption-activate.ts
+8ad88e364d958eb8f4c03ee0cf14f19354aa3657df3f33e0214435ef41fffcb3  packages/node/src/creator-adoption-commit.ts
+5796b88209a18380bebebb74932a8a6a258146748a66698edced1715742440fd  packages/node/src/creator-adoption.ts
+6dcd1a836caab88c8913c922589b84df343309e1ae98eb8fba9f081816411f14  packages/node/src/v3-live.ts
+ec12d31299383f553e35b8ce6d6f99239a94f12c538449a86fa077974dfdd3cc  packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+68b9669593c665909e19a4e9372c030b5bc5113198d4464426cdc3b138919ce5  packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
+dbe9867912f0bc8122853e4e7e7fb0c08c7b0b5d5a544da4032c0ae2f929e221  packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+11b51591013fb36bd475a90e97eb82a27b1cb9e7df3f6f5b83c4fb6ce5147bff  tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+f96f730bc121f14a82dce1b908210640fc7e456eea39d53659708286b6539f25  tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+1decc8777ef6e36ea00ed4a064398cb4475d37129947e9689f32f2234d974319  tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts
+ba43ae8b71390aca122fb4c1afd139b53524d4f7bd050449b774f8b7f093a088  tests/fixtures/phase-6b-d110c-b/source-shape.mjs
+3f618222197f9cd38239fc55dff1b71f229dc68456c96676a4d7428d8b2789b8  tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+0725933bab799af6629a1b9a49f7667c5a80bc4fd39183d8f07123a339397bf5  tests/phase-6b-d110c-b-hot-adoption.test.ts

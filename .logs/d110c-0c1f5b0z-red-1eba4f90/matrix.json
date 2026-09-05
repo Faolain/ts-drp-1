@@ -1,0 +1,129 @@
+{
+  "frozenAt": "2026-09-05T19:39:38.293Z",
+  "base": "5c44a7dc18ac1db1518034bcc3fa0b276baa4ec7",
+  "files": [
+    "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  ],
+  "fileHashes": {
+    "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts": "f5fd5086ea35ba7c374a275fd15ddbc2a5c489b07bba0f6041ce579e1718f003",
+    "tests/fixtures/phase-6b-d110c-0c1f5b0z/native-registry-child.mjs": "3ba2b9abd6d87015653ad5b2db5b8350d9bb44b163e69ab6f57e88008e4d7c0a",
+    "tests/fixtures/phase-6b-d110c-0c1f5b0z/source-custody.json": "619b90bad68d2fe856a24961f2598cf5de685b7433434997c5628a8e00f42e8c"
+  },
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/private/tmp/d110c-f5b0z-red-preflight-mWpFAK/focused.json"
+  ],
+  "selected": 16,
+  "expectedFailed": 14,
+  "expectedPassed": 2,
+  "intentionallyFiltered": 0,
+  "allowedTopLevelErrors": 0,
+  "allowedTimeouts": 0,
+  "allowedAdditionalFailures": 0,
+  "executionCount": 1,
+  "entries": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 01 real browser facade resolves the exact existing backend capability",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 02 real SQLite facade resolves the exact existing backend capability",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 03 memory copied proxy and foreign facades do not inherit discovery",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 04 first bind wins through both backends and refuses same and different second capabilities",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 05 duplicate internal backend registration preserves both first resolver identities",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 06 fresh native ESM instances share exact bindings in one global",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 07 incompatible preoccupied registry value fails closed",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_INCOMPATIBLE_REGISTRY_REFUSAL_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 08 preoccupied accessor is not invoked and import fails closed",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_INCOMPATIBLE_REGISTRY_REFUSAL_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 09 mutable configurable preoccupied descriptor fails closed",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_INCOMPATIBLE_REGISTRY_REFUSAL_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 10 discovered browser maintenance preserves closed refusal",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 11 discovered browser maintenance preserves poisoned refusal",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 12 discovered SQLite maintenance preserves closed refusal",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 13 discovered SQLite maintenance preserves poisoned refusal",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 14 registration and discovery preserve facade keys without additional store IO",
+      "expectedStatus": "failed",
+      "token": "F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 15 legacy backend resolvers stay backend specific and reject foreign identities",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 16 compatibility custody preserves interfaces roots manifests constructors and mutation bodies",
+      "expectedStatus": "passed",
+      "token": null
+    }
+  ],
+  "budgets": "Existing 10000ms test timeout and all coverage configuration/thresholds unchanged. Child transport bounded to 8000ms/1MiB. No campaigns or product epochs."
+}

@@ -1,0 +1,377 @@
+
+> @ts-drp/storage-node@0.11.0 typecheck /private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node
+> tsc --noEmit
+
+../node/src/creator-adoption-activate.ts(1,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./creator-adoption.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+    Imported via "../../../packages/node/src/creator-adoption.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../../../packages/node/src/creator-adoption.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-adoption-activate.ts(1,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./creator-adoption.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+    Imported via "../../../packages/node/src/creator-adoption.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../../../packages/node/src/creator-adoption.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-adoption-commit.ts(25,76): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-adoption-stage.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-adoption-commit.ts(25,76): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-adoption-stage.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-adoption.ts(31,45): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts'
+    Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+    Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts'
+    Imported via "../../../packages/node/src/creator-close.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-adoption.ts(31,45): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts'
+    Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+    Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts'
+    Imported via "../../../packages/node/src/creator-close.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-adoption.ts(42,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-adoption-recover.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-adoption.ts(42,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-adoption-recover.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(59,73): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-adoption-intent.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts'
+    Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts'
+    Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+    Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(59,73): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-adoption-intent.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts'
+    Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts'
+    Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+    Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(60,57): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-issuance-retirement-boundary.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(60,57): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-issuance-retirement-boundary.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(61,49): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-transition-advance.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts'
+    Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+    Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts'
+    Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(61,49): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-transition-advance.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts'
+    Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+    Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts'
+    Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(66,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/runtime-reclamation.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./internal/runtime-reclamation.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts'
+    Imported via "./internal/runtime-reclamation.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(66,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/runtime-reclamation.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./internal/runtime-reclamation.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts'
+    Imported via "./internal/runtime-reclamation.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(67,36): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./v3-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts'
+    Imported via "./v3-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+    Imported via "../../../packages/node/src/v3-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../../../packages/node/src/v3-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/creator-close.ts(67,36): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./v3-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-close.ts'
+    Imported via "./v3-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+    Imported via "../../../packages/node/src/v3-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../../../packages/node/src/v3-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/internal/creator-adoption-intent.ts(4,77): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-successor-live.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-adoption-intent.ts'
+    Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+    Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts'
+    Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+    Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/internal/creator-adoption-intent.ts(4,77): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-successor-live.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-adoption-intent.ts'
+    Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+    Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption.ts'
+    Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+    Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/internal/creator-successor-live.ts(14,46): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-room-head.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./creator-room-head.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-successor-live.ts'
+    Imported via "./internal/creator-room-head.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/internal/creator-successor-live.ts(14,46): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-room-head.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./creator-room-head.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/creator-successor-live.ts'
+    Imported via "./internal/creator-room-head.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/v3-live.ts(110,37): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/v3-topic.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./internal/v3-topic.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+    Imported via "./internal/v3-topic.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/v3-live.ts(110,37): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/internal/v3-topic.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./internal/v3-topic.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live.ts'
+    Imported via "./internal/v3-topic.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/v3-live.ts(111,41): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-envelope-scope.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/v3-live.ts(111,41): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-envelope-scope.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/v3-live.ts(112,82): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live-recovered-authority.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../node/src/v3-live.ts(112,82): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/v3-live-recovered-authority.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../protocol-v3/src/index.ts(21,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/src/internal/seal-authority-custody.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/package.json' has field "type" with value "module"
+../protocol-v3/src/index.ts(21,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/src/internal/seal-authority-custody.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/package.json' has field "type" with value "module"
+../storage-browser/src/internal/seal-evidence-store.ts(12,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/schema-idb.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./schema-idb.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/seal-evidence-store.ts'
+    Imported via "./schema-idb.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/seal-vote-store.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../storage-browser/src/internal/seal-evidence-store.ts(12,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/schema-idb.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./schema-idb.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/seal-evidence-store.ts'
+    Imported via "./schema-idb.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/seal-vote-store.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../storage-browser/src/seal-evidence.ts(6,70): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/seal-evidence-store.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./internal/seal-evidence-store.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/seal-evidence.ts'
+    Imported via "./internal/seal-evidence-store.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/seal-evidence.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../storage-browser/src/seal-evidence.ts(6,70): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/seal-evidence-store.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./internal/seal-evidence-store.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/seal-evidence.ts'
+    Imported via "./internal/seal-evidence-store.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/seal-evidence.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../storage-browser/src/seal-vote.ts(9,43): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/seal-vote-store.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../storage-browser/src/seal-vote.ts(9,43): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/internal/seal-vote-store.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+tests/phase-6a-creator-adoption-commit-death-red.test.ts(3,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+tests/phase-6a-creator-adoption-commit-death-red.test.ts(14,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-adoption-commit-death-red.test.ts(14,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-adoption-commit-death-red.test.ts(15,51): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts'
+    Imported via "../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'
+    Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+    Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts'
+    Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+    Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-adoption-commit-death-red.test.ts(15,51): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts'
+    Imported via "../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'
+    Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+    Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts'
+    Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+    Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-successor-activation-death-red.test.ts(13,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'
+    Imported via "./creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+    Imported via "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts'
+    Imported via "./creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-successor-activation-death-red.test.ts(13,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'
+    Imported via "./creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+    Imported via "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts'
+    Imported via "./creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-successor-activation-death-red.test.ts(14,39): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-successor-activation-death-red.test.ts(14,39): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-successor-activation-death-red.test.ts(18,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-successor-activation-death-red.test.ts(18,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-successor-local-author-death-red.test.ts(18,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6a-creator-successor-local-author-death-red.test.ts(18,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6b-ahe-reclamation-red.test.ts(36,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6b/ahe-reclamation-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6b-ahe-reclamation-red.test.ts(36,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6b/ahe-reclamation-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6b-differential-exit-red.test.ts(21,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6b/differential-exit-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6b-differential-exit-red.test.ts(21,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6b/differential-exit-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6b-differential-exit-red.test.ts(22,47): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6b/issuance-retention-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "../../../tests/fixtures/phase-6b/issuance-retention-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6b-differential-exit-red.test.ts'
+    Imported via "../../../tests/fixtures/phase-6b/issuance-retention-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6b-differential-exit-red.test.ts(22,47): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6b/issuance-retention-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "../../../tests/fixtures/phase-6b/issuance-retention-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6b-differential-exit-red.test.ts'
+    Imported via "../../../tests/fixtures/phase-6b/issuance-retention-contract.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+tests/phase-6b-issuance-retention-red.test.ts(1,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts(2,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(2,45): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(3,47): error TS2307: Cannot find module '@ts-drp/control-plane' or its corresponding type declarations.
+../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(4,82): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(10,46): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/blueprint-catalog/src/index.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/blueprint-catalog/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(10,46): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/blueprint-catalog/src/index.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/blueprint-catalog/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts(1,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts(2,81): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts(130,37): error TS7031: Binding element 'value' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(1,46): error TS2307: Cannot find module '@ts-drp/blueprint-catalog' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(2,62): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(8,8): error TS2307: Cannot find module '@ts-drp/compaction' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(9,47): error TS2307: Cannot find module '@ts-drp/control-plane' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(10,82): error TS2307: Cannot find module '@ts-drp/issuance-store' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(11,56): error TS2307: Cannot find module '@ts-drp/issuance-store/maintenance' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(13,49): error TS2307: Cannot find module '@ts-drp/keychain/finality' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(19,8): error TS2307: Cannot find module '@ts-drp/live-journal' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(20,37): error TS2307: Cannot find module '@ts-drp/message-queue' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(28,8): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(34,8): error TS2307: Cannot find module '@ts-drp/storage/snapshot-transfer' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(35,71): error TS2307: Cannot find module '@ts-drp/types' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(41,55): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(41,55): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-activate.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(42,53): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "../../../packages/node/src/creator-adoption-commit.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../../../packages/node/src/creator-adoption-commit.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(42,53): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/src/creator-adoption-commit.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "../../../packages/node/src/creator-adoption-commit.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../../../packages/node/src/creator-adoption-commit.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/node/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(61,41): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/src/index.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "../../../packages/protocol-v3/src/index.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../index.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/src/internal/seal-authority-custody.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(61,41): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/src/index.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "../../../packages/protocol-v3/src/index.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../index.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/src/internal/seal-authority-custody.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/protocol-v3/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(62,51): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/seal-evidence.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(62,51): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/seal-evidence.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(63,47): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/seal-vote.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(63,47): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/seal-vote.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(64,59): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/snapshot-transfer.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(64,59): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/src/snapshot-transfer.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(68,36): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts'
+    Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(68,36): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+    Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts'
+    Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(74,8): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(74,8): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(595,21): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(597,24): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(598,23): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(599,19): error TS7006: Parameter 'digest' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(607,22): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(608,19): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(609,30): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(639,20): error TS7006: Parameter 'objectId' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(644,35): error TS7006: Parameter 'objectId' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(678,52): error TS7006: Parameter 'ref' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(678,57): error TS7006: Parameter 'index' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(696,14): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(707,21): error TS7006: Parameter 'declaration' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(707,34): error TS7006: Parameter 'options' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(712,14): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(713,16): error TS7006: Parameter 'receipt' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(713,25): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(714,22): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(717,14): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(719,11): error TS7006: Parameter 'signal' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(723,21): error TS7006: Parameter 'descriptor' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(733,16): error TS7006: Parameter 'descriptor' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(733,28): error TS7006: Parameter 'bytes' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(740,18): error TS7006: Parameter 'options' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(805,35): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(806,22): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(806,29): error TS7006: Parameter 'sequence' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(811,23): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(816,26): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(823,19): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(823,26): error TS7006: Parameter 'buildAndSign' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(827,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(829,24): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(830,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(831,15): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(832,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(854,45): error TS7006: Parameter 'authorSequence' implicitly has an 'any' type.
+../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(1,62): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(9,36): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./creator-successor-oracle.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+    Imported via "./creator-successor-oracle.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(9,36): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "./creator-successor-oracle.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+    Imported via "./creator-successor-oracle.js" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+  File is ECMAScript module because '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/package.json' has field "type" with value "module"
+../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(10,44): error TS6059: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/shared/workspace-package-subprocess.mjs' is not under 'rootDir' '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "../shared/workspace-package-subprocess.mjs" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+    Imported via "../shared/workspace-package-subprocess.mjs" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(10,44): error TS6307: File '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/shared/workspace-package-subprocess.mjs' is not listed within the file list of project '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via "../shared/workspace-package-subprocess.mjs" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+    Imported via "../shared/workspace-package-subprocess.mjs" from file '/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts(2,45): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts(3,50): error TS2307: Cannot find module '@ts-drp/types' or its corresponding type declarations.
+../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts(157,45): error TS18046: 'byte' is of type 'unknown'.
+../../tests/fixtures/phase-6a-v3/creator-successor-oracle.ts(1,62): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-6b/ahe-reclamation-contract.ts(9,8): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+../../tests/fixtures/phase-6b/differential-exit-contract.ts(9,8): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+../../tests/fixtures/phase-6b/issuance-retention-contract.ts(1,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+../../tests/fixtures/phase-6b/issuance-retention-contract.ts(7,8): error TS2307: Cannot find module '@ts-drp/issuance-store' or its corresponding type declarations.
+../../tests/fixtures/phase-6b/issuance-retention-contract.ts(208,51): error TS7006: Parameter 'authorSequence' implicitly has an 'any' type.
+/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout/packages/storage-node:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @ts-drp/storage-node@0.11.0 typecheck: `tsc --noEmit`
+Exit status 2

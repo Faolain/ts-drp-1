@@ -1,0 +1,16 @@
+{
+  "facts": {
+    "checkpointExportAbsent": true,
+    "boundedAdvanceExportAbsent": true,
+    "currentOpenerUsed": true,
+    "currentEpochZeroLiteral": true,
+    "successorEpochOneLiteral": true,
+    "generationOneSelector": true,
+    "generationTwoSelector": true,
+    "unboundedAdoptionClassifier": true,
+    "unboundedCloseClassifier": true,
+    "retiringProofInputAbsent": true,
+    "retiringAclInputAbsent": true
+  },
+  "ok": true
+}

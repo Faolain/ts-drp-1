@@ -1,0 +1,39 @@
+{
+  "status": "PASS",
+  "commit": "4521f03f284a31001ae4a1a9e65ce23d5ca77ac9",
+  "signature": "G",
+  "pushedRef": "4521f03f284a31001ae4a1a9e65ce23d5ca77ac9",
+  "red": {
+    "selectedFiles": 1,
+    "failedTests": 1,
+    "exactSoftFailures": [
+      "safe = capability",
+      "(safe, capability)",
+      "safe &&= capability",
+      "safe ||= capability",
+      "safe ??= capability",
+      "capability &&= safe",
+      "capability ||= safe",
+      "capability ??= safe",
+      "safe = (other, { capability })"
+    ],
+    "filtered": 11
+  },
+  "green": {
+    "selectedFiles": 1,
+    "passedTests": 5,
+    "failedTests": 0,
+    "filtered": 7,
+    "selectedNames": [
+      "D.108d2 public return AST oracle accepts private computations and primitive comparisons without confusing operand names with returned authority",
+      "D.108d2 public return AST oracle rejects exact sensitive properties and values on exported returned shapes",
+      "D.108d2 public return AST oracle tracks the returned operands of assignment, comma and logical assignment expressions",
+      "D.108d2 public return AST oracle follows local returned aliases, helpers, methods, export aliases and global product surfaces",
+      "D.108e2b creator successor room lifetime RED keeps node-root and chat authority closed while assigning the room as sole node consumer"
+    ]
+  },
+  "stashCount": 27,
+  "protectedEntries": 81,
+  "productionChanges": 0,
+  "validatedAt": "2026-09-05T07:19:34.240Z"
+}

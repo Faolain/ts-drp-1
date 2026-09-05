@@ -1,0 +1,11 @@
+{
+	"originalClassification": "NO_VERDICT",
+	"originalStopReason": "end_turn",
+	"resumeRequestId": "f3a20f95-a575-43d6-b0b9-00f9e938d3ef",
+	"sessionId": "01a06416-f757-7983-aebd-abda1aef6ac7",
+	"structuredVerdict": "APPROVED",
+	"p0": 0,
+	"p1": 0,
+	"p2": 3,
+	"nextState": "D110C_0C_RED_AUTHORIZED"
+}

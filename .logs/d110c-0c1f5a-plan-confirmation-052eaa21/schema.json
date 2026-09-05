@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "properties": {
+    "verdict": { "type": "string", "enum": ["APPROVED", "CHANGES_REQUIRED"] },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "title": { "type": "string" },
+          "evidence": { "type": "string" },
+          "impact": { "type": "string" },
+          "required_action": { "type": "string" }
+        },
+        "required": ["severity", "title", "evidence", "impact", "required_action"],
+        "additionalProperties": false
+      }
+    },
+    "plan_sufficient": { "type": "boolean" },
+    "diagnostic_classification_honest": { "type": "boolean" },
+    "corrected_red_causal": { "type": "boolean" },
+    "corrected_red_authorized": { "type": "boolean" },
+    "scope_preserved": { "type": "boolean" }
+  },
+  "required": [
+    "verdict",
+    "summary",
+    "findings",
+    "plan_sufficient",
+    "diagnostic_classification_honest",
+    "corrected_red_causal",
+    "corrected_red_authorized",
+    "scope_preserved"
+  ],
+  "additionalProperties": false
+}

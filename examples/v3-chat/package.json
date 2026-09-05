@@ -1,0 +1,20 @@
+{
+	"name": "ts-drp-example-v3-chat",
+	"version": "0.11.0",
+	"license": "MIT",
+	"type": "module",
+	"scripts": {
+		"build": "esbuild src/index.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/index.js",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/example-v3-room": "workspace:*",
+		"@ts-drp/keychain": "0.11.0",
+		"@ts-drp/types": "0.11.0"
+	},
+	"devDependencies": {
+		"esbuild": "^0.25.3",
+		"typescript": "^5.5.4"
+	}
+}

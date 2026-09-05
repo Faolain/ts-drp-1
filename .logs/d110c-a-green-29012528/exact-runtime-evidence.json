@@ -1,0 +1,12 @@
+{
+  "afterReferenceCount": 7,
+  "beforeReferenceCount": 5,
+  "closeOrder": ["eebc50ed8d8ddaf088f7ae27c8263f9567cbbb9ba3cca96ad1a5c9a08401972e"],
+  "closureBytes": { "after": 7729, "before": 5776, "delta": 1953 },
+  "epoch": 1,
+  "historyRoot": "4c081bd4bba93a90303556778cdfa602c1e7ac04b11176d4cbf5ebf92ae190ff",
+  "historySize": 3,
+  "previousHistoryRoot": "745c34fc0ff5f8077f5b8860ce537f4f5944a02c495effeeb1a3584435fe33d2",
+  "previousHistorySize": 2,
+  "successorEpoch": 2
+}

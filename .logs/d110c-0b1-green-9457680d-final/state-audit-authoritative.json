@@ -1,0 +1,12 @@
+{
+  "fixedPortsClear": true,
+  "head": "9457680d95eec15afe3a6a6d7d17655a1d21c2ee",
+  "originHead": "9457680d95eec15afe3a6a6d7d17655a1d21c2ee",
+  "protectedPaths": {
+    ".agents": true,
+    ".claude": true,
+    ".pnpm-store": true
+  },
+  "relevantProcesses": [],
+  "stashCount": 27
+}

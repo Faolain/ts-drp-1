@@ -1,0 +1,102 @@
+{
+	"name": "@ts-drp/protocol-v3",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/public.d.ts",
+	"files": [
+		"src",
+		"registry",
+		"supplements/blueprint-artifact-profile-v1",
+		"supplements/blueprint-numeric-determinism-v1",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/public.d.ts",
+			"import": "./dist/src/public.js"
+		},
+		"./author-authorization": {
+			"types": "./dist/src/author-authorization.d.ts",
+			"import": "./dist/src/author-authorization.js"
+		},
+		"./blueprint-application": {
+			"types": "./dist/src/blueprint-application.d.ts",
+			"import": "./dist/src/blueprint-application.js"
+		},
+		"./latched-acl": {
+			"types": "./dist/src/latched-acl.d.ts",
+			"import": "./dist/src/latched-acl.js"
+		},
+		"./creator-close": {
+			"types": "./dist/src/creator-close.d.ts",
+			"import": "./dist/src/creator-close.js"
+		},
+		"./creator-checkpoint": {
+			"types": "./dist/src/creator-checkpoint.d.ts",
+			"import": "./dist/src/creator-checkpoint.js"
+		},
+		"./creator-issuance-retirement": {
+			"types": "./dist/src/creator-issuance-retirement.d.ts",
+			"import": "./dist/src/creator-issuance-retirement.js"
+		},
+		"./creator-author-issuance-frontiers": {
+			"types": "./dist/src/creator-author-issuance-frontiers.d.ts",
+			"import": "./dist/src/creator-author-issuance-frontiers.js"
+		},
+		"./settlement-profile": {
+			"types": "./dist/src/settlement-profile.d.ts",
+			"import": "./dist/src/settlement-profile.js"
+		},
+		"./seal": {
+			"types": "./dist/src/seal.d.ts",
+			"import": "./dist/src/seal.js"
+		},
+		"./internal/seal-signing-request": {
+			"types": "./dist/src/internal/seal-signing-request.d.ts",
+			"import": "./dist/src/internal/seal-signing-request.js"
+		},
+		"./internal/creator-anchor-signing-request": {
+			"types": "./dist/src/internal/creator-anchor-signing-request.d.ts",
+			"import": "./dist/src/internal/creator-anchor-signing-request.js"
+		},
+		"./internal/creator-issuance-retirement-signing-request": {
+			"types": "./dist/src/internal/creator-issuance-retirement-signing-request.d.ts",
+			"import": "./dist/src/internal/creator-issuance-retirement-signing-request.js"
+		},
+		"./internal/received-vertex-authentication": {
+			"types": "./dist/src/internal/received-vertex-authentication.d.ts",
+			"import": "./dist/src/internal/received-vertex-authentication.js"
+		},
+		"./internal/seal-authority-identity": {
+			"types": "./dist/src/internal/seal-authority-identity.d.ts",
+			"import": "./dist/src/internal/seal-authority-identity.js"
+		},
+		"./snapshot-transfer": {
+			"types": "./dist/src/snapshot-transfer.d.ts",
+			"import": "./dist/src/snapshot-transfer.js"
+		},
+		"./registry/registry-v1.json": "./registry/registry-v1.json"
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"smoke:public-package": "node --input-type=module -e \"const required = ['ANCHOR_TRUST_STATE_MAX_RECORD_BYTES', 'admitReceivedVertex', 'authenticateCurrentEpochAnchor', 'createAdmissionBoundTransactionalVertexIssuer', 'extractAdmittedReceivedVertex', 'installCertifiedAnchorTrustRoot', 'installCreatorAnchorTrustRoot', 'isAnchorTrustStateRecordBytes', 'openCertifiedAnchorTrust', 'openCurrentAnchorTrust', 'prepareBlueprintAdmission', 'prepareBlueprintRuntime']; const forbidden = ['authenticateCertifiedCurrentEpochAnchor', 'composeAuthorGossipBudget', 'createCurrentAnchorTrustStore', 'createDurableAuthorEquivocationProjection', 'createRemoteEquivocationObserver', 'createTransactionalVertexIssuer', 'deriveEquivocationProofId', 'inspectTrustClosure', 'materializeCurrentEquivocationProof', 'prepareAnchorTrustAdvance', 'verifyEquivocationProof', 'verifyReceivedVertex', 'verifyTrustRecord']; const actual = Object.keys(await import('@ts-drp/protocol-v3')).sort(); if (JSON.stringify(actual) !== JSON.stringify(required)) throw new Error('invalid package exports: ' + actual.join(',')); const leaked = forbidden.filter((name) => actual.includes(name)); if (leaked.length) throw new Error('leaked package exports: ' + leaked.join(',')); console.log('public package exports:', actual.join(','));\" && tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.built-package-audit.json && tsc -p ../../tests/fixtures/phase-3a0-v3/tsconfig.built-package-audit.json",
+		"typecheck": "tsc --noEmit && pnpm typecheck:public-entry-audit",
+		"typecheck:public-entry-audit": "tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-3a0-v3/tsconfig.public-entry-audit.json",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@noble/curves": "2.2.0",
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/errors": "0.11.0",
+		"es-module-lexer": "1.6.0"
+	}
+}

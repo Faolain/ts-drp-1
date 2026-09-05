@@ -1,0 +1,56 @@
+{
+  "acceptedForReview": true,
+  "production": "6f3d3049942c29f547f5cefdda628a3a01078077",
+  "evidence": "5e7099dfbfb56cc06de75eab6c6d616cf871a4ea",
+  "reviewCheckout": "/private/tmp/d110c-f5b0z-review-Kg6cuq/checkout",
+  "manifests": [
+    {
+      "directory": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-red-1eba4f90",
+      "entries": 81,
+      "sha256": "9e56180ab6f58e05a0b443629fbe9acc066614ca84ad56755b28643ea53864ef"
+    },
+    {
+      "directory": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7",
+      "entries": 243,
+      "sha256": "43de3f011b6ba54120fbff0b2e1cefba7bd7bf34a6b4d2444f0ba566a861afbd"
+    }
+  ],
+  "outcomes": [
+    {
+      "label": "initial-focused",
+      "files": 1,
+      "count": 16
+    },
+    {
+      "label": "initial-retained",
+      "files": 7,
+      "count": 125
+    },
+    {
+      "label": "initial-issuance",
+      "files": 1,
+      "count": 12
+    },
+    {
+      "label": "signed-focused",
+      "files": 1,
+      "count": 16
+    }
+  ],
+  "chromiumPasses": 4,
+  "nativeModes": 4,
+  "unchangedRedTests": true,
+  "parentFilesPreserved": 7,
+  "stashes": 27,
+  "packageTypechecks": {
+    "storagePass": true,
+    "browserPass": false,
+    "nodePass": false,
+    "browserInherited": 74,
+    "nodeInherited": 144,
+    "targetDiagnostics": 0,
+    "externalSourceMappedDiagnostic": "TS2322 tests/fixtures/phase-6b/ahe-reclamation-contract.ts:234, BlobDigest/ClosureDigest"
+  },
+  "signedRuntimeCheckout": "/private/tmp/d110c-f5b0z-green-signed-REUkBZ/checkout",
+  "sourceReview": "Root read the complete three-owner diff; no independent blocker found. Formal reviewers still decide their own verdicts."
+}

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "node",
+    "-e",
+    "const fs=require(\"fs\"),c=require(\"crypto\"),{execFileSync:e}=require(\"child_process\");const git=(...a)=>e(\"git\",a,{encoding:\"utf8\",maxBuffer:32*1024*1024});const d=\".logs/d110c-0c1f5b-green-f031b166\";const before=JSON.parse(fs.readFileSync(d+\"/custody-before.json\",\"utf8\"));const after=JSON.parse(fs.readFileSync(d+\"/custody-after.json\",\"utf8\"));const missing=before.untracked.filter(f=>!fs.existsSync(f));const patch=git(\"diff\",\"--\",...after.changed);const same=patch===fs.readFileSync(d+\"/partial-production.patch\",\"utf8\");const stashes=git(\"stash\",\"list\",\"--format=%H %gd %gs\").trim();const head=git(\"rev-parse\",\"HEAD\").trim(),origin=git(\"rev-parse\",\"origin/codex/phase3a1b-p6-golden-path\").trim();const status={head,origin,signature:git(\"log\",\"--format=%h %G? %s\",\"-1\").trim(),missingProtected:missing,partialProductionUnchanged:same,stashCount:stashes.split(\"\\n\").length,stashesUnchanged:stashes===after.stashes.trim(),staged:git(\"diff\",\"--cached\",\"--name-only\").trim()};console.log(JSON.stringify(status,null,2));if(missing.length||!same||!status.stashesUnchanged||head!==origin||status.staged)process.exitCode=1;"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "start": "2026-09-05T17:19:16.290Z",
+  "finish": "2026-09-05T17:19:20.183Z",
+  "status": 0,
+  "signal": null,
+  "stdout": "{\n  \"head\": \"ac7fb4f1e9d3088fe5abdd0a692f0785651f0a41\",\n  \"origin\": \"ac7fb4f1e9d3088fe5abdd0a692f0785651f0a41\",\n  \"signature\": \"ac7fb4f1 G docs: disposition settlement durable-row test mismatch\",\n  \"missingProtected\": [],\n  \"partialProductionUnchanged\": true,\n  \"stashCount\": 27,\n  \"stashesUnchanged\": true,\n  \"staged\": \"\"\n}\n",
+  "stderr": ""
+}

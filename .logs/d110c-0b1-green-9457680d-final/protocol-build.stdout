@@ -1,0 +1,4 @@
+
+> @ts-drp/protocol-v3@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3
+> tsc -b tsconfig.build.json
+

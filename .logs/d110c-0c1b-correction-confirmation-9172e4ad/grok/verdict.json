@@ -1,0 +1,8 @@
+{
+  "verdict": "APPROVED",
+  "summary": "The one-line issueOneVertex catch now treats the locally set capacityRejected arm as definitely pre-durable: the only setter still throws inside commitOutsideTransaction after buildAndSign and before either store reaches #commitCandidate, so the new || capacityRejected release cannot run after a possibly committed issuance. Exact ISSUANCE_OUTCOME_UNKNOWN and every post-return committedFailure() halt are unchanged. The tests-only pad proof reaches a real signed canonical candidate, the real hasGraphCapacity rejection, reservation release without commit, and a genuine 0→1 creator close without varying PARAMETERS or adding a product API. retained.json is 174/174 with the original nine paths plus the five freeze-named owners. Original causal RED (durable omitted issue / unknown outcome halt close until authenticated recovery) and GREEN remain intact in the focused 3/3.",
+  "findings": [],
+  "red_causal": true,
+  "green_closes_red": true,
+  "scope_preserved": true
+}

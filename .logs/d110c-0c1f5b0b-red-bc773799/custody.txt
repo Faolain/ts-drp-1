@@ -1,0 +1,16 @@
+record=D.110c-0c1f5b0b
+checkpoint=rejected-GREEN-corrective-RED
+commit=bc773799c1a994a3b8a920d9f79ea080d3fc6447
+tree=eb34ea1b54cc0484def0d7bbe4ed3a86e063d11a
+parent=8225ffc755edbd5e345d319ae4d424d90425fc51
+signature=G
+remote_ref=origin/codex/phase3a1b-p6-golden-path
+remote_value_at_capture=bc773799c1a994a3b8a920d9f79ea080d3fc6447
+rejected_green=93585bf3ba62ae662c2963fd13be2ee051451fa2
+rejected_green_evidence=9b02f9c27d6173b92265b23ccd205405c9383741
+rejected_review_evidence=8225ffc755edbd5e345d319ae4d424d90425fc51
+stashes=27
+protected_.agents=present
+protected_.claude=present
+protected_skills-lock.json=present
+

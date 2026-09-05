@@ -1,0 +1,25 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-f5b0s-browser-evidence-staleness",
+      "finding": "The new success-migration case 'v1-upgrade-preserves-committed-rows' (added at 9a9a2226) has no recorded execution in .logs/; the GREEN browser evidence (7/7, 4/4) at 9fef8d24 predates it, and the b926a606 corrective green ran package builds but not the phase-2l-b Playwright suite. The test is correctly wired (PHASE_2L_B_FAST_CASES registration plus inventory count 7), so coverage exists, but a fresh recorded browser pass is absent.",
+      "evidence": "packages/storage-browser/tests/phase-2l-b-browser-issuance-red.pw.ts:73",
+      "owner": "D.110c-0c1f5b0s owner / hardening integrator",
+      "disposition": "Run the phase-2l-b browser Playwright suite on a commit >= 9a9a2226 and record results under .logs/ before closing the record; not blocking because the originally missing coverage artifact now exists and is structurally exact."
+    }
+  ],
+  "notes": [
+    "P1-1 closed: creatorFilteredIssuanceStore now directly forwards readSettlementPlan (packages/node/src/v3-live.ts:4878) and transactWriteSettlementPlan (packages/node/src/v3-live.ts:4973-4974); the returned object literal is annotated DurableIssuanceStore whose eight-method contract is defined at packages/issuance-store/src/types.ts:102-115, matching the accepted design's settlement plan store contract. Compile evidence: .logs/d110c-0c1k-w0-green-0d6e38c2 records `pnpm --filter @ts-drp/node build` passing at exactly 0d6e38c2, and the b926a606 corrective green (post-9a9a2226) records a full `pnpm build:packages` pass.",
+    "P1-2 closed: 9a9a2226 adds case 'v1-upgrade-preserves-committed-rows' which builds the exact adapter-derived v1 three-store IndexedDB (suffix '--drp-issuance-v1' matches DATABASE_SUFFIX at packages/storage-browser/src/internal/browser-issuance-store.ts:49; v1 keyPaths match LINEAGE_KEY_PATH/RECORD_KEY_PATH), seeds representative lineage/issued/published-outbox rows with strict durability, opens through createBrowserDurableIssuanceStore (entry withStore at line 123), and asserts beforeSchema === PHASE_2L_B_SCHEMA (v1/three stores), afterSchema === PHASE_2L_B_SETTLEMENT_SCHEMA (v2/four stores, settlementPlans compound keyPath ['objectId','author'], fixture lines 25-36), byte-exact row preservation (digest [37,209], signature [37,81], preimage bytes), and settlementPlan: null.",
+    "Neighboring malformed native-v1 rejection intact: 'derived v2 schema is exact while primary identity remains completely opaque' still asserts badError ISSUANCE_UNSUPPORTED_SCHEMA (phase-2l-b-browser-issuance-red.pw.ts:70), and the adapter upgrade path still rejects non-conforming v1 shapes (browser-issuance-store.ts:1235-1242).",
+    "No assertion weakened: 0508133f changed the nativeSchemaControl expectation from SETTLEMENT_SCHEMA to PHASE_2L_B_SCHEMA — a disclosed correction of an impossible expectation (the raw v1 control DB is never touched by the adapter; the 9fef8d24 fixture and entry already produced a v1/three-store control), consistent with the design's primary-opacity rule and disclosed in the GREEN results. 6cc120eb replaced a regex method-count check with an AST-derived exact-name equality against PHASE_3A1B_P2_METHODS (all eight names including both settlement methods) — a strengthening — and fixed a child-IPC send race in the harness only.",
+    "The 9fef8d24..9a9a2226 range also carries separately-evidenced slices (D.110c-0c1j0 lineage policy, D.110c-0c1k W0 writer capacity, f5b0a settlement codecs/corrective); each has its own RED/GREEN log and none alters the settlement plan store contract, the facade forwarding, or the migration assertions.",
+    "RED causality re-verified from recorded evidence only: .logs/d110c-0c1f5b0s-red-5b286468/result.json reports causal: true with 21 focused failures and passing unaffected controls.",
+    "Review was read-only: no tests, builds, or typechecks were executed by this reviewer; all pass evidence cited is recorded in-repo."
+  ]
+}

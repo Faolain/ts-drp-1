@@ -1,0 +1,278 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+.logs/d110c-0c1f5b0b-green-e07f8a94/:
+total 552
+drwxr-xr-x    33 aristotle  staff    1056 Sep  4 06:54 .
+drwxr-xr-x  8030 aristotle  staff  256960 Sep  4 06:56 ..
+-rw-r--r--     1 aristotle  staff    1122 Sep  4 06:52 README.md
+-rw-r--r--     1 aristotle  staff    6036 Sep  4 06:53 built-replacement-title.json
+-rw-r--r--     1 aristotle  staff     169 Sep  4 06:53 built-replacement-title.stderr
+-rw-r--r--     1 aristotle  staff      72 Sep  4 06:53 built-replacement-title.stdout
+-rw-r--r--     1 aristotle  staff      29 Sep  4 06:52 changed-paths.txt
+-rw-r--r--     1 aristotle  staff    5776 Sep  4 06:53 commands.md
+-rw-r--r--     1 aristotle  staff     533 Sep  4 06:52 custody.txt
+-rw-r--r--     1 aristotle  staff     759 Sep  4 06:52 dist-identity.txt
+-rw-r--r--     1 aristotle  staff   15104 Sep  4 06:53 focused39.json
+-rw-r--r--     1 aristotle  staff    6045 Sep  4 06:53 isolated-built-child.json
+-rw-r--r--     1 aristotle  staff   15125 Sep  4 06:53 isolated-focused39.json
+-rw-r--r--     1 aristotle  staff   11150 Sep  4 06:53 legacy-consumers.json
+-rw-r--r--     1 aristotle  staff    2648 Sep  4 06:55 manifest.sha256
+-rw-r--r--     1 aristotle  staff    1141 Sep  4 06:52 matrix.md
+-rw-r--r--     1 aristotle  staff    7249 Sep  4 06:53 node-typecheck.normalized
+-rw-r--r--     1 aristotle  staff       0 Sep  4 06:53 node-typecheck.stderr
+-rw-r--r--     1 aristotle  staff    9073 Sep  4 06:53 node-typecheck.stdout
+-rw-r--r--     1 aristotle  staff    7249 Sep  4 06:53 parent-node-typecheck.normalized
+-rw-r--r--     1 aristotle  staff       0 Sep  4 06:53 parent-node-typecheck.stderr
+-rw-r--r--     1 aristotle  staff    9265 Sep  4 06:53 parent-node-typecheck.stdout
+-rw-r--r--     1 aristotle  staff    5960 Sep  4 06:53 phase3g.json
+-rw-r--r--     1 aristotle  staff    6611 Sep  4 06:54 production.diff
+-rw-r--r--     1 aristotle  staff    2175 Sep  4 06:52 result.json
+-rw-r--r--     1 aristotle  staff   33333 Sep  4 06:53 retained87.json
+-rw-r--r--     1 aristotle  staff   27336 Sep  4 06:53 shared-consumers-built.json
+-rw-r--r--     1 aristotle  staff    1017 Sep  4 06:52 source-audit.txt
+-rw-r--r--     1 aristotle  staff    7027 Sep  4 06:53 stale-dist-isolated-title.json
+-rw-r--r--     1 aristotle  staff     169 Sep  4 06:53 stale-dist-isolated-title.stderr
+-rw-r--r--     1 aristotle  staff      69 Sep  4 06:53 stale-dist-isolated-title.stdout
+-rw-r--r--     1 aristotle  staff   28325 Sep  4 06:53 stale-dist-shared-consumers.json
+-rw-r--r--     1 aristotle  staff     823 Sep  4 06:54 verification.txt
+
+.logs/d110c-0c1f5b0b-red-6e542c3d/:
+total 120
+drwxr-xr-x    15 aristotle  staff     480 Sep  4 06:39 .
+drwxr-xr-x  8030 aristotle  staff  256960 Sep  4 06:56 ..
+-rw-r--r--     1 aristotle  staff    1031 Sep  4 06:39 README.md
+-rw-r--r--     1 aristotle  staff     186 Sep  4 06:39 artifact-hashes.txt
+-rw-r--r--     1 aristotle  staff      44 Sep  4 06:39 changed-paths.txt
+-rw-r--r--     1 aristotle  staff    1157 Sep  4 06:39 commands.md
+-rw-r--r--     1 aristotle  staff     514 Sep  4 06:39 custody.txt
+-rw-r--r--     1 aristotle  staff    1018 Sep  4 06:39 manifest.sha256
+-rw-r--r--     1 aristotle  staff     836 Sep  4 06:39 matrix.md
+-rw-r--r--     1 aristotle  staff     466 Sep  4 06:39 prior-green-disposition.txt
+-rw-r--r--     1 aristotle  staff    6385 Sep  4 06:38 prior-green-phase3g.json
+-rw-r--r--     1 aristotle  staff       2 Sep  4 06:39 retained-structural-red.exit
+-rw-r--r--     1 aristotle  staff    6418 Sep  4 06:38 retained-structural-red.json
+-rw-r--r--     1 aristotle  staff     608 Sep  4 06:39 tests-only.diff
+-rw-r--r--     1 aristotle  staff     478 Sep  4 06:39 verification.txt
+
+.logs/d110c-0c1f5b0b-red-9a4b35f4/:
+total 192
+drwxr-xr-x    19 aristotle  staff     608 Sep  4 06:11 .
+drwxr-xr-x  8030 aristotle  staff  256960 Sep  4 06:56 ..
+-rw-r--r--     1 aristotle  staff    1029 Sep  4 06:10 README.md
+-rw-r--r--     1 aristotle  staff     762 Sep  4 06:11 artifact-hashes.txt
+-rw-r--r--     1 aristotle  staff      47 Sep  4 06:10 changed-paths.txt
+-rw-r--r--     1 aristotle  staff    2243 Sep  4 06:10 commands.md
+-rw-r--r--     1 aristotle  staff     511 Sep  4 06:10 custody.txt
+-rw-r--r--     1 aristotle  staff    1600 Sep  4 06:10 diagnostic-values.json
+-rw-r--r--     1 aristotle  staff       2 Sep  4 06:10 diagnostic.exit
+-rw-r--r--     1 aristotle  staff    3901 Sep  4 06:10 diagnostic.stderr
+-rw-r--r--     1 aristotle  staff    7563 Sep  4 06:10 diagnostic.stdout
+-rw-r--r--     1 aristotle  staff       2 Sep  4 06:10 final-red-39.exit
+-rw-r--r--     1 aristotle  staff   27845 Sep  4 06:10 final-red-39.json
+-rw-r--r--     1 aristotle  staff     338 Sep  4 06:10 final-red-39.stderr
+-rw-r--r--     1 aristotle  staff      68 Sep  4 06:10 final-red-39.stdout
+-rw-r--r--     1 aristotle  staff    1322 Sep  4 06:11 manifest.sha256
+-rw-r--r--     1 aristotle  staff     682 Sep  4 06:10 matrix.md
+-rw-r--r--     1 aristotle  staff     743 Sep  4 06:10 tests-only.diff
+-rw-r--r--     1 aristotle  staff     374 Sep  4 06:11 verification.txt
+
+.logs/d110c-0c1f5b0b-review-9b02f9c2/:
+total 320
+drwxr-xr-x    14 aristotle  staff     448 Sep  4 05:08 .
+drwxr-xr-x  8030 aristotle  staff  256960 Sep  4 06:56 ..
+-rw-r--r--     1 aristotle  staff     705 Sep  4 05:08 blocking-union.json
+-rw-r--r--     1 aristotle  staff    1421 Sep  4 05:07 commands.md
+-rw-r--r--     1 aristotle  staff    1000 Sep  4 04:37 custody-chain.txt
+drwxr-xr-x    10 aristotle  staff     320 Sep  4 05:07 grok
+-rw-r--r--     1 aristotle  staff     465 Sep  4 04:49 grok-resume-prompt.md
+drwxr-xr-x     8 aristotle  staff     256 Sep  4 05:07 kimi
+-rw-r--r--     1 aristotle  staff    2129 Sep  4 05:08 manifest.sha256
+drwxr-xr-x     5 aristotle  staff     160 Sep  4 05:07 opus
+-rw-r--r--     1 aristotle  staff   76848 Sep  4 04:37 production.diff
+-rw-r--r--     1 aristotle  staff    6016 Sep  4 04:37 prompt.md
+-rw-r--r--     1 aristotle  staff   50382 Sep  4 04:37 red.diff
+-rw-r--r--     1 aristotle  staff    3654 Sep  4 05:08 review-ledger.md
+
+.logs/d110c-0c1f5b0r-design-3a156aca/:
+total 136
+drwxr-xr-x     6 aristotle  staff     192 Sep  3 21:48 .
+drwxr-xr-x  8030 aristotle  staff  256960 Sep  4 06:56 ..
+-rw-r--r--@    1 aristotle  staff   35701 Sep  3 23:19 design.md
+-rw-r--r--@    1 aristotle  staff     237 Sep  4 00:50 manifest.sha256
+-rw-r--r--@    1 aristotle  staff    7388 Sep  4 00:50 next-prompt.md
+-rw-r--r--     1 aristotle  staff   16553 Sep  3 21:42 pre-review.md
+bb94a03f test(hardening): record corrective settlement green
+e07f8a94 fix(node): restore profile-safe settlement behavior
+449b95a3 test(hardening): record explicit legacy completion red
+6e542c3d test(node): preserve explicit legacy rebase completion
+53c83c3e test(hardening): record canonical legacy control red
+4543b957 test(node): pin legacy causal join intent shape
+a0ffa071 test(hardening): record legacy control red correction
+c77f8a1f test(node): preserve legacy causal join intent
+615233be test(hardening): record response-shape corrected red
+9a4b35f4 test(node): correct settlement rebase response shape
+f4be51ce test(hardening): record final node settlement red
+4e8cfb97 test(node): correct settlement source identity
+d40e5a98 test(hardening): record corrected node settlement red
+37ae2f7b test(node): correct settlement regression expectations
+6e2b82ff test(hardening): record node settlement corrective red
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+?? .logs/d108e4ab-campaign/
+?? .logs/d108e4ab-freeze/
+?? .logs/d108e4ab-plan-review/
+?? .logs/d108e4ac-green-review-correction/
+?? .logs/d108e4ac-green-review/
+?? .logs/d108e4ac-green/
+?? .logs/d108e4ac-plan-review/
+?? .logs/d108e4ac-red-review/
+?? .logs/d108e4ac-red/
+?? .logs/d108e4ad-campaign/
+commit e07f8a94d5e2449289bebd7aa89f1dcdbd4d9536
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 06:51:21 2026 -0400
+
+    fix(node): restore profile-safe settlement behavior
+
+ packages/node/src/v3-live.ts | 98 ++++++++++++++++++++++++--------------------
+ 1 file changed, 54 insertions(+), 44 deletions(-)
+---
+e07f8a94d5e2449289bebd7aa89f1dcdbd4d9536 449b95a3c93f163cd640535f3632c6095cffc6e1 G
+---
+ packages/node/src/v3-live.ts | 98 ++++++++++++++++++++++++--------------------
+ 1 file changed, 54 insertions(+), 44 deletions(-)
+6b56222c273f487d5e35bcc0acc30327bd43f4eeb28a33d8bb65fa079a9f359a  -
+a70e99af4df71121e86eb2bb1eb2127e9d21284dcb8fe576dc557dd96b838bc2  .logs/d110c-0c1f5b0b-green-e07f8a94/production.diff
+6b56222c273f487d5e35bcc0acc30327bd43f4eeb28a33d8bb65fa079a9f359a  /tmp/f5b0b-zero.diff
+manifest check done
+TYPECHECK NORMALIZED IDENTICAL
+focused39.json {"selected":39,"passed":39,"failed":0,"success":true}
+retained87.json {"selected":87,"passed":87,"failed":0,"success":true}
+phase3g.json {"selected":14,"passed":14,"failed":0,"success":true}
+legacy-consumers.json {"selected":26,"passed":26,"failed":0,"success":true}
+shared-consumers-built.json {"selected":64,"passed":64,"failed":0,"success":true}
+isolated-focused39.json {"selected":39,"passed":39,"failed":0,"success":true}
+isolated-built-child.json {"selected":17,"passed":1,"failed":0,"success":true}
+stale-dist-shared-consumers.json {"selected":64,"passed":63,"failed":1,"success":false}
+stale-dist-isolated-title.json {"selected":17,"passed":0,"failed":1,"success":false}
+built-replacement-title.json {"selected":17,"passed":1,"failed":0,"success":true}
+bb94a03f G test(hardening): record corrective settlement green
+e07f8a94 G fix(node): restore profile-safe settlement behavior
+449b95a3 G test(hardening): record explicit legacy completion red
+6e542c3d G test(node): preserve explicit legacy rebase completion
+9a4b35f4 G test(node): correct settlement rebase response shape
+8225ffc7 G test(hardening): record rejected node settlement review
+legacy files:
+  /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3f-b-chat-zone-causal-join-red.test.ts
+  /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3f-b-v3-frontier-reduction-red.test.ts
+  /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3f-c-v3-application-batching-red.test.ts
+  /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3f-c-v3-room-batching-red.test.ts
+shared files:
+  e5-01-v3-operation-admission-red.test.ts
+  phase-4a-v3-live-blueprint-fold.test.ts
+  phase-4b-v3-live-snapshot-composition-red.test.ts
+  phase-4c-snapshot-pull-red.test.ts
+  phase-4c-v3-snapshot-transfer-composition-red.test.ts
+  phase-6a-creator-successor-activation-red.test.ts
+  phase-6a-creator-successor-handle-identity-red.test.ts
+  phase-6b-d110c-0c1f4-bootstrap-policy.test.ts
+  protocol-v3-latched-acl-referee-successor-red.test.ts
+tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts:110:			result.activationVertexDigest
+---
+tests/fixtures/phase-6b/differential-exit-contract.ts:109:		ownerKey: "displacedSource",
+tests/fixtures/phase-6b/runtime-reclamation-contract.ts:144:	"displacedSource",
+   6 tests/fixtures/phase-3g/rebase-outbox-fixture.ts
+   6 tests/phase-3g-v3-room-rebase-red.test.ts
+   2 tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts
+   5 tests/phase-6b-runtime-reclamation-red.test.ts
+tests/phase-3g-v3-room-rebase-red.test.ts:148:		const displacedSource = Reflect.get(input, "displacedSource");
+tests/phase-3g-v3-room-rebase-red.test.ts-149-		const sourceCapability =
+tests/phase-3g-v3-room-rebase-red.test.ts:150:			typeof displacedSource === "object" && displacedSource !== null
+tests/phase-3g-v3-room-rebase-red.test.ts:151:				? Reflect.get(displacedSource, "capability")
+tests/phase-3g-v3-room-rebase-red.test.ts-152-				: undefined;
+tests/phase-3g-v3-room-rebase-red.test.ts-153-		for (const capability of [targetCapability, sourceCapability]) {
+tests/phase-3g-v3-room-rebase-red.test.ts-154-			const id = typeof capability === "object" && capability !== null ? Reflect.get(capability, "id") : undefined;
+tests/phase-3g-v3-room-rebase-red.test.ts-155-			if (!Number.isSafeInteger(id) || probe.consumedCapabilityIds.includes(id as number)) {
+tests/phase-3g-v3-room-rebase-red.test.ts-156-				return Promise.resolve({
+tests/phase-3g-v3-room-rebase-red.test.ts-157-					detail: "v3 recovery capability is unavailable",
+tests/phase-3g-v3-room-rebase-red.test.ts-158-					kind: "capability-consumed",
+tests/phase-3g-v3-room-rebase-red.test.ts-159-					ok: false,
+--
+tests/phase-3g-v3-room-rebase-red.test.ts:458:		expect(Reflect.get(Reflect.get(probe.recoveryInputs[0] ?? {}, "displacedSource") ?? {}, "capability")).not.toEqual(
+tests/phase-3g-v3-room-rebase-red.test.ts:459:			Reflect.get(Reflect.get(probe.recoveryInputs[1] ?? {}, "displacedSource") ?? {}, "capability")
+tests/phase-3g-v3-room-rebase-red.test.ts-460-		);
+tests/phase-3g-v3-room-rebase-red.test.ts-461-		expect(probe.recoveryInputs[1]).toMatchObject({
+tests/phase-3g-v3-room-rebase-red.test.ts:462:			displacedSource: {
+tests/phase-3g-v3-room-rebase-red.test.ts-463-				capability: { anchor: "a".repeat(64) },
+tests/phase-3g-v3-room-rebase-red.test.ts-464-				exactCanonicalLatchedAclBytes: Uint8Array.of(3),
+tests/phase-3g-v3-room-rebase-red.test.ts-465-			},
+tests/phase-3g-v3-room-rebase-red.test.ts-466-		});
+tests/phase-3g-v3-room-rebase-red.test.ts-467-		await first.close();
+tests/phase-3g-v3-room-rebase-red.test.ts-468-		const second = await create(roomInput());
+tests/phase-3g-v3-room-rebase-red.test.ts-469-		expect(probe.bootstrapIssues).toBe(1);
+tests/phase-3g-v3-room-rebase-red.test.ts-470-		expect(probe.issuanceNames).toEqual(["shared-lineage", "shared-lineage"]);
+--
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts:150:			"transportHandoff.displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes"
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts-151-		);
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts:152:		expect(displacedActivation).toContain("transportHandoff.displacedSource.pinnedGenesisAnchorDigest");
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts-153-		expect(hotKeys).not.toContain(BOOTSTRAP_POLICY_KEY);
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts-154-		expect(coldKeys).toContain("COLD_BOOTSTRAP_POLICY_KEYS");
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts-155-		expect(coldKeys).toContain(BOOTSTRAP_POLICY_KEY);
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts-156-		expect(pending).not.toContain(BOOTSTRAP_POLICY_KEY);
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts-157-		expect(room.match(/exactCanonicalPinnedGenesisBootstrapOperationBytes/gu)?.length ?? 0).toBeGreaterThanOrEqual(4);
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts-158-	});
+tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts-159-});
+--
+tests/phase-6b-runtime-reclamation-red.test.ts:388:				expect(before.displacedSource).toBe(true);
+tests/phase-6b-runtime-reclamation-red.test.ts-389-				expect(before.creatorCloseGraph).toBe(true);
+tests/phase-6b-runtime-reclamation-red.test.ts-390-				expect(before.creatorCloseStagedSnapshot).toBe(true);
+tests/phase-6b-runtime-reclamation-red.test.ts-391-				expect(before.creatorClosePersistedSnapshot).toBe(true);
+tests/phase-6b-runtime-reclamation-red.test.ts-392-				expect(before.creatorCloseDerivedCommitment).toBe(true);
+tests/phase-6b-runtime-reclamation-red.test.ts-393-				expect(before.creatorCloseDurableReplay).toBe(true);
+tests/phase-6b-runtime-reclamation-red.test.ts-394-				expect(result.after).toMatchObject({
+tests/phase-6b-runtime-reclamation-red.test.ts-395-					creatorCloseDerivedCommitment: false,
+tests/phase-6b-runtime-reclamation-red.test.ts-396-					creatorCloseDurableReplay: false,
+--
+tests/phase-6b-runtime-reclamation-red.test.ts:400:					displacedSource: false,
+tests/phase-6b-runtime-reclamation-red.test.ts-401-					hotPredecessor: false,
+tests/phase-6b-runtime-reclamation-red.test.ts-402-				});
+tests/phase-6b-runtime-reclamation-red.test.ts-403-			} finally {
+tests/phase-6b-runtime-reclamation-red.test.ts-404-				await fixture.close();
+tests/phase-6b-runtime-reclamation-red.test.ts-405-			}
+tests/phase-6b-runtime-reclamation-red.test.ts-406-		}
+tests/phase-6b-runtime-reclamation-red.test.ts-407-	});
+tests/phase-6b-runtime-reclamation-red.test.ts-408-
+--
+tests/phase-6b-runtime-reclamation-red.test.ts:559:				displacedSource: true,
+tests/phase-6b-runtime-reclamation-red.test.ts-560-				epochBytes: 1754,
+tests/phase-6b-runtime-reclamation-red.test.ts-561-				graphVersion: 2,
+tests/phase-6b-runtime-reclamation-red.test.ts-562-				hotPredecessor: true,
+tests/phase-6b-runtime-reclamation-red.test.ts-563-				latchedOperations: 0,
+tests/phase-6b-runtime-reclamation-red.test.ts-564-				pendingIngress: 0,
+tests/phase-6b-runtime-reclamation-red.test.ts-565-				pendingIngressBytes: 0,
+tests/phase-6b-runtime-reclamation-red.test.ts-566-				publication: false,
+tests/phase-6b-runtime-reclamation-red.test.ts-567-				quarantine: 0,
+--
+tests/phase-6b-runtime-reclamation-red.test.ts:583:				displacedSource: false,
+tests/phase-6b-runtime-reclamation-red.test.ts-584-				epochBytes: 962,
+tests/phase-6b-runtime-reclamation-red.test.ts-585-				graphVersion: 1,
+tests/phase-6b-runtime-reclamation-red.test.ts-586-				hotPredecessor: false,
+tests/phase-6b-runtime-reclamation-red.test.ts-587-				latchedOperations: 0,
+tests/phase-6b-runtime-reclamation-red.test.ts-588-				pendingIngress: 0,
+tests/phase-6b-runtime-reclamation-red.test.ts-589-				pendingIngressBytes: 0,
+tests/phase-6b-runtime-reclamation-red.test.ts-590-				publication: false,
+tests/phase-6b-runtime-reclamation-red.test.ts-591-				quarantine: 0,
+--
+tests/phase-6b-runtime-reclamation-red.test.ts:636:			expect(snapshotExportOwner).not.toMatch(/displacedSource|hotPredecessor/u);
+tests/phase-6b-runtime-reclamation-red.test.ts-637-			const closeHandle = fixture.base.handle as Readonly<{
+717:export async function runSharedPlaneScenario(
+tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts:6:	runSharedPlaneScenario,
+tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts:55:		const result = await runSharedPlaneScenario({ sourceOperationProfile: "join" });
+tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts:71:		const result = await runSharedPlaneScenario({

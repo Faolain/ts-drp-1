@@ -1,0 +1,30 @@
+{
+  "classification": "REJECTED_MATRIX_STOPPED_NO_RERUN",
+  "base": "62f71f4dccaf66da49d4af32f6afaf60394de7ee",
+  "testsCommit": "1dcff1709d040a4a37d3c73ecaef4fb2309451de",
+  "branch": "codex/phase3a1b-p6-golden-path",
+  "commands": [
+    { "command": "git status --porcelain=v1 --untracked-files=no; git rev-parse HEAD '@{upstream}'; git stash list --format='%gd' | wc -l", "result": "Only exact test path modified; HEAD/upstream both 62f71f4d; 27 stashes" },
+    { "command": "pnpm exec prettier --check tests/phase-6b-d110c-0c1f5b-integration-red.test.ts", "exit": 0, "result": "All matched files use Prettier code style!" },
+    { "command": "pnpm exec eslint tests/phase-6b-d110c-0c1f5b-integration-red.test.ts", "exit": 0, "result": "No errors or warnings after fixing four draft import-order errors" },
+    { "command": "pnpm exec vitest list tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --json", "exit": 0, "result": "Exactly two tests; names retained in result.json; no collection error" },
+    { "command": "git diff --check", "exit": 0 },
+    { "command": "git commit -S --only tests/phase-6b-d110c-0c1f5b-integration-red.test.ts -m 'test: complete bounded parent settlement RED continuations'", "exit": 0, "result": "1dcff1709d040a4a37d3c73ecaef4fb2309451de; 1 test file, 933 insertions, 67 deletions" },
+    { "command": "git push", "exit": 0, "result": "62f71f4d..1dcff170; exact HEAD/upstream match; git signature status G" },
+    { "command": "pnpm exec vitest run tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --reporter=json --outputFile=.logs/d110c-0c1f5b-red-1dcff170/focused.json", "executionCount": 1, "exit": 1, "result": "2 failed, 0 passed; JSON report written" }
+  ],
+  "typeOrientedDiagnostics": {
+    "method": "Read-only TypeScript createProgram for the exact test, using existing package export types plus literal workspaceAliases from vite.config.mts; no generated config or package edit",
+    "targetDiagnostics": 0,
+    "externalDiagnostics": [
+      { "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts", "code": 2741, "detail": "Existing fixture DurableLiveJournalStore lacks installEpochAnchor" },
+      { "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts", "code": 7006, "detail": "Existing entry parameter implicitly any" },
+      { "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts", "code": 2322, "detail": "Existing fixture transactWriteSettlementPlan returns SettlementPlan | null" }
+    ],
+    "caveat": "Not a full repository typecheck pass. The initial unaliased diagnostic invocation could not resolve workspace packages; an inline diagnostic-command regex typo was corrected before the alias-aware diagnostic. Neither command executed tests. Final exact listing and lint passed after the last source edits."
+  },
+  "longRuns": 0,
+  "productionEdits": 0,
+  "stashesPreserved": 27
+}
+

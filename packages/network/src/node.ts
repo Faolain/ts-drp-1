@@ -6,7 +6,8 @@ import { bootstrap, type BootstrapComponents } from "@libp2p/bootstrap";
 import { circuitRelayServer, circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { dcutr } from "@libp2p/dcutr";
-import { type GossipSub, gossipsub, type GossipsubOpts } from "@libp2p/gossipsub";
+import { type GossipSub, gossipsub, type GossipsubOpts, type SignedMessage, StrictSign } from "@libp2p/gossipsub";
+import { RPC } from "@libp2p/gossipsub/message";
 import {
 	createPeerScoreParams,
 	createTopicScoreParams,
@@ -25,7 +26,7 @@ import {
 	type PeerId,
 	type Stream,
 } from "@libp2p/interface";
-import { peerIdFromString } from "@libp2p/peer-id";
+import { peerIdFromPublicKey, peerIdFromString } from "@libp2p/peer-id";
 import { ping } from "@libp2p/ping";
 import { pubsubPeerDiscovery, type PubSubPeerDiscoveryComponents } from "@libp2p/pubsub-peer-discovery";
 import { webRTC } from "@libp2p/webrtc";
@@ -66,29 +67,143 @@ import {
 	type ControlPlaneTransport,
 	DRP_DISCOVERY_TOPIC,
 	DRP_INTERVAL_DISCOVERY_TOPIC,
+	type DRPConnectionBudget,
 	type DRPNetworkNodeConfig,
 	type DRPNetworkNode as DRPNetworkNodeInterface,
+	type DRPPeerSelectionSnapshot,
 	type GroupPeerChange,
 	type GroupPeerChangeHandler,
 	type IMessageQueueHandler,
 	IntervalRunnerState,
 	Message,
+	MessageType,
+	type PeerConnectionHandler,
+	type PeerDisconnectHandler,
 } from "@ts-drp/types";
 import { createLibp2p, type Libp2p, type Libp2pOptions, type ServiceFactoryMap } from "libp2p";
 import { isBrowser, isWebWorker } from "wherearewe";
 
+import {
+	type ConnectionAdmissionController,
+	createConnectionAdmissionController,
+	type ExplicitDialTicket,
+	resolveConnectionBudget,
+} from "./connection-budget.js";
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
-import { streamToUint8Array, uint8ArrayToStream } from "./stream.js";
+import { PeerSelector } from "./peer-selector.js";
+import { SEAL_EVIDENCE_PROTOCOL, type SealEvidenceProtocolPort } from "./seal.js";
+import {
+	SNAPSHOT_CHUNK_PROTOCOL,
+	type SnapshotChunkProtocolPort,
+	type SnapshotChunkProtocolStream,
+} from "./snapshot-transfer.js";
+import { readUint8ArrayFrame, streamToUint8Array, uint8ArrayToStream, writeUint8ArrayFrame } from "./stream.js";
+import {
+	createDirectSyncIngress,
+	type DirectSyncIngress,
+	DRP_MESSAGE_PROTOCOL,
+	DRP_SYNC_PROTOCOLS,
+	isDirectSyncIngress,
+	isSyncProtocolMessage,
+	selectedSyncProtocol,
+	type SelectedSyncProtocol,
+	SyncTransportError,
+	validateNegotiatedSync,
+} from "./sync.js";
+import {
+	createDRPUnreliableWebRtcOwner,
+	createLibp2pWebRtcSignalingPort,
+	DRP_UNRELIABLE_WEBRTC_MAX_PAYLOAD_BYTES,
+	DRP_UNRELIABLE_WEBRTC_SIGNALING_PROTOCOL,
+	type DRPUnreliableWebRtcOwner,
+} from "./unreliable-webrtc.js";
 
 export * from "./stream.js";
+export {
+	directSyncProtocolFor,
+	DRP_HEADS_CHUNK_PROTOCOL,
+	DRP_MESSAGE_PROTOCOL,
+	DRP_SYNC_PROTOCOLS,
+	isDirectSyncIngress,
+	isSyncProtocolMessage,
+	type DRPSyncMode,
+	type DRPSyncProtocol,
+	type NegotiatedSyncSender,
+	type SelectedSyncProtocol,
+	SYNC_FALLBACK_HASH_CAP,
+	SYNC_HEADS_FIELD_HASH_CAP,
+	SYNC_HEADS_TOTAL_HASH_CAP,
+	SYNC_OUTSTANDING_EXACT_CAP,
+	SYNC_REQUEST_BYTE_CAP,
+	SYNC_RESPONSE_BYTE_CAP,
+	SYNC_RESPONSE_CHUNK_CAP,
+	SYNC_RESPONSE_VERTEX_CAP,
+	SyncTransportError,
+	validateNegotiatedSync,
+} from "./sync.js";
 export type { GroupPeerChange, GroupPeerChangeHandler } from "@ts-drp/types";
 
-export const DRP_MESSAGE_PROTOCOL = "/drp/message/0.0.1";
 export const BOOTSTRAP_NODES = [
 	"/dns4/bootstrap1.topology.gg/tcp/443/wss/p2p/16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK",
 	"/dns4/bootstrap2.topology.gg/tcp/443/wss/p2p/16Uiu2HAmGjAVQyzgTCumpB9TuojKT4LZTBC5HRiZyuwGG9VHodLC",
 ];
 let log: Logger;
+const PUBSUB_SIGN_PREFIX = new TextEncoder().encode("libp2p-pubsub:");
+const MIN_PUBSUB_SEQUENCE = BigInt(0);
+const MAX_PUBSUB_SEQUENCE = BigInt("18446744073709551615");
+
+type IngressTransport =
+	| Readonly<{ kind: "authenticated-stream"; protocol: string; sender: string }>
+	| Readonly<{ kind: "signed-gossip"; sender: string; topic: string }>;
+
+type IngressEvidence = Readonly<{
+	message: Readonly<{ data: Uint8Array; objectId: string; sender: string; type: MessageType }>;
+	transport: IngressTransport;
+}>;
+
+function isClaimableIngress(message: Message): boolean {
+	return message.type === MessageType.MESSAGE_TYPE_CUSTOM || message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE;
+}
+
+function sameIngressBytes(left: Uint8Array, right: Uint8Array): boolean {
+	if (left.byteLength !== right.byteLength) return false;
+	for (let index = 0; index < left.byteLength; index += 1) {
+		if (left[index] !== right[index]) return false;
+	}
+	return true;
+}
+
+function pubsubSignaturePreimage(message: SignedMessage): Uint8Array | undefined {
+	try {
+		if (message.sequenceNumber < MIN_PUBSUB_SEQUENCE || message.sequenceNumber > MAX_PUBSUB_SEQUENCE) return undefined;
+		const sequenceNumber = new Uint8Array(8);
+		new DataView(sequenceNumber.buffer).setBigUint64(0, message.sequenceNumber, false);
+		const encoded = RPC.Message.encode({
+			from: message.from.toMultihash().bytes,
+			data: message.data,
+			seqno: sequenceNumber,
+			topic: message.topic,
+			signature: undefined,
+			key: undefined,
+		});
+		const preimage = new Uint8Array(PUBSUB_SIGN_PREFIX.byteLength + encoded.byteLength);
+		preimage.set(PUBSUB_SIGN_PREFIX);
+		preimage.set(encoded, PUBSUB_SIGN_PREFIX.byteLength);
+		return preimage;
+	} catch {
+		return undefined;
+	}
+}
+
+async function validateToRawMessage(message: SignedMessage): Promise<boolean> {
+	const preimage = pubsubSignaturePreimage(message);
+	if (preimage === undefined) return false;
+	try {
+		return await message.key.verify(preimage, message.signature);
+	} catch {
+		return false;
+	}
+}
 
 const WARM_RELAY_RETRY_BASE_DELAY_MS = 100;
 const WARM_RELAY_RETRY_MAX_DELAY_MS = 2_000;
@@ -99,6 +214,7 @@ type PeerDiscoveryFunction =
 	| ((components: BootstrapComponents) => PeerDiscovery);
 
 type ConfigurableGossipSub = GossipSub & {
+	mesh: Map<string, Set<string>>;
 	score: PeerScore;
 	streamsOutbound: Map<string, unknown>;
 };
@@ -161,6 +277,8 @@ export interface DRPNetworkHostConfigSnapshot {
 	readonly bootstrapDiscovery: boolean;
 	readonly bootstrapPeerCount: number;
 	readonly coldStartPubsubDiscovery: boolean;
+	readonly connectionBudget?: DRPConnectionBudget;
+	readonly globalDiscovery?: boolean;
 	readonly gossipSubPeerExchange: boolean;
 	readonly outboundAddressPolicy: "address-policy" | "allow-all" | "injected";
 	readonly peerDiscoveryModules: readonly ("@libp2p/bootstrap" | "@libp2p/pubsub-peer-discovery")[];
@@ -226,6 +344,12 @@ export interface RelayPolicyDriver {
 		excludedOperatorGroup?: string
 	): Promise<RelayReplacementResult>;
 	stop(): Promise<void>;
+}
+
+interface ResolvedRelayPolicyConfiguration {
+	readonly source: RelayCandidateSource;
+	readonly targetReservations: number;
+	readonly transportProfile: RelayTransportProfile;
 }
 
 const CORE_SERVICE_NAMES = new Set(["ping", "dcutr", "identify", "identifyPush", "pubsub", "autonat", "relay"]);
@@ -327,6 +451,71 @@ function sanitizedRelayIdHash(relayId: string): string {
 	return bytesToHex(sha256(new TextEncoder().encode(relayId))).slice(0, 16);
 }
 
+interface PendingSyncSend {
+	reject(reason?: unknown): void;
+	resolve(): void;
+	run(): Promise<void>;
+}
+
+class SyncSendAdmission {
+	private active = false;
+	private activeTask?: PendingSyncSend;
+	private closed = false;
+	private readonly queued: PendingSyncSend[] = [];
+
+	constructor(connection: Connection) {
+		connection.addEventListener(
+			"close",
+			() => {
+				this.closed = true;
+				const error = new SyncTransportError("SYNC_CONNECTION_CLOSED", "Sync connection closed");
+				this.activeTask?.reject(error);
+				this.activeTask = undefined;
+				for (const task of this.queued.splice(0)) task.reject(error);
+			},
+			{ once: true }
+		);
+	}
+
+	submit(run: () => Promise<void>): Promise<void> {
+		if (this.closed) {
+			return Promise.reject(new SyncTransportError("SYNC_CONNECTION_CLOSED", "Sync connection is closed"));
+		}
+		if (this.active && this.queued.length >= 2) {
+			return Promise.reject(new SyncTransportError("SYNC_SEND_QUEUE_FULL", "Sync send queue is full"));
+		}
+
+		return new Promise<void>((resolve, reject) => {
+			const task = { reject, resolve, run };
+			if (this.active) {
+				this.queued.push(task);
+				return;
+			}
+			this.active = true;
+			void this.execute(task);
+		});
+	}
+
+	private async execute(task: PendingSyncSend): Promise<void> {
+		this.activeTask = task;
+		try {
+			if (this.closed) throw new SyncTransportError("SYNC_CONNECTION_CLOSED", "Sync connection is closed");
+			await task.run();
+			task.resolve();
+		} catch (error) {
+			task.reject(error);
+		} finally {
+			if (this.activeTask === task) this.activeTask = undefined;
+			const next = this.queued.shift();
+			if (next === undefined) {
+				this.active = false;
+			} else {
+				void this.execute(next);
+			}
+		}
+	}
+}
+
 /**
  * The DRPNetworkNode class is the main class for the DRP network.
  * It handles the creation and management of the libp2p node, pubsub, and message queue.
@@ -335,7 +524,16 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _config?: DRPNetworkNodeConfig;
 	private _node?: Libp2p;
 	private _pubsub?: ConfigurableGossipSub;
-	private _messageQueue: MessageQueue<Message>;
+	private _connectionAdmission?: ConnectionAdmissionController;
+	private _peerSelector?: PeerSelector;
+	private _messageQueue: MessageQueue<Message | DirectSyncIngress>;
+	private _activeUnreliableWebRtcOwner?: DRPUnreliableWebRtcOwner;
+	private _unreliableWebRtcIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
+	private _snapshotChunkIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
+	private _sealEvidenceIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
+	private readonly _unreliableWebRtcOwner: DRPUnreliableWebRtcOwner;
+	private readonly _ingressEvidence = new WeakMap<Message, IngressEvidence>();
+	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapRetryController?: AbortController;
 	private _relayPolicyController?: AbortController;
@@ -350,7 +548,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _relayMaintenanceTail: Promise<void> = Promise.resolve();
 	private _relayRefreshTimer?: ReturnType<typeof setTimeout>;
 	private _reservedRelayPeerIds = new Set<string>();
+	private readonly _relayPriorityTickets = new Map<string, ExplicitDialTicket>();
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
+	private _peerConnectionHandlers = new Set<PeerConnectionHandler>();
+	private _peerDisconnectHandlers = new Set<PeerDisconnectHandler>();
 	private readonly _hostFactory: DRPNetworkHostFactory;
 	private readonly _hostPolicy: DRPNetworkHostPolicy;
 	private readonly _authenticatedPeerBehaviorProvider: DRPNetworkNodeDependencies["authenticatedPeerBehaviorProvider"];
@@ -359,6 +560,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private readonly _relayPolicyFactory: DRPNetworkNodeDependencies["relayPolicyFactory"];
 	private _membershipVerifier?: MembershipVerifier;
 	private _outboundAddressPolicy: DRPNetworkHostConfigSnapshot["outboundAddressPolicy"] = "allow-all";
+	private _expectedReplicas?: number;
+	private _globalDiscovery = false;
 
 	peerId = "";
 
@@ -381,7 +584,40 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		this._relayPolicyFactory = dependencies.relayPolicyFactory;
 		this._membershipVerifier = createMembershipVerifier(config?.control_plane?.membership);
 		log = new Logger("drp::network", config?.log_config);
-		this._messageQueue = new MessageQueue<Message>({ id: "network", logConfig: config?.log_config });
+		this._messageQueue = new MessageQueue<Message | DirectSyncIngress>({
+			id: "network",
+			logConfig: config?.log_config,
+		});
+		this._unreliableWebRtcOwner = Object.freeze({
+			close: (): void => this._resetUnreliableWebRtcOwner(),
+			openUnreliableWebRtcRoute: (routeId: string) => {
+				const active = this._activeUnreliableWebRtcOwner;
+				if (active !== undefined) return active.openUnreliableWebRtcRoute(routeId);
+				return Object.freeze({
+					close(): void {},
+					maxPayloadBytes: DRP_UNRELIABLE_WEBRTC_MAX_PAYLOAD_BYTES,
+					onMessage: (): (() => void) => (): void => undefined,
+					reconcile: (): Promise<void> => Promise.resolve(),
+					restart: (): Promise<void> => Promise.resolve(),
+					send: (): Promise<boolean> => Promise.resolve(false),
+					snapshot: () =>
+						Object.freeze({
+							activeLinks: 0,
+							authenticatedConnectionLosses: 0,
+							backpressuredDrops: 0,
+							handshakeFailures: 0,
+							lastLinkDrop: undefined,
+							linkDrops: 0,
+							links: Object.freeze([]),
+							received: 0,
+							routedBytesReceived: 0,
+							routedBytesSent: 0,
+							sent: 0,
+							unknownRouteDrops: 0,
+						}),
+				});
+			},
+		});
 		this._validateRelayPolicyConfiguration(false);
 	}
 
@@ -392,6 +628,350 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	get membershipVerifier(): MembershipVerifier | undefined {
 		return this._membershipVerifier;
+	}
+
+	/** @returns Stable fail-closed raw WebRTC owner for the node lifecycle. */
+	get unreliableWebRtcOwner(): DRPUnreliableWebRtcOwner {
+		return this._unreliableWebRtcOwner;
+	}
+
+	/**
+	 * Creates one dedicated snapshot protocol port over already-open authenticated connections.
+	 * This method is consumed only by the non-root snapshot-transfer subpath.
+	 * @returns A bounded port with no dial fallback.
+	 */
+	createSnapshotChunkProtocolHost(): SnapshotChunkProtocolPort {
+		const active = new Set<Stream>();
+		let closed = false;
+		let selectedHandler: ((stream: SnapshotChunkProtocolStream) => Promise<void>) | undefined;
+		let incoming: ((stream: Stream, connection: Connection) => Promise<void>) | undefined;
+		const failure = (code: string, message: string, cause?: unknown): Error => {
+			const error = new Error(message, cause === undefined ? undefined : { cause });
+			Object.defineProperty(error, "code", { enumerable: true, value: code });
+			return error;
+		};
+		const wrap = (stream: Stream, peerId: string): SnapshotChunkProtocolStream => {
+			let streamClosed = false;
+			active.add(stream);
+			const abort = (reason = failure("aborted", "snapshot stream was aborted")): void => {
+				if (streamClosed) return;
+				streamClosed = true;
+				active.delete(stream);
+				stream.abort(reason);
+			};
+			const abortIfNeeded = (signal: AbortSignal): void => {
+				if (signal.aborted) {
+					const error = failure("aborted", "snapshot stream was aborted", signal.reason);
+					abort(error);
+					throw error;
+				}
+			};
+			return Object.freeze({
+				peerId,
+				abort,
+				close: async (): Promise<void> => {
+					if (streamClosed) return;
+					streamClosed = true;
+					active.delete(stream);
+					await stream.close();
+				},
+				read: async (maxBytes: number, { signal }: Readonly<{ readonly signal: AbortSignal }>): Promise<Uint8Array> => {
+					abortIfNeeded(signal);
+					if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {
+						throw failure("protocol-violation", "snapshot frame limit is invalid");
+					}
+					let rejectAbort!: (error: Error) => void;
+					const aborted = new Promise<never>((_resolve, reject) => {
+						rejectAbort = reject;
+					});
+					const onAbort = (): void => {
+						const error = failure("aborted", "snapshot stream was aborted", signal.reason);
+						abort(error);
+						rejectAbort(error);
+					};
+					signal.addEventListener("abort", onAbort, { once: true });
+					try {
+						const bytes = await Promise.race([readUint8ArrayFrame(stream, maxBytes), aborted]);
+						abortIfNeeded(signal);
+						return new Uint8Array(bytes);
+					} catch (error) {
+						if (signal.aborted) throw failure("aborted", "snapshot stream was aborted", signal.reason);
+						abort(failure("protocol-violation", "snapshot frame violates its byte bound", error));
+						throw failure("protocol-violation", "snapshot frame violates its byte bound", error);
+					} finally {
+						signal.removeEventListener("abort", onAbort);
+					}
+				},
+				write: async (
+					exactBytes: Uint8Array,
+					{ signal }: Readonly<{ readonly signal: AbortSignal }>
+				): Promise<void> => {
+					abortIfNeeded(signal);
+					let bytes: Uint8Array;
+					try {
+						bytes = new Uint8Array(exactBytes);
+					} catch (error) {
+						throw failure("protocol-violation", "snapshot frame carrier is invalid", error);
+					}
+					await writeUint8ArrayFrame(stream, bytes);
+					abortIfNeeded(signal);
+				},
+			});
+		};
+		return Object.freeze({
+			localPeerId: this.peerId,
+			close: (): Promise<void> => {
+				if (closed) return Promise.resolve();
+				closed = true;
+				if (incoming !== undefined && this._snapshotChunkIncoming === incoming) {
+					this._snapshotChunkIncoming = undefined;
+				}
+				selectedHandler = undefined;
+				for (const stream of [...active]) stream.abort(failure("aborted", "snapshot protocol port closed"));
+				active.clear();
+				return Promise.resolve();
+			},
+			connectedPeers: (): readonly string[] => {
+				if (closed || this._node === undefined) return [];
+				return [
+					...new Set(
+						this._node
+							.getConnections()
+							.filter(({ status }) => status === "open")
+							.map(({ remotePeer }) => remotePeer.toString())
+					),
+				].sort();
+			},
+			open: async (
+				peerId: string,
+				{ signal }: Readonly<{ readonly signal: AbortSignal }>
+			): Promise<SnapshotChunkProtocolStream> => {
+				if (closed || this._node === undefined || signal.aborted) {
+					throw failure(signal.aborted ? "aborted" : "connection-unavailable", "snapshot connection is unavailable");
+				}
+				let connection: Connection | undefined;
+				try {
+					connection = this._node
+						.getConnections(peerIdFromString(peerId))
+						.filter(({ status }) => status === "open")
+						.sort((left, right) => left.id.localeCompare(right.id))[0];
+				} catch {
+					connection = undefined;
+				}
+				if (connection === undefined) {
+					throw failure("connection-unavailable", "snapshot peer is not already connected");
+				}
+				try {
+					const stream = await connection.newStream(SNAPSHOT_CHUNK_PROTOCOL, { signal });
+					return wrap(stream, connection.remotePeer.toString());
+				} catch (error) {
+					throw failure(signal.aborted ? "aborted" : "connection-unavailable", "snapshot stream open failed", error);
+				}
+			},
+			serve: (handler: (stream: SnapshotChunkProtocolStream) => Promise<void>): (() => void) => {
+				if (closed || selectedHandler !== undefined || this._snapshotChunkIncoming !== undefined) {
+					throw new TypeError("snapshot protocol server is unavailable");
+				}
+				selectedHandler = handler;
+				incoming = async (stream, connection): Promise<void> => {
+					const selected = selectedHandler;
+					if (closed || selected === undefined) {
+						stream.abort(failure("connection-unavailable", "snapshot protocol server is unavailable"));
+						return;
+					}
+					await selected(wrap(stream, connection.remotePeer.toString()));
+				};
+				this._snapshotChunkIncoming = incoming;
+				return (): void => {
+					if (incoming !== undefined && this._snapshotChunkIncoming === incoming) {
+						this._snapshotChunkIncoming = undefined;
+					}
+					selectedHandler = undefined;
+				};
+			},
+		});
+	}
+
+	/**
+	 * Creates one bounded creator-seal evidence carrier over already-open authenticated connections.
+	 * The carrier owns framing only; evidence verification and selection remain outside network.
+	 * @returns A connected-only request/response port with no dial fallback.
+	 */
+	createSealEvidenceProtocolHost(): SealEvidenceProtocolPort {
+		const maxBytes = 262_144;
+		const active = new Set<Stream>();
+		let closed = false;
+		let selectedHandler:
+			| ((input: Readonly<{ peerId: string; request: unknown; signal: AbortSignal }>) => Promise<unknown>)
+			| undefined;
+		let incoming: ((stream: Stream, connection: Connection) => Promise<void>) | undefined;
+		const failure = (message: string, cause?: unknown): Error =>
+			new Error(message, cause === undefined ? undefined : { cause });
+		const encode = (value: unknown): Uint8Array => {
+			const text = JSON.stringify(value, (_key, item: unknown) =>
+				item instanceof Uint8Array ? { $tsDrpBytes: Array.from(item) } : item
+			);
+			if (text === undefined) throw failure("seal-evidence carrier is not serializable");
+			const bytes = new TextEncoder().encode(text);
+			if (bytes.byteLength > maxBytes) throw failure("seal-evidence carrier exceeds its byte bound");
+			return bytes;
+		};
+		const decode = (bytes: Uint8Array): unknown =>
+			JSON.parse(new TextDecoder().decode(bytes), (_key, item: unknown) => {
+				if (
+					item !== null &&
+					typeof item === "object" &&
+					!Array.isArray(item) &&
+					Reflect.ownKeys(item).length === 1 &&
+					Array.isArray(Reflect.get(item, "$tsDrpBytes"))
+				) {
+					const values = Reflect.get(item, "$tsDrpBytes") as unknown[];
+					if (values.every((value) => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 255)) {
+						return Uint8Array.from(values as number[]);
+					}
+				}
+				return item;
+			});
+		const connectedPeers = (): readonly string[] => {
+			if (closed || this._node === undefined) return [];
+			return [
+				...new Set(
+					this._node
+						.getConnections()
+						.filter(({ status }) => status === "open")
+						.map(({ remotePeer }) => remotePeer.toString())
+				),
+			].sort();
+		};
+		return Object.freeze({
+			localPeerId: this.peerId,
+			close: (): Promise<void> => {
+				if (closed) return Promise.resolve();
+				closed = true;
+				if (incoming !== undefined && this._sealEvidenceIncoming === incoming) {
+					this._sealEvidenceIncoming = undefined;
+				}
+				selectedHandler = undefined;
+				for (const stream of [...active]) stream.abort(failure("seal-evidence protocol port closed"));
+				active.clear();
+				return Promise.resolve();
+			},
+			connectedPeers,
+			query: async (
+				peerId: string,
+				request: unknown,
+				{ signal }: Readonly<{ signal: AbortSignal }>
+			): Promise<unknown> => {
+				if (closed || this._node === undefined || signal.aborted) {
+					throw failure("seal-evidence connection is unavailable", signal.reason);
+				}
+				let connection: Connection | undefined;
+				try {
+					connection = this._node
+						.getConnections(peerIdFromString(peerId))
+						.filter(({ status }) => status === "open")
+						.sort((left, right) => left.id.localeCompare(right.id))[0];
+				} catch {
+					connection = undefined;
+				}
+				if (connection === undefined) throw failure("seal-evidence peer is not already connected");
+				const stream = await connection.newStream(SEAL_EVIDENCE_PROTOCOL, { signal });
+				active.add(stream);
+				try {
+					await writeUint8ArrayFrame(stream, encode(request));
+					if (signal.aborted) throw failure("seal-evidence query was aborted", signal.reason);
+					return decode(new Uint8Array(await readUint8ArrayFrame(stream, maxBytes)));
+				} finally {
+					active.delete(stream);
+					await stream.close().catch(() => undefined);
+				}
+			},
+			serve: (
+				handler: (input: Readonly<{ peerId: string; request: unknown; signal: AbortSignal }>) => Promise<unknown>
+			): (() => void) => {
+				if (closed || selectedHandler !== undefined || this._sealEvidenceIncoming !== undefined) {
+					throw new TypeError("seal-evidence protocol server is unavailable");
+				}
+				selectedHandler = handler;
+				incoming = async (stream, connection): Promise<void> => {
+					const selected = selectedHandler;
+					if (closed || selected === undefined) {
+						stream.abort(failure("seal-evidence protocol server is unavailable"));
+						return;
+					}
+					active.add(stream);
+					const controller = new AbortController();
+					try {
+						const request = decode(new Uint8Array(await readUint8ArrayFrame(stream, maxBytes)));
+						const response = await selected({
+							peerId: connection.remotePeer.toString(),
+							request,
+							signal: controller.signal,
+						});
+						await writeUint8ArrayFrame(stream, encode(response));
+					} finally {
+						controller.abort();
+						active.delete(stream);
+						await stream.close().catch(() => undefined);
+					}
+				};
+				this._sealEvidenceIncoming = incoming;
+				return (): void => {
+					if (incoming !== undefined && this._sealEvidenceIncoming === incoming) {
+						this._sealEvidenceIncoming = undefined;
+					}
+					selectedHandler = undefined;
+				};
+			},
+		});
+	}
+
+	private _activateUnreliableWebRtcOwner(): void {
+		this._deactivateUnreliableWebRtcOwner();
+		const signaling = createLibp2pWebRtcSignalingPort({
+			connections: (): readonly Connection[] => (this._node === undefined ? [] : this._node.getConnections()),
+			localPeerId: this.peerId,
+			onIncoming: (listener): (() => void) => {
+				const selected = (stream: Stream, connection: Connection): Promise<void> => listener({ connection, stream });
+				this._unreliableWebRtcIncoming = selected;
+				return (): void => {
+					if (this._unreliableWebRtcIncoming === selected) this._unreliableWebRtcIncoming = undefined;
+				};
+			},
+			read: (stream, maxBytes): Promise<Uint8Array> => readUint8ArrayFrame(stream, maxBytes),
+			write: (stream, bytes): Promise<void> => writeUint8ArrayFrame(stream, bytes),
+		});
+		this._activeUnreliableWebRtcOwner = createDRPUnreliableWebRtcOwner({
+			createPeerConnection: (): RTCPeerConnection => {
+				if (typeof RTCPeerConnection === "undefined") throw new Error("RTCPeerConnection is unavailable");
+				return new RTCPeerConnection();
+			},
+			signaling,
+		});
+	}
+
+	private _deactivateUnreliableWebRtcOwner(): void {
+		this._activeUnreliableWebRtcOwner?.close();
+		this._activeUnreliableWebRtcOwner = undefined;
+		this._unreliableWebRtcIncoming = undefined;
+	}
+
+	private _resetUnreliableWebRtcOwner(): void {
+		this._deactivateUnreliableWebRtcOwner();
+		if (this._node?.status === "started") this._activateUnreliableWebRtcOwner();
+	}
+
+	/** @returns Detached exact T1/T3 occupancy and deployment evidence. */
+	getPeerSelectionSnapshot(): DRPPeerSelectionSnapshot {
+		const controller = this._connectionAdmission;
+		if (controller === undefined) throw new Error("peer selection is not attached to a running host");
+		const connectionManager = (this._node as unknown as { components?: { connectionManager?: unknown } } | undefined)
+			?.components?.connectionManager as { getDialQueue(): readonly unknown[] } | undefined;
+		return controller.getSnapshot(
+			connectionManager?.getDialQueue().length ?? 0,
+			this._expectedReplicas,
+			this._globalDiscovery
+		);
 	}
 
 	/**
@@ -411,8 +991,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		const bootstrapDiscovery = this._hostPolicy.bootstrapDiscovery ?? true;
 		const coldStartPubsubDiscovery = this._hostPolicy.coldStartPubsubDiscovery ?? true;
 		const gossipSubPeerExchange = this._hostPolicy.gossipSubPeerExchange ?? true;
+		const expectedReplicas = this._config?.control_plane?.peer_selection?.expected_replicas;
+		if (expectedReplicas !== undefined && (!Number.isSafeInteger(expectedReplicas) || expectedReplicas < 1)) {
+			throw new Error("control_plane.peer_selection.expected_replicas must be a positive safe integer");
+		}
+		const globalDiscovery = coldStartPubsubDiscovery && expectedReplicas !== undefined && expectedReplicas <= 50;
+		this._expectedReplicas = expectedReplicas;
+		this._globalDiscovery = globalDiscovery;
 		const _peerDiscovery: Array<PeerDiscoveryFunction> = [];
-		if (coldStartPubsubDiscovery) {
+		if (globalDiscovery) {
 			_peerDiscovery.push(
 				pubsubPeerDiscovery({
 					topics: [DRP_DISCOVERY_TOPIC],
@@ -435,7 +1022,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			dcutr: dcutr(),
 			identify: identify(),
 			identifyPush: identifyPush(),
-			pubsub: gossipsub(this.getGossipSubConfig(gossipSubPeerExchange)),
+			pubsub: gossipsub(this.getGossipSubConfig(gossipSubPeerExchange, globalDiscovery)),
 		};
 
 		if (this._config?.autonat) {
@@ -449,6 +1036,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		) {
 			throw new Error("relay_service.max_reservations must be a non-negative safe integer");
 		}
+		const connectionBudget = this._resolveConnectionBudget();
+		const relayPolicyConfiguration = this._resolveRelayPolicyConfiguration();
+		const prioritySlots = relayPolicyConfiguration?.targetReservations ?? 0;
+		if (
+			prioritySlots >= connectionBudget.maxConnections ||
+			prioritySlots > connectionBudget.maxConnections - connectionBudget.maxParallelDials
+		) {
+			throw new Error("relay priority reservations exceed the effective connection budget");
+		}
 		const _relayServices = {
 			..._node_services,
 			relay: circuitRelayServer({
@@ -459,8 +1055,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		};
 
 		const configuredAddressPolicy = this._config?.control_plane?.address_policy;
+		const controlPlaneKeys = Object.keys(this._config?.control_plane ?? {}).filter((key) => key !== "peer_selection");
 		const addressPolicy =
-			this._config?.control_plane === undefined
+			configuredAddressPolicy === undefined && controlPlaneKeys.length === 0
 				? undefined
 				: new AddressPolicy({
 						allowInsecureWebSocket: configuredAddressPolicy?.allowInsecureWebSocket,
@@ -506,6 +1103,33 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					: "allow-all";
 		this._outboundAddressPolicy = outboundAddressPolicy;
 		const activeAddressPolicyGate = this._hostPolicy.denyDialMultiaddr === undefined ? addressPolicyGate : undefined;
+		const connectionAdmission =
+			this._connectionAdmission ?? createConnectionAdmissionController(connectionBudget, { prioritySlots });
+		const peerSelector = new PeerSelector(connectionAdmission);
+		this._connectionAdmission = connectionAdmission;
+		this._peerSelector = peerSelector;
+		for (const address of this._config?.listen_addresses ?? []) {
+			if (!address.includes("/p2p-circuit")) continue;
+			try {
+				connectionAdmission.addLifecycleTarget(multiaddr(address));
+			} catch {
+				// libp2p owns the final listen-address validation.
+			}
+		}
+		const wrapFactory =
+			<T>(factory: (components: object) => T): ((components: object) => T) =>
+			(components): T => {
+				const candidate = factory(peerSelector.wrapComponents(components));
+				peerSelector.attachDiscovery(candidate);
+				return candidate;
+			};
+		const wrapServices = (services: ServiceFactoryMap): ServiceFactoryMap =>
+			Object.fromEntries(
+				Object.entries(services).map(([name, factory]) => [
+					name,
+					wrapFactory(factory as (components: object) => unknown),
+				])
+			) as ServiceFactoryMap;
 		const baseOptions: Libp2pOptions = {
 			privateKey,
 			addresses: {
@@ -513,11 +1137,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				...(this._config?.announce_addresses ? { announce: this._config.announce_addresses } : {}),
 			},
 			connectionManager: {
+				maxConnections: connectionBudget.maxConnections,
+				maxDialQueueLength: connectionBudget.maxConnections,
+				maxParallelDials: connectionBudget.maxParallelDials,
 				dialTimeout: 60_000,
 				addressSorter: this._sortAddresses,
 			},
 			connectionEncrypters: [noise()],
 			connectionGater: {
+				...connectionAdmission.connectionGater,
 				denyDialMultiaddr: this._hostPolicy.denyDialMultiaddr ?? activeAddressPolicyGate ?? ((): false => false),
 				...(activeAddressPolicyGate === undefined
 					? {}
@@ -528,10 +1156,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			metrics: this._config?.browser_metrics ? inspectorMetrics() : undefined,
 			...(activeAddressPolicyGate === undefined ? {} : { dns: outboundDns }),
-			peerDiscovery: _peerDiscovery,
-			services: this._config?.relay_service?.enabled === true ? _relayServices : _node_services,
+			peerDiscovery: _peerDiscovery.map((factory) =>
+				wrapFactory(factory as (components: object) => PeerDiscovery)
+			) as NonNullable<Libp2pOptions["peerDiscovery"]>,
+			services: wrapServices(this._config?.relay_service?.enabled === true ? _relayServices : _node_services),
 			streamMuxers: [yamux()],
-			transports: [circuitRelayTransport(), webRTC(), webSockets()],
+			transports: [circuitRelayTransport(), webRTC(), webSockets()].map((factory) =>
+				wrapFactory(factory as (components: object) => ReturnType<typeof factory>)
+			) as NonNullable<Libp2pOptions["transports"]>,
 		};
 		const publicComponents = this._config?.control_plane?.rollout?.public_components;
 		const rollout = Object.freeze({
@@ -547,18 +1179,26 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				pubsubBehaviorRewards: publicComponents?.pubsub_behavior_rewards?.enabled === true,
 			}),
 		});
-		const snapshot: DRPNetworkHostConfigSnapshot = Object.freeze({
+		const snapshotWithoutBudget = {
 			bootstrapDiscovery,
 			bootstrapPeerCount: bootstrapDiscovery ? bootstrapNodes.length : 0,
 			coldStartPubsubDiscovery,
 			gossipSubPeerExchange,
 			outboundAddressPolicy,
 			peerDiscoveryModules: Object.freeze([
-				...(coldStartPubsubDiscovery ? (["@libp2p/pubsub-peer-discovery"] as const) : []),
+				...(globalDiscovery ? (["@libp2p/pubsub-peer-discovery"] as const) : []),
 				...(bootstrapDiscovery && bootstrapNodes.length ? (["@libp2p/bootstrap"] as const) : []),
 			]),
 			rollout,
-		});
+		};
+		// Preserve the established enumerable snapshot shape while exposing the
+		// immutable budget as direct host-factory evidence and through browser diagnostics.
+		const snapshot = Object.freeze(
+			Object.defineProperties(snapshotWithoutBudget, {
+				connectionBudget: { enumerable: false, value: connectionBudget },
+				globalDiscovery: { enumerable: false, value: globalDiscovery },
+			})
+		) as DRPNetworkHostConfigSnapshot;
 		let builtHost: Libp2p | undefined;
 		let hostBuild: Promise<Libp2p> | undefined;
 		const createHost = async (extensions: DRPNetworkHostExtensions = {}): Promise<Libp2p> => {
@@ -568,23 +1208,53 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					throw new Error(`DRP network host extension cannot replace reserved service "${serviceName}"`);
 				}
 			}
-			hostBuild = createLibp2p({
-				...baseOptions,
-				contentRouters: [...(baseOptions.contentRouters ?? []), ...(extensions.contentRouters ?? [])],
-				peerDiscovery: [...(baseOptions.peerDiscovery ?? []), ...(extensions.peerDiscovery ?? [])],
-				peerRouters: [...(baseOptions.peerRouters ?? []), ...(extensions.peerRouters ?? [])],
-				services: { ...baseOptions.services, ...extensions.services },
-				transports: [...(baseOptions.transports ?? []), ...(extensions.transports ?? [])],
-			});
-			builtHost = await hostBuild;
-			return builtHost;
+			const extensionPeerDiscovery = (extensions.peerDiscovery ?? []).map((factory) =>
+				wrapFactory(factory as (components: object) => PeerDiscovery)
+			) as NonNullable<Libp2pOptions["peerDiscovery"]>;
+			const extensionServices = wrapServices(extensions.services ?? {});
+			hostBuild = (async (): Promise<Libp2p> => {
+				const host = await createLibp2p({
+					...baseOptions,
+					contentRouters: [
+						...(baseOptions.contentRouters ?? []),
+						...(extensions.contentRouters ?? []).map((factory) =>
+							wrapFactory(factory as (components: object) => unknown)
+						),
+					] as NonNullable<Libp2pOptions["contentRouters"]>,
+					peerDiscovery: [...(baseOptions.peerDiscovery ?? []), ...extensionPeerDiscovery],
+					peerRouters: [
+						...(baseOptions.peerRouters ?? []),
+						...(extensions.peerRouters ?? []).map((factory) => wrapFactory(factory as (components: object) => unknown)),
+					] as NonNullable<Libp2pOptions["peerRouters"]>,
+					services: { ...baseOptions.services, ...extensionServices },
+					start: false,
+					transports: [
+						...(baseOptions.transports ?? []),
+						...(extensions.transports ?? []).map((factory) => wrapFactory(factory as (components: object) => unknown)),
+					] as NonNullable<Libp2pOptions["transports"]>,
+				});
+				builtHost = host;
+				const components = (host as unknown as { components: { connectionManager: object; transportManager: object } })
+					.components;
+				connectionAdmission.wrapConnectionManager(components.connectionManager);
+				connectionAdmission.wrapTransportManager(components.transportManager);
+				peerSelector.attachHost(host);
+				await host.start();
+				return host;
+			})();
+			return hostBuild;
 		};
 		try {
 			const host = await this._hostFactory({ createHost, snapshot });
 			if (!builtHost) throw new Error("DRP network host factory must build its host through createHost()");
 			if (host !== builtHost) throw new Error("DRP network host factory must return the host built by createHost()");
+			connectionAdmission.attach(host);
 			this._node = host;
 		} catch (error) {
+			peerSelector.stop();
+			connectionAdmission.stop();
+			if (this._connectionAdmission === connectionAdmission) this._connectionAdmission = undefined;
+			if (this._peerSelector === peerSelector) this._peerSelector = undefined;
 			this._emitControlPlaneEvent({ kind: "listen-readiness", outcome: "failed", transport: "unknown" });
 			if (!builtHost && hostBuild) {
 				try {
@@ -623,10 +1293,23 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 
 		this._pubsub = this._node.services.pubsub as ConfigurableGossipSub;
 		this.peerId = this._node.peerId.toString();
+		this._activateUnreliableWebRtcOwner();
 
 		log.info("::start: Successfuly started DRP network w/ peer_id", this.peerId);
 
-		this._node.addEventListener("peer:connect", (e) => log.info("::start::peer::connect", e.detail));
+		this._node.addEventListener("connection:open", (event: CustomEvent<Connection>) => {
+			const peerId = event.detail.remotePeer.toString();
+			log.info("::start::connection::open", peerId);
+			this.notifyPeerConnection(peerId);
+		});
+		this._node.addEventListener("peer:connect", (event: CustomEvent<PeerId>) => {
+			log.info("::start::peer::connect", event.detail.toString());
+		});
+		this._node.addEventListener("peer:disconnect", (event: CustomEvent<PeerId>) => {
+			const peerId = event.detail.toString();
+			log.info("::start::peer::disconnect", peerId);
+			this.notifyPeerDisconnect(peerId);
+		});
 
 		this._node.addEventListener("peer:discovery", (e) => log.info("::start::peer::discovery", e.detail));
 
@@ -651,104 +1334,50 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		});
 
 		// needed as I've disabled the pubsubPeerDiscovery
-		this._pubsub?.subscribe(DRP_DISCOVERY_TOPIC);
+		if (globalDiscovery) this._pubsub?.subscribe(DRP_DISCOVERY_TOPIC);
 		this._pubsub?.subscribe(DRP_INTERVAL_DISCOVERY_TOPIC);
 
 		// start the routing loop to enqueue messages
 		void this.startEnqueueMessages();
 		this._metrics?.start(`drp-network-${this.peerId}`, 10_000);
 		this._messageQueue.start();
-		this._startRelayPolicy();
+		try {
+			this._startRelayPolicy();
+		} catch (error) {
+			this._deactivateUnreliableWebRtcOwner();
+			this._bootstrapRetryController?.abort(error);
+			this._bootstrapRetryController = undefined;
+			this._relayPolicyController?.abort(error);
+			this._relayPolicyController = undefined;
+			const relayPolicy = this._relayPolicy;
+			this._relayPolicy = undefined;
+			this._clearRelayMaintenance();
+			this._peerSelector?.stop();
+			this._peerSelector = undefined;
+			this._connectionAdmission?.stop();
+			this._connectionAdmission = undefined;
+			this._metrics?.stop();
+			this._messageQueue.close();
+			const host = this._node;
+			this._node = undefined;
+			this._pubsub = undefined;
+			try {
+				await relayPolicy?.stop();
+				await host?.stop();
+			} catch (cleanupError) {
+				throw new AggregateError([error, cleanupError], "relay policy startup and cleanup failed", {
+					cause: error,
+				});
+			}
+			throw error;
+		}
 	}
 
 	private _startRelayPolicy(): void {
 		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
-		const configuredSources = relayPolicyConfig?.sources;
-		const injectedSources = this._relayCandidateSources;
-		if (relayPolicyConfig === undefined || configuredSources === undefined) return;
-		const publicRelayOverflowEnabled =
-			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
+		const resolved = this._resolveRelayPolicyConfiguration();
+		if (relayPolicyConfig === undefined || resolved === undefined) return;
 		const nodeClosestPeersEnabled = this._nodeClosestPeersEnabled();
-		const configuredPublicRelays =
-			configuredSources.configured_relays === undefined
-				? undefined
-				: new ConfiguredPublicRelaySource({ multiaddrs: configuredSources.configured_relays });
-		const nodeTransportProfileEnabled =
-			nodeClosestPeersEnabled ||
-			(configuredSources.configured_relays !== undefined &&
-				configuredSources.configured_relays.length > 0 &&
-				!isBrowser &&
-				!isWebWorker);
-
-		const targetReservations =
-			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
-		if (!Number.isSafeInteger(targetReservations) || targetReservations < 1 || targetReservations > 8) {
-			throw new Error("control_plane.relay_policy.target_reservations must be an integer within 1..8");
-		}
-		const sources = [
-			{
-				enabled: configuredPublicRelays !== undefined && configuredSources.configured_relays?.length !== 0,
-				name: "configured-public-relays",
-				priority: "primary" as const,
-				source: configuredPublicRelays,
-			},
-			{
-				enabled:
-					configuredSources.configured_fallback !== undefined &&
-					configuredSources.configured_fallback.enabled !== false &&
-					injectedSources?.configuredFallback !== undefined,
-				name: "configured-fallback",
-				priority: "primary" as const,
-				source: injectedSources?.configuredFallback,
-			},
-			{
-				enabled:
-					configuredSources.cached_successful_relays?.enabled === true &&
-					injectedSources?.cachedSuccessfulRelays !== undefined,
-				name: "cached-successful-relays",
-				priority: "primary" as const,
-				source: injectedSources?.cachedSuccessfulRelays,
-			},
-			{
-				enabled:
-					configuredSources.registry_relay_records?.enabled === true &&
-					injectedSources?.registryRelayRecords !== undefined,
-				name: "registry-relay-records",
-				priority: "primary" as const,
-				source: injectedSources?.registryRelayRecords,
-			},
-			{
-				enabled:
-					publicRelayOverflowEnabled &&
-					configuredSources.delegated_closest_peers?.enabled === true &&
-					injectedSources?.delegatedClosestPeers !== undefined,
-				name: "delegated-closest-peers",
-				priority: "overflow" as const,
-				source: injectedSources?.delegatedClosestPeers,
-			},
-			{
-				degradedOverflowEligible: true,
-				enabled: nodeClosestPeersEnabled && injectedSources?.nodeClosestPeers !== undefined,
-				name: "node-overflow",
-				priority: "overflow" as const,
-				source: injectedSources?.nodeClosestPeers,
-			},
-			{
-				enabled:
-					publicRelayOverflowEnabled &&
-					configuredSources.dht_relay_providers?.enabled === true &&
-					injectedSources?.dhtRelayProviders !== undefined,
-				name: "dht-relay-providers",
-				priority: "overflow" as const,
-				source: injectedSources?.dhtRelayProviders,
-			},
-		].filter(
-			(entry): entry is typeof entry & { readonly source: RelayCandidateSource } =>
-				entry.enabled && entry.source !== undefined
-		);
-		if (sources.length === 0) return;
-
-		const source = new CompositeRelayCandidateSource({ requiredOperatorGroups: targetReservations, sources });
 		const factory = this._relayPolicyFactory ?? ((options): RelayPolicyDriver => this._createRelayPolicy(options));
 		this._relayPolicy = factory({
 			onReservationEvent: (event): void => {
@@ -760,16 +1389,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			perCandidateDeadlineMs:
 				relayPolicyConfig.per_candidate_deadline_ms ?? DEFAULT_RELAY_POLICY_LIMITS.perCandidateDeadlineMs,
-			source,
-			targetReservations,
+			source: resolved.source,
+			targetReservations: resolved.targetReservations,
 			totalDeadlineMs:
 				relayPolicyConfig.total_deadline_ms ??
 				(nodeClosestPeersEnabled
 					? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
 					: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs),
-			transportProfile: nodeTransportProfileEnabled
-				? RELAY_TRANSPORT_PROFILES.node
-				: RELAY_TRANSPORT_PROFILES.broadBrowser,
+			transportProfile: resolved.transportProfile,
 		});
 		this._relayPolicyController?.abort();
 		const controller = new AbortController();
@@ -779,7 +1406,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
 		this._relayDisconnectListener = (event): void => {
 			const peerId = event.detail.toString();
-			if (!this._reservedRelayPeerIds.delete(peerId)) return;
+			const policyOwnsReservation = this._lastRelayPolicyResult?.reservations.some(
+				({ candidate }) => candidate.peerId === peerId
+			);
+			const hadPriorityReservation = this._reservedRelayPeerIds.delete(peerId);
+			if (!hadPriorityReservation && policyOwnsReservation !== true) return;
+			this._connectionAdmission?.reconcileRelayReservations(
+				[...this._reservedRelayPeerIds].map((activePeerId) => ({
+					peerId: activePeerId,
+					priorityTicket: this._relayPriorityTickets.get(activePeerId),
+				}))
+			);
+			this._relayPriorityTickets.delete(peerId);
 			this._queueRelayMaintenance(async (): Promise<void> => {
 				const result = await policy.replace(peerId, "relay-disconnected", controller.signal);
 				this._handleRelayPolicyResult(result, policy, controller);
@@ -858,6 +1496,96 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			controlPlane.routing.node.network === "public" &&
 			controlPlane.rollout?.public_components?.delegated_routing?.enabled === true
 		);
+	}
+
+	private _resolveRelayPolicyConfiguration(): ResolvedRelayPolicyConfiguration | undefined {
+		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
+		const configuredSources = relayPolicyConfig?.sources;
+		if (relayPolicyConfig === undefined || configuredSources === undefined) return undefined;
+		const injectedSources = this._relayCandidateSources;
+		const publicRelayOverflowEnabled =
+			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
+		const nodeClosestPeersEnabled = this._nodeClosestPeersEnabled();
+		const configuredPublicRelays =
+			configuredSources.configured_relays === undefined
+				? undefined
+				: new ConfiguredPublicRelaySource({ multiaddrs: configuredSources.configured_relays });
+		const targetReservations =
+			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
+		const sources = [
+			{
+				enabled: configuredPublicRelays !== undefined && configuredSources.configured_relays?.length !== 0,
+				name: "configured-public-relays",
+				priority: "primary" as const,
+				source: configuredPublicRelays,
+			},
+			{
+				enabled:
+					configuredSources.configured_fallback !== undefined &&
+					configuredSources.configured_fallback.enabled !== false &&
+					injectedSources?.configuredFallback !== undefined,
+				name: "configured-fallback",
+				priority: "primary" as const,
+				source: injectedSources?.configuredFallback,
+			},
+			{
+				enabled:
+					configuredSources.cached_successful_relays?.enabled === true &&
+					injectedSources?.cachedSuccessfulRelays !== undefined,
+				name: "cached-successful-relays",
+				priority: "primary" as const,
+				source: injectedSources?.cachedSuccessfulRelays,
+			},
+			{
+				enabled:
+					configuredSources.registry_relay_records?.enabled === true &&
+					injectedSources?.registryRelayRecords !== undefined,
+				name: "registry-relay-records",
+				priority: "primary" as const,
+				source: injectedSources?.registryRelayRecords,
+			},
+			{
+				enabled:
+					publicRelayOverflowEnabled &&
+					configuredSources.delegated_closest_peers?.enabled === true &&
+					injectedSources?.delegatedClosestPeers !== undefined,
+				name: "delegated-closest-peers",
+				priority: "overflow" as const,
+				source: injectedSources?.delegatedClosestPeers,
+			},
+			{
+				degradedOverflowEligible: true,
+				enabled: nodeClosestPeersEnabled && injectedSources?.nodeClosestPeers !== undefined,
+				name: "node-overflow",
+				priority: "overflow" as const,
+				source: injectedSources?.nodeClosestPeers,
+			},
+			{
+				enabled:
+					publicRelayOverflowEnabled &&
+					configuredSources.dht_relay_providers?.enabled === true &&
+					injectedSources?.dhtRelayProviders !== undefined,
+				name: "dht-relay-providers",
+				priority: "overflow" as const,
+				source: injectedSources?.dhtRelayProviders,
+			},
+		].filter(
+			(entry): entry is typeof entry & { readonly source: RelayCandidateSource } =>
+				entry.enabled && entry.source !== undefined
+		);
+		if (sources.length === 0) return undefined;
+		return {
+			source: new CompositeRelayCandidateSource({ requiredOperatorGroups: targetReservations, sources }),
+			targetReservations,
+			transportProfile:
+				nodeClosestPeersEnabled ||
+				(configuredSources.configured_relays !== undefined &&
+					configuredSources.configured_relays.length > 0 &&
+					!isBrowser &&
+					!isWebWorker)
+					? RELAY_TRANSPORT_PROFILES.node
+					: RELAY_TRANSPORT_PROFILES.broadBrowser,
+		};
 	}
 
 	private _validateRelayPolicyConfiguration(validateSources = true): void {
@@ -1030,7 +1758,28 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	): void {
 		if (controller.signal.aborted || this._relayPolicy !== policy) return;
 		this._lastRelayPolicyResult = result;
-		this._reservedRelayPeerIds = new Set(result.reservations.map(({ candidate }) => candidate.peerId));
+		const previouslyReservedRelayPeerIds = this._reservedRelayPeerIds;
+		this._connectionAdmission?.reconcileRelayReservations(
+			result.reservations.map(({ candidate }) => ({
+				peerId: candidate.peerId,
+				priorityTicket: this._relayPriorityTickets.get(candidate.peerId),
+			})),
+			result.terminal
+		);
+		this._reservedRelayPeerIds = new Set(
+			result.reservations
+				.map(({ candidate }) => candidate.peerId)
+				.filter((peerId) => this._connectionAdmission?.hasActiveRelayPeer(peerId) === true)
+		);
+		for (const peerId of this._reservedRelayPeerIds) {
+			if (!previouslyReservedRelayPeerIds.has(peerId)) this._pubsub?.score.scoreCache.delete(peerId);
+		}
+		const policyOwnedPeerIds = new Set(policy.activeReservations?.map(({ candidate }) => candidate.peerId) ?? []);
+		for (const peerId of [...this._relayPriorityTickets.keys()]) {
+			if (!this._reservedRelayPeerIds.has(peerId) && !policyOwnedPeerIds.has(peerId)) {
+				this._relayPriorityTickets.delete(peerId);
+			}
+		}
 		if (result.terminal !== "reserved") {
 			if (!this._relayPolicyFailed) {
 				this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
@@ -1082,7 +1831,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _clearRelayMaintenance(): void {
 		if (this._relayRefreshTimer !== undefined) clearTimeout(this._relayRefreshTimer);
 		this._relayRefreshTimer = undefined;
+		this._connectionAdmission?.reconcileRelayReservations([]);
 		this._reservedRelayPeerIds.clear();
+		this._relayPriorityTickets.clear();
 		const listener = this._relayDisconnectListener;
 		if (listener !== undefined) this._node?.removeEventListener("peer:disconnect", listener);
 		this._relayDisconnectListener = undefined;
@@ -1097,13 +1848,77 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _createRelayPolicy(options: RelayPolicyFactoryOptions): RelayPolicyDriver {
 		const host = this._node;
 		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
+		const admission = this._connectionAdmission;
+		if (admission === undefined) throw new Error("relay policy requires an attached admission controller");
 		const client = new Libp2pRelayClient({
-			connect: async (address, signal): Promise<void> => {
-				await host.dial(multiaddr(address), { signal });
+			// Contextual return preserves the legacy Promise<void> or owned-receipt callback boundary.
+			// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+			connect: async (address, signal) => {
+				const target = multiaddr(address);
+				const peerId = this.getPeerId(target);
+				if (peerId === undefined) throw new Error("relay candidate address omitted its terminal peer id");
+				const existingConnectionIds = new Set(host.getConnections(peerIdFromString(peerId)).map(({ id }) => id));
+				const priorityEnabled =
+					admission.getSnapshot(0, this._expectedReplicas, this._globalDiscovery).prioritySlots > 0;
+				if (!priorityEnabled) {
+					const connection = await this.safeDial(target, host, signal);
+					if (connection === undefined) throw new Error("relay dial did not return a connection");
+					const created = !existingConnectionIds.has(connection.id);
+					return {
+						close: async (): Promise<void> => {
+							if (created) await connection.close();
+						},
+						connectionId: connection.id,
+						created,
+					};
+				}
+
+				const ticket = admission.createPriorityTicket(target);
+				if (ticket === undefined) {
+					const error = new Error("relay priority dial denied before queue insertion");
+					error.name = "DialDeniedError";
+					throw error;
+				}
+				try {
+					const connection = await host.dial(target, ticket.bindOptions(target, { signal }));
+					const created = !existingConnectionIds.has(connection.id);
+					if (
+						!admission.bindPriorityConnection(ticket, peerId, {
+							connectionId: connection.id,
+							created,
+						})
+					) {
+						if (created) await connection.close().catch(() => undefined);
+						const error = new Error("relay priority dial returned an unbound connection receipt");
+						error.name = "DialDeniedError";
+						throw error;
+					}
+					const previous = this._relayPriorityTickets.get(peerId);
+					if (previous !== undefined && previous !== ticket) previous.release();
+					this._relayPriorityTickets.set(peerId, ticket);
+					let released = false;
+					return {
+						close: async (): Promise<void> => {
+							if (released) return;
+							released = true;
+							try {
+								if (created) await connection.close();
+							} finally {
+								ticket.release();
+								if (this._relayPriorityTickets.get(peerId) === ticket) {
+									this._relayPriorityTickets.delete(peerId);
+								}
+							}
+						},
+						connectionId: connection.id,
+						created,
+					};
+				} catch (error) {
+					ticket.release();
+					throw error;
+				}
 			},
-			disconnect: async (peerId): Promise<void> => {
-				await host.hangUp(peerIdFromString(peerId));
-			},
+			disconnect: (): Promise<void> => Promise.resolve(),
 			host: host as unknown as Libp2pRelayClientOptions["host"],
 		});
 		const policy = new RelayPolicy({
@@ -1145,7 +1960,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (signal.aborted || this._node !== node || node.status === "stopping" || node.status === "stopped") return;
 
 			try {
-				await this.safeDial(addr, node);
+				await this.safeDial(addr, node, signal);
 				return;
 			} catch (e) {
 				log.error("::start::dial::error", e);
@@ -1180,6 +1995,13 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async stop(): Promise<void> {
 		if (this._node?.status === IntervalRunnerState.Stopped) throw new Error("Node not started");
+		this._deactivateUnreliableWebRtcOwner();
+		this._snapshotChunkIncoming = undefined;
+		this._sealEvidenceIncoming = undefined;
+		this._peerSelector?.stop();
+		this._peerSelector = undefined;
+		this._connectionAdmission?.stop();
+		this._connectionAdmission = undefined;
 		this._bootstrapRetryController?.abort();
 		this._bootstrapRetryController = undefined;
 		const relayPolicyController = this._relayPolicyController;
@@ -1251,16 +2073,25 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return 0;
 	}
 
+	private _resolveConnectionBudget(): DRPConnectionBudget {
+		return resolveConnectionBudget({
+			...(this._config?.connection_budget === undefined ? {} : { configured: this._config.connection_budget }),
+			relayServiceEnabled: this._config?.relay_service?.enabled === true,
+			runtime: isBrowser ? "browser" : isWebWorker ? "worker" : "node",
+		});
+	}
+
 	private getPeerId(addr: Multiaddr): string | undefined {
 		return addr.getComponents().find((component) => component.name === "p2p")?.value;
 	}
 
-	private getGossipSubConfig(doPX = true): Partial<GossipsubOpts> {
+	private getGossipSubConfig(doPX = true, globalDiscovery = false): Partial<GossipsubOpts> {
 		const baseConfig: Partial<GossipsubOpts> = {
 			doPX,
 			fallbackToFloodsub: false,
+			globalSignaturePolicy: StrictSign,
 			allowPublishToZeroTopicPeers: true,
-			scoreParams: this.getGossipSubPeerScoreParams(),
+			scoreParams: this.getGossipSubPeerScoreParams(globalDiscovery),
 		};
 
 		if (this._config?.seed) {
@@ -1280,7 +2111,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return baseConfig;
 	}
 
-	private getGossipSubPeerScoreParams(): PeerScoreParams {
+	private getGossipSubPeerScoreParams(globalDiscovery = false): PeerScoreParams {
 		const ipColocation = this._config?.control_plane?.pubsub_scoring?.ip_colocation;
 		const ipColocationParams: Partial<PeerScoreParams> =
 			ipColocation?.enabled === true
@@ -1304,24 +2135,37 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			return 0;
 		};
 		const appSpecificScore = (peerId: string): number => {
-			if (!rewardEnabled || behaviorProvider === undefined) return 0;
-			try {
-				const observation = behaviorProvider.getObservedPeerBehavior(peerId);
-				if (observation === undefined || observation.authenticated !== true) return 0;
-				if (
-					typeof observation.diversityScore !== "number" ||
-					typeof observation.validBehaviorScore !== "number" ||
-					!Number.isFinite(observation.diversityScore) ||
-					!Number.isFinite(observation.validBehaviorScore)
-				) {
-					return neutralProviderFailure(new Error("observed peer behavior provider returned an invalid score"));
+			const relayScore =
+				this._connectionAdmission?.hasActiveRelayPeer(peerId) === true
+					? observedBehaviorReward?.enabled === true
+						? Math.min(0.5, observedBehaviorReward.max_application_score)
+						: 0.5
+					: 0;
+			let behaviorScore = 0;
+			if (rewardEnabled && behaviorProvider !== undefined && observedBehaviorReward !== undefined) {
+				try {
+					const observation = behaviorProvider.getObservedPeerBehavior(peerId);
+					if (observation?.authenticated === true) {
+						if (
+							typeof observation.diversityScore !== "number" ||
+							typeof observation.validBehaviorScore !== "number" ||
+							!Number.isFinite(observation.diversityScore) ||
+							!Number.isFinite(observation.validBehaviorScore)
+						) {
+							behaviorScore = neutralProviderFailure(
+								new Error("observed peer behavior provider returned an invalid score")
+							);
+						} else {
+							const observedScore =
+								Math.max(0, observation.diversityScore) + Math.max(0, observation.validBehaviorScore);
+							behaviorScore = Math.min(observedScore, observedBehaviorReward.max_application_score);
+						}
+					}
+				} catch (error) {
+					behaviorScore = neutralProviderFailure(error);
 				}
-				const observedScore = Math.max(0, observation.diversityScore) + Math.max(0, observation.validBehaviorScore);
-				if (observedScore <= 0) return 0;
-				return Math.min(observedScore, observedBehaviorReward.max_application_score);
-			} catch (error) {
-				return neutralProviderFailure(error);
 			}
+			return Math.max(relayScore, behaviorScore);
 		};
 
 		if (this._config?.seed) {
@@ -1337,7 +2181,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			...ipColocationParams,
 			appSpecificScore,
 			appSpecificWeight: APP_SPECIFIC_WEIGHT,
-			topics: { [DRP_DISCOVERY_TOPIC]: createTopicScoreParams({ topicWeight: 1 }) },
+			...(globalDiscovery ? { topics: { [DRP_DISCOVERY_TOPIC]: createTopicScoreParams({ topicWeight: 1 }) } } : {}),
 		});
 	}
 
@@ -1467,6 +2311,16 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		signal?: AbortSignal
 	): Promise<Connection | undefined> {
 		if (Array.isArray(peerId) && peerId.length === 0) return undefined;
+		const connectionAdmission =
+			this._connectionAdmission ?? createConnectionAdmissionController(this._resolveConnectionBudget());
+		this._connectionAdmission = connectionAdmission;
+		const ticket = connectionAdmission.createExplicitTicket(peerId);
+		if (ticket === undefined) {
+			const error = new Error("explicit dial denied before queue insertion");
+			error.name = "DialDeniedError";
+			this._emitDialOutcome(this._firstDialAddress(peerId), "denied");
+			throw error;
+		}
 		const eventAddress = this._firstDialAddress(peerId);
 		try {
 			const isArray = Array.isArray(peerId);
@@ -1474,10 +2328,27 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (!isArray) {
 				const addr =
 					typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
-				connection = await node?.dial(addr, { signal });
+				const targetPeerId =
+					typeof addr === "object" && "getComponents" in addr
+						? addr
+								.getComponents()
+								.filter(({ name }) => name === "p2p")
+								.at(-1)?.value
+						: undefined;
+				const force =
+					targetPeerId !== undefined &&
+					node
+						?.getConnections(peerIdFromString(targetPeerId))
+						.some(({ remoteAddr }) => !remoteAddr.equals(addr as Multiaddr));
+				connection = await node?.dial(
+					addr,
+					ticket.bindOptions(addr, { ...(force === true ? { force: true } : {}), signal })
+				);
 			} else {
 				const candidates = this.dialCandidates(peerId);
-				connection = await Promise.any(candidates.map((addresses) => node?.dial(addresses, { signal })));
+				connection = await Promise.any(
+					candidates.map((addresses) => node?.dial(addresses, ticket.bindOptions(addresses, { signal })))
+				);
 			}
 			this._emitDialOutcome(eventAddress, connection === undefined ? "failed" : "ok");
 			return connection;
@@ -1487,6 +2358,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				error instanceof Error && error.name === "DialDeniedError" ? "denied" : "failed"
 			);
 			throw error;
+		} finally {
+			ticket.release();
 		}
 	}
 
@@ -1559,6 +2432,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			request.relayId === undefined
 				? await policy.acquire(new TextEncoder().encode(this.peerId), signal)
 				: await policy.replace(request.relayId, "relay-disconnected", signal, request.excludedOperatorGroup);
+		const controller = this._relayPolicyController;
+		if (controller !== undefined) this._handleRelayPolicyResult(result, policy, controller);
 		return result.terminal === "reserved" || result.terminal === "owned-fallback";
 	}
 
@@ -1592,7 +2467,16 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				Array.isArray(addr) && !isComponentArray
 					? (addr as MultiaddrInput[]).map((value) => multiaddr(value))
 					: [multiaddr(addr as MultiaddrInput)];
-			await this.safeDial(multiaddrs);
+			const groups = this._peerSelector?.admitRemoteRoutes(multiaddrs) ?? [];
+			await Promise.all(
+				groups.map(async (group): Promise<void> => {
+					try {
+						await this._node?.dial(group.addresses.length === 1 ? group.addresses[0] : [...group.addresses]);
+					} catch (error) {
+						log.error("::connect:group:", error);
+					}
+				})
+			);
 			log.debug("::connect: Successfully dialed", addr);
 		} catch (e) {
 			log.error("::connect:", e);
@@ -1662,9 +2546,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	/**
 	 * Get the peers in a group.
 	 * @param group - The group to get the peers from.
+	 * @param view - Optional bounded GossipSub mesh view.
 	 * @returns The peers in the group.
 	 */
-	getGroupPeers(group: string): string[] {
+	getGroupPeers(group: string, view?: "mesh"): string[] {
+		if (view === "mesh") {
+			if (this._config?.seed === true) return [];
+			return [...(this._pubsub?.mesh.get(group) ?? [])];
+		}
+		if (view !== undefined) throw new Error("unsupported group peer view");
 		const peers = this._pubsub?.getSubscribers(group);
 		if (!peers) return [];
 		return peers.map((peer) => peer.toString());
@@ -1677,14 +2567,76 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async broadcastMessage(topic: string, message: Message): Promise<void> {
 		try {
-			const messageBuffer = Message.encode(message).finish();
-			await this.waitForSubscriber(topic);
-			await this._pubsub?.publish(topic, messageBuffer);
-
+			await this.waitForPeersAndPublish(topic, message);
 			log.debug("::broadcastMessage: Successfuly broadcasted message to topic", topic);
 		} catch (e) {
 			log.error("::broadcastMessage:", e);
 		}
+	}
+
+	private async waitForPeersAndPublish(topic: string, message: Message): Promise<void> {
+		const messageBuffer = Message.encode(message).finish();
+		const pubsub = this._pubsub;
+		if (pubsub === undefined) throw new Error("Pubsub is unavailable");
+		await this.waitForSubscriber(topic);
+		if (this._pubsub !== pubsub) throw new Error("Pubsub changed during publication readiness");
+		await pubsub.publish(topic, messageBuffer);
+		if (this._pubsub !== pubsub) throw new Error("Pubsub changed during publication");
+	}
+
+	/**
+	 * Publish one exact message and surface readiness or transport failure.
+	 * @param topic - Authenticated topic selected by the private live-plane owner.
+	 * @param message - Exact message to encode and publish.
+	 * @returns Literal truth after the publication completes.
+	 */
+	async publishMessage(topic: string, message: Message): Promise<true> {
+		await this.waitForPeersAndPublish(topic, message);
+		return true;
+	}
+
+	/**
+	 * Read the authenticated gossip topic bound to one decoded message identity.
+	 * @param message - Exact decoded message delivered by signed gossip ingress.
+	 * @returns Its authenticated topic, or undefined outside signed gossip ingress.
+	 */
+	gossipTopicFor(message: Message): string | undefined {
+		const transport = this._ingressEvidence.get(message)?.transport;
+		return transport?.kind === "signed-gossip" ? transport.topic : undefined;
+	}
+
+	/**
+	 * Atomically consume exact authenticated transport evidence for one decoded message.
+	 * @param message - Exact decoded message identity delivered by this node.
+	 * @returns A detached authenticated snapshot, or undefined after mutation/replay.
+	 */
+	claimIngressEvidence(message: Message): IngressEvidence | undefined {
+		const evidence = this._ingressEvidence.get(message);
+		this._ingressEvidence.delete(message);
+		if (evidence === undefined) return undefined;
+		const snapshot = evidence.message;
+		return snapshot.sender === message.sender &&
+			snapshot.type === message.type &&
+			snapshot.objectId === message.objectId &&
+			sameIngressBytes(snapshot.data, message.data)
+			? evidence
+			: undefined;
+	}
+
+	private recordIngressEvidence(message: Message, transport: IngressTransport): void {
+		if (!isClaimableIngress(message)) return;
+		this._ingressEvidence.set(
+			message,
+			Object.freeze({
+				message: Object.freeze({
+					data: message.data.slice(),
+					objectId: message.objectId,
+					sender: message.sender,
+					type: message.type,
+				}),
+				transport: Object.freeze(transport),
+			})
+		);
 	}
 
 	private async waitForSubscriber(topic: string, timeout = 1000): Promise<void> {
@@ -1703,15 +2655,174 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * @param peerId - The peer ID to send the message to.
 	 * @param message - The message to send.
 	 */
-	async sendMessage(peerId: string, message: Message): Promise<void> {
+	async sendMessage(peerId: string, message: Message, options: { readonly signal?: AbortSignal } = {}): Promise<void> {
+		let stream: Stream | undefined;
+		const abort = (): void => {
+			if (stream === undefined) return;
+			stream.abort(
+				options.signal?.reason instanceof Error ? options.signal.reason : new Error("direct message send aborted")
+			);
+		};
 		try {
+			options.signal?.throwIfAborted();
 			const connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)]);
-			const stream = <Stream>await connection?.newStream(DRP_MESSAGE_PROTOCOL);
+			options.signal?.throwIfAborted();
+			stream = <Stream>await connection?.newStream(DRP_MESSAGE_PROTOCOL, { signal: options.signal });
+			options.signal?.addEventListener("abort", abort, { once: true });
+			options.signal?.throwIfAborted();
 			const messageBuffer = Message.encode(message).finish();
 			await uint8ArrayToStream(stream, messageBuffer);
 		} catch (e) {
 			log.error("::sendMessage:", e);
+			if (options.signal !== undefined) throw e;
+		} finally {
+			options.signal?.removeEventListener("abort", abort);
 		}
+	}
+
+	/**
+	 * Open one negotiated sync stream, then build the payload for the protocol
+	 * selected by that exact stream. Additive completion means remote bounded
+	 * queue admission; fallback retains local write completion.
+	 */
+	async sendSyncMessage(
+		peerId: string,
+		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>,
+		options: { readonly signal?: AbortSignal } = {}
+	): Promise<void> {
+		return this.submitNegotiatedSync(peerId, payloadFactory, MessageType.MESSAGE_TYPE_SYNC, options);
+	}
+
+	/** Send one bounded sync response over a freshly selected sync stream. */
+	async sendSyncResponseMessage(
+		peerId: string,
+		message: Message,
+		options: { readonly signal?: AbortSignal } = {}
+	): Promise<void> {
+		if (
+			message.type !== MessageType.MESSAGE_TYPE_SYNC_ACCEPT &&
+			message.type !== MessageType.MESSAGE_TYPE_SYNC_REJECT
+		) {
+			throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Sync response sender requires SyncAccept or SyncReject");
+		}
+		return this.submitNegotiatedSync(peerId, () => message, message.type, options);
+	}
+
+	private async submitNegotiatedSync(
+		peerId: string,
+		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>,
+		expectedType:
+			| MessageType.MESSAGE_TYPE_SYNC
+			| MessageType.MESSAGE_TYPE_SYNC_ACCEPT
+			| MessageType.MESSAGE_TYPE_SYNC_REJECT,
+		options: { readonly signal?: AbortSignal }
+	): Promise<void> {
+		const deadlineSignal = AbortSignal.timeout(10_000);
+		const signal = options.signal === undefined ? deadlineSignal : AbortSignal.any([options.signal, deadlineSignal]);
+		let connection: Connection | undefined;
+		try {
+			connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)], this._node, signal);
+		} catch (cause) {
+			throw this.syncFailure(signal, deadlineSignal, "SYNC_DIAL_FAILED", "Could not dial sync peer", cause);
+		}
+		if (connection === undefined) throw new SyncTransportError("SYNC_DIAL_FAILED", "Could not dial sync peer");
+		let admission = this._syncAdmissions.get(connection);
+		if (admission === undefined) {
+			admission = new SyncSendAdmission(connection);
+			this._syncAdmissions.set(connection, admission);
+		}
+		return admission.submit(() =>
+			this.sendSelectedSync(connection, payloadFactory, expectedType, signal, deadlineSignal)
+		);
+	}
+
+	private async sendSelectedSync(
+		connection: Connection,
+		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>,
+		expectedType:
+			| MessageType.MESSAGE_TYPE_SYNC
+			| MessageType.MESSAGE_TYPE_SYNC_ACCEPT
+			| MessageType.MESSAGE_TYPE_SYNC_REJECT,
+		signal: AbortSignal,
+		deadlineSignal: AbortSignal
+	): Promise<void> {
+		if (connection.status !== "open") {
+			throw new SyncTransportError("SYNC_CONNECTION_CLOSED", "Sync connection is closed");
+		}
+		let stream: Stream;
+		try {
+			stream = await connection.newStream([...DRP_SYNC_PROTOCOLS], {
+				maxOutboundStreams: 3,
+				signal,
+			});
+		} catch (cause) {
+			throw this.syncFailure(
+				signal,
+				deadlineSignal,
+				"SYNC_PROTOCOL_SELECTION_FAILED",
+				"Could not select a sync protocol",
+				cause
+			);
+		}
+
+		try {
+			const selection = selectedSyncProtocol(stream.protocol);
+			const message = await payloadFactory(selection);
+			if (message.type !== expectedType) {
+				throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Sync sender factory returned the wrong message type");
+			}
+			const messageBuffer = Message.encode(message).finish();
+			validateNegotiatedSync(message, stream.protocol, messageBuffer.byteLength);
+			await uint8ArrayToStream(stream, messageBuffer);
+			if (selection.mode === "heads-chunk") {
+				await this.waitForRemoteSyncAdmission(stream, signal, deadlineSignal);
+			}
+		} catch (error) {
+			if (stream.status === "open" || stream.status === "closing") {
+				stream.abort(error instanceof Error ? error : new Error(String(error)));
+			}
+			if (error instanceof SyncTransportError) throw error;
+			throw this.syncFailure(signal, deadlineSignal, "SYNC_WRITE_FAILED", "Sync stream failed", error);
+		}
+	}
+
+	private waitForRemoteSyncAdmission(stream: Stream, signal: AbortSignal, deadlineSignal: AbortSignal): Promise<void> {
+		if (signal.aborted) {
+			return Promise.reject(this.syncFailure(signal, deadlineSignal, "SYNC_SEND_ABORTED", "Sync send aborted"));
+		}
+		if (stream.status === "closed") return Promise.resolve();
+		if (stream.status === "reset" || stream.status === "aborted") {
+			return Promise.reject(new SyncTransportError("SYNC_STREAM_RESET", "Remote sync stream reset"));
+		}
+		return new Promise<void>((resolve, reject) => {
+			const onAbort = (): void => {
+				cleanup();
+				reject(this.syncFailure(signal, deadlineSignal, "SYNC_SEND_ABORTED", "Sync send aborted"));
+			};
+			const onClose = (): void => {
+				cleanup();
+				if (stream.status === "closed") resolve();
+				else reject(new SyncTransportError("SYNC_STREAM_RESET", "Remote sync stream reset"));
+			};
+			const cleanup = (): void => {
+				signal.removeEventListener("abort", onAbort);
+				stream.removeEventListener("close", onClose);
+			};
+			signal.addEventListener("abort", onAbort, { once: true });
+			stream.addEventListener("close", onClose, { once: true });
+		});
+	}
+
+	private syncFailure(
+		signal: AbortSignal,
+		deadlineSignal: AbortSignal,
+		code: string,
+		message: string,
+		cause?: unknown
+	): SyncTransportError {
+		if (deadlineSignal.aborted) return new SyncTransportError("SYNC_SEND_DEADLINE", "Sync send deadline exceeded");
+		if (signal.aborted) return new SyncTransportError("SYNC_SEND_ABORTED", "Sync send aborted");
+		return new SyncTransportError(code, message, cause === undefined ? undefined : { cause });
 	}
 
 	/**
@@ -1721,8 +2832,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async sendGroupMessageRandomPeer(group: string, message: Message): Promise<void> {
 		try {
-			const peers = this._pubsub?.getSubscribers(group);
-			if (!peers || peers.length === 0) throw Error("Topic wo/ peers");
+			const peers = this.getGroupPeers(group, "mesh");
+			if (peers.length === 0) return;
 			const peerId = peers[Math.floor(Math.random() * peers.length)];
 
 			const connection = await this.safeDial(peerId);
@@ -1744,22 +2855,114 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return () => this._groupPeerChangeHandlers.delete(handler);
 	}
 
+	/**
+	 * Subscribe to genuine remote transport disconnections.
+	 * @param handler - Handler invoked with the disconnected peer ID
+	 * @returns A function that removes the handler
+	 */
+	subscribeToPeerDisconnects(handler: PeerDisconnectHandler): () => void {
+		this._peerDisconnectHandlers.add(handler);
+		return () => this._peerDisconnectHandlers.delete(handler);
+	}
+
+	/**
+	 * Subscribe to genuine remote transport connections.
+	 * @param handler - Handler invoked with the connected peer ID
+	 * @returns A function that removes the handler
+	 */
+	subscribeToPeerConnections(handler: PeerConnectionHandler): () => void {
+		this._peerConnectionHandlers.add(handler);
+		return () => this._peerConnectionHandlers.delete(handler);
+	}
+
 	private notifyGroupPeerChange(change: GroupPeerChange): void {
 		for (const handler of this._groupPeerChangeHandlers) handler(change);
+	}
+
+	private notifyPeerDisconnect(peerId: string): void {
+		for (const handler of this._peerDisconnectHandlers) handler(peerId);
+	}
+
+	private notifyPeerConnection(peerId: string): void {
+		for (const handler of this._peerConnectionHandlers) handler(peerId);
 	}
 
 	private async startEnqueueMessages(): Promise<void> {
 		this._pubsub?.addEventListener("gossipsub:message", (e) => {
 			if (e.detail.msg.topic === DRP_DISCOVERY_TOPIC) return;
-			this.handleGossipsubMessage(e.detail.msg.data);
+			if (e.detail.msg.type !== "signed") {
+				log.error("::startEnqueueMessages::handleGossipsubMessage: unsigned message on StrictSign ingress");
+				return;
+			}
+			void this.handleSignedGossipsubMessage(e.detail.msg);
 		});
-		await this._node?.handle(DRP_MESSAGE_PROTOCOL, (stream) => this.handleStream(stream));
+		await this._node?.handle(
+			SNAPSHOT_CHUNK_PROTOCOL,
+			async (stream, connection): Promise<void> => {
+				const listener = this._snapshotChunkIncoming;
+				if (listener === undefined) {
+					stream.abort(new Error("snapshot protocol owner is unavailable"));
+					return;
+				}
+				await listener(stream, connection);
+			},
+			{ maxInboundStreams: 4, maxOutboundStreams: 4 }
+		);
+		await this._node?.handle(
+			SEAL_EVIDENCE_PROTOCOL,
+			async (stream, connection): Promise<void> => {
+				const listener = this._sealEvidenceIncoming;
+				if (listener === undefined) {
+					stream.abort(new Error("seal-evidence protocol owner is unavailable"));
+					return;
+				}
+				await listener(stream, connection);
+			},
+			{ maxInboundStreams: 4, maxOutboundStreams: 4 }
+		);
+		await this._node?.handle(
+			DRP_UNRELIABLE_WEBRTC_SIGNALING_PROTOCOL,
+			async (stream, connection): Promise<void> => {
+				const listener = this._unreliableWebRtcIncoming;
+				if (listener === undefined) {
+					stream.abort(new Error("unreliable WebRTC signaling owner is unavailable"));
+					return;
+				}
+				await listener(stream, connection);
+			},
+			{ maxInboundStreams: 1, maxOutboundStreams: 1 }
+		);
+		await this._node?.handle(
+			[...DRP_SYNC_PROTOCOLS],
+			(stream, connection) => this.handleStream(stream, connection.remotePeer.toString()),
+			{ maxInboundStreams: 3, maxOutboundStreams: 3 }
+		);
 	}
 
-	private handleGossipsubMessage(data: Uint8Array): void {
+	private async handleSignedGossipsubMessage(message: SignedMessage): Promise<void> {
 		try {
-			const message = Message.decode(data);
-			this._messageQueue.enqueue(message).catch((e) => {
+			if (!peerIdFromPublicKey(message.key).equals(message.from)) return;
+			if (!(await validateToRawMessage(message))) return;
+			this.handleGossipsubMessage(message.data, message.from.toString(), message.topic);
+		} catch {
+			// Strict signed ingress fails closed.
+		}
+	}
+
+	private decodeAttributedMessage(data: Uint8Array, authenticatedSender: string): Message {
+		const message = Message.decode(data);
+		message.sender = authenticatedSender;
+		return message;
+	}
+
+	private handleGossipsubMessage(data: Uint8Array, authenticatedSender: string, topic: string): void {
+		try {
+			const message = this.decodeAttributedMessage(data, authenticatedSender);
+			if (isSyncProtocolMessage(message)) return;
+			const gossipTopic = topic;
+			this.recordIngressEvidence(message, { kind: "signed-gossip", sender: authenticatedSender, topic: gossipTopic });
+			const messageQueueCallback = this._messageQueue.enqueue(message);
+			messageQueueCallback.catch((e) => {
 				log.error("::startEnqueueMessages::enqueue:", e);
 			});
 		} catch (e) {
@@ -1767,14 +2970,36 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		}
 	}
 
-	private async handleStream(stream: Stream): Promise<void> {
+	private async handleStream(stream: Stream, authenticatedSender: string): Promise<void> {
 		try {
 			const data = await streamToUint8Array(stream);
-			const message = Message.decode(data);
-			this._messageQueue.enqueue(message).catch((e) => {
-				log.error("::startEnqueueMessages::enqueue:", e);
-			});
+			const message = this.decodeAttributedMessage(data, authenticatedSender);
+			const selection = selectedSyncProtocol(stream.protocol);
+			if (selection.mode === "heads-chunk" && !isSyncProtocolMessage(message)) {
+				throw new SyncTransportError(
+					"SYNC_PROTOCOL_VIOLATION",
+					"The heads-chunk protocol only accepts sync-family messages"
+				);
+			}
+			if (isSyncProtocolMessage(message)) {
+				validateNegotiatedSync(message, stream.protocol, data.byteLength);
+				const ingress = createDirectSyncIngress(message, authenticatedSender, selection.protocol);
+				await this._messageQueue.enqueue(ingress);
+				if (ingress.mode === "heads-chunk") await ingress.completion.wait();
+			} else {
+				validateNegotiatedSync(message, stream.protocol, data.byteLength);
+				this.recordIngressEvidence(message, {
+					kind: "authenticated-stream",
+					protocol: stream.protocol,
+					sender: authenticatedSender,
+				});
+				await this._messageQueue.enqueue(message);
+			}
+			await stream.close();
 		} catch (e) {
+			if (stream.status === "open" || stream.status === "closing") {
+				stream.abort(e instanceof Error ? e : new Error(String(e)));
+			}
 			log.error("::startEnqueueMessages::handleStream", e);
 		}
 	}
@@ -1784,6 +3009,19 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * @param handler - The handler to subscribe to the message queue.
 	 */
 	subscribeToMessageQueue(handler: IMessageQueueHandler<Message>): void {
-		this._messageQueue.subscribe(handler);
+		this._messageQueue.subscribe((ingress) => {
+			try {
+				const result = handler(ingress as Message);
+				if (isDirectSyncIngress(ingress) && !ingress.completion.isClaimed()) {
+					ingress.completion.claim(result);
+				}
+				return result;
+			} catch (error) {
+				if (isDirectSyncIngress(ingress) && !ingress.completion.isClaimed()) {
+					ingress.completion.claim(Promise.reject(error));
+				}
+				throw error;
+			}
+		});
 	}
 }

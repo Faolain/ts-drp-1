@@ -1,0 +1,9 @@
+{
+	"extends": "../../../packages/compaction/tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"rootDir": "../../..",
+		"tsBuildInfoFile": "../../../packages/compaction/node_modules/.tmp/phase-0p1-public-entry.tsbuildinfo"
+	},
+	"files": ["public-entry-type-audit.ts"]
+}
