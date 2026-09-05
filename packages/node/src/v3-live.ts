@@ -381,7 +381,9 @@ type V3BlueprintLiveBindingInput =
 /**
  * Authenticated replayable notification attempt, not an exactly-once external commit.
  * Persistent consumers deduplicate side effects by authenticated vertex digest.
- * Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.
+ * Successor-recovery callback rejection rejects and deactivates activation.
+ * Ordinary authenticated ingress and local issue retain legacy log-and-continue behavior on rejection.
+ * Failure, crash or cold reopen may replay notifications.
  */
 export type V3AdmittedVertexSink = (
 	delivery: Readonly<{
