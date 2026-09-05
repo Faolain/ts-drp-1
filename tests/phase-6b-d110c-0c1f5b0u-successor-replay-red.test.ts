@@ -21,7 +21,7 @@ import { createRecoverableFinalitySigner } from "../packages/keychain/src/finali
 type Delivery = Parameters<V3AdmittedVertexSink>[0];
 const observed = vi.hoisted(() => ({
 	phase: "prepare" as "prepare" | "reopen",
-	fault: "none" as "none" | "sink" | "commit",
+	fault: "none" as "none" | "sink" | "commit" | "second-commit",
 	deliveries: [] as Delivery[],
 	events: [] as string[],
 	handles: [] as V3PlaneHandle[],
@@ -221,6 +221,10 @@ async function genuineSuccessor() {
 			if (observed.phase !== "reopen") return;
 			observed.events.push(`commit:${vertex.authorSequence}`);
 			if (observed.fault === "commit") throw new Error("D110C_0C1F5B0U_REPLAY_COMMIT_FAILED");
+			if (observed.fault === "second-commit" && accepted.length === 1) {
+				observed.fault = "none";
+				throw new Error("D110C_0C1F5B0U_REPLAY_SECOND_COMMIT_FAILED");
+			}
 			accepted.push(Buffer.from(vertex.digest).toString("hex"));
 		},
 		onProjection: () => undefined,
@@ -351,6 +355,54 @@ describe("D.110c-0c1f5b0u genuine successor recovered-delivery RED", () => {
 			.soft(
 				observed.handles.filter((handle) => handle.currentEphemeralAuthority() !== undefined),
 				"REPLAY_ONE_ACTIVE_OWNER"
+			)
+			.toHaveLength(1);
+	});
+
+	it("preserves external delivery custody when callback two fails after callback one and the same room cold-reopens", async () => {
+		const fixture = await genuineSuccessor();
+		const expectedDigests = fixture.expected.map(({ vertex }) => Buffer.from(vertex.digest).toString("hex"));
+		observed.fault = "second-commit";
+		const outcome = await fixture.reopen().then(
+			() => "unexpected-success",
+			() => "rejected"
+		);
+		expect.soft(outcome, "REPLAY_SECOND_FAILURE_REFUSED").toBe("rejected");
+		expect
+			.soft(
+				observed.events.filter((event) => event.startsWith("commit:")),
+				"REPLAY_SECOND_CALLBACK_REACHED"
+			)
+			.toEqual(fixture.expected.map(({ vertex }) => `commit:${vertex.authorSequence}`));
+		expect.soft(observed.fault, "REPLAY_SECOND_FAULT_CONSUMED_ONCE").toBe("none");
+		expect
+			.soft(
+				observed.handles.filter((handle) => handle.currentEphemeralAuthority() !== undefined),
+				"REPLAY_SECOND_FAILURE_NO_ACTIVE_OWNER"
+			)
+			.toHaveLength(0);
+		expect.soft(observed.transportCloses, "REPLAY_SECOND_FAILURE_TRANSPORT_RELEASED").toBe(1);
+		// This ledger is external observer state: do not reset or deduplicate it across reopen.
+		expect.soft([...fixture.accepted], "REPLAY_SECOND_FAILURE_ATOMIC_EXTERNAL_LEDGER").toEqual([]);
+		observed.fault = "none";
+		const recovered = await fixture.reopen();
+		expect.soft(fixture.accepted, "REPLAY_COLD_REOPEN_IDEMPOTENT_EXTERNAL_LEDGER").toEqual(expectedDigests);
+		const canonicalStateBytes = required(createV3ChatApplication("alice").migration).canonicalStateBytes;
+		expect
+			.soft(
+				Reflect.apply(canonicalStateBytes, undefined, [recovered.projection()]),
+				"REPLAY_RECOVERY_CANONICAL_STATE_ONCE"
+			)
+			.toEqual(Reflect.apply(canonicalStateBytes, undefined, [fixture.projection]));
+		const messages = Reflect.get(recovered.projection(), "accepted") as readonly Record<string, unknown>[];
+		expect
+			.soft(messages.map((message) => message.clientOperationId).sort(), "REPLAY_RECOVERY_EACH_DURABLE_OPERATION_ONCE")
+			.toEqual(["above-snapshot-1", "above-snapshot-2", "snapshot"]);
+		expect.soft(recovered.authority(), "REPLAY_RECOVERY_AUTHORITY_UNCHANGED").toEqual(fixture.authority);
+		expect
+			.soft(
+				observed.handles.filter((handle) => handle.currentEphemeralAuthority() !== undefined),
+				"REPLAY_RECOVERY_ONE_ACTIVE_OWNER"
 			)
 			.toHaveLength(1);
 	});
