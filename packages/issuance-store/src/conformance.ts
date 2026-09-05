@@ -1,5 +1,6 @@
 import {
 	applySettlementPlanEffect,
+	assertSettlementPlanProgressTransition,
 	captureSettlementPlanWriteInput,
 	cloneDurableIssueCommit as cloneCommit,
 	copyDurableIssueScope as cloneScope,
@@ -16,6 +17,7 @@ import {
 	durablePreimageMatchesScopeAndSequence as preimageMatches,
 	durableIssuanceBytesEqual as sameBytes,
 	durableIssueScopesEqual as sameScope,
+	settlementReplacementLastLogicalTime,
 	assertDurableIssueScope as validateScope,
 	isValidDurableAuthorSequence as validOrdinal,
 	isValidDurableScopeField as validScopeField,
@@ -264,6 +266,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		if ((current?.revision ?? null) !== captured.expectedRevision) {
 			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
 		}
+		assertSettlementPlanProgressTransition(current ?? null, captured.plan);
 		const durable = cloneSettlementPlan(captured.plan);
 		this.#plans.set(key, durable);
 		return cloneSettlementPlan(durable);
@@ -331,7 +334,12 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 			}
 			const plan = copySettlementPlan(stored, detachedScope);
 			if (plan === undefined) throw this.#latchCorruption();
-			updatedPlan = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
+			updatedPlan = applySettlementPlanEffect(
+				plan,
+				candidate.planEffect,
+				candidate.authorSequence,
+				settlementReplacementLastLogicalTime(candidate)
+			);
 		}
 		this.#lineages.set(key, {
 			exhausted: prior.next === Number.MAX_SAFE_INTEGER,

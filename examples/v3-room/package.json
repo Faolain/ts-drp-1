@@ -19,6 +19,7 @@
 		"@ts-drp/compaction": "workspace:*",
 		"@ts-drp/control-plane": "workspace:*",
 		"@ts-drp/ephemeral": "workspace:*",
+		"@ts-drp/issuance-store": "workspace:*",
 		"@ts-drp/message-queue": "workspace:*",
 		"@ts-drp/node": "workspace:*",
 		"@ts-drp/protocol-v3": "workspace:*",

@@ -1,6 +1,7 @@
 import {
 	applySettlementPlanEffect,
 	assertDurableIssueScope,
+	assertSettlementPlanProgressTransition,
 	captureSettlementPlanWriteInput,
 	classifyDurableIssuanceTerminalSuppression,
 	cloneDurableIssueCommit,
@@ -31,6 +32,8 @@ import {
 	isValidDurableScopeField,
 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
 	type SettlementPlan,
+	settlementPlanHasExactEffectLink,
+	settlementReplacementLastLogicalTime,
 } from "@ts-drp/issuance-store";
 import {
 	bindDurableIssuancePruningMaintenance,
@@ -377,6 +380,16 @@ function settlementPlanEntriesJson(plan: SettlementPlan): string {
 	return JSON.stringify(
 		plan.entries.map((entry) => ({
 			disposition: entry.disposition,
+			...(entry.replacementProgress === undefined
+				? {}
+				: {
+						replacementProgress: {
+							chunks: entry.replacementProgress.chunks.map((chunk) => ({ ...chunk })),
+							intentCount: entry.replacementProgress.intentCount,
+							intentDigest: [...entry.replacementProgress.intentDigest],
+							version: 1,
+						},
+					}),
 			replacementSequence: entry.replacementSequence,
 			sourceDigest: [...entry.sourceDigest],
 			sourceSequence: entry.sourceSequence,
@@ -406,6 +419,26 @@ function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): Settle
 				sourceDigest.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
 			) {
 				return entry;
+			}
+			const replacementProgress = Reflect.get(entry, "replacementProgress");
+			if (replacementProgress !== undefined) {
+				if (typeof replacementProgress !== "object" || replacementProgress === null) return entry;
+				const intentDigest = Reflect.get(replacementProgress, "intentDigest");
+				if (
+					!Array.isArray(intentDigest) ||
+					intentDigest.length !== 32 ||
+					intentDigest.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
+				) {
+					return entry;
+				}
+				return {
+					...entry,
+					replacementProgress: {
+						...replacementProgress,
+						intentDigest: Uint8Array.from(intentDigest as number[]),
+					},
+					sourceDigest: Uint8Array.from(sourceDigest as number[]),
+				};
 			}
 			return { ...entry, sourceDigest: Uint8Array.from(sourceDigest as number[]) };
 		});
@@ -611,6 +644,7 @@ class NodeIssuanceImplementation {
 			if ((current?.revision ?? null) !== captured.expectedRevision) {
 				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
 			}
+			assertSettlementPlanProgressTransition(current, captured.plan);
 			const changes =
 				current === null
 					? statement(
@@ -930,6 +964,7 @@ class NodeIssuanceImplementation {
 	#commitCandidate(scope: DurableIssueScope, prior: NativeLineage, candidate: DurableIssueCommit): DurableIssueCommit {
 		let began = false;
 		let committing = false;
+		let expectedPlan: SettlementPlan | undefined;
 		try {
 			this.#database.exec("BEGIN IMMEDIATE");
 			began = true;
@@ -944,7 +979,13 @@ class NodeIssuanceImplementation {
 				const plan = readSettlementPlanRow(this.#database, scope);
 				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
 				if (plan === null) throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
-				const updated = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
+				const updated = applySettlementPlanEffect(
+					plan,
+					candidate.planEffect,
+					candidate.authorSequence,
+					settlementReplacementLastLogicalTime(candidate)
+				);
+				expectedPlan = updated;
 				const planChanges = statement(
 					this.#database,
 					"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
@@ -1002,24 +1043,25 @@ class NodeIssuanceImplementation {
 					// Preserve the mutation failure.
 				}
 			}
-			if (committing) return this.#classifyAfterTerminalSuppression(scope, prior, candidate);
+			if (committing) return this.#classifyAfterTerminalSuppression(scope, prior, candidate, expectedPlan);
 			if (error === this.#poison) throw error;
 			if (this.#hasCode(error, "ISSUANCE_RETRY_REQUIRED")) throw error;
 			if (this.#isConstraint(error)) throw this.#latchCorruption("issuance child-key collision");
 			throw mapSubstrate(error, "issuance write failed");
 		}
-		return this.#classifyAfterTerminalSuppression(scope, prior, candidate);
+		return this.#classifyAfterTerminalSuppression(scope, prior, candidate, expectedPlan);
 	}
 
 	#classifyAfterTerminalSuppression(
 		scope: DurableIssueScope,
 		prior: NativeLineage,
-		candidate: DurableIssueCommit
+		candidate: DurableIssueCommit,
+		expectedPlan?: SettlementPlan
 	): DurableIssueCommit {
 		const priorLineage = { exhausted: prior.exhausted, next: prior.next };
 		let observation: TerminalReadback;
 		try {
-			observation = this.#readTerminal(scope, candidate.authorSequence, candidate);
+			observation = this.#readTerminal(scope, candidate.authorSequence, candidate, expectedPlan);
 		} catch (error) {
 			if (error === this.#poison) throw error;
 			const committed = classifyDurableIssuanceTerminalSuppression({
@@ -1049,30 +1091,38 @@ class NodeIssuanceImplementation {
 	#assertPlanEffectReadback(
 		plan: SettlementPlan | null,
 		observation: TerminalReadback,
-		candidate: DurableIssueCommit
+		candidate: DurableIssueCommit,
+		expectedPlan?: SettlementPlan
 	): void {
 		const effect = candidate.planEffect;
 		if (effect === undefined) return;
-		const linked =
-			effect.kind === "fence"
-				? plan?.fenceSequence === candidate.authorSequence
-				: plan?.entries.some(
-						(entry) =>
-							entry.sourceSequence === effect.sourceSequence && entry.replacementSequence === candidate.authorSequence
-					);
+		const linked = settlementPlanHasExactEffectLink(plan, effect, candidate.authorSequence);
 		if ((observation.issuedRecord !== null) !== linked) {
 			throw this.#latchCorruption("issued row and settlement plan link are inconsistent");
 		}
+		if (
+			linked &&
+			(plan === null ||
+				expectedPlan === undefined ||
+				JSON.stringify(cloneSettlementPlan(plan)) !== JSON.stringify(cloneSettlementPlan(expectedPlan)))
+		) {
+			throw this.#latchCorruption("settlement plan differs from the committed revision and exact effect");
+		}
 	}
 
-	#readTerminal(scope: DurableIssueScope, authorSequence: number, candidate?: DurableIssueCommit): TerminalReadback {
+	#readTerminal(
+		scope: DurableIssueScope,
+		authorSequence: number,
+		candidate?: DurableIssueCommit,
+		expectedPlan?: SettlementPlan
+	): TerminalReadback {
 		this.#database.exec("BEGIN");
 		try {
 			const observation = this.#queryTerminal(scope, authorSequence);
 			if (candidate?.planEffect !== undefined) {
 				const plan = readSettlementPlanRow(this.#database, scope);
 				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
-				this.#assertPlanEffectReadback(plan, observation, candidate);
+				this.#assertPlanEffectReadback(plan, observation, candidate, expectedPlan);
 			}
 			this.#database.exec("COMMIT");
 			return observation;

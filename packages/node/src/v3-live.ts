@@ -22,6 +22,7 @@ import {
 	type DurableIssueScope,
 	type DurableOutboxPageInput,
 	type DurableOutboxPublicationTransitionInput,
+	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
 } from "@ts-drp/issuance-store";
 import {
 	bindDurableIssuancePruningMaintenance,
@@ -226,6 +227,13 @@ const BLUEPRINT_RETRIEVAL_INPUT_KEYS = ["plane"] as const;
 const BLUEPRINT_PROJECTION_BASE_INPUT_KEYS = ["plane", "purpose"] as const;
 const LOCAL_ISSUE_INPUT_KEYS = ["operations", "signRegisteredVertexDigest"] as const;
 const LOCAL_ISSUE_WITH_PLAN_EFFECT_KEYS = ["operations", "planEffect", "signRegisteredVertexDigest"] as const;
+const PROGRESS_REPLACEMENT_EFFECT_KEYS = [
+	"fromIntent",
+	"intentDigest",
+	"kind",
+	"sourceSequence",
+	"throughIntent",
+] as const;
 const LOCAL_ISSUE_ENTRY_KEYS = ["logicalTime", "operation"] as const;
 const CANONICAL_APPLICATION_BATCH_ENTRY_KEYS = ["operation", "logicalTime"] as const;
 const APPLICATION_BATCH_KEYS = ["batch", "action"] as const;
@@ -897,6 +905,10 @@ const creatorSuccessorRecovery = new WeakMap<
 >();
 const creatorPredecessorRecoverySource = new WeakMap<object, V3DisplacedSourceAuthority>();
 const creatorHistoricalIssuanceHandoffs = new WeakMap<object, HistoricalIssuanceContext>();
+const creatorSuccessorRecoveredDeliveries = new WeakMap<
+	object,
+	readonly Omit<Parameters<V3AdmittedVertexSink>[0], "transportSender">[]
+>();
 const creatorSuccessorInitialState = new WeakMap<
 	object,
 	Readonly<{
@@ -5496,6 +5508,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		let recoveredCount = 0;
 		let recoveredTerminal = false;
 		const recoveredVertices: AdmittedReceivedVertexView[] = [];
+		const recoveredDeliveries: Omit<Parameters<V3AdmittedVertexSink>[0], "transportSender">[] = [];
 		const quarantinedDigests = new IntrinsicSet<string>();
 		const latchedOperations = new IntrinsicMap<string, StagedLatchedAclOperation>();
 		const controlVertices = new IntrinsicSet<string>();
@@ -5667,6 +5680,17 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
+				if (successorRecovery !== undefined && !controlOperation) {
+					if (recoveredPreimageBytes === undefined || recoveredSignature === undefined)
+						return recoveryFailure("admission-rejected", "v3 recovered delivery evidence is unavailable");
+					recoveredDeliveries.push(
+						ObjectFreeze({
+							vertex: authenticated.admitted,
+							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(recoveredPreimageBytes),
+							signature: new Uint8ArrayConstructor(recoveredSignature),
+						})
+					);
+				}
 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
 				if (!commitOperationReservation(reservation)) {
 					return recoveryFailure("admission-rejected", "v3 journal replay policy commit failed");
@@ -5884,6 +5908,15 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
+				if (successorRecovery !== undefined && !controlOperation) {
+					recoveredDeliveries.push(
+						ObjectFreeze({
+							vertex: authenticated.admitted,
+							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+							signature: new Uint8ArrayConstructor(row.signature),
+						})
+					);
+				}
 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
 				if (!commitOperationReservation(reservation)) {
 					return recoveryFailure("admission-rejected", "v3 recovery policy commit failed");
@@ -6015,6 +6048,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
 		}
 		const capability = ObjectFreeze({}) as RecoveredV3Live;
+		if (successorRecovery !== undefined)
+			creatorSuccessorRecoveredDeliveries.set(capability, ObjectFreeze(recoveredDeliveries));
 		installRecoveredV3LiveAuthority(
 			capability,
 			ObjectFreeze({
@@ -6245,6 +6280,10 @@ function capturedLocalIssueInput(
 		const fence = snapshotClosedRecord(input.planEffect, ["kind"]);
 		const replacement =
 			fence === undefined ? snapshotClosedRecord(input.planEffect, ["kind", "sourceSequence"]) : undefined;
+		const progressReplacement =
+			fence === undefined && replacement === undefined
+				? snapshotClosedRecord(input.planEffect, PROGRESS_REPLACEMENT_EFFECT_KEYS)
+				: undefined;
 		if (fence?.kind === "fence") {
 			planEffect = ObjectFreeze({ kind: "fence" as const });
 		} else if (
@@ -6253,6 +6292,27 @@ function capturedLocalIssueInput(
 			(replacement.sourceSequence as number) >= 0
 		) {
 			planEffect = ObjectFreeze({ kind: "replacement" as const, sourceSequence: replacement.sourceSequence as number });
+		} else if (
+			progressReplacement?.kind === "replacement" &&
+			NumberIsSafeInteger(progressReplacement.sourceSequence) &&
+			(progressReplacement.sourceSequence as number) >= 0 &&
+			NumberIsSafeInteger(progressReplacement.fromIntent) &&
+			(progressReplacement.fromIntent as number) >= 0 &&
+			NumberIsSafeInteger(progressReplacement.throughIntent) &&
+			(progressReplacement.throughIntent as number) > (progressReplacement.fromIntent as number) &&
+			(progressReplacement.throughIntent as number) <= SETTLEMENT_REPLACEMENT_MAX_INTENTS
+		) {
+			const intentDigest = copyDetachedBytes(progressReplacement.intentDigest);
+			if (intentDigest?.byteLength !== 32) {
+				return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+			}
+			planEffect = ObjectFreeze({
+				fromIntent: progressReplacement.fromIntent as number,
+				intentDigest,
+				kind: "replacement" as const,
+				sourceSequence: progressReplacement.sourceSequence as number,
+				throughIntent: progressReplacement.throughIntent as number,
+			});
 		} else {
 			return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
 		}
@@ -6308,6 +6368,13 @@ function capturedLocalIssueInput(
 	}
 	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
+	}
+	if (
+		planEffect?.kind === "replacement" &&
+		"fromIntent" in planEffect &&
+		planEffect.throughIntent - planEffect.fromIntent !== operations.length
+	) {
+		return localIssueFailure("malformed-input", "v3 local issue replacement range does not match its operations");
 	}
 	return ObjectFreeze({
 		operations: ObjectFreeze(operations),
@@ -6693,6 +6760,30 @@ async function issueLocal(
 	) {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
 	}
+	if (input.planEffect?.kind === "replacement" && "fromIntent" in input.planEffect) {
+		const effect = input.planEffect;
+		let plan;
+		try {
+			plan = copySettlementPlan(
+				await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
+				registration.issuanceScope
+			);
+		} catch {
+			registration.operationAdmissionHalted = true;
+			return localIssueFailure("issuance-rejected", "v3 settlement replacement plan read failed");
+		}
+		const entry = plan?.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
+		const progress = entry?.replacementProgress;
+		if (
+			progress === undefined ||
+			entry?.replacementSequence !== null ||
+			!sameBytes(progress.intentDigest, effect.intentDigest) ||
+			(progress.chunks.at(-1)?.throughIntent ?? 0) !== effect.fromIntent ||
+			effect.throughIntent > progress.intentCount
+		) {
+			return localIssueFailure("issuance-rejected", "v3 settlement replacement progress changed");
+		}
+	}
 	let applicationOperation = first.operation;
 	if (input.operations.length > 1) {
 		if (typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") {
@@ -6880,7 +6971,8 @@ async function authenticatedOutboxRow(
 async function readRebaseOutbox(
 	registration: V3PlaneRegistration,
 	includePublishedSources = false,
-	settlementFrontier?: SettlementFrontierContext
+	settlementFrontier?: SettlementFrontierContext,
+	openProgressSources?: ReadonlySet<number>
 ): Promise<V3RebaseOutboxResult> {
 	if (!currentRegistration(registration)) {
 		return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
@@ -6950,7 +7042,12 @@ async function readRebaseOutbox(
 					settlementFrontier.admissionEpoch,
 					settlementFrontier.terminalThrough
 				);
-				if (ownRowClass === "terminal" || ownRowClass === "old-incarnation") continue;
+				if (
+					(ownRowClass === "terminal" || ownRowClass === "old-incarnation") &&
+					openProgressSources?.has(classified.row.authorSequence) !== true
+				) {
+					continue;
+				}
 			}
 			const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
 			if (historical && !countHistoricalIssuanceRow(registration.historicalIssuance, classified.row.authorSequence)) {
@@ -8578,6 +8675,10 @@ async function activateCreatorSuccessorLive(
 		if (transportHandoff !== undefined) {
 			creatorSuccessorTransportHandoffs.set(recovered.capability, transportHandoff);
 		}
+		const deliveries = creatorSuccessorRecoveredDeliveries.get(recovered.capability);
+		creatorSuccessorRecoveredDeliveries.delete(recovered.capability);
+		if (deliveries === undefined)
+			return rejected("recovery-rejected", "creator successor recovered deliveries are unavailable");
 		const activated = activateV3LivePlane({ capability: recovered.capability, ...bindings });
 		if (!activated.ok) return rejected("activation-rejected", `creator successor activation failed: ${activated.kind}`);
 		const activatedRegistration = v3HandleRegistrations.get(activated.handle);
@@ -8586,6 +8687,15 @@ async function activateCreatorSuccessorLive(
 			return rejected("internal-invariant", "creator successor runtime registration is unavailable");
 		}
 		activatedRegistration.sourceRuntimeHandle = material.sourceRuntimeHandle;
+		try {
+			for (const delivery of deliveries) {
+				await bindings.onAdmittedVertex(ObjectFreeze({ ...delivery, transportSender: bindings.networkNode.peerId }));
+				if (!currentRegistration(activatedRegistration)) throw new TypeError("creator successor replay was retired");
+			}
+		} catch {
+			await Promise.resolve(activated.handle.deactivate());
+			return rejected("recovery-rejected", "creator successor recovered delivery was rejected");
+		}
 		if (!material.terminalizeSource()) {
 			activated.handle.deactivate();
 			return rejected("source-unavailable", "creator predecessor could not be terminalized");
@@ -8688,8 +8798,26 @@ async function readSettlementSources(
 	registration: V3PlaneRegistration,
 	settlementFrontier?: SettlementFrontierContext
 ): Promise<V3RebaseOutboxResult> {
-	// Until the checkpoint/room owner supplies its verified frontier, retain every authenticated source candidate.
-	return readRebaseOutbox(registration, true, settlementFrontier);
+	if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
+	let plan;
+	try {
+		plan = copySettlementPlan(
+			await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
+			registration.issuanceScope
+		);
+	} catch {
+		return ObjectFreeze({
+			detail: "v3 settlement plan read failed",
+			kind: "store-failed" as const,
+			ok: false as const,
+		});
+	}
+	const openProgressSources = new Set(
+		plan?.entries
+			.filter((entry) => entry.replacementProgress !== undefined && entry.replacementSequence === null)
+			.map((entry) => entry.sourceSequence) ?? []
+	);
+	return readRebaseOutbox(registration, true, settlementFrontier, openProgressSources);
 }
 
 export { prepareV3LiveGeneration };

@@ -47,11 +47,32 @@ export interface DurableIssuanceOutboxEntry {
 
 export type SettlementDisposition = "expire" | "rebase" | "transform" | "manual-review";
 
+export const SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16;
+export const SETTLEMENT_REPLACEMENT_DIGEST_LIMITS = Object.freeze({
+	maxBytes: 1_048_640,
+	maxDepth: 9,
+	maxItems: 1_024,
+});
+
+export interface SettlementReplacementChunk {
+	readonly replacementSequence: number;
+	readonly throughIntent: number;
+	readonly lastLogicalTime: number;
+}
+
+export interface SettlementReplacementProgress {
+	readonly version: 1;
+	readonly intentCount: number;
+	readonly intentDigest: Uint8Array;
+	readonly chunks: readonly SettlementReplacementChunk[];
+}
+
 export interface SettlementPlanEntry {
 	readonly sourceSequence: number;
 	readonly sourceDigest: Uint8Array;
 	readonly disposition: SettlementDisposition;
 	readonly replacementSequence: number | null;
+	readonly replacementProgress?: SettlementReplacementProgress;
 }
 
 export interface SettlementPlan {
@@ -68,7 +89,14 @@ export interface DurableIssueCommit {
 	readonly outboxEntry: DurableIssuanceOutboxEntry;
 	readonly planEffect?:
 		| Readonly<{ readonly kind: "fence" }>
-		| Readonly<{ readonly kind: "replacement"; readonly sourceSequence: number }>;
+		| Readonly<{ readonly kind: "replacement"; readonly sourceSequence: number }>
+		| Readonly<{
+				readonly fromIntent: number;
+				readonly intentDigest: Uint8Array;
+				readonly kind: "replacement";
+				readonly sourceSequence: number;
+				readonly throughIntent: number;
+		  }>;
 }
 
 export type DurableBuildAndSign = (authorSequence: number) => Promise<DurableIssueCommit>;

@@ -344,6 +344,9 @@ importers:
       "@ts-drp/ephemeral":
         specifier: workspace:*
         version: link:../../packages/ephemeral
+      "@ts-drp/issuance-store":
+        specifier: workspace:*
+        version: link:../../packages/issuance-store
       "@ts-drp/message-queue":
         specifier: workspace:*
         version: link:../../packages/message-queue

@@ -1,6 +1,6 @@
-import { decodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 
-import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS } from "./types.js";
+import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS } from "./types.js";
 import type {
 	DurableIssuanceError,
 	DurableIssuanceErrorCode,
@@ -11,6 +11,8 @@ import type {
 	DurableSignedEnvelope,
 	SettlementPlan,
 	SettlementPlanEntry,
+	SettlementReplacementChunk,
+	SettlementReplacementProgress,
 } from "./types.js";
 
 type SettlementPlanEffect = NonNullable<DurableIssueCommit["planEffect"]>;
@@ -235,6 +237,50 @@ export function durablePreimageMatchesScopeAndSequence(
 }
 
 /**
+ * Derives the final submitted operation logical time from one validated commit.
+ * @param commit - Validated durable issue commit.
+ * @returns The positive final logical time, or undefined for an invalid preimage.
+ */
+export function settlementReplacementLastLogicalTime(commit: DurableIssueCommit): number | undefined {
+	try {
+		const decoded: unknown = decodeCanonical(commit.envelope.canonicalPreimageBytes);
+		if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return undefined;
+		const record = decoded as Record<string, unknown>;
+		let logicalTime = record.logicalTime;
+		const operation = record.operation;
+		if (
+			typeof operation === "object" &&
+			operation !== null &&
+			Reflect.get(operation, "action") === "applicationBatch"
+		) {
+			if (!isClosedDurableIssuanceRecord(operation, ["action", "batch"])) return undefined;
+			const batch = operation.batch;
+			if (!isClosedDurableIssuanceRecord(batch, ["entries", "version"]) || batch.version !== 1) return undefined;
+			const entries = batch.entries;
+			if (!Array.isArray(entries) || entries.length < 2 || entries.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS)
+				return undefined;
+			let previous = -1;
+			for (const entry of entries) {
+				if (
+					!isClosedDurableIssuanceRecord(entry, ["logicalTime", "operation"]) ||
+					!Number.isSafeInteger(entry.logicalTime) ||
+					(entry.logicalTime as number) <= previous
+				)
+					return undefined;
+				previous = entry.logicalTime as number;
+			}
+			const limits = { maxBytes: 65_536, maxDepth: 8, maxItems: 1_024 };
+			const bytes = encodeCanonical(operation, limits);
+			if (!durableIssuanceBytesEqual(bytes, encodeCanonical(decodeCanonical(bytes, limits), limits))) return undefined;
+			logicalTime = previous;
+		}
+		return Number.isSafeInteger(logicalTime) && (logicalTime as number) > 0 ? (logicalTime as number) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
  * Deep-copies one validated envelope.
  * @param envelope - Valid envelope.
  * @returns A detached envelope.
@@ -272,7 +318,15 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
 					planEffect:
 						commit.planEffect.kind === "fence"
 							? { kind: "fence" as const }
-							: { kind: "replacement" as const, sourceSequence: commit.planEffect.sourceSequence },
+							: "fromIntent" in commit.planEffect
+								? {
+										fromIntent: commit.planEffect.fromIntent,
+										intentDigest: new Uint8Array(commit.planEffect.intentDigest),
+										kind: "replacement" as const,
+										sourceSequence: commit.planEffect.sourceSequence,
+										throughIntent: commit.planEffect.throughIntent,
+									}
+								: { kind: "replacement" as const, sourceSequence: commit.planEffect.sourceSequence },
 				}),
 	};
 }
@@ -284,21 +338,108 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
  */
 export function copySettlementPlanEffect(value: unknown): SettlementPlanEffect | undefined {
 	if (!isClosedDurableIssuanceRecord(value, ["kind"])) {
+		if (isClosedDurableIssuanceRecord(value, ["kind", "sourceSequence"])) {
+			return value.kind === "replacement" && isValidDurableAuthorSequence(value.sourceSequence)
+				? { kind: "replacement", sourceSequence: value.sourceSequence }
+				: undefined;
+		}
 		if (
-			!isClosedDurableIssuanceRecord(value, ["kind", "sourceSequence"]) ||
+			!isClosedDurableIssuanceRecord(value, [
+				"fromIntent",
+				"intentDigest",
+				"kind",
+				"sourceSequence",
+				"throughIntent",
+			]) ||
 			value.kind !== "replacement" ||
-			!isValidDurableAuthorSequence(value.sourceSequence)
+			!isValidDurableAuthorSequence(value.sourceSequence) ||
+			!isValidDurableAuthorSequence(value.fromIntent) ||
+			!isValidDurableAuthorSequence(value.throughIntent) ||
+			value.fromIntent >= value.throughIntent ||
+			value.throughIntent > SETTLEMENT_REPLACEMENT_MAX_INTENTS
 		) {
 			return undefined;
 		}
-		return { kind: "replacement", sourceSequence: value.sourceSequence };
+		const intentDigest = copyDurableIssuanceBytes(value.intentDigest);
+		return intentDigest?.byteLength === 32
+			? {
+					fromIntent: value.fromIntent,
+					intentDigest,
+					kind: "replacement",
+					sourceSequence: value.sourceSequence,
+					throughIntent: value.throughIntent,
+				}
+			: undefined;
 	}
 	return value.kind === "fence" ? { kind: "fence" } : undefined;
 }
 
-function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
+function copySettlementReplacementChunk(value: unknown): SettlementReplacementChunk | undefined {
 	if (
-		!isClosedDurableIssuanceRecord(value, ["disposition", "replacementSequence", "sourceDigest", "sourceSequence"]) ||
+		!isClosedDurableIssuanceRecord(value, ["lastLogicalTime", "replacementSequence", "throughIntent"]) ||
+		!isValidDurableAuthorSequence(value.replacementSequence) ||
+		!Number.isSafeInteger(value.throughIntent) ||
+		(value.throughIntent as number) < 1 ||
+		!Number.isSafeInteger(value.lastLogicalTime) ||
+		(value.lastLogicalTime as number) < 1
+	) {
+		return undefined;
+	}
+	return {
+		lastLogicalTime: value.lastLogicalTime as number,
+		replacementSequence: value.replacementSequence,
+		throughIntent: value.throughIntent as number,
+	};
+}
+
+function copySettlementReplacementProgress(value: unknown): SettlementReplacementProgress | undefined {
+	if (
+		!isClosedDurableIssuanceRecord(value, ["chunks", "intentCount", "intentDigest", "version"]) ||
+		value.version !== 1 ||
+		!Number.isSafeInteger(value.intentCount) ||
+		(value.intentCount as number) < 1 ||
+		(value.intentCount as number) > SETTLEMENT_REPLACEMENT_MAX_INTENTS ||
+		!Array.isArray(value.chunks) ||
+		value.chunks.length > (value.intentCount as number)
+	) {
+		return undefined;
+	}
+	const intentDigest = copyDurableIssuanceBytes(value.intentDigest);
+	if (intentDigest?.byteLength !== 32) return undefined;
+	const chunks: SettlementReplacementChunk[] = [];
+	let priorSequence = -1;
+	let priorThrough = 0;
+	let priorLogicalTime = 0;
+	for (const rawChunk of value.chunks) {
+		const chunk = copySettlementReplacementChunk(rawChunk);
+		if (
+			chunk === undefined ||
+			chunk.replacementSequence <= priorSequence ||
+			chunk.throughIntent <= priorThrough ||
+			chunk.throughIntent > (value.intentCount as number) ||
+			chunk.lastLogicalTime <= priorLogicalTime
+		) {
+			return undefined;
+		}
+		chunks.push(chunk);
+		priorSequence = chunk.replacementSequence;
+		priorThrough = chunk.throughIntent;
+		priorLogicalTime = chunk.lastLogicalTime;
+	}
+	return { chunks, intentCount: value.intentCount as number, intentDigest, version: 1 };
+}
+
+function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
+	const hasProgress =
+		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "replacementProgress");
+	if (
+		!isClosedDurableIssuanceRecord(value, [
+			"disposition",
+			...(hasProgress ? ["replacementProgress"] : []),
+			"replacementSequence",
+			"sourceDigest",
+			"sourceSequence",
+		]) ||
 		!isValidDurableAuthorSequence(value.sourceSequence) ||
 		(value.replacementSequence !== null && !isValidDurableAuthorSequence(value.replacementSequence)) ||
 		(value.disposition !== "expire" &&
@@ -309,9 +450,22 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		return undefined;
 	}
 	const sourceDigest = copyDurableIssuanceBytes(value.sourceDigest);
-	if (sourceDigest === undefined) return undefined;
+	const replacementProgress = hasProgress ? copySettlementReplacementProgress(value.replacementProgress) : undefined;
+	if (
+		sourceDigest === undefined ||
+		(hasProgress && replacementProgress === undefined) ||
+		(replacementProgress !== undefined && (value.disposition === "expire" || value.disposition === "manual-review"))
+	) {
+		return undefined;
+	}
+	if (replacementProgress !== undefined) {
+		const finalChunk = replacementProgress.chunks.at(-1);
+		const complete = finalChunk?.throughIntent === replacementProgress.intentCount;
+		if ((complete ? finalChunk.replacementSequence : null) !== value.replacementSequence) return undefined;
+	}
 	return {
 		disposition: value.disposition,
+		...(replacementProgress === undefined ? {} : { replacementProgress }),
 		replacementSequence: value.replacementSequence,
 		sourceDigest,
 		sourceSequence: value.sourceSequence,
@@ -364,6 +518,16 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 	return {
 		entries: plan.entries.map((entry) => ({
 			disposition: entry.disposition,
+			...(entry.replacementProgress === undefined
+				? {}
+				: {
+						replacementProgress: {
+							chunks: entry.replacementProgress.chunks.map((chunk) => ({ ...chunk })),
+							intentCount: entry.replacementProgress.intentCount,
+							intentDigest: new Uint8Array(entry.replacementProgress.intentDigest),
+							version: 1 as const,
+						},
+					}),
 			replacementSequence: entry.replacementSequence,
 			sourceDigest: new Uint8Array(entry.sourceDigest),
 			sourceSequence: entry.sourceSequence,
@@ -372,6 +536,60 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 		revision: plan.revision,
 		scope: copyDurableIssueScope(plan.scope),
 	};
+}
+
+/**
+ * Refuses a CAS rewrite that would alter or remove durable replacement progress.
+ * @param current - Current durable plan, if present.
+ * @param next - Proposed next plan revision.
+ */
+export function assertSettlementPlanProgressTransition(current: SettlementPlan | null, next: SettlementPlan): void {
+	if (current === null) return;
+	for (const prior of current.entries) {
+		const candidate = next.entries.find((entry) => entry.sourceSequence === prior.sourceSequence);
+		if (prior.replacementProgress !== undefined && prior.replacementSequence === null) {
+			if (
+				candidate === undefined ||
+				candidate.disposition !== prior.disposition ||
+				candidate.replacementSequence !== prior.replacementSequence ||
+				!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest) ||
+				candidate.replacementProgress === undefined ||
+				candidate.replacementProgress.intentCount !== prior.replacementProgress.intentCount ||
+				!durableIssuanceBytesEqual(
+					candidate.replacementProgress.intentDigest,
+					prior.replacementProgress.intentDigest
+				) ||
+				candidate.replacementProgress.chunks.length !== prior.replacementProgress.chunks.length ||
+				candidate.replacementProgress.chunks.some((chunk, index) => {
+					const before = prior.replacementProgress?.chunks[index];
+					return (
+						before === undefined ||
+						chunk.lastLogicalTime !== before.lastLogicalTime ||
+						chunk.replacementSequence !== before.replacementSequence ||
+						chunk.throughIntent !== before.throughIntent
+					);
+				})
+			) {
+				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement progress changed");
+			}
+		} else if (
+			prior.replacementProgress === undefined &&
+			prior.replacementSequence !== null &&
+			candidate?.replacementProgress !== undefined
+		) {
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "linked settlement replacement cannot be upgraded");
+		} else if (prior.replacementProgress === undefined && candidate?.replacementProgress !== undefined) {
+			if (
+				candidate.replacementProgress.chunks.length !== 0 ||
+				prior.replacementSequence !== null ||
+				candidate.replacementSequence !== null ||
+				candidate.disposition !== prior.disposition ||
+				!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest)
+			) {
+				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement upgrade changed");
+			}
+		}
+	}
 }
 
 /**
@@ -410,12 +628,14 @@ export function captureSettlementPlanWriteInput(value: unknown): Readonly<{
  * @param plan - Current validated plan.
  * @param effect - Validated issue effect.
  * @param authorSequence - Sequence allocated to the issue.
+ * @param lastLogicalTime - Node-derived final operation logical time for a progress chunk.
  * @returns The detached next plan revision.
  */
 export function applySettlementPlanEffect(
 	plan: SettlementPlan,
 	effect: SettlementPlanEffect,
-	authorSequence: number
+	authorSequence: number,
+	lastLogicalTime?: number
 ): SettlementPlan {
 	if (plan.revision === Number.MAX_SAFE_INTEGER) {
 		throw createDurableIssuanceFailure("ISSUANCE_RECOVERY_CORRUPT", "settlement plan revision is exhausted");
@@ -432,10 +652,86 @@ export function applySettlementPlanEffect(
 		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement precondition changed");
 	}
 	const detached = cloneSettlementPlan(plan);
+	if ("fromIntent" in effect) {
+		if (!Number.isSafeInteger(lastLogicalTime) || (lastLogicalTime as number) < 1) {
+			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement chunk logical time is invalid");
+		}
+		const progress = entry.replacementProgress;
+		if (
+			progress === undefined ||
+			!durableIssuanceBytesEqual(progress.intentDigest, effect.intentDigest) ||
+			(progress.chunks.at(-1)?.throughIntent ?? 0) !== effect.fromIntent
+		) {
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement progress changed");
+		}
+		if (effect.throughIntent > progress.intentCount) {
+			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement replacement range is invalid");
+		}
+		const priorChunk = progress.chunks.at(-1);
+		if (
+			(priorChunk !== undefined && authorSequence <= priorChunk.replacementSequence) ||
+			(priorChunk !== undefined && (lastLogicalTime as number) <= priorChunk.lastLogicalTime)
+		) {
+			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement replacement chunk is not monotonic");
+		}
+		const nextProgress: SettlementReplacementProgress = {
+			...progress,
+			chunks: [
+				...progress.chunks,
+				{
+					lastLogicalTime: lastLogicalTime as number,
+					replacementSequence: authorSequence,
+					throughIntent: effect.throughIntent,
+				},
+			],
+		};
+		const entries = detached.entries.map((candidate, candidateIndex) =>
+			candidateIndex === index
+				? {
+						...candidate,
+						replacementProgress: nextProgress,
+						replacementSequence: effect.throughIntent === progress.intentCount ? authorSequence : null,
+					}
+				: candidate
+		);
+		return { ...detached, entries, revision: plan.revision + 1 };
+	}
+	if (entry.replacementProgress !== undefined) {
+		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement effect form changed");
+	}
 	const entries = detached.entries.map((candidate, candidateIndex) =>
 		candidateIndex === index ? { ...candidate, replacementSequence: authorSequence } : candidate
 	);
 	return { ...detached, entries, revision: plan.revision + 1 };
+}
+
+/**
+ * Tests whether durable plan state contains the exact selected issue effect link.
+ * @param plan - Durable plan observed after an ambiguous transaction outcome.
+ * @param effect - Effect carried by the candidate commit.
+ * @param authorSequence - Sequence allocated to the candidate commit.
+ * @returns Whether the exact link is durably present.
+ */
+export function settlementPlanHasExactEffectLink(
+	plan: SettlementPlan | null,
+	effect: SettlementPlanEffect,
+	authorSequence: number
+): boolean {
+	if (effect.kind === "fence") return plan?.fenceSequence === authorSequence;
+	const entry = plan?.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
+	if (!("fromIntent" in effect)) return entry?.replacementSequence === authorSequence;
+	const progress = entry?.replacementProgress;
+	if (progress === undefined || !durableIssuanceBytesEqual(progress.intentDigest, effect.intentDigest)) return false;
+	const index = progress.chunks.findIndex((chunk) => chunk.replacementSequence === authorSequence);
+	const chunk = progress.chunks[index];
+	return (
+		chunk !== undefined &&
+		chunk.throughIntent === effect.throughIntent &&
+		(index === 0 ? 0 : progress.chunks[index - 1]?.throughIntent) === effect.fromIntent &&
+		(effect.throughIntent === progress.intentCount
+			? entry?.replacementSequence === authorSequence
+			: entry?.replacementSequence === null)
+	);
 }
 
 /**
