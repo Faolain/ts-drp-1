@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b oracle consistency RED accepted)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b observer correction and cleanup boundary)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,7 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Authorized now (oracle consistency RED accepted; separate parent GREEN resumes):
+Authorized now (bounded observer RED correction; parent production GREEN paused):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18501,16 +18501,31 @@ Authorized now (oracle consistency RED accepted; separate parent GREEN resumes):
   filtered without the partial GREEN patch. The same-parent source audit now
   is closed by tests `97c0836b` / evidence `88fef442`: the isolated source-built
   run exactly matched 28 active / 23 fail / 5 pass / 17 filtered, with both
-  pure oracle controls passing and no anomalies. The separate Astra-high GREEN
-  owner may now resume the accepted parent implementation, including the
-  explicitly named private cleanup gate below. This does not change production
-  ordering or substitute semantic equality for exact snapshot bytes.
+  pure oracle controls passing and no anomalies. The resumed GREEN diagnostic
+  is now preserved at signed/pushed `0a656d1b`: the genuine split and prefix
+  commit succeed, the deliberate suffix fault terminates the owner, and case 3
+  incorrectly reads that owner's throwing projection getter before restart.
+  A separate tests-only observer correction below is authorized; production
+  GREEN remains paused. Cleanup also needs an explicit capability-composition
+  decision: Node holds authenticated successor material, while the room owns
+  the backend maintenance facade. The one-off Fable-high consultation has
+  completed and recommends the proposed f5b0z backend-neutral maintenance
+  discovery prerequisite below; no new API or bridge is authorized by research.
+  This does not change production ordering or substitute semantic equality
+  for exact snapshot bytes.
   Post-codec recovery, the complete 64-writer continuation and the later long
   campaign remain unproved. Product state, batch, epoch and snapshot ceilings
   remain unchanged.
 
 Blocked, and on what:
 
+- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is a proposed
+  narrow API prerequisite, awaiting explicit scope authorization and its
+  governing review/TDD gates. It blocks parent f5b's genuine cleanup caller
+  and therefore parent closure, not the independent tests-only observer
+  correction. The existing AHE backend capability must become discoverable by
+  Node without a Node-to-browser dependency or caller-invented authority. No
+  production change or new review invocation is authorized by this proposal.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -100731,9 +100746,12 @@ completion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: oracle consistency RED accepted at signed/pushed tests `97c0836b`
-and evidence `88fef442`; the separate Astra-high parent GREEN may resume.
-The prior stopped production patch is diagnostic, not accepted GREEN.** The
+**Status: oracle consistency RED remains accepted at signed/pushed tests
+`97c0836b` and evidence `88fef442`; resumed GREEN stopped with signed/pushed
+diagnostic `0a656d1b`. A bounded tests-only observer correction is authorized;
+production GREEN is paused on that correction and the cleanup capability
+boundary below. The seven-file production patch is unchanged diagnostic work,
+not accepted GREEN.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
@@ -101119,6 +101137,66 @@ dumping payload text, adding product telemetry or relaxing assertions. Preserve
 that diagnostic separately; no acceptance claim may depend on an unrecorded
 test overlay. No full campaign or ≥100-transition run is authorized here.
 
+Prospective disposition of the resumed GREEN diagnostic (2026-09-05):
+`.logs/d110c-0c1f5b-green-57834387/` is signed/pushed at
+`0a656d1ba37f7391f1a79e366136bd2248a16f0a`; its 14-entry self-excluding
+manifest validates with SHA-256
+`e4b4f46f11ead95618a8a3c46fe62353c6e5473254de55cbcaf5b25a47aa603e`.
+Preserve all three diagnostic attempts: the first failed configuration import
+before any test, the second suppressed console telemetry, and the third
+captured the genuine result through bounded stderr observation. None is a
+full GREEN gate. The third proves a real two-intent split, successful sequence
+5 prefix, and two intentionally faulted sequence 6 suffix attempts returning
+`admission-rejected` / `v3 local issue signature was not admitted`. It reports
+no application-state overflow. Case 3 then calls `productState(writer)` before
+restart; that calls `projection()`, whose existing terminal-failure rethrow is
+also required by the retained runtime suite. Do not make a terminal room
+readable to satisfy this expectation.
+
+Correct that observation contract in one bounded tests-only batch, owned by
+the separate Astra-high RED owner. Use the existing public `onProjection`
+callback, not a private getter bypass, to retain canonical emitted state per
+peer and room-open generation. Encode the exact callback value through the
+application's existing migration encoder before copying the resulting bytes;
+do not clone away a projection's identity/brand. The observer must return
+normally without mutating the value or changing admission. Because the callback
+is invoked before the final synchronous projection assignment, describe this
+as emitted projection evidence, not an independent commit receipt; pair it
+with the existing exact durable prefix/plan/publication assertions. Compare
+the last emitted prefix state before and after same-epoch reopen, require a
+fresh emission from each owner generation, and explicitly assert that both
+terminal owners' public projection getters still throw. A stale observation
+from the prior owner must not satisfy restart. Keep all 33,000-byte transient
+inputs, real split/chunk/prefix/suffix accounting, deliberate failure, exact
+state and three subsequent genuine transition/reopen obligations unchanged.
+No production edit, public observer API, increased limit or extra workload is
+authorized by this correction.
+
+Deadline: corrective tests committed and accepted before production GREEN
+resumes. Freeze one isolated source-built RED execution using the existing
+28-active selection: 45 total in two files, 23 exact inherited causal failures,
+5 passes, 17 explicitly filtered, no top-level errors or changed tokens. This
+is a continuation-oracle repair; pre-codec RED cannot claim it physically
+reached the post-prefix assertions. Mechanically inspect that both obsolete
+terminal getter reads are replaced, both explicit throw controls exist, and
+owner-generation observation cannot fall back to an earlier room. Final GREEN
+must execute the corrected continuation and the complete retained terminal-
+failure controls. If observation requires changing product behavior, or the
+RED matrix changes, stop and attribute it before further edits. No separate
+review-only slice or formal prose confirmation is required; final parent
+Grok / Sol-high / Fable-xhigh review covers this correction and its evidence.
+
+The separate cleanup stop remains real: Node's authenticated successor material
+contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
+room can resolve the existing browser maintenance facade but does not own the
+opaque Node checkpoint authority. The D109d post-delete receipt hook cannot
+perform the first deletion. The completed user-authorized Fable-high
+consultation and root audit recommend the explicit f5b0z API prerequisite
+below; this does not authorize its implementation. Do not add a
+Node-to-browser dependency, infer trust from a structural room projection,
+invent receipts, or silently widen the eight-owner repair. The pure private
+cleanup-gate adaptation is not evidence that its production caller exists.
+
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
 `D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` terminus below describe the
@@ -101245,6 +101323,97 @@ the four candidate families and six proof obligations above must be decided by
 the required plan review first. Its one-entry self-excluding manifest validates
 and has SHA-256
 `f53ae45b110472fc83e90c4e8113330ef3b70e6ee89b26f085d1ab2e65a94485`.
+
+###### D.110c-0c1f5b0z backend-neutral AHE maintenance discovery prerequisite
+
+**Status: proposed API prerequisite; root audit and user-requested one-off
+Fable-high consultation complete; explicit scope authorization and governing
+plan review required before tests-only RED, followed by separate GREEN and
+final implementation review. No implementation is authorized here.** Owner:
+the existing `@ts-drp/storage/maintenance` contract and browser/Node backend
+registration functions; root owns the boundary decision. Deadline: before
+parent f5b's first genuine cleanup invocation and parent closure, hence before
+D.110c-c/d can consume that closure. The independent parent observer RED may
+proceed. Completed f5b0d backend gates and all stopped parent evidence remain
+unchanged; this prerequisite does not claim any lifecycle or golden-path pass.
+
+Source audit at signed/pushed `0a656d1b` with the preserved seven-file partial
+patch: ordinary `AheDurableStore` has no reclamation method; browser and Node
+backend maintenance resolvers use separate module-local facade WeakMaps; Node
+depends on neither concrete backend. `CreatorSuccessorLiveMaterial` already
+holds the exact adopted AHE facade and authenticated predecessor/successor
+material. `activateCreatorSuccessorLive` is shared by hot and cold activation.
+The private cleanup planner and runtime reclaim hook still have no production
+caller. Issuance maintenance already solves the equivalent discovery seam via
+an exact-facade WeakMap on the storage-neutral maintenance subpath, shared by
+duplicate module instances in the same JavaScript global. It does not bridge
+workers or independent JavaScript globals.
+
+Consultation evidence:
+`.logs/d110c-0c1f5b-cleanup-api-fable-high-57834387/`, exact session
+`1486167a-aa1b-4356-b5a5-5d619dc8e214`, requested through `claude-phel` with
+explicit `claude-fable-5-1[1m]` / high; reported model `claude-fable-5-1`,
+terminal success, exit 0, no permission denials or nested subagents. This is
+the user's API-decision insight consultation, not a substituted formal GREEN
+review. Root agrees with the discovery recommendation, subject to the exact
+compatibility boundary and proof obligations below.
+
+Proposed minimal construction: add bind/resolve exports on the existing
+`@ts-drp/storage/maintenance` subpath for the existing
+`AheReclamationMaintenance` capability, keyed by the exact ordinary facade;
+register the same existing backend capability instance in the shared registry
+and in each existing package resolver. A first-bind-wins WeakMap shared through
+a versioned global symbol mirrors the issuance mechanism without adding
+properties to ordinary facades. The exact names, malformed/preoccupied registry
+handling and duplicate-registration behavior must be frozen in the authorized
+plan review, not inferred during GREEN. The binder is trusted in-process
+backend plumbing, not authentication against hostile same-process code. It
+does not certify an arbitrary caller-supplied capability or mint deletion
+authority. Backend transactions retain their existing lifecycle, head,
+generation, promotion, blob, rollback and availability rechecks.
+
+Production ownership for this prerequisite is limited to
+`packages/storage/src/maintenance.ts`,
+`packages/storage-browser/src/internal/ahe-reclamation.ts` and
+`packages/storage-node/src/internal/ahe-reclamation.ts`, with focused contract
+tests. No new package dependency, root export, `AheDurableStore` member,
+`StoreCapabilities` field, Node public input/return key, wire/schema field,
+cryptography, deadline, resource limit or deletion policy is proposed. Existing
+backend-specific resolvers remain compatible and resolve the identical object.
+Memory and foreign shape-compatible facades remain unresolved unless their own
+backend is separately authorized to implement reclamation. Registry lookup
+alone performs no storage mutation and no reclamation in v1 or settlement.
+
+Tests-only RED must fail causally for unavailable backend-neutral discovery,
+not a missing static import/export or loader error. Before its sole frozen
+execution, select the exact cases and counts. Cover genuine browser and Node
+facades; identical capability through old and new resolvers; foreign facade
+non-resolution; first binding retained after a duplicate attempt; duplicate
+module-instance resolution within one global; unchanged frozen facade keys;
+closed and poisoned backend refusal through the resolved capability; and no
+read/write/deletion merely from registration or resolution. GREEN supplies
+only the narrow registry/registration repair. Required gates: focused matrix,
+affected storage/browser/Node builds and typechecks, exact-owner lint/format/
+diff, existing D109c reclamation and D109d runtime tests, existing issuance
+registry behavior, browser retained tests and isolated freshly built import-
+identity proof. Use the governing Grok / Sol-high / Fable-xhigh protocol for
+this new API boundary; P0/P1 block, P2 receive owner/disposition.
+
+Rejected alternatives: room-to-Node public DI expands hot/cold input contracts
+and burdens every host; a Node-to-browser import adds a dependency; a hidden
+room/Node hook or production-relative import creates realm/custody coupling;
+room-side reconstruction of checkpoint authority duplicates authentication.
+After this prerequisite closes, the existing parent still owns authenticated
+plan construction, genuinely gated first deletion, issuance-prefix bounds and
+the exact two-physical-ancestor census. Registry GREEN alone proves none of
+them. Keep no-eligible-prefix AHE cleanup distinct from issuance deletion; do
+not invent rows or receipts to call D109d. Do not adopt the consultation's
+suggested nonfatal cleanup outcome or automatic retry policy: failure timing,
+idempotent reopen and partial-mutation accounting must satisfy the existing
+fail-closed parent contract, or stop for a specifically demonstrated reslice.
+Its claim that `onProjection` proves an already-installed projection is also
+qualified by root: emission precedes final synchronous assignment, so the
+tests-only correction pairs emitted bytes with durable prefix evidence.
 
 ###### D.110c-0c1f5b0y chat admission and bounded-state continuity checkpoint
 

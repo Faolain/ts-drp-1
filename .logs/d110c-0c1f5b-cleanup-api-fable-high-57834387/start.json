@@ -1,0 +1,15 @@
+{
+  "command": [
+    "zsh",
+    "-f",
+    "-c",
+    "alias claude-phel='CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude'\neval 'claude-phel -p --restricted --strict-mcp-config --tools Read,Glob,Grep --model \"claude-fable-5-1[1m]\" --effort high --output-format stream-json --verbose'"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "start": "2026-09-05T18:03:25.060Z",
+  "pid": 18363,
+  "requestedModel": "claude-fable-5-1[1m]",
+  "requestedEffort": "high",
+  "purpose": "one-off user-authorized cleanup API/private-boundary consultation",
+  "sourceAnchor": "57834387c6222189757fce0e7e125914f8d181d8"
+}
