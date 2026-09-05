@@ -18472,6 +18472,11 @@ Current work (f5b0z plan review, then separate RED/GREEN; parent GREEN paused):
   functions only. Sign/push the plan, complete its Grok / Sol-high /
   Fable-xhigh gate, then separate Astra-high causal RED and GREEN. No parent
   cleanup call, new authority, dependency, policy or limit is in this slice.
+  First review: Grok and Fable PASS; Sol found one P1 in the focused command's
+  inherited package-wide coverage. The single-batch correction and all P2
+  dispositions are `.logs/d110c-0c1f5b0z-plan-correction-7eb2a8df/amendment.md`.
+  Targeted Sol confirmation of that command remains before RED; no new Grok
+  or Fable round is required for P2/prose.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -101379,6 +101384,28 @@ parent f5b's first genuine cleanup invocation and parent closure, hence before
 D.110c-c/d can consume that closure. The independent parent observer RED is
 accepted at `78e068a8` / `45b1be36`. Completed f5b0d backend gates and all stopped parent evidence remain
 unchanged; this prerequisite does not claim any lifecycle or golden-path pass.
+
+The signed plan `7eb2a8df` received Grok PASS (0 P0 / 0 P1 / 2 P2), Fable
+PASS (0 / 0 / 4), and Sol CHANGES_REQUIRED (0 / 1 / 0). Review evidence is
+`.logs/d110c-0c1f5b0z-plan-review-7eb2a8df/`, 32 manifest entries, SHA-256
+`672dc830b38d4fe95b5bbf489d1643e683e3a2f63327b282b787ec3f4970d88a`.
+Sol's initial NO_VERDICT was a root prompt/tool mismatch: it had no non-shell
+reader, but the prompt prohibited shell reads. That result remains preserved;
+the exact session resumed with read-only inspection permitted and produced the
+coverage P1. No unavailable response is claimed as approval.
+
+The governing plan is now the original immutable design plus
+`.logs/d110c-0c1f5b0z-plan-correction-7eb2a8df/amendment.md`. It freezes
+`--coverage.enabled=false` for the same focused RED and GREEN command and the
+complete retained Vitest selection, without changing repository coverage
+configuration or claiming a coverage pass. Local Vitest help confirms the
+flag. The 16-case matrix, exact error tokens, workload, browser command,
+thresholds and source owners are unchanged. All six raw P2 findings receive
+RED/GREEN owner dispositions: internal duplicate registration on a dedicated
+facade after discovery, exact mutation-body custody, versioned registry shape,
+and concrete no-I/O spies. One targeted Sol confirmation covers the P1 command
+correction; Grok/Fable results remain scoped to their reviewed original plan.
+No recursive review of these dispositions or completed f5b work is authorized.
 
 Source audit at signed/pushed `0a656d1b` with the preserved seven-file partial
 patch: ordinary `AheDurableStore` has no reclamation method; browser and Node
