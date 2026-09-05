@@ -444,10 +444,25 @@ beforeEach(() => {
 
 const manualReviewMessage = "v3 room settlement plan requires manual review";
 
+function holdEffects() {
+	return {
+		issueTransactions: observation.issueTransactions,
+		commits: observation.commits.length,
+		accepted: observation.accepted,
+		publications: observation.publications,
+		migrations: observation.migrations,
+		planWrites: observation.planWrites.length,
+	};
+}
+
 function observeHold(writeOnly: boolean) {
-	return new Promise<SettlementPlan>((resolve) => {
+	return new Promise<{ plan: SettlementPlan; effects: ReturnType<typeof holdEffects> }>((resolve) => {
 		observation.onPlan = (plan, write) => {
-			if ((!writeOnly || write) && plan.entries.some((entry) => entry.disposition === "manual-review")) resolve(plan);
+			if ((!writeOnly || write) && plan.entries.some((entry) => entry.disposition === "manual-review")) {
+				// Capture synchronously after the real durable write/read, before its
+				// caller resumes. Startup attempts are not post-hold issue attempts.
+				resolve({ plan, effects: holdEffects() });
+			}
 		};
 	});
 }
@@ -458,7 +473,7 @@ async function openHeld(options: { withClose?: boolean; prepareActivation?: bool
 		hold: true,
 		prepareActivation: options.prepareActivation,
 	});
-	const plan = await durable;
+	const { plan, effects } = await durable;
 	expect(plan).toMatchObject({
 		scope: { author, objectId: fixture.objectId },
 		fenceSequence: null,
@@ -472,6 +487,7 @@ async function openHeld(options: { withClose?: boolean; prepareActivation?: bool
 	return {
 		...fixture,
 		plan,
+		effects,
 		row,
 		lineage: await store.readLineage(plan.scope),
 		outbox: await store.readOutboxPage({ scope: plan.scope, limit: 128 }),
@@ -485,11 +501,7 @@ async function holdCustody(fixture: Awaited<ReturnType<typeof openHeld>>) {
 	expect(await store.readIssued(plan.scope, fixture.row.authorSequence)).toEqual(fixture.row);
 	expect(await store.readLineage(plan.scope)).toEqual(fixture.lineage);
 	expect(await store.readOutboxPage({ scope: plan.scope, limit: 128 })).toEqual(fixture.outbox);
-	expect(observation.issueTransactions).toBe(0);
-	expect(observation.commits).toEqual([]);
-	expect(observation.accepted).toBe(0);
-	expect(observation.publications).toBe(0);
-	expect(observation.migrations).toBe(0);
+	expect(holdEffects()).toEqual(fixture.effects);
 	expect(observation.planWrites).toEqual([fixture.plan]);
 	expect(() => fixture.target.projection()).not.toThrow();
 	expect(() => fixture.target.status()).not.toThrow();
@@ -545,9 +557,13 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 		const reread = observeHold(false);
 		const reopened = await createV3RoomSession(fixture.input);
 		sessions.push(reopened);
-		expect(encodeCanonical(await reread)).toEqual(encodeCanonical(fixture.plan));
+		const reopenedHold = await reread;
+		expect(encodeCanonical(reopenedHold.plan)).toEqual(encodeCanonical(fixture.plan));
+		// A reopen has its own startup transaction probe, but cannot create an
+		// effect between the original durable hold and the re-read boundary.
+		expect({ ...reopenedHold.effects, issueTransactions: fixture.effects.issueTransactions }).toEqual(fixture.effects);
 		await microtaskTurns();
-		await holdCustody({ ...fixture, target: reopened });
+		await holdCustody({ ...fixture, effects: reopenedHold.effects, target: reopened });
 		expect(observation.closeCalls).toBe(0);
 		await reopened.close();
 	});
@@ -573,10 +589,10 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 		sessions.splice(sessions.indexOf(fixture.target), 1);
 		const reopened = await createV3RoomSession({
 			...fixture.input,
-			application: {
+			application: Object.freeze({
 				...fixture.input.application,
-				displacementPolicies: { message: "rebase" },
-			},
+				displacementPolicies: Object.freeze({ message: "rebase" as const }),
+			}),
 		});
 		sessions.push(reopened);
 		await expect(
@@ -588,12 +604,11 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 		expect(observation.commits).toEqual([]);
 		expect(observation.planWrites).toEqual([fixture.plan]);
 	});
-	it("single-generation internal redirect pins target hold refusal or the deferred parent frontier terminus", async () => {
+	it("single-generation internal redirect pins target hold refusal and orderly source cleanup", async () => {
 		const admissionErrors: unknown[] = [];
 		observation.onAdmissionError = (error) => admissionErrors.push(error);
 		const fixture = await openRebasePair(1, 100, false, true, { singleGeneration: true });
 		const receipt = await fixture.target.rehearseMigration(fixture.rehearsal);
-		const priorWrites = observation.planWrites.length;
 		const durable = observeHold(true);
 		const activation = fixture.target.activateMigration({
 			targetCreatorInvite: fixture.rehearsal.targetCreatorInvite,
@@ -605,29 +620,38 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 			() => ({ error: undefined }),
 			(error: unknown) => ({ error })
 		);
-		const first = await Promise.race([durable.then((plan) => ({ plan })), outcome]);
-		if ("plan" in first) {
-			await microtaskTurns();
-			const result = observeResult(activation);
-			await microtaskTurns();
-			expectPromptRefusal(result, "D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG");
-			expect(admissionErrors).toContainEqual(new TypeError(manualReviewMessage));
-		} else {
-			// Sole plan-authorized deferral: do not turn pre-hold record rejection
-			// into manual-review success or broaden product source classification.
-			expect(first.error).toEqual(new TypeError("v3 room migration activation failed: terminal-rejected"));
-			expect(admissionErrors).toEqual([new TypeError("v3 room rebase outbox failed: record-rejected")]);
-			expect(
-				observation.planWrites
-					.slice(priorWrites)
-					.some((plan) => plan.entries.some((entry) => entry.disposition === "manual-review"))
-			).toBe(false);
-			console.info("D110C_F5B0W_P2_REDIRECT_DEFERRED_PARENT_FRONTIER", { singleGeneration: true, durableHold: false });
-		}
+		const first = await Promise.race([durable, outcome]);
+		expect(first).toHaveProperty("plan");
+		const result = observeResult(activation);
+		await microtaskTurns();
 		expect(observation.migrations).toBe(0);
+		if (!result.result().settled) {
+			// The genuine target hold also leaves public source cleanup pending in
+			// RED. Own that promise here, not in the unbounded generic cleanup hook.
+			// This neither resolves the target hold nor claims successful shutdown.
+			const cleanup = observeResult(fixture.target.close());
+			await microtaskTurns();
+			expect(cleanup.result()).toEqual({ error: undefined, settled: false });
+			expect(result.result()).toEqual({ error: undefined, settled: false });
+			const index = sessions.indexOf(fixture.target);
+			expect(index).toBeGreaterThanOrEqual(0);
+			sessions.splice(index, 1);
+			console.info("f5b0w redirect RED cleanup observation", {
+				durableHold: true,
+				publicCloseSettled: false,
+				orderlyShutdownClaimed: false,
+			});
+			throw new Error("D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG");
+		}
+		expectPromptRefusal(result, "D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG");
+		expect(admissionErrors).toContainEqual(new TypeError(manualReviewMessage));
+		expect(observation.migrations).toBe(0);
+		expect(() => fixture.target.projection()).toThrow();
 		await expect(
 			fixture.target.issue({ action: "message", clientOperationId: "after-terminal", text: "forbidden" })
 		).rejects.toThrow();
+		await fixture.target.close();
+		sessions.splice(sessions.indexOf(fixture.target), 1);
 	});
 });
 afterEach(async () => {
