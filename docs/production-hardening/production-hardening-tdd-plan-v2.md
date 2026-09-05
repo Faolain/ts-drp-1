@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (parent functional GREEN passes; retained compatibility debt remains open):
+Current work (bounded finality-roster correction; parent retained debt remains open):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18582,6 +18582,8 @@ Blocked, and on what:
   remains uncommitted and unaccepted. Resolve those bounded causes before
   claiming retained GREEN, without a Node-to-browser dependency, invented
   authority, blanket hash update or reopened immutable evidence.
+  The independent finality-roster correction below may proceed tests-only;
+  it does not authorize registry-freeze repair or any production edit.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -101717,6 +101719,49 @@ No new API, workload, threshold, dependency or authority change is authorized
 by this diagnostic record. The existing Grok/Sol-high/Fable-xhigh final review
 still owes the complete accepted RED-to-GREEN history after the gates pass;
 no recursive model review of this status prose is required.
+
+**Prospective retained finality-roster correction (2026-09-05).** Root's
+bounded source audit confirms signed `d77ee315` already exports
+`signCreatorIssuanceRetirementRequest` from the existing keychain finality
+subpath. The two failures in retained gates 31/32 precede their intended
+behavioral checks because three test/fixture lists still expect only the
+earlier three exports. Owner: the retained keychain/creator-actor fixtures;
+deadline: before parent f5b retained acceptance. This is the already-owned
+tests-only fixture correction, not a new public API, authority decision,
+production slice or reason to repeat closed f5b0z review.
+
+The separate Astra-high RED owner may change only the exact finality export
+lists in `tests/fixtures/phase-5-v3/seal-types.ts`,
+`tests/fixtures/phase-5e-v3/creator-actor-contract.ts`, and
+`tests/phase-5e-creator-actor-red.test.ts`. Each list must name exactly the
+four current signed exports in sorted order. Preserve every byte outside
+those lists, all titles, assertions, timeouts, fixtures and executable behavior;
+do not replace equality with a subset check. Gate 31's test file remains
+byte-identical. The signed diagnostic checkpoint `8ba7d208` already owns the
+uncorrected 17-pass/two-failure evidence for these 19 assertions. Do not rerun
+that baseline or the accepted parent causal RED merely to reproduce it.
+
+Sign/push the tests-only correction separately, then independently install
+and source-build its exact signed tree in a fresh checkout without the
+eight-owner pending production patch or copied build artifacts. Execute the
+two exact retained files once: seven seal-safety plus 12 creator-actor tests,
+19 passes, no skipped assertions or suite errors; the existing bounded n=4
+formal witness remains part of the seven-test suite. Freeze the exact
+file-bound title multiset before execution and stop on any newly reached
+failure rather than folding another change into this correction. Record
+source lint/format/diff, bounded target type diagnostics, signed-source and
+runtime identity, complete reporter/stdout/stderr/statuses and a self-excluding
+manifest. Preserve all prior evidence, stashes, protected paths and the
+pending production patch.
+
+After root acceptance, the separate existing Astra-high GREEN owner must
+execute the same two files once against the pending patch, preserving all
+other frozen test hashes. No full inventory, wide workload, browser campaign
+or new model round is needed for these export lists. This control closes
+only the two finality-roster failures; all other retained debts and the final
+parent Grok/Sol-high/Fable-xhigh implementation review remain open. In
+particular, registry-freeze reconciliation still awaits its explicit
+prospective governance scope and must not be hidden in this correction.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
