@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
 
 const probe = vi.hoisted(() => ({
+	activationCount: 0,
 	afterEffect: undefined as undefined | ((sequence: number) => void),
 	acceptedActions: [] as string[],
 	completedSources: [] as unknown[],
@@ -230,6 +231,7 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 	recoverV3LiveReplica: () =>
 		Promise.resolve({ capability: {}, descriptor: { recoveredVertices: probe.recoveredVertices }, ok: true }),
 	activateV3LivePlane: (input: Readonly<Record<string, unknown>>) => {
+		probe.activationCount += 1;
 		const admittedSink = Reflect.get(input, "onAdmittedVertex") as
 			| ((delivery: Readonly<Record<string, unknown>>) => void | Promise<void>)
 			| undefined;
@@ -503,6 +505,7 @@ async function settleRoomWork(): Promise<void> {
 }
 
 beforeEach(() => {
+	probe.activationCount = 0;
 	probe.afterEffect = undefined;
 	probe.acceptedActions = [];
 	probe.completedSources = [];
@@ -534,7 +537,7 @@ describe("D.110c-0c1f5b0u room reconciliation boundaries", () => {
 		const session = await openRoom();
 		try {
 			await session.issue({ action: "message", clientOperationId: "after-race" });
-			expect(probe.nextCapabilityId, "D110C_0C1F5B0U_COMPATIBLE_PLAN_REUSED_UNCLASSIFIED_HANDLE").toBe(2);
+			expect(probe.activationCount, "D110C_0C1F5B0U_COMPATIBLE_PLAN_REUSED_UNCLASSIFIED_HANDLE").toBe(2);
 		} finally {
 			await session.close();
 		}

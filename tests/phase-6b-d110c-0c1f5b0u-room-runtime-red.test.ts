@@ -34,7 +34,7 @@ const observation = vi.hoisted(() => ({
 
 // Every operation and capability below is real. Only the receipt following one
 // selected signed store transaction is lost, using the accepted f5b0b seam.
-vi.mock("@ts-drp/storage-browser/issuance", async (importOriginal) => {
+vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@ts-drp/storage-browser/issuance")>();
 	return {
 		...actual,

@@ -79,10 +79,12 @@ function batch(times: readonly number[]): unknown {
 describe("D.110c-0c1f5b0u exact store logical-time owner", () => {
 	it("pins a real Node-assembled sixteen-entry progress chunk to its final child logical time", async () => {
 		const node = await openSettlementNode("creator-trusted-settlement-v1", true);
+		const realStore = createEphemeralDurableIssuanceStore();
 		try {
+			const selectedPlan = { ...plan(progressEntry(progress(16))), scope: node.scope };
 			await node.issuanceStore.transactWriteSettlementPlan({
 				expectedRevision: null,
-				plan: { ...plan(progressEntry(progress(16))), scope: node.scope } as never,
+				plan: selectedPlan as never,
 				scope: node.scope,
 			});
 			const operations = Array.from({ length: 16 }, (_, index) => ({
@@ -95,10 +97,29 @@ describe("D.110c-0c1f5b0u exact store logical-time owner", () => {
 				signRegisteredVertexDigest: node.fixture.signRegisteredVertexDigest,
 			} as never);
 			expect(issued).toMatchObject({ ok: true });
-			expect(snapshot(await node.issuanceStore.readSettlementPlan(node.scope))).toMatchObject({
+			const bootstrap = await node.issuanceStore.readIssued(node.scope, 0);
+			const signedBatch = await node.issuanceStore.readIssued(node.scope, 1);
+			if (bootstrap === null || signedBatch === null)
+				throw new TypeError("D110C_0C1F5B0U_REAL_NODE_SIGNED_BATCH_MISSING");
+			await realStore.transactIssue(node.scope, (sequence) => {
+				expect(sequence).toBe(bootstrap.authorSequence);
+				return Promise.resolve(bootstrap);
+			});
+			await realStore.transactWriteSettlementPlan({
+				expectedRevision: null,
+				plan: selectedPlan as never,
+				scope: node.scope,
+			});
+			await realStore.transactIssue(node.scope, (sequence) => {
+				expect(sequence).toBe(signedBatch.authorSequence);
+				return Promise.resolve(signedBatch);
+			});
+			expect(await realStore.readIssued(node.scope, 1)).toEqual(signedBatch);
+			expect(snapshot(await realStore.readSettlementPlan(node.scope))).toMatchObject({
 				entries: [{ replacementProgress: { chunks: [{ lastLogicalTime: 33, throughIntent: 16 }] } }],
 			});
 		} finally {
+			await realStore.close();
 			await node.close();
 		}
 	});
