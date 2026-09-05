@@ -7,6 +7,7 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import type { DurableIssuanceStore, DurableIssueCommit } from "@ts-drp/issuance-store";
 import type { V3PlaneHandle } from "@ts-drp/node/v3-live";
 import { Message, MessageType, V3Envelope } from "@ts-drp/types";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
@@ -431,8 +432,10 @@ async function openRoom(writerCount: number, legacy = false) {
 			peer.floor.receive(origin.floor.read());
 		}
 		const declaration = await producedDeclaration(peer.databaseName, closedEpoch);
+		const { creatorFinalitySigner, ...reopenInput } = peer.input;
+		void creatorFinalitySigner;
 		peer.room = await createV3RoomSession({
-			...peer.input,
+			...reopenInput,
 			application,
 			roomHeadAuthority: { ...peer.floor.authority, initialization: { kind: "reopen" } },
 			successorSnapshotDeclaration: declaration,
@@ -447,6 +450,31 @@ async function openRoom(writerCount: number, legacy = false) {
 			return await origin.room.sealEpoch();
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);
+			if (detail === "creator close actor failed: CERTIFIED_VALUE_MISMATCH") {
+				// The first preserved run established this earlier compatibility seam.
+				// Pin all three existing successor sites; do not substitute a profile,
+				// checkpoint, signature, successful actor result or synthetic authority.
+				const source = readFileSync(new URL("../packages/protocol-v3/src/creator-close.ts", import.meta.url), "utf8");
+				const owner = (name: string) => {
+					const start = source.indexOf(`export function ${name}(`);
+					expect(start, `F5B_SUCCESSOR_CODEC_OWNER_${name}`).toBeGreaterThanOrEqual(0);
+					const next = source.indexOf("\nexport function ", start + 1);
+					return source.slice(start, next === -1 ? undefined : next);
+				};
+				expect(owner("prepareCreatorAnchorSigningRequest"), "F5B_SUCCESSOR_PROFILE_PREPARATION_V1_ONLY").toContain(
+					'profile.profileId !== "creator-trusted-v1"'
+				);
+				expect(owner("completeCreatorSuccessor"), "F5B_SUCCESSOR_PROFILE_COMPLETION_V1_ONLY").toContain(
+					'profileId: "creator-trusted-v1"'
+				);
+				expect(owner("openCreatorSuccessorTrust"), "F5B_SUCCESSOR_PROFILE_OPEN_V1_ONLY").toContain(
+					'decodedRecord.profileId !== "creator-trusted-v1"'
+				);
+				throw new Error(
+					"F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production",
+					{ cause: error }
+				);
+			}
 			if (detail !== "creator trust advance failed: TRUST_CLOSURE_INVALID") throw error;
 			const candidate = required(observed.advances.at(-1)).proposed as { candidates: { bytes: Uint8Array }[] };
 			const kinds = candidate.candidates.map(({ bytes }) => record(bytes).kind);
