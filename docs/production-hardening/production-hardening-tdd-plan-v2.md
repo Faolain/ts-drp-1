@@ -18458,10 +18458,14 @@ Authorized now (tests-only RED; production GREEN remains gated):
   union. The first Astra-high tests-only checkpoint and its sole 219-test run
   are rejected and preserved at `8f91396a`/`9cc5cdb0`: the store RED and
   f5b0c supersession were causal, but two fixture oracles and redirect cleanup
-  made the complete matrix differ. One bounded Astra-high corrective
-  tests-only RED is authorized; only after its exact matrix is accepted may a
-  separate Astra-high GREEN begin. This prerequisite adds no public method,
-  field or authority: it
+  made the complete matrix differ. Its first corrective checkpoint is also
+  rejected and preserved at `91386f86`/`a83af8a4`: all intended RED tokens
+  became causal without a hook timeout, but two retained-control observations
+  still conflated restart callback replay and a terminally closed store with
+  product effects. One final bounded Astra-high tests-only correction is
+  authorized; only after its exact matrix is accepted may a separate
+  Astra-high GREEN begin. This prerequisite adds no public method, field or
+  authority: it
   makes a held public `issue()` refuse promptly, prevents the hold from
   blocking the existing creator-close owner, preserves same-epoch durable
   reopen and freezes retained store entries.
@@ -100596,6 +100600,38 @@ and failure-token matrix. If any other count, token, loader failure, timeout or
 top-level error appears, stop again. This is diagnostic/fixture correction,
 not new API, product, wire, authority, dependency, workload or threshold
 scope, so deterministic validation replaces another plan-review round.
+
+Corrective tests-only commit `91386f86` and its sole run remain rejected and
+immutable. Signed/pushed evidence commit `a83af8a4` records exactly 219 tests,
+154 passed, 65 failed and zero skipped against the pre-frozen 156/63 matrix at
+`.logs/d110c-0c1f5b0w-red-91386f86/`; its 31-entry self-excluding manifest
+SHA-256 is
+`3e1e5dc7f0c5a9d540a27185baf3c93c3d72dc12c59d0bb6863ec92c28f83ee1`.
+The 57 store failures, f5b0c issue token and all five intended runtime tokens
+were exact. The redirect public close was observed pending and removed from
+generic hook ownership without a hook timeout or clean-shutdown claim. The two
+additional failures are retained-test observation defects, not newly inferred
+product behavior. First, same-epoch reopen replayed `onAcceptedVertex` once,
+which is the already-accepted f5b0v replayable-notification contract rather
+than a duplicate canonical application, issuance, publication, migration or
+plan effect. Second, the changed-policy path reached both exact source-diff
+assertions and then tried to read through the issuance store that terminal
+failure had already closed, producing `ISSUANCE_STORE_CLOSED` before durable
+custody could be checked.
+
+One final tests-only correction is authorized without another model review.
+The reopen control must compare canonical projection and durable plan/source/
+lineage/outbox truth exactly, permit the already-specified replayable accepted
+notification across the restart boundary, and snapshot a fresh post-reopen
+boundary before asserting no later effect delta. It must not weaken same-
+session no-effect assertions. The changed-policy control must reopen the same
+issuance database through the ordinary public durable-store factory solely for
+readback after terminal close, prove the held plan remains byte-identical, and
+close that fresh read handle; it must not mutate or revive the session. The
+redirect oracle and every causal token remain unchanged. Freeze 219 selected,
+156 passed and 63 failures (57 store, one f5b0c issue, and runtime issue,
+creator close, rehearsal, activation and redirect) before the one execution.
+Any different count, token, timeout, loader or top-level error stops again.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
