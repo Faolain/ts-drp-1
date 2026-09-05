@@ -193,14 +193,16 @@ async function genuineSuccessor() {
 		migrate: () => Promise.resolve({ ok: false, reason: "conflict" }),
 		begin: async (input) => {
 			await Promise.resolve();
-			if (JSON.stringify(input.expected) !== JSON.stringify(state)) return { ok: false, reason: "conflict" };
+			if (!Buffer.from(encodeCanonical(input.expected)).equals(Buffer.from(encodeCanonical(state))))
+				return { ok: false, reason: "conflict" };
 			const previous = required(state).stable;
 			state = { stable: previous, pending: { previous, next: input.next } };
 			return success();
 		},
 		commit: async (input) => {
 			await Promise.resolve();
-			if (JSON.stringify(input.expected) !== JSON.stringify(state)) return { ok: false, reason: "conflict" };
+			if (!Buffer.from(encodeCanonical(input.expected)).equals(Buffer.from(encodeCanonical(state))))
+				return { ok: false, reason: "conflict" };
 			state = { pending: null, stable: required(required(state).pending).next };
 			return success();
 		},
