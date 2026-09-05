@@ -18453,13 +18453,13 @@ Closed through the 2026-09-05 checkpoint:
 Authorized now (tests-only RED; production GREEN remains gated):
 
 - **D.110c-0c1f5b0w settlement manual-review hold semantics** below. The
-  bounded plan must first receive the governing high-risk review. After an
-  empty P0/P1 union, one Astra-high tests-only RED and then a separate
-  Astra-high GREEN are authorized. This prerequisite adds no public method,
-  field or authority: it makes a held public `issue()` refuse promptly,
-  prevents the hold from blocking authenticated creator close, preserves the
-  durable hold across restart/cold reopen and freezes the store's one-way
-  disposition safety law.
+  governing high-risk plan review found a bounded sequencing/store-law P1
+  union. The correction is frozen below and receives exactly one material
+  confirmation. After its empty P0/P1 union, one Astra-high tests-only RED and
+  then a separate Astra-high GREEN are authorized. This prerequisite adds no
+  public method, field or authority: it makes a held public `issue()` refuse
+  promptly, prevents the hold from blocking the existing creator-close owner,
+  preserves same-epoch durable reopen and freezes retained store entries.
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
   exactly one expected settlement-profile failure and one complete v1 pass.
@@ -100352,16 +100352,18 @@ workload change is authorized here.
 
 ###### D.110c-0c1f5b0w settlement manual-review hold semantics prerequisite
 
-**Status: bounded plan frozen; high-risk plan review is next. Tests-only RED
-is authorized only after that review has an empty P0/P1 union; parent f5b
-production GREEN is blocked on this slice.** Owner:
+**Status: the one high-risk plan review found a bounded P1 sequencing and
+store-law union; this corrected plan receives exactly one material
+confirmation before tests-only RED. Parent f5b production GREEN remains
+blocked on this slice.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the settlement
 plan merge, `drainSettlementOutbox()`, startup `rebasePromise`, public
 `issue()` and creator `sealEpoch()` waits; and
 `packages/issuance-store/src/contract.ts::assertSettlementPlanProgressTransition()`
-plus its existing conformance matrix. Deadline: GREEN before parent f5b
-production edits, before its retained matrix is rebaselined, and before any
-D.110c-c/d, Phase-6 exit or Phase-7 golden-path claim.
+plus its existing conformance matrix. Deadline: GREEN before parent f5b claims
+or executes its post-codec manual-review, re-admission or 64-writer
+continuations, and before any D.110c-c/d, Phase-6 exit or Phase-7 golden-path
+claim.
 
 The accepted parent RED review found one narrow lifecycle defect. A durable
 `manual-review` entry makes `drainSettlementOutbox()` await a promise released
@@ -100376,15 +100378,14 @@ author-wide eviction and content discard, not per-source moderator approval.
 
 This record prospectively supersedes only parent design RED case 11 and the
 `manual-review entry` matrix row; the accepted design artifact and manifest
-remain immutable. The required parent truth is now: a manual-review entry
-causes no plan completion, fence or replacement; the held author's ordinary
-issue refuses promptly and fail closed; other authors and authenticated epoch
-close continue; the exact entry and source remain durable across close,
-restart and cold reopen; no pruning occurs while it is unlinked; and the plan
-can empty only when authenticated plan re-derivation no longer contains the
-source, including boundary settlement or removal/re-admission under a new
-`admissionEpoch`. Per-source interactive resolution is explicitly owned by
-future D.110c-0c1f5b0x and is not claimed here.
+remain immutable. The split acceptance is exact. This prerequisite proves the
+hold becomes a stable, prompt, same-epoch fail-closed state and cannot block
+the existing creator-close owner. Parent f5b, only after its already-causal
+successor-codec and frontier GREEN, must prove genuine close/adopt continuity,
+the unchanged authenticated held-author boundary, hold durability across an
+epoch close, restart/cold reopen, and authenticated noncreator removal/re-
+admission plan emptying. Per-source interactive resolution is explicitly owned
+by future D.110c-0c1f5b0x and is not claimed here.
 
 The narrow GREEN contract is:
 
@@ -100395,51 +100396,72 @@ The narrow GREEN contract is:
    does not enqueue an issuance transaction, publish, fence, replace, mutate
    the plan, close the session or set a terminal failure. `projection()`,
    status and orderly shutdown remain usable.
-2. Creator `sealEpoch()` does not wait on the held drain. A creator-owned or
-   noncreator-owned hold may keep only that author's authenticated boundary
-   from advancing; the genuine creator close/adopt transition and unaffected
-   authors continue. The held author emits no fence or replacement, and close
-   derives its unchanged boundary from authenticated product state rather than
-   a fixture override.
-3. Restart and cold reopen re-derive the same hold from durable settlement
-   plan and source truth. The exact scope, revision, source sequence/digest,
-   disposition and null link remain byte-identical. No retry, duplicate plan,
-   fence, replacement, publication, application effect or pruning occurs.
-4. The store transition validator preserves `sourceDigest` for every retained
-   entry and refuses a transition from a final `expire`/`rebase`/`transform`
-   disposition back to `manual-review`. A retained linked or progress-bearing
-   entry remains immutable under its existing stricter laws. The only
-   future-compatible disposition relaxation recognized by the contract is an
-   unlinked, unfenced, progress-free `manual-review` entry moving once to one
-   final disposition with the same source identity; this slice adds no room
-   caller for that transition and parent f5b keeps dispositions unchanged.
-5. Authenticated removal/re-admission proves the current no-API release path:
-   after revoke and genuine close/adopt, then grant and genuine close/adopt,
-   the returning author has a new `admissionEpoch`; old-incarnation sources are
-   terminal, the obsolete held entry disappears only through normal plan
-   re-derivation, the prune gate releases only when its existing requirements
-   hold, and a new empty plan issues exactly one fence before ordinary issue.
+2. Creator `sealEpoch()` does not wait on the held drain. Using the already-
+   closed f5b0u rebase-pair fixture with real browser stores and creator close
+   authority, a creator-owned hold must reach the unchanged creator-close
+   owner promptly and return that owner's existing result. Before parent GREEN
+   that result remains the already-accepted settlement successor-codec
+   terminus; f5b0w neither changes nor calls it success. The held plan remains
+   byte-identical, and no fence, replacement or application effect is emitted.
+3. Orderly session shutdown and same-epoch reopen of the same database re-
+   derive the same hold from durable plan and source truth without an epoch
+   close. The exact scope, revision, source sequence/digest, disposition and
+   null link remain byte-identical. No retry, duplicate plan, fence,
+   replacement, publication, application effect or pruning occurs.
+4. The store transition validator freezes every retained entry's
+   `sourceDigest` and disposition. It also freezes `replacementSequence` and
+   all replacement-progress fields for a legacy-linked entry or a completed-
+   progress entry, closing the current fall-through as well as preserving the
+   existing in-progress rules. Removal remains permitted only through normal
+   authenticated plan re-derivation. This slice recognizes no disposition
+   relaxation and no plan-level fence rule for resolution; D.110c-0c1f5b0x
+   must design both if it is ever authorized.
+5. A held source refuses `rehearseMigration()` and `activateMigration()` with
+   the same exact manual-review `TypeError`, retaining source plan/state and
+   producing no target/import/terminal effect. An internally redirected target
+   forced to manual review rejects target creation with that exact error; the
+   redirecting source retains the existing terminal fail-closed outcome rather
+   than claiming migration success. A standalone `rebaseSourceInvite` target
+   with a manual-review policy opens as a stable held session so its plan can
+   be inspected through existing test/store authority. Changed policy on a
+   retained held entry continues to fail terminally with the existing
+   `v3 room settlement plan source differs`; no redisposition is added.
 
-Tests-only RED uses genuine product sessions and stores and makes no direct
-plan edit. It deterministically observes, with a parent-owned bounded
-settlement sentinel rather than a wall-clock timeout, that a held `issue()`
-does not settle before shutdown and terminates with exact tests-only token
+A creator-owned or migration-forced hold is an indefinite fail-closed freeze
+of that author's ordinary issue/migration activity in this slice. Under fixed-
+creator authority it has no authenticated eviction release. A noncreator hold
+can later leave the plan through authenticated removal/re-admission, but the
+successful close/adopt sequence is a mandatory parent f5b continuation after
+the codec/frontier GREEN. The Discord/MMORPG retained workload uses rebase or
+transform, not manual review; f5b0w isolates a bad policy/operation to its
+author without claiming moderator UX.
+
+Tests-only RED uses the closed f5b0u `openRebasePair` product fixture with real
+browser stores and makes no direct plan edit. A fixture-local observer around
+the real store's `transactWriteSettlementPlan` resolves only after the durable
+manual-review write; bounded microtask turns then prove that a held `issue()`
+does not settle before shutdown and terminate with exact tests-only token
 `D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG`; separately it proves a creator-held
 plan prevents a genuine close from reaching its existing close owner and
 terminates with
-`D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG`. A migration-import manual-review path
-must likewise settle as a typed refusal rather than hang session creation. The
-store conformance RED proves source substitution and final-to-manual-review
-rewrites are currently admitted if that is what the real backend path shows;
-an already stricter backend result is a retained control, not a manufactured
-failure. RED is rejected if it times out, fails before durable hold creation,
-uses a private resolver/store mutation as authority, changes a product error,
-or does not preserve the exact durable row.
+`D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG`. The existing f5b0c room test that pins
+an unsettled public issue is superseded in the same tests-only RED: it uses the
+same bounded sentinel and expects the future exact prompt refusal with no
+issue input or additional plan write. Migration rehearsal, activation and
+redirect tests pin the exact observations in item 5. Memory, browser and node
+store conformance REDs retain a source-digest substitution, every final-to-
+manual-review rewrite, linked-entry mutation and completed-progress mutation
+that current code admits; an already stricter case is a retained control, not
+a manufactured failure. RED is rejected if it times out, fails before durable
+hold creation, uses a private resolver/store mutation as authority, changes a
+product error, or does not preserve the exact durable row.
 
-GREEN runs the focused room and issuance-store conformance tests, then the
-parent manual-review/displaced-control cases without advancing to the parent
-settlement-profile terminus. Retained gates cover ordinary no-hold startup and
-issue, creator close/adopt/reopen, migration redirect, offline/rebase,
+GREEN runs the focused f5b0u/f5b0c room and issuance-store conformance tests.
+It does not run or claim the parent manual-review, displaced-control,
+successful close/adopt, cross-close reopen or re-admission continuations.
+Those stay mandatory immediately after the parent codec/frontier repair and
+before parent closure. Retained gates cover ordinary no-hold startup and issue,
+the unchanged creator-close terminus, migration redirect, offline/rebase,
 settlement plan CAS/effects/pruning, f5b0t/u/v restart/reconciliation and
 callback semantics, and `creator-trusted-v1` behavior. Exact affected package
 build/typecheck, lint, 8-GiB format, diff and source-shape checks plus an
@@ -100467,6 +100489,34 @@ empty blocking union, one Astra-high agent writes and commits tests-only RED,
 and a separate Astra-high agent performs the narrow GREEN. The same review
 trio reviews the signed RED→GREEN history once. Preserve protected untracked
 paths, all 27 stashes, immutable evidence and every consumed identity.
+
+The initial plan review inspected signed/pushed commit `e9b29568`. Grok
+4.6/high reached its 16-turn cap after active inspection and was honestly
+classified `NO_VERDICT`; the exact session
+`01a07189-5776-77e2-a047-e60b61899a6c` was resumed once for terminal schema
+emission only and returned one P1 against the codec-cycle. Its terminal object
+reported four P2s but emitted no P2 bodies, so none is invented or attributed.
+Codex `gpt-5.6-sol` high returned P0/P1/P2 `0/2/1`, adding the retained linked
+and completed-progress store fall-through. Fable 5.1 xhigh session
+`7f191cbf-c0a6-4ea9-9021-354dac36b128`, invoked only through `claude-phel`,
+returned `0/1/4` and independently identified the same sequencing cycle.
+
+The blocking union is corrected above in one batch. The f5b0u rebase-pair and
+real browser store replace the unreachable parent post-close fixture; f5b0w
+requires only prompt issue/migration refusal, same-epoch durable reopen, store
+immutability and proof that seal reaches the unchanged close owner and accepted
+parent terminus. Successful settlement close/adopt, cross-close hold custody
+and noncreator removal/re-admission remain mandatory parent f5b continuations
+after its codec/frontier GREEN. Every retained store entry now freezes source,
+disposition, link and progress while present; no manual-review transition or
+plan-level resolution rule is introduced. The P2 union owns the superseded
+f5b0c hang assertion, exact migration outcomes, indefinite creator/migration
+holds and future f5b0x fence semantics. Because this correction changes
+executable sequencing and store acceptance, exactly one material confirmation
+reviews the corrected signed/pushed plan; no recursive prose-only review
+follows. Evidence is `.logs/d110c-0c1f5b0w-plan-review-e9b29568/`.
+Its sixteen-entry self-excluding manifest SHA-256 is
+`af286f4232b43d41424d9f7a17cd27977ae9a4c9766ab5befbc3f412eb25c246`.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
