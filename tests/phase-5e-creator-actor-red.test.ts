@@ -255,7 +255,12 @@ describe("Phase 5e durable creator actor RED", () => {
 		expect(EXPECTED_EXPORTS).toEqual({
 			creator: ["createCreatorSealActor"],
 			evidence: ["openBrowserSealEvidenceStore"],
-			finality: ["createRecoverableFinalitySigner", "signCreatorAnchorRequest", "signSealRegisteredDigest"],
+			finality: [
+				"createRecoverableFinalitySigner",
+				"signCreatorAnchorRequest",
+				"signCreatorIssuanceRetirementRequest",
+				"signSealRegisteredDigest",
+			],
 		});
 	});
 

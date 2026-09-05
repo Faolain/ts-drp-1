@@ -96,7 +96,12 @@ export const EXACT_VOTE_TRANSACTION_STORES = Object.freeze(["signerState", "stor
 export const EXPECTED_EXPORTS = Object.freeze({
 	creator: Object.freeze(["createCreatorSealActor"]),
 	evidence: Object.freeze(["openBrowserSealEvidenceStore"]),
-	finality: Object.freeze(["createRecoverableFinalitySigner", "signCreatorAnchorRequest", "signSealRegisteredDigest"]),
+	finality: Object.freeze([
+		"createRecoverableFinalitySigner",
+		"signCreatorAnchorRequest",
+		"signCreatorIssuanceRetirementRequest",
+		"signSealRegisteredDigest",
+	]),
 });
 
 export const CRASH_CHECKPOINTS = Object.freeze([

@@ -100,7 +100,12 @@ export interface CandidateSealModules {
 
 export const EXPECTED_EXPORTS = Object.freeze({
 	browser: Object.freeze(["openBrowserSealVoteStore"]),
-	keychain: Object.freeze(["createRecoverableFinalitySigner", "signCreatorAnchorRequest", "signSealRegisteredDigest"]),
+	keychain: Object.freeze([
+		"createRecoverableFinalitySigner",
+		"signCreatorAnchorRequest",
+		"signCreatorIssuanceRetirementRequest",
+		"signSealRegisteredDigest",
+	]),
 	protocol: Object.freeze([
 		"openSealAuthority",
 		"prepareRoundChange",
