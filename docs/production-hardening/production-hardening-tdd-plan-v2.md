@@ -18491,8 +18491,9 @@ Authorized now (tests-only RED; production GREEN remains gated):
   workload correction is authorized before GREEN resumes: retain the real
   two-intent/multiple-chunk crash-and-recovery proof with a tests-only
   transient-payload blueprint whose reducer keeps bounded state, and use a
-  256-character transform for the independent 64-writer append-only chat
-  proof. Product state, batch, epoch and snapshot ceilings remain unchanged.
+  256-character transform for every other parent append-only chat consumer,
+  including the independent 64-writer proof. Product state, batch, epoch and
+  snapshot ceilings remain unchanged.
 
 Blocked, and on what:
 
@@ -100852,14 +100853,20 @@ the unchanged 65,536-byte per-operation limit, preserves action and identity,
 the pair exceeds the unchanged application-batch limit, and its reducer keeps
 the exact application state below the unchanged 32,768-byte ceiling. The
 transient padding is test stimulus only and is neither archived state nor a
-product API. The independent one-room 64-writer append-only chat case changes
-only its deterministic transform text from 33,000 to 256 characters; for its
-exact 256 ordinary plus six transformed messages, the modeled final canonical
-state is 14,303 bytes. The executable test must assert the actual final state
-remains within 32,768 bytes while retaining every writer's every-epoch issue,
-publication, application, plan/fence/replacement, restart, cold-reopen, three-
-close and lineage/accounting predicates. Closed f5b0u chunk-splitting evidence
-and its 33,000/22,000-byte fixtures remain immutable and are not reinterpreted.
+product API. Every other parent consumer of the shared `openRoom()` append-only
+chat fixture—including cases 1, 4/15/16/19, 24a, 25 and the independent
+64-writer case—uses the same deterministic 256-character transform and updates
+its exact-effect expectation accordingly. The complete focused parent matrix
+must contain no `INVALID_APPLICATION_STATE` or other state-ceiling failure.
+For the wide case's exact 256 ordinary plus six transformed messages, the
+modeled final canonical state is 14,303 bytes. The executable test must assert
+the actual final state remains within 32,768 bytes while retaining every
+writer's every-epoch issue, publication, application, plan/fence/replacement,
+restart, cold-reopen, three-close and lineage/accounting predicates. Case 3
+alone overrides the bounded chat fixture with the transient-payload blueprint
+because it alone owns the cross-close multiple-chunk stimulus. Closed f5b0u
+chunk-splitting evidence and its 33,000/22,000-byte fixtures remain immutable
+and are not reinterpreted.
 
 This correction changes no production source, API, wire/schema, cryptography,
 dependency, resource ceiling, timeout or accepted prior evidence. Its focused
@@ -100867,11 +100874,20 @@ RED must fail only at the already accepted production seams, never at a missing
 import/export, malformed blueprint, new state-limit error or changed control.
 Because it corrects a frozen workload adjacent to the 64-writer golden-path
 gate, the signed/pushed amendment receives one bounded Grok 4.6/high, Codex
-`gpt-5.6-sol` high and Fable xhigh plan review. Only P0/P1 blocks. After an
-empty blocking union, one Astra-high tests-only RED agent commits the corrected
-fixture and exact matrix; a separate Astra-high GREEN agent starts from that
-RED and implements only the accepted parent production design. The final
-three-review GREEN gate remains unchanged. No long campaign is authorized.
+`gpt-5.6-sol` high and Fable xhigh plan review. Only P0/P1 blocks. The initial
+review at `f50a4637` found one material P1: the 33,000-byte transform was shared
+by sibling `openRoom()` consumers even though the amendment bounded only case
+3 and the wide case. Sol returned the P1 directly; Grok's runner classified its
+prose-plus-JSON terminal as `NO_VERDICT`, while its non-verdict public text
+independently described the same issue; Fable xhigh inspected the repo but
+ended at a denied Bash request without a terminal verdict. None is
+misrepresented as a pass. The correction above accepts the P1 in one batch and
+permits the one confirmation round appropriate for executable-scope changes.
+After its blocking union is empty, one Astra-high tests-only RED agent commits
+the corrected fixture and exact matrix; a separate Astra-high GREEN agent
+starts from that RED and implements only the accepted parent production
+design. The final three-review GREEN gate remains unchanged. No long campaign
+is authorized.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
