@@ -1,0 +1,91 @@
+[
+  {
+    "name": "format",
+    "bin": "pnpm",
+    "args": [
+      "exec",
+      "prettier",
+      "--check",
+      "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "tests/phase-6a-creator-successor-product-red.test.ts"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T07:18:22.958Z",
+    "finishedAt": "2026-09-05T07:18:24.073Z"
+  },
+  {
+    "name": "lint",
+    "bin": "pnpm",
+    "args": [
+      "exec",
+      "eslint",
+      "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "tests/phase-6a-creator-successor-product-red.test.ts"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T07:18:24.073Z",
+    "finishedAt": "2026-09-05T07:19:01.814Z"
+  },
+  {
+    "name": "diff",
+    "bin": "git",
+    "args": [
+      "-C",
+      "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "diff",
+      "4521f03f284a31001ae4a1a9e65ce23d5ca77ac9^",
+      "4521f03f284a31001ae4a1a9e65ce23d5ca77ac9",
+      "--check",
+      "--",
+      "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "tests/phase-6a-creator-successor-product-red.test.ts"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T07:19:01.815Z",
+    "finishedAt": "2026-09-05T07:19:01.855Z"
+  },
+  {
+    "name": "list",
+    "bin": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "list",
+      "tests/phase-6a-creator-successor-product-red.test.ts",
+      "-t",
+      "D\\.108d2 public return AST oracle|keeps node-root and chat authority closed while assigning the room as sole node consumer"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T07:19:01.855Z",
+    "finishedAt": "2026-09-05T07:19:05.260Z"
+  },
+  {
+    "name": "green",
+    "bin": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "run",
+      "tests/phase-6a-creator-successor-product-red.test.ts",
+      "-t",
+      "D\\.108d2 public return AST oracle|keeps node-root and chat authority closed while assigning the room as sole node consumer",
+      "--no-file-parallelism",
+      "--coverage.enabled=false",
+      "--reporter=json",
+      "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-source-oracle-p1-4521f03f/green-reporter.json"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T07:19:05.261Z",
+    "finishedAt": "2026-09-05T07:19:08.668Z"
+  }
+]
