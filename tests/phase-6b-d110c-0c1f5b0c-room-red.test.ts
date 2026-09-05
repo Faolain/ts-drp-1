@@ -3,6 +3,7 @@ import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { SettlementPlan } from "@ts-drp/issuance-store";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { microtaskTurns, observeResult } from "./fixtures/phase-6b-d110c-0c1f5b0w/manual-review-probe.js";
 import type { V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
 
 const probe = vi.hoisted(() => ({
@@ -888,21 +889,12 @@ describe("D.110c-0c1f5b0c room settlement orchestration RED", () => {
 		await session.close();
 	});
 
-	it("[RED] keeps manual-review durable and holds public issue before any fence or replacement", async () => {
+	it("[f5b0w RED] keeps manual-review durable and promptly refuses public issue before any fence or replacement", async () => {
 		probe.rebasePages = [
 			displaced(7, "07".repeat(32), [intent("review-me", "review-7", 7)]),
 			{ kind: "empty", ok: true },
 		];
 		const session = await openRoom();
-		let settled = false;
-		void session.issue(Object.freeze({ action: "message", clientOperationId: "must-wait" })).then(
-			() => {
-				settled = true;
-			},
-			() => {
-				settled = true;
-			}
-		);
 		await settleRoomWork();
 		expect(probe.plan).toMatchObject({
 			entries: [{ disposition: "manual-review", replacementSequence: null, sourceSequence: 7 }],
@@ -910,8 +902,21 @@ describe("D.110c-0c1f5b0c room settlement orchestration RED", () => {
 		});
 		expect(selectedActions()).toEqual([]);
 		expect(probe.completedSources).toEqual([]);
-		expect(settled).toBe(false);
-		await session.close();
+		const before = structuredClone(probe.plan);
+		const writes = probe.settlementPlanWrites.length;
+		try {
+			const result = observeResult(
+				session.issue(Object.freeze({ action: "message", clientOperationId: "must-refuse" }))
+			);
+			await microtaskTurns();
+			expect(probe.plan).toEqual(before);
+			expect(probe.settlementPlanWrites).toHaveLength(writes);
+			expect(probe.issueInputs).toEqual([]);
+			expect(result.result().settled, "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG").toBe(true);
+			expect(result.result().error).toEqual(new TypeError("v3 room settlement plan requires manual review"));
+		} finally {
+			await session.close();
+		}
 	});
 
 	it("[RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source", async () => {

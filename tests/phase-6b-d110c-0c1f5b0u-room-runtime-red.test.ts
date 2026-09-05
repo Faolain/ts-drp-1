@@ -4,11 +4,12 @@ import "fake-indexeddb/auto";
 
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import type { DurableIssuanceStore, DurableIssueCommit } from "@ts-drp/issuance-store";
+import type { DurableIssuanceStore, DurableIssueCommit, SettlementPlan } from "@ts-drp/issuance-store";
 import type { V3PlaneHandle } from "@ts-drp/node/v3-live";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
+import { microtaskTurns, observeResult } from "./fixtures/phase-6b-d110c-0c1f5b0w/manual-review-probe.js";
 import { createV3ChatApplication } from "../examples/v3-chat/src/index.js";
 import {
 	createV3RoomCreatorInviteMaterial,
@@ -31,6 +32,14 @@ const observation = vi.hoisted(() => ({
 	onFault: undefined as undefined | (() => void),
 	closeFault: false,
 	onAdmissionError: undefined as undefined | ((error: unknown) => void),
+	onPlan: undefined as undefined | ((plan: SettlementPlan, write: boolean) => void),
+	planWrites: [] as SettlementPlan[],
+	captureClose: false,
+	closeCalls: 0,
+	accepted: 0,
+	publications: 0,
+	migrations: 0,
+	issueTransactions: 0,
 }));
 
 // Every operation and capability below is real. Only the receipt following one
@@ -43,11 +52,23 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOrigina
 			const real = await actual.createBrowserDurableIssuanceStore(input);
 			const wrapped: DurableIssuanceStore = {
 				...real,
+				readSettlementPlan: async (scope) => {
+					const plan = await real.readSettlementPlan(scope);
+					if (plan !== null) observation.onPlan?.(plan, false);
+					return plan;
+				},
+				transactWriteSettlementPlan: async (input) => {
+					const plan = await real.transactWriteSettlementPlan(input);
+					observation.planWrites.push(plan);
+					observation.onPlan?.(plan, true);
+					return plan;
+				},
 				close: async () => {
 					await real.close();
 					if (observation.closeFault) throw new Error("D110C_0C1F5B0U_CONTROLLED_STORE_CLOSE_FAILED");
 				},
 				transactIssue: async (scope, build) => {
+					observation.issueTransactions += 1;
 					let selected: DurableIssueCommit | undefined;
 					let failAfter = false;
 					const result = await real.transactIssue(scope, async (sequence) => {
@@ -105,6 +126,21 @@ vi.mock("@ts-drp/node/creator-close", async (importOriginal) => {
 			return { ok: false as const, reason: "CREATOR_CONTINUITY_TERMINAL" };
 		const result = await actual.bindCreatorLiveClose(...args);
 		if (result.ok) observation.bound.push({ plane: args[0].plane, handle: result.handle });
+		// Only the f5b0w seal probe observes this boundary. The real close closure
+		// retains its registered owner; no adoption/resolver is called with this view.
+		if (result.ok && observation.captureClose) {
+			const real = result.handle;
+			return {
+				...result,
+				handle: {
+					...real,
+					close: () => {
+						observation.closeCalls += 1;
+						return real.close();
+					},
+				},
+			};
+		}
 		return result;
 	};
 	const descriptor = Object.getOwnPropertyDescriptor(
@@ -224,14 +260,22 @@ function roomHeadAuthority(scoped = false): CreateV3RoomSessionInput["roomHeadAu
 	};
 }
 
-async function openRebasePair(count: number, expandedBytes: number, withClose = false, migrationRecovery = false) {
+async function openRebasePair(
+	count: number,
+	expandedBytes: number,
+	withClose = false,
+	migrationRecovery = false,
+	options: { hold?: boolean; singleGeneration?: boolean; prepareActivation?: boolean } = {}
+) {
 	const identity = ++ordinal;
 	const objectId = `creator:${identity.toString(16).padStart(32, "0")}`;
 	const name = `d110c-f5b0u-runtime-${identity}`;
 	const base = createV3ChatApplication("alice");
 	const application = Object.freeze({
 		...base,
-		displacementPolicies: Object.freeze({ message: "transform" as const }),
+		displacementPolicies: Object.freeze({
+			message: options.hold ? ("manual-review" as const) : ("transform" as const),
+		}),
 		transformDisplacedOperation: (operation: Readonly<Record<string, unknown>>) =>
 			Object.freeze({ ...operation, text: "x".repeat(expandedBytes) }),
 	});
@@ -275,6 +319,16 @@ async function openRebasePair(count: number, expandedBytes: number, withClose = 
 	const sourceInvite = await invite(false);
 	const targetInvite = await invite(true);
 	const finality = withClose ? await createRecoverableFinalitySigner({ seed: authorSeed }) : undefined;
+	const network = (target: boolean) => {
+		const real = fakeNetwork(`${name}-${target ? "target" : "source"}`);
+		return {
+			...real,
+			publishMessage: (...args: Parameters<typeof real.publishMessage>) => {
+				observation.publications += 1;
+				return real.publishMessage(...args);
+			},
+		};
+	};
 	const input = (target: boolean): CreateV3RoomSessionInput => ({
 		application,
 		author,
@@ -284,7 +338,7 @@ async function openRebasePair(count: number, expandedBytes: number, withClose = 
 		issuanceDatabaseName: name,
 		objectId,
 		openTransport: () => ({
-			networkNode: fakeNetwork(`${name}-${target ? "target" : "source"}`),
+			networkNode: network(target),
 			close: () => undefined,
 			openEphemeral: () => {
 				throw new Error("not used");
@@ -293,7 +347,12 @@ async function openRebasePair(count: number, expandedBytes: number, withClose = 
 			setIngressHandler: () => undefined,
 			setRetainedPublisher: () => undefined,
 		}),
-		onAcceptedVertex: () => undefined,
+		onAcceptedVertex: () => {
+			observation.accepted += 1;
+		},
+		onMigrationTarget: () => {
+			observation.migrations += 1;
+		},
 		onProjection: () => undefined,
 		publicKeyBytes: publicKey,
 		roomHeadAuthority: roomHeadAuthority(migrationRecovery),
@@ -308,14 +367,6 @@ async function openRebasePair(count: number, expandedBytes: number, withClose = 
 			source.issue({ action: "message", clientOperationId: `message-${index}`, text: "original" })
 		)
 	);
-	await source.close();
-	sessions.splice(sessions.indexOf(source), 1);
-	observation.commits = [];
-	observation.activate = [];
-	observation.events = [];
-	observation.bound = [];
-	const target = await createV3RoomSession(input(true));
-	sessions.push(target);
 	const rehearsalNonce = new Uint8Array(32).fill(19);
 	const migrationIdentity = hashDomain(
 		"ts-drp/v3-room-migration-target-object/v1",
@@ -325,7 +376,43 @@ async function openRebasePair(count: number, expandedBytes: number, withClose = 
 		true,
 		`creator:${Buffer.from(migrationIdentity.subarray(0, 16)).toString("hex")}`
 	);
-	return { name, objectId, target, rehearsal: { rehearsalNonce, targetCreatorInvite } };
+	const rehearsal = { rehearsalNonce, targetCreatorInvite };
+	if (options.singleGeneration)
+		return { name, objectId, target: source, rehearsal, input: input(false), activation: undefined };
+	await source.close();
+	sessions.splice(sessions.indexOf(source), 1);
+	let activation;
+	if (options.prepareActivation) {
+		// Genuine rehearsal with the exact held target's genesis authority and
+		// empty canonical projection, before any hold exists. No plan is injected.
+		const { rebaseSourceInvite: _source, ...donorInput } = input(true);
+		const donor = await createV3RoomSession({
+			...donorInput,
+			databaseName: `${name}-rehearsal-source`,
+			issuanceDatabaseName: `${name}-rehearsal-issuance`,
+		});
+		sessions.push(donor);
+		const receipt = await donor.rehearseMigration(rehearsal);
+		activation = {
+			targetCreatorInvite,
+			exactCanonicalRecordBytes: receipt.exactCanonicalRecordBytes,
+			recordVertexDigest: receipt.recordVertexDigest,
+		};
+		await donor.close();
+		sessions.splice(sessions.indexOf(donor), 1);
+	}
+	observation.commits = [];
+	observation.activate = [];
+	observation.events = [];
+	observation.bound = [];
+	observation.planWrites = [];
+	observation.accepted = 0;
+	observation.publications = 0;
+	observation.issueTransactions = 0;
+	const targetInput = input(true);
+	const target = await createV3RoomSession(targetInput);
+	sessions.push(target);
+	return { name, objectId, target, rehearsal, input: targetInput, activation };
 }
 
 beforeEach(() => {
@@ -345,6 +432,203 @@ beforeEach(() => {
 	observation.onFault = undefined;
 	observation.closeFault = false;
 	observation.onAdmissionError = undefined;
+	observation.onPlan = undefined;
+	observation.planWrites = [];
+	observation.captureClose = false;
+	observation.closeCalls = 0;
+	observation.accepted = 0;
+	observation.publications = 0;
+	observation.migrations = 0;
+	observation.issueTransactions = 0;
+});
+
+const manualReviewMessage = "v3 room settlement plan requires manual review";
+
+function observeHold(writeOnly: boolean) {
+	return new Promise<SettlementPlan>((resolve) => {
+		observation.onPlan = (plan, write) => {
+			if ((!writeOnly || write) && plan.entries.some((entry) => entry.disposition === "manual-review")) resolve(plan);
+		};
+	});
+}
+
+async function openHeld(options: { withClose?: boolean; prepareActivation?: boolean } = {}) {
+	const durable = observeHold(true);
+	const fixture = await openRebasePair(1, 100, options.withClose, true, {
+		hold: true,
+		prepareActivation: options.prepareActivation,
+	});
+	const plan = await durable;
+	expect(plan).toMatchObject({
+		scope: { author, objectId: fixture.objectId },
+		fenceSequence: null,
+		entries: [{ disposition: "manual-review", replacementSequence: null }],
+	});
+	expect(plan.entries).toHaveLength(1);
+	const store = required(observation.stores.get(fixture.name));
+	const row = required(await store.readIssued(plan.scope, required(plan.entries[0]).sourceSequence));
+	expect(required(plan.entries[0]).sourceDigest).toEqual(row.envelope.digest);
+	await microtaskTurns();
+	return {
+		...fixture,
+		plan,
+		row,
+		lineage: await store.readLineage(plan.scope),
+		outbox: await store.readOutboxPage({ scope: plan.scope, limit: 128 }),
+	};
+}
+
+async function holdCustody(fixture: Awaited<ReturnType<typeof openHeld>>) {
+	const store = required(observation.stores.get(fixture.name));
+	const plan = required(await store.readSettlementPlan(fixture.plan.scope));
+	expect(encodeCanonical(plan)).toEqual(encodeCanonical(fixture.plan));
+	expect(await store.readIssued(plan.scope, fixture.row.authorSequence)).toEqual(fixture.row);
+	expect(await store.readLineage(plan.scope)).toEqual(fixture.lineage);
+	expect(await store.readOutboxPage({ scope: plan.scope, limit: 128 })).toEqual(fixture.outbox);
+	expect(observation.issueTransactions).toBe(0);
+	expect(observation.commits).toEqual([]);
+	expect(observation.accepted).toBe(0);
+	expect(observation.publications).toBe(0);
+	expect(observation.migrations).toBe(0);
+	expect(observation.planWrites).toEqual([fixture.plan]);
+	expect(() => fixture.target.projection()).not.toThrow();
+	expect(() => fixture.target.status()).not.toThrow();
+}
+
+function expectPromptRefusal(result: ReturnType<typeof observeResult>, token: string) {
+	expect(result.result().settled, token).toBe(true);
+	expect(result.result().error).toBeInstanceOf(TypeError);
+	expect((result.result().error as Error).message).toBe(manualReviewMessage);
+}
+
+describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
+	it("refuses held issue promptly after the real durable plan write without an issuance effect", async () => {
+		const fixture = await openHeld();
+		const result = observeResult(
+			fixture.target.issue({ action: "message", clientOperationId: "held", text: "forbidden" })
+		);
+		await microtaskTurns();
+		await holdCustody(fixture);
+		expectPromptRefusal(result, "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG");
+	});
+	it("creator-held seal reaches the existing close owner and exact successor-codec terminus", async () => {
+		observation.captureClose = true;
+		const fixture = await openHeld({ withClose: true });
+		expect(observation.bound).toHaveLength(1);
+		const sealing = fixture.target.sealEpoch();
+		const result = observeResult(sealing);
+		await microtaskTurns();
+		await holdCustody(fixture);
+		expect(observation.closeCalls, "D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG").toBe(1);
+		await sealing.catch(() => undefined);
+		expect(result.result().error).toBeInstanceOf(TypeError);
+		expect((result.result().error as Error).message).toBe("creator close actor failed: CERTIFIED_VALUE_MISMATCH");
+		await holdCustody(fixture);
+	});
+	it("no-hold creator close retains the exact existing thrown codec terminus", async () => {
+		observation.captureClose = true;
+		const { target } = await openRebasePair(1, 100, true);
+		await target.issue({ action: "message", clientOperationId: "ordinary", text: "continued" });
+		const error = await target.sealEpoch().then(
+			() => undefined,
+			(reason: unknown) => reason
+		);
+		expect(observation.closeCalls).toBe(1);
+		expect(error).toBeInstanceOf(TypeError);
+		expect((error as Error).message).toBe("creator close actor failed: CERTIFIED_VALUE_MISMATCH");
+	});
+	it("same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link", async () => {
+		const fixture = await openHeld();
+		await holdCustody(fixture);
+		await fixture.target.close();
+		sessions.splice(sessions.indexOf(fixture.target), 1);
+		const reread = observeHold(false);
+		const reopened = await createV3RoomSession(fixture.input);
+		sessions.push(reopened);
+		expect(encodeCanonical(await reread)).toEqual(encodeCanonical(fixture.plan));
+		await microtaskTurns();
+		await holdCustody({ ...fixture, target: reopened });
+		expect(observation.closeCalls).toBe(0);
+		await reopened.close();
+	});
+	it.each(["rehearsal", "activation"] as const)(
+		"held source refuses %s without target import or terminal effect",
+		async (operation) => {
+			const fixture = await openHeld({ prepareActivation: operation === "activation" });
+			const storesBefore = [...observation.stores.keys()];
+			const result = observeResult(
+				operation === "rehearsal"
+					? fixture.target.rehearseMigration(fixture.rehearsal)
+					: fixture.target.activateMigration(required(fixture.activation))
+			);
+			await microtaskTurns();
+			await holdCustody(fixture);
+			expect([...observation.stores.keys()]).toEqual(storesBefore);
+			expectPromptRefusal(result, `D110C_F5B0W_MANUAL_REVIEW_${operation.toUpperCase()}_HANG`);
+		}
+	);
+	it("changed retained held policy remains terminal source-diff refusal rather than redisposition", async () => {
+		const fixture = await openHeld();
+		await fixture.target.close();
+		sessions.splice(sessions.indexOf(fixture.target), 1);
+		const reopened = await createV3RoomSession({
+			...fixture.input,
+			application: {
+				...fixture.input.application,
+				displacementPolicies: { message: "rebase" },
+			},
+		});
+		sessions.push(reopened);
+		await expect(
+			reopened.issue({ action: "message", clientOperationId: "changed", text: "forbidden" })
+		).rejects.toThrow(new TypeError("v3 room settlement plan source differs"));
+		expect(() => reopened.projection()).toThrow("v3 room settlement plan source differs");
+		const store = required(observation.stores.get(fixture.name));
+		expect(encodeCanonical(await store.readSettlementPlan(fixture.plan.scope))).toEqual(encodeCanonical(fixture.plan));
+		expect(observation.commits).toEqual([]);
+		expect(observation.planWrites).toEqual([fixture.plan]);
+	});
+	it("single-generation internal redirect pins target hold refusal or the deferred parent frontier terminus", async () => {
+		const admissionErrors: unknown[] = [];
+		observation.onAdmissionError = (error) => admissionErrors.push(error);
+		const fixture = await openRebasePair(1, 100, false, true, { singleGeneration: true });
+		const receipt = await fixture.target.rehearseMigration(fixture.rehearsal);
+		const priorWrites = observation.planWrites.length;
+		const durable = observeHold(true);
+		const activation = fixture.target.activateMigration({
+			targetCreatorInvite: fixture.rehearsal.targetCreatorInvite,
+			// Only the three existing public fields cross the activation boundary.
+			exactCanonicalRecordBytes: receipt.exactCanonicalRecordBytes,
+			recordVertexDigest: receipt.recordVertexDigest,
+		} as Parameters<V3RoomSession["activateMigration"]>[0]);
+		const outcome = activation.then(
+			() => ({ error: undefined }),
+			(error: unknown) => ({ error })
+		);
+		const first = await Promise.race([durable.then((plan) => ({ plan })), outcome]);
+		if ("plan" in first) {
+			await microtaskTurns();
+			const result = observeResult(activation);
+			await microtaskTurns();
+			expectPromptRefusal(result, "D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG");
+			expect(admissionErrors).toContainEqual(new TypeError(manualReviewMessage));
+		} else {
+			// Sole plan-authorized deferral: do not turn pre-hold record rejection
+			// into manual-review success or broaden product source classification.
+			expect(first.error).toEqual(new TypeError("v3 room migration activation failed: terminal-rejected"));
+			expect(admissionErrors).toEqual([new TypeError("v3 room rebase outbox failed: record-rejected")]);
+			expect(
+				observation.planWrites
+					.slice(priorWrites)
+					.some((plan) => plan.entries.some((entry) => entry.disposition === "manual-review"))
+			).toBe(false);
+			console.info("D110C_F5B0W_P2_REDIRECT_DEFERRED_PARENT_FRONTIER", { singleGeneration: true, durableHold: false });
+		}
+		expect(observation.migrations).toBe(0);
+		await expect(
+			fixture.target.issue({ action: "message", clientOperationId: "after-terminal", text: "forbidden" })
+		).rejects.toThrow();
+	});
 });
 afterEach(async () => {
 	try {
