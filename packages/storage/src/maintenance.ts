@@ -10,6 +10,7 @@ import {
 	isStorageObjectId,
 } from "./internal/validation.js";
 import type {
+	AheDurableStore,
 	BlobDigest,
 	ExpectedHead,
 	GenerationId,
@@ -69,6 +70,90 @@ export type AheReclamationReceipt = Readonly<{
 
 export interface AheReclamationMaintenance {
 	reclaimClosedEpoch(input: unknown): Promise<AheReclamationReceipt>;
+}
+
+type AheMaintenanceRegistry = Readonly<{
+	bind(store: AheDurableStore, maintenance: AheReclamationMaintenance): boolean;
+	resolve(store: AheDurableStore): AheReclamationMaintenance | undefined;
+}>;
+
+/** Any registry-record shape change requires a new symbol version. */
+const aheMaintenanceRegistryKey = Symbol.for("@ts-drp/storage/ahe-reclamation-maintenance-v1");
+
+function isAheMaintenanceRegistry(value: unknown): value is AheMaintenanceRegistry {
+	try {
+		if (
+			typeof value !== "object" ||
+			value === null ||
+			Object.getPrototypeOf(value) !== Object.prototype ||
+			!Object.isFrozen(value)
+		) {
+			return false;
+		}
+		const keys = Reflect.ownKeys(value);
+		if (keys.length !== 2 || !keys.includes("bind") || !keys.includes("resolve")) return false;
+		return keys.every((key) => {
+			const descriptor = Object.getOwnPropertyDescriptor(value, key);
+			return descriptor !== undefined && "value" in descriptor && typeof descriptor.value === "function";
+		});
+	} catch {
+		return false;
+	}
+}
+
+function aheMaintenanceRegistry(): AheMaintenanceRegistry {
+	const descriptor = Object.getOwnPropertyDescriptor(globalThis, aheMaintenanceRegistryKey);
+	if (descriptor !== undefined) {
+		if (
+			"value" in descriptor &&
+			descriptor.enumerable === false &&
+			descriptor.configurable === false &&
+			descriptor.writable === false &&
+			isAheMaintenanceRegistry(descriptor.value)
+		) {
+			return descriptor.value;
+		}
+		throw new TypeError("AHE maintenance registry is incompatible");
+	}
+	const bindings = new WeakMap<AheDurableStore, AheReclamationMaintenance>();
+	const registry: AheMaintenanceRegistry = Object.freeze({
+		bind(store: AheDurableStore, maintenance: AheReclamationMaintenance): boolean {
+			if (bindings.has(store)) return false;
+			bindings.set(store, maintenance);
+			return true;
+		},
+		resolve(store: AheDurableStore): AheReclamationMaintenance | undefined {
+			return bindings.get(store);
+		},
+	});
+	Object.defineProperty(globalThis, aheMaintenanceRegistryKey, {
+		configurable: false,
+		enumerable: false,
+		value: registry,
+		writable: false,
+	});
+	return registry;
+}
+
+const sharedAheMaintenanceRegistry = aheMaintenanceRegistry();
+
+/**
+ * Registers trusted backend plumbing without authenticating arbitrary local callers.
+ * @param store - Exact facade identity owned by the registering backend.
+ * @param maintenance - The backend's existing maintenance capability.
+ * @returns True only for the first binding; later bindings never replace it.
+ */
+export function bindAheReclamationMaintenance(store: AheDurableStore, maintenance: AheReclamationMaintenance): boolean {
+	return sharedAheMaintenanceRegistry.bind(store, maintenance);
+}
+
+/**
+ * Resolves the existing maintenance capability by exact facade identity.
+ * @param store - Candidate facade identity in this JavaScript global.
+ * @returns The first registered capability, if any, without invoking it.
+ */
+export function aheReclamationMaintenanceForStore(store: AheDurableStore): AheReclamationMaintenance | undefined {
+	return sharedAheMaintenanceRegistry.resolve(store);
 }
 
 export type AheReclamationPromotion = Readonly<{

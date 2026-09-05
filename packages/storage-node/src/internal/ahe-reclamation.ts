@@ -13,6 +13,7 @@ import {
 	type AheReclamationPromotion,
 	type AheReclamationReceipt,
 	type AheReclamationSnapshot,
+	bindAheReclamationMaintenance,
 	captureAheReclamationInput,
 	classifyAheReclamation,
 	createAheReclamationError,
@@ -223,7 +224,11 @@ export function registerNodeAheReclamationMaintenance(
 	connection: DatabaseSync,
 	lifecycle: Lifecycle
 ): void {
-	maintenanceByStore.set(store, new NodeAheReclamationMaintenance(store, connection, lifecycle));
+	const maintenance = new NodeAheReclamationMaintenance(store, connection, lifecycle);
+	if (!bindAheReclamationMaintenance(store, maintenance)) {
+		throw new TypeError("AHE maintenance facade is already registered");
+	}
+	maintenanceByStore.set(store, maintenance);
 }
 
 /**
