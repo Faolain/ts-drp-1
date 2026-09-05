@@ -99893,6 +99893,18 @@ Bounded source/architecture audit and selected construction:
   checkpoint pair. Parent f5b retains production of that pair and the genuine
   successful repeated close/adopt proof. A test double that manufactures the
   pair would cross the same authority boundary as the rejected case-7 fixture.
+  The recovery/migration race has a second instance of that same boundary:
+  after rehearsal, redirect activation scans an older published source row
+  below the immediate displaced-source anchor. Before parent f5b supplies the
+  authenticated settlement frontier, that row cannot be authenticated by the
+  current target or immediate source authority and the exact fail-closed result
+  is `terminal-rejected` with underlying
+  `v3 room rebase outbox failed: record-rejected`. f5b0u must prove the
+  rehearsal and activation request both settle without deadlock and that this
+  refusal leaks no owner; parent f5b must make the same activation succeed once
+  the checkpoint-derived frontier is genuinely threaded. Skipping the row,
+  trusting its self-signed anchor or widening displaced-source classification
+  is forbidden.
 - `lastLogicalTime` comes from the exact signed vertex input.
   `packages/issuance-store/src/contract.ts` owns a closed local parser for the
   real Node application-batch carrier structure needed to derive that floor:
@@ -99981,10 +99993,13 @@ not future missing imports or exports:
    rebind failure is exactly `D110C_B_CLOSE_REBIND_FAILED` and never falls back
    to the retired plane. Include migration rehearsal and activation in this
    race matrix and prove neither can wait on a `rebasePromise` whose recovery
-   is queued behind itself. Successful settlement-profile close/adoption is
-   explicitly parent f5b acceptance after its authenticated checkpoint-pair
-   producer exists; f5b0u must not manufacture that pair. Retain the legacy
-   one-shot and creator-trusted-v1 byte and behavior controls.
+   is queued behind itself. Rehearsal must fulfill. The pre-frontier activation
+   request must settle promptly at the exact fail-closed `terminal-rejected` /
+   `record-rejected` boundary above, with no second owner; successful redirect
+   activation moves to parent f5b beside successful settlement-profile
+   close/adoption after its authenticated checkpoint-pair producer exists.
+   f5b0u must not manufacture that pair or widen row classification. Retain
+   the legacy one-shot and creator-trusted-v1 byte and behavior controls.
 
 GREEN is limited to the previously authorized seven f5b0t production paths,
 the private room recovery/refactor required above, bounded fixtures, and the
