@@ -1,0 +1,26 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "list",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+    "--no-file-parallelism",
+    "--maxWorkers=1",
+    "--minWorkers=1",
+    "--coverage.enabled=false",
+    "--json=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0w-red-final-import-corrected-56a264ce/list.json"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T13:53:13.564Z",
+  "finished": "2026-09-05T13:53:18.047Z",
+  "status": 0,
+  "signal": null
+}

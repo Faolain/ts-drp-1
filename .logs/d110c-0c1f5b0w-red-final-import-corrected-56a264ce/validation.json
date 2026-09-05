@@ -1,0 +1,91 @@
+{
+  "disposition": "CAUSAL_EXPECTED_RED_MATRIX_MATCH",
+  "acceptedF5b0wRed": true,
+  "testCommit": "8154c9cb292862b450bf88610dc58d5140f1072b",
+  "focusedRunCount": 1,
+  "counts": {
+    "selected": 219,
+    "total": 219,
+    "passed": 156,
+    "failed": 63,
+    "skipped": 0,
+    "todo": 0
+  },
+  "files": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "total": 24,
+      "passed": 23,
+      "failed": 1,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "total": 45,
+      "passed": 45,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "total": 22,
+      "passed": 22,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "total": 17,
+      "passed": 12,
+      "failed": 5,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "total": 12,
+      "passed": 12,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+      "total": 93,
+      "passed": 36,
+      "failed": 57,
+      "message": ""
+    }
+  ],
+  "anomalies": false,
+  "redirectCleanupObservedPending": true,
+  "orderlyRedShutdownClaimed": false,
+  "expectedMatrixHashUnchanged": true,
+  "typecheck": {
+    "baseline": 3,
+    "current": 3,
+    "added": []
+  },
+  "custody": {
+    "stashCount": 27,
+    "stashesUnchanged": true,
+    "untrackedUnchanged": true,
+    "trackedSourceHashesUnchanged": true,
+    "sourceHashesUnchanged": true,
+    "cleanTrackedRun": true,
+    "signedPushedTestHead": true
+  },
+  "contradictions": []
+}
