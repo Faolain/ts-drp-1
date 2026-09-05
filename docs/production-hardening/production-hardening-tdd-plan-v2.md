@@ -18462,10 +18462,10 @@ Authorized now (tests-only RED; production GREEN remains gated):
   rejected and preserved at `91386f86`/`a83af8a4`: all intended RED tokens
   became causal without a hook timeout, but two retained-control observations
   still conflated restart callback replay and a terminally closed store with
-  product effects. One final bounded Astra-high tests-only correction is
-  authorized; only after its exact matrix is accepted may a separate
-  Astra-high GREEN begin. This prerequisite adds no public method, field or
-  authority: it
+  product effects. Final tests-only correction `8154c9cb` and evidence
+  `ce55db71` establish the exact pre-frozen causal 156/63 RED matrix. A
+  separate Astra-high GREEN is authorized. This prerequisite adds no public
+  method, field or authority: it
   makes a held public `issue()` refuse promptly, prevents the hold from
   blocking the existing creator-close owner, preserves same-epoch durable
   reopen and freezes retained store entries.
@@ -100361,9 +100361,9 @@ workload change is authorized here.
 
 ###### D.110c-0c1f5b0w settlement manual-review hold semantics prerequisite
 
-**Status: plan gate closed; first tests-only RED rejected and preserved; one
-bounded Astra-high corrective tests-only RED is authorized next. Parent f5b
-production GREEN remains blocked on this slice.** Owner:
+**Status: exact causal tests-only RED accepted; one separate Astra-high GREEN
+is authorized next. Parent f5b production GREEN remains blocked until this
+slice is GREEN and finally reviewed.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the settlement
 plan merge, `drainSettlementOutbox()`, startup `rebasePromise`, public
 `issue()` and creator `sealEpoch()` waits; and
@@ -100632,6 +100632,26 @@ redirect oracle and every causal token remain unchanged. Freeze 219 selected,
 156 passed and 63 failures (57 store, one f5b0c issue, and runtime issue,
 creator close, rehearsal, activation and redirect) before the one execution.
 Any different count, token, timeout, loader or top-level error stops again.
+
+Final tests-only correction `8154c9cb` is signed/pushed, and signed/pushed
+evidence commit `ce55db71` accepts the causal RED under
+`.logs/d110c-0c1f5b0w-red-final-import-corrected-56a264ce/`. Its 32-entry
+self-excluding manifest SHA-256 is
+`d17fd52d41fa67bf58fe43768e51d69da60ebaa3782931aeaece2a2614dc4d34`.
+The sole execution exactly matches the pre-frozen matrix hash
+`76643d0012301bc1d99e469d9a90a03032f89f17501c5725f03797ffd0bcd348`:
+219 selected across eight files, 156 passed, 63 failed, zero skipped, no
+contradiction or anomaly. The failures are exactly 57 retained-store mutation
+cases, the superseded f5b0c issue hang, and the runtime issue, creator-close,
+rehearsal, activation and reachable redirect hangs. Same-epoch durable reopen,
+changed-policy terminal custody, the no-hold creator owner and all nine prior
+f5b0u runtime cases pass. The redirect observes public close pending in RED
+without a hook timeout or clean-shutdown claim. Lint, 8-GiB format, collection,
+source/diff and source-mapped typecheck-delta gates passed; an earlier
+pre-commit unresolved-import lint diagnostic consumed zero focused runs and is
+preserved separately. No production, API, wire, schema, dependency, timeout or
+post-run test change occurred. The accepted causal RED authorizes the separate
+Astra-high GREEN described above.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
