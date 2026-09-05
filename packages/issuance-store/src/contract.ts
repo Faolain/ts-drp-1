@@ -539,7 +539,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 }
 
 /**
- * Refuses a CAS rewrite that would alter or remove durable replacement progress.
+ * Freezes retained settlement identities and progress; issue effects own links and chunks.
  * @param current - Current durable plan, if present.
  * @param next - Proposed next plan revision.
  */
@@ -547,12 +547,21 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 	if (current === null) return;
 	for (const prior of current.entries) {
 		const candidate = next.entries.find((entry) => entry.sourceSequence === prior.sourceSequence);
-		if (prior.replacementProgress !== undefined && prior.replacementSequence === null) {
+		if (candidate === undefined) {
+			if (prior.replacementProgress !== undefined && prior.replacementSequence === null) {
+				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement progress changed");
+			}
+			continue;
+		}
+		if (
+			candidate.disposition !== prior.disposition ||
+			candidate.replacementSequence !== prior.replacementSequence ||
+			!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest)
+		) {
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement retained source changed");
+		}
+		if (prior.replacementProgress !== undefined) {
 			if (
-				candidate === undefined ||
-				candidate.disposition !== prior.disposition ||
-				candidate.replacementSequence !== prior.replacementSequence ||
-				!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest) ||
 				candidate.replacementProgress === undefined ||
 				candidate.replacementProgress.intentCount !== prior.replacementProgress.intentCount ||
 				!durableIssuanceBytesEqual(
@@ -572,20 +581,8 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			) {
 				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement progress changed");
 			}
-		} else if (
-			prior.replacementProgress === undefined &&
-			prior.replacementSequence !== null &&
-			candidate?.replacementProgress !== undefined
-		) {
-			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "linked settlement replacement cannot be upgraded");
-		} else if (prior.replacementProgress === undefined && candidate?.replacementProgress !== undefined) {
-			if (
-				candidate.replacementProgress.chunks.length !== 0 ||
-				prior.replacementSequence !== null ||
-				candidate.replacementSequence !== null ||
-				candidate.disposition !== prior.disposition ||
-				!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest)
-			) {
+		} else if (candidate.replacementProgress !== undefined) {
+			if (prior.replacementSequence !== null || candidate.replacementProgress.chunks.length !== 0) {
 				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement upgrade changed");
 			}
 		}

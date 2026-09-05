@@ -72,6 +72,7 @@ const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
 ] as const);
 const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
 const UNSUPPORTED_LINEAGE_POLICY = "D110C_LINEAGE_POLICY_UNSUPPORTED";
+const SETTLEMENT_MANUAL_REVIEW_MESSAGE = "v3 room settlement plan requires manual review";
 // Object framing plus the nine encoded keys and the fixed kind, digest and version values.
 // The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
 const CREATOR_INVITE_FIXED_CANONICAL_BYTE_LENGTH = 346;
@@ -2001,10 +2002,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let creatorSuccessorAdoptionTask: Promise<void> | undefined;
 	let redirectedSession: V3RoomSession<Projection> | undefined;
 	let redirectPromise: Promise<V3RoomSession<Projection>> | undefined;
-	let releaseSettlementHold: (() => void) | undefined;
-	const settlementHold = new Promise<void>((resolve) => {
-		releaseSettlementHold = resolve;
-	});
+	let settlementHeld = false;
+	const assertSettlementUnheld = (): void => {
+		if (settlementHeld) throw new TypeError(SETTLEMENT_MANUAL_REVIEW_MESSAGE);
+	};
 	let retainedBootstrapReady = !retainedBootstrapHeld;
 	let resolveRetainedBootstrap: (() => void) | undefined;
 	let rejectRetainedBootstrap: ((reason: unknown) => void) | undefined;
@@ -3158,7 +3159,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const drainSettlementOutbox = async (sources: readonly DisplacedSource[]): Promise<void> => {
 		let plan = await writeMergedSettlementPlan(sources);
 		if (plan.entries.some((entry) => entry.disposition === "manual-review")) {
-			await settlementHold;
+			settlementHeld = true;
 			return;
 		}
 		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
@@ -3573,6 +3574,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		rehearsalInput: V3RoomMigrationRehearsalInput
 	): Promise<V3RoomMigrationRehearsalReceipt> => {
 		if (terminalFailure !== undefined) throw terminalFailure;
+		assertSettlementUnheld();
 		if (closed) throw new TypeError("v3 room session is closed");
 		if (authenticatedProjectionBase !== undefined) {
 			throw new TypeError("D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE");
@@ -3908,6 +3910,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		activationInput: V3RoomMigrationActivationInput
 	): Promise<V3RoomMigrationActivationReceipt> => {
 		if (terminalFailure !== undefined) throw terminalFailure;
+		assertSettlementUnheld();
 		if (closed) throw new TypeError("v3 room session is closed");
 		if (migrationActivationAuthority === undefined || input.application.migration === undefined) {
 			throw new TypeError("v3 room migration activation is unavailable");
@@ -4116,6 +4119,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			throw error;
 		}
 		if (!published.ok) {
+			// The admission callback can record a target hold while publication awaits it.
+			const admissionFailure = terminalFailure as unknown;
+			if (admissionFailure instanceof TypeError && admissionFailure.message === SETTLEMENT_MANUAL_REVIEW_MESSAGE) {
+				throw admissionFailure;
+			}
 			const failure = new TypeError(`v3 room migration activation failed: ${published.kind}`);
 			if (published.terminalIntent === "absent") {
 				transition.capability.resume();
@@ -4155,6 +4163,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			await waitForRetainedBootstrap();
 			await rebasePromise;
 			if (terminalFailure !== undefined) throw terminalFailure;
+			assertSettlementUnheld();
 		} catch (error) {
 			await shutdown().catch(() => undefined);
 			throw error;
@@ -4316,7 +4325,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (sessionCloseTask !== undefined) return sessionCloseTask;
 		closed = true;
 		cancelRedirectCreation();
-		releaseSettlementHold?.();
 		const task = (async (): Promise<void> => {
 			let primaryFailure: unknown;
 			let primaryFailed = false;
@@ -4403,6 +4411,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (follower !== undefined) migrationFollowers.add(follower);
 			try {
 				await rebasePromise;
+				assertSettlementUnheld();
 				await (joinsMigration ? priorMigrationBarrier : priorMigrationCompletion);
 				if (terminalFailure !== undefined) throw terminalFailure;
 				if (closed) throw new TypeError("v3 room session is closed");
