@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (resume parent f5b GREEN after the accepted checkpoint-link RED):
+Current work (preserve parent focused GREEN and correct its retained counter harness):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18548,20 +18548,24 @@ Current work (resume parent f5b GREEN after the accepted checkpoint-link RED):
   digest expectation. The separate Astra-high tests-only correction is accepted
   at signed/pushed tests `f83764c5` / evidence `6640c4ab`: one isolated source-
   built run preserves the exact 23-fail / 5-pass / 17-filtered causal matrix
-  with no anomalies. Resume the separate parent GREEN owner on the unchanged
-  eight-owner patch; do not rerun this accepted RED. The other focused
-  continuations pass, but the complete 64-writer three-transition workload,
-  retained/static/isolated closure and later long campaign remain unproved.
+  with no anomalies. The unchanged eight-owner patch now passes all 28 focused
+  assertions, including the complete 64-writer three-transition workload, at
+  `.logs/d110c-0c1f5b-green-89f147cc/`. Retained execution stops with 167 passes
+  and one failure: the f5b0d source-extraction harness omits the counter's real
+  resolver binding. Correct that harness prospectively through the separate
+  test owner below; do not change production or the legacy window assertion.
+  Do not rerun the accepted parent RED. Retained/static/isolated closure and
+  the later long campaign remain unproved.
   Product state, batch, epoch and snapshot ceilings remain unchanged.
 
 Blocked, and on what:
 
-- **Parent f5b closure** still requires its genuine authenticated cleanup
-  caller and complete 64-writer/three-transition continuation, restart and cold
-  reopen. The discovery prerequisite f5b0z and independent observer RED are
+- **Parent f5b closure** still requires complete retained/static/isolated gates
+  and final review of the now-focused-passing cleanup and 64-writer composition.
+  The discovery prerequisite f5b0z and independent observer RED are
   closed; neither needs another execution or review. The narrow scalar
-  case-25 and checkpoint-link oracle corrections are also accepted. Resume
-  the existing parent implementation
+  case-25 and checkpoint-link oracle corrections are also accepted. First
+  correct the retained counter harness below, then resume the existing gates
   without a Node-to-browser dependency or invented authority.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
@@ -100796,10 +100800,13 @@ the exact inherited causal matrix. Resumed GREEN now preserves two further
 `.logs/d110c-0c1f5b-green-729be70e/`. The first missing hot fence is corrected;
 the second exposes a stale checkpoint-link digest oracle. Its separate tests-only
 correction is accepted at signed/pushed tests `f83764c5` / evidence `6640c4ab`
-under the unchanged isolated causal matrix. Resume the separate Astra-high GREEN
-owner without further production edits before the next focused run. The partial
-patch is preserved, not accepted; focused, static, retained, isolated and final review gates remain
-open.** The
+under the unchanged isolated causal matrix. The separate Astra-high GREEN owner
+now records 28 focused passes and no failures on the unchanged patch, including
+the complete three-transition 64-writer case. Retained execution stops at the
+f5b0d counter harness's missing resolver binding (167 passes / one failure).
+The prospective test-only correction below precedes further execution. The
+partial production patch is preserved, not committed or accepted; remaining
+static, retained, isolated and final review gates remain open.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
@@ -101482,6 +101489,89 @@ Any failure requires complete result capture and attribution before another
 change or run. Full focused, retained, isolated and final review acceptance
 remain open; no additional review of this bookkeeping or long workload is
 authorized by this acceptance.
+
+Prospective retained counter-harness correction (2026-09-05): the unchanged
+eight-owner patch now passes the full focused selection at
+`.logs/d110c-0c1f5b-green-89f147cc/`: 45 assertions in two files, 28 passes,
+zero failures and 17 intentionally filtered controls. The wide test completes
+all three genuine transitions with all 64 authors contributing in epochs 0–3,
+rotating offline cohorts, real plan/fence/replacement work, exact state and
+lineage, restart and final cold reopen. Root reparsed the complete reporter;
+all failure-message arrays and suite messages are empty. This is bounded
+functional GREEN, not parent closure or the later long-horizon claim. Source
+build, eight-owner lint/format and source-diff checks pass; the same four
+documented cleanup JSDoc warnings remain nonblocking.
+
+The complete sealed 137-entry self-excluding manifest has SHA-256
+`9ee19175cda3b5a1db33319c16478b3c01f3ea5c30db08a1d0a99566c3c4ef4c`.
+Root independently validated every entry and the complete file inventory.
+`assessment.md` owns exact commands, result matrices, source attribution and
+the distinction between prepared and executed gates. All eight owner hashes,
+the unchanged patch digest, 27 stashes and 86,522 protected paths are preserved.
+The unfiltered staged evidence whitespace check reports 928 warnings: 924 in
+the two exact raw patch captures and one trailing blank line each in the sealed
+`focused.mjs`, `run.mjs`, unexecuted `typecheck.mjs` and raw `source-lint/stdout`.
+Those immutable bytes are preserved. The check excluding only these six exact
+evidence files passes; all production-owner and edited-plan whitespace checks
+pass independently. This is not an unfiltered artifact whitespace pass.
+
+The retained roster reuses the required closed gates: 72 intended files and
+876 assertions, with the unfiltered parent controls retained and no consuming
+D110a or campaign launcher. The browser inventory selects only its 16 closed
+cases; it has not executed. Retained execution stops after 168 assertions:
+167 pass and one fails. Gate 07's legacy counter control throws
+`ReferenceError: resolveVerifiedCreatorHistoricalIssuance is not defined` in
+the test's `executableHistoricalIssuanceCounter` function. All its other 18
+backend cases pass. The eight production files remain byte-identical to the
+preserved patch; no further runtime gate or production edit follows this stop.
+
+Root and GREEN owner independently attribute this to the retained test's
+source-extraction boundary. It transpiles only `countHistoricalIssuanceRow`
+and binds three intrinsics, omitting the real resolver now imported by the
+ordinary production module. The existing resolver reads private capability
+custody; the counter still applies one `maxEpochVertices` window when
+`admissionEpoch` is absent, and the previously accepted three-window settlement
+bound only when present. No legacy-window regression is demonstrated by this
+ReferenceError. Do not move or rewrite production solely to accommodate the
+isolated extraction, fake authenticated custody, or change either bound.
+
+Owner: the separate Astra-high test owner; deadline: before resuming retained
+gate 07 or any later parent execution. Correct only the extraction helper's
+binding of the existing real resolver, using its existing module export rather
+than a stub returning a chosen identity. Preserve the exact legacy control's
+8,192 accepted rows, duplicate-row accounting and rejection of row 8,193;
+preserve all other 18 cases, parent tests, production bytes and thresholds.
+This repairs the current retained harness prospectively; it neither reopens
+closed f5b0d evidence nor substitutes this arithmetic control for genuine v1
+recovery. Sign/push the tests-only change separately. One independently
+installed/source-built checkout of its signed tree must pass the exact 19-case
+retained file without the pending production patch. Preserve complete evidence
+and a self-excluding manifest. The already-accepted parent causal RED is
+unchanged and must not be rerun. After acceptance, the separate GREEN owner
+runs that same 19-case gate once against the preserved patch and resumes the
+remaining frozen gates only if it passes. Do not rerun the already-passing
+focused workload solely for this unrelated harness binding. Any broader test,
+production or acceptance change requires renewed attribution before editing.
+
+Launcher/parser diagnostics are preserved separately from assertion failures.
+Installed Vitest 3.1.1 falls back from absolute paths to relative substring
+matching. Retained gate 02 therefore ran root 13 plus Node 21 assertions, all
+passing; root verified that exact union is the two already-planned gates 02
+and 26, so both are covered without rerun. The remaining ambiguous commands
+explicitly exclude their exact sibling paths while retaining the original
+configuration exclusions. Installed-selector simulation and one collection-only
+check validate the intended files; an extra six Node differential assertions
+were collected but never executed. A name validator also corrupted the literal
+`m > f` comparator by replacing every `>` separator. Corrected read-only
+parsing compares file-bound raw ancestor/title name multisets, preserving
+legitimate repeated parameterized titles. Root independently reparsed every
+completed reporter and confirmed the exact 167-pass / one-failure set. Neither
+diagnostic mistake is a production failure or grounds to rerun a passing test.
+
+No additional slice, model confirmation or recursive prose review is needed.
+The existing final parent Grok/Sol-high/Fable-xhigh review must inspect this
+preserved functional GREEN, retained stop, narrow harness correction and
+remaining gates before closure. No new API or campaign is authorized here.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
