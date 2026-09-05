@@ -99275,6 +99275,15 @@ through the real missing handoff rather than a private fixture context. If
 this composition needs a wire/schema/public-API/authority/dependency change,
 parent f5b stops and reslices under its high-risk rule.
 
+Parent f5b is also the first layer allowed to claim a successful
+settlement-profile close/adoption after recovery. It must replace the legacy
+admitted-frontier/retirement close carriers with the already-designed
+authenticated settlement checkpoint pair through the genuine creator-close
+and transition-advance path. The f5b0u prerequisite proves only that recovery
+serializes ownership, rebinds close authority and dispatches the next seal to
+the fresh plane; a manufactured checkpoint pair cannot substitute for the
+parent causal RED or GREEN.
+
 Authorization: the f5b0a and f5b0s tests-only REDs may begin from this record
 without a further design review; f5b0b, f5b0c, f5b0d and f5b are each
 authorized by their predecessors' GREEN in the dependency order above. Each
@@ -99860,6 +99869,17 @@ Bounded source/architecture audit and selected construction:
   open-progress exception on hot, restart and cold-reopen paths. This is the
   exact already-assigned f5b0b P2 for authenticated frontier threading, not a
   new API assumption or a weakening of the end-to-end gate.
+- Case 8 has the same checkpoint-production boundary. f5b0u owns lifetime
+  serialization, recovery/public-issue exclusion, fresh activation,
+  creator-close rebind, predecessor stop, dispatch to the fresh plane,
+  migration/rebase deadlock freedom and terminal cleanup failure. It can prove
+  that a later `sealEpoch()` call targets the rebound handle, but it cannot
+  claim a successful settlement-profile close/adoption: current creator close
+  still emits the legacy admitted-frontier/retirement carriers, while
+  settlement-profile transition advance requires an authenticated settlement
+  checkpoint pair. Parent f5b retains production of that pair and the genuine
+  successful repeated close/adopt proof. A test double that manufactures the
+  pair would cross the same authority boundary as the rejected case-7 fixture.
 - `lastLogicalTime` comes from the exact signed vertex input.
   `packages/issuance-store/src/contract.ts` owns a closed local parser for the
   real Node application-batch carrier structure needed to derive that floor:
@@ -99944,12 +99964,14 @@ not future missing imports or exports:
    owner survives, the fence stays first, the plan stays monotonic and cleanup
    failure is terminal. Recovered vertices are committed before resumed issue;
    a previously bound creator-close authority is rebound to the fresh plane,
-   and subsequent `sealEpoch()`/adoption operates on that plane. A controlled
+   and subsequent `sealEpoch()` dispatch targets that plane. A controlled
    rebind failure is exactly `D110C_B_CLOSE_REBIND_FAILED` and never falls back
    to the retired plane. Include migration rehearsal and activation in this
    race matrix and prove neither can wait on a `rebasePromise` whose recovery
-   is queued behind itself. Retain the legacy one-shot and creator-trusted-v1
-   byte and behavior controls.
+   is queued behind itself. Successful settlement-profile close/adoption is
+   explicitly parent f5b acceptance after its authenticated checkpoint-pair
+   producer exists; f5b0u must not manufacture that pair. Retain the legacy
+   one-shot and creator-trusted-v1 byte and behavior controls.
 
 GREEN is limited to the previously authorized seven f5b0t production paths,
 the private room recovery/refactor required above, bounded fixtures, and the
@@ -100022,6 +100044,12 @@ therefore assigned to parent f5b above, where the checkpoint is genuinely
 created and adopted; cases 1-6 and 8 remain authorized here. This dependency
 correction preserves the full end-to-end acceptance and prevents fabricated
 fixture authority.
+The resumed source trace found the corresponding case-8 boundary before test
+execution: rebind and fresh-plane seal dispatch are available, but successful
+settlement-profile transition advance still awaits the same genuine
+checkpoint-pair producer. Case 8 is narrowed only at that parent boundary as
+stated above; its recovery, exclusion, ownership, rebind, dispatch, deadlock
+and failure obligations remain in f5b0u.
 The frozen tests-only RED therefore has exactly two separately recorded
 layers:
 
