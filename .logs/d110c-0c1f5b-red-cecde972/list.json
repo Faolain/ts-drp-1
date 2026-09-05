@@ -1,0 +1,10 @@
+[
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > retains checkpoint-terminal open progress through cold recovery, then composes 64 active writers across three transitions",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  }
+]
