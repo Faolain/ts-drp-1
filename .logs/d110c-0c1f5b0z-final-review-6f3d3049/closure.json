@@ -1,0 +1,118 @@
+{
+  "accepted": true,
+  "blockingUnion": [],
+  "verdicts": {
+    "grok": {
+      "terminal": "VERDICT: PASS",
+      "verdict": "PASS",
+      "p0_count": 0,
+      "p1_count": 0,
+      "p2_count": 0,
+      "findings": [],
+      "red_causality": "Signed tests 1eba4f90 plus frozen matrix 464e04a8 produced one isolated focused run: 16 selected, 14 failed, 2 passed, 0 skips/filters/top-level errors. Cases 01-06 and 10-14 throw F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED from discovered()/native child after opened() real browser or SQLite construction, existing backend resolver identity, and an ordinary readHead; the optional namespace lookup never does a typeof/undefined-function call or substitutes resolveBrowser/resolveNode. Cases 07-09 throw F5B0Z_INCOMPATIBLE_REGISTRY_REFUSAL_REQUIRED from fresh children after a preoccupied slot is imported successfully without refusal. Cases 15-16 pass as retained controls. RED stacks stop at the discovery/refusal token, so post-discovery bind/duplicate/lifecycle/no-I/O continuations are not claimed executed in RED. Native child premises are enforced by status/token plus isolation dist hashes; missing standalone child streams are a disclosed JSON-reporter limitation, not a substitute-GREEN.",
+      "green_closure": "Production 6f3d3049 changes only the three owners. Tests/helpers remain the signed RED hashes f5fd5086/3ba2b9ab/619b90ba in both the b2594cc7+patch checkout and the overlay-free signed checkout. Both focused runs used the amendment command with --coverage.enabled=false and passed the same 16 names with 0 failures/skips. Continuations actually ran: first-bind-wins and repeat-bind false, dedicated internal duplicate TypeError before local-map mutation, closed/poisoned reclaimClosedEpoch on the discovered capability, facade-key and post-construction prepare/exec/transaction spies, and native ESM sharing plus exact TypeError/descriptor/zero-accessor refusal. Direct node helper invocations in four modes captured stdout/stderr/status 0 with token null, closing the RED child-stream gap without a RED rerun. Retained 125/7, issuance 12, and Chromium 4 with --fail-on-flaky-tests passed on the initial clean source-built checkout.",
+      "compatibility": "Exact-facade WeakMap, Symbol.for v1, descriptor-only inspect, frozen {bind,resolve} reuse, first-bind retention, and TypeError('AHE maintenance registry is incompatible') without overwrite or accessor execution match the design. Backend register creates the existing class once, bindAheReclamationMaintenance, then local WeakMap.set; duplicate throws TypeError('AHE maintenance facade is already registered') before local mutation. Legacy resolvers remain backend-local and reject foreign/memory/copy/proxy identities. Root/package exports, store interface, constructor registration call sites, issuance Symbol.for registry, mutation/classifier/receipt/error bodies, and the first captureAheReclamationInput(input) scheduling probe are unchanged (12 whole files, 66 spans). Discovery/bind/resolve perform no store I/O or reclamation; case 04/14 memory bindings are registry-plumbing only and never invoke the foreign capability. Dist hashes show only the three owner artifacts changed versus RED.",
+      "evidence_and_static_debt": "Self-excluding manifests are 81 and 243 entries as claimed. Isolation records show independent sparse clones, frozen install, source build, no parent partial overlay, no copied dist. Storage typecheck passes; clean browser 74 and Node 144 diagnostics are byte-identical to baseline with zero target diagnostics and the inherited TS2322 at tests/fixtures/phase-6b/ahe-reclamation-contract.ts:234. Initial focused validator false-alarmed on absent optional numRuntimeErrorTestSuites; the same successful reporter was revalidated, not rerun. Exact-owner lint/format failed only on binder wrapping before the first runtime and then passed. Raw stdout/patch whitespace and the privately quarantined credential-bearing process snapshot are disclosed evidence-only; published test/native/build/typecheck streams are unchanged. No skips, filters, or false pass classification remain on the signed focused/retained/issuance/native/Chromium gates.",
+      "scope_and_remaining_work": "This closes only f5b0z backend-neutral discovery of the existing AHE maintenance capability. Parent cleanup is not implemented. Seven dirty parent files, 27 stashes, and 86522 protected paths remain. No campaign, wire/schema/authority, dependency, threshold, timing, or lifecycle policy change is authorized. It cannot claim 64-writer/three-transition integration, >=100-transition memory/census, Discord state safety, or Phase 7 cold join. Parent f5b may resume its previously authorized implementation, including the observer correction, without treating this registry as new deletion ownership or authentication against malicious same-process JS.",
+      "ready_to_close_f5b0z": true
+    },
+    "sol": {
+      "terminal": "VERDICT: PASS",
+      "verdict": "PASS",
+      "p0_count": 0,
+      "p1_count": 0,
+      "p2_count": 1,
+      "findings": [
+        {
+          "severity": "P2",
+          "title": "Roadmap status still describes GREEN as pending",
+          "evidence": "docs/production-hardening/production-hardening-tdd-plan-v2.md:18389, :18466-18485, and :101382-101390 still say causal RED accepted and separate GREEN next/authorized, while production 6f3d3049 and evidence 5e7099df are present.",
+          "impact": "A resuming owner could mistake the completed GREEN for unstarted work; this does not affect implementation, causality, or acceptance evidence.",
+          "required_action": "Roadmap owner/root: update the Current frontier and D.110c-0c1f5b0z record during ordinary closure bookkeeping to cite production 6f3d3049, evidence 5e7099df, and this PASS. No new review slice or test rerun."
+        }
+      ],
+      "red_causality": "Accepted. The linear signed history is plan 7eb2a8df, correction 6ac0b5be, accepted gate 5c44a7dc, tests 1eba4f90, RED evidence 5ab259fe, and RED acceptance b2594cc7. The frozen test creates genuine browser/SQLite facades, resolves the existing backend capability, and completes an ordinary read before each neutral-discovery sentinel. Native duplication does the same from freshly built modules. RED records exactly 16 selected tests, 11 discovery failures, 3 incompatible-registry-refusal failures, 2 compatibility controls, and no skips or top-level errors. Later assertions are executable continuations but are not misrepresented as having passed during RED.",
+      "green_closure": "Complete. Production 6f3d3049 changes exactly the three authorized owners. The global versioned descriptor, closure-held WeakMap, exact-facade resolution, first-bind retention, accessor-safe refusal, and duplicate-registration ordering implement the accepted contract. Both unchanged focused executions pass all 16 assertions, including the post-sentinel duplicate, lifecycle, identity, facade-key, and no-I/O continuations.",
+      "compatibility": "Preserved. Browser and Node bind the exact existing maintenance object before updating their unchanged backend-local WeakMaps; duplicate registration throws before local-map mutation. Legacy resolvers retain backend-specific identity and reject memory, copied, proxied, and foreign facades. Custody covers 12 whole files and 66 statement spans, preserving mutation/transaction/lifecycle bodies, public inputs, receipts, errors, constructors, ordinary storage types, roots, manifests, and issuance precedent. Binding and resolution perform only descriptor/WeakMap operations and neither storage I/O nor reclamation.",
+      "evidence_and_static_debt": "Sufficient and internally consistent. The independently verified self-excluding manifests contain 81 RED entries with SHA-256 9e56180ab6f58e05a0b443629fbe9acc066614ca84ad56755b28643ea53864ef and 243 GREEN entries with SHA-256 43de3f011b6ba54120fbff0b2e1cefba7bd7bf34a6b4d2444f0ba566a861afbd. Evidence establishes clean source-built initial and signed checkouts, identical production/runtime hashes, focused 16/16 twice, retained 125/125, issuance 12/12, Chromium 4/4, and four successful direct native modes. The initial validator false negative was corrected against the unchanged successful reporter. Static reporting is honest: storage typecheck passes; browser 74 and Node 144 diagnostics are baseline-identical; target diagnostics are zero; the disclosed external TS2322 remains unchanged.",
+      "scope_and_remaining_work": "This closes only backend-neutral discovery of the existing AHE maintenance capability. It does not implement or validate parent cleanup, the 64-writer/three-transition integration, the at-least-100-transition memory/census gate, Discord state safety, or Phase 7 cold join. Those obligations remain with their existing parent owners.",
+      "ready_to_close_f5b0z": true
+    },
+    "fable": {
+      "terminal": "VERDICT: PASS",
+      "verdict": "PASS",
+      "p0_count": 0,
+      "p1_count": 0,
+      "p2_count": 3,
+      "findings": [
+        {
+          "severity": "P2",
+          "title": "Registry shape probe can run Proxy traps on a preoccupied value",
+          "evidence": "packages/storage/src/maintenance.ts:83-102 isAheMaintenanceRegistry calls Object.getPrototypeOf, Object.isFrozen, Reflect.ownKeys and Object.getOwnPropertyDescriptor on descriptor.value at module initialization (line 138).",
+          "impact": "The design's prohibition is honored: the globalThis accessor is never invoked because only the descriptor is read (line 105) and \"value\" in descriptor gates reuse (line 108). But if the preoccupied data value were a Proxy, its traps would execute during import; the try/catch converts throws into the required TypeError refusal. This is outside the stated threat model (hostile same-process JS) and has no effect on tests 07-09.",
+          "required_action": "No code change in f5b0z. Root records this as an accepted boundary note in the D.110c-0c1f5b0z roadmap record."
+        },
+        {
+          "severity": "P2",
+          "title": "Unreachable duplicate-registration throw would leave an attached IDB connection open",
+          "evidence": "packages/storage-browser/src/internal/idb-adapter.ts:971-973 attaches the connection then calls registerBrowserAheReclamationMaintenance, which now throws TypeError on a second bind (packages/storage-browser/src/internal/ahe-reclamation.ts:300-302). packages/storage-node/src/internal/create-scaffold.ts:147 registers inside the constructor; its connection.close guard (846-851) covers only configureConnection.",
+          "impact": "Reachable only if the same freshly constructed facade object were registered twice, which no production path does (grep shows single call sites). Constructors are outside the three owners and are custodied byte-identical.",
+          "required_action": "None in f5b0z. Parent f5b may wrap registration in the existing try/close only if a re-registration path is ever introduced; deferred to parent, not a new slice."
+        },
+        {
+          "severity": "P2",
+          "title": "Initial GREEN patch application has no recorded shell command",
+          "evidence": ".logs/d110c-0c1f5b0z-green-b2594cc7/initial-patch-check/command.json records only `git apply --check` (stdout empty, status 0); the application itself was done with the agent apply_patch tool. The boundary is instead pinned by isolation-initial-patched-before/after.json owner hashes (7cf23085.., 3453cebd.., 0067512d..) equal to the signed 6f3d3049 sources, and finalize.mjs:55-59 asserting `git diff 6f3d3049^ 6f3d3049 -- owners` hashes equal production.patch.",
+          "impact": "Evidence completeness only. The hash pins establish that the tested initial tree equals the committed production diff; no correctness or causal impact.",
+          "required_action": "None; disposition accepted. Future GREEN recorders should log the apply step as a command record (owner: root recorder convention)."
+        }
+      ],
+      "red_causality": "Established. Tests commit 1eba4f90 is signed and contains only the test file and two fixtures (hashes f5fd5086.., 3ba2b9ab.., 619b90ba.. frozen in matrix.json against base 5c44a7dc). The sole isolated run (fresh sparse clone, offline frozen install, build:packages at 19:42:20, run-once.mjs refusing reruns) produced 16 total, 14 failed, 2 passed, 0 pending, runner exit 1, no violations. result.json stacks show every discovery failure thrown at discovered():73 after opened() completed real facade construction, legacy backend resolution and a readHead for cases 01-05 and 10-14, and at child():125 for 06 after the child's status 0/no-signal/premise assertions. The failure is an optional call on a Partial namespace view, not a missing import, typeof assertion or undefined-function call; the namespace imported successfully. Cases 07-09 preoccupied the global in fresh children, asserted unchanged descriptor and zero accessor calls, then emitted the refusal token because RED dist maintenance.js (hash 0fc2b113..) imported without refusing. Cases 15-16 genuinely passed as controls, including the 12-whole-file/66-span custody and registrationCallSurface(false). RED correctly does not claim continuations executed; the intercepted child console lines are disclosed and closed by GREEN's direct native captures.",
+      "green_closure": "Established. 6f3d3049 is signed and changes exactly the three owners (production-changed-paths, production.patch). The implementation matches the design: Symbol.for v1 key with JSDoc versioning sentence, descriptor-only inspection, exact frozen two-data-function shape, non-enumerable/non-configurable/non-writable install, TypeError at module init on incompatibility without overwrite or fallback map, WeakMap first-bind-wins with no replacement and no store/capability invocation; both backends construct once, bind, throw the exact duplicate TypeError before local map mutation, then index the same object. Two focused 16/16 runs: initial in a fresh clone of b2594cc7 with only production.patch applied (git apply --check at 19:59:44, build 19:59:44, focused 20:00:15) and signed in a second fresh clone of 6f3d3049 with its own offline install and build (20:03:35, 20:03:57, focused 20:04:34). Assertion fullNames in both validation files equal the RED matrix names; tests/fixtures byte-identical to RED. Continuations executed by construction: sequential asserts with no conditional skips (04 same/different rebind refusals on artificial and real facades, 05 exact duplicate TypeError with fail-lifecycle never invoked and both resolvers unchanged, 10-13 real closed/poisoned refusals via substrate corruption, 14 spies plus key sets plus registrationCallSurface(true)). Retained 125 across the exact seven files with coverage disabled, issuance 12 (count verified against the test file), Chromium 4/4 with --fail-on-flaky-tests and no skip/flaky tokens. Four native modes captured directly with status 0, token null, completed true; runtime hashes equal isolation-signed-after (maintenance.js 5b04d42a.. identical in both GREEN checkouts, distinct from RED). Under vitest the backends resolve @ts-drp/storage/maintenance to dist while the test imports source, so the focused suite itself exercises two-instance sharing and a stale dist would fail loudly rather than pass falsely.",
+      "compatibility": "Preserved. Test 16 and source-check.mjs pin 12 whole files (storage index/types/package.json, browser and node index/maintenance/package.json, idb-adapter.ts, create-scaffold.ts, issuance-store maintenance.ts) and 66 statement spans (all existing storage maintenance functions/types/classes/error codes, both backend maintenance classes, resolver bodies, local WeakMaps, helpers) byte-identical; both GREEN runs passed it. Facade own-key sets unchanged; registration call surface exactly {new Class, bind, new TypeError, maintenanceByStore.set}; browser scheduling probe ordering intact. Legacy resolvers remain backend-specific (test 15). Public reclamation inputs, receipts and error codes unchanged. No dependency, manifest, root export, wire, threshold or lifecycle change. bind/resolve/module init perform only descriptor reads and WeakMap operations; initial registration adds no storage calls. Type delta identical (0/74/144), zero target diagnostics.",
+      "evidence_and_static_debt": "Honestly disclosed and bounded. Browser 74 and Node 144 package typecheck diagnostics fail identically to the clean signed baseline and are not claimed passed; one unchanged external TS2322 at tests/fixtures/phase-6b/ahe-reclamation-contract.ts:234. The initial validator false alarm was on the strict side (missing optional numRuntimeErrorTestSuites treated as nonzero); the identical stored reporter was revalidated without rerun, and suite.mjs line 22 now defaults the field. Whitespace dispositions cover only raw stdout and the patch. Credential redaction was scoped to browser-process-preflight/stdout and evidence-whitespace.json with test/build/native/typecheck streams unchanged. With file tools only I could not recompute manifest digests; RED root lists 81 files and GREEN lists 243 plus the self-excluding manifest, consistent with root's revalidation, and accepted-manifests.json records the RED digest 9e56180a.. as given. Owner hashes in validation.json, source-check and both isolation records agree.",
+      "scope_and_remaining_work": "This closes only f5b0z: backend-neutral discovery of the existing AHE maintenance capability. Parent cleanup is not implemented; the seven dirty parent files, 27 stashes and 86,522 protected paths are preserved. No claim is made for 64-writer/three-transition integration, >=100-transition memory/census, Discord state safety f5b0y or Phase 7 cold join. The three P2 notes require no new slice or review round.",
+      "ready_to_close_f5b0z": true
+    }
+  },
+  "dispositions": [
+    {
+      "finding": "Fable P2-1",
+      "owner": "Root boundary owner",
+      "disposition": "Accepted trusted-process boundary; Proxy traps on an injected registry data value are outside the hostile-local threat model. No code change."
+    },
+    {
+      "finding": "Fable P2-2",
+      "owner": "Future backend-construction change owner",
+      "disposition": "No reachable duplicate registration path today. Construction-failure cleanup is conditional on a future authorized change introducing that path; no parent scope expansion."
+    },
+    {
+      "finding": "Fable P2-3",
+      "owner": "Root evidence convention",
+      "disposition": "Accept hash-proven apply_patch boundary. Future applicable recorders log the actual tool action; no invented shell receipt, retrospective evidence edit or rerun."
+    },
+    {
+      "finding": "Sol P2-1",
+      "owner": "Root roadmap owner",
+      "disposition": "Resolved by Current frontier and f5b0z closure status update in this checkpoint; no prose confirmation review."
+    }
+  ],
+  "fable": {
+    "session": "b5e0c067-f4da-4e8c-8f5b-a6234ecf079c",
+    "models": [
+      "claude-fable-5-1"
+    ],
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "reviewCheckoutUnchanged": true,
+  "parentFilesPreserved": 7,
+  "stashes": 27,
+  "productionCommit": "6f3d3049942c29f547f5cefdda628a3a01078077",
+  "greenEvidenceCommit": "5e7099dfbfb56cc06de75eab6c6d616cf871a4ea",
+  "closureScope": "f5b0z only; parent integration remains unexecuted/open",
+  "planSha256": "558ef85d6c35d5fc4fd755b5afa1d815956476e89ecbb76b8d0a167456050deb"
+}

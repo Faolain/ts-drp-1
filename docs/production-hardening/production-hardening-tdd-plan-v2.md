@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0z causal RED accepted; separate GREEN next)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0z closed; parent GREEN next)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,28 +18463,19 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Current work (f5b0z separate GREEN; parent GREEN paused):
+- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is closed.
+  Signed/pushed RED tests `1eba4f90` / evidence `5ab259fe` establish the exact
+  14-causal-failure / 2-control matrix. Separate Astra-high GREEN production
+  `6f3d3049` and evidence `5e7099df` pass focused 16/16 twice, retained 125,
+  issuance-registry 12, Chromium 4 and all four direct native-import modes.
+  Final Grok/Sol/Fable review is PASS with empty P0/P1 union; all four P2s have
+  dispositions in the record. The three-owner repair adds only neutral
+  discovery and backend registration; no parent cleanup caller or authority,
+  dependency, policy or limit changes. Clean package static diagnostics remain
+  baseline-identical and explicitly unclaimed as passing. Final evidence is
+  `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is expressly
-  authorized by the user on 2026-09-05, with review and separate RED/GREEN.
-  The exact design is `.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md`: two
-  maintenance-subpath exports and the existing browser/SQLite registration
-  functions only. Sign/push the plan, complete its Grok / Sol-high /
-  Fable-xhigh gate, then separate Astra-high causal RED and GREEN. No parent
-  cleanup call, new authority, dependency, policy or limit is in this slice.
-  First review: Grok and Fable PASS; Sol found one P1 in the focused command's
-  inherited package-wide coverage. The single-batch correction and all P2
-  dispositions are `.logs/d110c-0c1f5b0z-plan-correction-7eb2a8df/amendment.md`.
-  Targeted Sol confirmation PASS closes that command finding with zero P0/P1.
-  Plan gate accepted: separate Astra-high tests-only RED is authorized now.
-  No new Grok or Fable round is required for P2/prose.
-  That RED is now accepted at signed/pushed tests `1eba4f90` and evidence
-  `5ab259fe`: sole clean source-built execution, 16 total / 14 exact causal
-  failures / 2 compatibility passes / zero skipped or top-level errors.
-  Root's independent audit is
-  `.logs/d110c-0c1f5b0z-red-acceptance-1eba4f90/`. Separate Astra-high GREEN
-  may now change only the three frozen owners; final Grok/Sol/Fable review
-  follows signed/pushed GREEN and all focused/static/retained/isolated gates.
+Current work (resume the previously authorized parent f5b GREEN):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18529,27 +18520,25 @@ Current work (f5b0z separate GREEN; parent GREEN paused):
   The separate observer correction is accepted at tests `78e068a8` / evidence
   `45b1be36`: one isolated source-built run, 28 active / 23 expected failures /
   5 passes / 17 filtered, no anomalies. Both terminal getter throws and fresh
-  owner-bound emitted-state checks are retained. Production GREEN remains
-  paused. Cleanup needs an explicit capability-composition
-  decision: Node holds authenticated successor material, while the room owns
-  the backend maintenance facade. The one-off Fable-high consultation has
-  completed and recommends the proposed f5b0z backend-neutral maintenance
-  discovery prerequisite below; no new API or bridge is authorized by research.
-  This does not change production ordering or substitute semantic equality
-  for exact snapshot bytes.
+  owner-bound emitted-state checks are retained. Production GREEN may now
+  resume: closed f5b0z supplies backend-neutral discovery of the existing
+  capability, while Node retains authenticated successor/cleanup-plan ownership.
+  Parent f5b must still compose that capability with the genuine first-deletion
+  gates, issuance-prefix bounds and exact two-physical-ancestor accounting.
+  Discovery alone does not authorize deletion or change production ordering,
+  retry/failure policy, or exact snapshot-byte requirements. Do not rerun the
+  accepted observer RED or repeat f5b0z reviews.
   Post-codec recovery, the complete 64-writer continuation and the later long
   campaign remain unproved. Product state, batch, epoch and snapshot ceilings
   remain unchanged.
 
 Blocked, and on what:
 
-- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** now has explicit
-  scope authorization and awaits its governing review/TDD gates. It blocks parent f5b's genuine cleanup caller
-  and therefore parent closure. The independent tests-only observer correction
-  is accepted and needs no further RED execution. The existing AHE backend
-  capability must become discoverable by
-  Node without a Node-to-browser dependency or caller-invented authority.
-  Production edits require the accepted plan gate and signed tests-only RED.
+- **Parent f5b closure** still requires its genuine authenticated cleanup
+  caller and complete 64-writer/three-transition continuation, restart and cold
+  reopen. The discovery prerequisite f5b0z and independent observer RED are
+  closed; neither needs another execution or review. Resume the existing narrow
+  parent implementation without a Node-to-browser dependency or invented authority.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -101381,18 +101370,92 @@ and has SHA-256
 
 ###### D.110c-0c1f5b0z backend-neutral AHE maintenance discovery prerequisite
 
-**Status: causal tests-only RED accepted; separate Astra-high GREEN authorized
-within the three frozen production owners.** The user
+**Status: CLOSED — separate causal RED and GREEN signed/pushed; final
+Grok/Sol/Fable PASS with empty P0/P1 union.** The user
 authorized review and separate RED/GREEN on 2026-09-05. The exact plan is the
 original `.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md` plus the signed
-`6ac0b5be` command amendment below. Production edits require accepted signed
-RED, and final implementation review remains mandatory. Owner:
+`6ac0b5be` command amendment below. The required signed RED, narrow GREEN and
+final implementation review have passed. Owner:
 the existing `@ts-drp/storage/maintenance` contract and browser/Node backend
 registration functions; root owns the boundary decision. Deadline: before
 parent f5b's first genuine cleanup invocation and parent closure, hence before
 D.110c-c/d can consume that closure. The independent parent observer RED is
 accepted at `78e068a8` / `45b1be36`. Completed f5b0d backend gates and all stopped parent evidence remain
 unchanged; this prerequisite does not claim any lifecycle or golden-path pass.
+
+GREEN production `6f3d3049942c29f547f5cefdda628a3a01078077` changes exactly the
+three frozen owners (97 insertions / 2 deletions), with the signed RED tests
+and helpers byte-identical. Evidence `5e7099dfbfb56cc06de75eab6c6d616cf871a4ea`
+is signed (`G`) and pushed. Its 243-entry self-excluding manifest is
+`43de3f011b6ba54120fbff0b2e1cefba7bd7bf34a6b4d2444f0ba566a861afbd` under
+`.logs/d110c-0c1f5b0z-green-b2594cc7/`. Results: focused 16/16 twice, complete
+seven-file retained 125/125, existing issuance-registry 12/12, Chromium 4/4
+with zero skips/flakes/failures, and four directly captured native-child modes
+with successful status, `completed: true`, `token: null`. Post-discovery
+identity, duplicate, closed/poisoned, facade-key and no-I/O continuations
+genuinely execute in GREEN. No cleanup is invoked by discovery itself.
+
+The first GREEN checkout independently installed and built clean `b2594cc7`,
+then applied only the recorded three-owner patch via `apply_patch` before its
+full source rebuild. The second checkout,
+`/private/tmp/d110c-f5b0z-green-signed-REUkBZ/checkout`, independently installed
+and source-built exact signed `6f3d3049` with no overlay or copied dist.
+Source hashes and all eight native runtime hashes agree across both GREEN
+checkouts and before/after execution. Exact source lint/format/diff and
+12-whole-file/66-statement custody pass. Storage typecheck passes; browser 74
+and Node 144 diagnostic blocks exactly match the clean signed baseline, with
+zero target diagnostics and the same external fixture TS2322 at line 234.
+Those inherited diagnostics remain with their existing package/test owners;
+this is not a blanket typecheck or coverage pass.
+
+The single final review over plan/RED/GREEN is recorded in
+`.logs/d110c-0c1f5b0z-final-review-6f3d3049/`: Grok 4.6/high PASS (0 P0 /
+0 P1 / 0 P2), Codex `gpt-5.6-sol` high PASS (0 / 0 / 1), and Fable 5.1
+xhigh through `claude-phel` PASS (0 / 0 / 3). Grok completed normally; no
+resume or duplicate round was needed. Sol session:
+`01a07339-b934-7c93-8f96-07d20884cf08`; Fable session:
+`b5e0c067-f4da-4e8c-8f5b-a6234ecf079c`, reported model `claude-fable-5-1`.
+Root independently validated signed refs, both complete manifests, all reporter
+outcomes and unchanged RED names, native outputs, source/runtime identity and
+parent/stash custody in `pre-review-audit.mjs`. Final P0/P1 union is empty.
+
+All four final P2 findings have bounded dispositions:
+
+- Fable P2-1, root boundary owner: accepted. A Proxy installed as a preoccupied
+  registry data value can run Proxy traps during shape inspection. The global
+  accessor itself is never invoked. Hostile same-process JavaScript is outside
+  the frozen trusted-backend contract; no new authentication or code change.
+- Fable P2-2, backend-construction owners: conditional future note only. Current
+  production constructors register each fresh facade exactly once; no reachable
+  duplicate-registration connection leak is demonstrated. If a future authorized
+  change introduces a fallible re-registration path, that change must own
+  construction-failure cleanup. Do not expand parent f5b or reopen these custodied
+  constructors merely for this hypothetical path.
+- Fable P2-3, root evidence owner: accepted. The initial patch application used
+  the required `apply_patch` tool, not a shell command; exact before/after source
+  hashes and signed diff prove its boundary. Future applicable recorders should
+  record the tool action explicitly as a tool action, not invent a shell receipt.
+  No retrospective evidence alteration, rerun or new slice.
+- Sol P2-1, root roadmap owner: resolved by this ordinary closure update to
+  Current frontier and this record. No further model review of closure prose.
+
+Recorder diagnostics remain preserved: initial formatting corrected before
+runtime, the omitted-optional-field validator false alarm revalidated against
+the same successful reporter without rerun, and raw-capture whitespace
+dispositions without source exemptions. A newly generated unrelated process
+snapshot contained credential-bearing arguments; before evidence publication,
+only that diagnostic and its derivative were privately quarantined outside the
+repository, and published copies were sanitized with explicit provenance and
+a credential scan. Test/build/native/typecheck streams were not altered. No
+prior immutable evidence or protected path was modified. All seven inherited
+dirty parent files, 27 stashes and 86,522 protected untracked paths remain.
+
+This closes only backend-neutral discovery. Parent f5b resumes its previously
+authorized composition/cleanup implementation and still owes genuine
+64-writer/three-transition integration, restart and cold reopen. The later
+at-least-100-transition census/memory gate, f5b0y's production chat safety and
+Phase 7 archive/cold join remain open. No campaign or golden-path closure is
+claimed by this prerequisite, and no new review round is needed for its P2s.
 
 RED tests `1eba4f9065d220afb0d77d90aac4a05b250a05bb` and evidence
 `5ab259fedeea24a102d1e3309d7282da81a3b224` are signed (`G`) and pushed.
