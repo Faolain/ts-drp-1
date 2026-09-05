@@ -99438,7 +99438,8 @@ is nonblocking prospective evidence guidance.
 
 ###### D.110c-0c1f5b0t segmented settlement replacement-progress prerequisite
 
-**Status: BLOCKING PLAN CHECKPOINT on 2026-09-04.** The first parent f5b RED
+**Status: AUTHORIZED for one causal tests-only RED on 2026-09-04; production
+remains blocked until that RED is signed and pushed.** The first parent f5b RED
 stopped before any test or production edit under the accepted design stop rule:
 the persisted `SettlementPlanEntry` has only one scalar
 `replacementSequence`, `applySettlementPlanEffect` may fill it only once, the
@@ -99451,13 +99452,16 @@ crash-safe multi-vertex settlement. This is a demonstrated stored-contract
 gap, not permission to weaken the multi-intent acceptance.
 
 Owners: `@ts-drp/issuance-store` contract plus memory/browser/Node backends,
-the Node settlement-effect validation seam, and the v3-room settlement drain
-owner. Deadline: GREEN and an empty P0/P1 final review union before parent f5b
+the Node settlement-effect validation and plan-aware settlement-source scan
+seams, and the v3-room settlement drain owner. Deadline: GREEN and an empty
+P0/P1 final review union before parent f5b
 RED resumes, D.110c-c/d, the same-room 64-writer and at-least-100-transition
 gates, the MMORPG golden-path claim, Phase-6 exit, or Phase 7. Because this is
 an additive public TypeScript and durable-value contract adjacent to issuance,
-one exact Grok 4.6/high, Kimi K3 100-step and Opus xhigh design review is
-required before its causal tests-only RED. No production edit precedes RED.
+one exact Grok 4.6/high, Kimi K3 100-step and Opus xhigh design review plus its
+single material confirmation was required before the causal tests-only RED.
+Those results and their final exact dispositions are recorded below. No
+production edit precedes RED.
 
 Selected bounded contract:
 
@@ -99467,7 +99471,7 @@ Selected bounded contract:
   `rebase` or `transform` entry. Its exact public shapes are:
 
   - `SettlementReplacementChunk` has readonly numeric
-    `replacementSequence` and `throughIntent` members.
+    `replacementSequence`, `throughIntent` and `lastLogicalTime` members.
   - `SettlementReplacementProgress` has readonly literal `version: 1`, numeric
     `intentCount`, `Uint8Array` `intentDigest`, and readonly
     `SettlementReplacementChunk[]` `chunks` members.
@@ -99488,17 +99492,22 @@ Selected bounded contract:
   prefix is zero for no chunks and otherwise the final `throughIntent`. The
   legacy scalar remains `null` while the prefix is partial and becomes exactly
   the final chunk's sequence only when the prefix reaches `intentCount`.
-  Expire/manual-review entries cannot carry progress.
+  `lastLogicalTime` is a positive safe integer, equals the last submitted
+  operation logical time in that chunk, and is strictly increasing across
+  chunks. Expire/manual-review entries cannot carry progress.
 - The room derives the complete ordered detached replacement-operation list
   before fencing. `orderedReplacementOperations` is exactly a dense ordinary
   array of detached application-operation records in source-intent order after
   the expire filter and deterministic 1:1 transform; it contains no logical
   time, author sequence or wrapper record. Every member must individually
-  encode under the existing Node application-batch limits: 65,536 bytes,
-  depth 8 and 1,024 items. The whole dense array is encoded under the bounded
-  settlement-digest limits: 1,048,640 bytes, depth 9 and 1,024 items. That is
-  sufficient for 16 individually valid members plus array framing. Its digest
-  is `hashDomain` over the domain below and those exact canonical array bytes.
+  encode under the existing Node application-batch limits—65,536 bytes, depth
+  8 and 1,024 items—as a necessary precondition only; Node's actual assembled
+  batch fit/`split-required` result is authoritative. Export the
+  issuance-store-owned `SETTLEMENT_REPLACEMENT_DIGEST_LIMITS` beside the count
+  bound with 1,048,640 bytes, depth 9 and 1,024 items. The whole dense array is
+  encoded once under that profile, sufficient for 16 individually valid
+  members plus array framing. Its digest is `hashDomain` over exact domain
+  `ts-drp/settlement-replacement-intents/v1` and those canonical array bytes.
   This registers that hash name as a device-local durable-plan domain, not a
   wire-bound cryptographic suite or domain change. `intentCount` is the length
   of this post-policy list, not source `intents.length` or `operationCount`.
@@ -99521,21 +99530,25 @@ Selected bounded contract:
   kind. `fromIntent` must equal the durable consumed prefix; `throughIntent`
   must be greater, no greater than `intentCount`, and the Node issue owner must
   reject before issuance unless `throughIntent - fromIntent` equals the exact
-  `input.operations.length`. This validation is internal to the existing issue
-  path and does not add a public `V3LocalIssueInput` member. The store
-  atomically appends the allocated author sequence plus `throughIntent`, fills
-  the scalar only at completion, advances the plan revision, and commits
-  issued/outbox/lineage/plan state in the existing transaction.
+  `input.operations.length`. This adds no public top-level
+  `V3LocalIssueInput` member. Node derives—not the room—the chunk
+  `lastLogicalTime` from the exact final input operation. The store atomically
+  appends the allocated author sequence, `throughIntent` and that derived
+  logical-time floor, fills the scalar only at completion, advances the plan
+  revision, and commits issued/outbox/lineage/plan state in the existing
+  transaction.
 - The Node owner reads and validates the current plan, digest, prefix and range
-  before `buildAndSign`. An effect with extra/missing keys, non-safe indices, a
-  non-32-byte digest, `fromIntent >= throughIntent`, or an operation-count
-  mismatch returns existing `malformed-input` before signing. A well-formed
-  effect whose entry/progress/digest/prefix is absent or different returns
-  existing `issuance-rejected`, also before signing and without halting the
-  plane. The store retains the authoritative in-transaction recheck. A race
-  that fails that recheck after signing returns existing `admission-rejected`,
-  halts the handle and requires reopen; it is never retried on the same plane.
-  This adds no `V3LocalIssueResult` variant or public Node input member.
+  before `reserveOperation` and `buildAndSign`. An effect with extra/missing
+  keys, non-safe indices, a non-32-byte digest, `fromIntent >= throughIntent`,
+  or an operation-count mismatch returns existing `malformed-input` before any
+  reservation or signing. A well-formed effect whose
+  entry/progress/digest/prefix is absent or different returns existing
+  `issuance-rejected`, also before reservation/signing and without halting the
+  plane. Repeating that refusal cannot consume admission capacity. The store
+  retains the authoritative in-transaction recheck. A race that fails that
+  recheck after signing returns existing `admission-rejected`, halts the handle
+  and requires reopen; it is never retried on the same plane. This adds no
+  `V3LocalIssueResult` variant or top-level Node input member.
 - Error ownership is exact. Malformed durable plan values use
   `ISSUANCE_RECOVERY_CORRUPT`. A commit effect with invalid closed shape,
   unsafe indices, `fromIntent >= throughIntent`, `throughIntent > 16`, or a
@@ -99559,14 +99572,14 @@ Selected bounded contract:
   suffix once under the effect form selected above; `split-required(p)` remains
   nonmutating, after which it submits the exact prefix that fits with the
   matching progress effect, publishes it, rereads the plan, and continues.
-  Before allocating logical times for any resumed suffix, it authenticates the
-  recorded chunk sequences through the existing recovered/accepted vertex set
-  and displaced-row outbox classification—no new store lookup API—and sets the
-  next logical time strictly above the last operation logical time in the
-  latest chunk. A missing or mismatched recorded chunk fails closed. Thus the
-  first operation in chunk k+1 is strictly later than the last in chunk k even
-  across restart. The settlement fence remains the first issued control
-  action, and only the completed scalar permits the existing maintenance gate.
+  Before allocating logical times for any resumed suffix, it sets the next
+  logical time strictly above the latest durable chunk's `lastLogicalTime`.
+  The store accepted that floor only as Node-derived data from the committed
+  input, so no recovered terminal-row lookup or new store API is required.
+  Thus the first operation in chunk k+1 is strictly later than the last in
+  chunk k even across cold reopen. The settlement fence remains the first
+  issued control action, and only the completed scalar permits the existing
+  maintenance gate.
 - Plan merge is monotonic for open progress. The room's equality/merge owner
   carries `replacementProgress` byte-for-byte for an unchanged
   `(sourceSequence, sourceDigest, disposition)` triple. The store refuses a
@@ -99574,8 +99587,15 @@ Selected bounded contract:
   digest/count; or drops, rewrites, reorders or shrinks its chunk prefix. The
   parent design's terminal-source removal rule is suspended for an entry with
   progress and a null scalar until its final chunk fills the scalar. The
-  scalar-null prune gate therefore retains the source row needed for
-  rederivation across close.
+  scalar-null prune gate prevents physical reclamation, but visibility is a
+  separate rule: `readSettlementSources` consults the durable plan and treats
+  the authenticated row named by an open-progress `sourceSequence` as
+  displaced, never terminal or old-incarnation, even when the supplied
+  frontier's `terminalThrough` covers it. This narrow override exists only for
+  the room's own open settlement entry and does not admit, republish or apply
+  the old row; it exposes the authenticated source solely to rederive the
+  bound remaining suffix. Once the scalar is complete, ordinary frontier
+  classification resumes.
 - Cross-close custody is explicit. A recorded replacement chunk that was
   admitted before close is terminal and is not planned again. A recorded chunk
   that was not admitted and is consequently displaced becomes its own source
@@ -99602,13 +99622,15 @@ Selected bounded contract:
   upgraded to partial progress; only an old unlinked entry may take the
   post-split CAS-upgrade path above.
 - No wire envelope, protobuf, checkpoint, anchor, authority, wire-bound
-  cryptographic domain/suite, dependency, threshold, workload or public Node
-  issue-input change is authorized. The durable/public issuance-store type
-  addition and registered device-local digest domain are the entire
-  compatibility cost. Do not persist replacement operations. Reject duplicate
-  source-plan entries, one plan entry per intent, linking only the first or
-  last chunk, scalar reuse, and converting a valid multi-intent replacement to
-  manual review or unsupported status.
+  cryptographic domain/suite, dependency, threshold or workload change is
+  authorized. The compatibility cost is the durable/public issuance-store
+  type addition, registered device-local digest domain, and one additive
+  five-key replacement variant of the already accepted hidden `planEffect`
+  runtime member. There is no new top-level `V3LocalIssueInput` member and no
+  `V3LocalIssueResult` variant. Do not persist replacement operations. Reject
+  duplicate source-plan entries, one plan entry per intent, linking only the
+  first or last chunk, scalar reuse, and converting a valid multi-intent
+  replacement to manual review or unsupported status.
 
 Tests-only RED acceptance, with controls written so failure is behavioral and
 not a missing import/export:
@@ -99618,13 +99640,17 @@ not a missing import/export:
    corruption refusals. RED uses untyped/`unknown` fixtures through existing
    validators and observable 16/17 bound controls, not imports or type
    annotations for symbols that GREEN has not exported. No 17-intent fixture
-   is used as a valid settlement source or progress split.
+   is used as a valid settlement source or progress split. The equality
+   control pairs issuance-store progress acceptance at 16/refusal at 17 with
+   Node's observed 17-operation `split-required` prefix of 16, without one
+   constant importing the other.
 2. In memory, real Chromium and Node conformance, issue a two-or-more-chunk
    replacement: the first transaction is durable partial progress and the
    final transaction alone fills the scalar. Prove revision CAS, atomic
    outbox/lineage/plan updates, rollback on injected failure, exact ambiguous
    outcome readback, the exact Node-result/store-error matrix above, pre-sign
-   versus post-sign handle state, and pre-mutation refusal of every mismatch.
+   versus post-sign handle state, N repeated pre-sign refusals with unchanged
+   admission capacity, and pre-mutation refusal of every mismatch.
 3. Prove legacy migration and downgrade refusal, unchanged browser store names
    and database version, unchanged Node table shape, exact old-value decoding,
    and exact new-progress JSON/structured-clone write/read round trips.
@@ -99639,7 +99665,10 @@ not a missing import/export:
    admitted chunk and a displaced chunk. Prove no skipped, duplicated or
    substituted intent, preserved fence-first order, strictly increasing
    cross-chunk logical time, digest mismatch refusal, monotonic merge/readback,
-   open-progress source retention and correct displaced-chunk re-sourcing.
+   open-progress source retention and correct displaced-chunk re-sourcing. The
+   cold-reopen vector supplies a frontier whose `terminalThrough` covers the
+   original source and proves that only the plan-aware settlement-source scan
+   exposes it for suffix rederivation.
 
 The signed initial plan checkpoint is
 `cf4b6d820031a546a8013b500be7bfac100a8a3f`. Its single Grok/Kimi/Opus design
@@ -99656,12 +99685,28 @@ the dense digest preimage and bounded limits, post-policy count, registered
 local domain, transform byte-growth wording, unknown-fixture RED technique,
 nested Node JSON grammar, exact error codes, 16-bound derivation, independent
 constant ownership/equality control and existing Node result kinds are now
-explicit. One material confirmation of this corrected executable contract is
-required; no recursive review of its later bookkeeping prose is permitted.
+explicit. The one permitted material confirmation of signed correction
+`9ade7c703c5ba67451273df73da4d9a4d17f951f` is preserved under
+`.logs/d110c-0c1f5b0t-plan-confirmation-9ade7c70/`. Grok and direct Kimi
+returned `PASS`; Grok's two P2s and Kimi's two P2s are adopted above by
+restoring the exact domain, naming the digest-limits owner and paired equality
+control, and avoiding a terminal-row lookup. Opus returned one P0, one P1 and
+three P2s: physical prune retention did not make an authenticated terminal
+source visible for rederivation; the named logical-time lookups could be empty
+after cold reopen; the hidden plan-effect grammar change needed explicit
+compatibility ownership; pre-sign validation needed to precede reservation;
+and per-member encoding is only a necessary check. The exact plan-aware source
+classification, Node-derived durable chunk logical-time floor, compatibility
+sentence, pre-reservation placement and authoritative Node fit rule above
+adopt that entire union. The plan protocol permits no second confirmation
+loop; deterministic source/seam audit precedes RED, and the mandatory final
+GREEN Grok/Kimi/Opus review must inspect this signed correction and the causal
+RED. No later bookkeeping prose is recursively reviewed.
 
 GREEN is limited to issuance-store types/contract/conformance, the three
-backends, bounded test fixtures, the internal Node effect/range validation and
-the room settlement-drain loop. Focused tests, affected builds/typechecks,
+backends, bounded test fixtures, the internal Node effect/range validation,
+plan-aware open-progress source classification and the room settlement-drain
+loop. Focused tests, affected builds/typechecks,
 exact-owner lint/format/diff, retained issuance/room/recovery suites and an
 isolated clean-checkout gate are mandatory. Evidence lives under the usual
 self-excluding RED/GREEN manifests. The final Grok/Kimi/Opus implementation
