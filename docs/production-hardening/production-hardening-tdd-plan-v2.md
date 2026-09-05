@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, observer RED accepted; cleanup API decision pending)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0z authorized for reviewed RED/GREEN)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,15 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Current work (observer RED accepted; parent production GREEN paused):
+Current work (f5b0z plan review, then separate RED/GREEN; parent GREEN paused):
+
+- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is expressly
+  authorized by the user on 2026-09-05, with review and separate RED/GREEN.
+  The exact design is `.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md`: two
+  maintenance-subpath exports and the existing browser/SQLite registration
+  functions only. Sign/push the plan, complete its Grok / Sol-high /
+  Fable-xhigh gate, then separate Astra-high causal RED and GREEN. No parent
+  cleanup call, new authority, dependency, policy or limit is in this slice.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18522,14 +18530,13 @@ Current work (observer RED accepted; parent production GREEN paused):
 
 Blocked, and on what:
 
-- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is a proposed
-  narrow API prerequisite, awaiting explicit scope authorization and its
-  governing review/TDD gates. It blocks parent f5b's genuine cleanup caller
+- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** now has explicit
+  scope authorization and awaits its governing review/TDD gates. It blocks parent f5b's genuine cleanup caller
   and therefore parent closure. The independent tests-only observer correction
   is accepted and needs no further RED execution. The existing AHE backend
   capability must become discoverable by
-  Node without a Node-to-browser dependency or caller-invented authority. No
-  production change or new review invocation is authorized by this proposal.
+  Node without a Node-to-browser dependency or caller-invented authority.
+  Production edits require the accepted plan gate and signed tests-only RED.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -101361,10 +101368,11 @@ and has SHA-256
 
 ###### D.110c-0c1f5b0z backend-neutral AHE maintenance discovery prerequisite
 
-**Status: proposed API prerequisite; root audit and user-requested one-off
-Fable-high consultation complete; explicit scope authorization and governing
-plan review required before tests-only RED, followed by separate GREEN and
-final implementation review. No implementation is authorized here.** Owner:
+**Status: expressly authorized by the user on 2026-09-05 for review and
+separate RED/GREEN; exact plan frozen at
+`.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md`. Governing plan review precedes
+tests-only RED; production edits require signed RED, and final implementation
+review remains mandatory.** Owner:
 the existing `@ts-drp/storage/maintenance` contract and browser/Node backend
 registration functions; root owns the boundary decision. Deadline: before
 parent f5b's first genuine cleanup invocation and parent closure, hence before
@@ -101392,6 +101400,14 @@ terminal success, exit 0, no permission denials or nested subagents. This is
 the user's API-decision insight consultation, not a substituted formal GREEN
 review. Root agrees with the discovery recommendation, subject to the exact
 compatibility boundary and proof obligations below.
+
+The frozen design above prospectively resolves the proposal's remaining API
+and executable details: exact bind/resolve names, compatible global descriptor,
+first-bind-wins and duplicate-registration refusal, no-I/O ownership, 16-test
+RED matrix (14 named causal failures / 2 controls), focused/static/retained/
+isolated commands and final review. Its source anchor is signed `609ee4ba`;
+the inherited seven-file parent patch stays separate. The prior consultation
+and proposal below remain rationale, not a competing implementation contract.
 
 Proposed minimal construction: add bind/resolve exports on the existing
 `@ts-drp/storage/maintenance` subpath for the existing
