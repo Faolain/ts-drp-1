@@ -18442,9 +18442,13 @@ Authorized now (tests-only RED first, then GREEN):
   constant-ownership seams. Its initial bounded high-risk review returned a
   material P1 union; the single confirmation then found one nested-lifetime
   deadlock, which the final plan correction removes without another review
-  round. Proceed with its causal tests-only RED and the combined f5b0t/f5b0u
-  GREEN. No parent f5b integration or further production edit is authorized
-  before that checkpoint.
+  round. The f5b0u RED uses the exact two-layer attribution method frozen in
+  its record: clean signed HEAD classifies inherited f5b0t prerequisite
+  failures, while a separate isolated checkout overlays only the byte-for-byte
+  rejected seven-file candidate to reach the new f5b0u seams. Proceed with
+  that tests-only RED and the combined f5b0t/f5b0u GREEN. No parent f5b
+  integration or further production edit is authorized before that
+  checkpoint.
 
 Blocked, and on what:
 
@@ -99965,6 +99969,59 @@ the existing `rebasePromise`, `enqueueLifetimeTransition`, migration wait,
 creator-close stop/rebind and batch-grammar seams. Under the one-confirmation
 cap, these exact corrections receive no second model round; RED is authorized
 after this correction and confirmation evidence are signed and pushed.
+
+Corrective RED attribution after the accepted plan review: a clean detached
+checkout at the f5b0u tests-only RED commit still contains the legacy f5b0t
+production contract, which rejects every `replacementProgress` entry before
+the new parser, exact-readback and recovery seams can execute. The first
+Astra/high RED author stopped without editing or running tests when this made
+the promised causal matrix impossible. That is an inherited prerequisite
+failure, not a missing-import RED and not evidence against the f5b0u design.
+The frozen tests-only RED therefore has exactly two separately recorded
+layers:
+
+1. Run the focused test from a clean detached checkout of the signed/pushed
+   tests-only RED commit. This run may classify only the exact inherited f5b0t
+   prerequisite failures caused by the absent progress contract; it must not
+   be presented as f5b0u causal evidence.
+2. In a second isolated temporary checkout at the same tests-only RED commit,
+   apply the pre-existing rejected f5b0t GREEN candidate byte-for-byte to only
+   the seven production paths below. Verify both the combined binary patch
+   hash and every resulting file hash before and after the focused run. No
+   other production, manifest or lockfile path may differ. The overlay is a
+   diagnostic baseline under correction: it is not committed, accepted as
+   GREEN, or allowed to satisfy any final gate. Against it, the retained
+   f5b0t controls must pass and every f5b0u case must match its exact intended
+   causal failure. If either condition differs, stop and diagnose rather than
+   weakening the matrix.
+
+The rejected-candidate custody is frozen as:
+
+- combined `git diff --binary` SHA-256:
+  `1239cf2d5fbbc6e40eebdae4365ba7b8843af1d22586851548a1f995025684c9`;
+- `examples/v3-room/src/index.ts`:
+  `d872ebca21e0b637a258423650a3fa074556c4408a2f6057f7427fcdbd2f75fd`;
+- `packages/issuance-store/src/conformance.ts`:
+  `00aa85f56e738686049099ded7ff4d1a12c34d54d7dadd9c6d47751df91a5c9a`;
+- `packages/issuance-store/src/contract.ts`:
+  `5616617c29488208fe46c2fafd45e19af28129f7948b164424ea6275b621fab9`;
+- `packages/issuance-store/src/types.ts`:
+  `2100ed2037bfb027d9f6090f843f04d9d448135498fa256e208afdd67ec65b8d`;
+- `packages/node/src/v3-live.ts`:
+  `04057f76969a1286d511f629a3a0a84e60f1a811a0d7a7b0ba131d0a29db0177`;
+- `packages/storage-browser/src/internal/browser-issuance-store.ts`:
+  `692e02f4381872f26b9d1801ef1d17cd760eb30ca6bfb9d8ffb09f4d27c024bd`;
+- `packages/storage-node/src/internal/node-issuance-store.ts`:
+  `ab4fa2a5f81c5f674a799387d324e2f83db6dddbda6e22bc5611f0818f140110`.
+
+The RED evidence manifest records the clean-layer and overlay-layer commands,
+complete results, exact classifications, overlay application/removal, all
+hashes and the proof that the main worktree's seven candidate files were never
+modified by the isolated execution. GREEN remains one later production commit
+and must pass every focused, static, retained and isolated gate in a genuinely
+clean checkout with no overlay. This correction changes evidence attribution
+only; it adds no production behavior, test accommodation, review round or
+acceptance weakening.
 
 Because this adds recovery behavior beside signed issuance and one explicit
 workspace dependency edge, one bounded Grok 4.6/high, direct Kimi K3 with
