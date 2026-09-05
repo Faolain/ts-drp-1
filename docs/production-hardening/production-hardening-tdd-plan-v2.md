@@ -18449,26 +18449,22 @@ Closed through the 2026-09-05 checkpoint:
   authenticated notification. Room-owned and successor-recovery rejection
   fail closed, while ordinary Node ingress/local issue retain their legacy
   log-and-continue behavior.
+- **D.110c-0c1f5b0w settlement manual-review hold semantics** is GREEN,
+  signed, pushed and finally reviewed with an empty P0/P1 union. Accepted RED
+  `8154c9cb`/`ce55db71` is the exact pre-frozen 219-test, 156-pass/63-fail
+  matrix; rejected diagnostics `8f91396a`/`9cc5cdb0` and
+  `91386f86`/`a83af8a4` remain immutable and unclaimed. Production
+  `9c1ec6c4` and evidence `ad38e6c4` make the durable manual-review hold a
+  prompt fail-closed state, restore creator-close and cleanup liveness, and
+  freeze retained settlement entry identity/link/progress without an API or
+  parent successor-codec change. Final review evidence is
+  `.logs/d110c-0c1f5b0w-final-review-ad38e6c4/`. Its nonblocking private error-
+  provenance and closed-error-precedence findings are owned by parent f5b
+  before parent closure; prospective isolated evidence must record its patch-
+  application boundary explicitly.
 
 Authorized now (tests-only RED; production GREEN remains gated):
 
-- **D.110c-0c1f5b0w settlement manual-review hold semantics** below. The
-  governing high-risk plan review found a bounded sequencing/store-law P1
-  union; the signed correction's one material confirmation has an empty P0/P1
-  union. The first Astra-high tests-only checkpoint and its sole 219-test run
-  are rejected and preserved at `8f91396a`/`9cc5cdb0`: the store RED and
-  f5b0c supersession were causal, but two fixture oracles and redirect cleanup
-  made the complete matrix differ. Its first corrective checkpoint is also
-  rejected and preserved at `91386f86`/`a83af8a4`: all intended RED tokens
-  became causal without a hook timeout, but two retained-control observations
-  still conflated restart callback replay and a terminally closed store with
-  product effects. Final tests-only correction `8154c9cb` and evidence
-  `ce55db71` establish the exact pre-frozen causal 156/63 RED matrix. A
-  separate Astra-high GREEN is authorized. This prerequisite adds no public
-  method, field or authority: it
-  makes a held public `issue()` refuse promptly, prevents the hold from
-  blocking the existing creator-close owner, preserves same-epoch durable
-  reopen and freezes retained store entries.
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
   exactly one expected settlement-profile failure and one complete v1 pass.
@@ -100361,9 +100357,9 @@ workload change is authorized here.
 
 ###### D.110c-0c1f5b0w settlement manual-review hold semantics prerequisite
 
-**Status: exact causal tests-only RED accepted; one separate Astra-high GREEN
-is authorized next. Parent f5b production GREEN remains blocked until this
-slice is GREEN and finally reviewed.** Owner:
+**Status: GREEN, signed, pushed and finally reviewed with an empty P0/P1 union;
+parent f5b may resume its already-authorized coverage-corrective tests-only
+RED.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the settlement
 plan merge, `drainSettlementOutbox()`, startup `rebasePromise`, public
 `issue()` and creator `sealEpoch()` waits; and
@@ -100653,10 +100649,50 @@ preserved separately. No production, API, wire, schema, dependency, timeout or
 post-run test change occurred. The accepted causal RED authorizes the separate
 Astra-high GREEN described above.
 
+Production GREEN `9c1ec6c40b0af8999c22fa1bc9f1ad971e0e6b2e` and evidence
+`ad38e6c4571c582114e36f29040fd8d2ecafe3b3` are signed and pushed. The
+two-file implementation changes only `examples/v3-room/src/index.ts` and
+`packages/issuance-store/src/contract.ts`; accepted tests are byte-unchanged.
+The primary and isolated focused suites pass 219/219, the genuine v1 control
+passes 1/1 in both environments, affected typechecks/builds/lint/8-GiB format/
+diff/source/API-shape gates pass, and the isolated checkout rebuild resolves
+the candidate validator from its own source. The broader retained run is
+118/136 in both candidate and accepted-anchor comparison: all 18 failures have
+the same Phase-3g title/status/`truncated canonical value` matrix from the
+already-owned malformed legacy parameter fixture, before the changed hold and
+validator seams. GREEN neither fixes nor rebaselines that debt. Evidence at
+`.logs/d110c-0c1f5b0w-green-25ec9862/` has a 155-entry self-excluding manifest
+SHA-256 of
+`ce993ecca0337e0a9684d1dfde8883c27b5521f15d994c3c10a900816e02de7d`.
+
+The final review inspected the complete plan/rejected-RED/accepted-RED/GREEN
+history. Grok 4.6/high returned substantive PASS `0/0/0`; its strict runner
+first recorded `NO_VERDICT` because the JSON followed progress prose inside a
+Markdown fence, and exact session `01a071f3-84df-7f01-879f-f1f899135b6b`
+performed one unchanged schema-only re-emission. Codex `gpt-5.6-sol` high
+returned PASS `0/0/1`. Fable 5.1 was invoked only through `claude-phel`; the
+default-high inspection was continued in exact session
+`a9158ed5-f908-4514-9b56-3f37902e8f17` with explicit `--effort xhigh`, which
+returned PASS `0/0/2`. The blocking union is empty. Sol's P2 is assigned to
+parent f5b room integration before closure: replace message-only recognition
+of the internally generated manual-review redirect cause with a private non-
+exported brand or equivalent marker and retain a non-hold same-message
+collision control, preserving the public TypeError text. Fable's lifecycle P2
+is also parent-owned: align closed-versus-held refusal precedence without a
+new API. Its evidence P2 is prospective: future isolated gates record an
+explicit empty pre-patch diff or patch-application status; it does not reopen
+this slice. Final review evidence has a 15-entry self-excluding manifest
+SHA-256 of
+`43cd8a3f75654bc7a55612cd7e20323b1fdeed0dea7805c99f3a857d50ee625f`.
+This closes f5b0w without claiming parent settlement close/adopt,
+cross-epoch hold custody, removal/re-admission, 64-writer or ≥100-transition
+completion.
+
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: CAUSAL RED ESTABLISHED; one coverage-corrective tests-only RED is
-authorized, while parent GREEN is blocked on that correction and f5b0w.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+**Status: CAUSAL RED ESTABLISHED; f5b0w is GREEN/finally reviewed and one
+coverage-corrective Astra-high tests-only RED is authorized next. Parent GREEN
+is blocked on that correction.** The f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
