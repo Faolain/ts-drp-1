@@ -1,0 +1,126 @@
+{
+  "tests": "867d7f09a78bb106cae10419b636bfa3638b11d6",
+  "signature": "G",
+  "pushed": true,
+  "classification": "ACCEPTED_RETAINED_FINALITY_BASELINE",
+  "executionCount": 1,
+  "total": 19,
+  "passed": 19,
+  "failed": 0,
+  "allOtherAssertionsUnchanged": true,
+  "parentTestsUnchanged": true,
+  "productionPreserved": true,
+  "isolatedSourceRuntimePreserved": true,
+  "targetDiagnostics": 4,
+  "inheritedTypeDiagnosticsIdentical": true,
+  "editedOwnerDiagnostics": 0,
+  "typecheckClaimedPass": false,
+  "externalDiagnostics": 0,
+  "packageWideTypecheckClaimedGreen": false,
+  "protectedPaths": 86522,
+  "stashCount": 27,
+  "arraySpans": [
+    {
+      "file": "tests/fixtures/phase-5-v3/seal-types.ts",
+      "oldSpan": [
+        2933,
+        3024
+      ],
+      "newSpan": [
+        2933,
+        3076
+      ],
+      "before": "[\"createRecoverableFinalitySigner\", \"signCreatorAnchorRequest\", \"signSealRegisteredDigest\"]",
+      "after": "[\n\t\t\"createRecoverableFinalitySigner\",\n\t\t\"signCreatorAnchorRequest\",\n\t\t\"signCreatorIssuanceRetirementRequest\",\n\t\t\"signSealRegisteredDigest\",\n\t]",
+      "allOutsideBytesPreserved": true,
+      "sha256": "002405797fbeec6ddcb18c28f2261ba27b28d5e601cfd8a73b586d20077488d8"
+    },
+    {
+      "file": "tests/fixtures/phase-5e-v3/creator-actor-contract.ts",
+      "oldSpan": [
+        3900,
+        3991
+      ],
+      "newSpan": [
+        3900,
+        4043
+      ],
+      "before": "[\"createRecoverableFinalitySigner\", \"signCreatorAnchorRequest\", \"signSealRegisteredDigest\"]",
+      "after": "[\n\t\t\"createRecoverableFinalitySigner\",\n\t\t\"signCreatorAnchorRequest\",\n\t\t\"signCreatorIssuanceRetirementRequest\",\n\t\t\"signSealRegisteredDigest\",\n\t]",
+      "allOutsideBytesPreserved": true,
+      "sha256": "627b4dd02f716a3b457dc718f27e0ae9ec98a432fe8f68b2f4622d9f64ecb1ae"
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "oldSpan": [
+        9860,
+        9952
+      ],
+      "newSpan": [
+        9860,
+        10014
+      ],
+      "before": " [\"createRecoverableFinalitySigner\", \"signCreatorAnchorRequest\", \"signSealRegisteredDigest\"]",
+      "after": " [\n\t\t\t\t\"createRecoverableFinalitySigner\",\n\t\t\t\t\"signCreatorAnchorRequest\",\n\t\t\t\t\"signCreatorIssuanceRetirementRequest\",\n\t\t\t\t\"signSealRegisteredDigest\",\n\t\t\t]",
+      "allOutsideBytesPreserved": true,
+      "sha256": "f589a071a3844c31254ec648d2c0a6cf29b2f14cf29551d58556a24cbb48c906"
+    }
+  ],
+  "retainedHashes": {
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "3eaf77c0438df09af30509c839531e78576a5fe6e88c70ea2983ee997807c885",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c",
+    "tests/phase-5a-c-seal-safety-red.test.ts": "3f849d43e92056e19e94d89619a792b6bbd962ae4ee9165c0e88fbaf141991bb",
+    "packages/seal/formal/seal-safety.qnt": "710bfc464242c8209f558fd101c69d001c626f8552d454ddc3d764529247c302"
+  },
+  "immutable": [
+    {
+      "name": "d110c-0c1f5b0r-design-3a156aca",
+      "entries": 3,
+      "manifestSha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0"
+    },
+    {
+      "name": "d110c-0c1f5b-red-observer-78e068a8",
+      "entries": 63,
+      "manifestSha256": "fb5f83746c7690a6c53cdccd5edc3821687042ed2832ed6165b862407f488148"
+    },
+    {
+      "name": "d110c-0c1f5b-red-checkpoint-link-f83764c5",
+      "entries": 71,
+      "manifestSha256": "606860edd135b91fbd1eb71b3ebed39caaa80860485024bff1564a7d65797a39"
+    },
+    {
+      "name": "d110c-0c1f5b-green-d8cdb620",
+      "entries": 77,
+      "manifestSha256": "0f4facc68a059323e1d8aa9d76b0c7ecaea9d43a74684f70cb2643b3bd34993f"
+    },
+    {
+      "name": "d110c-0c1f5b-green-729be70e",
+      "entries": 61,
+      "manifestSha256": "432a74a1d229346b225e96e7314435271e32acb653f8d1012c48aade4d565be0"
+    },
+    {
+      "name": "d110c-0c1f5b-red-scalar-6353eb61",
+      "entries": 75,
+      "manifestSha256": "4590049f6472fd0eb5699ed795289803ad3ca7197545356b5049ccf4ba77d0f0"
+    },
+    {
+      "name": "d110c-0c1f5b-green-89f147cc",
+      "entries": 137,
+      "manifestSha256": "9ee19175cda3b5a1db33319c16478b3c01f3ea5c30db08a1d0a99566c3c4ef4c"
+    },
+    {
+      "name": "d110c-0c1f5b-retained-counter-bc7d615b",
+      "entries": 66,
+      "manifestSha256": "aade868d5db834154c300c5d60a68cc217a792f8eecc90c4e8811b67d9d9a69d"
+    },
+    {
+      "name": "d110c-0c1f5b-green-ab98cce6",
+      "entries": 458,
+      "manifestSha256": "16888af6758fb12fa0cf4c55cf231babac0b468665e04b7a8e6f4976a4f41523"
+    }
+  ],
+  "notNewCausalRed": true,
+  "pendingGreenGateStillRequired": true
+}

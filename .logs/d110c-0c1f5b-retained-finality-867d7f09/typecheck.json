@@ -1,0 +1,29 @@
+{
+  "targetDiagnostics": [
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "code": 2345,
+      "line": 300,
+      "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "code": 2345,
+      "line": 355,
+      "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "code": 2345,
+      "line": 488,
+      "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "code": 2345,
+      "line": 532,
+      "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+    }
+  ],
+  "externalDiagnostics": []
+}
