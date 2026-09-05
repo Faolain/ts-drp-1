@@ -31,10 +31,16 @@ const observed = vi.hoisted(() => ({
 // Resolve the existing adoption exports to the same source-module identity as
 // vite.config.mts's v3-live/creator-close aliases. These are real implementations,
 // not manufactured capabilities, transition records or future exports.
-vi.mock("@ts-drp/node/creator-adoption", () => import("../packages/node/src/creator-adoption.js"));
-vi.mock("@ts-drp/node/creator-adoption-stage", () => import("../packages/node/src/creator-adoption-stage.js"));
-vi.mock("@ts-drp/node/creator-adoption-recover", () => import("../packages/node/src/creator-adoption-recover.js"));
-vi.mock("@ts-drp/node/creator-adoption-activate", async () => {
+vi.mock("../packages/node/dist/src/creator-adoption.js", () => import("../packages/node/src/creator-adoption.js"));
+vi.mock(
+	"../packages/node/dist/src/creator-adoption-stage.js",
+	() => import("../packages/node/src/creator-adoption-stage.js")
+);
+vi.mock(
+	"../packages/node/dist/src/creator-adoption-recover.js",
+	() => import("../packages/node/src/creator-adoption-recover.js")
+);
+vi.mock("../packages/node/dist/src/creator-adoption-activate.js", async () => {
 	const actual = await import("../packages/node/src/creator-adoption-activate.js");
 	const observe = async (owner: typeof actual.reopenCreatorSuccessorAdoption, value: unknown) => {
 		const input = value as Record<string, unknown> & { onAdmittedVertex: V3AdmittedVertexSink };
