@@ -1,0 +1,42 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 2,
+  "passed": 2,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0v replayable callback contract"
+      ],
+      "fullName": "D.110c-0c1f5b0v replayable callback contract documents both existing callback surfaces without changing their type shapes",
+      "status": "passed",
+      "title": "documents both existing callback surfaces without changing their type shapes",
+      "duration": 122.61583400000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0v replayable callback contract"
+      ],
+      "fullName": "D.110c-0c1f5b0v replayable callback contract pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks",
+      "status": "passed",
+      "title": "pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks",
+      "duration": 933.6099159999999,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

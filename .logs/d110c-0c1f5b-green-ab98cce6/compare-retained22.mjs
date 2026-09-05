@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const baseline='.logs/d110c-0c1f5b0u-green-ea02487e/commands/retained-22-corrected/result.json',commit='60548549219378b30548c3c638da178561c17875';
+const read=p=>JSON.parse(fs.readFileSync(p));
+const rows=r=>r.testResults.flatMap(s=>s.assertionResults.map(a=>({name:[...a.ancestorTitles,a.title].join(' > '),status:a.status,failureMessages:a.failureMessages})));
+const old=rows(read(path.join(root,baseline))),now=rows(read(path.join(out,'retained-22/result.json')));
+const comparisons=old.map(row=>{const current=now.find(r=>r.name===row.name);return {baseline:row,current,sameStatus:row.status===current?.status,sameFirstErrorLines:JSON.stringify(row.failureMessages.map(m=>m.split('\n')[0]))===JSON.stringify(current?.failureMessages.map(m=>m.split('\n')[0]))};});
+const file='tests/phase-6a-creator-successor-product-red.test.ts',source=fs.readFileSync(path.join(root,file),'utf8'),signed=execFileSync('git',['-C',root,'show',commit+':'+file],{encoding:'utf8'});
+const start='\tit("rejects only unsupported cold successor compositions',end='\n\tit(';
+const extract=s=>{const i=s.indexOf(start);return s.slice(i,s.indexOf(end,i+1));};
+const room='examples/v3-room/src/index.ts',currentRoom=fs.readFileSync(path.join(root,room),'utf8'),oldRoom=execFileSync('git',['-C',root,'show',commit+':'+room],{encoding:'utf8'});
+const prelude=s=>{const i=s.indexOf('const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(');return s.slice(i,s.indexOf('\n\tif (',i));};
+const result={baseline,baselineReporterSha256:hash(fs.readFileSync(path.join(root,baseline))),commit,currentReporterSha256:hash(fs.readFileSync(path.join(out,'retained-22/result.json'))),comparisons,allElevenPreviousOutcomesMatch:comparisons.every(r=>r.sameStatus&&r.sameFirstErrorLines),addedCases:now.filter(r=>!old.some(o=>o.name===r.name)),test:{file,sha256:hash(source),failedCaseByteIdentical:extract(source)===extract(signed),failedCase:extract(source)},causalPrelude:{room,current:prelude(currentRoom),signed:prelude(oldRoom),byteIdentical:prelude(currentRoom)===prelude(oldRoom)},attribution:'The test supplies an application getter that throws. Existing unconditional pinned-bootstrap canonicalization reads application before the unsupported-composition guard in both signed baseline and current source. All three synthetic inputs fail before the expected guard. The later settlement-only creator restart permission change is not reached by these inputs. This is the single corrected-baseline failure, not the previously fixed AST failure; the additional AST case now passes. Not a pass or waiver.'};
+fs.writeFileSync(path.join(out,'retained-22-baseline-comparison.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({allElevenPreviousOutcomesMatch:result.allElevenPreviousOutcomesMatch,addedCases:result.addedCases,failedCaseByteIdentical:result.test.failedCaseByteIdentical,preludeByteIdentical:result.causalPrelude.byteIdentical}));

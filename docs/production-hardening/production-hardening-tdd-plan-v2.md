@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (resume parent retained GREEN after the accepted counter-harness correction):
+Current work (parent functional GREEN passes; retained compatibility debt remains open):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18554,11 +18554,19 @@ Current work (resume parent retained GREEN after the accepted counter-harness co
   and one failure: the f5b0d source-extraction harness omits the counter's real
   resolver binding. The separate helper-only correction is accepted at
   signed/pushed tests `bc7d615b` / evidence `9c9e66b3`, with one clean source-
-  built 19/19 baseline pass and unchanged assertions. Resume the separate GREEN
-  owner at gate 07 against the preserved patch, then the remaining frozen gates;
-  do not change production or the legacy window assertion for this correction.
-  Do not rerun the accepted parent RED. Retained/static/isolated closure and
-  the later long campaign remain unproved.
+  built 19/19 baseline pass and unchanged assertions. The separate GREEN
+  continuation now passes that same gate 07 at 19/19 and completes the frozen
+  runtime inventory without changing the eight-owner production patch. Final
+  unfiltered parent gate 71 passes 45/45, including the genuine 64-writer
+  three-transition case. The complete retained result is 72 files, 876 active
+  assertions plus five conditional skips: 845 pass / 31 fail / 5 skip.
+  The parent record's **Retained diagnostic inventory (2026-09-05)** assigns
+  each failure family and distinguishes source-supported hypotheses from
+  measured results. Registry-freeze reconciliation requires an explicit
+  prospective governance decision; do not replace historical hashes or undo
+  completed W0. No failure is waived. Do not rerun accepted RED or repeat the
+  inventory merely to rediscover these failures. Browser/static/isolated/final
+  review closure and the later long campaign remain unproved.
   Product state, batch, epoch and snapshot ceilings remain unchanged.
 
 Blocked, and on what:
@@ -18568,8 +18576,12 @@ Blocked, and on what:
   The discovery prerequisite f5b0z and independent observer RED are
   closed; neither needs another execution or review. The narrow scalar
   case-25, checkpoint-link and retained counter-harness corrections are also
-  accepted. Resume the existing gates
-  without a Node-to-browser dependency or invented authority.
+  accepted. The completed retained inventory exposes fixture/export-roster,
+  authority-read-order, registry-freeze, codec and W0 compatibility debts;
+  their owners and deadlines are in the parent record. The unchanged patch
+  remains uncommitted and unaccepted. Resolve those bounded causes before
+  claiming retained GREEN, without a Node-to-browser dependency, invented
+  authority, blanket hash update or reopened immutable evidence.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -100808,10 +100820,13 @@ now records 28 focused passes and no failures on the unchanged patch, including
 the complete three-transition 64-writer case. Retained execution stops at the
 f5b0d counter harness's missing resolver binding (167 passes / one failure).
 Its helper-only correction is now accepted at signed/pushed tests `bc7d615b` /
-evidence `9c9e66b3`, with one isolated 19/19 baseline pass. The separate GREEN
-owner resumes at the affected gate against the unchanged production patch. The
-partial production patch is preserved, not committed or accepted; remaining
-static, retained, isolated and final review gates remain open.** The
+evidence `9c9e66b3`, with one isolated 19/19 baseline pass. Its separate GREEN
+continuation passes the affected gate 19/19 and final unfiltered parent gate
+45/45. Complete retained runtime is 845 pass / 31 fail / 5 conditional skips
+across 72 files; the diagnostic inventory below owns the unresolved causes.
+The partial eight-owner production patch is preserved, not committed or
+accepted. Retained repair, browser/static/isolated and final review gates remain
+open.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
@@ -101601,6 +101616,107 @@ accepted parent causal RED and prior evidence are not rerun or relabeled.
 Full remaining static/retained/isolated/final-review gates stay open. The
 assessment records exact commands, all outcomes and root's corrected
 summary-versus-reporter inspection; no additional prose review is required.
+
+**Retained diagnostic inventory (2026-09-05).** The separate Astra-high GREEN
+owner completed the frozen runtime roster against signed/pushed `ab98cce6`
+plus the unchanged eight-owner patch. Evidence is
+`.logs/d110c-0c1f5b-green-ab98cce6/`; exact commands, complete reporter JSON,
+runner statuses and individual source/history attributions live there. No
+production or test edit, additional model review, browser gate, long campaign,
+consumed D.110a invocation or prior retained rerun occurred in this continuation.
+The corrected counter passes 19/19 against the actual pending implementation.
+Final unfiltered parent gate 71 passes all 45 assertions, including one real
+64-active-writer room across three genuine close/adopt transitions, restart,
+cold reopen and exact accounting. That case took 56,860.0455 ms under the
+unchanged 60,000-ms fixture watchdog; this is not a new timing guarantee or a
+substitute for the later at-least-100-transition memory/census gate.
+
+The sealed self-excluding manifest has 458 entries and SHA-256
+`16888af6758fb12fa0cf4c55cf231babac0b468665e04b7a8e6f4976a4f41523`.
+Root independently verified every entry and exact inventory, all 70 distinct
+raw reporters and runner statuses, the 72-file active-name multiset, all eight
+production hashes, all 72 test hashes and seven affected built-runtime hashes.
+The full-index/binary production patch remains
+`245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed`;
+all 27 stashes and 86,522 protected paths remain. The affected runtime matches
+actual TypeScript-program in-memory emit; this is runtime-identity evidence,
+not a new typecheck pass. Incorrect initial source-map/single-file-transpile
+diagnostics are preserved and superseded by that corrected check without a
+build or test rerun. Exact edited-plan-section formatting and plan diff checks
+pass; no repository-wide formatting or typecheck pass is claimed.
+The unfiltered staged-artifact diff check returns status 2 with exactly 924
+whitespace findings, all in the two identical raw production patch captures:
+445 context-space-before-tab and 17 blank-context trailing-space findings per
+file. Preserve those immutable diff bytes. The exact evidence check excluding
+only `inherited-production.patch` and `partial-production.patch` passes; the
+production-owner and edited-plan diff checks independently pass. This is not
+an unfiltered staged-artifact pass or a source/test exclusion.
+
+Accounting is exact: this continuation has 732 reporter entries (696 pass,
+31 fail, five conditional skips); prior gates 01–06 already contribute 149
+passes, including gate 26 covered by gate 02's verified union. No double count
+or rerun: 72 files, 876 active assertions, 881 complete reporter entries,
+845 pass / 31 fail / 5 skip. The two deliberately disabled long Node journal
+death cases are distinct from three seal-supplement cases blocked by failed
+registry readiness. Vitest listing omits these conditional cases; all five
+remain visible in raw evidence, not relabeled as passes. File-bound active
+name multisets agree with the freeze and no top-level/suite errors occurred.
+
+The following debts block parent retained acceptance. Every owner must close
+its debt before parent f5b closure and before D.110c-c/d consumes that closure:
+
+- Phase-3 room harness owner: gate 10's 18 failures match the signed baseline
+  exactly. Its one-byte fake canonical invite reaches parameters decoding
+  before the intended rebase assertions. A bounded valid-fixture correction
+  must preserve those assertions; no product decoding bypass.
+- Room lifecycle owner: gate 22's one failure also matches the signed
+  baseline. Unsupported cold compositions read application authority before
+  refusal. This is an unresolved ordering contract, not permission to weaken
+  the zero-authority-read assertion or label it a fixture-only defect.
+- Root/protocol-governance owner: gates 30 and 40 have three registry-pin
+  failures. Signed W0 `0d6e38c2` added the optional `authorShareMultiplier`
+  registry field; the old raw-registry freeze remains in force in checkers,
+  policies and historical/reference evidence. Preserve closed W0 and every
+  immutable artifact. A prospective compatibility/freeze reconciliation is
+  required, with an explicit reviewed boundary before any pin/checker change;
+  no implementation of that governance repair is authorized by this record.
+  Historical hashes must not be bulk-replaced to make a current suite pass.
+- Keychain/issuance retained-contract owners: gates 31, 32 and 67 have three
+  stale export-roster failures. They omit the signed retirement signer and
+  five signed settlement-progress/hold exports. Gate 67 also has a stale
+  `contract.ts` hash after its failed assertion; that is a read-only finding,
+  not another executed failure. Corrections must recognize exact existing
+  signed owners and preserve publication/classifier semantics and later checks.
+- Settlement codec fixture owner: gate 56 has two distinct failures. The
+  current parent patch rejects a cut fixture missing history root/size when
+  its settlement checkpoint binds those fields; this failure is exposed by
+  the pending patch, not simply inherited. Separately, an abbreviated ACL
+  fixture fails the exact shape contract already signed at `93585bf3`.
+  Preserve history binding, sentinel and adjacency assertions; do not relax
+  production authentication to accommodate incomplete fixture records.
+- W0 runtime/settlement compatibility owners: gate 58 has one measured
+  aggregate-assertion failure after its real workload. Its five other cases
+  pass. The source-supported explanation is a legacy-profile fixture expecting
+  a fence despite the later signed `93585bf3` settlement-only ingress rule.
+  The reporter omits received property values, so the exact differing property
+  is not claimed as measured. Reconcile the two accepted contracts explicitly;
+  do not claim a new capacity regression, waive fence accounting or reopen W0.
+- Phase-3 transport harness owner: gate 70 has three failures. The known
+  pre-publication fixture and its FIFO companion lack matching durable issued
+  rows, preventing the intended publication observations. A separate whole-file
+  extractor-count assertion predates two signed recovery call sites. Preserve
+  genuine signature/issued-row authentication, publication ordering and exact
+  ingress ownership rather than adding a production bypass or loose count.
+
+After the full inventory, execution stops for these bounded dispositions.
+Passing bounded functional integration does not close retained GREEN. Preserve
+the current patch and evidence; complete any necessary separate tests-only
+RED correction before its GREEN, use the existing parent review gate, and
+obtain the explicit prospective registry-governance scope before that repair.
+No new API, workload, threshold, dependency or authority change is authorized
+by this diagnostic record. The existing Grok/Sol-high/Fable-xhigh final review
+still owes the complete accepted RED-to-GREEN history after the gates pass;
+no recursive model review of this status prose is required.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

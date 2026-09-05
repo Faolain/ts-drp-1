@@ -1,0 +1,31 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3f-c-v3-room-batching-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 3f-c shared-room batch measurement"
+      ],
+      "fullName": "Phase 3f-c shared-room batch measurement measures one, two, sixteen, and seventeen captured requests at the genuine signing boundary",
+      "status": "passed",
+      "title": "measures one, two, sixteen, and seventeen captured requests at the genuine signing boundary",
+      "duration": 327.95270800000003,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

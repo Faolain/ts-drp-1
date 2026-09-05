@@ -1,0 +1,262 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 22,
+  "passed": 22,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress codec RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress codec RED keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte",
+      "status": "passed",
+      "title": "keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte",
+      "duration": 1.9588329999999132,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress codec RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress codec RED accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks",
+      "status": "passed",
+      "title": "accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks",
+      "duration": 1.633209000000079,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress codec RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress codec RED pins 16 as accepted and 17 as rejected without treating 17 as a settlement source",
+      "status": "passed",
+      "title": "pins 16 as accepted and 17 as rejected without treating 17 as a settlement source",
+      "duration": 0.2516250000001037,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress codec RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress codec RED rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions",
+      "status": "passed",
+      "title": "rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions",
+      "duration": 0.5911669999998139,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress codec RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress codec RED accepts only the exact five-key progress effect and copies its digest",
+      "status": "passed",
+      "title": "accepts only the exact five-key progress effect and copies its digest",
+      "duration": 0.5478749999999764,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress codec RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress codec RED validates a progress effect as a closed commit instead of failing on a future export",
+      "status": "passed",
+      "title": "validates a progress effect as a closed commit instead of failing on a future export",
+      "duration": 2.226791999999932,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED memory atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "status": "passed",
+      "title": "memory atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "duration": 4.969875000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED browser atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "status": "passed",
+      "title": "browser atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "duration": 16.15424999999982,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED node atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "status": "passed",
+      "title": "node atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "duration": 11.032958000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "status": "passed",
+      "title": "memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "duration": 0.7745409999999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "status": "passed",
+      "title": "browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "duration": 3.4947500000000673,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "status": "passed",
+      "title": "node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "duration": 5.567000000000007,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "status": "passed",
+      "title": "memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "duration": 1.1720410000000356,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "status": "passed",
+      "title": "browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "duration": 2.850791000000072,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "status": "passed",
+      "title": "node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "duration": 5.185167000000092,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED uses exact error ownership for malformed commits, stale progress and corrupt stored values",
+      "status": "passed",
+      "title": "uses exact error ownership for malformed commits, stale progress and corrupt stored values",
+      "duration": 0.9770000000000891,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED round-trips nested progress through browser structured clone and Node JSON without changing schemas",
+      "status": "passed",
+      "title": "round-trips nested progress through browser structured clone and Node JSON without changing schemas",
+      "duration": 4.614124999999831,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED browser reopens before/after partial and final chunks without losing exact progress",
+      "status": "passed",
+      "title": "browser reopens before/after partial and final chunks without losing exact progress",
+      "duration": 5.4287910000000466,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t settlement progress store RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t settlement progress store RED node reopens before/after partial and final chunks without losing exact progress",
+      "status": "passed",
+      "title": "node reopens before/after partial and final chunks without losing exact progress",
+      "duration": 13.043333999999959,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t Node pre-reservation and split RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t Node pre-reservation and split RED keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split",
+      "status": "passed",
+      "title": "keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split",
+      "duration": 241.57850000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t Node pre-reservation and split RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t Node pre-reservation and split RED refuses malformed and stale progress before signing, while a valid exact prefix issues",
+      "status": "passed",
+      "title": "refuses malformed and stale progress before signing, while a valid exact prefix issues",
+      "duration": 79.03554199999985,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0t Node pre-reservation and split RED"
+      ],
+      "fullName": "D.110c-0c1f5b0t Node pre-reservation and split RED pins the progress owners without confusing a source-shape diagnostic with runtime proof",
+      "status": "passed",
+      "title": "pins the progress owners without confusing a source-shape diagnostic with runtime proof",
+      "duration": 1.9172499999999673,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

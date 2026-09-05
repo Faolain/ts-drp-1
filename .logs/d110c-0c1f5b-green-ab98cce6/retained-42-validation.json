@@ -1,0 +1,141 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 11,
+  "passed": 11,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED freezes one tests-only RED owner, one internal GREEN owner, the policy vector, and refusal precedence",
+      "status": "passed",
+      "title": "freezes one tests-only RED owner, one internal GREEN owner, the policy vector, and refusal precedence",
+      "duration": 1.9182499999999436,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED proves the dangling-parent mutant and exact local lineage-floor normalization",
+      "status": "passed",
+      "title": "proves the dangling-parent mutant and exact local lineage-floor normalization",
+      "duration": 8.279999999999973,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED keeps the candidate package-internal and free of deletion effects",
+      "status": "passed",
+      "title": "keeps the candidate package-internal and free of deletion effects",
+      "duration": 4.37074999999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED [RED readiness] requires the sole closed-epoch cleanup planner",
+      "status": "passed",
+      "title": "[RED readiness] requires the sole closed-epoch cleanup planner",
+      "duration": 0.20366699999999582,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED returns the exact immutable active/two-ancestor/floor plan",
+      "status": "passed",
+      "title": "returns the exact immutable active/two-ancestor/floor plan",
+      "duration": 17.304040999999984,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED continues planning from a numeric pruning watermark across restart and a later epoch",
+      "status": "passed",
+      "title": "continues planning from a numeric pruning watermark across restart and a later epoch",
+      "duration": 3.1070419999999785,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED rejects every causal mutant with the exact closed reason",
+      "status": "passed",
+      "title": "rejects every causal mutant with the exact closed reason",
+      "duration": 1.6782080000000406,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED refuses gaps, surviving branches, wrong floor parents, and incomplete closures",
+      "status": "passed",
+      "title": "refuses gaps, surviving branches, wrong floor parents, and incomplete closures",
+      "duration": 1.1709160000000338,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED applies exact refusal precedence",
+      "status": "passed",
+      "title": "applies exact refusal precedence",
+      "duration": 0.5412919999999986,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED is permutation-invariant and returns detached output",
+      "status": "passed",
+      "title": "is permutation-invariant and returns detached output",
+      "duration": 1.0806250000000546,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED accepts genuine Phase-6a close/adoption material without reopening verification",
+      "status": "passed",
+      "title": "accepts genuine Phase-6a close/adoption material without reopening verification",
+      "duration": 959.548583,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

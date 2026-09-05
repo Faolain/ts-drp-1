@@ -1,0 +1,31 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5 foreign-author close liveness"
+      ],
+      "fullName": "D.110c-0c1f5 foreign-author close liveness keeps foreign frontier anomalies author-local while creator corruption stays fail closed",
+      "status": "passed",
+      "title": "keeps foreign frontier anomalies author-local while creator corruption stays fail closed",
+      "duration": 7957.955334,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}
