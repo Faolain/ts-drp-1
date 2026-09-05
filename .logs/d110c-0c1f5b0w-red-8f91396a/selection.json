@@ -1,0 +1,33 @@
+{
+  "changed": [
+    "tests/fixtures/phase-6b-d110c-0c1f5b0w/manual-review-probe.ts",
+    "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  ],
+  "selected": [
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts"
+  ],
+  "runCountAuthorized": 1,
+  "noCampaign": true,
+  "expectedStore": {
+    "total": 93,
+    "failed": 57,
+    "passed": 36
+  },
+  "expectedNewRoomFailures": [
+    "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG",
+    "D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG",
+    "D110C_F5B0W_MANUAL_REVIEW_REHEARSAL_HANG",
+    "D110C_F5B0W_MANUAL_REVIEW_ACTIVATION_HANG"
+  ],
+  "supersededF5b0cFailures": 1,
+  "redirect": "Either genuine durable target hold causal refusal or exact record-rejected pre-hold deferral; no other failure accepted"
+}
