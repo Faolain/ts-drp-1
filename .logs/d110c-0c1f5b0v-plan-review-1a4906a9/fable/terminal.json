@@ -1,0 +1,33 @@
+{
+  "verdict": "PASS",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 3,
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Tests-only GREEN label conflicts with criterion 3 source-comment edit",
+      "evidence": "Plan f5b0v record says tests-only GREEN correction while acceptance item 3 requires adding a public-contract comment beside examples/v3-room/src/index.ts:399.",
+      "impact": "GREEN evidence would report a non-zero source change while appearing to violate its own label, or omit the contract comment.",
+      "required_action": "f5b0v GREEN author: relabel the checkpoint as tests-plus-contract-comments GREEN and source-check that the two source hunks are comments only."
+    },
+    {
+      "severity": "P2",
+      "title": "Criterion 2 durable issuance rows has no direct assertion in the retained RED",
+      "evidence": "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts:397-400 asserts projection-derived operation identities, not a direct issuance-store read.",
+      "impact": "A duplicated or re-issued local row hidden by projection digest deduplication would not be caught by the named check.",
+      "required_action": "f5b0v GREEN author: add a direct issuance-store assertion for unchanged lineage/exact issued records across rejected and successful reopen."
+    },
+    {
+      "severity": "P2",
+      "title": "Second-callback test does not pin authentication-before-callback ordering on the recovered attempt",
+      "evidence": "The second test does not assert authenticated-projection-base and validated-application-state precede the successful recovered attempt's commit events.",
+      "impact": "The replayable d1,d1,d2 count alone would not detect callbacks occurring before successor base validation on retry.",
+      "required_action": "f5b0v GREEN author: assert the second authentication/validation events precede the recovered attempt's first commit event."
+    }
+  ],
+  "contract_assessment": "Correct and honest. Canonical state is exact-once by digest; neither DurableLiveJournalStore nor DurableIssuanceStore exposes a per-consumer delivery cursor or receipt; fail-closed cleanup is preserved; digest is a valid idempotency key. Exactly-once external effects require an application-owned atomic effect/idempotency port.",
+  "consumer_assessment": "No production consumer requires durable exactly-once callback effects. v3-chat and grid use no-op callbacks and derive state from onProjection. Room-internal consumers are bounded in-memory reconstruction observers checked against canonical evidence.",
+  "red_green_assessment": "RED 488a22a6/692b4add is causal and validated. The explicit replayable d1,d1,d2 expectation is discriminating if canonical exact-once checks remain; the three P2 gaps are concrete but nonblocking.",
+  "parent_f5b_ready_after_green": true
+}
