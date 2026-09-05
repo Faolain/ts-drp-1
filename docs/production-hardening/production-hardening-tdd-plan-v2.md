@@ -18440,10 +18440,11 @@ Authorized now (tests-only RED first, then GREEN):
   f5b0t RED and corrected RED are causal, but the first incomplete GREEN audit
   demonstrated missing failure classification, fresh-handle recovery and
   constant-ownership seams. Its initial bounded high-risk review returned a
-  material P1 union; complete the single confirmation of the corrected plan,
-  then its causal tests-only RED and the combined f5b0t/f5b0u GREEN. No parent
-  f5b integration or further production edit is authorized before that
-  checkpoint.
+  material P1 union; the single confirmation then found one nested-lifetime
+  deadlock, which the final plan correction removes without another review
+  round. Proceed with its causal tests-only RED and the combined f5b0t/f5b0u
+  GREEN. No parent f5b integration or further production edit is authorized
+  before that checkpoint.
 
 Blocked, and on what:
 
@@ -99559,6 +99560,12 @@ Selected bounded contract:
   recheck after signing returns existing `admission-rejected`, halts the handle
   and requires reopen; it is never retried on the same plane. This adds no
   `V3LocalIssueResult` variant or top-level Node input member.
+- f5b0u supersedes only the `lastLogicalTime` ownership sentence above. Node
+  remains the application-batch assembly and admission authority, but the
+  issuance store derives the durable chunk floor inside the existing issue
+  transaction from the exact signed commit bytes. The room never supplies the
+  floor, and the store's closed structural parser is not a second Node
+  admission policy.
 - Error ownership is exact. Malformed durable plan values use
   `ISSUANCE_RECOVERY_CORRUPT`. A commit effect with invalid closed shape,
   unsafe indices, `fromIntent >= throughIntent`, `throughIntent > 16`, or a
@@ -99731,9 +99738,11 @@ prerequisite neither satisfies nor weakens any of them.
 
 ###### D.110c-0c1f5b0u settlement restart/reconciliation prerequisite
 
-**Status: PLAN REVIEW CORRECTION REQUIRED; tests-only RED is blocked until the
-one material confirmation of the corrected plan has an empty P0/P1 union.**
-The signed f5b0t RED `fb3c5c59` and its tests-only
+**Status: PLAN ACCEPTED; tests-only RED is authorized.** The single material
+confirmation returned one P1 against nested lifetime-transition enqueueing;
+the exact correction below makes startup settlement/rebase itself the sole
+queued transition and is mechanically source-audited under the governing
+one-confirmation cap. The signed f5b0t RED `fb3c5c59` and its tests-only
 timing correction `c1d602f6` remain accepted causal evidence under
 `.logs/d110c-0c1f5b0t-red-fb3c5c59/` and
 `.logs/d110c-0c1f5b0t-red-correction-c1d602f6/`. The incomplete f5b0t GREEN
@@ -99749,8 +99758,8 @@ reopening of closed f5b0a through f5b0d or W0.
 
 Owners: the existing f5b0t issuance-store contract/conformance and three
 backends, Node v3-live issue/source owners, v3-room settlement startup and
-recovery orchestration, the f5b0t fixtures, and one direct existing workspace
-dependency edge from `@ts-drp/example-v3-room` to
+recovery orchestration, the f5b0t fixtures, and one new direct workspace
+dependency edge from `@ts-drp/example-v3-room` to the existing package
 `@ts-drp/issuance-store`. Deadline: combined f5b0t/f5b0u GREEN and an empty
 P0/P1 final review union before parent f5b resumes, before its exact 64-writer
 three-close acceptance, and before D.110c-c/d, Phase-6 exit or Phase 7.
@@ -99781,16 +99790,24 @@ Bounded source/architecture audit and selected construction:
   old registration. Whole-session `shutdown()` is not a recovery primitive:
   it closes stores, transport and the queue manager.
 - Recovery is one owner transition, not an auxiliary promise beside startup
-  settlement. Serialize it on the existing `enqueueLifetimeTransition` tail
-  shared with close/adopt, block and drain public issue before retirement, and
-  do not resume either path until fresh activation and reconciliation finish.
+  settlement. Construct `rebasePromise` as the result of enqueueing the entire
+  startup settlement/rebase body exactly once on the existing
+  `enqueueLifetimeTransition` tail shared with close/adopt; recovery runs
+  inline inside that already-owned transition and must never make a nested
+  `enqueueLifetimeTransition` call. This ordering lets migration
+  rehearsal/activation queue behind startup settlement and await an already
+  settled `rebasePromise` without a cycle. Block and drain public issue before
+  retirement, and do not resume either path until fresh activation and
+  reconciliation finish.
   Feed every `recovered.descriptor.recoveredVertices` member through the
   existing room `commit()` path before publishing or issuing the suffix. If
   creator-close authority was bound, rebind it to the fresh handle through
   existing `bindCurrentCreatorClose` before installing that handle or
   resuming work; use the existing `D110C_B_CLOSE_REBIND_FAILED` terminal
   disposition on failure. A room with no bound close authority remains
-  unaffected. This uses existing private seams only.
+  unaffected. After a successful rebind, stop the predecessor close handle
+  before resuming, matching the existing adoption path. This uses existing
+  private seams only.
 - Before an attempted replacement issue, capture the exact prior plan revision
   and prefix. After a failed/unknown call, only a readback with the same entry,
   digest and count, prior prefix plus exactly one matching range, one newly
@@ -99812,17 +99829,22 @@ Bounded source/architecture audit and selected construction:
   not invent a fixture-only declaration.
 - `lastLogicalTime` comes from the exact signed vertex input.
   `packages/issuance-store/src/contract.ts` owns a closed local parser for the
-  real Node application-batch grammar: exact action `applicationBatch`, exact
-  outer keys `action`/`batch`, exact nested keys `entries`/`version`, exact
-  entry keys `logicalTime`/`operation`, version `1`, and `2..16` entries. Only
-  that form may select the final child logical time; an ordinary application
-  operation containing an `entries` or `batch.entries` field retains the
-  vertex logical time. Issuance-store cannot import Node, and Node must not
-  import this parser back as its admission owner. A real Node-assembled batch
-  behavioral test pins the parser's final-child result and the existing
-  sixteen-entry bound across that dependency direction. The current test
-  helper's invented `$drp.application-batch.v1` direct `entries` grammar is
-  removed rather than supported in production.
+  real Node application-batch carrier structure needed to derive that floor:
+  exact action `applicationBatch`, exact outer keys `action`/`batch`, exact
+  nested keys `entries`/`version`, exact entry keys
+  `logicalTime`/`operation`, version `1`, and `2..16` entries. Every entry time
+  is a nonnegative safe integer strictly greater than its predecessor, and the
+  whole carrier must round-trip canonically under the existing limits
+  `{ maxBytes: 65_536, maxDepth: 8, maxItems: 1_024 }`. Node retains semantic
+  authority for known, non-reserved child actions and reducers. Only the
+  structurally exact form may select the final child logical time; an ordinary
+  application operation containing an `entries` or `batch.entries` field
+  retains the vertex logical time. Issuance-store cannot import Node, and Node
+  must not import this parser back as its admission owner. A real
+  Node-assembled batch behavioral test pins the parser's final-child result
+  and the existing sixteen-entry bound across that dependency direction. The
+  current test helper's invented `$drp.application-batch.v1` direct `entries`
+  grammar is removed rather than supported in production.
 - Validate every existing progress entry's count and digest against the fully
   rederived ordered operation list before issuing a missing fence. A mismatch
   issues and signs nothing, leaves lineage/plan unchanged and remains
@@ -99848,7 +99870,9 @@ not future missing imports or exports:
 
 1. Pin the real `applicationBatch` nested grammar and two ordinary-operation
    collision controls (`entries` and `batch.entries`); only the genuine batch
-   uses its last child's logical time.
+   uses its last child's logical time. Reject a non-safe, negative, duplicate
+   or regressed child logical time and a carrier that fails the existing
+   canonical round-trip limits.
 2. Across memory, Chromium and Node conformance, refuse a legacy-unlinked to
    nonempty-progress CAS with exact unchanged readback; retain zero-chunk
    origination and atomic chunk append as the paired controls.
@@ -99885,8 +99909,10 @@ not future missing imports or exports:
    a previously bound creator-close authority is rebound to the fresh plane,
    and subsequent `sealEpoch()`/adoption operates on that plane. A controlled
    rebind failure is exactly `D110C_B_CLOSE_REBIND_FAILED` and never falls back
-   to the retired plane. Retain the legacy one-shot and creator-trusted-v1 byte
-   and behavior controls.
+   to the retired plane. Include migration rehearsal and activation in this
+   race matrix and prove neither can wait on a `rebasePromise` whose recovery
+   is queued behind itself. Retain the legacy one-shot and creator-trusted-v1
+   byte and behavior controls.
 
 GREEN is limited to the previously authorized seven f5b0t production paths,
 the private room recovery/refactor required above, bounded fixtures, and the
@@ -99918,8 +99944,27 @@ real-store one-shot fault seam is named; the dependency is correctly called
 new; and the pre-existing room/Node batch-limit duplication is accepted only
 as a behaviorally pinned compatibility seam, not a new ownership or threshold
 channel. Because these corrections materially change executable recovery and
-acceptance, one confirmation of this corrected signed plan is required before
-RED; no further prose-only round follows an empty P0/P1 confirmation.
+acceptance, the single permitted confirmation reviewed signed/pushed
+`c35fae7e` and is preserved under
+`.logs/d110c-0c1f5b0u-plan-confirmation-c35fae7e/`. Grok exhausted its first
+turn allowance without a terminal verdict, then exact session
+`01a06f8b-9697-76d0-9206-f2c03e09f8e2` resumed and returned `PASS` with no
+findings. Kimi session `session_4332f058-3853-4b29-ab6a-02d1f4a03fab`
+returned `PASS` with one P2 wording correction. Opus session
+`8a1dbade-2ffe-4108-b616-036257a9f6f8` confirmed the original P1 union closed
+but found one new P1: nesting recovery on the lifetime tail from inside
+`rebasePromise` deadlocks with existing queued migration transitions that
+await that promise. The correction above instead makes the whole startup
+settlement/rebase body the one queued transition and runs recovery inline;
+RED case 8 now includes the migration waits. Opus's P2s are also adopted:
+stop the predecessor close actor after successful rebind, enforce safe and
+strictly increasing child times plus canonical limits in the store parser,
+and state that store-side signed-commit derivation supersedes only f5b0t's
+prior `lastLogicalTime` ownership sentence. A deterministic source audit pins
+the existing `rebasePromise`, `enqueueLifetimeTransition`, migration wait,
+creator-close stop/rebind and batch-grammar seams. Under the one-confirmation
+cap, these exact corrections receive no second model round; RED is authorized
+after this correction and confirmation evidence are signed and pushed.
 
 Because this adds recovery behavior beside signed issuance and one explicit
 workspace dependency edge, one bounded Grok 4.6/high, direct Kimi K3 with
