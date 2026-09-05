@@ -771,7 +771,20 @@ async function durable(peer: Peer) {
 		const scope = { author: peer.author, objectId: peer.input.objectId };
 		const lineage = await store.readLineage(scope);
 		const plan = await store.readSettlementPlan(scope);
-		const rows = await store.readOutboxPage({ scope, limit: 256 });
+		const rows: Awaited<ReturnType<typeof store.readOutboxPage>>[number][] = [];
+		let afterKey: readonly [string, string, number] | null = null;
+		for (;;) {
+			const page = await store.readOutboxPage({ scope, limit: 128, afterKey });
+			if (page.length === 0) break;
+			for (const row of page) {
+				expect(row.commit.outboxEntry.scope, "F5B_DURABLE_CENSUS_EXACT_SCOPE").toEqual(scope);
+				expect(row.commit.authorSequence, "F5B_DURABLE_CENSUS_STRICT_CURSOR_PROGRESS").toBeGreaterThan(
+					afterKey?.[2] ?? -1
+				);
+				rows.push(row);
+				afterKey = [scope.objectId, scope.author, row.commit.authorSequence];
+			}
+		}
 		return { lineage, plan, rows };
 	} finally {
 		await store.close();
