@@ -18386,14 +18386,14 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0v reslice)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b RED authorization)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
 superseded record's "Prior status" text disagrees with this list, this list and
 the superseding record win.
 
-Closed in the 2026-09-04 checkpoint:
+Closed through the 2026-09-05 checkpoint:
 
 - **f5b0a protocol codecs**, **f5b0s settlement plan store** and
   **D.110c-0c1k W0** are GREEN, signed, pushed and formally reviewed with an
@@ -18433,31 +18433,41 @@ Closed in the 2026-09-04 checkpoint:
   `b15917ff` has an empty P0/P1 union. The three stale source oracles are
   removed, the backend contracts are green, and the legacy one-window bound is
   restored without claiming the parent lifecycle gates.
+- **f5b0t/f5b0u settlement restart and reconciliation** plus **f5b0v
+  replay-callback contract** are GREEN, signed, pushed and finally reviewed
+  with an empty P0/P1 union. Production candidate `ea02487e` and evidence
+  `60548549` retain the nine-path settlement/recovery repair; AST correction
+  `4521f03f`/`22e909b91` closes the sensitive-return oracle; genuine callback
+  RED `488a22a6`/`692b4add` proves replayable `d1,d1,d2` external notification
+  attempts without duplicate canonical state or issuance; contract GREEN
+  `c66e09c2`/`d9d9487c` makes that distinction explicit. The final Sol P1
+  against blanket Node rejection wording is causally closed by source-only RED
+  `e8e7b027`/`b5d94193` and the exact JSDoc-only GREEN
+  `3f47ced3`/`5f03da91`. Final review evidence is
+  `.logs/d110c-0c1f5b0v-final-review-d9d9487c/`. Canonical projection and
+  issuance remain exact-once; the external callback is a replayable
+  authenticated notification. Room-owned and successor-recovery rejection
+  fail closed, while ordinary Node ingress/local issue retain their legacy
+  log-and-continue behavior.
 
 Authorized now (tests-only RED first, then GREEN):
 
-- **D.110c-0c1f5b0v replay-callback contract prerequisite** below. The
-  f5b0t/f5b0u production GREEN and its complete focused/static/retained/clean
-  evidence remain accepted candidate implementation, and the final-review AST
-  P1 is closed by signed correction `4521f03f` with evidence `22e909b91`.
-  Final review also found that an arbitrary external callback can expose its
-  first effect, reject on the second recovered vertex and be invoked again on
-  the next cold reopen. Genuine two-row RED `488a22a6` with evidence
-  `692b4add` proves exactly that while canonical state, durable issuance,
-  authority and owner cleanup remain correct. Existing private seams cannot
-  make an arbitrary external effect transactional. The bounded Grok,
-  Sol-high and Fable-xhigh contract review passed with an empty P0/P1 union;
-  proceed with the tests-plus-contract-comments GREEN below. No parent f5b
-  production edit is authorized before this checkpoint closes.
+- **f5b creator settlement and recovery integration** below. Resume the
+  accepted 27-case design with one causal tests-only RED commit; no parent
+  production edit precedes that RED. Its first authenticated-frontier test must
+  reach the dormant `openProgressSources` branch through the genuine
+  checkpoint-derived frontier, or GREEN deletes the dormant branch before
+  threading anything into it. The functional gate remains one real room with
+  64 active writers, every writer issuing in every epoch, across at least three
+  genuine close/adopt transitions with restart and cold reopen. The later
+  retained gate remains at least 100 genuine same-room transitions with the
+  bounded durable-structure, owner-custody and fresh-process memory controls
+  needed by the Discord/MMORPG golden paths.
 
 Blocked, and on what:
 
-- **f5b creator settlement and recovery integration** → f5b0t/f5b0u GREEN,
-  f5b0v contract closure and an empty P0/P1 review union. It then retains the full 27-case design matrix, all
-  resliced reclamation gates, and the same-room 64-active-writer,
-  every-writer-every-epoch, three-close acceptance unchanged.
-- Stage W1 (256-line frontier, version-3 ACL) is inside the blocked parent f5b
-  integration, not a separate slice.
+- Stage W1 (256-line frontier, version-3 ACL) is inside the authorized parent
+  f5b integration, not a separate slice.
 - **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
   five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
   migration → separate design; not started. **D.110c-c / D.110c-d / Phase 7**
@@ -99776,7 +99786,8 @@ prerequisite neither satisfies nor weakens any of them.
 
 ###### D.110c-0c1f5b0u settlement restart/reconciliation prerequisite
 
-**Status: GREEN CANDIDATE; final review is blocked on f5b0v.** Production
+**Status: GREEN CLOSED; signed, pushed and finally reviewed with an empty
+P0/P1 union.** Production
 GREEN `ea02487e` and evidence `60548549` passed the complete focused, native
 Chromium, build, retained-baseline and clean-isolated gates. Its final review
 closed the AST P1 through `4521f03f`/`22e909b91`, then causal RED
@@ -100146,8 +100157,8 @@ the explicit one-room 64-writer parent acceptance unchanged.
 
 ###### D.110c-0c1f5b0v recovered-delivery callback contract prerequisite
 
-**Status: PLAN REVIEWED; tests-plus-contract-comments GREEN is authorized.
-Parent f5b remains blocked.** Preserve the
+**Status: GREEN CLOSED; signed, pushed and finally reviewed with an empty
+P0/P1 union. Parent f5b tests-only RED is authorized.** Preserve the
 f5b0t/f5b0u GREEN `ea02487e`, evidence `60548549`, the final-review findings
 and all earlier immutable evidence. Final review found two P1s. The
 sensitive-return oracle P1 is closed by tests-only correction `4521f03f` and
@@ -100193,9 +100204,11 @@ Bounded architecture audit and selected contract:
   after its own rejection, session failure, crash or cold reopen. A consumer
   that persists side effects must idempotently key them on the authenticated
   vertex digest already present in `AdmittedReceivedVertexView`; callback
-  order remains canonical within one attempt. Throw/rejection remains
-  fail-closed for that session, cleanup remains mandatory, and no public issue
-  or active owner is exposed before successful recovery. This clarification
+  order remains canonical within one attempt. For the room-owned session and
+  successor recovery, throw/rejection remains fail-closed and cleanup remains
+  mandatory; ordinary authenticated Node ingress and local issue retain their
+  legacy catch/log-and-continue behavior. No public issue or active owner is
+  exposed before successful recovery. This clarification
   does not authorize swallowing callback errors, losing a retained row,
   duplicating canonical state, retrying an unclassified signed issue, or
   treating a callback as an authority source.
@@ -100232,9 +100245,12 @@ Tests-plus-contract-comments GREEN acceptance for the selected contract:
 3. Add the exact public-contract comment beside
    `CreateV3RoomSessionInput.onAcceptedVertex` and mirror it beside the
    exported Node `V3AdmittedVertexSink`: authenticated delivery is a
-   replayable attempt, persistent consumers deduplicate by vertex digest, and
-   rejection fails the current session closed. These two comment-only source
-   hunks are the sole authorized non-test changes. A source/type assertion
+   replayable attempt and persistent consumers deduplicate by vertex digest.
+   The room comment pins fail-closed session rejection; the Node comment pins
+   fail-closed successor-recovery activation separately from legacy ordinary
+   ingress/local-issue log-and-continue behavior. These two comment-only source
+   hunks, followed by the exact one-comment wording correction, are the sole
+   authorized non-test changes. A source/type assertion
    pins the guidance and proves no callback field shape, return type, runtime
    ordering, error behavior, token/AST behavior or export surface changed.
 4. Audit all production consumers and pin that none treats the callback as a
@@ -100263,6 +100279,40 @@ projection alone; and assert the successful second reopen's authentication
 and state validation precede its first callback. No P2 changes runtime scope
 or triggers another plan review.
 
+Implementation and final confirmation: GREEN `c66e09c2`, evidence
+`d9d9487c`, passed focused 6/6, source-governance 4/4, the accepted retained
+104/123 matrix with the same 19 inherited failures, all 40 package builds,
+room typecheck, exact Node baseline diagnostics, lint/format/diff/source
+checks, and a clean isolated checkout. Initial final review preserved Grok's
+substantive PASS but strict leading-prose `NO_VERDICT`, Sol's one P1 against
+the blanket Node rejection sentence, and Fable's substantive PASS but
+wrong-schema/permission-limited `NO_VERDICT`. Tests-only RED
+`e8e7b027`/`b5d94193` then failed only
+`NODE_CALLBACK_REJECTION_GUIDANCE_IS_SURFACE_SPECIFIC`; JSDoc-only GREEN
+`3f47ced3`/`5f03da91` passed local and isolated focused 2/2, relevant retained
+33/33, selected governance 4/4, exact token/AST and static gates. The exact
+Grok session `01a070b7-7c16-7721-be1a-3a87cfe13ba2` first returned substantive
+PASS after progress prose and then re-emitted terminal-only PASS on resume;
+Sol-high and Fable 5.1 xhigh session
+`e57364e1-8dbb-46f4-80b4-fbe1719afcd6` also returned PASS. The final P0/P1
+union is empty.
+
+Final P2 disposition is nonblocking and owned. This closure commit retains the
+complete current review packet and records the older f5b0u first-round union:
+Grok PASS with no findings; Sol's AST-oracle and callback-atomicity P1s, both
+closed by the causal corrections above; and Fable's three P2s covering exact
+progress-origin custody, the initially limited AST oracle, and dormant
+`openProgressSources`. Parent f5b owns a causal genuine-frontier RED or deletion
+of that dormant branch before frontier threading. The Phase-3 live-plane
+harness owner separately owns the newly observed pre-sink `publishPending()`
+failure at `tests/phase-3a1b-p3-live-transport-red.test.ts:1223`: it reproduces
+identically at untouched pre-comment `c66e09c2`, is outside this slice's
+accepted retained matrix, is not called green, and must be diagnosed before
+parent f5b rebaselines its retained matrix. No shipped consumer needs durable
+exactly-once external effects, so no new API or transactional receipt port is
+introduced; any future demonstrated need stops for the separately reviewed
+high-risk API/schema design already specified above.
+
 Because this deliberately corrects a public callback semantic overclaim next
 to authenticated recovery, one bounded Grok 4.6/high, Codex
 `gpt-5.6-sol` high and Fable xhigh plan review is mandatory before changing
@@ -100283,14 +100333,24 @@ workload change is authorized here.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED on f5b0v contract closure and the combined f5b0t/f5b0u/f5b0v
-empty P0/P1 review union.** The first
+**Status: AUTHORIZED FOR ONE CAUSAL TESTS-ONLY RED; no parent production edit
+precedes that signed/pushed RED.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
 multi-vertex progress. After f5b0t closes, this record resumes under the
 accepted D.110c-0c1f5b0r design and the prospective 64-writer composition
 amendment; f5b0a, f5b0s, f5b0b, f5b0c, f5b0d and W0 remain closed, f5b0p-a/b
 remain deleted, and no parent f5b production edit precedes its resumed RED.
+The resumed RED must include genuine checkpoint-derived reachability for
+`openProgressSources` or require its deletion before authenticated frontier
+threading. It also retains the exact one-room 64-active-writer composition:
+all 64 issue real operations in every epoch across at least three genuine
+close/adopt transitions, restart and cold reopen, before the reviewed
+long-horizon ≥100-transition MMORPG/Discord gate. Membership alone is not
+coverage. The inherited Phase-3 pre-sink publication expectation above is
+test-harness debt with a named owner and must be resolved before this parent's
+retained matrix is rebaselined; it does not authorize a product workaround.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
