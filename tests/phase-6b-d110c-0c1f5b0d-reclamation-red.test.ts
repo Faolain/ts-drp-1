@@ -139,6 +139,9 @@ type HistoricalIssuanceCounter = (
 ) => boolean;
 
 async function executableHistoricalIssuanceCounter(): Promise<HistoricalIssuanceCounter> {
+	const { resolveVerifiedCreatorHistoricalIssuance } = await import(
+		"../packages/node/src/internal/creator-transition-advance.js"
+	);
 	const filename = resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts");
 	const source = await readFile(filename, "utf8");
 	const unit = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -154,13 +157,15 @@ async function executableHistoricalIssuanceCounter(): Promise<HistoricalIssuance
 		"ReflectApply",
 		"SetPrototypeHas",
 		"SetPrototypeAdd",
+		"resolveVerifiedCreatorHistoricalIssuance",
 		`"use strict";\n${emitted}\nreturn countHistoricalIssuanceRow;`
 	) as (
 		reflectApply: typeof Reflect.apply,
 		setPrototypeHas: typeof Set.prototype.has,
-		setPrototypeAdd: typeof Set.prototype.add
+		setPrototypeAdd: typeof Set.prototype.add,
+		resolveHistoricalIssuance: typeof resolveVerifiedCreatorHistoricalIssuance
 	) => HistoricalIssuanceCounter;
-	return load(Reflect.apply, Set.prototype.has, Set.prototype.add);
+	return load(Reflect.apply, Set.prototype.has, Set.prototype.add, resolveVerifiedCreatorHistoricalIssuance);
 }
 
 afterEach(async () => {
