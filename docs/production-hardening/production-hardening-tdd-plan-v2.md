@@ -18445,12 +18445,10 @@ Authorized now (tests-only RED first, then GREEN):
   the next cold reopen. Genuine two-row RED `488a22a6` with evidence
   `692b4add` proves exactly that while canonical state, durable issuance,
   authority and owner cleanup remain correct. Existing private seams cannot
-  make an arbitrary external effect transactional. Run the one bounded
-  high-risk contract review below, then close the causal RED with the selected
-  replayable-notification contract or stop for the separately reviewed
-  transactional application-port design if the reviewers demonstrate that
-  external exactly-once effects are a product requirement. No parent f5b
-  production edit is authorized before this checkpoint.
+  make an arbitrary external effect transactional. The bounded Grok,
+  Sol-high and Fable-xhigh contract review passed with an empty P0/P1 union;
+  proceed with the tests-plus-contract-comments GREEN below. No parent f5b
+  production edit is authorized before this checkpoint closes.
 
 Blocked, and on what:
 
@@ -100148,8 +100146,8 @@ the explicit one-room 64-writer parent acceptance unchanged.
 
 ###### D.110c-0c1f5b0v recovered-delivery callback contract prerequisite
 
-**Status: PLAN FROZEN; one bounded high-risk review is required before the
-tests-only GREEN correction. Parent f5b remains blocked.** Preserve the
+**Status: PLAN REVIEWED; tests-plus-contract-comments GREEN is authorized.
+Parent f5b remains blocked.** Preserve the
 f5b0t/f5b0u GREEN `ea02487e`, evidence `60548549`, the final-review findings
 and all earlier immutable evidence. Final review found two P1s. The
 sensitive-return oracle P1 is closed by tests-only correction `4521f03f` and
@@ -100218,7 +100216,7 @@ Bounded architecture audit and selected contract:
   boundary, plus restart, corruption, prune and compatibility ownership. That
   is a public API/schema design and is expressly not folded into f5b0u.
 
-Tests-only GREEN acceptance for the selected contract:
+Tests-plus-contract-comments GREEN acceptance for the selected contract:
 
 1. Preserve the genuine two-row, second-callback failure and same-room cold
    reopen. Replace neither its authority nor its durable data. Prove the first
@@ -100227,14 +100225,18 @@ Tests-only GREEN acceptance for the selected contract:
    replayable `d1,d1,d2` rather than mislabeled as an exactly-once external
    effect.
 2. In the same test, keep hard exact-once assertions for canonical projected
-   operation IDs, application-state bytes, durable issuance rows and room
-   authority. A mutant that duplicates `d1` in canonical state must fail even
-   though repeated notification attempts are permitted.
+   operation IDs, application-state bytes, directly read issuance-store
+   lineage/rows and room authority. A mutant that duplicates `d1` in canonical
+   state or re-issues a durable row must fail even though repeated notification
+   attempts are permitted.
 3. Add the exact public-contract comment beside
-   `CreateV3RoomSessionInput.onAcceptedVertex`, and a source/type assertion
-   pinning digest-keyed idempotency guidance and fail-closed rejection. Do not
-   change the callback's field shape, return type, runtime ordering, error
-   behavior or export surface.
+   `CreateV3RoomSessionInput.onAcceptedVertex` and mirror it beside the
+   exported Node `V3AdmittedVertexSink`: authenticated delivery is a
+   replayable attempt, persistent consumers deduplicate by vertex digest, and
+   rejection fails the current session closed. These two comment-only source
+   hunks are the sole authorized non-test changes. A source/type assertion
+   pins the guidance and proves no callback field shape, return type, runtime
+   ordering, error behavior, token/AST behavior or export surface changed.
 4. Audit all production consumers and pin that none treats the callback as a
    durable exactly-once commit. Preserve v3-chat/grid behavior byte-for-byte
    and retain the existing first-callback sink/commit failure controls.
@@ -100243,6 +100245,23 @@ Tests-only GREEN acceptance for the selected contract:
    checks, retained room/recovery/creator-successor/active-owner suites and a
    clean-isolated checkout. Record commands, complete results, consumer
    inventory, hashes and a self-excluding manifest.
+
+The signed/pushed plan `1a4906a9` received the one bounded review under
+`.logs/d110c-0c1f5b0v-plan-review-1a4906a9/`. Grok's initial session
+`01a0707a-b0f0-7542-a7f0-a3548bfea427` returned PASS after progress prose, so
+the strict runner honestly recorded `NO_VERDICT`; the exact session was
+resumed once and re-emitted the same terminal PASS JSON with no P0/P1 and one
+P2. Codex `gpt-5.6-sol` high returned PASS with no P0/P1 and one P2. Fable 5.1
+xhigh ran only through the interactive `claude-phel` alias as session
+`f06b1a58-7a54-4e04-8abe-514e611fd299` and returned PASS with no P0/P1 and
+three P2s. The P2 union is adopted in one GREEN batch: rename the two
+causal-RED tokens so they say replayable notification rather than
+atomic/idempotent external delivery; mirror the contract comment on the
+exported Node sink; call the checkpoint tests-plus-contract-comments; directly
+read issuance-store lineage/rows rather than inferring durable exactness from
+projection alone; and assert the successful second reopen's authentication
+and state validation precede its first callback. No P2 changes runtime scope
+or triggers another plan review.
 
 Because this deliberately corrects a public callback semantic overclaim next
 to authenticated recovery, one bounded Grok 4.6/high, Codex
