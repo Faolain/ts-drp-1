@@ -98,11 +98,37 @@ vi.mock(
 );
 vi.mock("../packages/node/dist/src/creator-adoption-activate.js", async () => {
 	const real = await import("../packages/node/src/creator-adoption-activate.js");
+	type ActivationRealm = typeof real;
+	const realms = new Map<string, Promise<ActivationRealm>>();
+	// Independent physical clients have independent module-local activeOwners.
+	// Query-isolate ONLY that unchanged production module; its opaque intent,
+	// handle-alias and recovery dependencies retain their exact shared identities.
+	// A peer keeps its realm across close/reopen: only real room.close() releases
+	// its ownership. Never clear/reset a production singleton to admit a peer.
+	const realmFor = async (peerId: string): Promise<ActivationRealm> => {
+		let pending = realms.get(peerId);
+		if (pending === undefined) {
+			const source = new URL("../packages/node/src/creator-adoption-activate.ts", import.meta.url).href;
+			pending = import(`${source}?f5bClient=${encodeURIComponent(peerId)}`) as Promise<ActivationRealm>;
+			realms.set(peerId, pending);
+		}
+		const selected = await pending;
+		for (const [otherId, other] of realms)
+			if (otherId !== peerId)
+				expect(selected.activateCreatorSuccessorAdoption, "F5B_INDEPENDENT_CLIENT_MODULE_REALM").not.toBe(
+					(await other).activateCreatorSuccessorAdoption
+				);
+		return selected;
+	};
 	const capture =
 		(name: "activateCreatorSuccessorAdoption" | "reopenCreatorSuccessorAdoption") => async (input: unknown) => {
-			const result = await real[name](input);
+			const network = Reflect.get(input as object, "networkNode") as { peerId: string };
+			expect(network.peerId, "F5B_PHYSICAL_CLIENT_TRANSPORT_IDENTITY").toMatch(
+				/^d110c-f5b-parent-\d+-peer-\d+(?:-fresh)?$/u
+			);
+			const realm = await realmFor(network.peerId);
+			const result = await realm[name](input);
 			if (result.ok === true) {
-				const network = Reflect.get(input as object, "networkNode") as { peerId: string };
 				observed.planes.set(network.peerId, result.handle as V3PlaneHandle);
 			}
 			return result;
@@ -523,6 +549,27 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 		}
 		return true;
 	};
+	const transportFor =
+		(databaseName: string): CreateV3RoomSessionInput["openTransport"] =>
+		() => {
+			const networkNode = fakeNetwork(databaseName);
+			Reflect.set(networkNode, "gossipTopicFor", (message: Message) => message.objectId);
+			Reflect.set(networkNode, "publishMessage", (_topic: string, message: Message) => send(databaseName, message));
+			return {
+				networkNode,
+				close: () => {
+					ingress.delete(databaseName);
+				},
+				openEphemeral: () => {
+					throw new Error("F5B_EPHEMERAL_NOT_USED");
+				},
+				requestRetainedHistory: () => undefined,
+				setRetainedPublisher: () => undefined,
+				setIngressHandler: (_topic, handler) => {
+					ingress.set(databaseName, handler);
+				},
+			};
+		};
 	for (const [index, identity] of identities.entries()) {
 		const databaseName = `d110c-f5b-parent-${id}-peer-${index}`;
 		const floor = floorOwner();
@@ -554,25 +601,7 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 			},
 			onProjection: () => undefined,
 			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
-			openTransport: () => {
-				const networkNode = fakeNetwork(databaseName);
-				Reflect.set(networkNode, "gossipTopicFor", (message: Message) => message.objectId);
-				Reflect.set(networkNode, "publishMessage", (_topic: string, message: Message) => send(databaseName, message));
-				return {
-					networkNode,
-					close: () => {
-						ingress.delete(databaseName);
-					},
-					openEphemeral: () => {
-						throw new Error("F5B_EPHEMERAL_NOT_USED");
-					},
-					requestRetainedHistory: () => undefined,
-					setRetainedPublisher: () => undefined,
-					setIngressHandler: (_topic, handler) => {
-						ingress.set(databaseName, handler);
-					},
-				};
-			},
+			openTransport: transportFor(databaseName),
 		};
 		const room = await createV3RoomSession(input);
 		sessions.add(room);
@@ -726,6 +755,7 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 		checkpoint,
 		reopen,
 		stop,
+		transportFor,
 		held,
 		publicationFailures,
 		heldApplications,
@@ -1439,6 +1469,7 @@ async function sameKeyReentry() {
 			...writer.input,
 			databaseName: `${writer.databaseName}-fresh`,
 			issuanceDatabaseName: `${writer.databaseName}-fresh`,
+			openTransport: fixture.transportFor(`${writer.databaseName}-fresh`),
 		},
 	};
 	await fixture.reopen(fresh, 3, true);
@@ -1733,6 +1764,9 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		await floorCreator.room.adoptCreatorSuccessor();
 		floorWriter.floor.receive(floorCreator.floor.read());
 		const currentFloor = floorWriter.floor.read();
+		// No live owner competes with this stale durable-copy probe. The newer
+		// creator floor stays committed; stopping a session never rewinds it.
+		await floorControl.stop(floorCreator);
 		await expect(
 			floorControl.reopen(floorWriter, 0),
 			"F5B_C24A_EXACT_REACHABLE_FLOOR_REJECTION_CONTROL"
