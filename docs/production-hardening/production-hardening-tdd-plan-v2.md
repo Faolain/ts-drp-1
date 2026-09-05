@@ -18497,6 +18497,15 @@ Authorized now (tests-only RED; production GREEN remains gated):
 
 Blocked, and on what:
 
+- **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
+  high-risk design checkpoint, not a production implementation authorization.
+  The f5b fixture correction proves settlement under existing limits but does
+  not prove that production chat admission can never accept individually valid
+  work whose aggregate retained state later strands close or recovery. It does
+  not block W1, bounded parent f5b GREEN, or the MMORPG-only 100-transition
+  control. It blocks D.110c-d's Discord-shaped control, any production
+  Discord-scale claim, Phase 7a execution, and the complete Discord golden path
+  until its reviewed RED/GREEN is complete.
 - Stage W1 (256-line frontier, version-3 ACL) is inside the authorized parent
   f5b integration, not a separate slice.
 - **D.110c-0c1f5b0x per-source settlement resolution API** is an unstarted,
@@ -92222,7 +92231,11 @@ receipt, archive record, or active registration in test code.
    Node control owners. At each selected close/restart boundary it also proves
    the exported blueprint state bytes and digest equal the application's exact
    canonical state, so projector/machine divergence cannot be deferred to the
-   next cold reopen. Deadline:
+   next cold reopen. The MMORPG 64-writer and generic ≥100-transition control
+   may execute against their independently bounded application workload after
+   the existing lifecycle prerequisites. D.110c-d's Discord-shaped control and
+   its final golden-path closure additionally require D.110c-0c1f5b0y GREEN;
+   a smaller bounded fixture is not message-capacity safety evidence. Deadline:
    before Phase-6 exit or Phase-7a execution.
 
 ##### D.110c-0a bounded epoch-relative seal-custody plan
@@ -100873,7 +100886,7 @@ dependency, resource ceiling, timeout or accepted prior evidence. Its focused
 RED must fail only at the already accepted production seams, never at a missing
 import/export, malformed blueprint, new state-limit error or changed control.
 Because it corrects a frozen workload adjacent to the 64-writer golden-path
-gate, the signed/pushed amendment receives one bounded Grok 4.6/high, Codex
+gate, the signed/pushed amendment received one bounded Grok 4.6/high, Codex
 `gpt-5.6-sol` high and Fable xhigh plan review. Only P0/P1 blocks. The initial
 review at `f50a4637` found one material P1: the 33,000-byte transform was shared
 by sibling `openRoom()` consumers even though the amendment bounded only case
@@ -100883,7 +100896,16 @@ independently described the same issue; Fable xhigh inspected the repo but
 ended at a denied Bash request without a terminal verdict. None is
 misrepresented as a pass. The correction above accepts the P1 in one batch and
 permits the one confirmation round appropriate for executable-scope changes.
-After its blocking union is empty, one Astra-high tests-only RED agent commits
+That confirmation reviewed signed/pushed `d836fc3d`; Grok, Sol and Fable all
+returned `PASS`, with an empty P0/P1 union. Fable's three P2s are dispositioned
+as RED evidence/implementation guards: retain the inherited exact
+26-active/23-fail/3-pass matrix, keep case 3's local blueprint package coupled
+to its creator invite and digest, and preserve the existing case-14
+three-transition predicate. Evidence is
+`.logs/d110c-0c1f5b-workload-plan-confirmation-d836fc3d/`; its eleven-entry
+self-excluding manifest SHA-256 is
+`2ffe6ba37ac8d8a7944d43a3024a8bc6fe4050882bbfc16f8be39fc602353c8e`.
+One Astra-high tests-only RED agent now commits
 the corrected fixture and exact matrix; a separate Astra-high GREEN agent
 starts from that RED and implements only the accepted parent production
 design. The final three-review GREEN gate remains unchanged. No long campaign
@@ -101015,6 +101037,90 @@ the four candidate families and six proof obligations above must be decided by
 the required plan review first. Its one-entry self-excluding manifest validates
 and has SHA-256
 `f53ae45b110472fc83e90c4e8113330ef3b70e6ee89b26f085d1ab2e65a94485`.
+
+###### D.110c-0c1f5b0y chat admission and bounded-state continuity checkpoint
+
+**Status: source gap audited; design checkpoint required before production
+edits and before the Discord-shaped retained gate.** Owner: the v3 chat
+blueprint and product admission path in `examples/v3-chat`, generic blueprint
+operation/application-state validation in `packages/protocol-v3` and
+`packages/compaction`, and the room settlement/recovery composition in
+`examples/v3-room` and `packages/node`. Deadline: before D.110c-d can close its
+Discord-shaped control, before Phase 7a execution, and before any production
+Discord-scale claim. This checkpoint does not reopen f5b, W1, or immutable
+evidence and does not authorize a production edit.
+
+The bounded audit at
+`.logs/d110c-0c1f5b0y-chat-state-safety-audit-d836fc3d/` establishes the exact
+gap; its one-entry self-excluding manifest SHA-256 is
+`305aabf3ee4f7c4c93f4f10c63584e73fe6a86046c919c48c4b9314a34071df1`.
+Protocol-v3 can cap complete canonical operation bytes through
+`maxCanonicalOperationBytes`; v3 chat currently gives both `message` and
+`applicationBatch` the generic 65,536-byte ceiling, while the message schema
+only requires string fields and product `send()` only rejects empty text.
+Compaction separately limits canonical reducer output and application state to
+32,768 bytes. Thus one operation can be valid at ingress but impossible to
+retain, and concurrent individually valid small messages can collectively
+cross the state ceiling. Sender-local checks cannot decide that aggregate race
+authoritatively. Recovery-generated replacements have generic operation-byte
+validation but no complete contract for an oversized retained effect or a
+durable non-stranding refusal. The f5b 256-character correction avoids this
+failure in one bounded fixture; it is not production-capacity proof.
+
+The high-risk design checkpoint must select and review one deterministic
+contract before RED. It must specify:
+
+1. explicit canonical encoded-byte limits for message text and every retained
+   message-metadata field, applied consistently to local issue, remote
+   admission, direct messages, application batches, and recovery-generated
+   replacements. Character counts are insufficient; canonical framing and
+   multibyte UTF-8 overhead are included;
+2. deterministic aggregate-state overflow semantics under concurrent writers,
+   with canonical ordering and peer-independent accept/reject results. A local
+   preflight may improve UX but is never consensus authority;
+3. the exact point at which work becomes accepted, how capacity refusal is
+   represented durably, how source/replacement/fence accounting terminates,
+   what the user sees, and how close, restart, cold reopen, and later issue
+   continue without silent loss, divergence, retry ambiguity, or an
+   `INVALID_APPLICATION_STATE` dead end;
+4. separate budgets for operation input bytes, reducer output bytes, and
+   retained state. Bounded-state applications may legitimately consume large
+   transient operations; no chat-specific rule may collapse these distinct
+   limits globally;
+5. the pre-archive support boundary: hot v3 chat is supported only within its
+   reviewed retained-state/message budgets. Long history, attachments,
+   authenticated archive segmentation, paging, and million-message cold join
+   remain Phase 7 work and cannot be inferred from a smaller hot fixture; and
+6. migration, compatibility, error taxonomy, public/API/manifest/schema impact,
+   and the interaction with settlement manual-review holds and authenticated
+   pruning. No limit is silently raised, no accepted text is truncated, and no
+   rejected operation is silently dropped.
+
+RED must use the real product paths and fail for the named missing guarantee,
+not a tests-only record. Its frozen matrix covers exact encoded limit and
+one-byte-over for text and metadata; equivalent character counts with different
+UTF-8 byte lengths and canonical overhead; local and remote direct issue;
+application-batch entries; concurrent writers whose individually valid small
+messages collectively exceed retained capacity; a recovery transformation
+whose operation is valid but retained effect is oversized; deterministic
+peer-order permutations; durable outcome/accounting; and successful close,
+restart, recovery, and continued issue after each refusal. GREEN preserves
+exact-limit acceptance and one-over refusal at every ingress/recovery seam,
+produces identical ordered outcomes at every peer, never turns partial progress
+into success, and proves no refused workload can strand a later epoch.
+
+Retained gates include chat and room focused suites, generic protocol-v3
+operation-bound vectors, compaction fold/state bounds, settlement
+plan/fence/replacement recovery, concurrent multi-peer ordering, restart/cold
+reopen, exact state/effect/accounting digests, and isolated browser/Node paths.
+The later D.110c-d Discord control must consume this GREEN and Phase 7a must
+consume both; the MMORPG 64-writer and generic ≥100-transition control may
+proceed on their independently bounded application state but cannot be relabeled
+as chat-capacity evidence. If the selected contract needs a new public API,
+wire/schema field, blueprint-manifest contract, durable outcome carrier, or
+authority change, stop after the design audit and reslice that exact high-risk
+prerequisite. Before any new-API decision, root analysis plus the user-required
+one-off Fable-high consultation is mandatory.
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
@@ -101967,20 +102073,23 @@ D.110c-d must prove, in a fresh process where required, all of the following:
   MMORPG-style world using the 64-writer schedule above whose current state and
   authority continue across rotations, and a Discord-shaped room whose messages
   span genuine epochs and whose current work continues after safe pruning.
-  D.110c must produce the latter without synthetic archive rows; actual evolving
-  archive roots and cold paging remain a separately reviewed Phase-7 control
-  because the current creator-close wire requires the archive root to remain
-  unchanged.
+  D.110c must produce the latter without synthetic archive rows and only after
+  D.110c-0c1f5b0y's deterministic message/aggregate-state refusal contract is
+  GREEN; actual evolving archive roots and cold paging remain a separately
+  reviewed Phase-7 control because the current creator-close wire requires the
+  archive root to remain unchanged.
 
 Phase 7a's one-million-message cold-join gate is downstream acceptance, not a
 D.110c shortcut. Before implementation it must explicitly reslice the current
 archive-root equality contract if genuine segment production requires the root
-to advance. It then ingests the genuinely multi-epoch Discord control after
-early epochs have been safely pruned, authenticates its archive lineage, and
-proves O(hot + window) network bytes. One oversized epoch, prebuilt archive
-segments, or fixture-authored epoch records is invalid. Neither the Discord
-golden path nor age-independent cold join is claimed until that downstream gate
-is green.
+to advance, and D.110c-0c1f5b0y must already be GREEN so locally issued,
+remotely admitted, batched, and recovery-generated chat work cannot strand
+close before archive rotation. It then ingests the genuinely multi-epoch
+Discord control after early epochs have been safely pruned, authenticates its
+archive lineage, and proves O(hot + window) network bytes. One oversized epoch,
+prebuilt archive segments, or fixture-authored epoch records is invalid. Neither
+the Discord golden path nor age-independent cold join is claimed until that
+downstream gate is green.
 
 ##### Retained gates, evidence, review, and debt disposition
 
