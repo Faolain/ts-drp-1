@@ -1066,7 +1066,69 @@ async function ambiguousPlanIssue(kind: "fence" | "replacement", committed: bool
 	const entry = required(boundary.plan?.entries.find((row) => row.sourceSequence === source.authorSequence));
 	const link = kind === "fence" ? boundary.plan?.fenceSequence : entry.replacementSequence;
 	expect(link !== null, `F5B_C25_${kind}_${committed ? "ROW_AND_LINK" : "NEITHER"}`).toBe(committed);
-	expect(boundary.row, "F5B_C25_EXACT_DURABLE_ROW_AT_AMBIGUITY").toEqual(committed ? boundary.candidate : null);
+	const candidate = boundary.candidate;
+	// planEffect is an atomic transaction instruction, not an issued-row field.
+	expect(boundary.row, "F5B_C25_EXACT_DURABLE_ROW_AT_AMBIGUITY").toEqual(
+		committed
+			? {
+					authorSequence: candidate.authorSequence,
+					envelope: candidate.envelope,
+					issuedRecord: candidate.issuedRecord,
+					outboxEntry: candidate.outboxEntry,
+				}
+			: null
+	);
+	const priorPlan = required(observed.issuePlans.get(candidate));
+	const effect = required(candidate.planEffect);
+	let committedPlan: SettlementPlan;
+	if (kind === "fence") {
+		expect(effect, "F5B_C25_EXACT_FENCE_INSTRUCTION").toEqual({ kind: "fence" });
+		expect(priorPlan.fenceSequence, "F5B_C25_FENCE_LINK_ABSENT_BEFORE_TRANSACTION").toBeNull();
+		committedPlan = { ...priorPlan, fenceSequence: candidate.authorSequence, revision: priorPlan.revision + 1 };
+	} else {
+		const priorEntry = required(priorPlan.entries.find((row) => row.sourceSequence === source.authorSequence));
+		const progress = required(priorEntry.replacementProgress);
+		expect(effect, "F5B_C25_EXACT_REPLACEMENT_INSTRUCTION").toEqual({
+			kind: "replacement",
+			sourceSequence: source.authorSequence,
+			fromIntent: 0,
+			throughIntent: 1,
+			intentDigest: progress.intentDigest,
+		});
+		expect(progress, "F5B_C25_EXACT_UNCOMMITTED_REPLACEMENT_PROGRESS").toEqual({
+			version: 1,
+			intentCount: 1,
+			intentDigest: progress.intentDigest,
+			chunks: [],
+		});
+		expect(priorEntry.replacementSequence, "F5B_C25_REPLACEMENT_LINK_ABSENT_BEFORE_TRANSACTION").toBeNull();
+		expect(applicationOperations(candidate), "F5B_C25_EXACT_SINGLE_TRANSFORMED_INTENT").toEqual([
+			{ action: "message", clientOperationId: "timing-displaced", text: "r".repeat(256) },
+		]);
+		committedPlan = {
+			...priorPlan,
+			revision: priorPlan.revision + 1,
+			entries: priorPlan.entries.map((row) =>
+				row.sourceSequence === source.authorSequence
+					? {
+							...row,
+							replacementSequence: candidate.authorSequence,
+							replacementProgress: {
+								...progress,
+								chunks: [
+									{
+										replacementSequence: candidate.authorSequence,
+										throughIntent: 1,
+										lastLogicalTime: Number(record(candidate.envelope.canonicalPreimageBytes).logicalTime),
+									},
+								],
+							},
+						}
+					: row
+			),
+		};
+	}
+	expect(boundary.plan, "F5B_C25_EXACT_ATOMIC_PLAN_LINK_AND_PROGRESS").toEqual(committed ? committedPlan : priorPlan);
 	expect(boundary.lineage.next, "F5B_C25_ATOMIC_LINEAGE_WITH_ROW_AND_LINK").toBe(
 		boundary.candidate.authorSequence + (committed ? 1 : 0)
 	);
