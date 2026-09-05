@@ -131,6 +131,7 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
 });
 
 const sessions: V3RoomSession[] = [];
+const originalStorage = Object.getOwnPropertyDescriptor(navigator, "storage");
 let ordinal = 0;
 const parameters = Object.freeze({
 	maxEpochVertices: 8192,
@@ -287,6 +288,10 @@ async function openRebasePair(count: number, expandedBytes: number, withClose = 
 }
 
 beforeEach(() => {
+	Object.defineProperty(navigator, "storage", {
+		configurable: true,
+		value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+	});
 	observation.activate = [];
 	observation.commits = [];
 	observation.events = [];
@@ -300,7 +305,12 @@ beforeEach(() => {
 	observation.closeFault = false;
 });
 afterEach(async () => {
-	for (const session of sessions.splice(0)) await session.close().catch(() => undefined);
+	try {
+		for (const session of sessions.splice(0)) await session.close().catch(() => undefined);
+	} finally {
+		if (originalStorage === undefined) Reflect.deleteProperty(navigator, "storage");
+		else Object.defineProperty(navigator, "storage", originalStorage);
+	}
 });
 
 describe("D.110c-0c1f5b0u genuine room Node settlement composition", () => {
@@ -372,8 +382,13 @@ describe("D.110c-0c1f5b0u genuine room Node settlement composition", () => {
 			observation.onFault = resolve;
 		});
 		const { target, rehearsal } = await openRebasePair(2, 33_000);
-		await reached;
 		const issued = target.issue({ action: "message", clientOperationId: "after", text: "continued" });
+		await Promise.race([
+			reached,
+			issued.then(() => {
+				throw new Error("D110C_0C1F5B0U_MIGRATION_FAULT_NOT_REACHED");
+			}),
+		]);
 		const migration = target.rehearseMigration(rehearsal);
 		const activation = migration.then((receipt) =>
 			target.activateMigration({
