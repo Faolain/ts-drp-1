@@ -18450,30 +18450,43 @@ Closed through the 2026-09-05 checkpoint:
   fail closed, while ordinary Node ingress/local issue retain their legacy
   log-and-continue behavior.
 
-Authorized now (tests-only RED correction; GREEN remains blocked):
+Authorized now (tests-only RED; production GREEN remains gated):
 
-- **f5b creator settlement and recovery integration** below. Tests-only RED
-  `3a9e9329` with evidence `f7df8f80` is causal but not yet coverage-complete:
-  its genuine settlement close alone fails at
-  `F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED` over the underlying
-  `CERTIFIED_VALUE_MISMATCH`, while the genuine v1 issue/close/adopt/cold-
-  reopen/issue control passes. The first RED review preserved Grok's pre-session
-  timeout as `NO_VERDICT`, returned two Sol P1 findings against missing parent
-  safety/reclamation cases and incomplete 64-writer recovery oracles, and one
-  Fable xhigh PASS with nonblocking compatibility guidance. One tests-only
-  correction must close that union before GREEN. It retains genuine checkpoint-
-  derived `openProgressSources`, the complete parent case mapping, and one real
-  room with 64 active writers, every writer issuing in every epoch, a rotating
-  offline cohort, at least three genuine close/adopt transitions, restart and
-  cold reopen, and exact product-owned state/ACL/authority/anchor/history/plan/
-  operation accounting. The later retained gate remains at least 100 genuine
-  same-room transitions with the bounded durable-structure, owner-custody and
-  fresh-process memory controls needed by the Discord/MMORPG golden paths.
+- **D.110c-0c1f5b0w settlement manual-review hold semantics** below. The
+  bounded plan must first receive the governing high-risk review. After an
+  empty P0/P1 union, one Astra-high tests-only RED and then a separate
+  Astra-high GREEN are authorized. This prerequisite adds no public method,
+  field or authority: it makes a held public `issue()` refuse promptly,
+  prevents the hold from blocking authenticated creator close, preserves the
+  durable hold across restart/cold reopen and freezes the store's one-way
+  disposition safety law.
+- **f5b creator settlement and recovery integration** below. Accepted causal
+  RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
+  exactly one expected settlement-profile failure and one complete v1 pass.
+  Rejected fixture checkpoints `1dcff170`/`bc6ec1b1` and
+  `8fcbc039`/`aea679ba` remain immutable. Its review accepted causality but
+  found coverage corrections in cases 1, 12, 17, 22 and 25, universal
+  64-writer plan/fence accounting, final canonical-state bytes, bounded
+  rollback/prune assertions and the test-only timeout. One tests-only
+  correction is authorized; parent production GREEN remains blocked until
+  both that correction and f5b0w are closed. The retained golden-path contract
+  remains one real room with 64 active writers, every writer issuing in every
+  epoch, rotating offline cohorts, at least three genuine close/adopt
+  transitions, restart and cold reopen, followed later by at least 100 genuine
+  same-room transitions with bounded durable structures, owner custody and
+  fresh-process memory.
 
 Blocked, and on what:
 
 - Stage W1 (256-line frontier, version-3 ACL) is inside the authorized parent
   f5b integration, not a separate slice.
+- **D.110c-0c1f5b0x per-source settlement resolution API** is an unstarted,
+  unauthorized product-capability question. It is not required for parent f5b
+  or the current Discord/MMORPG continuity proof. If a product later requires
+  interactive per-source moderation rather than a durable fail-closed hold,
+  it needs its own authority, API, idempotence, multi-device and compatibility
+  design and the user's required root analysis plus one bounded Fable-high
+  consultation before any API decision.
 - **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
   five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
   migration → separate design; not started. **D.110c-c / D.110c-d / Phase 7**
@@ -100337,10 +100350,128 @@ no receipt-only patch is sufficient. No production behavior, wire/protobuf,
 authority, checkpoint, ACL, cryptography, dependency, threshold, timeout or
 workload change is authorized here.
 
+###### D.110c-0c1f5b0w settlement manual-review hold semantics prerequisite
+
+**Status: bounded plan frozen; high-risk plan review is next. Tests-only RED
+is authorized only after that review has an empty P0/P1 union; parent f5b
+production GREEN is blocked on this slice.** Owner:
+`examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the settlement
+plan merge, `drainSettlementOutbox()`, startup `rebasePromise`, public
+`issue()` and creator `sealEpoch()` waits; and
+`packages/issuance-store/src/contract.ts::assertSettlementPlanProgressTransition()`
+plus its existing conformance matrix. Deadline: GREEN before parent f5b
+production edits, before its retained matrix is rebaselined, and before any
+D.110c-c/d, Phase-6 exit or Phase-7 golden-path claim.
+
+The accepted parent RED review found one narrow lifecycle defect. A durable
+`manual-review` entry makes `drainSettlementOutbox()` await a promise released
+only by session shutdown. Public `issue()` and creator `sealEpoch()` both await
+the enclosing `rebasePromise`; the held author therefore receives no bounded
+refusal, and a creator-owned hold can freeze epoch close for every author.
+`V3RoomSession` exposes no resolution method, and the room rejects a changed
+prior disposition. Direct store mutation would invent authority. The existing
+authenticated membership revoke → close/adopt → grant → close/adopt path can
+eventually remove the old-incarnation source at plan merge, but that is
+author-wide eviction and content discard, not per-source moderator approval.
+
+This record prospectively supersedes only parent design RED case 11 and the
+`manual-review entry` matrix row; the accepted design artifact and manifest
+remain immutable. The required parent truth is now: a manual-review entry
+causes no plan completion, fence or replacement; the held author's ordinary
+issue refuses promptly and fail closed; other authors and authenticated epoch
+close continue; the exact entry and source remain durable across close,
+restart and cold reopen; no pruning occurs while it is unlinked; and the plan
+can empty only when authenticated plan re-derivation no longer contains the
+source, including boundary settlement or removal/re-admission under a new
+`admissionEpoch`. Per-source interactive resolution is explicitly owned by
+future D.110c-0c1f5b0x and is not claimed here.
+
+The narrow GREEN contract is:
+
+1. A completed plan containing `manual-review` becomes a stable held startup
+   state rather than a pending lifetime transition or terminal session
+   failure. Public `issue()` on that author's session rejects promptly with
+   exact `TypeError("v3 room settlement plan requires manual review")`; it
+   does not enqueue an issuance transaction, publish, fence, replace, mutate
+   the plan, close the session or set a terminal failure. `projection()`,
+   status and orderly shutdown remain usable.
+2. Creator `sealEpoch()` does not wait on the held drain. A creator-owned or
+   noncreator-owned hold may keep only that author's authenticated boundary
+   from advancing; the genuine creator close/adopt transition and unaffected
+   authors continue. The held author emits no fence or replacement, and close
+   derives its unchanged boundary from authenticated product state rather than
+   a fixture override.
+3. Restart and cold reopen re-derive the same hold from durable settlement
+   plan and source truth. The exact scope, revision, source sequence/digest,
+   disposition and null link remain byte-identical. No retry, duplicate plan,
+   fence, replacement, publication, application effect or pruning occurs.
+4. The store transition validator preserves `sourceDigest` for every retained
+   entry and refuses a transition from a final `expire`/`rebase`/`transform`
+   disposition back to `manual-review`. A retained linked or progress-bearing
+   entry remains immutable under its existing stricter laws. The only
+   future-compatible disposition relaxation recognized by the contract is an
+   unlinked, unfenced, progress-free `manual-review` entry moving once to one
+   final disposition with the same source identity; this slice adds no room
+   caller for that transition and parent f5b keeps dispositions unchanged.
+5. Authenticated removal/re-admission proves the current no-API release path:
+   after revoke and genuine close/adopt, then grant and genuine close/adopt,
+   the returning author has a new `admissionEpoch`; old-incarnation sources are
+   terminal, the obsolete held entry disappears only through normal plan
+   re-derivation, the prune gate releases only when its existing requirements
+   hold, and a new empty plan issues exactly one fence before ordinary issue.
+
+Tests-only RED uses genuine product sessions and stores and makes no direct
+plan edit. It deterministically observes, with a parent-owned bounded
+settlement sentinel rather than a wall-clock timeout, that a held `issue()`
+does not settle before shutdown and terminates with exact tests-only token
+`D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG`; separately it proves a creator-held
+plan prevents a genuine close from reaching its existing close owner and
+terminates with
+`D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG`. A migration-import manual-review path
+must likewise settle as a typed refusal rather than hang session creation. The
+store conformance RED proves source substitution and final-to-manual-review
+rewrites are currently admitted if that is what the real backend path shows;
+an already stricter backend result is a retained control, not a manufactured
+failure. RED is rejected if it times out, fails before durable hold creation,
+uses a private resolver/store mutation as authority, changes a product error,
+or does not preserve the exact durable row.
+
+GREEN runs the focused room and issuance-store conformance tests, then the
+parent manual-review/displaced-control cases without advancing to the parent
+settlement-profile terminus. Retained gates cover ordinary no-hold startup and
+issue, creator close/adopt/reopen, migration redirect, offline/rebase,
+settlement plan CAS/effects/pruning, f5b0t/u/v restart/reconciliation and
+callback semantics, and `creator-trusted-v1` behavior. Exact affected package
+build/typecheck, lint, 8-GiB format, diff and source-shape checks plus an
+isolated checkout are mandatory. No campaign or long workload runs.
+
+No public method, input field, callback, result union, wire/protobuf field,
+cryptography, dependency, authority carrier, threshold, workload, timeout or
+resource ceiling is authorized. The fixed error message is a correction from
+an unbounded wait to an existing `TypeError`-style fail-closed refusal, not a
+new API surface. If RED/GREEN shows that close continuity requires weakening
+authenticated boundary rules, that a held plan must be mutated to close, or
+that a public resolver is required, stop and reslice. The separate future
+**D.110c-0c1f5b0x per-source settlement resolution API** remains unauthorized;
+before any decision to add it, perform root architecture analysis and the
+user-required one-off Fable-high consultation, then freeze read authority,
+exact `(objectId, author, sourceSequence, sourceDigest)` identity, one-way CAS,
+already-settled behavior, restart, multi-device scope and compatibility.
+
+Because this corrects public call semantics and close liveness beside durable
+settlement, it is a high-risk lifecycle slice. Sign and push this plan-only
+checkpoint, then run one Grok 4.6/high, Codex `gpt-5.6-sol` high and Fable
+xhigh plan review; invoke Fable only through `claude-phel`. Only P0/P1 blocks;
+P2 receives an owner/disposition without recursive prose review. After an
+empty blocking union, one Astra-high agent writes and commits tests-only RED,
+and a separate Astra-high agent performs the narrow GREEN. The same review
+trio reviews the signed RED→GREEN history once. Preserve protected untracked
+paths, all 27 stashes, immutable evidence and every consumed identity.
+
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
 **Status: CAUSAL RED ESTABLISHED; one coverage-corrective tests-only RED is
-authorized, while parent GREEN remains blocked.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+authorized, while parent GREEN is blocked on that correction and f5b0w.** The f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
@@ -100357,6 +100488,57 @@ long-horizon ≥100-transition MMORPG/Discord gate. Membership alone is not
 coverage. The inherited Phase-3 pre-sink publication expectation above is
 test-harness debt with a named owner and must be resolved before this parent's
 retained matrix is rebaselined; it does not authorize a product workaround.
+
+The current accepted tests-only RED chain is exact. `1dcff170` first exposed
+the fixture-global activation-owner collision and was rejected/preserved at
+`bc6ec1b1`; `8fcbc039` isolated the activation module realm but exposed an
+out-of-contract page limit and was rejected/preserved at `aea679ba`;
+`cecde972` added complete limit-128 pagination and produced the accepted run,
+preserved at signed/pushed evidence commit `b7751f72`. That run selected two
+tests in one file, passed the complete genuine v1 issue/close/adopt/cold-
+reopen/issue/stale-floor control, and failed only the genuine settlement close
+with exact `F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED` over
+`CERTIFIED_VALUE_MISMATCH`. It had no import, top-level or additional soft
+failure. Evidence is `.logs/d110c-0c1f5b-red-cecde972/`; its eleven-entry
+self-excluding manifest SHA-256 is
+`356ef503c16b1f500781350a41704bcec514e7505a64a96ca0f3614519094009`.
+
+The governing RED review accepted that causal failure and returned this
+blocking coverage union before parent GREEN: use distinct causally linked
+author sequences for case 1; add the stale `m <= terminalThrough` fence in
+case 12; add the settlement null-boundary/no-fence/no-slot-0 close and retain
+the v1 guard by reachable behavior or source-shape custody for case 17; pin
+creator slot-0 accounting in case 22; count the surviving publication exactly
+in every case-25 ambiguous outcome; require every author in every epoch of the
+64-writer proof to have the exact durable plan, one committed/published fence
+before ordinary issue and no duplicate; compare exact final canonical state
+bytes as well as the semantic digest; demand two rollback generations and
+pruning only after the product gate establishes the full window; and replace
+the unproven 60-second aggregate fixture timeout with a documented non-product
+budget or attributable split without changing workload. The query-isolated
+activation module is accepted for this bounded RED but claims only activation-
+owner isolation; D.110c-d owns a genuine multi-context/isolated-client retained
+proof before the 64-writer golden path closes. Case 5 cites the already-closed
+f5b0s missing-plan/already-fenced conformance tests rather than duplicating
+them. Rollback census observed through the copied creator AHE is creator-side
+evidence only until that later retained proof.
+
+The review also found that case 11 promised a per-source resolution seam that
+does not exist. Existing private `recoverSettlementOwner()` is valid and
+retained for case 25's ambiguous issue path; it does not resolve manual review.
+The Fable xhigh claim that case 25's in-call recovery was unauthorized is
+rejected by the existing implementation at `recoverSettlementOwner()` and
+`issueSettlement()` and the closed f5b0u contract. Its useful manual-review
+finding is accepted and owned by f5b0w above. Parent case 11 is prospectively
+reframed to the durable fail-closed hold and authenticated re-admission path;
+no resolver is added to parent f5b. Review evidence is
+`.logs/d110c-0c1f5b-red-review-b7751f72/`; its fourteen-entry self-excluding
+manifest SHA-256 is
+`69720f84caefc5f3571c449e11a2ae1da27f94f1668577ddad40eca430fecadb`.
+The separate user-required API decision consultation is
+`.logs/d110c-0c1f5b-manual-review-api-fable-high-b7751f72/`; its five-entry
+self-excluding manifest SHA-256 is
+`3d9bee48ce28e589d9f025e596d830356277cfbfc99b9011b1584838d5dba9ab`.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
