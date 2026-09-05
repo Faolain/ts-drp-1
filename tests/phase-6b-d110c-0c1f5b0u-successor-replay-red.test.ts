@@ -17,6 +17,7 @@ import {
 	type V3RoomSession,
 } from "../examples/v3-room/src/index.js";
 import { createRecoverableFinalitySigner } from "../packages/keychain/src/finality.js";
+import { createBrowserDurableIssuanceStore } from "../packages/storage-browser/src/issuance.js";
 
 type Delivery = Parameters<V3AdmittedVertexSink>[0];
 const observed = vi.hoisted(() => ({
@@ -274,7 +275,21 @@ async function genuineSuccessor() {
 		sessions.push(reopened);
 		return reopened;
 	};
-	return { accepted, authority, expected, projection, reopen };
+	const readIssuance = async () => {
+		const store = await createBrowserDurableIssuanceStore({ primaryDatabaseName: databaseName });
+		try {
+			const scope = { author, objectId };
+			const lineage = await store.readLineage(scope);
+			if (lineage.next > 16) throw new TypeError("D110C_0C1F5B0V_UNEXPECTED_ISSUANCE_GROWTH");
+			const rows = await Promise.all(
+				Array.from({ length: lineage.next + 1 }, (_, sequence) => store.readIssued(scope, sequence))
+			);
+			return { lineage, rows };
+		} finally {
+			await store.close();
+		}
+	};
+	return { accepted, authority, expected, projection, readIssuance, reopen };
 }
 
 beforeEach(() => {
@@ -359,9 +374,24 @@ describe("D.110c-0c1f5b0u genuine successor recovered-delivery RED", () => {
 			.toHaveLength(1);
 	});
 
-	it("preserves external delivery custody when callback two fails after callback one and the same room cold-reopens", async () => {
+	it("replays authenticated notifications after callback two rejects without duplicating canonical state or issuance", async () => {
 		const fixture = await genuineSuccessor();
 		const expectedDigests = fixture.expected.map(({ vertex }) => Buffer.from(vertex.digest).toString("hex"));
+		const issuedBefore = await fixture.readIssuance();
+		expect(issuedBefore.lineage.exhausted, "REPLAY_ISSUANCE_NOT_EXHAUSTED").toBe(false);
+		expect(issuedBefore.lineage.next, "REPLAY_EXACT_NEXT_DURABLE_SEQUENCE").toBe(
+			required(fixture.expected.at(-1)).vertex.authorSequence + 1
+		);
+		expect(issuedBefore.rows.at(-1), "REPLAY_NO_UNALLOCATED_ISSUED_ROW").toBeNull();
+		for (const { vertex, exactReceivedCanonicalPreimageBytes, signature } of fixture.expected) {
+			const row = required(issuedBefore.rows[vertex.authorSequence]);
+			expect(row.envelope.canonicalPreimageBytes, "REPLAY_EXACT_DURABLE_PREIMAGE").toEqual(
+				exactReceivedCanonicalPreimageBytes
+			);
+			expect(row.envelope.signature, "REPLAY_EXACT_DURABLE_SIGNATURE").toEqual(signature);
+			expect(row.envelope.digest, "REPLAY_EXACT_DURABLE_DIGEST").toEqual(vertex.digest);
+			expect(row.authorSequence, "REPLAY_EXACT_DURABLE_SEQUENCE").toBe(vertex.authorSequence);
+		}
 		observed.fault = "second-commit";
 		const outcome = await fixture.reopen().then(
 			() => "unexpected-success",
@@ -383,10 +413,24 @@ describe("D.110c-0c1f5b0u genuine successor recovered-delivery RED", () => {
 			.toHaveLength(0);
 		expect.soft(observed.transportCloses, "REPLAY_SECOND_FAILURE_TRANSPORT_RELEASED").toBe(1);
 		// This ledger is external observer state: do not reset or deduplicate it across reopen.
-		expect.soft([...fixture.accepted], "REPLAY_SECOND_FAILURE_ATOMIC_EXTERNAL_LEDGER").toEqual([]);
+		expect
+			.soft([...fixture.accepted], "REPLAY_SECOND_FAILURE_OBSERVED_NOTIFICATION_PREFIX")
+			.toEqual([required(expectedDigests[0])]);
+		expect(await fixture.readIssuance(), "REPLAY_REJECTION_DURABLE_ISSUANCE_UNCHANGED").toEqual(issuedBefore);
 		observed.fault = "none";
+		const secondAttemptStart = observed.events.length;
 		const recovered = await fixture.reopen();
-		expect.soft(fixture.accepted, "REPLAY_COLD_REOPEN_IDEMPOTENT_EXTERNAL_LEDGER").toEqual(expectedDigests);
+		expect
+			.soft(fixture.accepted, "REPLAY_COLD_REOPEN_REPEATED_NOTIFICATION_ATTEMPTS")
+			.toEqual([required(expectedDigests[0]), ...expectedDigests]);
+		expect(await fixture.readIssuance(), "REPLAY_RECOVERY_DURABLE_ISSUANCE_UNCHANGED").toEqual(issuedBefore);
+		const secondAttemptEvents = observed.events.slice(secondAttemptStart);
+		const authentication = secondAttemptEvents.indexOf("authenticated-projection-base");
+		const validation = secondAttemptEvents.indexOf("validated-application-state");
+		const firstCallback = secondAttemptEvents.findIndex((event) => event.startsWith("commit:"));
+		expect(authentication, "REPLAY_SECOND_ATTEMPT_AUTHENTICATES_BASE").toBeGreaterThanOrEqual(0);
+		expect(validation, "REPLAY_SECOND_ATTEMPT_VALIDATES_STATE").toBeGreaterThan(authentication);
+		expect(firstCallback, "REPLAY_SECOND_ATTEMPT_VALIDATES_BEFORE_NOTIFICATION").toBeGreaterThan(validation);
 		const canonicalStateBytes = required(createV3ChatApplication("alice").migration).canonicalStateBytes;
 		expect
 			.soft(

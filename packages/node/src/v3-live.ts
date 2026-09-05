@@ -378,6 +378,11 @@ type V3BlueprintLiveBindingInput =
 	| V3BlueprintLiveRetrievalInput
 	| V3BlueprintProjectionBaseInput;
 
+/**
+ * Authenticated replayable notification attempt, not an exactly-once external commit.
+ * Persistent consumers deduplicate side effects by authenticated vertex digest.
+ * Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.
+ */
 export type V3AdmittedVertexSink = (
 	delivery: Readonly<{
 		readonly vertex: AdmittedReceivedVertexView;

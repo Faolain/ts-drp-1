@@ -396,6 +396,11 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	readonly migrationDatabaseNamespace?: string;
 	readonly objectId: string;
 	openTransport(objectId: string): V3RoomTransport;
+	/**
+	 * Authenticated replayable notification attempt, not an exactly-once external commit.
+	 * Persistent consumers deduplicate side effects by authenticated vertex digest.
+	 * Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.
+	 */
 	onAcceptedVertex(vertex: AdmittedReceivedVertexView): void | Promise<void>;
 	onMigrationTarget?(session: V3RoomSession<Projection>, objectId: string): void;
 	onProjection(projection: Projection): void;
