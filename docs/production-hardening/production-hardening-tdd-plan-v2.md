@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0z plan gate accepted; tests-only RED next)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0z causal RED accepted; separate GREEN next)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,7 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Current work (f5b0z tests-only RED, then separate GREEN; parent GREEN paused):
+Current work (f5b0z separate GREEN; parent GREEN paused):
 
 - **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is expressly
   authorized by the user on 2026-09-05, with review and separate RED/GREEN.
@@ -18478,6 +18478,13 @@ Current work (f5b0z tests-only RED, then separate GREEN; parent GREEN paused):
   Targeted Sol confirmation PASS closes that command finding with zero P0/P1.
   Plan gate accepted: separate Astra-high tests-only RED is authorized now.
   No new Grok or Fable round is required for P2/prose.
+  That RED is now accepted at signed/pushed tests `1eba4f90` and evidence
+  `5ab259fe`: sole clean source-built execution, 16 total / 14 exact causal
+  failures / 2 compatibility passes / zero skipped or top-level errors.
+  Root's independent audit is
+  `.logs/d110c-0c1f5b0z-red-acceptance-1eba4f90/`. Separate Astra-high GREEN
+  may now change only the three frozen owners; final Grok/Sol/Fable review
+  follows signed/pushed GREEN and all focused/static/retained/isolated gates.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -101374,8 +101381,8 @@ and has SHA-256
 
 ###### D.110c-0c1f5b0z backend-neutral AHE maintenance discovery prerequisite
 
-**Status: plan gate accepted with empty P0/P1 union after one targeted Sol
-confirmation; separate Astra-high tests-only RED authorized.** The user
+**Status: causal tests-only RED accepted; separate Astra-high GREEN authorized
+within the three frozen production owners.** The user
 authorized review and separate RED/GREEN on 2026-09-05. The exact plan is the
 original `.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md` plus the signed
 `6ac0b5be` command amendment below. Production edits require accepted signed
@@ -101386,6 +101393,52 @@ parent f5b's first genuine cleanup invocation and parent closure, hence before
 D.110c-c/d can consume that closure. The independent parent observer RED is
 accepted at `78e068a8` / `45b1be36`. Completed f5b0d backend gates and all stopped parent evidence remain
 unchanged; this prerequisite does not claim any lifecycle or golden-path pass.
+
+RED tests `1eba4f9065d220afb0d77d90aac4a05b250a05bb` and evidence
+`5ab259fedeea24a102d1e3309d7282da81a3b224` are signed (`G`) and pushed.
+The sole frozen focused execution matches exactly: 16 tests / one file,
+11 `F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED` failures,
+3 `F5B0Z_INCOMPATIBLE_REGISTRY_REFUSAL_REQUIRED` failures, 2 compatibility
+passes, no skips, top-level errors or matrix violations. Vitest status 1 is
+the expected causal RED; the wrapper validator status is 0. The independently
+installed/source-built checkout is
+`/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout`, without any of the
+seven parent partial-production versions or copied dist. Complete install,
+build, collection, runtime/source identity and focused evidence is in
+`.logs/d110c-0c1f5b0z-red-1eba4f90/`; its 81-entry self-excluding manifest is
+`9e56180ab6f58e05a0b443629fbe9acc066614ca84ad56755b28643ea53864ef`.
+Root independently verified it, all reporter outcomes, eight unchanged native
+runtimes, signatures/pushed identity and parent custody using
+`node .logs/d110c-0c1f5b0z-red-acceptance-1eba4f90/audit.mjs`.
+
+RED source lint/format/syntax/custody and exact collection pass. The new test
+has zero target type diagnostics; the external reclamation fixture retains
+its existing BlobDigest/ClosureDigest TS2322. Storage package typecheck passes;
+main-workspace browser/Node checks retain 75/144 existing diagnostics, including
+the preserved parent-dirty priorFence diagnostic. No blanket package typecheck
+pass is claimed. GREEN must repeat affected package checks in a clean source-
+built checkout and separate inherited signed-baseline diagnostics from new
+target errors. The draft source-relative import and nominal-brand observation
+corrections occurred before the signed test commit and sole runtime; they are
+recorded authoring diagnostics, not product failures or substituted GREEN.
+
+Two bounded evidence dispositions remain explicit: JSON reporter interception
+means RED has no standalone child console streams; native premises are enforced
+before the exact child token, with independent built-file identity capture.
+Do not rerun RED. GREEN's existing native-import gate captures the existing
+child directly in all four modes with separate stdout/stderr. One raw Git
+stdout capture has an EOF blank-line diff diagnostic; preserve those exact
+bytes, without waiving source/docs whitespace gates. Existing mutation bodies,
+seven dirty parent files, 27 stashes and 86,522 protected untracked paths are
+preserved. No post-discovery lifecycle continuation is claimed passing in RED.
+
+GREEN retains the frozen seven-file Vitest and Chromium commands. The already-
+required unchanged issuance-registry behavior is additionally covered by its
+existing direct owner test, identified during source audit:
+`pnpm exec vitest run tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts --coverage.enabled=false --reporter=json`.
+This is one existing retained file, not a new fixture, scope, review round or
+change to the frozen 16-case RED matrix. Final Grok/Sol/Fable review must inspect
+the signed causal RED together with GREEN; no separate three-model RED round.
 
 The signed plan `7eb2a8df` received Grok PASS (0 P0 / 0 P1 / 2 P2), Fable
 PASS (0 / 0 / 4), and Sol CHANGES_REQUIRED (0 / 1 / 0). Review evidence is
