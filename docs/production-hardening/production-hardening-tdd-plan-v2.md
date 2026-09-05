@@ -18446,9 +18446,11 @@ Authorized now (tests-only RED first, then GREEN):
   its record: clean signed HEAD classifies inherited f5b0t prerequisite
   failures, while a separate isolated checkout overlays only the byte-for-byte
   rejected seven-file candidate to reach the new f5b0u seams. Proceed with
-  that tests-only RED and the combined f5b0t/f5b0u GREEN. No parent f5b
-  integration or further production edit is authorized before that
-  checkpoint.
+  that tests-only RED for cases 1-6 and 8 and the combined f5b0t/f5b0u GREEN.
+  Its original case 7 is dependency-corrected into parent f5b: current code
+  has no authenticated checkpoint-to-runtime frontier handoff, and a fixture
+  injection here would fabricate authority. No parent f5b integration or
+  further production edit is authorized before that checkpoint.
 
 Blocked, and on what:
 
@@ -99261,6 +99263,18 @@ and prove the settlement rollback-window bound only after genuine repeated
 adoption makes the over-bound path reachable. None of these may be discharged
 by the direct private counter unit test or a manufactured receipt.
 
+That parent RED also owns the authenticated frontier handoff absent before
+integration: open the adopted settlement checkpoint under successor-floor
+trust, select the current author's exact `[admissionEpoch, terminalThrough]`,
+and carry it into Node source classification on hot adoption, restart and cold
+reopen. With a durable open-progress plan, an authenticated source at or below
+`terminalThrough` is visible only for exact digest/suffix rederivation; linked
+chunks are never repeated, completion restores terminal suppression, and no
+other author or issuance scope can borrow the exception. The RED must fail
+through the real missing handoff rather than a private fixture context. If
+this composition needs a wire/schema/public-API/authority/dependency change,
+parent f5b stops and reslices under its high-risk rule.
+
 Authorization: the f5b0a and f5b0s tests-only REDs may begin from this record
 without a further design review; f5b0b, f5b0c, f5b0d and f5b are each
 authorized by their predecessors' GREEN in the dependency order above. Each
@@ -99831,6 +99845,21 @@ Bounded source/architecture audit and selected construction:
   hot epochs. If existing storage/close seams cannot provide it without a new
   API, authority carrier or schema, parent f5b stops and reslices; f5b0u must
   not invent a fixture-only declaration.
+- The same boundary applies to settlement-frontier source recovery. The
+  rejected candidate defines private `SettlementFrontierContext` plumbing,
+  but the only production `readSettlementSources` caller supplies no context,
+  public `V3PlaneHandle.readRebaseOutbox()` accepts none, and the existing
+  verified historical-issuance capability authenticates legacy aggregate and
+  retirement material rather than `[admissionEpoch, terminalThrough]`.
+  Creator close also does not yet produce the settlement checkpoint that
+  would authenticate such a context. Therefore f5b0u cannot honestly exercise
+  a cold reopen below a supplied `terminalThrough`; doing so would require
+  private fixture authority. Parent f5b, which owns genuine checkpoint
+  creation, close/adopt and recovery composition, must thread the opened
+  current-author frontier into runtime source classification and prove the
+  open-progress exception on hot, restart and cold-reopen paths. This is the
+  exact already-assigned f5b0b P2 for authenticated frontier threading, not a
+  new API assumption or a weakening of the end-to-end gate.
 - `lastLogicalTime` comes from the exact signed vertex input.
   `packages/issuance-store/src/contract.ts` owns a closed local parser for the
   real Node application-batch carrier structure needed to derive that floor:
@@ -99902,11 +99931,15 @@ not future missing imports or exports:
    `lastLogicalTime` must equal the real Node-assembled batch's final child
    logical time, including the sixteen-entry equality control. A mocked room
    split and a separate Node split do not satisfy this case.
-7. Cold reopen with the original authenticated source below a supplied
-   `terminalThrough`: open progress exposes it only for digest/suffix
-   rederivation, admitted chunks are not repeated, completion restores normal
-   terminal classification, and another author/scope cannot borrow the
-   override.
+7. **Resliced to parent f5b, not executable in this prerequisite.** Cold reopen
+   with the original authenticated source below a checkpoint-derived
+   `terminalThrough` must expose an open-progress source only for
+   digest/suffix rederivation, never repeat admitted chunks, restore normal
+   terminal classification after completion, and prevent another
+   author/scope from borrowing the override. Parent f5b must fail through the
+   real absent checkpoint-to-runtime handoff before implementing that
+   composition. f5b0u records the source audit above but adds no fixture-only
+   RED, private context injection or production carrier for this case.
 8. Race public issue, close/adopt and settlement recovery; only one active
    owner survives, the fence stays first, the plan stays monotonic and cleanup
    failure is terminal. Recovered vertices are committed before resumed issue;
@@ -99977,6 +100010,18 @@ the new parser, exact-readback and recovery seams can execute. The first
 Astra/high RED author stopped without editing or running tests when this made
 the promised causal matrix impossible. That is an inherited prerequisite
 failure, not a missing-import RED and not evidence against the f5b0u design.
+After the layered correction was frozen, the replacement Astra/high author
+found a second source contradiction before commit: case 7 requires an
+authenticated settlement frontier that no current recovery or handle input
+carries. It preserved its tests-only store draft and stopped without executing
+or committing. The bounded source trace pins the only
+`readSettlementSources` caller without a frontier, the zero-argument public
+`readRebaseOutbox`, the legacy-only historical-issuance capability and the
+absence of settlement-checkpoint production in creator close. Case 7 is
+therefore assigned to parent f5b above, where the checkpoint is genuinely
+created and adopted; cases 1-6 and 8 remain authorized here. This dependency
+correction preserves the full end-to-end acceptance and prevents fabricated
+fixture authority.
 The frozen tests-only RED therefore has exactly two separately recorded
 layers:
 
