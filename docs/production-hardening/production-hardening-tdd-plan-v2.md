@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (correct parent f5b's scalar-replacement oracle, then resume GREEN):
+Current work (resume parent f5b GREEN on the accepted scalar-replacement oracle):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18528,12 +18528,14 @@ Current work (correct parent f5b's scalar-replacement oracle, then resume GREEN)
   Discovery alone does not authorize deletion or change production ordering,
   retry/failure policy, or exact snapshot-byte requirements. Do not rerun the
   accepted observer RED or repeat f5b0z reviews.
-  The resumed GREEN is now stopped at
+  The resumed GREEN diagnostic is preserved at
   `.logs/d110c-0c1f5b-green-d8cdb620/`: its second focused run records
-  22 pass / 6 fail / 17 filtered. Before further production edits, a separate
-  Astra-high tests-only correction must preserve the accepted scalar one-vertex
-  replacement contract in case 25, with one isolated corrected RED execution
-  under the unchanged causal matrix. The exact scope is in the parent record.
+  22 pass / 6 fail / 17 filtered. The separate Astra-high scalar case-25
+  correction is accepted at signed/pushed tests `6353eb61` / evidence
+  `ea795862`: one isolated source-built execution matches the unchanged
+  45-total / 23-fail / 5-pass / 17-filtered causal matrix with no anomalies.
+  The separate parent GREEN owner may now resume the existing eight-owner
+  repair; do not rerun this accepted RED. The exact evidence is in the parent record.
   The hot-adoption snapshot-byte assertion is not relaxed: its failure exposes
   missing authenticated projection-base installation in the existing room
   composition. Creator restart, fresh-device reentry and cleanup availability
@@ -18547,8 +18549,8 @@ Blocked, and on what:
 - **Parent f5b closure** still requires its genuine authenticated cleanup
   caller and complete 64-writer/three-transition continuation, restart and cold
   reopen. The discovery prerequisite f5b0z and independent observer RED are
-  closed; neither needs another execution or review. First close the narrow
-  scalar case-25 oracle correction below, then resume the existing parent
+  closed; neither needs another execution or review. The narrow scalar
+  case-25 oracle correction is also accepted; resume the existing parent
   implementation without a Node-to-browser dependency or invented authority.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
@@ -100776,9 +100778,11 @@ diagnostic `0a656d1b`. Its bounded observer correction is now accepted at
 tests `78e068a8` / evidence `45b1be36`; the f5b0z cleanup-discovery prerequisite
 is closed at signed/pushed `d8cdb620`. The separate Astra-high parent GREEN
 owner resumed the authorized eight-owner repair and stopped after its second
-focused run (22 pass / 6 fail / 17 filtered). A scalar case-25 oracle correction
-must precede further GREEN edits; the partial production patch is preserved,
-not accepted. Focused, static, retained, isolated and final review gates remain
+focused run (22 pass / 6 fail / 17 filtered). The scalar case-25 oracle correction
+is now accepted at signed/pushed tests `6353eb61` / evidence `ea795862` under
+the exact inherited causal matrix. The separate parent GREEN owner may resume;
+the partial production patch is preserved, not accepted. Focused, static,
+retained, isolated and final review gates remain
 open.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
@@ -101304,6 +101308,54 @@ evidence before accepting the correction. Do not rerun the completed observer
 RED, reopen f5b0t/f5b0u/f5b0z, or add a separate model/prose review round.
 The existing final parent Grok/Sol-high/Fable-xhigh review must inspect this
 correction and both preserved failed GREEN runs.
+
+The scalar correction is now accepted at signed/pushed tests
+`6353eb617bc889365c6ab62494a18311d2ea5338` and evidence
+`ea795862d94850ab228aa7419bebf21d99f4b102`. Its sole run used
+`/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout`, independently installed
+the frozen dependencies offline and built from signed source, without the
+pending GREEN patch, copied dist or diagnostic configuration. The complete
+reporter records exactly 45 tests in two files, 28 active, 23 expected failures,
+5 passing controls and 17 filtered assertions: nineteen exact successor-codec
+failures, one room ACL item-limit failure at `migrationInviteAuthority`, and
+the three inherited parent-owned P2 tokens. No unexpected failure, loading,
+timeout or top-level error occurred. Root independently checked the raw
+reporter, signed diff, complete evidence inventory and hashes, and remote ref.
+Evidence is `.logs/d110c-0c1f5b-red-scalar-6353eb61/`; its 75-entry
+self-excluding manifest has SHA-256
+`4590049f6472fd0eb5699ed795289803ad3ca7197545356b5049ccf4ba77d0f0`.
+
+Only `ambiguousPlanIssue` changed; all bytes outside that function, including
+the segmented progress case and exact hot-adoption snapshot assertion, remain
+unchanged. Lint/format, source build, collection, syntax and test diff checks
+pass. Target type diagnostics are zero; the same three external
+`live-snapshot.ts` diagnostics remain explicitly unclaimed as a whole-package
+typecheck pass. The eight dirty production owners, exact partial patch,
+27 stashes and all 86,522 protected paths are preserved. Read-only diagnostic
+syntax and abbreviated-patch comparisons were corrected without executing
+another test. The evidence commit's raw lint capture retains its final blank
+line; only that exact raw file is excluded from its passing staged whitespace
+check. A post-commit full-reporter read exceeded the inspection command's
+buffer; Git blob-hash comparison verified all committed evidence without a
+workload rerun or altered evidence. This accepts the scalar oracle only:
+pre-codec RED does not demonstrate the replacement continuation. The separate
+parent GREEN owner now resumes the four production obligations below; final
+parent review covers this correction without an additional prose review.
+
+The bounded retained audit also identifies the inherited Phase-3 publication
+fixture's first rejection without a runtime rerun: `fakeIssuanceStore` returns
+null from `readIssued`; `recoverActivationCapability` temporarily substitutes
+the genuine recovery row, then restores that null reader. The outbox retains
+rows 1 and 2, so `authenticatedOutboxRow` correctly rejects the absent matching
+issued row before publication. Moreover, `outboxRecord` supplies only three
+preimage keys and a synthetic two-byte signature, not a genuine live vertex.
+The test is byte-identical to signed `c66e09c2`, whose matching raw failure is
+already preserved in the f5b0v wording evidence; its authentication owner has
+the same predicate. This diagnoses stale fixture authority, not a new parent
+product defect. The Phase-3 harness owner retains this unpassed debt before
+parent retained acceptance; no production bypass, silently corrected fixture,
+or blanket passing-baseline claim is authorized. Complete current and signed
+baseline outcomes must remain explicit when the retained gates execute.
 
 The other four failures remain genuine production composition obligations in
 the existing eight owners: authenticated creator restart under the settlement
