@@ -30,6 +30,7 @@ const observation = vi.hoisted(() => ({
 	faultGate: undefined as undefined | Promise<void>,
 	onFault: undefined as undefined | (() => void),
 	closeFault: false,
+	onAdmissionError: undefined as undefined | ((error: unknown) => void),
 }));
 
 // Every operation and capability below is real. Only the receipt following one
@@ -125,7 +126,23 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
 	return {
 		...actual,
 		activateV3LivePlane: (...args: Parameters<typeof actual.activateV3LivePlane>) => {
-			const result = actual.activateV3LivePlane(...args);
+			const captureError = observation.onAdmissionError;
+			const input = args[0];
+			const result = actual.activateV3LivePlane(
+				captureError === undefined
+					? input
+					: {
+							...input,
+							onAdmittedVertex: async (delivery) => {
+								try {
+									return await input.onAdmittedVertex(delivery);
+								} catch (error) {
+									captureError(error);
+									throw error;
+								}
+							},
+						}
+			);
 			if (result.ok) {
 				observation.activate.push(result.handle);
 				observation.events.push("activate");
@@ -327,6 +344,7 @@ beforeEach(() => {
 	observation.faultGate = undefined;
 	observation.onFault = undefined;
 	observation.closeFault = false;
+	observation.onAdmissionError = undefined;
 });
 afterEach(async () => {
 	try {
@@ -398,6 +416,8 @@ describe("D.110c-0c1f5b0u genuine room Node settlement composition", () => {
 	);
 	it("queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock", async () => {
 		observation.fault = "legacy-unknown";
+		const admissionErrors: unknown[] = [];
+		observation.onAdmissionError = (error) => admissionErrors.push(error);
 		let release!: () => void;
 		observation.faultGate = new Promise<void>((resolve) => {
 			release = resolve;
@@ -422,17 +442,31 @@ describe("D.110c-0c1f5b0u genuine room Node settlement composition", () => {
 			})
 		);
 		const observedActivation = activation.then(
-			() => "fulfilled",
-			() => "rejected"
+			() => ({ status: "fulfilled" as const }),
+			(error: unknown) => ({
+				status: "rejected" as const,
+				message: error instanceof Error ? error.message : String(error),
+			})
 		);
 		release();
 		const results = await Promise.allSettled([issued, migration]);
 		expect.soft(results[0]?.status, "D110C_0C1F5B0U_QUEUED_ISSUE_NOT_RECOVERED").toBe("fulfilled");
 		expect.soft(results[1]?.status, "D110C_0C1F5B0U_MIGRATION_DID_NOT_RESUME").toBe("fulfilled");
-		expect.soft(await observedActivation, "D110C_0C1F5B0U_MIGRATION_ACTIVATION_DID_NOT_RESUME").toBe("fulfilled");
+		expect.soft(await observedActivation, "D110C_0C1F5B0U_MIGRATION_ACTIVATION_BOUNDARY_DIFFERS").toEqual({
+			status: "rejected",
+			message: "v3 room migration activation failed: terminal-rejected",
+		});
+		expect
+			.soft(
+				admissionErrors.map((error) => (error instanceof Error ? error.message : String(error))),
+				"D110C_0C1F5B0U_MIGRATION_FRONTIER_CAUSE_DIFFERS"
+			)
+			.toEqual(["v3 room rebase outbox failed: record-rejected"]);
 		expect(
 			observation.activate.filter((plane) => plane.currentEphemeralAuthority() !== undefined).length
 		).toBeLessThanOrEqual(1);
+		await target.close();
+		expect(observation.activate.filter((plane) => plane.currentEphemeralAuthority() !== undefined)).toHaveLength(0);
 	});
 	it("keeps a store-close cleanup failure terminal after signed recovery", async () => {
 		observation.fault = "partial-unknown";
