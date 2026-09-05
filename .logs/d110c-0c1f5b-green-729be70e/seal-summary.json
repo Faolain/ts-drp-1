@@ -1,0 +1,30 @@
+{
+  "head": "729be70e2066b1a8693d3f0ccee4fba2febb0522",
+  "ownerCount": 8,
+  "patchSha256": "245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed",
+  "protectedPaths": 86522,
+  "testHashes": {
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "c846038f5c5dc36a1d7e1acf54a495ea82ef4fd3e809850d626f8c0beb4f56c2",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c"
+  },
+  "matrix": {
+    "focused-01": {
+      "total": 45,
+      "passed": 27,
+      "failed": 1,
+      "filtered": 17,
+      "topLevelErrorCount": 0
+    },
+    "focused-02": {
+      "total": 45,
+      "passed": 27,
+      "failed": 1,
+      "filtered": 17,
+      "topLevelErrorCount": 0
+    }
+  },
+  "productionAccepted": false,
+  "signedByThisAgent": false
+}

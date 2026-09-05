@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (resume parent f5b GREEN on the accepted scalar-replacement oracle):
+Current work (correct parent f5b's checkpoint-link oracle before resuming GREEN):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18534,15 +18534,23 @@ Current work (resume parent f5b GREEN on the accepted scalar-replacement oracle)
   correction is accepted at signed/pushed tests `6353eb61` / evidence
   `ea795862`: one isolated source-built execution matches the unchanged
   45-total / 23-fail / 5-pass / 17-filtered causal matrix with no anomalies.
-  The separate parent GREEN owner may now resume the existing eight-owner
-  repair; do not rerun this accepted RED. The exact evidence is in the parent record.
+  The separate parent GREEN owner resumed the existing eight-owner repair;
+  do not rerun this accepted RED. The exact evidence is in the parent record.
   The hot-adoption snapshot-byte assertion is not relaxed: its failure exposes
   missing authenticated projection-base installation in the existing room
   composition. Creator restart, fresh-device reentry and cleanup availability
   binding also remain production GREEN obligations, not fixture exemptions.
-  Post-codec recovery, the complete 64-writer continuation and the later long
-  campaign remain unproved. Product state, batch, epoch and snapshot ceilings
-  remain unchanged.
+  The continuation at `.logs/d110c-0c1f5b-green-729be70e/` now preserves two
+  27-pass / 1-fail / 17-filtered runs. Its first run exposed missing hot-adoption
+  settlement preparation; the bounded correction reuses the existing plan/fence
+  drain and refuses ordinary issue during the existing adoption task. The next
+  run passes fence accounting but exposes a stale wide-test checkpoint-link
+  digest expectation. Production remains stopped until a separate Astra-high
+  tests-only correction preserves the closed storage-reference digest contract
+  and passes the unchanged isolated causal RED matrix. The other focused
+  continuations pass, but the complete 64-writer three-transition workload,
+  retained/static/isolated closure and later long campaign remain unproved.
+  Product state, batch, epoch and snapshot ceilings remain unchanged.
 
 Blocked, and on what:
 
@@ -18550,8 +18558,9 @@ Blocked, and on what:
   caller and complete 64-writer/three-transition continuation, restart and cold
   reopen. The discovery prerequisite f5b0z and independent observer RED are
   closed; neither needs another execution or review. The narrow scalar
-  case-25 oracle correction is also accepted; resume the existing parent
-  implementation without a Node-to-browser dependency or invented authority.
+  case-25 oracle correction is also accepted. First close the checkpoint-link
+  oracle correction below, then resume the existing parent implementation
+  without a Node-to-browser dependency or invented authority.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -100780,9 +100789,12 @@ is closed at signed/pushed `d8cdb620`. The separate Astra-high parent GREEN
 owner resumed the authorized eight-owner repair and stopped after its second
 focused run (22 pass / 6 fail / 17 filtered). The scalar case-25 oracle correction
 is now accepted at signed/pushed tests `6353eb61` / evidence `ea795862` under
-the exact inherited causal matrix. The separate parent GREEN owner may resume;
-the partial production patch is preserved, not accepted. Focused, static,
-retained, isolated and final review gates remain
+the exact inherited causal matrix. Resumed GREEN now preserves two further
+27-pass / 1-fail / 17-filtered runs at
+`.logs/d110c-0c1f5b-green-729be70e/`. The first missing hot fence is corrected;
+the second exposes a stale checkpoint-link digest oracle. Production is stopped
+pending the separate tests-only correction below. The partial patch is preserved,
+not accepted; focused, static, retained, isolated and final review gates remain
 open.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
@@ -101369,6 +101381,77 @@ any need for a new authority/API boundary stops for explicit reslicing.
 Exact-once canonical effects must not be confused with exactly-once external
 callback delivery: f5b0v's accepted replayable notification contract remains
 unchanged, including during hot projection-base installation.
+
+Prospective checkpoint-link oracle correction (2026-09-05): preserve the
+continuation evidence at `.logs/d110c-0c1f5b-green-729be70e/`. Both focused
+runs have 45 assertions in two files, 27 passes, one failure and 17 filtered
+controls, without top-level or selected-name anomalies. Focused-01's sole
+failure is `F5B_64_EVERY_AUTHOR_EVERY_EPOCH_EXACT_ONE_FENCE`: the creator's
+hot successor did not run the existing settlement drain, unlike cold reopen.
+The correction invokes existing publication and plan/fence preparation after
+authenticated base/replay and close rebind. Ordinary `issueOwned` refuses
+settlement work during the existing adoption task before Node/sign/durable
+issue, using the existing unavailable error. Internal settlement issuance
+remains direct; there is no new waiting barrier, automatic retry, API, authority,
+wire field or threshold. The existing terminal-failure containment remains.
+Focused-02 passes fence accounting and reaches the next exact lineage check;
+its sole failure is `F5B_64_ADJACENT_CHECKPOINT_LINK`. The segmented three-close,
+fresh-device readmission, scalar ambiguity and real cleanup controls pass in
+both runs. These are failed GREEN diagnostics, not completed parent acceptance.
+Root independently validated its complete 61-entry self-excluding manifest,
+SHA-256 `432a74a1d229346b225e96e7314435271e32acb653f8d1012c48aade4d565be0`.
+The preserved eight-owner patch has SHA-256
+`245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed`.
+Both batches pass formatting, lint and source builds; retained, isolated GREEN,
+package typecheck attribution and final review remain open. No new typecheck
+pass, production commit or golden-path completion is claimed by this evidence.
+The unfiltered staged whitespace check reports 840 patch-context warnings in
+the two exact raw captures `inherited-production.patch` and
+`partial-production.patch`; their bytes remain unchanged. The staged check
+excluding only those two captures passes. The edited plan sections pass
+Prettier under the resolved repository configuration; no whole-plan formatter
+or product-memory result is claimed.
+
+The latter failure is an oracle mismatch with a closed contract, not permission
+to change the production digest. Signed `b926a60658b7ce244f4ef159d634077e0cba3b49`
+already makes `authenticatedSettlementPair` require
+`priorCheckpointDigest === current.ref.digest`, with the candidate reference
+validated by `digestBlob`. The inherited predicate is unchanged in parent
+GREEN. `packages/storage/src/values.ts` defines that reference as
+`hashDomain("ts-drp-storage/blob/v1", exactSignedRecordBytes)`. The settlement
+codec's `ts-drp/creator-author-settlement/v1` domain instead signs the canonical
+preimage excluding `detachedAuthoritySignature`. The wide fixture applies that
+signing domain to the entire signed prior record, which is neither digest.
+The accepted design's signing-domain declaration does not replace the bounded
+advance owner's storage-reference contract; no opener traverses old records.
+Root's bounded sweep of the two retained parent test files and parent fixture
+directory finds only this one erroneous checkpoint-link expectation.
+
+Owner: a separate Astra-high RED test owner. Deadline: before another parent
+GREEN edit or execution. Change only the expected hash domain at
+`F5B_64_ADJACENT_CHECKPOINT_LINK` in
+`tests/phase-6b-d110c-0c1f5b-integration-red.test.ts`, optionally with a short
+comment distinguishing the signed-record reference from the signing preimage.
+Independently hash the exact prior signed bytes with the existing storage blob
+domain; do not copy the current checkpoint's field or accept either digest.
+Preserve the exact token, test titles/counts, all other assertions, scalar and
+segmented cases, workload, fixture helpers and production bytes. No import,
+API, wire contract or codec change is required.
+
+Sign and push the tests-only correction, independently install/build its exact
+signed tree in one clean isolated checkout without the pending GREEN patch or
+copied dist, and run the unchanged focused selection once. Require the same
+45-total / 28-active / 23-exact-causal-fail / 5-pass / 17-filtered matrix,
+including the exact nineteen codec failures, one room ACL item-limit owner and
+three P2 tokens, with no loader, fixture, timeout, count or top-level anomaly.
+Sign/push complete evidence and a self-excluding manifest before accepting it.
+The pre-codec RED does not reach the corrected adjacency assertion; final GREEN
+must physically execute that assertion across all three genuine 64-writer
+transitions. If the correction requires changing production or the matrix
+differs, stop and attribute it. Preserve all prior diagnostics, protected paths
+and stashes. No extra prose/model review or new slice is needed: the existing
+final parent Grok/Sol-high/Fable-xhigh review inspects the complete correction
+and RED-to-GREEN history after the required gates pass. No long workload runs.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
