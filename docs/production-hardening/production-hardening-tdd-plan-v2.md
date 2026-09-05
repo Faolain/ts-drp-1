@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b corrective RED)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b bounded-workload correction)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18483,7 +18483,16 @@ Authorized now (tests-only RED; production GREEN remains gated):
   epoch, rotating offline cohorts, at least three genuine close/adopt
   transitions, restart and cold reopen, followed later by at least 100 genuine
   same-room transitions with bounded durable structures, owner custody and
-  fresh-process memory.
+  fresh-process memory. The first parent GREEN attempt is preserved as a
+  stopped diagnostic at `.logs/d110c-0c1f5b-green-79743f98/`: it reached the
+  real cross-close replacement-progress path, then proved that the parent
+  fixture's inherited 33,000-byte append-only chat transform cannot satisfy
+  the unchanged 32,768-byte application-state ceiling. A bounded tests-only
+  workload correction is authorized before GREEN resumes: retain the real
+  two-intent/multiple-chunk crash-and-recovery proof with a tests-only
+  transient-payload blueprint whose reducer keeps bounded state, and use a
+  256-character transform for the independent 64-writer append-only chat
+  proof. Product state, batch, epoch and snapshot ceilings remain unchanged.
 
 Blocked, and on what:
 
@@ -100694,8 +100703,9 @@ completion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: coverage-corrective causal RED accepted; one separate Astra-high
-parent GREEN is authorized next.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+**Status: coverage-corrective causal RED accepted; first parent GREEN stopped
+at a contradictory fixture workload; one bounded tests-only correction is
+authorized before a fresh Astra-high parent GREEN.** The f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
@@ -100811,6 +100821,57 @@ manifest SHA-256 is
 `425d45904058d483f6b15339724613a747a77a03fb48bcc3acb1b306ff23a2e5`.
 Rejected evidence `e9015cff` remains unchanged. This causal RED authorizes one
 separate Astra-high GREEN under the accepted design and scope above.
+
+The first parent GREEN attempt is stopped and unclaimed under
+`.logs/d110c-0c1f5b-green-79743f98/` (27-entry self-excluding manifest SHA-256
+`2a3a138665854862c75846d2930141c47f88e1b6c8b9b9729137687e76e9e650`).
+It made seven bounded production files progress far enough for the genuine
+checkpoint-terminal case to commit the first replacement chunk and enter the
+next close, where blueprint folding rejected the append-only application state
+as `INVALID_APPLICATION_STATE`. The fixture transforms each of two displaced
+chat messages to 33,000 bytes so their replacement batch exceeds 65,536 bytes;
+but one such message is already about 33,046 canonical bytes and the complete
+four-epoch wide state is about 210,773 bytes, while the existing product state
+ceiling is 32,768 bytes. No value can both make two state-retaining chat
+operations exceed the 65,536-byte batch ceiling and keep their combined exact
+state under 32,768 bytes. This is a fixture-contract contradiction, not evidence
+for raising a product ceiling, weakening exact state, changing an API, or
+abandoning the Discord/MMORPG goal. Contiguity, `admissionEpoch`, plan authority
+and anchor fencing were not contradicted. The unfinished production diff is
+preserved in that evidence root but was reverted from the worktree and must not
+be promoted without a new GREEN.
+
+One bounded tests-only workload correction is authorized on top of
+`c1d04d31`. It must preserve case 3's genuine two-intent source, multiple
+replacement chunks, committed-prefix crash, same-epoch restart, intervening
+close, later restart, exact no-reissue/once-only suffix accounting and case 14
+continuation. That case must use either the already-established tests-only
+batch-boundary blueprint pattern or an equivalent local test blueprint: each
+transformed operation carries deterministic transient padding, remains below
+the unchanged 65,536-byte per-operation limit, preserves action and identity,
+the pair exceeds the unchanged application-batch limit, and its reducer keeps
+the exact application state below the unchanged 32,768-byte ceiling. The
+transient padding is test stimulus only and is neither archived state nor a
+product API. The independent one-room 64-writer append-only chat case changes
+only its deterministic transform text from 33,000 to 256 characters; for its
+exact 256 ordinary plus six transformed messages, the modeled final canonical
+state is 14,303 bytes. The executable test must assert the actual final state
+remains within 32,768 bytes while retaining every writer's every-epoch issue,
+publication, application, plan/fence/replacement, restart, cold-reopen, three-
+close and lineage/accounting predicates. Closed f5b0u chunk-splitting evidence
+and its 33,000/22,000-byte fixtures remain immutable and are not reinterpreted.
+
+This correction changes no production source, API, wire/schema, cryptography,
+dependency, resource ceiling, timeout or accepted prior evidence. Its focused
+RED must fail only at the already accepted production seams, never at a missing
+import/export, malformed blueprint, new state-limit error or changed control.
+Because it corrects a frozen workload adjacent to the 64-writer golden-path
+gate, the signed/pushed amendment receives one bounded Grok 4.6/high, Codex
+`gpt-5.6-sol` high and Fable xhigh plan review. Only P0/P1 blocks. After an
+empty blocking union, one Astra-high tests-only RED agent commits the corrected
+fixture and exact matrix; a separate Astra-high GREEN agent starts from that
+RED and implements only the accepted parent production design. The final
+three-review GREEN gate remains unchanged. No long campaign is authorized.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
