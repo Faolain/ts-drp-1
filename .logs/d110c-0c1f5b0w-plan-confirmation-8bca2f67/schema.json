@@ -1,0 +1,39 @@
+{
+	"type": "object",
+	"properties": {
+		"verdict": { "type": "string", "enum": ["PASS", "FAIL"] },
+		"p0_count": { "type": "integer", "minimum": 0 },
+		"p1_count": { "type": "integer", "minimum": 0 },
+		"p2_count": { "type": "integer", "minimum": 0 },
+		"findings": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+					"title": { "type": "string" },
+					"evidence": { "type": "string" },
+					"required_action": { "type": "string" }
+				},
+				"required": ["severity", "title", "evidence", "required_action"],
+				"additionalProperties": false
+			}
+		},
+		"blocking_union_empty": { "type": "boolean" },
+		"red_authorized": { "type": "boolean" },
+		"scope_preserved": { "type": "boolean" },
+		"assessment": { "type": "string" }
+	},
+	"required": [
+		"verdict",
+		"p0_count",
+		"p1_count",
+		"p2_count",
+		"findings",
+		"blocking_union_empty",
+		"red_authorized",
+		"scope_preserved",
+		"assessment"
+	],
+	"additionalProperties": false
+}

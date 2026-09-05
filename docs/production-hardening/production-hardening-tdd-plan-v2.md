@@ -18454,12 +18454,12 @@ Authorized now (tests-only RED; production GREEN remains gated):
 
 - **D.110c-0c1f5b0w settlement manual-review hold semantics** below. The
   governing high-risk plan review found a bounded sequencing/store-law P1
-  union. The correction is frozen below and receives exactly one material
-  confirmation. After its empty P0/P1 union, one Astra-high tests-only RED and
-  then a separate Astra-high GREEN are authorized. This prerequisite adds no
-  public method, field or authority: it makes a held public `issue()` refuse
-  promptly, prevents the hold from blocking the existing creator-close owner,
-  preserves same-epoch durable reopen and freezes retained store entries.
+  union; the signed correction's one material confirmation has an empty P0/P1
+  union. One Astra-high tests-only RED and then a separate Astra-high GREEN are
+  authorized. This prerequisite adds no public method, field or authority: it
+  makes a held public `issue()` refuse promptly, prevents the hold from
+  blocking the existing creator-close owner, preserves same-epoch durable
+  reopen and freezes retained store entries.
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
   exactly one expected settlement-profile failure and one complete v1 pass.
@@ -100352,10 +100352,9 @@ workload change is authorized here.
 
 ###### D.110c-0c1f5b0w settlement manual-review hold semantics prerequisite
 
-**Status: the one high-risk plan review found a bounded P1 sequencing and
-store-law union; this corrected plan receives exactly one material
-confirmation before tests-only RED. Parent f5b production GREEN remains
-blocked on this slice.** Owner:
+**Status: plan gate closed with an empty P0/P1 confirmation union; one
+Astra-high tests-only RED is authorized next. Parent f5b production GREEN
+remains blocked on this slice.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the settlement
 plan merge, `drainSettlementOutbox()`, startup `rebasePromise`, public
 `issue()` and creator `sealEpoch()` waits; and
@@ -100399,23 +100398,29 @@ The narrow GREEN contract is:
 2. Creator `sealEpoch()` does not wait on the held drain. Using the already-
    closed f5b0u rebase-pair fixture with real browser stores and creator close
    authority, a creator-owned hold must reach the unchanged creator-close
-   owner promptly and return that owner's existing result. Before parent GREEN
-   that result remains the already-accepted settlement successor-codec
-   terminus; f5b0w neither changes nor calls it success. The held plan remains
-   byte-identical, and no fence, replacement or application effect is emitted.
+   owner promptly and reject with exact existing
+   `TypeError("creator close actor failed: CERTIFIED_VALUE_MISMATCH")`. Before
+   parent GREEN that thrown result remains the already-accepted settlement
+   successor-codec terminus; f5b0w neither changes nor calls it success. The
+   held plan remains byte-identical, and no fence, replacement or application
+   effect is emitted.
 3. Orderly session shutdown and same-epoch reopen of the same database re-
    derive the same hold from durable plan and source truth without an epoch
    close. The exact scope, revision, source sequence/digest, disposition and
    null link remain byte-identical. No retry, duplicate plan, fence,
    replacement, publication, application effect or pruning occurs.
 4. The store transition validator freezes every retained entry's
-   `sourceDigest` and disposition. It also freezes `replacementSequence` and
-   all replacement-progress fields for a legacy-linked entry or a completed-
-   progress entry, closing the current fall-through as well as preserving the
-   existing in-progress rules. Removal remains permitted only through normal
-   authenticated plan re-derivation. This slice recognizes no disposition
-   relaxation and no plan-level fence rule for resolution; D.110c-0c1f5b0x
-   must design both if it is ever authorized.
+   `sourceDigest`, disposition and `replacementSequence`, including direct-CAS
+   null→linked mutation that would bypass atomic `planEffect`. It freezes all
+   existing nonempty, in-progress and completed replacement-progress fields,
+   including the legacy-linked/completed-progress fall-through. The one
+   existing direct-CAS transition retained is undefined progress → exact empty
+   progress initialization with unchanged source/disposition and null link;
+   later chunks and the final link remain `transactIssue`/`planEffect` owned.
+   Removal remains permitted only through normal authenticated plan re-
+   derivation. This slice recognizes no disposition relaxation and no plan-
+   level fence rule for resolution; D.110c-0c1f5b0x must design both if it is
+   ever authorized.
 5. A held source refuses `rehearseMigration()` and `activateMigration()` with
    the same exact manual-review `TypeError`, retaining source plan/state and
    producing no target/import/terminal effect. An internally redirected target
@@ -100425,7 +100430,13 @@ The narrow GREEN contract is:
    with a manual-review policy opens as a stable held session so its plan can
    be inspected through existing test/store authority. Changed policy on a
    retained held entry continues to fail terminally with the existing
-   `v3 room settlement plan source differs`; no redisposition is added.
+   `v3 room settlement plan source differs`; no redisposition is added. The
+   internal redirect RED uses a fixture-local single-generation settlement-v1
+   source so target hold creation precedes the inherited two-generation
+   frontier limitation. If that genuine path still cannot reach a durable hold
+   without parent frontier threading, record the observation honestly and move
+   only this redirect subcase to the parent continuation; do not widen row
+   classification or fail the independent f5b0w hold gate.
 
 A creator-owned or migration-forced hold is an indefinite fail-closed freeze
 of that author's ordinary issue/migration activity in this slice. Under fixed-
@@ -100450,11 +100461,12 @@ same bounded sentinel and expects the future exact prompt refusal with no
 issue input or additional plan write. Migration rehearsal, activation and
 redirect tests pin the exact observations in item 5. Memory, browser and node
 store conformance REDs retain a source-digest substitution, every final-to-
-manual-review rewrite, linked-entry mutation and completed-progress mutation
-that current code admits; an already stricter case is a retained control, not
-a manufactured failure. RED is rejected if it times out, fails before durable
-hold creation, uses a private resolver/store mutation as authority, changes a
-product error, or does not preserve the exact durable row.
+manual-review rewrite, direct-CAS null→linked mutation, linked-entry mutation
+and completed-progress mutation that current code admits; an already stricter
+case is a retained control, not a manufactured failure. RED is rejected if it
+times out, fails before durable hold creation, uses a private resolver/store
+mutation as authority, changes a product error, or does not preserve the exact
+durable row.
 
 GREEN runs the focused f5b0u/f5b0c room and issuance-store conformance tests.
 It does not run or claim the parent manual-review, displaced-control,
@@ -100517,6 +100529,27 @@ reviews the corrected signed/pushed plan; no recursive prose-only review
 follows. Evidence is `.logs/d110c-0c1f5b0w-plan-review-e9b29568/`.
 Its sixteen-entry self-excluding manifest SHA-256 is
 `af286f4232b43d41424d9f7a17cd27977ae9a4c9766ab5befbc3f412eb25c246`.
+
+The sole material confirmation inspected signed/pushed correction
+`8bca2f672f01c01c22ce8cefae2963f7016a2fb0`. Grok 4.6/high returned
+substantive PASS, P0/P1/P2 `0/0/0`; its runner honestly classified leading
+progress prose as `NO_VERDICT`, and exact session
+`01a07199-d34f-72e1-a484-2da7fc29ee0e` re-emitted the unchanged schema-only
+PASS without another inspection. Codex `gpt-5.6-sol` high returned PASS
+`0/0/0`. Fable 5.1 xhigh session
+`e23a02d3-e56c-4576-b3c1-16f2d21ddaa3`, invoked only through
+`claude-phel`, returned PASS `0/0/3`. All three set the blocking union empty,
+RED authorized and scope preserved.
+
+The P2s are owned in the authorized tests-only RED without another review:
+use a single-generation settlement source for internal redirect hold
+reachability or defer only that subcase if genuine pre-frontier reachability
+fails; pin the exact thrown close-owner `CERTIFIED_VALUE_MISMATCH`; and reject
+direct-CAS null→linked mutation because only atomic `planEffect` owns a link.
+Evidence is `.logs/d110c-0c1f5b0w-plan-confirmation-8bca2f67/`; its sixteen-
+entry self-excluding manifest SHA-256 is
+`60d4c63ee1e858b72af642947c44a31f4b101a696808abcd905eae4beddc3579`.
+The plan gate is closed; proceed directly to Astra-high tests-only RED.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
