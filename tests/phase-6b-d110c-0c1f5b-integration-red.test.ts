@@ -1594,7 +1594,7 @@ async function sixtyFourWriterGoldenPath() {
 				priorCheckpoint.identity.successorAnchorDigest
 			);
 			expect(checkpoint.identity.priorCheckpointDigest, "F5B_64_ADJACENT_CHECKPOINT_LINK").toBe(
-				hex(hashDomain("ts-drp/creator-author-settlement/v1", priorCheckpoint.bytes))
+				hex(hashDomain("ts-drp-storage/blob/v1", priorCheckpoint.bytes))
 			);
 			expect(checkpoint.identity.historySize, "F5B_64_MONOTONE_HISTORY_ACCOUNTING").toBeGreaterThan(
 				priorCheckpoint.identity.historySize
