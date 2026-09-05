@@ -1,0 +1,24 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "list",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "--json"
+  ],
+  "startedAt": "2026-09-05T21:04:26.382Z",
+  "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+  "ownerHashes": {
+    "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+    "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+    "packages/node/src/creator-close.ts": "931800cefb3efbc4d63257178a09c287f325ef14acb9261d70b131118f83ed50",
+    "packages/node/src/internal/creator-transition-advance.ts": "adbc6f82e00482e3187828e39dafb15cd7a68d5ef2ca23746d8fd849e5ff0cf7",
+    "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+    "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+    "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+  }
+}

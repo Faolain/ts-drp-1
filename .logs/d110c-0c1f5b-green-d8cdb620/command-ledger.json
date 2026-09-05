@@ -1,0 +1,482 @@
+[
+  {
+    "name": "batch01-build",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "build:packages"
+      ],
+      "startedAt": "2026-09-05T21:01:40.634Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "0d205ed1d34fcf75663316460ba590f47d53a7e5e2dd4e9229e4b85da9dbaac4",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "931800cefb3efbc4d63257178a09c287f325ef14acb9261d70b131118f83ed50",
+        "packages/node/src/internal/creator-transition-advance.ts": "fc3ee67d481728052ecc22d100dda7bb43cf1a617307fbdc3cb207158388929b",
+        "packages/node/src/v3-live.ts": "15c019027191e60f31fc1f703d4361d2a387ba4d36fd206ee343eee42ee58001",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "22438ccc314a29511c59b3db9e8d5ab37bc44ad10cdbd8f620edf044547cd7db",
+        "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "2860bf22570a3f1df33509f7ad5982f44edb6154c9342e0909d28196efb3bf51"
+      }
+    },
+    "status": {
+      "status": 1,
+      "signal": null,
+      "endedAt": "2026-09-05T21:01:46.701Z"
+    },
+    "stdout": "batch01-build/stdout",
+    "stderr": "batch01-build/stderr"
+  },
+  {
+    "name": "batch01-build-corrected",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "build:packages"
+      ],
+      "startedAt": "2026-09-05T21:02:35.824Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "0d205ed1d34fcf75663316460ba590f47d53a7e5e2dd4e9229e4b85da9dbaac4",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "931800cefb3efbc4d63257178a09c287f325ef14acb9261d70b131118f83ed50",
+        "packages/node/src/internal/creator-transition-advance.ts": "b771738c5a7b858085576dfdae7b0417198d06d37c9c710dee24a82552751be5",
+        "packages/node/src/v3-live.ts": "5fdc7e58e0adf98c59b714948a33a10fd34602ef73e339bfe8d0feeddd219f8e",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "5f9ef8a1c2ab12775442536a76ba794e533105b3980eeb0cea9cec627d002e69",
+        "packages/protocol-v3/src/creator-close.ts": "de8271d98a82d0b47ac5b16a04276ab2975883532b6d11ec0370fe4a66d1bc4a",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "2860bf22570a3f1df33509f7ad5982f44edb6154c9342e0909d28196efb3bf51"
+      }
+    },
+    "status": {
+      "status": 2,
+      "signal": null,
+      "endedAt": "2026-09-05T21:02:54.874Z"
+    },
+    "stdout": "batch01-build-corrected/stdout",
+    "stderr": "batch01-build-corrected/stderr"
+  },
+  {
+    "name": "batch01-build-final",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "build:packages"
+      ],
+      "startedAt": "2026-09-05T21:03:38.871Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "931800cefb3efbc4d63257178a09c287f325ef14acb9261d70b131118f83ed50",
+        "packages/node/src/internal/creator-transition-advance.ts": "adbc6f82e00482e3187828e39dafb15cd7a68d5ef2ca23746d8fd849e5ff0cf7",
+        "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+        "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+      }
+    },
+    "status": {
+      "status": 0,
+      "signal": null,
+      "endedAt": "2026-09-05T21:03:57.042Z"
+    },
+    "stdout": "batch01-build-final/stdout",
+    "stderr": "batch01-build-final/stderr"
+  },
+  {
+    "name": "batch01-format",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--write",
+        "examples/v3-room/src/index.ts",
+        "packages/node/src/creator-adoption.ts",
+        "packages/node/src/creator-close.ts",
+        "packages/node/src/internal/creator-transition-advance.ts",
+        "packages/node/src/v3-live.ts",
+        "packages/protocol-v3/src/creator-checkpoint.ts",
+        "packages/protocol-v3/src/creator-close.ts",
+        "packages/node/src/internal/closed-epoch-cleanup.ts"
+      ],
+      "startedAt": "2026-09-05T21:00:18.534Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "243d280b22f7aad3967e1a10aa82ffde3be8178b27d2cc23c8d03e5fc0f32cec",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "06e504d840644ba6dc92b46baac45a9dc6c51fc8e989151c33c7609c9eec6674",
+        "packages/node/src/internal/creator-transition-advance.ts": "60c286446bb81fb6b9617b2e24bb82a4140fa3f9b79b89e58eb79a9f915cc6b2",
+        "packages/node/src/v3-live.ts": "24e985b4816c4c1b55372a24aa4efa3b5cdbd4e29f281094decb88e1ec855f40",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+        "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "e3a2f55d7a6463811b0ff9fbdc85aa1b128ca55e7476bfc91caf77f8eb8149b2"
+      }
+    },
+    "status": {
+      "status": 0,
+      "signal": null,
+      "endedAt": "2026-09-05T21:00:20.336Z"
+    },
+    "stdout": "batch01-format/stdout",
+    "stderr": "batch01-format/stderr"
+  },
+  {
+    "name": "batch01-lint",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "--fix",
+        "examples/v3-room/src/index.ts",
+        "packages/node/src/creator-adoption.ts",
+        "packages/node/src/creator-close.ts",
+        "packages/node/src/internal/creator-transition-advance.ts",
+        "packages/node/src/v3-live.ts",
+        "packages/protocol-v3/src/creator-checkpoint.ts",
+        "packages/protocol-v3/src/creator-close.ts",
+        "packages/node/src/internal/closed-epoch-cleanup.ts"
+      ],
+      "startedAt": "2026-09-05T21:00:54.214Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "0d205ed1d34fcf75663316460ba590f47d53a7e5e2dd4e9229e4b85da9dbaac4",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "1e83897f17208aa05b2b4d82e79b1dd0c14022473a2c3bed2b633e1e406021f6",
+        "packages/node/src/internal/creator-transition-advance.ts": "ddf78cc0ff8bda651982fe7d2d926192baf90796ed2dbd78ee4340ff18c599b4",
+        "packages/node/src/v3-live.ts": "639a9b0fa1f6bbfcc04bb11b7c25eacc2a65e574354903224018e25ebeaa9c41",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+        "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "9eabd6692fcbc7232a0fc160692b37423e9ec0af0df8f35b39ddfdad6401eda0"
+      }
+    },
+    "status": {
+      "status": 1,
+      "signal": null,
+      "endedAt": "2026-09-05T21:01:23.674Z"
+    },
+    "stdout": "batch01-lint/stdout",
+    "stderr": "batch01-lint/stderr"
+  },
+  {
+    "name": "batch01-lint-corrected",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "--fix",
+        "examples/v3-room/src/index.ts",
+        "packages/node/src/creator-adoption.ts",
+        "packages/node/src/creator-close.ts",
+        "packages/node/src/internal/creator-transition-advance.ts",
+        "packages/node/src/v3-live.ts",
+        "packages/protocol-v3/src/creator-checkpoint.ts",
+        "packages/protocol-v3/src/creator-close.ts",
+        "packages/node/src/internal/closed-epoch-cleanup.ts"
+      ],
+      "startedAt": "2026-09-05T21:02:37.281Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "0d205ed1d34fcf75663316460ba590f47d53a7e5e2dd4e9229e4b85da9dbaac4",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "931800cefb3efbc4d63257178a09c287f325ef14acb9261d70b131118f83ed50",
+        "packages/node/src/internal/creator-transition-advance.ts": "b771738c5a7b858085576dfdae7b0417198d06d37c9c710dee24a82552751be5",
+        "packages/node/src/v3-live.ts": "5fdc7e58e0adf98c59b714948a33a10fd34602ef73e339bfe8d0feeddd219f8e",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "5f9ef8a1c2ab12775442536a76ba794e533105b3980eeb0cea9cec627d002e69",
+        "packages/protocol-v3/src/creator-close.ts": "de8271d98a82d0b47ac5b16a04276ab2975883532b6d11ec0370fe4a66d1bc4a",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "2860bf22570a3f1df33509f7ad5982f44edb6154c9342e0909d28196efb3bf51"
+      }
+    },
+    "status": {
+      "status": 0,
+      "signal": null,
+      "endedAt": "2026-09-05T21:03:06.635Z"
+    },
+    "stdout": "batch01-lint-corrected/stdout",
+    "stderr": "batch01-lint-corrected/stderr"
+  },
+  {
+    "name": "batch01-typecheck-node",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ts-drp/node",
+        "typecheck"
+      ],
+      "startedAt": "2026-09-05T21:00:55.430Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "0d205ed1d34fcf75663316460ba590f47d53a7e5e2dd4e9229e4b85da9dbaac4",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "1e83897f17208aa05b2b4d82e79b1dd0c14022473a2c3bed2b633e1e406021f6",
+        "packages/node/src/internal/creator-transition-advance.ts": "ddf78cc0ff8bda651982fe7d2d926192baf90796ed2dbd78ee4340ff18c599b4",
+        "packages/node/src/v3-live.ts": "639a9b0fa1f6bbfcc04bb11b7c25eacc2a65e574354903224018e25ebeaa9c41",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+        "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "9eabd6692fcbc7232a0fc160692b37423e9ec0af0df8f35b39ddfdad6401eda0"
+      }
+    },
+    "status": {
+      "status": 2,
+      "signal": null,
+      "endedAt": "2026-09-05T21:01:02.851Z"
+    },
+    "stdout": "batch01-typecheck-node/stdout",
+    "stderr": "batch01-typecheck-node/stderr"
+  },
+  {
+    "name": "batch01-typecheck-node-built",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ts-drp/node",
+        "typecheck"
+      ],
+      "startedAt": "2026-09-05T21:03:40.416Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "931800cefb3efbc4d63257178a09c287f325ef14acb9261d70b131118f83ed50",
+        "packages/node/src/internal/creator-transition-advance.ts": "adbc6f82e00482e3187828e39dafb15cd7a68d5ef2ca23746d8fd849e5ff0cf7",
+        "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+        "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+      }
+    },
+    "status": {
+      "status": 2,
+      "signal": null,
+      "endedAt": "2026-09-05T21:03:47.893Z"
+    },
+    "stdout": "batch01-typecheck-node-built/stdout",
+    "stderr": "batch01-typecheck-node-built/stderr"
+  },
+  {
+    "name": "batch02-build",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "build:packages"
+      ],
+      "startedAt": "2026-09-05T21:08:46.608Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+        "packages/node/src/creator-adoption.ts": "a668a8c02f28cb4f936a0883fdaeee37a327774860fe173213fba0c0e3ab870a",
+        "packages/node/src/creator-close.ts": "df18f730c730533c7943d41dab1f26cab3718b1206f35a2bae50da82cc499c9d",
+        "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+        "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+        "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+      }
+    },
+    "status": {
+      "status": 0,
+      "signal": null,
+      "endedAt": "2026-09-05T21:09:06.930Z"
+    },
+    "stdout": "batch02-build/stdout",
+    "stderr": "batch02-build/stderr"
+  },
+  {
+    "name": "batch02-format",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--write",
+        "examples/v3-room/src/index.ts",
+        "packages/node/src/creator-adoption.ts",
+        "packages/node/src/creator-close.ts",
+        "packages/node/src/internal/creator-transition-advance.ts",
+        "packages/node/src/v3-live.ts",
+        "packages/protocol-v3/src/creator-checkpoint.ts",
+        "packages/protocol-v3/src/creator-close.ts",
+        "packages/node/src/internal/closed-epoch-cleanup.ts"
+      ],
+      "startedAt": "2026-09-05T21:08:33.471Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+        "packages/node/src/creator-adoption.ts": "b07bd34da41b7a3934270ef389efed3ff69bde9a0a01bd3d33fa9c0806c4fc14",
+        "packages/node/src/creator-close.ts": "841d8594745b18c13f8152c1574d56b85fa5c5d75d1a15ffe58d17d54ae7834e",
+        "packages/node/src/internal/creator-transition-advance.ts": "332571f9c12c5a57df5ef940c79d99330738bc2e67c66f4c939d495e12db3277",
+        "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+        "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+      }
+    },
+    "status": {
+      "status": 0,
+      "signal": null,
+      "endedAt": "2026-09-05T21:08:36.435Z"
+    },
+    "stdout": "batch02-format/stdout",
+    "stderr": "batch02-format/stderr"
+  },
+  {
+    "name": "batch02-lint",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "examples/v3-room/src/index.ts",
+        "packages/node/src/creator-adoption.ts",
+        "packages/node/src/creator-close.ts",
+        "packages/node/src/internal/creator-transition-advance.ts",
+        "packages/node/src/v3-live.ts",
+        "packages/protocol-v3/src/creator-checkpoint.ts",
+        "packages/protocol-v3/src/creator-close.ts",
+        "packages/node/src/internal/closed-epoch-cleanup.ts"
+      ],
+      "startedAt": "2026-09-05T21:08:48.238Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+        "packages/node/src/creator-adoption.ts": "a668a8c02f28cb4f936a0883fdaeee37a327774860fe173213fba0c0e3ab870a",
+        "packages/node/src/creator-close.ts": "df18f730c730533c7943d41dab1f26cab3718b1206f35a2bae50da82cc499c9d",
+        "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+        "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+        "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+      }
+    },
+    "status": {
+      "status": 0,
+      "signal": null,
+      "endedAt": "2026-09-05T21:09:20.880Z"
+    },
+    "stdout": "batch02-lint/stdout",
+    "stderr": "batch02-lint/stderr"
+  },
+  {
+    "name": "focused-01",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "--testNamePattern=D.110c-0c1f5b parent genuine settlement composition|parent f5b P2",
+        "--coverage.enabled=false",
+        "--reporter=json",
+        "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-d8cdb620/focused-01/result.json"
+      ],
+      "startedAt": "2026-09-05T21:04:38.518Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "931800cefb3efbc4d63257178a09c287f325ef14acb9261d70b131118f83ed50",
+        "packages/node/src/internal/creator-transition-advance.ts": "adbc6f82e00482e3187828e39dafb15cd7a68d5ef2ca23746d8fd849e5ff0cf7",
+        "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+        "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+      }
+    },
+    "status": {
+      "status": 1,
+      "signal": null,
+      "endedAt": "2026-09-05T21:05:00.295Z"
+    },
+    "stdout": "focused-01/stdout",
+    "stderr": "focused-01/stderr"
+  },
+  {
+    "name": "focused-02",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "--testNamePattern=D.110c-0c1f5b parent genuine settlement composition|parent f5b P2",
+        "--coverage.enabled=false",
+        "--reporter=json",
+        "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-d8cdb620/focused-02/result.json"
+      ],
+      "startedAt": "2026-09-05T21:09:48.318Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+        "packages/node/src/creator-adoption.ts": "a668a8c02f28cb4f936a0883fdaeee37a327774860fe173213fba0c0e3ab870a",
+        "packages/node/src/creator-close.ts": "df18f730c730533c7943d41dab1f26cab3718b1206f35a2bae50da82cc499c9d",
+        "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+        "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+        "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+      }
+    },
+    "status": {
+      "status": 1,
+      "signal": null,
+      "endedAt": "2026-09-05T21:10:23.960Z"
+    },
+    "stdout": "focused-02/stdout",
+    "stderr": "focused-02/stderr"
+  },
+  {
+    "name": "focused-list",
+    "command": {
+      "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "list",
+        "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "--json"
+      ],
+      "startedAt": "2026-09-05T21:04:26.382Z",
+      "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+      "ownerHashes": {
+        "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+        "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+        "packages/node/src/creator-close.ts": "931800cefb3efbc4d63257178a09c287f325ef14acb9261d70b131118f83ed50",
+        "packages/node/src/internal/creator-transition-advance.ts": "adbc6f82e00482e3187828e39dafb15cd7a68d5ef2ca23746d8fd849e5ff0cf7",
+        "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+        "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+        "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+        "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+      }
+    },
+    "status": {
+      "status": 0,
+      "signal": null,
+      "endedAt": "2026-09-05T21:04:30.326Z"
+    },
+    "stdout": "focused-list/stdout",
+    "stderr": "focused-list/stderr"
+  }
+]

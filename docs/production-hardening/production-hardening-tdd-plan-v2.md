@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (resume the previously authorized parent f5b GREEN):
+Current work (correct parent f5b's scalar-replacement oracle, then resume GREEN):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18520,14 +18520,24 @@ Current work (resume the previously authorized parent f5b GREEN):
   The separate observer correction is accepted at tests `78e068a8` / evidence
   `45b1be36`: one isolated source-built run, 28 active / 23 expected failures /
   5 passes / 17 filtered, no anomalies. Both terminal getter throws and fresh
-  owner-bound emitted-state checks are retained. Production GREEN may now
-  resume: closed f5b0z supplies backend-neutral discovery of the existing
+  owner-bound emitted-state checks are retained. Closed f5b0z supplies
+  backend-neutral discovery of the existing
   capability, while Node retains authenticated successor/cleanup-plan ownership.
   Parent f5b must still compose that capability with the genuine first-deletion
   gates, issuance-prefix bounds and exact two-physical-ancestor accounting.
   Discovery alone does not authorize deletion or change production ordering,
   retry/failure policy, or exact snapshot-byte requirements. Do not rerun the
   accepted observer RED or repeat f5b0z reviews.
+  The resumed GREEN is now stopped at
+  `.logs/d110c-0c1f5b-green-d8cdb620/`: its second focused run records
+  22 pass / 6 fail / 17 filtered. Before further production edits, a separate
+  Astra-high tests-only correction must preserve the accepted scalar one-vertex
+  replacement contract in case 25, with one isolated corrected RED execution
+  under the unchanged causal matrix. The exact scope is in the parent record.
+  The hot-adoption snapshot-byte assertion is not relaxed: its failure exposes
+  missing authenticated projection-base installation in the existing room
+  composition. Creator restart, fresh-device reentry and cleanup availability
+  binding also remain production GREEN obligations, not fixture exemptions.
   Post-codec recovery, the complete 64-writer continuation and the later long
   campaign remain unproved. Product state, batch, epoch and snapshot ceilings
   remain unchanged.
@@ -18537,8 +18547,9 @@ Blocked, and on what:
 - **Parent f5b closure** still requires its genuine authenticated cleanup
   caller and complete 64-writer/three-transition continuation, restart and cold
   reopen. The discovery prerequisite f5b0z and independent observer RED are
-  closed; neither needs another execution or review. Resume the existing narrow
-  parent implementation without a Node-to-browser dependency or invented authority.
+  closed; neither needs another execution or review. First close the narrow
+  scalar case-25 oracle correction below, then resume the existing parent
+  implementation without a Node-to-browser dependency or invented authority.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -100762,10 +100773,13 @@ completion.
 **Status: oracle consistency RED remains accepted at signed/pushed tests
 `97c0836b` and evidence `88fef442`; resumed GREEN stopped with signed/pushed
 diagnostic `0a656d1b`. Its bounded observer correction is now accepted at
-tests `78e068a8` / evidence `45b1be36`; production GREEN remains paused on
-the proposed f5b0z cleanup capability boundary below. The seven-file production
-patch is unchanged diagnostic work,
-not accepted GREEN.** The
+tests `78e068a8` / evidence `45b1be36`; the f5b0z cleanup-discovery prerequisite
+is closed at signed/pushed `d8cdb620`. The separate Astra-high parent GREEN
+owner resumed the authorized eight-owner repair and stopped after its second
+focused run (22 pass / 6 fail / 17 filtered). A scalar case-25 oracle correction
+must precede further GREEN edits; the partial production patch is preserved,
+not accepted. Focused, static, retained, isolated and final review gates remain
+open.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
@@ -101230,13 +101244,89 @@ tests-only observation debt: the pre-codec RED does not reach the post-prefix
 restart comparison, which remains a full GREEN obligation. No rerun, reviewer,
 campaign or new API is authorized by accepting this correction.
 
-The separate cleanup stop remains real: Node's authenticated successor material
+Prospective scalar case-25 correction (2026-09-05): preserve the resumed
+diagnostic at `.logs/d110c-0c1f5b-green-d8cdb620/`, including both focused
+result sets and the eight-owner partial production patch. Focused-01 recorded
+8 pass / 20 fail / 17 filtered: all twenty failures were the same new
+`TRUST_CLOSURE_INVALID` composition bug, not a design failure. The private
+validator incorrectly sought a standalone successor ACL in the pre-adoption
+closure. The corrected composition threads the existing authenticated snapshot
+ACL bytes through the private transition owner: close requires them, and hot,
+cold and pending adoption perform the final ACL/adjacency checks after snapshot
+verification and before acceptance. It creates no wire record or public API.
+Focused-02 then recorded 22 pass / 6 fail / 17 filtered across the unchanged
+45 tests and two files. Both are failed GREEN diagnostics, not acceptance.
+The initial reporter checker mistook `skipped` for `pending`; its correction
+revalidates the same saved reporter without a test rerun.
+The stopped diagnostic's 77-entry self-excluding manifest validates with
+SHA-256 `0f4facc68a059323e1d8aa9d76b0c7ecaea9d43a74684f70cb2643b3bd34993f`.
+Root independently reparsed both complete reporters and verified the manifest.
+Whole-plan `pnpm exec prettier --check` aborted at the formatter's default
+approximately 4-GiB heap (SIGABRT, wrapper exit 1); this is neither a product
+memory result nor a full-plan format pass. Prettier checks of the three edited
+Markdown sections with the repository's resolved configuration pass, as does
+the plan's `git diff --check`; no heap ceiling was raised.
+The unfiltered staged diff check returns 2 solely for 381 raw-evidence
+whitespace warnings: patch-context prefixes in `partial-production.patch` and
+final blank lines in the three captured lint stdout files. These four captures
+remain byte-identical; the staged check excluding only those exact raw files
+passes. No source or prose whitespace exception is granted.
+
+Two of the six failures occur at case 25's requirement that a one-intent,
+256-character replacement have `replacementProgress`. The closed f5b0t
+contract above explicitly preserves the four-key entry and two-key replacement
+effect when one vertex fits; progress is introduced only after genuine
+nonmutating `split-required`. The room follows that contract. The prior
+durable-row correction remains valid and its assertion now passes; requiring
+progress here is a separate stale expectation and must not be implemented as
+a production representation change.
+
+Owner: a separate Astra-high RED test owner. Deadline: before the stopped
+parent GREEN makes further production edits. Change only
+`tests/phase-6b-d110c-0c1f5b-integration-red.test.ts` inside the case-25
+one-vertex replacement expectation: assert absent progress before and after
+the atomic write, the exact two-key effect, the unchanged scalar link until
+commit, and the exact one-revision plan mutation on commit. Preserve the exact
+durable row, transformed operation, lineage, fresh-owner, publication,
+unknown-outcome and failed-recovery assertions. Preserve the segmented
+two-intent progress test, wide-state byte assertions, all other functions and
+helpers, workload, limits, test titles and selected-test count. No test may
+manufacture a split or require a new API.
+
+Commit the tests-only correction separately. In one isolated checkout of that
+signed test commit, independently install and build from source without the
+partial GREEN overlay or copied dist, then execute the unchanged 28-active
+selection once. Require the existing 45-total/two-file matrix: 23 exact
+inherited causal failures, 5 passes and 17 intentional filtered tests, with no
+loader, fixture, timeout, top-level or changed-token anomaly. Record complete
+results, static/source checks and self-excluding manifest; sign and push the
+evidence before accepting the correction. Do not rerun the completed observer
+RED, reopen f5b0t/f5b0u/f5b0z, or add a separate model/prose review round.
+The existing final parent Grok/Sol-high/Fable-xhigh review must inspect this
+correction and both preserved failed GREEN runs.
+
+The other four failures remain genuine production composition obligations in
+the existing eight owners: authenticated creator restart under the settlement
+profile; an authentically readmitted fresh device with no predecessor rows;
+the cleanup availability digest from the signed cut, not the anchor; and hot
+adoption's authenticated snapshot projection base plus retired/current operation
+custody. In particular, the wide test's post-adoption exact snapshot bytes are
+not changed to a semantic-only comparison. Use the existing projection-base
+capability and preserve callback/replay, failure and v1 compatibility contracts;
+any need for a new authority/API boundary stops for explicit reslicing.
+Exact-once canonical effects must not be confused with exactly-once external
+callback delivery: f5b0v's accepted replayable notification contract remains
+unchanged, including during hot projection-base installation.
+
+Historical cleanup stop, resolved prospectively by the closed f5b0z record
+below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
 room can resolve the existing browser maintenance facade but does not own the
 opaque Node checkpoint authority. The D109d post-delete receipt hook cannot
 perform the first deletion. The completed user-authorized Fable-high
 consultation and root audit recommend the explicit f5b0z API prerequisite
-below; this does not authorize its implementation. Do not add a
+below. Its separate authorization, implementation and review are now complete;
+the parent consumes that existing discovery contract only. Do not add a
 Node-to-browser dependency, infer trust from a structural room projection,
 invent receipts, or silently widen the eight-owner repair. The pure private
 cleanup-gate adaptation is not evidence that its production caller exists.

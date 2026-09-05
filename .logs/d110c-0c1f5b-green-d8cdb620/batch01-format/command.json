@@ -1,0 +1,29 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "prettier",
+    "--write",
+    "examples/v3-room/src/index.ts",
+    "packages/node/src/creator-adoption.ts",
+    "packages/node/src/creator-close.ts",
+    "packages/node/src/internal/creator-transition-advance.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/protocol-v3/src/creator-checkpoint.ts",
+    "packages/protocol-v3/src/creator-close.ts",
+    "packages/node/src/internal/closed-epoch-cleanup.ts"
+  ],
+  "startedAt": "2026-09-05T21:00:18.534Z",
+  "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+  "ownerHashes": {
+    "examples/v3-room/src/index.ts": "243d280b22f7aad3967e1a10aa82ffde3be8178b27d2cc23c8d03e5fc0f32cec",
+    "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+    "packages/node/src/creator-close.ts": "06e504d840644ba6dc92b46baac45a9dc6c51fc8e989151c33c7609c9eec6674",
+    "packages/node/src/internal/creator-transition-advance.ts": "60c286446bb81fb6b9617b2e24bb82a4140fa3f9b79b89e58eb79a9f915cc6b2",
+    "packages/node/src/v3-live.ts": "24e985b4816c4c1b55372a24aa4efa3b5cdbd4e29f281094decb88e1ec855f40",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+    "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c",
+    "packages/node/src/internal/closed-epoch-cleanup.ts": "e3a2f55d7a6463811b0ff9fbdc85aa1b128ca55e7476bfc91caf77f8eb8149b2"
+  }
+}
