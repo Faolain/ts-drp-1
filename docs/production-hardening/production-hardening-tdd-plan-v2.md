@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b bounded-workload correction)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b bounded-workload RED accepted)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,7 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Authorized now (tests-only RED; production GREEN remains gated):
+Authorized now (bounded-workload RED accepted; separate parent GREEN):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18487,13 +18487,15 @@ Authorized now (tests-only RED; production GREEN remains gated):
   stopped diagnostic at `.logs/d110c-0c1f5b-green-79743f98/`: it reached the
   real cross-close replacement-progress path, then proved that the parent
   fixture's inherited 33,000-byte append-only chat transform cannot satisfy
-  the unchanged 32,768-byte application-state ceiling. A bounded tests-only
-  workload correction is authorized before GREEN resumes: retain the real
-  two-intent/multiple-chunk crash-and-recovery proof with a tests-only
-  transient-payload blueprint whose reducer keeps bounded state, and use a
-  256-character transform for every other parent append-only chat consumer,
-  including the independent 64-writer proof. Product state, batch, epoch and
-  snapshot ceilings remain unchanged.
+  the unchanged 32,768-byte application-state ceiling. The bounded tests-only
+  correction is now accepted: signed/pushed tests `d1eee8ed` and evidence
+  `6cb33ee9` preserve the transient-payload multiple-chunk continuation and
+  bound every other parent chat transform to 256 characters. The sole focused
+  run matches the frozen 26-active/23-fail/3-pass plus 17-filtered matrix with
+  no violations. Evidence is `.logs/d110c-0c1f5b-red-workload-d1eee8ed/`.
+  A separate fresh Astra-high parent GREEN is authorized; post-codec recovery,
+  the complete 64-writer continuation and the later long campaign are not yet
+  proved. Product state, batch, epoch and snapshot ceilings remain unchanged.
 
 Blocked, and on what:
 
@@ -100717,9 +100719,9 @@ completion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: coverage-corrective causal RED accepted; first parent GREEN stopped
-at a contradictory fixture workload; one bounded tests-only correction is
-authorized before a fresh Astra-high parent GREEN.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+**Status: bounded-workload causal RED accepted; the earlier parent GREEN
+remains a stopped diagnostic; a separate fresh Astra-high parent GREEN is
+authorized.** The f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
@@ -100905,11 +100907,27 @@ three-transition predicate. Evidence is
 `.logs/d110c-0c1f5b-workload-plan-confirmation-d836fc3d/`; its eleven-entry
 self-excluding manifest SHA-256 is
 `2ffe6ba37ac8d8a7944d43a3024a8bc6fe4050882bbfc16f8be39fc602353c8e`.
-One Astra-high tests-only RED agent now commits
-the corrected fixture and exact matrix; a separate Astra-high GREEN agent
-starts from that RED and implements only the accepted parent production
-design. The final three-review GREEN gate remains unchanged. No long campaign
-is authorized.
+The bounded-workload correction is accepted at signed/pushed tests
+`d1eee8ed48209c6ad3cfc07872984b4f94667cbb` and evidence
+`6cb33ee9fc139781c65db07814b86722120be8e8`. Its sole focused execution exactly
+matches 26 active / 23 fail / 3 pass plus 17 filtered: nineteen successor-codec
+failures, the exact 64-writer `migrationInviteAuthority` item-limit failure,
+and the three inherited P2 provenance/closed-precedence failures; all three
+controls pass. There are no matrix violations or fixture, import, state-limit,
+loader or timeout anomalies. Source-derived bounds are 33,061 bytes per
+transformed case-3 operation, 66,237 for their pair, 108 for their exact reducer
+state, and 14,303 for the modeled final wide state; the real room passed the
+local package/invite and two-intent preconditions before the expected codec
+failure. The actual wide-state bound and full recovery continuation remain
+GREEN obligations, not RED passes. Evidence and the preserved, corrected
+read-only calculator diagnostic are in
+`.logs/d110c-0c1f5b-red-workload-d1eee8ed/`; its eighteen-entry self-excluding
+manifest SHA-256 is
+`9da17cf12ba0a281896bce99570130cce5aacae69bec33a83bf837c64728b889`.
+A separate Astra-high GREEN agent starts from this RED and implements only the
+accepted parent production design. The final three-review GREEN gate remains
+unchanged. No long campaign is authorized, and no production chat-admission
+safety claim is made.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
