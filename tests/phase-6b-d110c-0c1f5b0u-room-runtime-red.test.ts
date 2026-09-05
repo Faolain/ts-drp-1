@@ -586,7 +586,7 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 		await holdCustody(fixture);
 		expectPromptRefusal(result, "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG");
 	});
-	it("creator-held seal reaches the existing close owner and exact successor-codec terminus", async () => {
+	it("creator-held seal succeeds through the genuine close owner with unchanged hold custody", async () => {
 		observation.captureClose = true;
 		const fixture = await openHeld({ withClose: true });
 		expect(observation.bound).toHaveLength(1);
@@ -595,22 +595,18 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 		await microtaskTurns();
 		await holdCustody(fixture);
 		expect(observation.closeCalls, "D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG").toBe(1);
-		await sealing.catch(() => undefined);
-		expect(result.result().error).toBeInstanceOf(TypeError);
-		expect((result.result().error as Error).message).toBe("creator close actor failed: CERTIFIED_VALUE_MISMATCH");
+		await expect(sealing).resolves.toMatchObject({ ok: true, lifecycle: "successor-pending-adoption" });
+		expect(result.result().settled).toBe(true);
+		expect(result.result().error).toBeUndefined();
+		expect(observation.closeCalls).toBe(1);
 		await holdCustody(fixture);
 	});
-	it("no-hold creator close retains the exact existing thrown codec terminus", async () => {
+	it("no-hold creator seal succeeds through exactly one genuine close-owner call", async () => {
 		observation.captureClose = true;
 		const { target } = await openRebasePair(1, 100, true);
 		await target.issue({ action: "message", clientOperationId: "ordinary", text: "continued" });
-		const error = await target.sealEpoch().then(
-			() => undefined,
-			(reason: unknown) => reason
-		);
+		await expect(target.sealEpoch()).resolves.toMatchObject({ ok: true, lifecycle: "successor-pending-adoption" });
 		expect(observation.closeCalls).toBe(1);
-		expect(error).toBeInstanceOf(TypeError);
-		expect((error as Error).message).toBe("creator close actor failed: CERTIFIED_VALUE_MISMATCH");
 	});
 	it("same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link", async () => {
 		const fixture = await openHeld();

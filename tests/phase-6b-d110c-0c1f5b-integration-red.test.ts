@@ -33,6 +33,10 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
+import {
+	type SnapshotOracleVertex,
+	snapshotStateOracle,
+} from "./fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.js";
 import { createTransientPayloadApplication } from "./fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.js";
 import { createV3ChatApplication } from "../examples/v3-chat/src/index.js";
 import {
@@ -86,11 +90,27 @@ const observed = vi.hoisted(() => ({
 		error?: unknown;
 	}[],
 	cleanup: [] as { input: unknown; result: unknown }[],
+	snapshots: [] as {
+		input: Parameters<typeof import("@ts-drp/protocol-v3/snapshot-transfer").encodeSnapshotTransfer>[0];
+		result: ReturnType<typeof import("@ts-drp/protocol-v3/snapshot-transfer").encodeSnapshotTransfer>;
+	}[],
 	closeGraphs: [] as {
 		input: Parameters<typeof import("@ts-drp/compaction").deriveCloseSetHistoryCommitment>[0];
 		result: Awaited<ReturnType<typeof import("@ts-drp/compaction").deriveCloseSetHistoryCommitment>>;
 	}[],
 }));
+
+vi.mock("@ts-drp/protocol-v3/snapshot-transfer", async (importOriginal) => {
+	const real = await importOriginal<typeof import("@ts-drp/protocol-v3/snapshot-transfer")>();
+	return {
+		...real,
+		encodeSnapshotTransfer: (input: Parameters<typeof real.encodeSnapshotTransfer>[0]) => {
+			const result = real.encodeSnapshotTransfer(input);
+			observed.snapshots.push(structuredClone({ input, result }));
+			return result;
+		},
+	};
+});
 
 vi.mock("@ts-drp/compaction", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@ts-drp/compaction")>();
@@ -859,10 +879,16 @@ async function aheFacts(peer: Peer) {
 	}
 }
 
-async function assertRetainedRollbackPair(peer: Peer, adoptedEpoch: number) {
+async function assertRetainedRollbackPair(peer: Peer) {
+	const cleanup = observed.cleanup.findLast((event) => {
+		const input = event.input as { issuance?: { scope?: { author?: string } }; close?: { objectId?: string } };
+		return input.issuance?.scope?.author === peer.author && input.close?.objectId === peer.input.objectId;
+	});
+	expect(required(cleanup).result, "F5B_C13_C24C_REAL_AUTHENTICATED_CLEANUP_BEFORE_CENSUS").toMatchObject({ ok: true });
 	const facts = await aheFacts(peer);
 	const retained = facts.generations.filter((generation) => generation.state === "Superseded");
-	const expected = Math.min(adoptedEpoch, 2);
+	// Cleanup retains physical generations, including preparation/close ancestors.
+	const expected = 2;
 	expect(retained, "F5B_C13_C24C_PRODUCT_TRUE_BOUNDED_ROLLBACK_WINDOW").toHaveLength(expected);
 	expect(facts.generations, "F5B_C13_BOUNDED_ACTIVE_AND_ROLLBACK_GENERATIONS").toHaveLength(expected + 1);
 	const active = required(facts.generations.find((generation) => generation.generationId === facts.head.generationId));
@@ -1274,7 +1300,7 @@ async function sixtyFourWriterGoldenPath() {
 		}))
 		.sort((left, right) => (left.author < right.author ? -1 : 1));
 	let priorCheckpoint: ReturnType<typeof fixture.checkpoint> | undefined;
-	let sealedState: Uint8Array | undefined;
+	let sealedState = encodeCanonical([]);
 	const semanticState = (rows: { clientOperationId: string; text: string }[]) =>
 		encodeCanonical([...rows].sort((left, right) => left.clientOperationId.localeCompare(right.clientOperationId)));
 	const accountEpoch = (epoch: number) => {
@@ -1438,7 +1464,8 @@ async function sixtyFourWriterGoldenPath() {
 			displaced.push({ peer, source: row.commit, id, epoch });
 		}
 		await Promise.all(cohort.map(fixture.stop));
-		sealedState = productState(creator);
+		// The live migration view has already passed its independent semantic check.
+		// Its order is not the authoritative snapshot's projected-graph Kahn order.
 		await fixture.close();
 		const checkpoint = fixture.checkpoint();
 		accountEpoch(epoch);
@@ -1450,6 +1477,55 @@ async function sixtyFourWriterGoldenPath() {
 					record(row.envelope.canonicalPreimageBytes).epoch === epoch &&
 					!displaced.some((source) => hex(source.source.envelope.digest) === hex(row.envelope.digest))
 			);
+		const anchor = hex(hashDomain("ts-drp/epoch-anchor/v3", graph.input.exactCanonicalEpochAnchorPreimageBytes));
+		const signedGraph = new Map<string, SnapshotOracleVertex>([[anchor, { dependencies: [] }]]);
+		for (const row of admitted) {
+			const hash = hex(row.envelope.digest);
+			const signed = record(row.envelope.canonicalPreimageBytes);
+			expect(hex(hashDomain("ts-drp/vertex/v3", row.envelope.canonicalPreimageBytes))).toBe(hash);
+			expect(
+				ed25519.verify(row.envelope.signature, row.envelope.digest, Buffer.from(row.issuedRecord.scope.author, "hex"))
+			).toBe(true);
+			const vertex = required(graph.input.vertices.get(hash));
+			expect(vertex.dependencies, "F5B_64_CAPTURED_GRAPH_EXACT_SIGNED_DEPENDENCIES").toEqual(signed.dependencies);
+			expect(vertex.operation, "F5B_64_CAPTURED_GRAPH_EXACT_SIGNED_OPERATION").toEqual(signed.operation);
+			expect([vertex.hash, vertex.epoch, vertex.objectId, vertex.anchor, vertex.kind]).toEqual([
+				hash,
+				epoch,
+				fixture.objectId,
+				anchor,
+				"drp-vertex",
+			]);
+			signedGraph.set(hash, {
+				dependencies: signed.dependencies as string[],
+				operation: signed.operation as Record<string, unknown>,
+			});
+		}
+		expect([...signedGraph.keys()].sort(), "F5B_64_SIGNED_GRAPH_HAS_NO_MISSING_OR_EXTRA_VERTICES").toEqual(
+			[...graph.input.vertices.keys()].sort()
+		);
+		const oracle = snapshotStateOracle(signedGraph, anchor, graph.input.frontier, sealedState);
+		expect(oracle.ancestors, "F5B_64_FULL_FRONTIER_ANCESTRY_COVERS_COMPLETE_RAW_GRAPH").toEqual(
+			[...signedGraph.keys()].sort()
+		);
+		sealedState = oracle.state;
+		const snapshot = required(
+			observed.snapshots.findLast((row) => row.result.manifestDigest === checkpoint.identity.snapshotManifestDigest)
+		);
+		const payloadBytes = new Uint8Array(Buffer.concat(snapshot.result.chunks));
+		expect(payloadBytes, "F5B_64_ACTUAL_TRANSFER_CHUNKS_MATCH_PRODUCED_PAYLOAD").toEqual(
+			snapshot.input.exactCanonicalPayloadBytes
+		);
+		expect([snapshot.input.objectId, snapshot.input.epoch, snapshot.input.anchor]).toEqual([
+			fixture.objectId,
+			epoch,
+			anchor,
+		]);
+		expect(
+			encodeCanonical(record(payloadBytes).application),
+			"F5B_64_SNAPSHOT_EXACT_INDEPENDENT_APPLICATION_BYTES"
+		).toEqual(sealedState);
+		expect(snapshot.input.stateDigest).toBe(hex(hashDomain("ts-drp/state/v3", sealedState)));
 		expect(
 			[...graph.result.closeSetOrder].sort(),
 			"F5B_64_EXACT_CLOSE_SET_COUNTS_APPLICATION_AND_CONTROL_VERTICES"
@@ -1493,7 +1569,7 @@ async function sixtyFourWriterGoldenPath() {
 		await creator.room.adoptCreatorSuccessor();
 		expect(productState(creator), "F5B_64_ADOPTION_EXACT_STATE_BYTES").toEqual(sealedState);
 		const authority = required(creator.room.authority());
-		const head = await assertRetainedRollbackPair(creator, epoch + 1);
+		const head = await assertRetainedRollbackPair(creator);
 		expect(authority.anchorDigest).toBe(checkpoint.identity.successorAnchorDigest);
 		expect(authority.aclDigest).toBe(checkpoint.identity.successorAclDigest);
 		expect(creator.floor.read().stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
@@ -1615,7 +1691,7 @@ async function positiveAuthenticatedPruning() {
 		await fixture.reopen(required(fixture.peers[1]), epoch, true);
 		await fixture.issue(required(fixture.peers[1]), `prune-reopened-${epoch}`);
 		for (const peer of fixture.peers) {
-			await assertRetainedRollbackPair(peer, epoch + 1);
+			await assertRetainedRollbackPair(peer);
 			const events = observed.prunes.filter(
 				(event) =>
 					event.database === peer.databaseName &&
@@ -1623,8 +1699,8 @@ async function positiveAuthenticatedPruning() {
 					event.receipt !== undefined
 			);
 			if (epoch < 2) {
-				// First adoption has only one rollback parent; second establishes
-				// the full window but has no older prefix outside that window.
+				// Physical rollback custody is already complete; no authenticated
+				// older issuance prefix is deletable at these logical boundaries.
 				expect(events, "F5B_C13_NO_PREFIX_DELETE_BEFORE_FULL_WINDOW_AND_OLDER_PREFIX").toHaveLength(0);
 				continue;
 			}
@@ -2006,6 +2082,7 @@ beforeEach(() => {
 	observed.prunes = [];
 	observed.cleanup = [];
 	observed.closeGraphs = [];
+	observed.snapshots = [];
 });
 afterEach(async () => {
 	observed.failSuffixFor = "";
@@ -2019,6 +2096,85 @@ afterEach(async () => {
 });
 
 describe("D.110c-0c1f5b parent genuine settlement composition", () => {
+	it("snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect", () => {
+		const message = (id: string) => ({ action: "message", clientOperationId: id, text: id });
+		const graph = new Map<string, SnapshotOracleVertex>([
+			["00", { dependencies: [] }],
+			["80", { dependencies: ["00"], operation: { action: "$drp.author-fence.v1" } }],
+			["90", { dependencies: ["80"], operation: { action: "join" } }],
+			["05", { dependencies: ["90"], operation: { action: "acl" } }],
+			["85", { dependencies: ["05"], operation: { action: "causalJoin" } }],
+			["95", { dependencies: ["80"], operation: { action: "join" } }],
+			["10", { dependencies: ["85", "95"], operation: message("A") }],
+			["20", { dependencies: ["00"], operation: message("B") }],
+		]);
+		// 85 and 95 are incomparable: elision expands them to 05 and its
+		// ancestor 00, so the projected dependencies must reduce to just 05.
+		// Raw minimum-hash Kahn is 00,20,80,90,05,85,95,10: filtering that order
+		// would yield B,A. Elision before ordering must instead yield A,B.
+		const result = snapshotStateOracle(graph, "00", ["10", "20"], encodeCanonical([]));
+		expect(result.order).toEqual(["00", "05", "10", "20"]);
+		expect([...result.dependencies]).toEqual([
+			["00", []],
+			["05", ["00"]],
+			["10", ["05"]],
+			["20", ["00"]],
+		]);
+		expect(result.ancestors).toEqual(["00", "05", "10", "20", "80", "85", "90", "95"]);
+		expect(result.state).toEqual(
+			encodeCanonical([
+				{ clientOperationId: "A", text: "A" },
+				{ clientOperationId: "B", text: "B" },
+			])
+		);
+		expect(result.state).not.toEqual(
+			encodeCanonical([
+				{ clientOperationId: "B", text: "B" },
+				{ clientOperationId: "A", text: "A" },
+			])
+		);
+	});
+	it("snapshot oracle preserves prior state atomic batch entry order and duplicate effects", () => {
+		const duplicate = { clientOperationId: "dup", text: "same" };
+		const operation = { action: "message", ...duplicate };
+		const base = encodeCanonical([duplicate]);
+		const graph = new Map<string, SnapshotOracleVertex>([
+			["00", { dependencies: [] }],
+			["10", { dependencies: ["00"], operation }],
+			[
+				"30",
+				{
+					dependencies: ["00"],
+					operation: {
+						action: "applicationBatch",
+						batch: {
+							version: 1,
+							entries: [
+								{ logicalTime: 2, operation: { action: "message", clientOperationId: "z", text: "first-in-batch" } },
+								{ logicalTime: 3, operation },
+							],
+						},
+					},
+				},
+			],
+			[
+				"35",
+				{ dependencies: ["00"], operation: { action: "message", clientOperationId: "tail", text: "after-batch" } },
+			],
+		]);
+		const result = snapshotStateOracle(graph, "00", ["10", "30", "35"], base);
+		expect(result.order).toEqual(["00", "10", "30", "35"]);
+		expect(result.state).toEqual(
+			encodeCanonical([
+				duplicate,
+				duplicate,
+				{ clientOperationId: "z", text: "first-in-batch" },
+				duplicate,
+				{ clientOperationId: "tail", text: "after-batch" },
+			])
+		);
+		expect(base).toEqual(encodeCanonical([duplicate]));
+	});
 	it("retains checkpoint-terminal open progress through cold recovery across three transitions", async () => {
 		const fixture = await openRoom(2, false, false, true);
 		const creator = required(fixture.peers[0]);
