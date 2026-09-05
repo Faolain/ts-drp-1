@@ -321,7 +321,17 @@ describe("D.110c-0c1f5b0u genuine successor recovered-delivery RED", () => {
 				}))
 			);
 		expect.soft(fixture.accepted, "REPLAY_EXACTLY_ONCE_COMMIT").toEqual(expectedDigests);
-		expect.soft(reopened.projection(), "REPLAY_RECOVERS_PROJECTION").toEqual(fixture.projection);
+		const canonicalStateBytes = required(createV3ChatApplication("alice").migration).canonicalStateBytes;
+		expect
+			.soft(Reflect.apply(canonicalStateBytes, undefined, [reopened.projection()]), "REPLAY_RECOVERS_APPLICATION_STATE")
+			.toEqual(Reflect.apply(canonicalStateBytes, undefined, [fixture.projection]));
+		const reopenedMessages = Reflect.get(reopened.projection(), "accepted") as readonly Record<string, unknown>[];
+		expect
+			.soft(
+				reopenedMessages.filter((message) => message.provenance === "authenticated-snapshot"),
+				"REPLAY_AUTHENTICATED_SNAPSHOT_PROVENANCE"
+			)
+			.toEqual([{ clientOperationId: "snapshot", provenance: "authenticated-snapshot", text: "snapshot" }]);
 		expect.soft(reopened.authority()).toEqual(fixture.authority);
 		const validation = observed.events.indexOf("validated-application-state");
 		expect.soft(observed.events.indexOf("authenticated-projection-base")).toBeGreaterThanOrEqual(0);
