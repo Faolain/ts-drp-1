@@ -133,7 +133,6 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
 const sessions: V3RoomSession[] = [];
 let ordinal = 0;
 const parameters = Object.freeze({
-	authorShareMultiplier: 4,
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
 	maxDependencies: 16,
