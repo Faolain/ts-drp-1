@@ -1,0 +1,67 @@
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > treats a compatible pre-sign race as durable truth without reusing the unclassified handle
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > rejects stale message progress before the missing fence
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > rejects stale transform-me progress before the missing fence
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > does not interpret an absent legacy entry as a durable replacement link
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses wrong-sequence ambiguous progress readback
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses unchanged-revision ambiguous progress readback
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses surplus-revision ambiguous progress readback
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses skipped-range ambiguous progress readback
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses duplicate-range ambiguous progress readback
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses incompatible-prefix ambiguous progress readback
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses wrong-final-scalar ambiguous progress readback
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] keeps manual-review durable and holds public issue before any fence or replacement
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] clears a displaced fence and drops terminal plan rows before issuing one larger fence
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] rebases a published displaced source without requiring in-memory target-map presence
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] surfaces an ACL source into a durable manual-review entry before any fence
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] covers reserved empty-intent rows with a settlement fence and never calls the legacy completion owner
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] reads back an ambiguous atomic replacement link and never reissues it after reopen
+tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > keeps creator-trusted-v1 on the retained completion path with no settlement plan or fence
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > pins 16 as accepted and 17 as rejected without treating 17 as a settlement source
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > accepts only the exact five-key progress effect and copies its digest
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > validates a progress effect as a closed commit instead of failing on a future export
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > memory atomically records a partial chunk, then only the final chunk projects replacementSequence
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > browser atomically records a partial chunk, then only the final chunk projects replacementSequence
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > node atomically records a partial chunk, then only the final chunk projects replacementSequence
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > uses exact error ownership for malformed commits, stale progress and corrupt stored values
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > round-trips nested progress through browser structured clone and Node JSON without changing schemas
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > browser reopens before/after partial and final chunks without losing exact progress
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > node reopens before/after partial and final chunks without losing exact progress
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t Node pre-reservation and split RED > keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t Node pre-reservation and split RED > refuses malformed and stale progress before signing, while a valid exact prefix issues
+tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t Node pre-reservation and split RED > pins the progress owners without confusing a source-shape diagnostic with runtime proof
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > transforms 2 actual source intents and persists exact real Node batch times
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > transforms 16 actual source intents and persists exact real Node batch times
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed before-commit failure onto a fresh active owner
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed partial-unknown failure onto a fresh active owner
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed final-unknown failure onto a fresh active owner
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > keeps a store-close cleanup failure terminal after signed recovery
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)
+tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > pins a real Node-assembled sixteen-entry progress chunk to its final child logical time
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > ordinary entries fields do not impersonate an application batch
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > ordinary batch.entries fields do not impersonate an application batch
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > genuine nested applicationBatch derives the final child rather than outer time
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > rejects negative child time without publishing a durable chunk
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > rejects non-integer child time without publishing a durable chunk
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > rejects duplicate child time without publishing a durable chunk
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > rejects regressed child time without publishing a durable chunk
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > refuses a structurally batch-shaped carrier beyond the canonical operation ceiling
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u zero-chunk origination ownership > memory refuses a nonempty legacy CAS while retaining empty upgrade and atomic append
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u zero-chunk origination ownership > browser refuses a nonempty legacy CAS while retaining empty upgrade and atomic append
+tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u zero-chunk origination ownership > node refuses a nonempty legacy CAS while retaining empty upgrade and atomic append
