@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b bounded-workload RED accepted)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b durable-row corrective RED)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,7 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Authorized now (bounded-workload RED accepted; separate parent GREEN):
+Authorized now (bounded-workload RED preserved; narrow durable-row corrective RED):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18493,9 +18493,16 @@ Authorized now (bounded-workload RED accepted; separate parent GREEN):
   bound every other parent chat transform to 256 characters. The sole focused
   run matches the frozen 26-active/23-fail/3-pass plus 17-filtered matrix with
   no violations. Evidence is `.logs/d110c-0c1f5b-red-workload-d1eee8ed/`.
-  A separate fresh Astra-high parent GREEN is authorized; post-codec recovery,
-  the complete 64-writer continuation and the later long campaign are not yet
-  proved. Product state, batch, epoch and snapshot ceilings remain unchanged.
+  The separate Astra-high GREEN stopped after its second diagnostic iteration
+  (19 pass / 7 fail / 17 filtered) on case 25's comparison of a durable issued
+  row with a transaction candidate containing non-persisted `planEffect`.
+  A separate RED owner corrects only that expectation, preserving exact row
+  bytes and independent atomic plan-effect checks, then proves the unchanged
+  causal RED matrix in an isolated checkout without the partial GREEN patch.
+  Resume the separate GREEN owner only after that tests-only correction is
+  signed, pushed and its evidence accepted. Post-codec recovery, the complete
+  64-writer continuation and the later long campaign are not yet proved.
+  Product state, batch, epoch and snapshot ceilings remain unchanged.
 
 Blocked, and on what:
 
@@ -100719,9 +100726,10 @@ completion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: bounded-workload causal RED accepted; the earlier parent GREEN
-remains a stopped diagnostic; a separate fresh Astra-high parent GREEN is
-authorized.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+**Status: bounded-workload causal RED preserved; the separate parent GREEN
+stopped on a case-25 test/store-contract contradiction; narrow tests-only
+durable-row corrective RED is authorized before GREEN resumes.** The
+f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
@@ -100928,6 +100936,50 @@ A separate Astra-high GREEN agent starts from this RED and implements only the
 accepted parent production design. The final three-review GREEN gate remains
 unchanged. No long campaign is authorized, and no production chat-admission
 safety claim is made.
+
+Prospective case-25 correction (2026-09-05): the separate GREEN attempt based
+on `f031b166` is preserved at `.logs/d110c-0c1f5b-green-f031b166/` as an
+incomplete diagnostic, not a passing checkpoint. Its ten-entry self-excluding
+manifest validates with SHA-256
+`f8104d640f96c23fb6d8c0d3b42aa414bd62bd13b35bd6244bee9d75945b83c2`.
+The two full focused iterations produced 6 pass / 20 fail / 17 filtered and
+19 pass / 7 fail / 17 filtered respectively, with no application-state
+overflow. The second run exposed two committed-ambiguity expectations that
+deep-compare `readIssued()` against the whole transaction candidate including
+`planEffect`. The accepted design's settlement-store contract applies that
+command atomically to the separate plan; it does not persist command history
+on the issued record. `browser-issuance-store.ts::commitFromIssued` returns
+the four durable fields and `nativeIssued` deliberately stores no plan effect.
+Changing the durable schema or inventing command history would be an invalid
+production workaround.
+
+Owner: the separate Astra-high RED test owner for parent case 25. Deadline:
+before the stopped GREEN resumes. Correct the exact durable-row expectation
+to `authorSequence`, `envelope`, `issuedRecord`, and `outboxEntry`, and retain
+independent exact checks for the atomic fence/replacement plan mutation,
+lineage advance, owner deactivation, and publication accounting. Do not relax
+the committed=false or recovery-failure controls. Commit only the test path;
+preserve the seven-file partial production patch unchanged. Execute the
+corrected 26-active selection once in an isolated checkout of the committed
+RED, without the partial GREEN overlay, and require the inherited 23 fail /
+3 pass / 17 filtered causal matrix and no loader/fixture/timeout anomaly.
+An unexpected result stops for attribution. No production edit, new storage
+contract, new review-only slice, or long workload is authorized by this
+correction. The complete final GREEN review must inspect this correction and
+the preserved failed assertions. The other five failures remain unresolved:
+segmented recovery admission, wide exact-state digest, two readmission
+recovery cases, and rollback/pruning. They are not declared test defects.
+
+Review-provenance correction, recorded prospectively without changing prior
+evidence: the earlier `claude-phel` workload confirmation session
+`2c5ec6ae-1dfa-423e-a842-56eb8ebb3954` reported `claude-opus-5` in its runtime
+metadata. Its prior label “Fable 5.1 alias” does not prove that requested model
+ran. Preserve its actual verdict and findings as that reported model's result;
+do not claim a verified Fable verdict from it. The next already-required final
+GREEN review must explicitly select Fable through `claude-phel` and record
+requested and reported model identities separately. This correction does not
+relaunch the old confirmation, alter its immutable evidence, or waive the
+final Grok / Sol-high / Fable-xhigh gate.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
