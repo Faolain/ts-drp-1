@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "packages/node/src/v3-live.ts"
+  ],
+  "start": "2026-09-05T08:29:00.761Z"
+}
