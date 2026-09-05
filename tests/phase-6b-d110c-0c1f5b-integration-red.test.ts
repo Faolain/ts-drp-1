@@ -563,6 +563,42 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 	const heldApplications = new Set<string>();
 	const envelopes: Message[] = [];
 	const peers: Peer[] = [];
+	const emitted = new Map<
+		string,
+		{
+			generation: number;
+			owner?: V3RoomSession;
+			emissions: number;
+			bytes?: Uint8Array;
+		}
+	>();
+	const observeProjection = (
+		databaseName: string,
+		application: CreateV3RoomSessionInput["application"]
+	): CreateV3RoomSessionInput["onProjection"] => {
+		const migration = required(application.migration);
+		const cell = { generation: (emitted.get(databaseName)?.generation ?? 0) + 1, emissions: 0 } as {
+			generation: number;
+			owner?: V3RoomSession;
+			emissions: number;
+			bytes?: Uint8Array;
+		};
+		emitted.set(databaseName, cell);
+		return (projection) => {
+			// Encode the exact branded callback value before copying bytes. This is
+			// emitted projection evidence, not an independent commit receipt: room
+			// assigns its projection synchronously after this callback returns.
+			const bytes = migration.canonicalStateBytes(projection);
+			cell.bytes = new Uint8Array(bytes);
+			cell.emissions += 1;
+		};
+	};
+	const emittedProjection = (peer: Peer) => {
+		const cell = required(emitted.get(peer.databaseName));
+		expect(cell.owner, "F5B_C03_EMITTED_PROJECTION_BINDS_CURRENT_OPEN_OWNER").toBe(peer.room);
+		expect(cell.emissions, "F5B_C03_EVERY_OPEN_REQUIRES_FRESH_PROJECTION_EMISSION").toBeGreaterThan(0);
+		return { generation: cell.generation, emissions: cell.emissions, bytes: required(cell.bytes).slice() };
+	};
 	const send = async (sender: string, message: Message) => {
 		envelopes.push(structuredClone(message));
 		if (publicationFailures.has(sender)) return false;
@@ -638,13 +674,18 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 					received.add(digest);
 				}
 			},
-			onProjection: () => undefined,
+			onProjection: transientPayload ? observeProjection(databaseName, application) : () => undefined,
 			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
 			openTransport: transportFor(databaseName),
 		};
 		const room = await createV3RoomSession(input);
 		sessions.add(room);
-		peers.push({ ...identity, databaseName, floor, input, room });
+		const peer = { ...identity, databaseName, floor, input, room };
+		peers.push(peer);
+		if (transientPayload) {
+			required(emitted.get(databaseName)).owner = room;
+			emittedProjection(peer);
+		}
 	}
 	const stop = async (peer: Peer) => {
 		await peer.room.close();
@@ -669,10 +710,15 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 			// authenticate this existing input pair and rebind close authority.
 			...(!legacy && creatorFinalitySigner !== undefined ? { creatorFinalitySigner } : {}),
 			application,
+			onProjection: transientPayload ? observeProjection(peer.databaseName, application) : reopenInput.onProjection,
 			roomHeadAuthority: { ...peer.floor.authority, initialization: { kind: "reopen" } },
 			successorSnapshotDeclaration: declaration,
 		});
 		sessions.add(peer.room);
+		if (transientPayload) {
+			required(emitted.get(peer.databaseName)).owner = peer.room;
+			emittedProjection(peer);
+		}
 	};
 	const issue = (peer: Peer, clientOperationId: string) =>
 		peer.room.issue({ action: "message", clientOperationId, text: clientOperationId });
@@ -788,6 +834,7 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 	const deliver = (message: Message) => required(ingress.get(required(peers[0]).databaseName))(message);
 	return {
 		peers,
+		emittedProjection,
 		objectId,
 		issue,
 		close,
@@ -2290,14 +2337,23 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		expect(applicationOperations(prefix), "F5B_C03_COMMITTED_PREFIX_RETAINS_REAL_TRANSIENT_BYTES").toEqual([
 			required(transformed[0]).operation,
 		]);
-		const beforeRestartState = productState(writer).slice();
+		const failedOwner = writer.room;
+		expect(() => failedOwner.projection(), "F5B_C03_FAILED_PREFIX_OWNER_PROJECTION_REMAINS_TERMINAL").toThrow();
+		const beforeRestartProjection = fixture.emittedProjection(writer);
+		const beforeRestartState = beforeRestartProjection.bytes;
 		await fixture.reopen(writer, 0);
 		await expect(
 			fixture.issue(writer, "same-epoch-blocked-suffix"),
 			"F5B_C03_SAME_EPOCH_RESTART_RETRIES_ONLY_UNCOMMITTED_SUFFIX"
 		).rejects.toThrow();
 		expect((await durable(writer)).plan, "F5B_C03_SAME_EPOCH_RESTART_PRESERVES_EXACT_PARTIAL_PLAN").toEqual(partial);
-		expect(productState(writer), "F5B_C03_SAME_EPOCH_RESTART_PRESERVES_EXACT_BOUNDED_STATE").toEqual(
+		expect(writer.room, "F5B_C03_SAME_EPOCH_RESTART_HAS_FRESH_ROOM_OWNER").not.toBe(failedOwner);
+		expect(() => writer.room.projection(), "F5B_C03_FAILED_RESTART_OWNER_PROJECTION_REMAINS_TERMINAL").toThrow();
+		const afterRestartProjection = fixture.emittedProjection(writer);
+		expect(afterRestartProjection.generation, "F5B_C03_RESTART_CANNOT_REUSE_PRIOR_OWNER_EMISSION").toBe(
+			beforeRestartProjection.generation + 1
+		);
+		expect(afterRestartProjection.bytes, "F5B_C03_SAME_EPOCH_RESTART_PRESERVES_EXACT_BOUNDED_STATE").toEqual(
 			beforeRestartState
 		);
 		expect(
