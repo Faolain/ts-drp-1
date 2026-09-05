@@ -18475,10 +18475,10 @@ Authorized now (tests-only RED; production GREEN remains gated):
   rollback/prune assertions and the test-only timeout. Corrective tests commit
   `c1d04d31` is signed/pushed; its first execution is rejected and preserved
   at `e9015cff` because the genuine 64-writer version-3 ACL exposed a second
-  causal room decode seam before the expected successor token. One exact
-  same-commit causal RED execution with that diagnosed error in the pre-frozen
-  matrix is authorized; parent production GREEN remains blocked until it is
-  accepted. The retained golden-path contract
+  causal room decode seam before the expected successor token. Corrected
+  pre-frozen execution evidence `35db56e4` accepts the exact 23-failure/
+  three-control matrix. One separate Astra-high parent GREEN is authorized.
+  The retained golden-path contract
   remains one real room with 64 active writers, every writer issuing in every
   epoch, rotating offline cohorts, at least three genuine close/adopt
   transitions, restart and cold reopen, followed later by at least 100 genuine
@@ -100694,10 +100694,8 @@ completion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: corrective tests are signed/pushed; their first focused execution is
-rejected/preserved after exposing a second causal room decode seam; one exact
-same-commit Astra-high RED execution with the corrected frozen matrix is
-authorized next. Parent GREEN remains blocked.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+**Status: coverage-corrective causal RED accepted; one separate Astra-high
+parent GREEN is authorized next.** The f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
@@ -100797,6 +100795,22 @@ failures and three passes: 19 successor-codec failures, one exact 64-writer
 room item-limit failure, and the three f5b0w P2 failures, with the unchanged
 three controls. Any other error, count, timeout, loader or top-level anomaly
 stops again. The rejected invocation is never overwritten or reclassified.
+
+The authorized same-tests-commit execution is accepted and sealed by
+signed/pushed evidence commit `35db56e4781aa9e2b1b025c4b9446b0b40562237`
+under `.logs/d110c-0c1f5b-red-corrective-accepted-c1d04d31/`. Its exact
+pre-frozen matrix hash is
+`ae88bb15536be405f7a15f3d00730448f8c9196486f759626665e4f6a2fd84a3`:
+26 active tests, 23 failures, three passes and 17 explicitly filtered existing
+tests. Failures are exactly 19 successor-codec tokens, the one 64-writer room
+`canonical value exceeds item limit` seam at `migrationInviteAuthority()`,
+and the private provenance collision plus two closed-precedence cases. Exact
+v1, source-guard and closed-issue controls pass. There is no timeout, loader,
+top-level, stack, count or custody anomaly. The fresh 17-entry self-excluding
+manifest SHA-256 is
+`425d45904058d483f6b15339724613a747a77a03fb48bcc3acb1b306ff23a2e5`.
+Rejected evidence `e9015cff` remains unchanged. This causal RED authorizes one
+separate Astra-high GREEN under the accepted design and scope above.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
