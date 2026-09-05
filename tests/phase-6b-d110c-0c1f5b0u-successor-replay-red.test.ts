@@ -101,7 +101,9 @@ async function snapshotDeclaration(databaseName: string) {
 			request(transaction.objectStore("scopes").getAll()) as Promise<Record<string, unknown>[]>,
 			request(transaction.objectStore("chunks").getAll()) as Promise<Record<string, unknown>[]>,
 		]);
-		const verified = scopes.filter((scope) => scope.state === "verified" && scope.epoch === 1);
+		// The close snapshots predecessor epoch 0; its verified payload is the
+		// authenticated application base imported by the epoch-1 successor.
+		const verified = scopes.filter((scope) => scope.state === "verified" && scope.epoch === 0);
 		if (verified.length !== 1) throw new TypeError("D110C_0C1F5B0U_REPLAY_SNAPSHOT_AMBIGUOUS");
 		const scope = required(verified[0]);
 		const selected = chunks
