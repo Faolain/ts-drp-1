@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- controlled module factories expose exact room/plane probes. */
-import { encodeCanonical } from "@ts-drp/canonical";
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { SettlementPlan } from "@ts-drp/issuance-store";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,6 +22,7 @@ const probe = vi.hoisted(() => ({
 	recoveredVertices: [] as Readonly<Record<string, unknown>>[],
 	settlementPlanReads: 0,
 	settlementPlanWrites: [] as Readonly<Record<string, unknown>>[],
+	splitPrefixLength: null as number | null,
 }));
 
 const AUTHOR = "1".repeat(64);
@@ -35,6 +36,11 @@ function detachedPlan(plan: Readonly<Record<string, unknown>>): Readonly<Record<
 			entries.map((entry) =>
 				Object.freeze({
 					disposition: Reflect.get(entry, "disposition"),
+					...(Object.hasOwn(entry, "replacementProgress")
+						? {
+								replacementProgress: structuredClone(Reflect.get(entry, "replacementProgress")),
+							}
+						: {}),
 					replacementSequence: Reflect.get(entry, "replacementSequence"),
 					sourceDigest: new Uint8Array(Reflect.get(entry, "sourceDigest") as Uint8Array),
 					sourceSequence: Reflect.get(entry, "sourceSequence"),
@@ -66,12 +72,38 @@ function applyPlanEffect(effect: Readonly<Record<string, unknown>>, sequence: nu
 	const sourceSequence = Reflect.get(effect, "sourceSequence");
 	const selected = entries.findIndex((entry) => Reflect.get(entry, "sourceSequence") === sourceSequence);
 	if (selected < 0) throw new TypeError("controlled settlement entry is absent");
+	const fromIntent = Reflect.get(effect, "fromIntent");
+	const throughIntent = Reflect.get(effect, "throughIntent");
 	probe.plan = detachedPlan(
 		Object.freeze({
 			...current,
 			entries: Object.freeze(
 				entries.map((entry, index) =>
-					index === selected ? Object.freeze({ ...entry, replacementSequence: sequence }) : entry
+					index === selected
+						? fromIntent === undefined
+							? Object.freeze({ ...entry, replacementSequence: sequence })
+							: Object.freeze({
+									...entry,
+									replacementProgress: Object.freeze({
+										...(Reflect.get(entry, "replacementProgress") as object),
+										chunks: Object.freeze([
+											...((Reflect.get(
+												Reflect.get(entry, "replacementProgress") as object,
+												"chunks"
+											) as readonly object[]) ?? []),
+											Object.freeze({
+												lastLogicalTime: Number(throughIntent) + 40,
+												replacementSequence: sequence,
+												throughIntent,
+											}),
+										]),
+									}),
+									replacementSequence:
+										throughIntent === Reflect.get(Reflect.get(entry, "replacementProgress") as object, "intentCount")
+											? sequence
+											: null,
+								})
+						: entry
 				)
 			),
 			revision: (Reflect.get(current, "revision") as number) + 1,
@@ -213,6 +245,14 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 				issueLocal: async (issueInput: Readonly<Record<string, unknown>>) => {
 					probe.issueInputs.push(issueInput);
 					const operations = Reflect.get(issueInput, "operations") as readonly Readonly<Record<string, unknown>>[];
+					if (probe.splitPrefixLength !== null && operations.length > probe.splitPrefixLength) {
+						return Object.freeze({
+							detail: "controlled genuine-size split",
+							kind: "split-required",
+							ok: false,
+							prefixLength: probe.splitPrefixLength,
+						});
+					}
 					const first = operations[0] as Readonly<Record<string, unknown>>;
 					const operation = Reflect.get(first, "operation") as Readonly<Record<string, unknown>>;
 					const action = String(Reflect.get(operation, "action"));
@@ -476,9 +516,197 @@ beforeEach(() => {
 	probe.recoveredVertices = [];
 	probe.settlementPlanReads = 0;
 	probe.settlementPlanWrites = [];
+	probe.splitPrefixLength = null;
 });
 
 describe("D.110c-0c1f5b0c room settlement orchestration RED", () => {
+	it("[f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks", async () => {
+		const intents = Object.freeze(
+			Array.from({ length: 3 }, (_, index) =>
+				Object.freeze({
+					logicalTime: index + 7,
+					operation: Object.freeze({
+						action: "transform-me",
+						clientOperationId: `large-transform-${index}`,
+						padding: "x".repeat(25_000),
+						transformed: false,
+					}),
+					operationCount: 1,
+					operationIndex: 0,
+				})
+			)
+		);
+		const transformed = intents.map((selected) => Object.freeze({ ...selected.operation, transformed: true }));
+		expect(transformed.every((operation) => encodeCanonical(operation).byteLength < 65_536)).toBe(true);
+		expect(encodeCanonical(transformed).byteLength).toBeGreaterThan(65_536);
+		probe.splitPrefixLength = 2;
+		probe.rebasePages = [displaced(7, "07".repeat(32), intents), { kind: "empty", ok: true }];
+		const session = await openRoom();
+		let issueFailure: unknown;
+		const publicIssue = session
+			.issue(Object.freeze({ action: "message", clientOperationId: "after-split-settlement" }))
+			.catch((error: unknown) => {
+				issueFailure = error;
+			});
+		await settleRoomWork();
+		const effects = probe.issueInputs.flatMap((input) => {
+			const effect = Reflect.get(input, "planEffect");
+			return effect !== null && typeof effect === "object" && Reflect.get(effect, "kind") === "replacement"
+				? [effect]
+				: [];
+		});
+		expect.soft(effects).toHaveLength(3);
+		expect.soft(effects.slice(1)).toMatchObject([
+			{ fromIntent: 0, kind: "replacement", sourceSequence: 7, throughIntent: 2 },
+			{ fromIntent: 2, kind: "replacement", sourceSequence: 7, throughIntent: 3 },
+		]);
+		expect.soft(probe.nextSequence, "D110C_0C1F5B0T_SPLIT_CONSUMED_SEQUENCE").toBe(23);
+		expect.soft(probe.plan).toMatchObject({
+			entries: [
+				{
+					replacementProgress: {
+						chunks: [
+							{ replacementSequence: 21, throughIntent: 2 },
+							{ replacementSequence: 22, throughIntent: 3 },
+						],
+						intentCount: 3,
+						intentDigest: expect.any(Uint8Array),
+						version: 1,
+					},
+					replacementSequence: 22,
+					sourceSequence: 7,
+				},
+			],
+			fenceSequence: 20,
+		});
+		await session.close();
+		await publicIssue;
+		expect.soft(issueFailure).toBeUndefined();
+	});
+
+	it("[f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay", async () => {
+		const intents = Object.freeze([
+			intent("transform-me", "resume-0", 7),
+			intent("transform-me", "resume-1", 8),
+			intent("transform-me", "resume-2", 9),
+		]);
+		const ordered = intents.map((selected) => Object.freeze({ ...selected.operation, transformed: true }));
+		const digest = hashDomain("ts-drp/settlement-replacement-intents/v1", encodeCanonical(ordered));
+		probe.plan = plan(
+			[
+				Object.freeze({
+					...entry(7, "transform"),
+					replacementProgress: Object.freeze({
+						chunks: Object.freeze([Object.freeze({ lastLogicalTime: 42, replacementSequence: 21, throughIntent: 2 })]),
+						intentCount: 3,
+						intentDigest: digest,
+						version: 1,
+					}),
+				}),
+			],
+			20,
+			2
+		) as unknown as Readonly<Record<string, unknown>>;
+		probe.nextSequence = 22;
+		probe.rebasePages = [displaced(7, "07".repeat(32), intents), { kind: "empty", ok: true }];
+		const session = await openRoom();
+		await session.issue(Object.freeze({ action: "message", clientOperationId: "after-partial-reopen" }));
+		const resumed = probe.issueInputs.filter((input) => {
+			const effect = Reflect.get(input, "planEffect");
+			return effect !== null && typeof effect === "object" && Reflect.get(effect, "sourceSequence") === 7;
+		});
+		expect(resumed).toHaveLength(1);
+		expect(Reflect.get(resumed[0] as object, "planEffect")).toMatchObject({ fromIntent: 2, throughIntent: 3 });
+		const operations = Reflect.get(resumed[0] as object, "operations") as readonly Readonly<Record<string, unknown>>[];
+		expect(operations).toHaveLength(1);
+		expect(Reflect.get(operations[0] as object, "logicalTime")).toBeGreaterThan(42);
+		expect(probe.plan).toMatchObject({
+			entries: [{ replacementSequence: 22, replacementProgress: { chunks: [{}, {}] } }],
+		});
+		await session.close();
+	});
+
+	it("[f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress", async () => {
+		probe.plan = plan(
+			[
+				Object.freeze({
+					...entry(7, "rebase"),
+					replacementProgress: Object.freeze({
+						chunks: Object.freeze([]),
+						intentCount: 1,
+						intentDigest: new Uint8Array(32).fill(0xff),
+						version: 1,
+					}),
+				}),
+			],
+			20,
+			2
+		) as unknown as Readonly<Record<string, unknown>>;
+		probe.rebasePages = [
+			displaced(7, "07".repeat(32), [intent("message", "digest-mismatch", 7)]),
+			{ kind: "empty", ok: true },
+		];
+		const session = await openRoom();
+		await settleRoomWork();
+		expect(probe.issueInputs).toEqual([]);
+		expect(probe.plan).toMatchObject({
+			entries: [{ replacementProgress: { intentDigest: new Uint8Array(32).fill(0xff) } }],
+		});
+		await session.close();
+	});
+
+	it("[f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close", async () => {
+		const originalIntents = Object.freeze([
+			intent("message", "cross-close-0", 7),
+			intent("message", "cross-close-1", 8),
+			intent("message", "cross-close-2", 9),
+		]);
+		const ordered = originalIntents.map((selected) => selected.operation);
+		const digest = hashDomain("ts-drp/settlement-replacement-intents/v1", encodeCanonical(ordered));
+		probe.plan = plan(
+			[
+				Object.freeze({
+					...entry(7, "rebase"),
+					replacementProgress: Object.freeze({
+						chunks: Object.freeze([Object.freeze({ lastLogicalTime: 42, replacementSequence: 21, throughIntent: 2 })]),
+						intentCount: 3,
+						intentDigest: digest,
+						version: 1,
+					}),
+				}),
+			],
+			20,
+			2
+		) as unknown as Readonly<Record<string, unknown>>;
+		probe.nextSequence = 22;
+		probe.rebasePages = [
+			displaced(7, "07".repeat(32), originalIntents),
+			displaced(21, "15".repeat(32), originalIntents.slice(0, 2)),
+			{ kind: "empty", ok: true },
+		];
+		const session = await openRoom();
+		await session.issue(Object.freeze({ action: "message", clientOperationId: "after-displaced-chunk" }));
+		const effects = probe.issueInputs.flatMap((input) => {
+			const effect = Reflect.get(input, "planEffect");
+			return effect !== null && typeof effect === "object" ? [effect] : [];
+		});
+		expect(effects).toMatchObject([
+			{ fromIntent: 2, sourceSequence: 7, throughIntent: 3 },
+			{ kind: "replacement", sourceSequence: 21 },
+		]);
+		const originalIssue = probe.issueInputs.find(
+			(input) => Reflect.get(Reflect.get(input, "planEffect") as object, "sourceSequence") === 7
+		);
+		expect(Reflect.get(originalIssue as object, "operations")).toHaveLength(1);
+		expect(probe.plan).toMatchObject({
+			entries: [
+				{ replacementProgress: { chunks: [{ throughIntent: 2 }, { throughIntent: 3 }] }, replacementSequence: 22 },
+				{ replacementSequence: 23, sourceSequence: 21 },
+			],
+		});
+		await session.close();
+	});
+
 	it("[RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing", async () => {
 		probe.rebasePages = [
 			displaced(7, "07".repeat(32), [intent("message", "rebase-7", 7)]),
