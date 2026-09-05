@@ -22,7 +22,7 @@ const observation = vi.hoisted(() => ({
 	activate: [] as V3PlaneHandle[],
 	commits: [] as DurableIssueCommit[],
 	events: [] as string[],
-	fault: "none" as "none" | "before-commit" | "partial-unknown" | "final-unknown",
+	fault: "none" as "none" | "before-commit" | "partial-unknown" | "final-unknown" | "legacy-unknown",
 	fired: false,
 	stores: new Map<string, DurableIssuanceStore>(),
 	bound: [] as { plane: V3PlaneHandle; handle: { status(): unknown } }[],
@@ -53,13 +53,18 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOrigina
 						const candidate = await build(sequence);
 						selected = candidate;
 						const effect = candidate.planEffect as unknown as Record<string, unknown> | undefined;
-						if (!observation.fired && effect?.kind === "replacement" && typeof effect.fromIntent === "number") {
+						if (
+							!observation.fired &&
+							effect?.kind === "replacement" &&
+							(typeof effect.fromIntent === "number" || observation.fault === "legacy-unknown")
+						) {
 							const current = await real.readSettlementPlan(scope);
 							const entry = current?.entries.find((row) => row.sourceSequence === effect.sourceSequence);
 							const progress = Reflect.get(entry as object, "replacementProgress") as Record<string, unknown>;
-							const final = effect.throughIntent === progress.intentCount;
+							const final = progress !== undefined && effect.throughIntent === progress.intentCount;
 							if (
 								observation.fault === "before-commit" ||
+								observation.fault === "legacy-unknown" ||
 								(observation.fault === "partial-unknown" && !final) ||
 								(observation.fault === "final-unknown" && final)
 							) {
@@ -151,7 +156,26 @@ function required<T>(value: T | null | undefined): T {
 	return value;
 }
 
-function roomHeadAuthority(): CreateV3RoomSessionInput["roomHeadAuthority"] {
+function roomHeadAuthority(scoped = false): CreateV3RoomSessionInput["roomHeadAuthority"] {
+	if (scoped) {
+		const owners = new Map<string, CreateV3RoomSessionInput["roomHeadAuthority"]>();
+		const owner = (scope: { readonly objectId: string }) => {
+			let selected = owners.get(scope.objectId);
+			if (selected === undefined) {
+				selected = roomHeadAuthority();
+				owners.set(scope.objectId, selected);
+			}
+			return selected;
+		};
+		return {
+			initialization: { kind: "create" },
+			read: (input) => owner(input.scope).read(input),
+			create: (input) => owner(input.scope).create(input),
+			migrate: (input) => owner(input.scope).migrate(input),
+			begin: (input) => owner(input.scope).begin(input),
+			commit: (input) => owner(input.scope).commit(input),
+		};
+	}
 	let state: { pending: null | { previous: unknown; next: unknown }; stable: unknown } | null = null;
 	const success = () => ({ ok: true as const, state: structuredClone(state) as never });
 	return {
@@ -183,7 +207,7 @@ function roomHeadAuthority(): CreateV3RoomSessionInput["roomHeadAuthority"] {
 	};
 }
 
-async function openRebasePair(count: number, expandedBytes: number, withClose = false) {
+async function openRebasePair(count: number, expandedBytes: number, withClose = false, migrationRecovery = false) {
 	const identity = ++ordinal;
 	const objectId = `creator:${identity.toString(16).padStart(32, "0")}`;
 	const name = `d110c-f5b0u-runtime-${identity}`;
@@ -255,7 +279,7 @@ async function openRebasePair(count: number, expandedBytes: number, withClose = 
 		onAcceptedVertex: () => undefined,
 		onProjection: () => undefined,
 		publicKeyBytes: publicKey,
-		roomHeadAuthority: roomHeadAuthority(),
+		roomHeadAuthority: roomHeadAuthority(migrationRecovery),
 		...(target && finality !== undefined ? { creatorFinalitySigner: finality.signer } : {}),
 		signRegisteredVertexDigest: (value) => Promise.resolve(ed25519.sign(value, authorSeed)),
 		...(target ? { rebaseSourceInvite: sourceInvite } : {}),
@@ -373,7 +397,7 @@ describe("D.110c-0c1f5b0u genuine room Node settlement composition", () => {
 		}
 	);
 	it("queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock", async () => {
-		observation.fault = "partial-unknown";
+		observation.fault = "legacy-unknown";
 		let release!: () => void;
 		observation.faultGate = new Promise<void>((resolve) => {
 			release = resolve;
@@ -381,7 +405,7 @@ describe("D.110c-0c1f5b0u genuine room Node settlement composition", () => {
 		const reached = new Promise<void>((resolve) => {
 			observation.onFault = resolve;
 		});
-		const { target, rehearsal } = await openRebasePair(2, 33_000);
+		const { target, rehearsal } = await openRebasePair(2, 100, false, true);
 		const issued = target.issue({ action: "message", clientOperationId: "after", text: "continued" });
 		await Promise.race([
 			reached,
@@ -405,7 +429,7 @@ describe("D.110c-0c1f5b0u genuine room Node settlement composition", () => {
 		const results = await Promise.allSettled([issued, migration]);
 		expect.soft(results[0]?.status, "D110C_0C1F5B0U_QUEUED_ISSUE_NOT_RECOVERED").toBe("fulfilled");
 		expect.soft(results[1]?.status, "D110C_0C1F5B0U_MIGRATION_DID_NOT_RESUME").toBe("fulfilled");
-		await observedActivation;
+		expect.soft(await observedActivation, "D110C_0C1F5B0U_MIGRATION_ACTIVATION_DID_NOT_RESUME").toBe("fulfilled");
 		expect(
 			observation.activate.filter((plane) => plane.currentEphemeralAuthority() !== undefined).length
 		).toBeLessThanOrEqual(1);
