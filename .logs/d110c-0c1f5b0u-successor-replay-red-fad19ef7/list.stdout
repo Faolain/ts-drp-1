@@ -1,0 +1,3 @@
+tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts > D.110c-0c1f5b0u genuine successor recovered-delivery RED > replays exact above-snapshot evidence once after authority/base validation and before resumed issue
+tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts > D.110c-0c1f5b0u genuine successor recovered-delivery RED > fails closed and releases successor custody when recovered sink fails
+tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts > D.110c-0c1f5b0u genuine successor recovered-delivery RED > fails closed and releases successor custody when recovered commit fails
