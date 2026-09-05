@@ -33,6 +33,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
+import { createTransientPayloadApplication } from "./fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.js";
 import { createV3ChatApplication } from "../examples/v3-chat/src/index.js";
 import {
 	createV3RoomCreatorInviteMaterial,
@@ -489,7 +490,7 @@ interface Peer {
 	room: V3RoomSession;
 }
 
-async function openRoom(writerCount: number, legacy = false, secondaryAdmin = false) {
+async function openRoom(writerCount: number, legacy = false, secondaryAdmin = false, transientPayload = false) {
 	const id = ++ordinal;
 	const objectId = `creator:${(8000 + id).toString(16).padStart(32, "0")}`;
 	const identities = Array.from({ length: writerCount }, (_, index) => {
@@ -499,7 +500,7 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 		return { seed, author: hex(ed25519.getPublicKey(seed)) };
 	});
 	const creator = required(identities[0]);
-	const base = createV3ChatApplication("alice");
+	const base = transientPayload ? createTransientPayloadApplication() : createV3ChatApplication("alice");
 	const signers = [{ publicKey: creator.author, signerId: "creator" }];
 	const invite = await createV3RoomCreatorInviteMaterial({
 		blueprintDigest: required(base.catalog.blueprintDigests[0]),
@@ -596,10 +597,9 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 		const application = {
 			...base,
 			displacementPolicies: { message: "transform" as const },
-			transformDisplacedOperation: (operation: Readonly<Record<string, unknown>>) => ({
-				...operation,
-				text: "r".repeat(33_000),
-			}),
+			transformDisplacedOperation: transientPayload
+				? required(base.transformDisplacedOperation)
+				: (operation: Readonly<Record<string, unknown>>) => ({ ...operation, text: "r".repeat(256) }),
 		};
 		const input: CreateV3RoomSessionInput = {
 			application,
@@ -961,7 +961,7 @@ async function delayedDependency() {
 	).toBe(required(ownCommits(writer).at(-1)).authorSequence);
 	for (const id of ["dependency-n", "dependency-n-plus-one"])
 		expect(messages(creator).filter((row) => row.clientOperationId === id)).toEqual([
-			{ clientOperationId: id, text: "r".repeat(33_000) },
+			{ clientOperationId: id, text: "r".repeat(256) },
 		]);
 	await Promise.all(fixture.peers.map(fixture.stop));
 }
@@ -1048,7 +1048,7 @@ async function delayedPublication(mode: "unpublished-fence" | "delayed-replaceme
 	expect(
 		messages(creator).filter((row) => row.clientOperationId === "timing-displaced"),
 		"F5B_C15_C16_ONE_APPLICATION_EFFECT"
-	).toEqual([{ clientOperationId: "timing-displaced", text: "r".repeat(33_000) }]);
+	).toEqual([{ clientOperationId: "timing-displaced", text: "r".repeat(256) }]);
 	await Promise.all(fixture.peers.map(fixture.stop));
 }
 
@@ -1317,7 +1317,7 @@ async function sixtyFourWriterGoldenPath() {
 				const ownRecovered = displaced.filter((row) => row.peer === peer && row.epoch === epoch - 1);
 				const expectedLocal = [
 					...(decodeCanonical(required(sealedState)) as { clientOperationId: string; text: string }[]),
-					...ownRecovered.map((row) => ({ clientOperationId: row.id, text: "r".repeat(33_000) })),
+					...ownRecovered.map((row) => ({ clientOperationId: row.id, text: "r".repeat(256) })),
 					{ clientOperationId: id, text: id },
 				];
 				// Creator also receives peers' automatically drained replacements; its
@@ -1339,7 +1339,7 @@ async function sixtyFourWriterGoldenPath() {
 						),
 						"F5B_64_EXACT_ONE_REPLACEMENT_LINK"
 					).toHaveLength(1);
-					expected.set(source.id, "r".repeat(33_000));
+					expected.set(source.id, "r".repeat(256));
 				}
 			}
 		}
@@ -1506,6 +1506,10 @@ async function sixtyFourWriterGoldenPath() {
 	).toBe(268);
 	expect(messages(creator), "F5B_64_EXACT_262_UNIQUE_APPLICATION_EFFECTS").toHaveLength(262);
 	const finalCanonicalState = productState(creator).slice();
+	expect(
+		finalCanonicalState.byteLength,
+		"F5B_64_ACTUAL_FINAL_CANONICAL_STATE_WITHIN_UNCHANGED_CEILING"
+	).toBeLessThanOrEqual(32_768);
 	const finalAuthority = creator.room.authority();
 	const finalAccounting = {
 		commits: aggregate.length,
@@ -1954,9 +1958,32 @@ afterEach(async () => {
 
 describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 	it("retains checkpoint-terminal open progress through cold recovery across three transitions", async () => {
-		const fixture = await openRoom(2);
+		const fixture = await openRoom(2, false, false, true);
 		const creator = required(fixture.peers[0]);
 		const writer = required(fixture.peers[1]);
+		const application = creator.input.application;
+		const blueprintDigest = required(application.catalog.blueprintDigests[0]);
+		const artifact = application.catalog.resolve(blueprintDigest);
+		expect(artifact.canonicalBlueprintPackageBytes, "F5B_C03_CATALOG_PACKAGE_MATCHES_REAL_APPLICATION").toEqual(
+			application.canonicalBlueprintPackageBytes
+		);
+		expect(blueprintDigest, "F5B_C03_REAL_LOCAL_PACKAGE_DIGEST").toBe(
+			hex(hashDomain("ts-drp/blueprint-admission/v3", application.canonicalBlueprintPackageBytes))
+		);
+		expect(
+			record(application.canonicalBlueprintPackageBytes).implementation,
+			"F5B_C03_LOCAL_ARTIFACT_ID_AND_DIGEST_COUPLED"
+		).toEqual({
+			artifactId: "f5b-transient-payload.v1",
+			artifactDigest: hex(hashDomain("ts-drp/blueprint-artifact/v3", artifact.exactArtifactBytes)),
+			runtimeProfile: "ecmascript-2024-sync-v1",
+		});
+		const invite = creator.input.creatorInvite;
+		if (typeof invite === "string") throw new TypeError("F5B_C03_EXACT_CREATOR_INVITE_MATERIAL_REQUIRED");
+		expect(
+			record(invite.exactCanonicalGenesisAnchorPreimageBytes).blueprintDigest,
+			"F5B_C03_GENUINE_INVITE_BINDS_LOCAL_BLUEPRINT"
+		).toBe(blueprintDigest);
 		await fixture.issue(creator, "creator-before-close");
 		await fixture.issue(writer, "writer-before-close");
 		fixture.held.add(writer.databaseName);
@@ -1968,6 +1995,39 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		expect(record(source.envelope.canonicalPreimageBytes).operation, "F5B_REAL_BATCH_SOURCE").toMatchObject({
 			action: "applicationBatch",
 		});
+		const sourceOperation = record(source.envelope.canonicalPreimageBytes).operation as {
+			action: string;
+			batch: { entries: { logicalTime: number; operation: Record<string, unknown> }[]; version: number };
+		};
+		expect(
+			sourceOperation.batch.entries.map((entry) => entry.operation),
+			"F5B_C03_REAL_TWO_INTENT_SOURCE_BYTES"
+		).toEqual([
+			{ action: "message", clientOperationId: "displaced-0", text: "displaced-0" },
+			{ action: "message", clientOperationId: "displaced-1", text: "displaced-1" },
+		]);
+		const transformed = sourceOperation.batch.entries.map((entry) => ({
+			...entry,
+			operation: required(application.transformDisplacedOperation)(entry.operation),
+		}));
+		for (const entry of transformed) {
+			expect(entry.operation).toEqual({
+				action: "message",
+				clientOperationId: entry.operation.clientOperationId,
+				text: "r".repeat(33_000),
+			});
+			expect(
+				encodeCanonical(entry.operation).byteLength,
+				"F5B_C03_SINGLE_TRANSIENT_OPERATION_WITHIN_UNCHANGED_LIMIT"
+			).toBeLessThan(65_536);
+		}
+		expect(
+			encodeCanonical({ action: "applicationBatch", batch: { entries: transformed, version: 1 } }).byteLength,
+			"F5B_C03_PAIR_REQUIRES_REAL_MULTIPLE_REPLACEMENT_CHUNKS"
+		).toBeGreaterThan(65_536);
+		expect(productState(creator).byteLength, "F5B_C03_INITIAL_REAL_STATE_WITHIN_UNCHANGED_CEILING").toBeLessThan(
+			32_768
+		);
 		// The only intended RED terminus: genuine production close, before any
 		// frontier fixture or capability can exist. All subsequent code is GREEN
 		// continuation, not a claim that RED physically entered openProgressSources.
@@ -2007,7 +2067,31 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		expect(partial.fenceSequence, "F5B_C02_FENCE_PRECEDES_REPLACEMENT").toBeLessThan(
 			required(required(entry.replacementProgress).chunks[0]).replacementSequence
 		);
+		const prefixSequence = required(required(entry.replacementProgress).chunks[0]).replacementSequence;
+		const prefix = required(ownCommits(writer).find((row) => row.authorSequence === prefixSequence));
+		expect(applicationOperations(prefix), "F5B_C03_COMMITTED_PREFIX_RETAINS_REAL_TRANSIENT_BYTES").toEqual([
+			required(transformed[0]).operation,
+		]);
+		const beforeRestartState = productState(writer).slice();
+		await fixture.reopen(writer, 0);
+		await expect(
+			fixture.issue(writer, "same-epoch-blocked-suffix"),
+			"F5B_C03_SAME_EPOCH_RESTART_RETRIES_ONLY_UNCOMMITTED_SUFFIX"
+		).rejects.toThrow();
+		expect((await durable(writer)).plan, "F5B_C03_SAME_EPOCH_RESTART_PRESERVES_EXACT_PARTIAL_PLAN").toEqual(partial);
+		expect(productState(writer), "F5B_C03_SAME_EPOCH_RESTART_PRESERVES_EXACT_BOUNDED_STATE").toEqual(
+			beforeRestartState
+		);
+		expect(
+			ownCommits(writer).filter((row) => row.authorSequence === prefixSequence),
+			"F5B_C03_SAME_EPOCH_RESTART_NO_PREFIX_REISSUE"
+		).toEqual([prefix]);
+		expect(
+			observed.publications.filter((row) => row.database === writer.databaseName && row.sequence === prefixSequence),
+			"F5B_C03_SAME_EPOCH_RESTART_NO_PREFIX_REPUBLICATION"
+		).toHaveLength(1);
 		await fixture.issue(creator, "creator-during-writer-crash");
+		expect(productState(creator).byteLength, "F5B_C03_PREFIX_FOLD_STATE_WITHIN_UNCHANGED_CEILING").toBeLessThan(32_768);
 		await fixture.close();
 		const second = fixture.checkpoint();
 		expect(
@@ -2048,6 +2132,35 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		expect(required(completed.replacementProgress).chunks.at(-1)?.throughIntent, "F5B_C03_UNLINKED_SUFFIX_ONCE").toBe(
 			2
 		);
+		const chunks = required(completed.replacementProgress).chunks;
+		expect(chunks, "F5B_C03_EXACT_TWO_GENUINE_COMMITTED_REPLACEMENT_CHUNKS").toHaveLength(2);
+		const chunkCommits = chunks.map((chunk) =>
+			required(ownCommits(writer).find((row) => row.authorSequence === chunk.replacementSequence))
+		);
+		expect(
+			chunkCommits.flatMap(applicationOperations),
+			"F5B_C03_EXACT_TRANSIENT_INTENTS_NO_PREFIX_REISSUE_SUFFIX_ONCE"
+		).toEqual(transformed.map((entry) => entry.operation));
+		for (const chunk of chunkCommits) {
+			expect(ownCommits(writer).filter((row) => row.authorSequence === chunk.authorSequence)).toHaveLength(1);
+			expect(
+				observed.publications.filter(
+					(row) =>
+						row.database === writer.databaseName &&
+						row.sequence === chunk.authorSequence &&
+						row.digest === hex(chunk.envelope.digest)
+				)
+			).toHaveLength(1);
+			expect(encodeCanonical(record(chunk.envelope.canonicalPreimageBytes).operation).byteLength).toBeLessThan(65_536);
+		}
+		for (const id of ["displaced-0", "displaced-1"])
+			expect(
+				messages(creator).filter((row) => row.clientOperationId === id),
+				"F5B_C03_TRANSIENT_BYTES_NOT_RETAINED_ONE_STATE_EFFECT_PER_INTENT"
+			).toEqual([{ clientOperationId: id, text: id }]);
+		expect(productState(creator).byteLength, "F5B_C03_COMPLETE_REAL_STATE_WITHIN_UNCHANGED_CEILING").toBeLessThan(
+			32_768
+		);
 		await fixture.close();
 		fixture.checkpoint();
 		await creator.room.adoptCreatorSuccessor();
@@ -2057,6 +2170,11 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		await fixture.issue(writer, "writer-third-reopen");
 		for (const peer of fixture.peers)
 			expect(peer.room.authority()?.epoch, "F5B_C14_THREE_TRANSITIONS_AND_COLD_REOPEN").toBe(3);
+		for (const peer of fixture.peers)
+			expect(
+				productState(peer).byteLength,
+				"F5B_C03_THIRD_TRANSITION_REAL_STATE_WITHIN_UNCHANGED_CEILING"
+			).toBeLessThan(32_768);
 		await Promise.all(fixture.peers.map(fixture.stop));
 	});
 
