@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b RED authorization)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b corrective RED)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18450,19 +18450,25 @@ Closed through the 2026-09-05 checkpoint:
   fail closed, while ordinary Node ingress/local issue retain their legacy
   log-and-continue behavior.
 
-Authorized now (tests-only RED first, then GREEN):
+Authorized now (tests-only RED correction; GREEN remains blocked):
 
-- **f5b creator settlement and recovery integration** below. Resume the
-  accepted 27-case design with one causal tests-only RED commit; no parent
-  production edit precedes that RED. Its first authenticated-frontier test must
-  reach the dormant `openProgressSources` branch through the genuine
-  checkpoint-derived frontier, or GREEN deletes the dormant branch before
-  threading anything into it. The functional gate remains one real room with
-  64 active writers, every writer issuing in every epoch, across at least three
-  genuine close/adopt transitions with restart and cold reopen. The later
-  retained gate remains at least 100 genuine same-room transitions with the
-  bounded durable-structure, owner-custody and fresh-process memory controls
-  needed by the Discord/MMORPG golden paths.
+- **f5b creator settlement and recovery integration** below. Tests-only RED
+  `3a9e9329` with evidence `f7df8f80` is causal but not yet coverage-complete:
+  its genuine settlement close alone fails at
+  `F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED` over the underlying
+  `CERTIFIED_VALUE_MISMATCH`, while the genuine v1 issue/close/adopt/cold-
+  reopen/issue control passes. The first RED review preserved Grok's pre-session
+  timeout as `NO_VERDICT`, returned two Sol P1 findings against missing parent
+  safety/reclamation cases and incomplete 64-writer recovery oracles, and one
+  Fable xhigh PASS with nonblocking compatibility guidance. One tests-only
+  correction must close that union before GREEN. It retains genuine checkpoint-
+  derived `openProgressSources`, the complete parent case mapping, and one real
+  room with 64 active writers, every writer issuing in every epoch, a rotating
+  offline cohort, at least three genuine close/adopt transitions, restart and
+  cold reopen, and exact product-owned state/ACL/authority/anchor/history/plan/
+  operation accounting. The later retained gate remains at least 100 genuine
+  same-room transitions with the bounded durable-structure, owner-custody and
+  fresh-process memory controls needed by the Discord/MMORPG golden paths.
 
 Blocked, and on what:
 
@@ -99181,7 +99187,7 @@ matrix. Deadline: implemented and retained before f5b, parent 0c1/0c, the
 ≥100-transition gate, Phase-6 exit or Phase-7 long-lived-room cold join.
 
 The exact design is `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, pinning
-signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its two-entry
+signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its three-entry
 self-excluding manifest `manifest.sha256` records design SHA-256
 `f906810ee738d20c6e2d414d6dfbb43ec4a80e3bf86ab51fffd94644d99fefa7` and
 pre-review SHA-256
@@ -100333,8 +100339,8 @@ workload change is authorized here.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: AUTHORIZED FOR ONE CAUSAL TESTS-ONLY RED; no parent production edit
-precedes that signed/pushed RED.** The f5b0t/f5b0u/f5b0v prerequisite chain is
+**Status: CAUSAL RED ESTABLISHED; one coverage-corrective tests-only RED is
+authorized, while parent GREEN remains blocked.** The f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
 demonstrated that the scalar replacement link cannot represent crash-safe
@@ -100360,6 +100366,35 @@ exists nowhere under `packages/` or `examples/`. The authoritative f5b slice
 definition and RED obligations are design.md "TDD implementation slices" item
 6 and RED cases 1–27; the no-rebase trigger is replaced by delayed-dependency
 case 1.
+
+Case-24 clarification (2026-09-05, adjudicated after the first RED review; the
+accepted design artifact and its manifest remain immutable): no production
+path regresses a committed room-head floor or re-adopts a `Superseded` AHE
+generation. Storage swaps accept only a `Complete` candidate based on the
+current head; recovery verifies the one `Adopted` head or advances a pending
+successor; room-head begin, cold reopen and activation fail closed on a behind,
+ahead or substituted floor. The D.110c-0b anti-rollback contract therefore
+forbids treating a captured older floor as fixture authority. The design phrase
+“boundaries regress with the closure” refers only to the immediate-predecessor
+settlement checkpoint retained in the two `Superseded` rollback generations
+and inspected for adjacent-transition comparison; no author drains against or
+re-adopts it.
+
+Case 24 is discharged without a new API or floor mutation through two genuine
+production-path subcases. **24a** links a writer plan under checkpoint N+1,
+then attempts reopen from its untransferred N+1 local head against the genuinely
+committed N+2 floor: reopen must fail closed, the durable plan and lineage must
+remain byte-identical, and the floor must not move backward; after genuine
+authenticated state transfer, reopen and issue must succeed without a new
+replacement row or re-disposition. **24c** proves authority epoch, floor epoch
+and active head increase monotonically across the three transitions while
+exactly two complete `Superseded` rollback generations remain retained behind
+the active head. Interrupted adoption before floor commit remains covered by
+retained D.110c-0b0a and D.110c-b evidence; rollback-generation retention stays
+part of case 13's pruning gate. Literal administrative post-commit regression
+is neither required by the Discord/MMORPG golden paths nor authorized here. If
+ever required, it needs a separate high-risk D.110c-c authority/API slice and
+durable tombstoning of terminal-retired plan entries before any implementation.
 Owner: the cross-epoch relationship among creator-admitted
 per-author identities, aggregate coverage, historical outbox classification,
 rebase source→replacement/disposition correlation, close-set/history proofs,
