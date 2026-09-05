@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Transparent test observers retain real runtime signatures. */
 /* eslint-disable @typescript-eslint/consistent-type-imports -- importOriginal describes the observed production module. */
-// Parent case ownership (all calls below remain after the single causal RED):
-// 1-3,10,13-negative,14,22,26: checkpoint-terminal open-progress continuation.
+// Parent case ownership (each independent continuation has its own causal close):
+// 1: delayedDependency; 2-3,10,13-negative,14,22,26: checkpoint-terminal progress.
 // 4,15,16,19: delayedPublication; 5,11: manualReviewHold; 6-9: sameKeyReentry.
 // 12,23: creatorFenceScan; 13-positive: positiveAuthenticatedPruning;
 // 14,24c and the 64-writer product golden path: sixtyFourWriterGoldenPath;
-// 17: unchanged v1 control; 19-21: displacedControls; 24a: staleLocalHead;
+// 17: nullBoundaryClose plus v1 source-shape custody; 19-21: displacedControls; 24a: staleLocalHead;
 // 25: ambiguousPlanIssue. Case 24 follows signed clarification 62f71f4d:
 // no committed floor regression, no Superseded-generation readoption.
 // Closed nonduplicated primitives: 18 and 26-27 are exact vectors in
@@ -63,6 +63,8 @@ const observed = vi.hoisted(() => ({
 	failRecoveryReadFor: "",
 	issueAttempts: [] as DurableIssueCommit[],
 	commitHandles: new Map<DurableIssueCommit, V3PlaneHandle | undefined>(),
+	issuePlans: new Map<DurableIssueCommit, SettlementPlan | null>(),
+	timeline: [] as { database: string; kind: "plan" | "commit" | "publication"; sequence?: number; revision?: number }[],
 	ambiguities: [] as {
 		database: string;
 		candidate: DurableIssueCommit;
@@ -83,7 +85,23 @@ const observed = vi.hoisted(() => ({
 		error?: unknown;
 	}[],
 	cleanup: [] as { input: unknown; result: unknown }[],
+	closeGraphs: [] as {
+		input: Parameters<typeof import("@ts-drp/compaction").deriveCloseSetHistoryCommitment>[0];
+		result: Awaited<ReturnType<typeof import("@ts-drp/compaction").deriveCloseSetHistoryCommitment>>;
+	}[],
 }));
+
+vi.mock("@ts-drp/compaction", async (importOriginal) => {
+	const real = await importOriginal<typeof import("@ts-drp/compaction")>();
+	return {
+		...real,
+		deriveCloseSetHistoryCommitment: async (input: Parameters<typeof real.deriveCloseSetHistoryCommitment>[0]) => {
+			const result = await real.deriveCloseSetHistoryCommitment(input);
+			observed.closeGraphs.push({ input, result });
+			return result;
+		},
+	};
+});
 
 // All aliases point at the existing implementations, sharing their actual opaque
 // capability custody. No replacement trust, codec, checkpoint or activation result.
@@ -200,6 +218,7 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async () => {
 				const ambiguity = observed.ambiguous?.database === input.primaryDatabaseName ? observed.ambiguous : undefined;
 				const result = await transactIssue(scope, async (sequence) => {
 					const candidate = await build(sequence);
+					observed.issuePlans.set(candidate, structuredClone(await store.readSettlementPlan(scope)));
 					observed.issueAttempts.push(candidate);
 					const effect = candidate.planEffect;
 					if (ambiguity !== undefined && ambiguity.kind === effect?.kind && !ambiguity.committed) {
@@ -222,6 +241,11 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async () => {
 				});
 				if (selected !== undefined) {
 					observed.commits.push(selected);
+					observed.timeline.push({
+						database: input.primaryDatabaseName,
+						kind: "commit",
+						sequence: selected.authorSequence,
+					});
 					observed.commitHandles.set(selected, observed.planes.get(input.primaryDatabaseName));
 				}
 				if (ambiguity !== undefined && ambiguity.kind === selected?.planEffect?.kind && ambiguity.committed) {
@@ -235,6 +259,11 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async () => {
 			const publish = store.compareAndMarkOutboxPublished;
 			Reflect.set(store, "compareAndMarkOutboxPublished", (async (value) => {
 				await publish(value);
+				observed.timeline.push({
+					database: input.primaryDatabaseName,
+					kind: "publication",
+					sequence: value.authorSequence,
+				});
 				observed.publications.push({
 					database: input.primaryDatabaseName,
 					sequence: value.authorSequence,
@@ -246,6 +275,7 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async () => {
 			Reflect.set(store, "transactWriteSettlementPlan", (async (value) => {
 				const plan = await writePlan(value);
 				observed.planWrites.push({ database: input.primaryDatabaseName, plan: structuredClone(plan) });
+				observed.timeline.push({ database: input.primaryDatabaseName, kind: "plan", revision: plan.revision });
 				return plan;
 			}) satisfies DurableIssuanceStore["transactWriteSettlementPlan"]);
 			const implementation = browserIssuanceImplementationForTest(store);
@@ -507,7 +537,6 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 	const finality = await createRecoverableFinalitySigner({ seed: creator.seed });
 	const ingress = new Map<string, (message: Message) => void>();
 	const received = new Set<string>();
-	const waiters = new Map<string, () => void>();
 	const held = new Set<string>();
 	const publicationFailures = new Set<string>();
 	const heldApplications = new Set<string>();
@@ -527,26 +556,17 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 		const digest = hex(hashDomain("ts-drp/vertex/v3", envelope.canonicalPreimage));
 		if (received.has(digest)) return true;
 		const operation = record(envelope.canonicalPreimage).operation as Record<string, unknown>;
-		const delivered = new Promise<void>((resolve) => {
-			waiters.set(digest, resolve);
-		});
 		required(ingress.get(target.databaseName))(message);
 		// Control vertices intentionally have no application callback. A following
 		// ordinary issue causally depends on them and supplies the admission ack.
 		if (operation.action === "$drp.author-fence.v1" || operation.action === "join" || operation.action === "causalJoin")
 			return true;
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		try {
-			await Promise.race([
-				delivered,
-				new Promise<never>((_resolve, reject) => {
-					timer = setTimeout(() => reject(new Error(`F5B_ROUTED_OPERATION_NOT_ADMITTED:${digest}`)), 5000);
-				}),
-			]);
-		} finally {
-			if (timer !== undefined) clearTimeout(timer);
-			waiters.delete(digest);
-		}
+		// Bounded deterministic scheduling oracle: each real readonly IDB round
+		// yields to queued ingress/storage work, with no sleep or elapsed-time test.
+		// 256 is a fixture scheduling budget, never a product resource ceiling.
+		for (let turn = 0; turn < 256 && !received.has(digest); turn += 1)
+			await required(observed.stores.get(target.databaseName)).readLineage({ author: target.author, objectId });
+		if (!received.has(digest)) throw new Error(`F5B_ROUTED_OPERATION_NOT_ADMITTED:${digest}`);
 		return true;
 	};
 	const transportFor =
@@ -596,7 +616,6 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 				const digest = hex(vertex.digest);
 				if (index === 0) {
 					received.add(digest);
-					waiters.get(digest)?.();
 				}
 			},
 			onProjection: () => undefined,
@@ -840,14 +859,16 @@ async function aheFacts(peer: Peer) {
 	}
 }
 
-async function assertRetainedRollbackPair(peer: Peer) {
+async function assertRetainedRollbackPair(peer: Peer, adoptedEpoch: number) {
 	const facts = await aheFacts(peer);
 	const retained = facts.generations.filter((generation) => generation.state === "Superseded");
-	expect(retained, "F5B_C13_C24C_EXACT_TWO_SUPERSEDED_ROLLBACK_GENERATIONS").toHaveLength(2);
+	const expected = Math.min(adoptedEpoch, 2);
+	expect(retained, "F5B_C13_C24C_PRODUCT_TRUE_BOUNDED_ROLLBACK_WINDOW").toHaveLength(expected);
+	expect(facts.generations, "F5B_C13_BOUNDED_ACTIVE_AND_ROLLBACK_GENERATIONS").toHaveLength(expected + 1);
 	const active = required(facts.generations.find((generation) => generation.generationId === facts.head.generationId));
 	expect(active.state).toBe("Adopted");
 	let base = active.baseExpectedHead;
-	for (let index = 0; index < 2; index += 1) {
+	for (let index = 0; index < expected; index += 1) {
 		if (base.kind !== "present") throw new Error("F5B_C13_ROLLBACK_LINEAGE_GAP");
 		const id = base.generationId;
 		const prior = required(retained.find((generation) => generation.generationId === id));
@@ -873,6 +894,104 @@ async function displacedFixture() {
 	await creator.room.adoptCreatorSuccessor();
 	fixture.held.delete(writer.databaseName);
 	return { fixture, creator, writer, source: source.commit, checkpoint };
+}
+
+async function delayedDependency() {
+	const fixture = await openRoom(2);
+	const creator = required(fixture.peers[0]);
+	const writer = required(fixture.peers[1]);
+	await fixture.issue(creator, "dependency-creator");
+	await fixture.issue(writer, "dependency-admitted-prefix");
+	const prefix = required(ownCommits(writer).at(-1));
+	fixture.held.add(writer.databaseName);
+	await fixture.issue(writer, "dependency-n");
+	const delayed = required(ownCommits(writer).at(-1));
+	await fixture.issue(writer, "dependency-n-plus-one");
+	const dependent = required(ownCommits(writer).at(-1));
+	expect(dependent.authorSequence, "F5B_C01_TWO_DISTINCT_ADJACENT_AUTHOR_SEQUENCES").toBe(delayed.authorSequence + 1);
+	expect(
+		record(dependent.envelope.canonicalPreimageBytes).dependencies,
+		"F5B_C01_REAL_ISSUE_CAUSALLY_DEPENDS_ON_DELAYED_VERTEX"
+	).toContain(hex(delayed.envelope.digest));
+	const envelope = required(
+		fixture.envelopes.find(
+			(message) =>
+				hex(hashDomain("ts-drp/vertex/v3", V3Envelope.decode(message.data).canonicalPreimage)) ===
+				hex(dependent.envelope.digest)
+		)
+	);
+	fixture.deliver(envelope); // Deliver n+1, never n, through real signed ingress.
+	await fixture.issue(creator, "dependency-before-close");
+	await fixture.close();
+	const checkpoint = fixture.checkpoint();
+	expect(frontierFor(checkpoint.capability, writer.author)?.[2], "F5B_C01_CLOSE_STAYS_AT_ADMITTED_PREFIX").toBe(
+		prefix.authorSequence
+	);
+	const graph = required(observed.closeGraphs.at(-1));
+	for (const row of [delayed, dependent])
+		expect(
+			graph.input.vertices.has(hex(row.envelope.digest)),
+			"F5B_C01_DEPENDENT_NEVER_IN_REAL_CLOSE_GRAPH_WITHOUT_PREDECESSOR"
+		).toBe(false);
+	for (const row of [delayed, dependent])
+		expect(fixture.received.has(hex(row.envelope.digest)), "F5B_C01_NEITHER_DEPENDENCY_NOR_DEPENDENT_ADMITTED").toBe(
+			false
+		);
+	expect(messages(creator).map((row) => row.clientOperationId)).not.toContain("dependency-n-plus-one");
+	await creator.room.adoptCreatorSuccessor();
+	fixture.held.delete(writer.databaseName);
+	await fixture.reopen(writer, 0, true);
+	await fixture.issue(writer, "dependency-after-recovery");
+	const plan = required((await durable(writer)).plan);
+	for (const source of [delayed, dependent]) {
+		const entry = required(plan.entries.find((row) => row.sourceSequence === source.authorSequence));
+		expect(entry.sourceDigest).toEqual(source.envelope.digest);
+		expect(required(entry.replacementSequence)).toBeGreaterThan(required(plan.fenceSequence));
+		expect(
+			ownCommits(writer).filter(
+				(row) => row.planEffect?.kind === "replacement" && row.planEffect.sourceSequence === source.authorSequence
+			),
+			"F5B_C01_EXACT_ONE_REPLACEMENT_FOR_EACH_DISTINCT_SOURCE"
+		).toHaveLength(1);
+	}
+	await fixture.close();
+	expect(
+		frontierFor(fixture.checkpoint().capability, writer.author)?.[2],
+		"F5B_C01_FENCE_AND_CONTIGUOUS_REPLACEMENTS_ADVANCE"
+	).toBe(required(ownCommits(writer).at(-1)).authorSequence);
+	for (const id of ["dependency-n", "dependency-n-plus-one"])
+		expect(messages(creator).filter((row) => row.clientOperationId === id)).toEqual([
+			{ clientOperationId: id, text: "r".repeat(33_000) },
+		]);
+	await Promise.all(fixture.peers.map(fixture.stop));
+}
+
+async function nullBoundaryClose() {
+	const fixture = await openRoom(2);
+	const creator = required(fixture.peers[0]);
+	const writer = required(fixture.peers[1]);
+	await fixture.issue(creator, "null-boundary-initial");
+	await fixture.stop(writer);
+	await creator.room.issue({ action: "acl", group: "writer", kind: "revoke", target: writer.author });
+	await fixture.close();
+	expect(frontierFor(fixture.checkpoint().capability, writer.author)).toBeUndefined();
+	await creator.room.adoptCreatorSuccessor();
+	await creator.room.issue({ action: "acl", group: "writer", kind: "grant", target: writer.author });
+	await fixture.close();
+	expect(frontierFor(fixture.checkpoint().capability, writer.author)).toEqual([writer.author, 2, null]);
+	await creator.room.adoptCreatorSuccessor();
+	// Member is authentically re-admitted but stays offline: there is no current
+	// slot 0, fence or application from it. Never manufacture a frontier or row.
+	await fixture.issue(creator, "null-boundary-close-continues");
+	await fixture.close();
+	expect(
+		frontierFor(fixture.checkpoint().capability, writer.author),
+		"F5B_C17_NULL_NO_FENCE_NO_SLOT_ZERO_CLOSE_SUCCEEDS"
+	).toEqual([writer.author, 2, null]);
+	expect(
+		ownCommits(writer).filter((row) => Number(record(row.envelope.canonicalPreimageBytes).epoch) >= 2)
+	).toHaveLength(0);
+	await fixture.stop(creator);
 }
 
 async function delayedPublication(mode: "unpublished-fence" | "delayed-replacement" | "delayed-fence") {
@@ -981,6 +1100,29 @@ async function ambiguousPlanIssue(kind: "fence" | "replacement", committed: bool
 	if (committed) {
 		expect(recoveredLink, "F5B_C25_LINK_FROM_DURABLE_TRUTH").toBe(link);
 	} else expect(recoveredLink, "F5B_C25_UNCOMMITTED_SLOT_REUSED").toBe(boundary.lineage.next);
+	const surviving = required(ownCommits(writer).find((row) => row.authorSequence === recoveredLink));
+	expect(
+		observed.publications.filter(
+			(row) => row.database === writer.databaseName && row.sequence === surviving.authorSequence
+		),
+		"F5B_C25_EXACT_ONE_SURVIVING_PUBLICATION_WITH_EXACT_DIGEST"
+	).toEqual([
+		{
+			database: writer.databaseName,
+			sequence: surviving.authorSequence,
+			digest: hex(surviving.envelope.digest),
+			handle: observed.planes.get(writer.databaseName),
+		},
+	]);
+	expect(
+		fixture.envelopes.filter(
+			(message) =>
+				message.sender === writer.databaseName &&
+				hex(hashDomain("ts-drp/vertex/v3", V3Envelope.decode(message.data).canonicalPreimage)) ===
+					hex(surviving.envelope.digest)
+		),
+		"F5B_C25_EXACT_ONE_NETWORK_PUBLICATION_NOT_JUST_OUTBOX_MARK"
+	).toHaveLength(1);
 	expect(
 		ownCommits(writer).filter(
 			(row) => record(row.envelope.canonicalPreimageBytes).epoch === 1 && row.planEffect?.kind === kind
@@ -1073,6 +1215,54 @@ async function sixtyFourWriterGoldenPath() {
 	let sealedState: Uint8Array | undefined;
 	const semanticState = (rows: { clientOperationId: string; text: string }[]) =>
 		encodeCanonical([...rows].sort((left, right) => left.clientOperationId.localeCompare(right.clientOperationId)));
+	const accountEpoch = (epoch: number) => {
+		for (const { peer, commit } of contributions.filter((row) => row.epoch === epoch)) {
+			const plan = required(observed.issuePlans.get(commit));
+			const fenceSequence = required(plan.fenceSequence);
+			const fences = ownCommits(peer).filter(
+				(row) => row.planEffect?.kind === "fence" && record(row.envelope.canonicalPreimageBytes).epoch === epoch
+			);
+			expect(fences, "F5B_64_EVERY_AUTHOR_EVERY_EPOCH_EXACT_ONE_FENCE").toHaveLength(1);
+			const fence = required(fences[0]);
+			expect(fence.authorSequence).toBe(fenceSequence);
+			expect(fenceSequence, "F5B_64_FENCE_BEFORE_FIRST_ORDINARY_ISSUE").toBeLessThan(commit.authorSequence);
+			const beforeFence = required(observed.issuePlans.get(fence));
+			expect(beforeFence.scope).toEqual({ author: peer.author, objectId: fixture.objectId });
+			expect(beforeFence.fenceSequence).toBeNull();
+			expect(beforeFence.entries.some((entry) => entry.disposition === "manual-review")).toBe(false);
+			const events = observed.timeline.filter((event) => event.database === peer.databaseName);
+			const planAt = events.findIndex((event) => event.kind === "plan" && event.revision === beforeFence.revision);
+			const fenceAt = events.findIndex((event) => event.kind === "commit" && event.sequence === fenceSequence);
+			const publishedAt = events.findIndex((event) => event.kind === "publication" && event.sequence === fenceSequence);
+			const ordinaryAt = events.findIndex(
+				(event) => event.kind === "commit" && event.sequence === commit.authorSequence
+			);
+			expect(planAt, "F5B_64_DURABLE_PLAN_WRITE_EXISTS_BEFORE_FENCE").toBeGreaterThanOrEqual(0);
+			expect(planAt).toBeLessThan(fenceAt);
+			expect(fenceAt).toBeLessThan(publishedAt);
+			expect(publishedAt).toBeLessThan(ordinaryAt);
+			const effects = ownCommits(peer).filter(
+				(row) =>
+					row.authorSequence >= fenceSequence &&
+					row.authorSequence < commit.authorSequence &&
+					row.planEffect !== undefined
+			);
+			expect(plan.revision, "F5B_64_EXACT_PLAN_REVISION_ADVANCES_ONLY_WITH_ATOMIC_EFFECTS").toBe(
+				beforeFence.revision + effects.length
+			);
+			expect(
+				observed.publications.filter((row) => row.database === peer.databaseName && row.sequence === fenceSequence),
+				"F5B_64_EXACT_ONE_FENCE_PUBLICATION"
+			).toEqual([
+				{
+					database: peer.databaseName,
+					sequence: fenceSequence,
+					digest: hex(fence.envelope.digest),
+					handle: observed.commitHandles.get(fence),
+				},
+			]);
+		}
+	};
 	for (let epoch = 0; epoch <= 3; epoch += 1) {
 		for (const [index, peer] of fixture.peers.entries()) {
 			const acl = peer.room.previewLatchedAcl().current;
@@ -1161,7 +1351,10 @@ async function sixtyFourWriterGoldenPath() {
 			hex(hashDomain("ts-drp/state/v3", semanticState(messages(creator)))),
 			"F5B_64_EXACT_PRODUCT_SEMANTIC_DIGEST"
 		).toBe(hex(hashDomain("ts-drp/state/v3", semanticState(expectedMessages))));
-		if (epoch === 3) break;
+		if (epoch === 3) {
+			accountEpoch(epoch);
+			break;
+		}
 		// Rotating eight-author cohort has ALREADY issued/admitted/applied/published
 		// in this epoch. It remains genuinely stopped over close/adopt and the
 		// selected creator cold restart, then rejoins before the next epoch's issue.
@@ -1186,6 +1379,32 @@ async function sixtyFourWriterGoldenPath() {
 		sealedState = productState(creator);
 		await fixture.close();
 		const checkpoint = fixture.checkpoint();
+		accountEpoch(epoch);
+		const graph = required(observed.closeGraphs.at(-1));
+		const admitted = fixture.peers
+			.flatMap(ownCommits)
+			.filter(
+				(row) =>
+					record(row.envelope.canonicalPreimageBytes).epoch === epoch &&
+					!displaced.some((source) => hex(source.source.envelope.digest) === hex(row.envelope.digest))
+			);
+		expect(
+			[...graph.result.closeSetOrder].sort(),
+			"F5B_64_EXACT_CLOSE_SET_COUNTS_APPLICATION_AND_CONTROL_VERTICES"
+		).toEqual(admitted.map((row) => hex(row.envelope.digest)).sort());
+		for (const row of admitted)
+			expect(
+				graph.input.authenticatedCanonicalPreimageByteLengths.get(hex(row.envelope.digest)),
+				"F5B_64_EXACT_SIGNED_BYTE_CHARGES_INCLUDE_FENCES"
+			).toBe(row.envelope.canonicalPreimageBytes.byteLength);
+		expect(checkpoint.identity.historySize, "F5B_64_EXACT_HISTORY_SIZE_NOT_ONLY_MONOTONICITY").toBe(
+			(priorCheckpoint?.identity.historySize ?? 0) + admitted.length
+		);
+		expect(checkpoint.identity.historyRoot, "F5B_64_HISTORY_ROOT_BINDS_COMPLETE_REAL_GRAPH").toBe(
+			graph.result.historyRoot
+		);
+		expect(checkpoint.cut.closeSetCount).toBe(admitted.length);
+		expect(checkpoint.cut.closeSetRoot).toBe(graph.result.closeSetRoot);
 		expect(checkpoint.identity.frontiers, "F5B_64_AUTHENTICATED_ACL_MEMBER_VECTOR").toHaveLength(64);
 		expect(checkpoint.cut.stateDigest, "F5B_64_SNAPSHOT_BINDS_EXACT_PRODUCT_STATE").toBe(
 			hex(hashDomain("ts-drp/state/v3", sealedState))
@@ -1212,7 +1431,7 @@ async function sixtyFourWriterGoldenPath() {
 		await creator.room.adoptCreatorSuccessor();
 		expect(productState(creator), "F5B_64_ADOPTION_EXACT_STATE_BYTES").toEqual(sealedState);
 		const authority = required(creator.room.authority());
-		const head = await assertRetainedRollbackPair(creator);
+		const head = await assertRetainedRollbackPair(creator, epoch + 1);
 		expect(authority.anchorDigest).toBe(checkpoint.identity.successorAnchorDigest);
 		expect(authority.aclDigest).toBe(checkpoint.identity.successorAclDigest);
 		expect(creator.floor.read().stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
@@ -1261,6 +1480,15 @@ async function sixtyFourWriterGoldenPath() {
 		const publications = new Set(
 			observed.publications.filter((row) => row.database === peer.databaseName).map((row) => row.sequence)
 		);
+		for (const commit of commits) {
+			const marks = observed.publications.filter(
+				(row) => row.database === peer.databaseName && row.sequence === commit.authorSequence
+			);
+			expect(marks, "F5B_64_NO_DUPLICATE_PUBLICATION_MARK").toHaveLength(
+				publications.has(commit.authorSequence) ? 1 : 0
+			);
+			for (const mark of marks) expect(mark.digest).toBe(hex(commit.envelope.digest));
+		}
 		const intentionallyNeverPublished = displaced
 			.filter((row) => row.peer === peer)
 			.filter((row) => !publications.has(row.source.authorSequence));
@@ -1277,7 +1505,26 @@ async function sixtyFourWriterGoldenPath() {
 		"F5B_64_AGGREGATE_ISSUES_INCLUDE_SOURCES_AND_REPLACEMENTS"
 	).toBe(268);
 	expect(messages(creator), "F5B_64_EXACT_262_UNIQUE_APPLICATION_EFFECTS").toHaveLength(262);
+	const finalCanonicalState = productState(creator).slice();
+	const finalAuthority = creator.room.authority();
+	const finalAccounting = {
+		commits: aggregate.length,
+		publications: observed.publications.filter((row) =>
+			fixture.peers.some((peer) => peer.databaseName === row.database)
+		).length,
+	};
 	await fixture.reopen(creator, 2);
+	expect(productState(creator), "F5B_64_FINAL_COLD_REOPEN_EXACT_CANONICAL_STATE_BYTES").toEqual(finalCanonicalState);
+	expect(creator.room.authority(), "F5B_64_FINAL_COLD_REOPEN_EXACT_AUTHORITY").toEqual(finalAuthority);
+	expect(
+		{
+			commits: fixture.peers.flatMap(ownCommits).length,
+			publications: observed.publications.filter((row) =>
+				fixture.peers.some((peer) => peer.databaseName === row.database)
+			).length,
+		},
+		"F5B_64_FINAL_COLD_REOPEN_NO_DUPLICATE_ISSUE_PUBLICATION"
+	).toEqual(finalAccounting);
 	expect(semanticState(messages(creator)), "F5B_64_FINAL_CREATOR_COLD_REOPEN_EXACT_STATE").toEqual(
 		semanticState([...expected].map(([clientOperationId, text]) => ({ clientOperationId, text })))
 	);
@@ -1302,12 +1549,19 @@ async function positiveAuthenticatedPruning() {
 		await fixture.reopen(required(fixture.peers[1]), epoch, true);
 		await fixture.issue(required(fixture.peers[1]), `prune-reopened-${epoch}`);
 		for (const peer of fixture.peers) {
+			await assertRetainedRollbackPair(peer, epoch + 1);
 			const events = observed.prunes.filter(
 				(event) =>
 					event.database === peer.databaseName &&
 					event.receipt?.deletedAuthorSequenceRange !== null &&
 					event.receipt !== undefined
 			);
+			if (epoch < 2) {
+				// First adoption has only one rollback parent; second establishes
+				// the full window but has no older prefix outside that window.
+				expect(events, "F5B_C13_NO_PREFIX_DELETE_BEFORE_FULL_WINDOW_AND_OLDER_PREFIX").toHaveLength(0);
+				continue;
+			}
 			expect(events.length, "F5B_C13_PARENT_OWNER_ACTUALLY_DELETES_ISSUANCE").toBeGreaterThan(0);
 			const first = required(events[0]);
 			expect(
@@ -1340,7 +1594,6 @@ async function positiveAuthenticatedPruning() {
 				snapshot: { adopted: true, manifestDigest: checkpoint.identity.snapshotManifestDigest },
 				issuance: { complete: true },
 			});
-			await assertRetainedRollbackPair(peer);
 			const durableState = await durable(peer);
 			expect(
 				durableState.rows.every((row) => row.commit.authorSequence > receipt.prunedThroughAuthorSequence),
@@ -1549,11 +1802,42 @@ async function manualReviewHold() {
 	} finally {
 		await store.close();
 	}
+	// Hold survives an authenticated transition and cold reopen byte-for-byte.
+	const heldPolicy = Object.freeze({
+		...writer.input.application,
+		displacementPolicies: Object.freeze({ message: "manual-review" as const }),
+	});
+	await fixture.reopen(writer, 1, true, heldPolicy);
+	await expect(fixture.issue(writer, "held-after-cold-reopen")).rejects.toThrow(
+		"v3 room settlement plan requires manual review"
+	);
+	expect(encodeCanonical((await durable(writer)).plan), "F5B_C11_CROSS_CLOSE_COLD_REOPEN_PRESERVES_HELD_PLAN").toEqual(
+		encodeCanonical(held.plan)
+	);
+	await fixture.stop(writer);
+	await creator.room.issue({ action: "acl", group: "writer", kind: "revoke", target: writer.author });
+	await fixture.close();
+	expect(frontierFor(fixture.checkpoint().capability, writer.author)).toBeUndefined();
+	await creator.room.adoptCreatorSuccessor();
+	await creator.room.issue({ action: "acl", group: "writer", kind: "grant", target: writer.author });
+	await fixture.close();
+	expect(frontierFor(fixture.checkpoint().capability, writer.author)).toEqual([writer.author, 4, null]);
+	await creator.room.adoptCreatorSuccessor();
+	await fixture.reopen(writer, 3, true, heldPolicy);
+	await fixture.issue(writer, "readmitted-after-hold");
+	expect(
+		(await durable(writer)).plan?.entries,
+		"F5B_C11_AUTHENTICATED_READMISSION_RETIRES_OLD_HOLD_NO_RESOLVER"
+	).toEqual([]);
+	expect(
+		messages(creator).map((row) => row.clientOperationId),
+		"F5B_C11_AUTHOR_WIDE_READMISSION_DISCARDS_OLD_CONTENT_NOT_MODERATOR_APPROVAL"
+	).not.toContain("manual-displaced");
 	await fixture.stop(writer);
 	await fixture.stop(creator);
 }
 
-async function creatorFenceScan(duplicate = false) {
+async function creatorFenceScan(duplicate = false, stale = false) {
 	const fixture = await openRoom(2);
 	const creator = required(fixture.peers[0]);
 	const writer = required(fixture.peers[1]);
@@ -1593,9 +1877,13 @@ async function creatorFenceScan(duplicate = false) {
 	// adversarial; creator graph, signature checking, close and checkpoint are real.
 	const lower = makeFence(10_000, 10_000);
 	const largest = makeFence(10_001, 10_001, lower.digest);
-	fixture.deliver(lower.message);
-	if (duplicate) fixture.deliver(makeFence(10_000, 9999).message);
-	fixture.deliver(largest.message);
+	if (stale) {
+		fixture.deliver(makeFence(10_000, required(frontierFor(first.capability, writer.author)?.[2])).message);
+	} else {
+		fixture.deliver(lower.message);
+		if (duplicate) fixture.deliver(makeFence(10_000, 9999).message);
+		fixture.deliver(largest.message);
+	}
 	fixture.deliver(makeFence(10_002, 10_003).message); // m > f: malformed control
 	await fixture.issue(writer, "scan-after-fences"); // FIFO ingress acknowledgement
 	await fixture.issue(creator, "scan-independent-creator");
@@ -1606,7 +1894,18 @@ async function creatorFenceScan(duplicate = false) {
 		duplicate
 			? "F5B_C23_SAME_SLOT_DUPLICATE_BELOW_FENCE_FREEZES_PRIOR_BOUNDARY"
 			: "F5B_C12_LARGEST_VALID_FENCE_THEN_CONTIGUOUS_SCAN"
-	).toBe(duplicate ? frontierFor(first.capability, writer.author)?.[2] : 10_001);
+	).toBe(
+		duplicate
+			? frontierFor(first.capability, writer.author)?.[2]
+			: stale
+				? required(ownCommits(writer).at(-1)).authorSequence
+				: 10_001
+	);
+	if (stale)
+		expect(
+			frontierFor(second.capability, writer.author)?.[2],
+			"F5B_C12_M_AT_OR_BELOW_TERMINAL_CANNOT_BRIDGE_UNKNOWN_SLOTS"
+		).toBeLessThan(10_000);
 	expect(
 		frontierFor(second.capability, creator.author)?.[2],
 		duplicate ? "F5B_C23_OTHER_AUTHOR_ADVANCES_DESPITE_DUPLICATE" : "F5B_C12_BYZANTINE_JUMP_ONLY_BURNS_OWN_SPACE"
@@ -1633,11 +1932,14 @@ beforeEach(() => {
 	observed.failRecoveryReadFor = "";
 	observed.issueAttempts = [];
 	observed.commitHandles.clear();
+	observed.issuePlans.clear();
+	observed.timeline = [];
 	observed.ambiguities = [];
 	observed.publications = [];
 	observed.planWrites = [];
 	observed.prunes = [];
 	observed.cleanup = [];
+	observed.closeGraphs = [];
 });
 afterEach(async () => {
 	observed.failSuffixFor = "";
@@ -1651,7 +1953,7 @@ afterEach(async () => {
 });
 
 describe("D.110c-0c1f5b parent genuine settlement composition", () => {
-	it("retains checkpoint-terminal open progress through cold recovery, then composes 64 active writers across three transitions", async () => {
+	it("retains checkpoint-terminal open progress through cold recovery across three transitions", async () => {
 		const fixture = await openRoom(2);
 		const creator = required(fixture.peers[0]);
 		const writer = required(fixture.peers[1]);
@@ -1671,11 +1973,28 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		// continuation, not a claim that RED physically entered openProgressSources.
 		await fixture.close();
 		const first = fixture.checkpoint();
-		expect(frontierFor(first.capability, writer.author)?.[2], "F5B_C01_DELAYED_DEPENDENCY_NOT_ADMITTED").toBeLessThan(
+		expect(frontierFor(first.capability, writer.author)?.[2], "F5B_C03_BATCH_SOURCE_NOT_ADMITTED").toBeLessThan(
 			source.authorSequence
 		);
 		for (const peer of fixture.peers)
 			expect(frontierFor(first.capability, peer.author)?.[1], "F5B_C22_GENESIS_INCARNATION").toBe(0);
+		const creatorZero = required(ownCommits(creator).find((row) => row.authorSequence === 0));
+		expect(
+			required(observed.closeGraphs.at(-1)).result.closeSetOrder,
+			"F5B_C22_REAL_CLOSE_SET_INCLUDES_CREATOR_SLOT_ZERO"
+		).toContain(hex(creatorZero.envelope.digest));
+		expect(
+			record(creatorZero.envelope.canonicalPreimageBytes).epoch,
+			"F5B_C22_REAL_CREATOR_SLOT_ZERO_GENESIS_ROW"
+		).toBe(0);
+		expect(
+			record(creatorZero.envelope.canonicalPreimageBytes).operation,
+			"F5B_C22_SLOT_ZERO_ACCOUNTED_WITHOUT_BEING_A_FENCE"
+		).not.toMatchObject({ action: "$drp.author-fence.v1" });
+		expect(
+			frontierFor(first.capability, creator.author)?.[2],
+			"F5B_C22_EXACT_CREATOR_GENESIS_FRONTIER_INCLUDES_SLOT_ZERO"
+		).toBe(required(ownCommits(creator).at(-1)).authorSequence);
 		await creator.room.adoptCreatorSuccessor();
 		fixture.held.delete(writer.databaseName);
 		observed.failSuffixFor = writer.databaseName;
@@ -1710,6 +2029,13 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		observed.failSuffixFor = "";
 		await fixture.reopen(writer, 1, true);
 		await fixture.issue(writer, "after-cold-reopen");
+		const recoverySource = readFileSync(new URL("../packages/node/src/v3-live.ts", import.meta.url), "utf8");
+		// Together with the real terminal checkpoint + partial-progress completion
+		// below, forbid the current unconditional undefined-frontier bypass. This
+		// does not inject the context: only production checkpoint custody may do so.
+		expect(recoverySource, "F5B_OPEN_PROGRESS_NO_UNAUTHENTICATED_UNDEFINED_FRONTIER_CALL").not.toMatch(
+			/readSettlementSources\(registration\)/u
+		);
 		const complete = required(await required(observed.stores.get(writer.databaseName)).readSettlementPlan(scope));
 		const completed = required(complete.entries.find((row) => row.sourceSequence === source.authorSequence));
 		expect(
@@ -1732,22 +2058,53 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		for (const peer of fixture.peers)
 			expect(peer.room.authority()?.epoch, "F5B_C14_THREE_TRANSITIONS_AND_COLD_REOPEN").toBe(3);
 		await Promise.all(fixture.peers.map(fixture.stop));
+	});
 
-		await sixtyFourWriterGoldenPath();
-		await sameKeyReentry();
-		await manualReviewHold();
-		await creatorFenceScan();
-		await creatorFenceScan(true);
-		await delayedPublication("unpublished-fence");
-		await delayedPublication("delayed-replacement");
-		await delayedPublication("delayed-fence");
-		await displacedControls();
-		await staleLocalHead();
-		for (const kind of ["fence", "replacement"] as const)
-			for (const committed of [false, true]) await ambiguousPlanIssue(kind, committed);
-		await ambiguousPlanIssue("fence", false, true);
-		await positiveAuthenticatedPruning();
-	}, 60_000);
+	// Independently attributable continuations replace the old aggregate timeout.
+	// The unchanged 60s runner watchdog belongs only to the fixed 64-writer
+	// functional fixture; it is NOT a product latency/performance acceptance gate.
+	// No complete GREEN duration is claimed by this pre-codec RED.
+	it(
+		"composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+		sixtyFourWriterGoldenPath,
+		60_000
+	);
+	it(
+		"case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+		delayedDependency
+	);
+	it("cases 6-9 authenticate same-key removal and same-device and fresh-device readmission", sameKeyReentry);
+	it(
+		"case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+		manualReviewHold
+	);
+	it("case 12 scans the largest valid fence without burning another author space", () => creatorFenceScan());
+	it("case 12 ignores a stale fence at or below the authenticated terminal boundary", () =>
+		creatorFenceScan(false, true));
+	it("case 23 freezes only the equivocating author below a fence", () => creatorFenceScan(true));
+	it.each(["unpublished-fence", "delayed-replacement", "delayed-fence"] as const)(
+		"cases 4 15 16 preserve %s custody",
+		delayedPublication
+	);
+	it("case 17 closes an authenticated null-boundary member without a fence or slot zero", nullBoundaryClose);
+	it("cases 19-21 retain displaced control and sole plan completion ownership", displacedControls);
+	it("case 24a rejects a stale local head without regressing the authenticated floor", staleLocalHead);
+	it.each([
+		["fence", false],
+		["fence", true],
+		["replacement", false],
+		["replacement", true],
+	] as const)("case 25 accounts exact surviving %s publication with committed=%s", ambiguousPlanIssue);
+	it("case 25 retains custody when bounded authenticated recovery cannot read durable truth", () =>
+		ambiguousPlanIssue("fence", false, true));
+	it("case 13 prunes only beyond the fully retained authenticated rollback window", positiveAuthenticatedPruning);
+	it("case 17 retains the exact legacy v1 reentry guard source custody", () => {
+		const source = readFileSync(new URL("../packages/node/src/creator-close.ts", import.meta.url), "utf8");
+		expect(source).toContain('"D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED"');
+		expect(source.replace(/\s+/gu, " "), "F5B_C17_V1_PRIORLESS_REENTRY_GUARD_UNCHANGED").toContain(
+			"if (priorBoundary === undefined) { const observedNext = author === input.issuanceScope.author ? localNext : undefined; if ((sequences[0] ?? observedNext ?? 0) > 1) { throw new TypeError( priorIdentity === undefined ? LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED : AUTHOR_REENTRY_PROOF_REQUIRED ); }"
+		);
+	});
 
 	it("keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged", async () => {
 		const fixture = await openRoom(1, true);

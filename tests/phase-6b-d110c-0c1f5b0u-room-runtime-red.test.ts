@@ -33,6 +33,7 @@ const observation = vi.hoisted(() => ({
 	onFault: undefined as undefined | (() => void),
 	closeFault: false,
 	onAdmissionError: undefined as undefined | ((error: unknown) => void),
+	applicationFailure: undefined as undefined | TypeError,
 	onPlan: undefined as undefined | ((plan: SettlementPlan, write: boolean) => void),
 	planWrites: [] as SettlementPlan[],
 	captureClose: false,
@@ -350,6 +351,7 @@ async function openRebasePair(
 		}),
 		onAcceptedVertex: () => {
 			observation.accepted += 1;
+			if (observation.applicationFailure !== undefined) throw observation.applicationFailure;
 		},
 		onMigrationTarget: () => {
 			observation.migrations += 1;
@@ -433,6 +435,7 @@ beforeEach(() => {
 	observation.onFault = undefined;
 	observation.closeFault = false;
 	observation.onAdmissionError = undefined;
+	observation.applicationFailure = undefined;
 	observation.onPlan = undefined;
 	observation.planWrites = [];
 	observation.captureClose = false;
@@ -515,6 +518,65 @@ function expectPromptRefusal(result: ReturnType<typeof observeResult>, token: st
 }
 
 describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
+	it("parent f5b P2 non-hold same-message application failure retains generic activation mapping", async () => {
+		const admissionErrors: unknown[] = [];
+		observation.onAdmissionError = (error) => admissionErrors.push(error);
+		const fixture = await openRebasePair(1, 100, false, true, { singleGeneration: true });
+		const receipt = await fixture.target.rehearseMigration(fixture.rehearsal);
+		const collision = new TypeError(manualReviewMessage);
+		observation.applicationFailure = collision;
+		const error = await fixture.target
+			.activateMigration({
+				targetCreatorInvite: fixture.rehearsal.targetCreatorInvite,
+				exactCanonicalRecordBytes: receipt.exactCanonicalRecordBytes,
+				recordVertexDigest: receipt.recordVertexDigest,
+			})
+			.then(
+				() => undefined,
+				(reason: unknown) => reason
+			);
+		expect(admissionErrors, "F5B_P2_REAL_NON_HOLD_APPLICATION_CALLBACK_COLLISION").toContain(collision);
+		expect(
+			observation.planWrites.flatMap((plan) => plan.entries).filter((entry) => entry.disposition === "manual-review"),
+			"F5B_P2_NO_DURABLE_HOLD_CAUSED_THIS_FAILURE"
+		).toHaveLength(0);
+		expect(observation.migrations).toBe(0);
+		expect(error, "F5B_P2_PRIVATE_HOLD_PROVENANCE_REQUIRED").toEqual(
+			new TypeError("v3 room migration activation failed: terminal-rejected")
+		);
+	});
+	it.each(["issue", "rehearse", "activate"] as const)(
+		"parent f5b P2 closed-session precedence is consistent for %s",
+		async (operation) => {
+			const fixture = await openHeld({ prepareActivation: true });
+			await fixture.target.close();
+			sessions.splice(sessions.indexOf(fixture.target), 1);
+			const effects = holdEffects();
+			const call =
+				operation === "issue"
+					? fixture.target.issue({ action: "message", clientOperationId: "closed", text: "forbidden" })
+					: operation === "rehearse"
+						? fixture.target.rehearseMigration(fixture.rehearsal)
+						: fixture.target.activateMigration(required(fixture.activation));
+			const result = observeResult(call);
+			await microtaskTurns();
+			expect(result.result().settled, "F5B_P2_CLOSED_REFUSAL_MUST_BE_PROMPT").toBe(true);
+			expect(holdEffects(), "F5B_P2_CLOSED_REFUSAL_HAS_NO_EFFECT").toEqual(effects);
+			const readback = await createBrowserDurableIssuanceStore({ primaryDatabaseName: fixture.name });
+			try {
+				expect(encodeCanonical(await readback.readSettlementPlan(fixture.plan.scope))).toEqual(
+					encodeCanonical(fixture.plan)
+				);
+				expect(await readback.readLineage(fixture.plan.scope)).toEqual(fixture.lineage);
+				expect(await readback.readOutboxPage({ scope: fixture.plan.scope, limit: 128 })).toEqual(fixture.outbox);
+			} finally {
+				await readback.close();
+			}
+			expect(result.result().error, `F5B_P2_CLOSED_PRECEDENCE_${operation.toUpperCase()}_REQUIRED`).toEqual(
+				new TypeError("v3 room session is closed")
+			);
+		}
+	);
 	it("refuses held issue promptly after the real durable plan write without an issuance effect", async () => {
 		const fixture = await openHeld();
 		const result = observeResult(
