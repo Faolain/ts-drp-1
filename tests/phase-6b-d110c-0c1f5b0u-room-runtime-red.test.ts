@@ -94,16 +94,25 @@ vi.mock("@ts-drp/storage-browser/issuance", async (importOriginal) => {
 
 vi.mock("@ts-drp/node/creator-close", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@ts-drp/node/creator-close")>();
-	return {
-		...actual,
-		bindCreatorLiveClose: async (...args: Parameters<typeof actual.bindCreatorLiveClose>) => {
-			if (observation.failRebind && observation.fired && observation.bound.length > 0)
-				return { ok: false as const, reason: "CREATOR_CONTINUITY_TERMINAL" };
-			const result = await actual.bindCreatorLiveClose(...args);
-			if (result.ok) observation.bound.push({ plane: args[0].plane, handle: result.handle });
-			return result;
-		},
+	const observed = async (...args: Parameters<typeof actual.bindCreatorLiveClose>) => {
+		if (observation.failRebind && observation.fired && observation.bound.length > 0)
+			return { ok: false as const, reason: "CREATOR_CONTINUITY_TERMINAL" };
+		const result = await actual.bindCreatorLiveClose(...args);
+		if (result.ok) observation.bound.push({ plane: args[0].plane, handle: result.handle });
+		return result;
 	};
+	const descriptor = Object.getOwnPropertyDescriptor(
+		actual.bindCreatorLiveClose,
+		"installV3CreatorCloseRegistrationResolver"
+	);
+	if (descriptor === undefined || typeof descriptor.value !== "function")
+		throw new TypeError("creator-close observer installer is unavailable");
+	const install = descriptor.value as (...args: unknown[]) => unknown;
+	Object.defineProperty(observed, "installV3CreatorCloseRegistrationResolver", {
+		...descriptor,
+		value: (...args: unknown[]) => Reflect.apply(install, actual.bindCreatorLiveClose, args),
+	});
+	return { ...actual, bindCreatorLiveClose: observed };
 });
 
 vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
