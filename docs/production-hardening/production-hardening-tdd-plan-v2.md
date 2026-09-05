@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (correct parent f5b's checkpoint-link oracle before resuming GREEN):
+Current work (resume parent f5b GREEN after the accepted checkpoint-link RED):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18545,9 +18545,11 @@ Current work (correct parent f5b's checkpoint-link oracle before resuming GREEN)
   settlement preparation; the bounded correction reuses the existing plan/fence
   drain and refuses ordinary issue during the existing adoption task. The next
   run passes fence accounting but exposes a stale wide-test checkpoint-link
-  digest expectation. Production remains stopped until a separate Astra-high
-  tests-only correction preserves the closed storage-reference digest contract
-  and passes the unchanged isolated causal RED matrix. The other focused
+  digest expectation. The separate Astra-high tests-only correction is accepted
+  at signed/pushed tests `f83764c5` / evidence `6640c4ab`: one isolated source-
+  built run preserves the exact 23-fail / 5-pass / 17-filtered causal matrix
+  with no anomalies. Resume the separate parent GREEN owner on the unchanged
+  eight-owner patch; do not rerun this accepted RED. The other focused
   continuations pass, but the complete 64-writer three-transition workload,
   retained/static/isolated closure and later long campaign remain unproved.
   Product state, batch, epoch and snapshot ceilings remain unchanged.
@@ -18558,8 +18560,8 @@ Blocked, and on what:
   caller and complete 64-writer/three-transition continuation, restart and cold
   reopen. The discovery prerequisite f5b0z and independent observer RED are
   closed; neither needs another execution or review. The narrow scalar
-  case-25 oracle correction is also accepted. First close the checkpoint-link
-  oracle correction below, then resume the existing parent implementation
+  case-25 and checkpoint-link oracle corrections are also accepted. Resume
+  the existing parent implementation
   without a Node-to-browser dependency or invented authority.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
@@ -100792,9 +100794,11 @@ is now accepted at signed/pushed tests `6353eb61` / evidence `ea795862` under
 the exact inherited causal matrix. Resumed GREEN now preserves two further
 27-pass / 1-fail / 17-filtered runs at
 `.logs/d110c-0c1f5b-green-729be70e/`. The first missing hot fence is corrected;
-the second exposes a stale checkpoint-link digest oracle. Production is stopped
-pending the separate tests-only correction below. The partial patch is preserved,
-not accepted; focused, static, retained, isolated and final review gates remain
+the second exposes a stale checkpoint-link digest oracle. Its separate tests-only
+correction is accepted at signed/pushed tests `f83764c5` / evidence `6640c4ab`
+under the unchanged isolated causal matrix. Resume the separate Astra-high GREEN
+owner without further production edits before the next focused run. The partial
+patch is preserved, not accepted; focused, static, retained, isolated and final review gates remain
 open.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
@@ -101452,6 +101456,32 @@ differs, stop and attribute it. Preserve all prior diagnostics, protected paths
 and stashes. No extra prose/model review or new slice is needed: the existing
 final parent Grok/Sol-high/Fable-xhigh review inspects the complete correction
 and RED-to-GREEN history after the required gates pass. No long workload runs.
+
+Checkpoint-link RED acceptance (2026-09-05): signed/pushed tests
+`f83764c5a141972f13870168eb5b9a758cd92e1c` change only the expected hash-domain
+literal; all other test bytes are unchanged. Signed/pushed evidence
+`6640c4ab485e91c7d620a1bc99e1fb1a98665219` is at
+`.logs/d110c-0c1f5b-red-checkpoint-link-f83764c5/`; its complete 71-entry
+self-excluding manifest SHA-256 is
+`606860edd135b91fbd1eb71b3ebed39caaa80860485024bff1564a7d65797a39`.
+Root verified the signed refs, complete reporter and manifest. One independently
+installed and source-built checkout at
+`/private/tmp/d110c-f5b-checkpoint-link-red-m2McIC/checkout`, pinned to the
+tests commit without the pending production patch or copied artifacts, matches
+the frozen 45-total / 28-active / 23-fail / 5-pass / 17-filtered matrix in two
+files. The exact nineteen codec failures, one room ACL item-limit failure and
+three P2 tokens remain unchanged, with no unexpected soft or top-level failure.
+`assessment.md` owns the complete outcomes, commands, source-contract proof and
+isolation limits. Target static diagnostics are zero; three baseline-identical
+external diagnostics remain debt, not a package-wide pass. The eight production
+owners, patch digest above, 27 stashes and 86,522 protected paths are preserved.
+No production change or design contradiction was needed. This pre-codec RED
+does not reach adjacency; resume the separate GREEN owner on the preserved patch
+with source/static/build custody and one focused run before any further edit.
+Any failure requires complete result capture and attribution before another
+change or run. Full focused, retained, isolated and final review acceptance
+remain open; no additional review of this bookkeeping or long workload is
+authorized by this acceptance.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
