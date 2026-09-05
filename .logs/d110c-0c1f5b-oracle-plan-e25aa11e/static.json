@@ -1,0 +1,10 @@
+{
+  "command": "NODE_OPTIONS=--max-old-space-size=12288 pnpm exec prettier --check docs/production-hardening/production-hardening-tdd-plan-v2.md",
+  "exitCode": 0,
+  "output": "Checking formatting...\nAll matched files use Prettier code style!\n",
+  "diffCheck": {
+    "command": "git diff --check -- docs/production-hardening/production-hardening-tdd-plan-v2.md",
+    "exitCode": 0
+  },
+  "scope": "Plan-only test-oracle correction; formatter allowance only, no product or runtime limit change."
+}

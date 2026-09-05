@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b durable-row corrective RED)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b state-oracle consistency correction)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,7 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Authorized now (bounded-workload RED preserved; narrow durable-row corrective RED):
+Authorized now (durable-row corrective RED accepted; same-parent test-oracle consistency batch):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18496,13 +18496,17 @@ Authorized now (bounded-workload RED preserved; narrow durable-row corrective RE
   The separate Astra-high GREEN stopped after its second diagnostic iteration
   (19 pass / 7 fail / 17 filtered) on case 25's comparison of a durable issued
   row with a transaction candidate containing non-persisted `planEffect`.
-  A separate RED owner corrects only that expectation, preserving exact row
-  bytes and independent atomic plan-effect checks, then proves the unchanged
-  causal RED matrix in an isolated checkout without the partial GREEN patch.
-  Resume the separate GREEN owner only after that tests-only correction is
-  signed, pushed and its evidence accepted. Post-codec recovery, the complete
-  64-writer continuation and the later long campaign are not yet proved.
-  Product state, batch, epoch and snapshot ceilings remain unchanged.
+  That narrow correction is accepted at tests `689c6948` / evidence `e25aa11e`:
+  the isolated source-built run exactly reproduced 23 fail / 3 pass / 17
+  filtered without the partial GREEN patch. The same-parent source audit now
+  authorizes one tests-only consistency batch for the authoritative snapshot
+  oracle, physical rollback census and two obsolete retained codec-error
+  expectations, as specified in the f5b record. It does not change production
+  ordering or substitute semantic equality for exact snapshot bytes. Resume
+  the separate GREEN owner only after that batch is signed, pushed and its
+  causal RED evidence accepted. Post-codec recovery, the complete 64-writer
+  continuation and the later long campaign remain unproved. Product state,
+  batch, epoch and snapshot ceilings remain unchanged.
 
 Blocked, and on what:
 
@@ -100726,9 +100730,9 @@ completion.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: bounded-workload causal RED preserved; the separate parent GREEN
-stopped on a case-25 test/store-contract contradiction; narrow tests-only
-durable-row corrective RED is authorized before GREEN resumes.** The
+**Status: durable-row corrective RED accepted at tests `689c6948` and evidence
+`e25aa11e`; one same-parent tests-only state-oracle/physical-census/retained-
+terminus consistency batch is authorized before the stopped GREEN resumes.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
@@ -100980,6 +100984,88 @@ GREEN review must explicitly select Fable through `claude-phel` and record
 requested and reported model identities separately. This correction does not
 relaunch the old confirmation, alter its immutable evidence, or waive the
 final Grok / Sol-high / Fable-xhigh gate.
+
+The case-25 correction is now accepted at signed/pushed tests
+`689c69487d28cfdeae62a32ae4b56db36b037c60` and evidence
+`e25aa11e36c86ab4f10593564322a59344ffe492`. The detached isolated checkout
+`/private/tmp/d110c-f5b-row-red-hWOKRB/checkout` used an independent frozen
+offline install and full package build, with no copied dist or partial GREEN
+overlay. Its sole focused run exactly matched 26 active / 23 fail / 3 pass /
+17 filtered, with no anomalies. Exact-owner static gates pass; the same three
+external `live-snapshot.ts` type diagnostics remain. Evidence at
+`.logs/d110c-0c1f5b-red-row-689c6948/` has a validated 65-entry self-excluding
+manifest SHA-256
+`b13a2dcfdb68ce7659396012dc95f822e08de04eade4a1bacabbce369e339f1f`.
+The root's separate plan-format/custody audit is
+`.logs/d110c-0c1f5b-durable-row-disposition-ac7fb4f1/`, manifest SHA-256
+`140bf18127327969d8ff379f91d7b41511607cd11c8977ca1f77ec30c2a008ac`.
+It preserves the initial default-heap formatter failure honestly and records
+the passing existing formatter-only 12-GiB invocation. Neither changes a
+product ceiling. The seven-file production diagnostic and all 27 stashes
+remain unchanged.
+
+Same-parent test-oracle consistency disposition (2026-09-05; no new product
+or review-only slice): read-only attribution of that same stopped GREEN found
+three additional expectation/contract boundaries. Correct these in one bounded
+tests-only batch before more production work, with a separate RED owner and
+final review of the complete history:
+
+1. The wide test's `productState` invokes chat's migration-export encoder of
+   the live projection, ordered by epoch/logicalTime/author/sequence/digest
+   (`examples/v3-room/src/index.ts::stage/compareAcceptedVertices` and
+   `examples/v3-chat/src/index.ts::canonicalChatStateBytes`). The authoritative
+   snapshot instead folds the application graph in minimum-hash Kahn order.
+   Node's `applicationProjectionVertices` removes settlement fences, joins
+   and causal joins **before** ordering, reconnecting dependencies and reducing
+   antichains; ACL vertices remain order participants. Comparing those two
+   different encodings directly is not a valid exact-state oracle. Preserve
+   the independent live-view message/accounting check, and derive expected
+   snapshot bytes independently from genesis state plus the actual captured
+   signed graph for each close: project controls before Kahn, retain batch
+   atomicity and signed entry order, append all message effects without
+   deduplicating, and retain ACL ordering participants. Do not read expected
+   state from the current snapshot or reuse production graph projection/fold
+   output. Independently prove frontier ancestry covers the complete raw graph;
+   keep raw close-set/history/byte-charge checks separate from application
+   ordering. Compare exact expected bytes/digest to the actual produced
+   snapshot, immediate adopted state and restart/cold reopen. Carry the verified
+   independent state across all three closes. Epoch 3 remains open: its final
+   262-message live projection retains its separate exact reopen check and is
+   not relabeled a fourth closed snapshot. Add two bounded pure oracle controls:
+   control removal before ordering differs from raw-order filtering; and
+   prior-state/batch-entry/duplicate effects are preserved exactly. These are
+   known-answer helper controls, never fabricated authority for the real room.
+2. `closed-epoch-cleanup.ts::lineagePlan` requires and retains two immediate
+   complete Superseded **physical generations**, not `min(epoch, 2)` logical
+   predecessors. First adoption already has three physical ancestors (genesis
+   trust, live preparation, pending close). Require exactly two after real
+   successful cleanup and the active generation, retaining every closure,
+   lineage, availability, outbox and authenticated-pruning check. This does not
+   authorize fewer rollback generations, early deletion or a policy change.
+3. The two retained f5b0w seal tests in the f5b0u runtime file intentionally
+   pinned the then-unrepaired `CERTIFIED_VALUE_MISMATCH` terminus. Preserve
+   those historical results. Prospectively require successful genuine seal,
+   one close-owner call and unchanged manual-review custody; do not restore a
+   production codec failure to satisfy a stale expectation. Both remain in the
+   complete retained GREEN selection, with no exclusion.
+
+Owners: the separate Astra-high RED test owner for these two existing test
+files and a test-local oracle if needed; root owns acceptance/source audit.
+Deadline: before the paused parent GREEN resumes. Freeze one isolated RED
+execution with the original 26 selected cases plus the two pure oracle
+controls: 28 active / 23 expected failures / 5 passes / 17 explicitly filtered
+(45 total in two files). The existing 23 causal failures remain unchanged;
+the new pure controls must pass. Full retained GREEN must then include both
+corrected seal controls. No change to 64 active writers, four contributing
+epochs, three genuine transitions, six displaced sources, state/workload/time
+limits, product algorithms, ABI, APIs or cryptography is authorized. A wrong
+oracle count/order, new causal failure or need for production changes during
+this test batch stops for attribution. Final formal GREEN review must verify
+this is an exact authoritative-state oracle correction, not a weakened
+golden-path claim. Readmission still requires successor-authorized custody
+without granting retroactive predecessor membership; admissionEpoch has not
+been shown insufficient. Segmented admission still needs bounded runtime
+attribution after RED acceptance. Neither defect is declared closed here.
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
