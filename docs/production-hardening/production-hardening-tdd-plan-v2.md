@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, parent f5b observer correction and cleanup boundary)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, observer RED accepted; cleanup API decision pending)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,7 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Authorized now (bounded observer RED correction; parent production GREEN paused):
+Current work (observer RED accepted; parent production GREEN paused):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18505,8 +18505,11 @@ Authorized now (bounded observer RED correction; parent production GREEN paused)
   is now preserved at signed/pushed `0a656d1b`: the genuine split and prefix
   commit succeed, the deliberate suffix fault terminates the owner, and case 3
   incorrectly reads that owner's throwing projection getter before restart.
-  A separate tests-only observer correction below is authorized; production
-  GREEN remains paused. Cleanup also needs an explicit capability-composition
+  The separate observer correction is accepted at tests `78e068a8` / evidence
+  `45b1be36`: one isolated source-built run, 28 active / 23 expected failures /
+  5 passes / 17 filtered, no anomalies. Both terminal getter throws and fresh
+  owner-bound emitted-state checks are retained. Production GREEN remains
+  paused. Cleanup needs an explicit capability-composition
   decision: Node holds authenticated successor material, while the room owns
   the backend maintenance facade. The one-off Fable-high consultation has
   completed and recommends the proposed f5b0z backend-neutral maintenance
@@ -18522,8 +18525,9 @@ Blocked, and on what:
 - **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is a proposed
   narrow API prerequisite, awaiting explicit scope authorization and its
   governing review/TDD gates. It blocks parent f5b's genuine cleanup caller
-  and therefore parent closure, not the independent tests-only observer
-  correction. The existing AHE backend capability must become discoverable by
+  and therefore parent closure. The independent tests-only observer correction
+  is accepted and needs no further RED execution. The existing AHE backend
+  capability must become discoverable by
   Node without a Node-to-browser dependency or caller-invented authority. No
   production change or new review invocation is authorized by this proposal.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
@@ -100748,9 +100752,10 @@ completion.
 
 **Status: oracle consistency RED remains accepted at signed/pushed tests
 `97c0836b` and evidence `88fef442`; resumed GREEN stopped with signed/pushed
-diagnostic `0a656d1b`. A bounded tests-only observer correction is authorized;
-production GREEN is paused on that correction and the cleanup capability
-boundary below. The seven-file production patch is unchanged diagnostic work,
+diagnostic `0a656d1b`. Its bounded observer correction is now accepted at
+tests `78e068a8` / evidence `45b1be36`; production GREEN remains paused on
+the proposed f5b0z cleanup capability boundary below. The seven-file production
+patch is unchanged diagnostic work,
 not accepted GREEN.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
@@ -101186,6 +101191,36 @@ RED matrix changes, stop and attribute it before further edits. No separate
 review-only slice or formal prose confirmation is required; final parent
 Grok / Sol-high / Fable-xhigh review covers this correction and its evidence.
 
+The observer correction is now accepted at signed/pushed tests
+`78e068a8992a6a4fa7402e24eeca50609aebff64` and evidence
+`45b1be366eac3616545da9d0ddbf42b3c2f82022`. Its sole execution used
+`/private/tmp/d110c-f5b-observer-red-zKIwWG/checkout`, with independent frozen
+offline install and full source build from the signed test commit, no partial
+GREEN overlay or copied dist. The complete reporter matches 45 total in two
+files / 28 active / 23 exact inherited failures / 5 passes / 17 filtered,
+zero violations. The 19 successor-codec failures, one genuine 64-writer room
+ACL item-limit failure and three inherited parent-owned P2 tokens are unchanged.
+All five controls pass. Evidence:
+`.logs/d110c-0c1f5b-red-observer-78e068a8/`; its 63-entry self-excluding
+manifest validates with SHA-256
+`fb5f83746c7690a6c53cdccd5edc3821687042ed2832ed6165b862407f488148`.
+
+Root inspected the correction and independently matched raw reporter outcomes
+and complete failure messages, plus eleven isolated source hashes against the
+signed tree. The callback encodes the exact branded value and closes over a
+fresh per-open cell; a late old callback cannot update the new cell. Both
+terminal getter throw assertions remain, alongside positive fresh emission,
+exact room identity, generation increment and exact restart byte comparison.
+Other fixtures keep their no-op callback and incur no encoding work. The
+segmented workload, 64-writer sibling, 25 other functions, helpers and retained
+runtime file remain unchanged. Lint/format, source build and collection pass;
+target type diagnostics are zero with the same three inherited external
+`live-snapshot.ts` diagnostics, not a repository-wide typecheck pass. The seven
+dirty production paths and 27 stashes remain unchanged. This closes only the
+tests-only observation debt: the pre-codec RED does not reach the post-prefix
+restart comparison, which remains a full GREEN obligation. No rerun, reviewer,
+campaign or new API is authorized by accepting this correction.
+
 The separate cleanup stop remains real: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
 room can resolve the existing browser maintenance facade but does not own the
@@ -101333,8 +101368,8 @@ final implementation review. No implementation is authorized here.** Owner:
 the existing `@ts-drp/storage/maintenance` contract and browser/Node backend
 registration functions; root owns the boundary decision. Deadline: before
 parent f5b's first genuine cleanup invocation and parent closure, hence before
-D.110c-c/d can consume that closure. The independent parent observer RED may
-proceed. Completed f5b0d backend gates and all stopped parent evidence remain
+D.110c-c/d can consume that closure. The independent parent observer RED is
+accepted at `78e068a8` / `45b1be36`. Completed f5b0d backend gates and all stopped parent evidence remain
 unchanged; this prerequisite does not claim any lifecycle or golden-path pass.
 
 Source audit at signed/pushed `0a656d1b` with the preserved seven-file partial
