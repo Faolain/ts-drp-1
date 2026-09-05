@@ -560,7 +560,6 @@ describe("D.110c-0c1f5b0c room settlement orchestration RED", () => {
 			{ fromIntent: 0, kind: "replacement", sourceSequence: 7, throughIntent: 2 },
 			{ fromIntent: 2, kind: "replacement", sourceSequence: 7, throughIntent: 3 },
 		]);
-		expect.soft(probe.nextSequence, "D110C_0C1F5B0T_SPLIT_CONSUMED_SEQUENCE").toBe(23);
 		expect.soft(probe.plan).toMatchObject({
 			entries: [
 				{
@@ -579,9 +578,11 @@ describe("D.110c-0c1f5b0c room settlement orchestration RED", () => {
 			],
 			fenceSequence: 20,
 		});
-		await session.close();
 		await publicIssue;
 		expect.soft(issueFailure).toBeUndefined();
+		await session.close();
+		// Fence 20, chunks 21/22 and the awaited public issue 23 are the only allocations; the rejected split allocates none.
+		expect.soft(probe.nextSequence, "D110C_0C1F5B0T_SPLIT_DID_NOT_ALLOCATE_AFTER_COMPLETION").toBe(24);
 	});
 
 	it("[f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay", async () => {
