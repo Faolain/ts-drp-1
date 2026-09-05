@@ -18476,6 +18476,16 @@ updated in the same commit that closes it. Stop rules are in the f5b0r design
 authority or anchor fencing stops and reslices rather than reintroducing the
 per-source grammar, the global floor or the retired-key dictionary.
 
+Prospective reviewer substitution (user decision, 2026-09-05): for every
+remaining unclosed slice in this lineage, Codex `gpt-5.6-sol` high replaces
+the Kimi reviewer slot. The review set is therefore Grok 4.6/high, Codex
+`gpt-5.6-sol` high and Opus xhigh. All new test-authoring and implementation
+subagents use `gpt-6-astra` high. Completed Kimi reviews and their immutable
+evidence remain historically accurate and are neither relabeled nor rerun.
+Any lower record that still names Kimi is prospectively superseded by this
+frontier policy; the change does not alter an accepted verdict, executable
+scope, causal gate or acceptance threshold.
+
 ## Appendix A — traceability against `deep-analysis-migration.md`
 
 Its §11 roadmap (15 items) and §12 blockers (10 items), each mapped to a slice. This is the coverage
