@@ -1,0 +1,14 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "examples/v3-room/src/index.ts",
+    "packages/issuance-store/src/contract.ts"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:04:07.626Z",
+  "finished": "2026-09-05T14:04:22.610Z",
+  "status": 0,
+  "signal": null
+}

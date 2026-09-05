@@ -1,0 +1,16 @@
+{
+  "executable": "git",
+  "args": [
+    "worktree",
+    "add",
+    "--detach",
+    "--no-checkout",
+    "/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+    "25ec98628eba5d348086ba18d6481544803e03c9"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:08:54.410Z",
+  "finished": "2026-09-05T14:08:54.488Z",
+  "status": 0,
+  "signal": null
+}

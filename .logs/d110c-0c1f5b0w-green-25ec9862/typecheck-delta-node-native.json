@@ -1,0 +1,1118 @@
+{
+  "baseline": [
+    {
+      "file": null,
+      "code": 6379,
+      "message": "Composite projects may not disable incremental compilation."
+    },
+    {
+      "file": "packages/node/src/creator-adoption-activate.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-adoption.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n    Imported via \"../../../packages/node/src/creator-adoption.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../../../packages/node/src/creator-adoption.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-adoption-commit.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-adoption-stage.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-adoption.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-close.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts'\n    Imported via \"./creator-close.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"./creator-close.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts'\n    Imported via \"../../../packages/node/src/creator-close.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-adoption.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-adoption-recover.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-adoption-intent.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/creator-adoption-intent.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts'\n    Imported via \"./internal/creator-adoption-intent.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts'\n    Imported via \"./internal/creator-adoption-intent.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n    Imported via \"./internal/creator-adoption-intent.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-issuance-retirement-boundary.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-transition-advance.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/creator-transition-advance.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts'\n    Imported via \"./internal/creator-transition-advance.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"./internal/creator-transition-advance.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts'\n    Imported via \"./internal/creator-transition-advance.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/runtime-reclamation.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/runtime-reclamation.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts'\n    Imported via \"./internal/runtime-reclamation.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./v3-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts'\n    Imported via \"./v3-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n    Imported via \"../../../packages/node/src/v3-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../../../packages/node/src/v3-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a1b-p3/live-fixture.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/internal/creator-adoption-intent.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-successor-live.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-adoption-intent.ts'\n    Imported via \"./internal/creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"./internal/creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts'\n    Imported via \"./internal/creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n    Imported via \"./internal/creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/internal/creator-successor-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-room-head.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-room-head.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-successor-live.ts'\n    Imported via \"./internal/creator-room-head.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/v3-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/registry/registry-v1.json' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"@ts-drp/protocol-v3/registry/registry-v1.json\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"../registry/registry-v1.json\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts'"
+    },
+    {
+      "file": "packages/node/src/v3-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/v3-topic.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/v3-topic.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"./internal/v3-topic.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/v3-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-envelope-scope.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/v3-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live-recovered-authority.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/protocol-v3/src/index.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/internal/seal-authority-custody.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/protocol-v3/src/index.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/supplements/blueprint-artifact-profile-v1/profile.json' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern."
+    },
+    {
+      "file": "packages/storage-browser/src/internal/seal-evidence-store.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/schema-idb.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./schema-idb.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/seal-evidence-store.ts'\n    Imported via \"./schema-idb.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/seal-vote-store.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-browser/src/seal-evidence.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/seal-evidence-store.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/seal-evidence-store.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/seal-evidence.ts'\n    Imported via \"./internal/seal-evidence-store.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/seal-evidence.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-browser/src/seal-vote.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/seal-vote-store.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts'\n    Imported via \"../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'\n    Imported via \"./creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n    Imported via \"./creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts'\n    Imported via \"./creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'\n    Imported via \"./creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'\n    Imported via \"./creator-successor-activation-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'\n    Imported via \"../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts'\n    Imported via \"./creator-successor-activation-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b/ahe-reclamation-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6b-differential-exit-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b/differential-exit-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6b-differential-exit-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b/issuance-retention-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../tests/fixtures/phase-6b/issuance-retention-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-differential-exit-red.test.ts'\n    Imported via \"../../../tests/fixtures/phase-6b/issuance-retention-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a0-v3/anchor-trust-contract.json' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern."
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/control-plane' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/blueprint-catalog/src/index.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/blueprint-catalog/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/track-p2-b/forward-counter-package.json' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts",
+      "code": 7031,
+      "message": "Binding element 'value' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/blueprint-catalog' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/compaction' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/control-plane' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/issuance-store' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/issuance-store/maintenance' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/keychain/finality' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/live-journal' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/message-queue' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage/snapshot-transfer' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/types' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../packages/node/src/creator-adoption-commit.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../../../packages/node/src/creator-adoption-commit.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../packages/protocol-v3/src/index.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../index.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/internal/seal-authority-custody.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/seal-evidence.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/seal-vote.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/snapshot-transfer.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../phase-3a0-v3/controlled-anchor-trust.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../phase-3a0-v3/controlled-anchor-trust.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a1b-p3/live-fixture.ts'\n    Imported via \"../phase-3a0-v3/controlled-anchor-trust.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a1b-p3/live-fixture.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'digest' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'ref' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'index' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'declaration' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'receipt' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'signal' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'bytes' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'sequence' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-successor-oracle.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n    Imported via \"./creator-successor-oracle.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/shared/workspace-package-subprocess.mjs' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../shared/workspace-package-subprocess.mjs\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n    Imported via \"../shared/workspace-package-subprocess.mjs\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/types' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts",
+      "code": 18046,
+      "message": "'byte' is of type 'unknown'."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-oracle.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/ahe-reclamation-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/differential-exit-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/issuance-retention-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/issuance-retention-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/issuance-store' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/issuance-retention-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type."
+    }
+  ],
+  "current": [
+    {
+      "file": null,
+      "code": 6379,
+      "message": "Composite projects may not disable incremental compilation."
+    },
+    {
+      "file": "packages/node/src/creator-adoption-activate.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-adoption.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n    Imported via \"../../../packages/node/src/creator-adoption.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../../../packages/node/src/creator-adoption.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-adoption-commit.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-adoption-stage.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-adoption.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-close.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts'\n    Imported via \"./creator-close.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"./creator-close.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts'\n    Imported via \"../../../packages/node/src/creator-close.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-adoption.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-adoption-recover.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-adoption-intent.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/creator-adoption-intent.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts'\n    Imported via \"./internal/creator-adoption-intent.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts'\n    Imported via \"./internal/creator-adoption-intent.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n    Imported via \"./internal/creator-adoption-intent.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-issuance-retirement-boundary.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-transition-advance.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/creator-transition-advance.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts'\n    Imported via \"./internal/creator-transition-advance.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"./internal/creator-transition-advance.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts'\n    Imported via \"./internal/creator-transition-advance.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/runtime-reclamation.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/runtime-reclamation.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts'\n    Imported via \"./internal/runtime-reclamation.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/creator-close.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./v3-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-close.ts'\n    Imported via \"./v3-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n    Imported via \"../../../packages/node/src/v3-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../../../packages/node/src/v3-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a1b-p3/live-fixture.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/internal/creator-adoption-intent.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-successor-live.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-adoption-intent.ts'\n    Imported via \"./internal/creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"./internal/creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts'\n    Imported via \"./internal/creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n    Imported via \"./internal/creator-successor-live.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/internal/creator-successor-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-room-head.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-room-head.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-successor-live.ts'\n    Imported via \"./internal/creator-room-head.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/v3-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/registry/registry-v1.json' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"@ts-drp/protocol-v3/registry/registry-v1.json\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"../registry/registry-v1.json\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts'"
+    },
+    {
+      "file": "packages/node/src/v3-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/v3-topic.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/v3-topic.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts'\n    Imported via \"./internal/v3-topic.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/v3-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-envelope-scope.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/node/src/v3-live.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live-recovered-authority.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/protocol-v3/src/index.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/internal/seal-authority-custody.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/protocol-v3/src/index.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/supplements/blueprint-artifact-profile-v1/profile.json' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern."
+    },
+    {
+      "file": "packages/storage-browser/src/internal/seal-evidence-store.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/schema-idb.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./schema-idb.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/seal-evidence-store.ts'\n    Imported via \"./schema-idb.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/seal-vote-store.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-browser/src/seal-evidence.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/seal-evidence-store.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./internal/seal-evidence-store.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/seal-evidence.ts'\n    Imported via \"./internal/seal-evidence-store.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/seal-evidence.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-browser/src/seal-vote.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/seal-vote-store.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts'\n    Imported via \"../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'\n    Imported via \"./creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n    Imported via \"./creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts'\n    Imported via \"./creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'\n    Imported via \"./creator-adoption-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'\n    Imported via \"./creator-successor-activation-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'\n    Imported via \"../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts'\n    Imported via \"./creator-successor-activation-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b/ahe-reclamation-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6b-differential-exit-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b/differential-exit-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6b-differential-exit-red.test.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b/issuance-retention-contract.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../tests/fixtures/phase-6b/issuance-retention-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-differential-exit-red.test.ts'\n    Imported via \"../../../tests/fixtures/phase-6b/issuance-retention-contract.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a0-v3/anchor-trust-contract.json' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern."
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/control-plane' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/blueprint-catalog/src/index.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/blueprint-catalog/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/track-p2-b/forward-counter-package.json' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts",
+      "code": 7031,
+      "message": "Binding element 'value' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/blueprint-catalog' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/compaction' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/control-plane' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/issuance-store' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/issuance-store/maintenance' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/keychain/finality' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/live-journal' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/message-queue' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage/snapshot-transfer' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/types' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-activate.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption-commit.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../packages/node/src/creator-adoption-commit.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../../../packages/node/src/creator-adoption-commit.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../../../packages/protocol-v3/src/index.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../index.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/internal/seal-authority-custody.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/seal-evidence.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/seal-vote.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/snapshot-transfer.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../phase-3a0-v3/controlled-anchor-trust.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'\n    Imported via \"../phase-3a0-v3/controlled-anchor-trust.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a1b-p3/live-fixture.ts'\n    Imported via \"../phase-3a0-v3/controlled-anchor-trust.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3a1b-p3/live-fixture.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'digest' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'ref' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'index' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'declaration' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'receipt' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'signal' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'bytes' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'sequence' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"./creator-successor-oracle.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n    Imported via \"./creator-successor-oracle.js\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/package.json' has field \"type\" with value \"module\""
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "code": 6307,
+      "message": "File '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/shared/workspace-package-subprocess.mjs' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.\n  The file is in the program because:\n    Imported via \"../shared/workspace-package-subprocess.mjs\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'\n    Imported via \"../shared/workspace-package-subprocess.mjs\" from file '/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/types' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts",
+      "code": 18046,
+      "message": "'byte' is of type 'unknown'."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-oracle.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/ahe-reclamation-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/differential-exit-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/storage' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/issuance-retention-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/canonical' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/issuance-retention-contract.ts",
+      "code": 2307,
+      "message": "Cannot find module '@ts-drp/issuance-store' or its corresponding type declarations."
+    },
+    {
+      "file": "tests/fixtures/phase-6b/issuance-retention-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type."
+    }
+  ],
+  "added": [],
+  "pass": true
+}

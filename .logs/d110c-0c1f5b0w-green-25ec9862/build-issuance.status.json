@@ -1,0 +1,13 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "--filter",
+    "@ts-drp/issuance-store",
+    "build"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:02:40.347Z",
+  "finished": "2026-09-05T14:02:41.845Z",
+  "status": 0,
+  "signal": null
+}
