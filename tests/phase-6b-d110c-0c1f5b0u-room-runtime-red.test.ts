@@ -18,6 +18,7 @@ import {
 	type V3RoomSession,
 } from "../examples/v3-room/src/index.js";
 import { createRecoverableFinalitySigner } from "../packages/keychain/src/finality.js";
+import { createBrowserDurableIssuanceStore } from "../packages/storage-browser/src/issuance.js";
 
 const observation = vi.hoisted(() => ({
 	activate: [] as V3PlaneHandle[],
@@ -552,6 +553,9 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 	it("same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link", async () => {
 		const fixture = await openHeld();
 		await holdCustody(fixture);
+		const projection = structuredClone(fixture.target.projection());
+		const canonicalStateBytes = required(fixture.input.application.migration).canonicalStateBytes;
+		const canonicalProjection = canonicalStateBytes(fixture.target.projection());
 		await fixture.target.close();
 		sessions.splice(sessions.indexOf(fixture.target), 1);
 		const reread = observeHold(false);
@@ -559,11 +563,19 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 		sessions.push(reopened);
 		const reopenedHold = await reread;
 		expect(encodeCanonical(reopenedHold.plan)).toEqual(encodeCanonical(fixture.plan));
-		// A reopen has its own startup transaction probe, but cannot create an
-		// effect between the original durable hold and the re-read boundary.
-		expect({ ...reopenedHold.effects, issueTransactions: fixture.effects.issueTransactions }).toEqual(fixture.effects);
+		// Restart may replay the authenticated accepted notification (f5b0v),
+		// not canonical application, issuance, publication or durable plan effects.
+		expect({
+			...reopenedHold.effects,
+			accepted: fixture.effects.accepted,
+			issueTransactions: fixture.effects.issueTransactions,
+		}).toEqual(fixture.effects);
+		expect(reopened.projection()).toEqual(projection);
+		expect(canonicalStateBytes(reopened.projection())).toEqual(canonicalProjection);
 		await microtaskTurns();
 		await holdCustody({ ...fixture, effects: reopenedHold.effects, target: reopened });
+		expect(reopened.projection()).toEqual(projection);
+		expect(canonicalStateBytes(reopened.projection())).toEqual(canonicalProjection);
 		expect(observation.closeCalls).toBe(0);
 		await reopened.close();
 	});
@@ -585,6 +597,8 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 	);
 	it("changed retained held policy remains terminal source-diff refusal rather than redisposition", async () => {
 		const fixture = await openHeld();
+		await holdCustody(fixture);
+		const commits = [...observation.commits];
 		await fixture.target.close();
 		sessions.splice(sessions.indexOf(fixture.target), 1);
 		const reopened = await createV3RoomSession({
@@ -599,9 +613,18 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 			reopened.issue({ action: "message", clientOperationId: "changed", text: "forbidden" })
 		).rejects.toThrow(new TypeError("v3 room settlement plan source differs"));
 		expect(() => reopened.projection()).toThrow("v3 room settlement plan source differs");
-		const store = required(observation.stores.get(fixture.name));
-		expect(encodeCanonical(await store.readSettlementPlan(fixture.plan.scope))).toEqual(encodeCanonical(fixture.plan));
-		expect(observation.commits).toEqual([]);
+		// Terminal failure closed the session's store. A fresh public capability
+		// reads the same database only; it neither mutates nor revives the session.
+		const readback = await createBrowserDurableIssuanceStore({ primaryDatabaseName: fixture.name });
+		try {
+			expect(encodeCanonical(await readback.readSettlementPlan(fixture.plan.scope))).toEqual(
+				encodeCanonical(fixture.plan)
+			);
+		} finally {
+			await readback.close();
+		}
+		expect(observation.commits).toEqual(commits);
+		expect({ ...holdEffects(), accepted: fixture.effects.accepted }).toEqual(fixture.effects);
 		expect(observation.planWrites).toEqual([fixture.plan]);
 	});
 	it("single-generation internal redirect pins target hold refusal and orderly source cleanup", async () => {
