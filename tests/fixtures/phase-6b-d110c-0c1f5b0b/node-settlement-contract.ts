@@ -111,13 +111,16 @@ export async function writeSettlementPlan(store: DurableIssuanceStore, plan: Set
 /**
  * Opens an authenticated live Node plane using the selected trust profile.
  * @param profileId - Settlement or compatibility trust profile.
+ * @param applicationBatch - Whether the genuine catalog admits Node application batches.
  * @returns Authenticated live plane and durable owners.
  */
 export async function openSettlementNode(
-	profileId: "creator-trusted-settlement-v1" | "creator-trusted-v1" = "creator-trusted-settlement-v1"
+	profileId: "creator-trusted-settlement-v1" | "creator-trusted-v1" = "creator-trusted-settlement-v1",
+	applicationBatch = false
 ): Promise<OpenSettlementNode> {
 	const initialState = encodeCanonical(0);
 	const fixture = await createGenuinePreparedV3Fixture({
+		applicationBatch,
 		authorizationMode: "latched-acl",
 		creatorTrustProfileId: profileId,
 		exactCanonicalInitialStateBytes: initialState,

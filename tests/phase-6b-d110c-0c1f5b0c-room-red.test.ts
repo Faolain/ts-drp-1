@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
 
 const probe = vi.hoisted(() => ({
+	afterEffect: undefined as undefined | ((sequence: number) => void),
 	acceptedActions: [] as string[],
 	completedSources: [] as unknown[],
 	events: [] as string[],
@@ -273,6 +274,8 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 						applyPlanEffect(effectivePlanEffect, sequence);
 					}
 					if (selectedOutcome !== undefined) {
+						probe.afterEffect?.(sequence);
+						probe.afterEffect = undefined;
 						const { applyEffect: _applyEffect, ...outcome } = selectedOutcome;
 						return Object.freeze(outcome);
 					}
@@ -500,6 +503,7 @@ async function settleRoomWork(): Promise<void> {
 }
 
 beforeEach(() => {
+	probe.afterEffect = undefined;
 	probe.acceptedActions = [];
 	probe.completedSources = [];
 	probe.events = [];
@@ -517,6 +521,146 @@ beforeEach(() => {
 	probe.settlementPlanReads = 0;
 	probe.settlementPlanWrites = [];
 	probe.splitPrefixLength = null;
+});
+
+describe("D.110c-0c1f5b0u room reconciliation boundaries", () => {
+	it("treats a compatible pre-sign race as durable truth without reusing the unclassified handle", async () => {
+		probe.plan = plan([entry(7, "rebase")], 20, 2) as unknown as Readonly<Record<string, unknown>>;
+		probe.rebasePages = [
+			displaced(7, "07".repeat(32), [intent("message", "pre-sign-race", 7)]),
+			{ kind: "empty", ok: true },
+		];
+		probe.issueOutcomes = [{ applyEffect: true, kind: "issuance-rejected", ok: false }];
+		const session = await openRoom();
+		try {
+			await session.issue({ action: "message", clientOperationId: "after-race" });
+			expect(probe.nextCapabilityId, "D110C_0C1F5B0U_COMPATIBLE_PLAN_REUSED_UNCLASSIFIED_HANDLE").toBe(2);
+		} finally {
+			await session.close();
+		}
+	});
+	it.each(["message", "transform-me"])("rejects stale %s progress before the missing fence", async (action) => {
+		probe.plan = plan(
+			[
+				{
+					...entry(7, action === "message" ? "rebase" : "transform"),
+					replacementProgress: {
+						chunks: [],
+						intentCount: 1,
+						intentDigest: new Uint8Array(32).fill(255),
+						version: 1,
+					},
+				},
+			],
+			null,
+			2
+		) as unknown as Readonly<Record<string, unknown>>;
+		probe.rebasePages = [displaced(7, "07".repeat(32), [intent(action, "stale", 7)]), { kind: "empty", ok: true }];
+		const before = structuredClone(probe.plan);
+		const session = await openRoom();
+		try {
+			await expect(session.issue({ action: "message", clientOperationId: "must-not-issue" })).rejects.toThrow(
+				"intent digest changed"
+			);
+			expect.soft(probe.issueInputs, "D110C_0C1F5B0U_STALE_INTENT_SIGNED_FENCE").toEqual([]);
+			expect.soft(probe.nextSequence).toBe(20);
+			expect.soft(probe.plan).toEqual(before);
+		} finally {
+			await session.close();
+		}
+	});
+	it("does not interpret an absent legacy entry as a durable replacement link", async () => {
+		probe.plan = plan([entry(7, "rebase")], 20, 2) as unknown as Readonly<Record<string, unknown>>;
+		probe.rebasePages = [
+			displaced(7, "07".repeat(32), [intent("message", "absent-link", 7)]),
+			{ kind: "empty", ok: true },
+		];
+		probe.issueOutcomes = [{ applyEffect: false, kind: "issuance-rejected", ok: false }];
+		probe.afterEffect = () => {
+			probe.plan = plan([], 20, 2) as unknown as Readonly<Record<string, unknown>>;
+		};
+		const session = await openRoom();
+		try {
+			await expect(
+				session.issue({ action: "message", clientOperationId: "must-not-issue" }),
+				"D110C_0C1F5B0U_ABSENT_LEGACY_LINK_ACCEPTED"
+			).rejects.toThrow();
+			expect(selectedActions()).toEqual(["message"]);
+		} finally {
+			await session.close();
+		}
+	});
+	it.each([
+		"wrong-sequence",
+		"unchanged-revision",
+		"surplus-revision",
+		"skipped-range",
+		"duplicate-range",
+		"incompatible-prefix",
+		"wrong-final-scalar",
+	])("refuses %s ambiguous progress readback", async (mutation) => {
+		const intents = [
+			intent("message", "range-0", 7),
+			intent("message", "range-1", 9),
+			intent("message", "range-2", 11),
+		];
+		probe.plan = plan(
+			[
+				{
+					...entry(7, "rebase"),
+					replacementProgress: {
+						chunks: [],
+						intentCount: 3,
+						intentDigest: hashDomain(
+							"ts-drp/settlement-replacement-intents/v1",
+							encodeCanonical(intents.map((row) => row.operation))
+						),
+						version: 1,
+					},
+				},
+			],
+			20,
+			2
+		) as unknown as Readonly<Record<string, unknown>>;
+		probe.nextSequence = 21;
+		probe.splitPrefixLength = 2;
+		probe.rebasePages = [displaced(7, "07".repeat(32), intents), { kind: "empty", ok: true }];
+		probe.issueOutcomes = [{ applyEffect: true, kind: "issuance-rejected", ok: false }];
+		probe.afterEffect = (sequence) => {
+			const current = structuredClone(probe.plan) as {
+				revision: number;
+				entries: {
+					replacementSequence: number | null;
+					replacementProgress: {
+						chunks: { replacementSequence: number; throughIntent: number; lastLogicalTime: number }[];
+						intentDigest: Uint8Array;
+					};
+				}[];
+			};
+			const selected = current.entries[0];
+			const chunk = selected?.replacementProgress.chunks[0];
+			if (selected === undefined || chunk === undefined) throw new TypeError("readback fixture chunk is absent");
+			if (mutation === "wrong-sequence") chunk.replacementSequence = sequence + 1;
+			if (mutation === "unchanged-revision") current.revision = 2;
+			if (mutation === "surplus-revision") current.revision = 4;
+			if (mutation === "skipped-range") chunk.throughIntent = 3;
+			if (mutation === "duplicate-range") selected.replacementProgress.chunks.push({ ...chunk });
+			if (mutation === "incompatible-prefix")
+				selected.replacementProgress.chunks.unshift({ lastLogicalTime: 1, replacementSequence: 1, throughIntent: 1 });
+			if (mutation === "wrong-final-scalar") selected.replacementSequence = sequence;
+			probe.plan = current as unknown as Readonly<Record<string, unknown>>;
+		};
+		const session = await openRoom();
+		try {
+			await expect(
+				session.issue({ action: "message", clientOperationId: "must-not-issue" }),
+				`D110C_0C1F5B0U_INEXACT_READBACK_${mutation}`
+			).rejects.toThrow();
+			expect(probe.issueInputs.some((input) => JSON.stringify(input).includes("must-not-issue"))).toBe(false);
+		} finally {
+			await session.close();
+		}
+	});
 });
 
 describe("D.110c-0c1f5b0c room settlement orchestration RED", () => {

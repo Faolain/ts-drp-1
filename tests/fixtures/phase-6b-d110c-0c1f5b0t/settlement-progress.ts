@@ -85,16 +85,18 @@ export function commit(
 		operationCount === 1
 			? Object.freeze({ action: "add", value: 1 })
 			: Object.freeze({
-					action: "$drp.application-batch.v1",
-					entries: Object.freeze(
-						Array.from({ length: operationCount }, (_, index) =>
-							Object.freeze({
-								logicalTime: logicalTime - operationCount + index + 1,
-								operation: { action: "add", value: index },
-							})
-						)
-					),
-					version: 1,
+					action: "applicationBatch",
+					batch: Object.freeze({
+						entries: Object.freeze(
+							Array.from({ length: operationCount }, (_, index) =>
+								Object.freeze({
+									logicalTime: logicalTime - operationCount + index + 1,
+									operation: { action: "add", value: index },
+								})
+							)
+						),
+						version: 1,
+					}),
 				});
 	const canonicalPreimageBytes = encodeCanonical({
 		author: PROGRESS_SCOPE.author,
