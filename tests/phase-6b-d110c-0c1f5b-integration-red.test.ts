@@ -433,9 +433,11 @@ async function openRoom(writerCount: number, legacy = false) {
 		}
 		const declaration = await producedDeclaration(peer.databaseName, closedEpoch);
 		const { creatorFinalitySigner, ...reopenInput } = peer.input;
-		void creatorFinalitySigner;
 		peer.room = await createV3RoomSession({
 			...reopenInput,
+			// Legacy keeps its existing restriction. Settlement creator restart must
+			// authenticate this existing input pair and rebind close authority.
+			...(!legacy && creatorFinalitySigner !== undefined ? { creatorFinalitySigner } : {}),
 			application,
 			roomHeadAuthority: { ...peer.floor.authority, initialization: { kind: "reopen" } },
 			successorSnapshotDeclaration: declaration,
