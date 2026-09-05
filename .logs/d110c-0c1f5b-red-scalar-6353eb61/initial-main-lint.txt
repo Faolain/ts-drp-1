@@ -1,0 +1,8 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts
+  1183:49  error  Replace `⏎↹↹↹↹↹?·{·...row,·replacementSequence:·candidate.authorSequence·}⏎↹↹↹↹↹` with `·?·{·...row,·replacementSequence:·candidate.authorSequence·}·`  prettier/prettier
+  1189:85  error  Replace `committed·?·committedPlan·:·priorPlan` with `⏎↹↹committed·?·committedPlan·:·priorPlan⏎↹`                                                       prettier/prettier
+
+✖ 2 problems (2 errors, 0 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+
