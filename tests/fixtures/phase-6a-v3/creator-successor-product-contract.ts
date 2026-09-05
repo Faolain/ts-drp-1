@@ -422,15 +422,22 @@ export function d108d2HasClosedProductReturns(source: string): boolean {
 		if (ts.isArrayLiteralExpression(value))
 			return value.elements.some((item) => inspect(ts.isSpreadElement(item) ? item.expression : item));
 		if (ts.isConditionalExpression(value)) return inspect(value.whenTrue) || inspect(value.whenFalse);
-		// Comparisons return primitives. Only value-selecting operators expose operands.
-		if (ts.isBinaryExpression(value))
+		// Assignment and comma return their right operand; logical assignments may return either.
+		if (ts.isBinaryExpression(value)) {
+			if ([ts.SyntaxKind.EqualsToken, ts.SyntaxKind.CommaToken].includes(value.operatorToken.kind))
+				return inspect(value.right);
 			return [
 				ts.SyntaxKind.AmpersandAmpersandToken,
 				ts.SyntaxKind.BarBarToken,
 				ts.SyntaxKind.QuestionQuestionToken,
+				ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+				ts.SyntaxKind.BarBarEqualsToken,
+				ts.SyntaxKind.QuestionQuestionEqualsToken,
 			].includes(value.operatorToken.kind)
 				? inspect(value.left) || inspect(value.right)
-				: false;
+				: // All remaining binary operators compute a primitive, rather than return an operand.
+					false;
+		}
 		if (ts.isPropertyAccessExpression(value)) return sensitive.has(value.name.text);
 		if (ts.isElementAccessExpression(value))
 			return ts.isStringLiteral(value.argumentExpression) && sensitive.has(value.argumentExpression.text);

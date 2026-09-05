@@ -59,6 +59,26 @@ describe("D.108d2 public return AST oracle", () => {
 			}
 		}
 	});
+	it("tracks the returned operands of assignment, comma and logical assignment expressions", () => {
+		for (const expression of [
+			"safe = capability",
+			"(safe, capability)",
+			"safe &&= capability",
+			"safe ||= capability",
+			"safe ??= capability",
+			"capability &&= safe",
+			"capability ||= safe",
+			"capability ??= safe",
+			"safe = (other, { capability })",
+		])
+			expect
+				.soft(d108d2HasClosedProductReturns(`export function room() { return (${expression}); }`), expression)
+				.toBe(false);
+		for (const expression of ["capability = true", "(capability, true)", "safe += capability", "capability === safe"])
+			expect
+				.soft(d108d2HasClosedProductReturns(`export function room() { return (${expression}); }`), expression)
+				.toBe(true);
+	});
 	it("follows local returned aliases, helpers, methods, export aliases and global product surfaces", () => {
 		for (const source of [
 			"const result = { capability }; export function room() { return result; }",
