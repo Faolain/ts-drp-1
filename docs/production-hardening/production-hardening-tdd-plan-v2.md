@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0z authorized for reviewed RED/GREEN)
+### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0z plan gate accepted; tests-only RED next)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18463,7 +18463,7 @@ Closed through the 2026-09-05 checkpoint:
   before parent closure; prospective isolated evidence must record its patch-
   application boundary explicitly.
 
-Current work (f5b0z plan review, then separate RED/GREEN; parent GREEN paused):
+Current work (f5b0z tests-only RED, then separate GREEN; parent GREEN paused):
 
 - **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is expressly
   authorized by the user on 2026-09-05, with review and separate RED/GREEN.
@@ -18475,8 +18475,9 @@ Current work (f5b0z plan review, then separate RED/GREEN; parent GREEN paused):
   First review: Grok and Fable PASS; Sol found one P1 in the focused command's
   inherited package-wide coverage. The single-batch correction and all P2
   dispositions are `.logs/d110c-0c1f5b0z-plan-correction-7eb2a8df/amendment.md`.
-  Targeted Sol confirmation of that command remains before RED; no new Grok
-  or Fable round is required for P2/prose.
+  Targeted Sol confirmation PASS closes that command finding with zero P0/P1.
+  Plan gate accepted: separate Astra-high tests-only RED is authorized now.
+  No new Grok or Fable round is required for P2/prose.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -101373,11 +101374,12 @@ and has SHA-256
 
 ###### D.110c-0c1f5b0z backend-neutral AHE maintenance discovery prerequisite
 
-**Status: expressly authorized by the user on 2026-09-05 for review and
-separate RED/GREEN; exact plan frozen at
-`.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md`. Governing plan review precedes
-tests-only RED; production edits require signed RED, and final implementation
-review remains mandatory.** Owner:
+**Status: plan gate accepted with empty P0/P1 union after one targeted Sol
+confirmation; separate Astra-high tests-only RED authorized.** The user
+authorized review and separate RED/GREEN on 2026-09-05. The exact plan is the
+original `.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md` plus the signed
+`6ac0b5be` command amendment below. Production edits require accepted signed
+RED, and final implementation review remains mandatory. Owner:
 the existing `@ts-drp/storage/maintenance` contract and browser/Node backend
 registration functions; root owns the boundary decision. Deadline: before
 parent f5b's first genuine cleanup invocation and parent closure, hence before
@@ -101406,6 +101408,14 @@ facade after discovery, exact mutation-body custody, versioned registry shape,
 and concrete no-I/O spies. One targeted Sol confirmation covers the P1 command
 correction; Grok/Fable results remain scoped to their reviewed original plan.
 No recursive review of these dispositions or completed f5b work is authorized.
+
+The targeted Sol confirmation of signed/pushed `6ac0b5be` now returns PASS,
+0 P0 / 0 P1 / 0 P2, `original_p1_closed: true`, `ready_for_red: true`.
+Evidence is `.logs/d110c-0c1f5b0z-plan-confirmation-6ac0b5be/`; the exact
+session remained `01a072f7-6534-7f62-9fcf-2a6c64ee674e`. Root independently
+checked the explicit focused/retained coverage flags, unchanged root coverage
+configuration and three-owner scope. This closes the plan gate only; no RED
+execution, GREEN behavior or parent lifecycle claim follows from review.
 
 Source audit at signed/pushed `0a656d1b` with the preserved seven-file partial
 patch: ordinary `AheDurableStore` has no reclamation method; browser and Node
