@@ -1,0 +1,1989 @@
+commit ea02487e9c80d25ab6e7038cdf35330b72f29de6
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Sat Sep 5 02:45:54 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Sat Sep 5 02:45:54 2026 -0400
+
+    fix(room): recover segmented settlement through fresh authenticated owners
+
+diff --git a/examples/v3-room/package.json b/examples/v3-room/package.json
+index 2c6e6e1c..3c7349c1 100644
+--- a/examples/v3-room/package.json
++++ b/examples/v3-room/package.json
+@@ -19,6 +19,7 @@
+ 		"@ts-drp/compaction": "workspace:*",
+ 		"@ts-drp/control-plane": "workspace:*",
+ 		"@ts-drp/ephemeral": "workspace:*",
++		"@ts-drp/issuance-store": "workspace:*",
+ 		"@ts-drp/message-queue": "workspace:*",
+ 		"@ts-drp/node": "workspace:*",
+ 		"@ts-drp/protocol-v3": "workspace:*",
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index 939665a0..8678f740 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -2,6 +2,7 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
+ import { CompactMerkleAccumulator } from "@ts-drp/compaction";
+ import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
+ import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
++import { SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS } from "@ts-drp/issuance-store";
+ import { MessageQueueManager } from "@ts-drp/message-queue";
+ import { verifyCreatorSuccessorAdoption } from "@ts-drp/node/creator-adoption";
+ import {
+@@ -1907,13 +1908,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			});
+ 		}
+ 	};
++	const isSettlementFence = (vertex: V3RoomAcceptedVertex): boolean =>
++		settlementProfile === "v1" && Reflect.get(vertex.operation, "action") === "$drp.author-fence.v1";
+ 	const commit = async (vertices: readonly V3RoomAcceptedVertex[]): Promise<boolean> => {
+ 		for (const vertex of vertices) {
+ 			const expanded = expand(vertex);
+ 			const latestChild = expanded?.at(-1)?.logicalTime ?? vertex.logicalTime;
+ 			logicalTime = Math.max(logicalTime, vertex.logicalTime + 2, latestChild + 2);
+ 		}
+-		const candidate = stage(vertices);
++		const candidate = stage(vertices.filter((vertex) => !isSettlementFence(vertex)));
+ 		if (candidate.additions.length === 0) return false;
+ 		for (const { vertex } of candidate.additions) await input.onAcceptedVertex(vertex);
+ 		input.onProjection(candidate.projection);
+@@ -1963,10 +1966,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		}
+ 	}
+ 	const recoveredProjectionRejected = (recovered?.descriptor.recoveredVertices ?? Object.freeze([])).some(
+-		(vertex) => vertex.author === input.author && acceptedOperationRows.get(hex(vertex.digest)) === null
++		(vertex) =>
++			!isSettlementFence(vertex) &&
++			vertex.author === input.author &&
++			acceptedOperationRows.get(hex(vertex.digest)) === null
+ 	);
+ 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
+ 	let activeHandle: RoomPlaneHandle | undefined;
++	let recoverStartupPlane: (() => Promise<void>) | undefined;
+ 	let creatorCloseHandle: CreatorLiveCloseHandle | undefined;
+ 	let bindCurrentCreatorClose: ((plane: RoomPlaneHandle) => ReturnType<typeof bindCreatorLiveClose>) | undefined;
+ 	let creatorCloseUnavailableContinuity: CreatorLiveCloseStatus["continuity"] = "continuous";
+@@ -2215,6 +2222,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		resolveRetainedBootstrap?.();
+ 		return true;
+ 	};
++	let startupReplay: V3RoomAcceptedVertex[] | undefined;
+ 	const admittedSink = async ({
+ 		vertex,
+ 	}: Parameters<V3AdmittedVertexSink>[0]): Promise<
+@@ -2222,6 +2230,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
+ 		}>
+ 	> => {
++		if (startupReplay !== undefined) {
++			startupReplay.push(vertex);
++			return Object.freeze({ kind: "continue" as const });
++		}
+ 		try {
+ 			await commit([vertex]);
+ 			if (retainedPrefixReady(vertex)) return Object.freeze({ kind: "retained-bootstrap-ready" as const });
+@@ -2249,137 +2261,172 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	try {
+ 		const openedTransport = input.openTransport(input.objectId);
+ 		transport = openedTransport;
+-		if (input.successorSnapshotDeclaration === undefined) {
+-			if (recovered === undefined) throw new TypeError("v3 room recovered genesis custody is unavailable");
+-			const activated = activateV3LivePlane({
+-				capability: recovered.capability,
+-				messageQueueManager,
+-				networkNode: openedTransport.networkNode,
+-				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+-			});
+-			if (!activated.ok) throw new TypeError(`v3 room activation failed: ${activated.kind}`);
+-			activeHandle = activated.handle as RoomPlaneHandle;
+-		} else {
+-			if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+-				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+-			}
+-			const snapshotStore = await createBrowserSnapshotQuarantineStore({
+-				primaryDatabaseName: input.databaseName,
+-			});
+-			creatorCloseStoreClosers.push(snapshotStore.close);
+-			const selectedPending = openedRoomHeadState.pending;
+-			if (selectedPending !== null) {
+-				const pending = Object.freeze({ pending: selectedPending, stable: openedRoomHeadState.stable });
+-				const recoveredPending = await recoverPendingCreatorSuccessorAdoption({
++		let successorSnapshotStore: Awaited<ReturnType<typeof createBrowserSnapshotQuarantineStore>> | undefined;
++		const activateStartupPlane = async (recovering: boolean): Promise<void> => {
++			if (input.successorSnapshotDeclaration === undefined) {
++				if (recovering) {
++					const durable = await prepareDurableRoomState(
++						Object.freeze({ ...input, issuanceDatabaseName }),
++						material,
++						sourceMaterial,
++						objectIdResult.value,
++						false,
++						classifyTerminalVertex,
++						redirectSource,
++						redirectHistoryComplete,
++						{ aheStores, issuanceStore, journalStore }
++					);
++					prepared = durable.prepared;
++					recovered = durable.recovered;
++					await commit(recovered.descriptor.recoveredVertices);
++				}
++				if (recovered === undefined) throw new TypeError("v3 room recovered genesis custody is unavailable");
++				const activated = activateV3LivePlane({
++					capability: recovered.capability,
++					messageQueueManager,
++					networkNode: openedTransport.networkNode,
++					onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
++				});
++				if (!activated.ok) throw new TypeError(`v3 room activation failed: ${activated.kind}`);
++				activeHandle = activated.handle as RoomPlaneHandle;
++			} else {
++				if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
++					return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
++				}
++				if (successorSnapshotStore === undefined) {
++					successorSnapshotStore = await createBrowserSnapshotQuarantineStore({
++						primaryDatabaseName: input.databaseName,
++					});
++					creatorCloseStoreClosers.push(successorSnapshotStore.close);
++				}
++				const snapshotStore = successorSnapshotStore;
++				const selectedPending = openedRoomHeadState.pending;
++				if (selectedPending !== null) {
++					const pending = Object.freeze({ pending: selectedPending, stable: openedRoomHeadState.stable });
++					const recoveredPending = await recoverPendingCreatorSuccessorAdoption({
++						authenticationProfile: "creator-only",
++						catalog: input.application.catalog,
++						detachedSignature: material.detachedGenesisSignature,
++						exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
++						exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
++						expectedNextRoomHead: selectedPending.next,
++						expectedPreviousRoomHead: selectedPending.previous,
++						pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
++						snapshotDeclaration: input.successorSnapshotDeclaration,
++						snapshotStore,
++						store: aheStores[0],
++					});
++					const recoveredHead = captureRoomHead(recoveredPending.head);
++					if (
++						recoveredPending.ok !== true ||
++						recoveredHead === undefined ||
++						!sameRoomHead(recoveredHead, selectedPending.next)
++					) {
++						const kind = Reflect.get(recoveredPending, "kind");
++						return roomHeadFailure(
++							kind === "true-fork" || kind === "chain-invalid" || kind === "stale-head" || kind === "malformed-input"
++								? "D110C_FLOOR_PENDING_INVALID"
++								: "D110C_FLOOR_RECOVERY_UNAVAILABLE"
++						);
++					}
++					openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pending);
++				}
++				const expectedRoomHead = openedRoomHeadState.stable;
++				startupReplay = [];
++				const reopened = await reopenCreatorSuccessorAdoption({
+ 					authenticationProfile: "creator-only",
++					author: input.author,
+ 					catalog: input.application.catalog,
+ 					detachedSignature: material.detachedGenesisSignature,
+ 					exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+ 					exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+-					expectedNextRoomHead: selectedPending.next,
+-					expectedPreviousRoomHead: selectedPending.previous,
++					exactCanonicalPinnedGenesisBootstrapOperationBytes,
++					expectedRoomHead,
++					issuanceStore,
++					liveJournalStore: journalStore,
++					messageQueueManager,
++					networkNode: openedTransport.networkNode,
++					onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+ 					pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
++					signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+ 					snapshotDeclaration: input.successorSnapshotDeclaration,
+ 					snapshotStore,
+ 					store: aheStores[0],
+ 				});
+-				const recoveredHead = captureRoomHead(recoveredPending.head);
++				if (reopened.ok !== true) {
++					throw new TypeError(`v3 room successor reopen failed: ${String(reopened.kind)}: ${String(reopened.detail)}`);
++				}
++				activeHandle = reopened.handle as RoomPlaneHandle;
++				successorProjectionAuthority = successorAuthority(reopened.trust, activeHandle);
++				const projectionBaseResult = bindV3BlueprintLivePlane({ plane: activeHandle, purpose: "projection-base" });
++				if (!projectionBaseResult.ok) {
++					throw new TypeError(`v3 room successor projection base failed: ${projectionBaseResult.kind}`);
++				}
++				if (exactRecord(projectionBaseResult, PROJECTION_BASE_RESULT_KEYS) === undefined) {
++					throw new TypeError("v3 room successor projection base differs");
++				}
++				const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
++					projectionBaseResult.exactCanonicalApplicationStateBytes,
++					"migration"
++				);
+ 				if (
+-					recoveredPending.ok !== true ||
+-					recoveredHead === undefined ||
+-					!sameRoomHead(recoveredHead, selectedPending.next)
++					projectionBaseResult.objectId !== input.objectId ||
++					projectionBaseResult.epoch !== successorProjectionAuthority.epoch ||
++					projectionBaseResult.blueprintDigest !== roomDescriptor.blueprintDigest ||
++					projectionBaseResult.stateDigest !== digest("ts-drp/state/v3", exactCanonicalApplicationStateBytes)
+ 				) {
+-					const kind = Reflect.get(recoveredPending, "kind");
+-					return roomHeadFailure(
+-						kind === "true-fork" || kind === "chain-invalid" || kind === "stale-head" || kind === "malformed-input"
+-							? "D110C_FLOOR_PENDING_INVALID"
+-							: "D110C_FLOOR_RECOVERY_UNAVAILABLE"
+-					);
++					throw new TypeError("v3 room successor projection base differs");
+ 				}
+-				openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pending);
+-			}
+-			const expectedRoomHead = openedRoomHeadState.stable;
+-			const reopened = await reopenCreatorSuccessorAdoption({
+-				authenticationProfile: "creator-only",
+-				author: input.author,
+-				catalog: input.application.catalog,
+-				detachedSignature: material.detachedGenesisSignature,
+-				exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+-				exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+-				exactCanonicalPinnedGenesisBootstrapOperationBytes,
+-				expectedRoomHead,
+-				issuanceStore,
+-				liveJournalStore: journalStore,
+-				messageQueueManager,
+-				networkNode: openedTransport.networkNode,
+-				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+-				pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+-				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+-				snapshotDeclaration: input.successorSnapshotDeclaration,
+-				snapshotStore,
+-				store: aheStores[0],
+-			});
+-			if (reopened.ok !== true) {
+-				throw new TypeError(`v3 room successor reopen failed: ${String(reopened.kind)}: ${String(reopened.detail)}`);
+-			}
+-			activeHandle = reopened.handle as RoomPlaneHandle;
+-			successorProjectionAuthority = successorAuthority(reopened.trust, activeHandle);
+-			const projectionBaseResult = bindV3BlueprintLivePlane({ plane: activeHandle, purpose: "projection-base" });
+-			if (!projectionBaseResult.ok) {
+-				throw new TypeError(`v3 room successor projection base failed: ${projectionBaseResult.kind}`);
+-			}
+-			if (exactRecord(projectionBaseResult, PROJECTION_BASE_RESULT_KEYS) === undefined) {
+-				throw new TypeError("v3 room successor projection base differs");
+-			}
+-			const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
+-				projectionBaseResult.exactCanonicalApplicationStateBytes,
+-				"migration"
+-			);
+-			if (
+-				projectionBaseResult.objectId !== input.objectId ||
+-				projectionBaseResult.epoch !== successorProjectionAuthority.epoch ||
+-				projectionBaseResult.blueprintDigest !== roomDescriptor.blueprintDigest ||
+-				projectionBaseResult.stateDigest !== digest("ts-drp/state/v3", exactCanonicalApplicationStateBytes)
+-			) {
+-				throw new TypeError("v3 room successor projection base differs");
+-			}
+-			authenticatedProjectionBase = Object.freeze({
+-				blueprintDigest: projectionBaseResult.blueprintDigest,
+-				epoch: projectionBaseResult.epoch,
+-				exactCanonicalApplicationStateBytes,
+-				objectId: projectionBaseResult.objectId,
+-				stateDigest: projectionBaseResult.stateDigest,
+-			});
+-			projection = stage(Object.freeze([])).projection;
+-			const canonicalStateBytes = input.application.migration?.canonicalStateBytes;
+-			if (typeof canonicalStateBytes !== "function") {
+-				throw new TypeError("v3 room successor projection state is unavailable");
+-			}
+-			const projectedStateBytes = normalizeApplicationStateBytes(
+-				Reflect.apply(canonicalStateBytes, input.application.migration, [projection]) as Uint8Array,
+-				"migration"
+-			);
+-			if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
+-				throw new TypeError("v3 room successor projection state differs");
++				authenticatedProjectionBase = Object.freeze({
++					blueprintDigest: projectionBaseResult.blueprintDigest,
++					epoch: projectionBaseResult.epoch,
++					exactCanonicalApplicationStateBytes,
++					objectId: projectionBaseResult.objectId,
++					stateDigest: projectionBaseResult.stateDigest,
++				});
++				const baseProjection = input.application.projectAcceptedOperations(
++					Object.freeze({
++						authenticatedBase: authenticatedProjectionBase,
++						currentEpochOperations: Object.freeze([]),
++					})
++				);
++				const canonicalStateBytes = input.application.migration?.canonicalStateBytes;
++				if (typeof canonicalStateBytes !== "function") {
++					throw new TypeError("v3 room successor projection state is unavailable");
++				}
++				const projectedStateBytes = normalizeApplicationStateBytes(
++					Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
++					"migration"
++				);
++				if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
++					throw new TypeError("v3 room successor projection state differs");
++				}
++				const replay = startupReplay;
++				startupReplay = undefined;
++				await commit(replay);
++				projection = stage(Object.freeze([])).projection;
++				input.onProjection(projection);
+ 			}
+-			input.onProjection(projection);
+-		}
+-		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+-			if (input.application.migration === undefined) {
+-				throw new TypeError("v3 room creator close initial state is unavailable");
++			if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
++				if (input.application.migration === undefined) {
++					throw new TypeError("v3 room creator close initial state is unavailable");
++				}
++				const initialProjection = input.application.projectAcceptedOperations(
++					Object.freeze({ authenticatedBase: undefined, currentEpochOperations: Object.freeze([]) })
++				);
++				const exactCanonicalInitialStateBytes = normalizeApplicationStateBytes(
++					Reflect.apply(input.application.migration.canonicalStateBytes, input.application.migration, [
++						initialProjection,
++					]) as Uint8Array,
++					"genesis"
++				);
++				const blueprint = bindV3BlueprintLivePlane({ exactCanonicalInitialStateBytes, plane: activeHandle });
++				if (!blueprint.ok) throw new TypeError(`v3 room creator-close blueprint binding failed: ${blueprint.kind}`);
+ 			}
+-			const initialProjection = input.application.projectAcceptedOperations(
+-				Object.freeze({ authenticatedBase: undefined, currentEpochOperations: Object.freeze([]) })
+-			);
+-			const exactCanonicalInitialStateBytes = normalizeApplicationStateBytes(
+-				Reflect.apply(input.application.migration.canonicalStateBytes, input.application.migration, [
+-					initialProjection,
+-				]) as Uint8Array,
+-				"genesis"
+-			);
+-			const blueprint = bindV3BlueprintLivePlane({ exactCanonicalInitialStateBytes, plane: activeHandle });
+-			if (!blueprint.ok) throw new TypeError(`v3 room creator-close blueprint binding failed: ${blueprint.kind}`);
+-		}
++		};
++		recoverStartupPlane = (): Promise<void> => activateStartupPlane(true);
++		await activateStartupPlane(false);
++		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+ 		openedTransport.setIngressHandler(
+ 			activeHandle.topic,
+ 			(message) => {
+@@ -2831,11 +2878,26 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	}>;
+ 	type RoomSettlementPlan = NonNullable<Awaited<ReturnType<typeof issuanceStore.readSettlementPlan>>>;
+ 	type RoomSettlementPlanEntry = RoomSettlementPlan["entries"][number];
++	type RoomReplacementEffect = Readonly<{
++		readonly fromIntent: number;
++		readonly intentDigest: Uint8Array;
++		readonly kind: "replacement";
++		readonly sourceSequence: number;
++		readonly throughIntent: number;
++	}>;
++	type RoomSettlementIssueResult = Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>> | null;
+ 	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
++	const sameReplacementProgress = (left: RoomSettlementPlanEntry, right: RoomSettlementPlanEntry): boolean => {
++		if (left.replacementProgress === undefined || right.replacementProgress === undefined) {
++			return left.replacementProgress === right.replacementProgress;
++		}
++		return sameBytes(encodeCanonical(left.replacementProgress), encodeCanonical(right.replacementProgress));
++	};
+ 	const sameSettlementEntry = (left: RoomSettlementPlanEntry, right: RoomSettlementPlanEntry): boolean =>
+ 		left.sourceSequence === right.sourceSequence &&
+ 		left.disposition === right.disposition &&
+ 		left.replacementSequence === right.replacementSequence &&
++		sameReplacementProgress(left, right) &&
+ 		sameBytes(left.sourceDigest, right.sourceDigest);
+ 	const settlementDisposition = (source: DisplacedSource): RoomSettlementPlanEntry["disposition"] | undefined => {
+ 		if (source.intents.length === 0) return undefined;
+@@ -2877,6 +2939,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			entries.push(
+ 				Object.freeze({
+ 					disposition,
++					...(prior?.replacementProgress === undefined ? {} : { replacementProgress: prior.replacementProgress }),
+ 					replacementSequence: prior?.replacementSequence ?? null,
+ 					sourceDigest,
+ 					sourceSequence: source.authorSequence,
+@@ -2908,38 +2971,184 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		});
+ 		return issuanceStore.transactWriteSettlementPlan({ expectedRevision, plan, scope: settlementScope });
+ 	};
+-	const readSettlementEffect = async (
+-		effect: Readonly<{ readonly kind: "fence" } | { readonly kind: "replacement"; readonly sourceSequence: number }>
+-	): Promise<boolean> => {
+-		const plan = await issuanceStore.readSettlementPlan(settlementScope);
+-		if (plan === null) return false;
+-		if (effect.kind === "fence") return plan.fenceSequence !== null;
+-		return plan.entries.some(
+-			(entry) => entry.sourceSequence === effect.sourceSequence && entry.replacementSequence !== null
++	const readSettlementEffect = (
++		prior: RoomSettlementPlan,
++		plan: RoomSettlementPlan | null,
++		authorSequence: number,
++		effect: Readonly<
++			| { readonly kind: "fence" }
++			| { readonly kind: "replacement"; readonly sourceSequence: number }
++			| RoomReplacementEffect
++		>
++	): boolean => {
++		if (plan === null || plan.revision !== prior.revision + 1 || plan.entries.length !== prior.entries.length)
++			return false;
++		if (effect.kind === "fence")
++			return (
++				plan.fenceSequence === authorSequence &&
++				prior.fenceSequence === null &&
++				plan.entries.every((entry, index) =>
++					sameSettlementEntry(entry, prior.entries[index] as RoomSettlementPlanEntry)
++				)
++			);
++		if (plan.fenceSequence !== prior.fenceSequence) return false;
++		const entry = plan.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
++		const before = prior.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
++		if (
++			entry === undefined ||
++			before === undefined ||
++			before.replacementSequence !== null ||
++			entry.disposition !== before.disposition ||
++			!sameBytes(entry.sourceDigest, before.sourceDigest) ||
++			plan.entries.some(
++				(row, index) =>
++					row.sourceSequence !== effect.sourceSequence &&
++					!sameSettlementEntry(row, prior.entries[index] as RoomSettlementPlanEntry)
++			)
++		)
++			return false;
++		if (!("fromIntent" in effect))
++			return (
++				before.replacementProgress === undefined &&
++				entry.replacementProgress === undefined &&
++				entry.replacementSequence === authorSequence
++			);
++		const progress = entry?.replacementProgress;
++		const previous = before.replacementProgress;
++		const chunk = progress?.chunks.at(-1);
++		return (
++			progress !== undefined &&
++			previous !== undefined &&
++			progress.intentCount === previous.intentCount &&
++			progress.chunks.length === previous.chunks.length + 1 &&
++			(previous.chunks.at(-1)?.throughIntent ?? 0) === effect.fromIntent &&
++			progress.chunks
++				.slice(0, -1)
++				.every((row, index) => sameBytes(encodeCanonical(row), encodeCanonical(previous.chunks[index]))) &&
++			sameBytes(previous.intentDigest, effect.intentDigest) &&
++			sameBytes(progress.intentDigest, effect.intentDigest) &&
++			chunk?.replacementSequence === authorSequence &&
++			chunk.throughIntent === effect.throughIntent &&
++			entry.replacementSequence === (effect.throughIntent === progress.intentCount ? authorSequence : null)
+ 		);
+ 	};
++	const recoverSettlementOwner = async (): Promise<void> => {
++		const predecessor = activeHandle;
++		const predecessorClose = creatorCloseHandle;
++		if (predecessor === undefined || recoverStartupPlane === undefined)
++			throw new TypeError("v3 room recovery custody is unavailable");
++		try {
++			await Promise.resolve(predecessor.deactivate());
++			activeHandle = undefined;
++			await recoverStartupPlane();
++			if (activeHandle === undefined) throw new TypeError("v3 room recovery activation is unavailable");
++			if (predecessorClose !== undefined) {
++				const rebound = await bindCurrentCreatorClose?.(activeHandle);
++				if (rebound?.ok !== true) throw new TypeError("D110C_B_CLOSE_REBIND_FAILED");
++				creatorCloseHandle = rebound.handle;
++				creatorCloseUnavailableContinuity = "continuous";
++				await predecessorClose.stop();
++			}
++		} catch (error) {
++			terminalFailure = error;
++			try {
++				await shutdown();
++			} catch (cleanup) {
++				throw combineFailures(error, cleanup);
++			}
++			throw error;
++		}
++	};
+ 	const issueSettlement = async (
+ 		operations: readonly Readonly<{
+ 			readonly logicalTime: number;
+ 			readonly operation: Readonly<Record<string, unknown>>;
+ 		}>[],
+-		effect: Readonly<{ readonly kind: "fence" } | { readonly kind: "replacement"; readonly sourceSequence: number }>
+-	): Promise<void> => {
++		effect: Readonly<
++			| { readonly kind: "fence" }
++			| { readonly kind: "replacement"; readonly sourceSequence: number }
++			| RoomReplacementEffect
++		>,
++		mayRecover = true
++	): Promise<RoomSettlementIssueResult> => {
+ 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
++		const prior = await issuanceStore.readSettlementPlan(settlementScope);
++		const lineage = await issuanceStore.readLineage(settlementScope);
++		if (prior === null || lineage.exhausted || !Number.isSafeInteger(lineage.next))
++			throw new TypeError("v3 room settlement issue custody is unavailable");
++		let signed = false;
+ 		const issued = await activeHandle.issueLocal({
+ 			operations: Object.freeze(operations),
+ 			...(effect.kind === "replacement" ? { planEffect: effect } : {}),
+-			signRegisteredVertexDigest: input.signRegisteredVertexDigest,
++			signRegisteredVertexDigest: async (value: Uint8Array) => {
++				const signature = await input.signRegisteredVertexDigest(value);
++				signed = true;
++				return signature;
++			},
+ 		} as Parameters<RoomPlaneHandle["issueLocal"]>[0]);
+ 		if (!issued.ok) {
+-			const linked = await readSettlementEffect(effect);
+-			throw new TypeError(
+-				linked
+-					? `v3 room settlement issue outcome is unknown: ${issued.kind}`
+-					: `v3 room settlement issue failed: ${issued.kind}`
+-			);
++			if (issued.kind === "split-required") return issued;
++			const observed = await issuanceStore.readSettlementPlan(settlementScope);
++			const linked = readSettlementEffect(prior, observed, lineage.next, effect);
++			const unchanged = observed !== null && sameBytes(encodeCanonical(observed), encodeCanonical(prior));
++			if (!mayRecover || (!linked && !(signed && unchanged))) {
++				throw new TypeError(`v3 room settlement issue failed: ${issued.kind}`);
++			}
++			await recoverSettlementOwner();
++			if (linked) {
++				await publishAccepted();
++				return null;
++			}
++			return issueSettlement(operations, effect, false);
+ 		}
+ 		await publishAccepted();
++		return issued;
++	};
++	const orderedReplacementOperations = (source: DisplacedSource): readonly Readonly<Record<string, unknown>>[] => {
++		const ordered = source.intents.flatMap((intent) => {
++			const operation = detachedRoomOperation(intent.operation);
++			const action = operation === undefined ? undefined : Reflect.get(operation, "action");
++			if (operation === undefined || typeof action !== "string") {
++				throw new TypeError("v3 room displaced operation is invalid");
++			}
++			const policy = input.application.displacementPolicies[action];
++			if (policy === "expire") return [];
++			if (policy !== "rebase" && policy !== "transform") {
++				throw new TypeError("v3 room settlement replacement policy is invalid");
++			}
++			let selected = operation;
++			if (policy === "transform") {
++				const transform = input.application.transformDisplacedOperation;
++				if (transform === undefined) throw new TypeError("v3 room displaced transform is unavailable");
++				const first = detachedRoomOperation(transform(operation));
++				const second = detachedRoomOperation(transform(operation));
++				const identity = input.application.displacedOperationIdentity(operation);
++				if (
++					first === undefined ||
++					second === undefined ||
++					!sameBytes(encodeCanonical(first), encodeCanonical(second)) ||
++					Reflect.get(first, "action") !== action ||
++					input.application.displacedOperationIdentity(first) !== identity
++				) {
++					throw new TypeError("v3 room displaced transform is unstable");
++				}
++				selected = first;
++			}
++			try {
++				decodeCanonical(encodeCanonical(selected, { maxBytes: 65_536, maxDepth: 8, maxItems: 1_024 }), {
++					maxBytes: 65_536,
++					maxDepth: 8,
++					maxItems: 1_024,
++				});
++			} catch {
++				throw new TypeError("v3 room settlement replacement operation exceeds the application batch limit");
++			}
++			return [selected];
++		});
++		if (ordered.length === 0 || ordered.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS) {
++			throw new TypeError("v3 room settlement replacement intent count is invalid");
++		}
++		return Object.freeze(ordered);
+ 	};
+ 	const drainSettlementOutbox = async (sources: readonly DisplacedSource[]): Promise<void> => {
+ 		let plan = await writeMergedSettlementPlan(sources);
+@@ -2947,6 +3156,29 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			await settlementHold;
+ 			return;
+ 		}
++		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
++		const orderedBySequence = new Map<number, readonly Readonly<Record<string, unknown>>[]>();
++		for (const entry of plan.entries) {
++			if (entry.disposition === "expire" || entry.replacementSequence !== null) continue;
++			const source = sourceBySequence.get(entry.sourceSequence);
++			if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
++			const ordered = orderedReplacementOperations(source);
++			const progress = entry.replacementProgress;
++			if (
++				progress !== undefined &&
++				(progress.intentCount !== ordered.length ||
++					!sameBytes(
++						progress.intentDigest,
++						hashDomain(
++							"ts-drp/settlement-replacement-intents/v1",
++							encodeCanonical(ordered, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
++						)
++					))
++			) {
++				throw new TypeError("v3 room settlement replacement intent digest changed");
++			}
++			orderedBySequence.set(entry.sourceSequence, ordered);
++		}
+ 		if (plan.fenceSequence === null) {
+ 			const lineage = await issuanceStore.readLineage(settlementScope);
+ 			if (!Number.isSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
+@@ -2969,49 +3201,133 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			);
+ 			plan = (await issuanceStore.readSettlementPlan(settlementScope)) ?? plan;
+ 		}
+-		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
+ 		for (const entry of plan.entries) {
+ 			if (entry.disposition === "expire" || entry.replacementSequence !== null) continue;
+-			const source = sourceBySequence.get(entry.sourceSequence);
+-			if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
+-			const operations = source.intents.flatMap((intent) => {
+-				const operation = detachedRoomOperation(intent.operation);
+-				const action = operation === undefined ? undefined : Reflect.get(operation, "action");
+-				if (operation === undefined || typeof action !== "string") {
+-					throw new TypeError("v3 room displaced operation is invalid");
++			const ordered = orderedBySequence.get(entry.sourceSequence);
++			if (ordered === undefined) throw new TypeError("v3 room settlement replacement is unavailable");
++			const intentDigest = hashDomain(
++				"ts-drp/settlement-replacement-intents/v1",
++				encodeCanonical(ordered, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
++			);
++			const durableProgress = entry.replacementProgress;
++			if (
++				durableProgress !== undefined &&
++				(durableProgress.intentCount !== ordered.length || !sameBytes(durableProgress.intentDigest, intentDigest))
++			) {
++				throw new TypeError("v3 room settlement replacement intent digest changed");
++			}
++			const consumed = durableProgress?.chunks.at(-1)?.throughIntent ?? 0;
++			const lastLogicalTime = durableProgress?.chunks.at(-1)?.lastLogicalTime;
++			if (lastLogicalTime !== undefined) logicalTime = Math.max(logicalTime, lastLogicalTime + 2);
++			const allocateOperations = (
++				fromIntent: number
++			): readonly Readonly<{ readonly logicalTime: number; readonly operation: Readonly<Record<string, unknown>> }>[] =>
++				Object.freeze(
++					ordered.slice(fromIntent).map((operation) => {
++						const selected = Object.freeze({ logicalTime, operation });
++						logicalTime += 2;
++						return selected;
++					})
++				);
++			const operationBaseIntent = consumed;
++			const operations = allocateOperations(consumed);
++			let initialPrefixLength: number | undefined;
++			if (durableProgress === undefined) {
++				const legacy = await issueSettlement(
++					operations,
++					Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence })
++				);
++				if (legacy === null || legacy.ok) continue;
++				if (legacy.kind !== "split-required") throw new TypeError("v3 room settlement split result is invalid");
++				initialPrefixLength = legacy.prefixLength;
++				const current = await issuanceStore.readSettlementPlan(settlementScope);
++				const selected = current?.entries.find((candidate) => candidate.sourceSequence === entry.sourceSequence);
++				if (current === null || selected === undefined || selected.replacementSequence !== null) {
++					throw new TypeError("v3 room settlement split plan changed");
+ 				}
+-				const policy = input.application.displacementPolicies[action];
+-				if (policy === "expire") return [];
+-				if (policy !== "rebase" && policy !== "transform") {
+-					throw new TypeError("v3 room settlement replacement policy is invalid");
++				plan = await issuanceStore.transactWriteSettlementPlan({
++					expectedRevision: current.revision,
++					plan: Object.freeze({
++						...current,
++						entries: Object.freeze(
++							current.entries.map((candidate) =>
++								candidate.sourceSequence === entry.sourceSequence
++									? Object.freeze({
++											...candidate,
++											replacementProgress: Object.freeze({
++												chunks: Object.freeze([]),
++												intentCount: ordered.length,
++												intentDigest,
++												version: 1 as const,
++											}),
++										})
++									: candidate
++							)
++						),
++						revision: current.revision + 1,
++					}),
++					scope: settlementScope,
++				});
++			}
++			let fromIntent = consumed;
++			const refreshProgressPrefix = async (expectedThrough: number): Promise<void> => {
++				const current = await issuanceStore.readSettlementPlan(settlementScope);
++				const selected = current?.entries.find((candidate) => candidate.sourceSequence === entry.sourceSequence);
++				const progress = selected?.replacementProgress;
++				if (
++					current === null ||
++					progress === undefined ||
++					!sameBytes(progress.intentDigest, intentDigest) ||
++					(progress.chunks.at(-1)?.throughIntent ?? 0) !== expectedThrough
++				) {
++					throw new TypeError("v3 room settlement replacement progress did not advance");
+ 				}
+-				let selected = operation;
+-				if (policy === "transform") {
+-					const transform = input.application.transformDisplacedOperation;
+-					if (transform === undefined) throw new TypeError("v3 room displaced transform is unavailable");
+-					const first = detachedRoomOperation(transform(operation));
+-					const second = detachedRoomOperation(transform(operation));
+-					const identity = input.application.displacedOperationIdentity(operation);
++				plan = current;
++			};
++			while (fromIntent < ordered.length) {
++				const remaining = operations.slice(fromIntent - operationBaseIntent);
++				const effect = (throughIntent: number): RoomReplacementEffect =>
++					Object.freeze({
++						fromIntent,
++						intentDigest,
++						kind: "replacement",
++						sourceSequence: entry.sourceSequence,
++						throughIntent,
++					});
++				if (initialPrefixLength !== undefined) {
+ 					if (
+-						first === undefined ||
+-						second === undefined ||
+-						!sameBytes(encodeCanonical(first), encodeCanonical(second)) ||
+-						Reflect.get(first, "action") !== action ||
+-						input.application.displacedOperationIdentity(first) !== identity
++						!Number.isSafeInteger(initialPrefixLength) ||
++						initialPrefixLength < 1 ||
++						initialPrefixLength >= remaining.length
+ 					) {
+-						throw new TypeError("v3 room displaced transform is unstable");
++						throw new TypeError("v3 room settlement split prefix is invalid");
+ 					}
+-					selected = first;
++					const throughIntent = fromIntent + initialPrefixLength;
++					await issueSettlement(remaining.slice(0, initialPrefixLength), effect(throughIntent));
++					await refreshProgressPrefix(throughIntent);
++					fromIntent = throughIntent;
++					initialPrefixLength = undefined;
++					continue;
+ 				}
+-				const selectedLogicalTime = logicalTime;
+-				logicalTime += 2;
+-				return [Object.freeze({ logicalTime: selectedLogicalTime, operation: selected })];
+-			});
+-			if (operations.length === 0) throw new TypeError("v3 room settlement replacement is empty");
+-			await issueSettlement(
+-				Object.freeze(operations),
+-				Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence })
+-			);
++				const attempted = await issueSettlement(remaining, effect(ordered.length));
++				if (attempted === null || attempted.ok) {
++					await refreshProgressPrefix(ordered.length);
++					fromIntent = ordered.length;
++					continue;
++				}
++				if (
++					attempted.kind !== "split-required" ||
++					!Number.isSafeInteger(attempted.prefixLength) ||
++					attempted.prefixLength < 1 ||
++					attempted.prefixLength >= remaining.length
++				) {
++					throw new TypeError("v3 room settlement split prefix is invalid");
++				}
++				const throughIntent = fromIntent + attempted.prefixLength;
++				await issueSettlement(remaining.slice(0, attempted.prefixLength), effect(throughIntent));
++				await refreshProgressPrefix(throughIntent);
++				fromIntent = throughIntent;
++			}
+ 		}
+ 	};
+ 	const drainRebaseOutbox = async (): Promise<void> => {
+@@ -3208,11 +3524,21 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	const rebasePromise =
+ 		settlementProfile === "none" && sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
+ 			? Promise.resolve()
+-			: Promise.resolve().then(async () => {
+-					await waitForRetainedBootstrap();
+-					if (terminalFailure !== undefined) throw terminalFailure;
+-					await publishAccepted();
+-					await drainRebaseOutbox();
++			: enqueueLifetimeTransition(async () => {
++					try {
++						await waitForRetainedBootstrap();
++						if (terminalFailure !== undefined) throw terminalFailure;
++						await publishAccepted();
++						await drainRebaseOutbox();
++					} catch (error) {
++						terminalFailure = error;
++						try {
++							await shutdown();
++						} catch (cleanup) {
++							throw combineFailures(error, cleanup);
++						}
++						throw error;
++					}
+ 				});
+ 	void rebasePromise.catch((error: unknown) => {
+ 		terminalFailure = error;
+@@ -4156,7 +4482,12 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
+ 	requireFreshTrust = false,
+ 	classifyTerminalVertex?: RoomTerminalVertexClassifier,
+ 	redirectSource?: RedirectSourceRecovery,
+-	redirectHistoryComplete?: (vertices: readonly V3RoomAcceptedVertex[]) => boolean
++	redirectHistoryComplete?: (vertices: readonly V3RoomAcceptedVertex[]) => boolean,
++	ownedStores?: Readonly<{
++		readonly aheStores: readonly Awaited<ReturnType<typeof createBrowserAheDurableStore>>[];
++		readonly issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>;
++		readonly journalStore: Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>>;
++	}>
+ ): Promise<
+ 	Readonly<{
+ 		readonly aheStores: readonly Awaited<ReturnType<typeof createBrowserAheDurableStore>>[];
+@@ -4172,7 +4503,8 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
+ 		APPLICATION_BATCH_LIMITS
+ 	);
+ 	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
+-	const aheStore = await createBrowserAheDurableStore({ databaseName: `${input.databaseName}--ahe` });
++	const aheStore =
++		ownedStores?.aheStores[0] ?? (await createBrowserAheDurableStore({ databaseName: `${input.databaseName}--ahe` }));
+ 	const aheStores = [aheStore];
+ 	let issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>> | undefined;
+ 	let journalStore: Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>> | undefined;
+@@ -4236,9 +4568,11 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
+ 		let sourceAheStore: Awaited<ReturnType<typeof createBrowserAheDurableStore>> | undefined;
+ 		let sourcePrepared: Extract<Awaited<ReturnType<typeof prepareV3LiveGeneration>>, { readonly ok: true }> | undefined;
+ 		if (sourceMaterial !== undefined) {
+-			sourceAheStore = await createBrowserAheDurableStore({
+-				databaseName: `${input.databaseName}--rebase-${sourceMaterial.pinnedGenesisAnchorDigest}--ahe`,
+-			});
++			sourceAheStore =
++				ownedStores?.aheStores[1] ??
++				(await createBrowserAheDurableStore({
++					databaseName: `${input.databaseName}--rebase-${sourceMaterial.pinnedGenesisAnchorDigest}--ahe`,
++				}));
+ 			aheStores.push(sourceAheStore);
+ 			sourcePrepared = await prepareMaterial(
+ 				sourceMaterial,
+@@ -4247,11 +4581,15 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
+ 				redirectSourceObjectId?.ok === true ? redirectSourceObjectId.value : objectId
+ 			);
+ 		}
+-		const openedIssuanceStore = await createBrowserDurableIssuanceStore({
+-			primaryDatabaseName: input.issuanceDatabaseName,
+-		});
++		const openedIssuanceStore =
++			ownedStores?.issuanceStore ??
++			(await createBrowserDurableIssuanceStore({
++				primaryDatabaseName: input.issuanceDatabaseName,
++			}));
+ 		issuanceStore = openedIssuanceStore;
+-		const openedJournalStore = await createBrowserDurableLiveJournalStore({ primaryDatabaseName: input.databaseName });
++		const openedJournalStore =
++			ownedStores?.journalStore ??
++			(await createBrowserDurableLiveJournalStore({ primaryDatabaseName: input.databaseName }));
+ 		journalStore = openedJournalStore;
+ 		const scope = Object.freeze({ author: input.author, objectId: input.objectId });
+ 		if (requireFreshTrust) {
+@@ -4415,6 +4753,7 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
+ 			retainedBootstrapHeld,
+ 		});
+ 	} catch (error) {
++		if (ownedStores !== undefined) throw error;
+ 		const closers: Promise<void>[] = aheStores.map((store) => store.close());
+ 		if (issuanceStore !== undefined) closers.push(issuanceStore.close());
+ 		if (journalStore !== undefined) closers.push(journalStore.close());
+diff --git a/packages/issuance-store/src/conformance.ts b/packages/issuance-store/src/conformance.ts
+index c04addbb..4466cd81 100644
+--- a/packages/issuance-store/src/conformance.ts
++++ b/packages/issuance-store/src/conformance.ts
+@@ -1,5 +1,6 @@
+ import {
+ 	applySettlementPlanEffect,
++	assertSettlementPlanProgressTransition,
+ 	captureSettlementPlanWriteInput,
+ 	cloneDurableIssueCommit as cloneCommit,
+ 	copyDurableIssueScope as cloneScope,
+@@ -16,6 +17,7 @@ import {
+ 	durablePreimageMatchesScopeAndSequence as preimageMatches,
+ 	durableIssuanceBytesEqual as sameBytes,
+ 	durableIssueScopesEqual as sameScope,
++	settlementReplacementLastLogicalTime,
+ 	assertDurableIssueScope as validateScope,
+ 	isValidDurableAuthorSequence as validOrdinal,
+ 	isValidDurableScopeField as validScopeField,
+@@ -264,6 +266,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
+ 		if ((current?.revision ?? null) !== captured.expectedRevision) {
+ 			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+ 		}
++		assertSettlementPlanProgressTransition(current ?? null, captured.plan);
+ 		const durable = cloneSettlementPlan(captured.plan);
+ 		this.#plans.set(key, durable);
+ 		return cloneSettlementPlan(durable);
+@@ -331,7 +334,12 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
+ 			}
+ 			const plan = copySettlementPlan(stored, detachedScope);
+ 			if (plan === undefined) throw this.#latchCorruption();
+-			updatedPlan = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
++			updatedPlan = applySettlementPlanEffect(
++				plan,
++				candidate.planEffect,
++				candidate.authorSequence,
++				settlementReplacementLastLogicalTime(candidate)
++			);
+ 		}
+ 		this.#lineages.set(key, {
+ 			exhausted: prior.next === Number.MAX_SAFE_INTEGER,
+diff --git a/packages/issuance-store/src/contract.ts b/packages/issuance-store/src/contract.ts
+index e1050bc8..eaf9c0b3 100644
+--- a/packages/issuance-store/src/contract.ts
++++ b/packages/issuance-store/src/contract.ts
+@@ -1,6 +1,6 @@
+-import { decodeCanonical } from "@ts-drp/canonical";
++import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+ 
+-import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS } from "./types.js";
++import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS } from "./types.js";
+ import type {
+ 	DurableIssuanceError,
+ 	DurableIssuanceErrorCode,
+@@ -11,6 +11,8 @@ import type {
+ 	DurableSignedEnvelope,
+ 	SettlementPlan,
+ 	SettlementPlanEntry,
++	SettlementReplacementChunk,
++	SettlementReplacementProgress,
+ } from "./types.js";
+ 
+ type SettlementPlanEffect = NonNullable<DurableIssueCommit["planEffect"]>;
+@@ -234,6 +236,50 @@ export function durablePreimageMatchesScopeAndSequence(
+ 	}
+ }
+ 
++/**
++ * Derives the final submitted operation logical time from one validated commit.
++ * @param commit - Validated durable issue commit.
++ * @returns The positive final logical time, or undefined for an invalid preimage.
++ */
++export function settlementReplacementLastLogicalTime(commit: DurableIssueCommit): number | undefined {
++	try {
++		const decoded: unknown = decodeCanonical(commit.envelope.canonicalPreimageBytes);
++		if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return undefined;
++		const record = decoded as Record<string, unknown>;
++		let logicalTime = record.logicalTime;
++		const operation = record.operation;
++		if (
++			typeof operation === "object" &&
++			operation !== null &&
++			Reflect.get(operation, "action") === "applicationBatch"
++		) {
++			if (!isClosedDurableIssuanceRecord(operation, ["action", "batch"])) return undefined;
++			const batch = operation.batch;
++			if (!isClosedDurableIssuanceRecord(batch, ["entries", "version"]) || batch.version !== 1) return undefined;
++			const entries = batch.entries;
++			if (!Array.isArray(entries) || entries.length < 2 || entries.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS)
++				return undefined;
++			let previous = -1;
++			for (const entry of entries) {
++				if (
++					!isClosedDurableIssuanceRecord(entry, ["logicalTime", "operation"]) ||
++					!Number.isSafeInteger(entry.logicalTime) ||
++					(entry.logicalTime as number) <= previous
++				)
++					return undefined;
++				previous = entry.logicalTime as number;
++			}
++			const limits = { maxBytes: 65_536, maxDepth: 8, maxItems: 1_024 };
++			const bytes = encodeCanonical(operation, limits);
++			if (!durableIssuanceBytesEqual(bytes, encodeCanonical(decodeCanonical(bytes, limits), limits))) return undefined;
++			logicalTime = previous;
++		}
++		return Number.isSafeInteger(logicalTime) && (logicalTime as number) > 0 ? (logicalTime as number) : undefined;
++	} catch {
++		return undefined;
++	}
++}
++
+ /**
+  * Deep-copies one validated envelope.
+  * @param envelope - Valid envelope.
+@@ -272,7 +318,15 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
+ 					planEffect:
+ 						commit.planEffect.kind === "fence"
+ 							? { kind: "fence" as const }
+-							: { kind: "replacement" as const, sourceSequence: commit.planEffect.sourceSequence },
++							: "fromIntent" in commit.planEffect
++								? {
++										fromIntent: commit.planEffect.fromIntent,
++										intentDigest: new Uint8Array(commit.planEffect.intentDigest),
++										kind: "replacement" as const,
++										sourceSequence: commit.planEffect.sourceSequence,
++										throughIntent: commit.planEffect.throughIntent,
++									}
++								: { kind: "replacement" as const, sourceSequence: commit.planEffect.sourceSequence },
+ 				}),
+ 	};
+ }
+@@ -284,21 +338,108 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
+  */
+ export function copySettlementPlanEffect(value: unknown): SettlementPlanEffect | undefined {
+ 	if (!isClosedDurableIssuanceRecord(value, ["kind"])) {
++		if (isClosedDurableIssuanceRecord(value, ["kind", "sourceSequence"])) {
++			return value.kind === "replacement" && isValidDurableAuthorSequence(value.sourceSequence)
++				? { kind: "replacement", sourceSequence: value.sourceSequence }
++				: undefined;
++		}
+ 		if (
+-			!isClosedDurableIssuanceRecord(value, ["kind", "sourceSequence"]) ||
++			!isClosedDurableIssuanceRecord(value, [
++				"fromIntent",
++				"intentDigest",
++				"kind",
++				"sourceSequence",
++				"throughIntent",
++			]) ||
+ 			value.kind !== "replacement" ||
+-			!isValidDurableAuthorSequence(value.sourceSequence)
++			!isValidDurableAuthorSequence(value.sourceSequence) ||
++			!isValidDurableAuthorSequence(value.fromIntent) ||
++			!isValidDurableAuthorSequence(value.throughIntent) ||
++			value.fromIntent >= value.throughIntent ||
++			value.throughIntent > SETTLEMENT_REPLACEMENT_MAX_INTENTS
+ 		) {
+ 			return undefined;
+ 		}
+-		return { kind: "replacement", sourceSequence: value.sourceSequence };
++		const intentDigest = copyDurableIssuanceBytes(value.intentDigest);
++		return intentDigest?.byteLength === 32
++			? {
++					fromIntent: value.fromIntent,
++					intentDigest,
++					kind: "replacement",
++					sourceSequence: value.sourceSequence,
++					throughIntent: value.throughIntent,
++				}
++			: undefined;
+ 	}
+ 	return value.kind === "fence" ? { kind: "fence" } : undefined;
+ }
+ 
++function copySettlementReplacementChunk(value: unknown): SettlementReplacementChunk | undefined {
++	if (
++		!isClosedDurableIssuanceRecord(value, ["lastLogicalTime", "replacementSequence", "throughIntent"]) ||
++		!isValidDurableAuthorSequence(value.replacementSequence) ||
++		!Number.isSafeInteger(value.throughIntent) ||
++		(value.throughIntent as number) < 1 ||
++		!Number.isSafeInteger(value.lastLogicalTime) ||
++		(value.lastLogicalTime as number) < 1
++	) {
++		return undefined;
++	}
++	return {
++		lastLogicalTime: value.lastLogicalTime as number,
++		replacementSequence: value.replacementSequence,
++		throughIntent: value.throughIntent as number,
++	};
++}
++
++function copySettlementReplacementProgress(value: unknown): SettlementReplacementProgress | undefined {
++	if (
++		!isClosedDurableIssuanceRecord(value, ["chunks", "intentCount", "intentDigest", "version"]) ||
++		value.version !== 1 ||
++		!Number.isSafeInteger(value.intentCount) ||
++		(value.intentCount as number) < 1 ||
++		(value.intentCount as number) > SETTLEMENT_REPLACEMENT_MAX_INTENTS ||
++		!Array.isArray(value.chunks) ||
++		value.chunks.length > (value.intentCount as number)
++	) {
++		return undefined;
++	}
++	const intentDigest = copyDurableIssuanceBytes(value.intentDigest);
++	if (intentDigest?.byteLength !== 32) return undefined;
++	const chunks: SettlementReplacementChunk[] = [];
++	let priorSequence = -1;
++	let priorThrough = 0;
++	let priorLogicalTime = 0;
++	for (const rawChunk of value.chunks) {
++		const chunk = copySettlementReplacementChunk(rawChunk);
++		if (
++			chunk === undefined ||
++			chunk.replacementSequence <= priorSequence ||
++			chunk.throughIntent <= priorThrough ||
++			chunk.throughIntent > (value.intentCount as number) ||
++			chunk.lastLogicalTime <= priorLogicalTime
++		) {
++			return undefined;
++		}
++		chunks.push(chunk);
++		priorSequence = chunk.replacementSequence;
++		priorThrough = chunk.throughIntent;
++		priorLogicalTime = chunk.lastLogicalTime;
++	}
++	return { chunks, intentCount: value.intentCount as number, intentDigest, version: 1 };
++}
++
+ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
++	const hasProgress =
++		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "replacementProgress");
+ 	if (
+-		!isClosedDurableIssuanceRecord(value, ["disposition", "replacementSequence", "sourceDigest", "sourceSequence"]) ||
++		!isClosedDurableIssuanceRecord(value, [
++			"disposition",
++			...(hasProgress ? ["replacementProgress"] : []),
++			"replacementSequence",
++			"sourceDigest",
++			"sourceSequence",
++		]) ||
+ 		!isValidDurableAuthorSequence(value.sourceSequence) ||
+ 		(value.replacementSequence !== null && !isValidDurableAuthorSequence(value.replacementSequence)) ||
+ 		(value.disposition !== "expire" &&
+@@ -309,9 +450,22 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
+ 		return undefined;
+ 	}
+ 	const sourceDigest = copyDurableIssuanceBytes(value.sourceDigest);
+-	if (sourceDigest === undefined) return undefined;
++	const replacementProgress = hasProgress ? copySettlementReplacementProgress(value.replacementProgress) : undefined;
++	if (
++		sourceDigest === undefined ||
++		(hasProgress && replacementProgress === undefined) ||
++		(replacementProgress !== undefined && (value.disposition === "expire" || value.disposition === "manual-review"))
++	) {
++		return undefined;
++	}
++	if (replacementProgress !== undefined) {
++		const finalChunk = replacementProgress.chunks.at(-1);
++		const complete = finalChunk?.throughIntent === replacementProgress.intentCount;
++		if ((complete ? finalChunk.replacementSequence : null) !== value.replacementSequence) return undefined;
++	}
+ 	return {
+ 		disposition: value.disposition,
++		...(replacementProgress === undefined ? {} : { replacementProgress }),
+ 		replacementSequence: value.replacementSequence,
+ 		sourceDigest,
+ 		sourceSequence: value.sourceSequence,
+@@ -364,6 +518,16 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
+ 	return {
+ 		entries: plan.entries.map((entry) => ({
+ 			disposition: entry.disposition,
++			...(entry.replacementProgress === undefined
++				? {}
++				: {
++						replacementProgress: {
++							chunks: entry.replacementProgress.chunks.map((chunk) => ({ ...chunk })),
++							intentCount: entry.replacementProgress.intentCount,
++							intentDigest: new Uint8Array(entry.replacementProgress.intentDigest),
++							version: 1 as const,
++						},
++					}),
+ 			replacementSequence: entry.replacementSequence,
+ 			sourceDigest: new Uint8Array(entry.sourceDigest),
+ 			sourceSequence: entry.sourceSequence,
+@@ -374,6 +538,60 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
+ 	};
+ }
+ 
++/**
++ * Refuses a CAS rewrite that would alter or remove durable replacement progress.
++ * @param current - Current durable plan, if present.
++ * @param next - Proposed next plan revision.
++ */
++export function assertSettlementPlanProgressTransition(current: SettlementPlan | null, next: SettlementPlan): void {
++	if (current === null) return;
++	for (const prior of current.entries) {
++		const candidate = next.entries.find((entry) => entry.sourceSequence === prior.sourceSequence);
++		if (prior.replacementProgress !== undefined && prior.replacementSequence === null) {
++			if (
++				candidate === undefined ||
++				candidate.disposition !== prior.disposition ||
++				candidate.replacementSequence !== prior.replacementSequence ||
++				!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest) ||
++				candidate.replacementProgress === undefined ||
++				candidate.replacementProgress.intentCount !== prior.replacementProgress.intentCount ||
++				!durableIssuanceBytesEqual(
++					candidate.replacementProgress.intentDigest,
++					prior.replacementProgress.intentDigest
++				) ||
++				candidate.replacementProgress.chunks.length !== prior.replacementProgress.chunks.length ||
++				candidate.replacementProgress.chunks.some((chunk, index) => {
++					const before = prior.replacementProgress?.chunks[index];
++					return (
++						before === undefined ||
++						chunk.lastLogicalTime !== before.lastLogicalTime ||
++						chunk.replacementSequence !== before.replacementSequence ||
++						chunk.throughIntent !== before.throughIntent
++					);
++				})
++			) {
++				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement progress changed");
++			}
++		} else if (
++			prior.replacementProgress === undefined &&
++			prior.replacementSequence !== null &&
++			candidate?.replacementProgress !== undefined
++		) {
++			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "linked settlement replacement cannot be upgraded");
++		} else if (prior.replacementProgress === undefined && candidate?.replacementProgress !== undefined) {
++			if (
++				candidate.replacementProgress.chunks.length !== 0 ||
++				prior.replacementSequence !== null ||
++				candidate.replacementSequence !== null ||
++				candidate.disposition !== prior.disposition ||
++				!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest)
++			) {
++				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement upgrade changed");
++			}
++		}
++	}
++}
++
+ /**
+  * Validates and detaches one exact settlement-plan CAS write request.
+  * @param value - Untrusted write request.
+@@ -410,12 +628,14 @@ export function captureSettlementPlanWriteInput(value: unknown): Readonly<{
+  * @param plan - Current validated plan.
+  * @param effect - Validated issue effect.
+  * @param authorSequence - Sequence allocated to the issue.
++ * @param lastLogicalTime - Node-derived final operation logical time for a progress chunk.
+  * @returns The detached next plan revision.
+  */
+ export function applySettlementPlanEffect(
+ 	plan: SettlementPlan,
+ 	effect: SettlementPlanEffect,
+-	authorSequence: number
++	authorSequence: number,
++	lastLogicalTime?: number
+ ): SettlementPlan {
+ 	if (plan.revision === Number.MAX_SAFE_INTEGER) {
+ 		throw createDurableIssuanceFailure("ISSUANCE_RECOVERY_CORRUPT", "settlement plan revision is exhausted");
+@@ -432,12 +652,88 @@ export function applySettlementPlanEffect(
+ 		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement precondition changed");
+ 	}
+ 	const detached = cloneSettlementPlan(plan);
++	if ("fromIntent" in effect) {
++		if (!Number.isSafeInteger(lastLogicalTime) || (lastLogicalTime as number) < 1) {
++			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement chunk logical time is invalid");
++		}
++		const progress = entry.replacementProgress;
++		if (
++			progress === undefined ||
++			!durableIssuanceBytesEqual(progress.intentDigest, effect.intentDigest) ||
++			(progress.chunks.at(-1)?.throughIntent ?? 0) !== effect.fromIntent
++		) {
++			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement progress changed");
++		}
++		if (effect.throughIntent > progress.intentCount) {
++			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement replacement range is invalid");
++		}
++		const priorChunk = progress.chunks.at(-1);
++		if (
++			(priorChunk !== undefined && authorSequence <= priorChunk.replacementSequence) ||
++			(priorChunk !== undefined && (lastLogicalTime as number) <= priorChunk.lastLogicalTime)
++		) {
++			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement replacement chunk is not monotonic");
++		}
++		const nextProgress: SettlementReplacementProgress = {
++			...progress,
++			chunks: [
++				...progress.chunks,
++				{
++					lastLogicalTime: lastLogicalTime as number,
++					replacementSequence: authorSequence,
++					throughIntent: effect.throughIntent,
++				},
++			],
++		};
++		const entries = detached.entries.map((candidate, candidateIndex) =>
++			candidateIndex === index
++				? {
++						...candidate,
++						replacementProgress: nextProgress,
++						replacementSequence: effect.throughIntent === progress.intentCount ? authorSequence : null,
++					}
++				: candidate
++		);
++		return { ...detached, entries, revision: plan.revision + 1 };
++	}
++	if (entry.replacementProgress !== undefined) {
++		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement effect form changed");
++	}
+ 	const entries = detached.entries.map((candidate, candidateIndex) =>
+ 		candidateIndex === index ? { ...candidate, replacementSequence: authorSequence } : candidate
+ 	);
+ 	return { ...detached, entries, revision: plan.revision + 1 };
+ }
+ 
++/**
++ * Tests whether durable plan state contains the exact selected issue effect link.
++ * @param plan - Durable plan observed after an ambiguous transaction outcome.
++ * @param effect - Effect carried by the candidate commit.
++ * @param authorSequence - Sequence allocated to the candidate commit.
++ * @returns Whether the exact link is durably present.
++ */
++export function settlementPlanHasExactEffectLink(
++	plan: SettlementPlan | null,
++	effect: SettlementPlanEffect,
++	authorSequence: number
++): boolean {
++	if (effect.kind === "fence") return plan?.fenceSequence === authorSequence;
++	const entry = plan?.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
++	if (!("fromIntent" in effect)) return entry?.replacementSequence === authorSequence;
++	const progress = entry?.replacementProgress;
++	if (progress === undefined || !durableIssuanceBytesEqual(progress.intentDigest, effect.intentDigest)) return false;
++	const index = progress.chunks.findIndex((chunk) => chunk.replacementSequence === authorSequence);
++	const chunk = progress.chunks[index];
++	return (
++		chunk !== undefined &&
++		chunk.throughIntent === effect.throughIntent &&
++		(index === 0 ? 0 : progress.chunks[index - 1]?.throughIntent) === effect.fromIntent &&
++		(effect.throughIntent === progress.intentCount
++			? entry?.replacementSequence === authorSequence
++			: entry?.replacementSequence === null)
++	);
++}
++
+ /**
+  * Closes and detaches a structural commit for the selected scope and ordinal.
+  * @param value - Untrusted commit candidate.
+diff --git a/packages/issuance-store/src/types.ts b/packages/issuance-store/src/types.ts
+index e8ef652b..451422a7 100644
+--- a/packages/issuance-store/src/types.ts
++++ b/packages/issuance-store/src/types.ts
+@@ -47,11 +47,32 @@ export interface DurableIssuanceOutboxEntry {
+ 
+ export type SettlementDisposition = "expire" | "rebase" | "transform" | "manual-review";
+ 
++export const SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16;
++export const SETTLEMENT_REPLACEMENT_DIGEST_LIMITS = Object.freeze({
++	maxBytes: 1_048_640,
++	maxDepth: 9,
++	maxItems: 1_024,
++});
++
++export interface SettlementReplacementChunk {
++	readonly replacementSequence: number;
++	readonly throughIntent: number;
++	readonly lastLogicalTime: number;
++}
++
++export interface SettlementReplacementProgress {
++	readonly version: 1;
++	readonly intentCount: number;
++	readonly intentDigest: Uint8Array;
++	readonly chunks: readonly SettlementReplacementChunk[];
++}
++
+ export interface SettlementPlanEntry {
+ 	readonly sourceSequence: number;
+ 	readonly sourceDigest: Uint8Array;
+ 	readonly disposition: SettlementDisposition;
+ 	readonly replacementSequence: number | null;
++	readonly replacementProgress?: SettlementReplacementProgress;
+ }
+ 
+ export interface SettlementPlan {
+@@ -68,7 +89,14 @@ export interface DurableIssueCommit {
+ 	readonly outboxEntry: DurableIssuanceOutboxEntry;
+ 	readonly planEffect?:
+ 		| Readonly<{ readonly kind: "fence" }>
+-		| Readonly<{ readonly kind: "replacement"; readonly sourceSequence: number }>;
++		| Readonly<{ readonly kind: "replacement"; readonly sourceSequence: number }>
++		| Readonly<{
++				readonly fromIntent: number;
++				readonly intentDigest: Uint8Array;
++				readonly kind: "replacement";
++				readonly sourceSequence: number;
++				readonly throughIntent: number;
++		  }>;
+ }
+ 
+ export type DurableBuildAndSign = (authorSequence: number) => Promise<DurableIssueCommit>;
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index 02e7dbc2..48c733fc 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -22,6 +22,7 @@ import {
+ 	type DurableIssueScope,
+ 	type DurableOutboxPageInput,
+ 	type DurableOutboxPublicationTransitionInput,
++	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+ } from "@ts-drp/issuance-store";
+ import {
+ 	bindDurableIssuancePruningMaintenance,
+@@ -226,6 +227,13 @@ const BLUEPRINT_RETRIEVAL_INPUT_KEYS = ["plane"] as const;
+ const BLUEPRINT_PROJECTION_BASE_INPUT_KEYS = ["plane", "purpose"] as const;
+ const LOCAL_ISSUE_INPUT_KEYS = ["operations", "signRegisteredVertexDigest"] as const;
+ const LOCAL_ISSUE_WITH_PLAN_EFFECT_KEYS = ["operations", "planEffect", "signRegisteredVertexDigest"] as const;
++const PROGRESS_REPLACEMENT_EFFECT_KEYS = [
++	"fromIntent",
++	"intentDigest",
++	"kind",
++	"sourceSequence",
++	"throughIntent",
++] as const;
+ const LOCAL_ISSUE_ENTRY_KEYS = ["logicalTime", "operation"] as const;
+ const CANONICAL_APPLICATION_BATCH_ENTRY_KEYS = ["operation", "logicalTime"] as const;
+ const APPLICATION_BATCH_KEYS = ["batch", "action"] as const;
+@@ -897,6 +905,10 @@ const creatorSuccessorRecovery = new WeakMap<
+ >();
+ const creatorPredecessorRecoverySource = new WeakMap<object, V3DisplacedSourceAuthority>();
+ const creatorHistoricalIssuanceHandoffs = new WeakMap<object, HistoricalIssuanceContext>();
++const creatorSuccessorRecoveredDeliveries = new WeakMap<
++	object,
++	readonly Omit<Parameters<V3AdmittedVertexSink>[0], "transportSender">[]
++>();
+ const creatorSuccessorInitialState = new WeakMap<
+ 	object,
+ 	Readonly<{
+@@ -5496,6 +5508,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 		let recoveredCount = 0;
+ 		let recoveredTerminal = false;
+ 		const recoveredVertices: AdmittedReceivedVertexView[] = [];
++		const recoveredDeliveries: Omit<Parameters<V3AdmittedVertexSink>[0], "transportSender">[] = [];
+ 		const quarantinedDigests = new IntrinsicSet<string>();
+ 		const latchedOperations = new IntrinsicMap<string, StagedLatchedAclOperation>();
+ 		const controlVertices = new IntrinsicSet<string>();
+@@ -5667,6 +5680,17 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 				epochBytes = updatedEpochBytes;
+ 				recoveredCount += 1;
+ 				recoveredVertices.push(authenticated.admitted);
++				if (successorRecovery !== undefined && !controlOperation) {
++					if (recoveredPreimageBytes === undefined || recoveredSignature === undefined)
++						return recoveryFailure("admission-rejected", "v3 recovered delivery evidence is unavailable");
++					recoveredDeliveries.push(
++						ObjectFreeze({
++							vertex: authenticated.admitted,
++							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(recoveredPreimageBytes),
++							signature: new Uint8ArrayConstructor(recoveredSignature),
++						})
++					);
++				}
+ 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
+ 				if (!commitOperationReservation(reservation)) {
+ 					return recoveryFailure("admission-rejected", "v3 journal replay policy commit failed");
+@@ -5884,6 +5908,15 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 				epochBytes = updatedEpochBytes;
+ 				recoveredCount += 1;
+ 				recoveredVertices.push(authenticated.admitted);
++				if (successorRecovery !== undefined && !controlOperation) {
++					recoveredDeliveries.push(
++						ObjectFreeze({
++							vertex: authenticated.admitted,
++							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
++							signature: new Uint8ArrayConstructor(row.signature),
++						})
++					);
++				}
+ 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
+ 				if (!commitOperationReservation(reservation)) {
+ 					return recoveryFailure("admission-rejected", "v3 recovery policy commit failed");
+@@ -6015,6 +6048,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
+ 		}
+ 		const capability = ObjectFreeze({}) as RecoveredV3Live;
++		if (successorRecovery !== undefined)
++			creatorSuccessorRecoveredDeliveries.set(capability, ObjectFreeze(recoveredDeliveries));
+ 		installRecoveredV3LiveAuthority(
+ 			capability,
+ 			ObjectFreeze({
+@@ -6245,6 +6280,10 @@ function capturedLocalIssueInput(
+ 		const fence = snapshotClosedRecord(input.planEffect, ["kind"]);
+ 		const replacement =
+ 			fence === undefined ? snapshotClosedRecord(input.planEffect, ["kind", "sourceSequence"]) : undefined;
++		const progressReplacement =
++			fence === undefined && replacement === undefined
++				? snapshotClosedRecord(input.planEffect, PROGRESS_REPLACEMENT_EFFECT_KEYS)
++				: undefined;
+ 		if (fence?.kind === "fence") {
+ 			planEffect = ObjectFreeze({ kind: "fence" as const });
+ 		} else if (
+@@ -6253,6 +6292,27 @@ function capturedLocalIssueInput(
+ 			(replacement.sourceSequence as number) >= 0
+ 		) {
+ 			planEffect = ObjectFreeze({ kind: "replacement" as const, sourceSequence: replacement.sourceSequence as number });
++		} else if (
++			progressReplacement?.kind === "replacement" &&
++			NumberIsSafeInteger(progressReplacement.sourceSequence) &&
++			(progressReplacement.sourceSequence as number) >= 0 &&
++			NumberIsSafeInteger(progressReplacement.fromIntent) &&
++			(progressReplacement.fromIntent as number) >= 0 &&
++			NumberIsSafeInteger(progressReplacement.throughIntent) &&
++			(progressReplacement.throughIntent as number) > (progressReplacement.fromIntent as number) &&
++			(progressReplacement.throughIntent as number) <= SETTLEMENT_REPLACEMENT_MAX_INTENTS
++		) {
++			const intentDigest = copyDetachedBytes(progressReplacement.intentDigest);
++			if (intentDigest?.byteLength !== 32) {
++				return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
++			}
++			planEffect = ObjectFreeze({
++				fromIntent: progressReplacement.fromIntent as number,
++				intentDigest,
++				kind: "replacement" as const,
++				sourceSequence: progressReplacement.sourceSequence as number,
++				throughIntent: progressReplacement.throughIntent as number,
++			});
+ 		} else {
+ 			return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+ 		}
+@@ -6309,6 +6369,13 @@ function capturedLocalIssueInput(
+ 	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+ 		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
+ 	}
++	if (
++		planEffect?.kind === "replacement" &&
++		"fromIntent" in planEffect &&
++		planEffect.throughIntent - planEffect.fromIntent !== operations.length
++	) {
++		return localIssueFailure("malformed-input", "v3 local issue replacement range does not match its operations");
++	}
+ 	return ObjectFreeze({
+ 		operations: ObjectFreeze(operations),
+ 		...(planEffect === undefined ? {} : { planEffect }),
+@@ -6693,6 +6760,30 @@ async function issueLocal(
+ 	) {
+ 		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+ 	}
++	if (input.planEffect?.kind === "replacement" && "fromIntent" in input.planEffect) {
++		const effect = input.planEffect;
++		let plan;
++		try {
++			plan = copySettlementPlan(
++				await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
++				registration.issuanceScope
++			);
++		} catch {
++			registration.operationAdmissionHalted = true;
++			return localIssueFailure("issuance-rejected", "v3 settlement replacement plan read failed");
++		}
++		const entry = plan?.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
++		const progress = entry?.replacementProgress;
++		if (
++			progress === undefined ||
++			entry?.replacementSequence !== null ||
++			!sameBytes(progress.intentDigest, effect.intentDigest) ||
++			(progress.chunks.at(-1)?.throughIntent ?? 0) !== effect.fromIntent ||
++			effect.throughIntent > progress.intentCount
++		) {
++			return localIssueFailure("issuance-rejected", "v3 settlement replacement progress changed");
++		}
++	}
+ 	let applicationOperation = first.operation;
+ 	if (input.operations.length > 1) {
+ 		if (typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") {
+@@ -6880,7 +6971,8 @@ async function authenticatedOutboxRow(
+ async function readRebaseOutbox(
+ 	registration: V3PlaneRegistration,
+ 	includePublishedSources = false,
+-	settlementFrontier?: SettlementFrontierContext
++	settlementFrontier?: SettlementFrontierContext,
++	openProgressSources?: ReadonlySet<number>
+ ): Promise<V3RebaseOutboxResult> {
+ 	if (!currentRegistration(registration)) {
+ 		return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
+@@ -6950,7 +7042,12 @@ async function readRebaseOutbox(
+ 					settlementFrontier.admissionEpoch,
+ 					settlementFrontier.terminalThrough
+ 				);
+-				if (ownRowClass === "terminal" || ownRowClass === "old-incarnation") continue;
++				if (
++					(ownRowClass === "terminal" || ownRowClass === "old-incarnation") &&
++					openProgressSources?.has(classified.row.authorSequence) !== true
++				) {
++					continue;
++				}
+ 			}
+ 			const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
+ 			if (historical && !countHistoricalIssuanceRow(registration.historicalIssuance, classified.row.authorSequence)) {
+@@ -8578,6 +8675,10 @@ async function activateCreatorSuccessorLive(
+ 		if (transportHandoff !== undefined) {
+ 			creatorSuccessorTransportHandoffs.set(recovered.capability, transportHandoff);
+ 		}
++		const deliveries = creatorSuccessorRecoveredDeliveries.get(recovered.capability);
++		creatorSuccessorRecoveredDeliveries.delete(recovered.capability);
++		if (deliveries === undefined)
++			return rejected("recovery-rejected", "creator successor recovered deliveries are unavailable");
+ 		const activated = activateV3LivePlane({ capability: recovered.capability, ...bindings });
+ 		if (!activated.ok) return rejected("activation-rejected", `creator successor activation failed: ${activated.kind}`);
+ 		const activatedRegistration = v3HandleRegistrations.get(activated.handle);
+@@ -8586,6 +8687,15 @@ async function activateCreatorSuccessorLive(
+ 			return rejected("internal-invariant", "creator successor runtime registration is unavailable");
+ 		}
+ 		activatedRegistration.sourceRuntimeHandle = material.sourceRuntimeHandle;
++		try {
++			for (const delivery of deliveries) {
++				await bindings.onAdmittedVertex(ObjectFreeze({ ...delivery, transportSender: bindings.networkNode.peerId }));
++				if (!currentRegistration(activatedRegistration)) throw new TypeError("creator successor replay was retired");
++			}
++		} catch {
++			await Promise.resolve(activated.handle.deactivate());
++			return rejected("recovery-rejected", "creator successor recovered delivery was rejected");
++		}
+ 		if (!material.terminalizeSource()) {
+ 			activated.handle.deactivate();
+ 			return rejected("source-unavailable", "creator predecessor could not be terminalized");
+@@ -8688,8 +8798,26 @@ async function readSettlementSources(
+ 	registration: V3PlaneRegistration,
+ 	settlementFrontier?: SettlementFrontierContext
+ ): Promise<V3RebaseOutboxResult> {
+-	// Until the checkpoint/room owner supplies its verified frontier, retain every authenticated source candidate.
+-	return readRebaseOutbox(registration, true, settlementFrontier);
++	if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
++	let plan;
++	try {
++		plan = copySettlementPlan(
++			await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
++			registration.issuanceScope
++		);
++	} catch {
++		return ObjectFreeze({
++			detail: "v3 settlement plan read failed",
++			kind: "store-failed" as const,
++			ok: false as const,
++		});
++	}
++	const openProgressSources = new Set(
++		plan?.entries
++			.filter((entry) => entry.replacementProgress !== undefined && entry.replacementSequence === null)
++			.map((entry) => entry.sourceSequence) ?? []
++	);
++	return readRebaseOutbox(registration, true, settlementFrontier, openProgressSources);
+ }
+ 
+ export { prepareV3LiveGeneration };
+diff --git a/packages/storage-browser/src/internal/browser-issuance-store.ts b/packages/storage-browser/src/internal/browser-issuance-store.ts
+index 959aa090..d2367c2c 100644
+--- a/packages/storage-browser/src/internal/browser-issuance-store.ts
++++ b/packages/storage-browser/src/internal/browser-issuance-store.ts
+@@ -1,6 +1,7 @@
+ import {
+ 	applySettlementPlanEffect,
+ 	assertDurableIssueScope,
++	assertSettlementPlanProgressTransition,
+ 	captureSettlementPlanWriteInput,
+ 	classifyDurableIssuanceTerminalSuppression,
+ 	cloneDurableIssueCommit,
+@@ -31,6 +32,9 @@ import {
+ 	isValidDurableScopeField,
+ 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
+ 	type SettlementPlan,
++	type SettlementPlanEntry,
++	settlementPlanHasExactEffectLink,
++	settlementReplacementLastLogicalTime,
+ } from "@ts-drp/issuance-store";
+ import {
+ 	bindDurableIssuancePruningMaintenance,
+@@ -68,7 +72,9 @@ interface NativeOutboxRecord extends DurableIssueScope {
+ }
+ 
+ interface NativeSettlementPlan extends DurableIssueScope {
+-	readonly entries: SettlementPlan["entries"];
++	readonly entries: readonly (SettlementPlanEntry & {
++		readonly replacementProgress?: SettlementPlanEntry["replacementProgress"];
++	})[];
+ 	readonly fenceSequence: number | null;
+ 	readonly revision: number;
+ }
+@@ -500,6 +506,17 @@ class BrowserIssuanceImplementation {
+ 				reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+ 				transaction.abort();
+ 			} else {
++				try {
++					assertSettlementPlanProgressTransition(current ?? null, captured.plan);
++				} catch (error) {
++					reason =
++						error instanceof Error
++							? error
++							: createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan progress changed");
++					transaction.abort();
++				}
++			}
++			if (reason === undefined) {
+ 				const writtenKey = await requestResult(plans.put(nativeSettlementPlan(captured.plan)));
+ 				if (!this.#sameNativePlanKey(writtenKey, captured.scope)) {
+ 					reason = this.#latchCorruption("settlement plan put returned an impossible key");
+@@ -865,6 +882,7 @@ class BrowserIssuanceImplementation {
+ 			throw error;
+ 		}
+ 		let reason: Error | undefined;
++		let expectedPlan: SettlementPlan | undefined;
+ 		const terminal = transactionResult(transaction);
+ 		try {
+ 			const lineages = transaction.objectStore("lineages");
+@@ -896,7 +914,13 @@ class BrowserIssuanceImplementation {
+ 							transaction.abort();
+ 						} else {
+ 							try {
+-								updatedPlan = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
++								updatedPlan = applySettlementPlanEffect(
++									plan,
++									candidate.planEffect,
++									candidate.authorSequence,
++									settlementReplacementLastLogicalTime(candidate)
++								);
++								expectedPlan = updatedPlan;
+ 							} catch (error) {
+ 								reason = error instanceof Error ? error : invalid("settlement plan effect failed");
+ 								transaction.abort();
+@@ -923,7 +947,7 @@ class BrowserIssuanceImplementation {
+ 			}
+ 			await terminal;
+ 			if (reason !== undefined) throw reason;
+-			const observation = await this.#readTerminal(scope, candidate.authorSequence, candidate);
++			const observation = await this.#readTerminal(scope, candidate.authorSequence, candidate, expectedPlan);
+ 			const committed = classifyDurableIssuanceTerminalSuppression({
+ 				candidate,
+ 				observation,
+@@ -937,7 +961,7 @@ class BrowserIssuanceImplementation {
+ 			if (this.#poison !== undefined) throw this.#poison;
+ 			let observation: TerminalReadback;
+ 			try {
+-				observation = await this.#readTerminal(scope, candidate.authorSequence, candidate);
++				observation = await this.#readTerminal(scope, candidate.authorSequence, candidate, expectedPlan);
+ 			} catch {
+ 				if (this.#closed || this.#poison !== undefined) this.#assertAvailable();
+ 				return classifyDurableIssuanceTerminalSuppression({
+@@ -967,26 +991,30 @@ class BrowserIssuanceImplementation {
+ 	#assertPlanEffectReadback(
+ 		plan: SettlementPlan | null,
+ 		observation: TerminalReadback,
+-		candidate: DurableIssueCommit
++		candidate: DurableIssueCommit,
++		expectedPlan?: SettlementPlan
+ 	): void {
+ 		const effect = candidate.planEffect;
+ 		if (effect === undefined) return;
+-		const linked =
+-			effect.kind === "fence"
+-				? plan?.fenceSequence === candidate.authorSequence
+-				: plan?.entries.some(
+-						(entry) =>
+-							entry.sourceSequence === effect.sourceSequence && entry.replacementSequence === candidate.authorSequence
+-					);
++		const linked = settlementPlanHasExactEffectLink(plan, effect, candidate.authorSequence);
+ 		if ((observation.issuedRecord !== null) !== linked) {
+ 			throw this.#latchCorruption("issued row and settlement plan link are inconsistent");
+ 		}
++		if (
++			linked &&
++			(plan === null ||
++				expectedPlan === undefined ||
++				JSON.stringify(cloneSettlementPlan(plan)) !== JSON.stringify(cloneSettlementPlan(expectedPlan)))
++		) {
++			throw this.#latchCorruption("settlement plan differs from the committed revision and exact effect");
++		}
+ 	}
+ 
+ 	async #readTerminal(
+ 		scope: DurableIssueScope,
+ 		authorSequence: number,
+-		candidate?: DurableIssueCommit
++		candidate?: DurableIssueCommit,
++		expectedPlan?: SettlementPlan
+ 	): Promise<TerminalReadback> {
+ 		const transaction = this.#startTransaction("readonly");
+ 		const key = [scope.objectId, scope.author, authorSequence];
+@@ -1005,7 +1033,7 @@ class BrowserIssuanceImplementation {
+ 			if (plan === undefined) {
+ 				throw this.#latchCorruption("stored settlement plan is malformed");
+ 			}
+-			this.#assertPlanEffectReadback(plan, observation, candidate);
++			this.#assertPlanEffectReadback(plan, observation, candidate, expectedPlan);
+ 		}
+ 		return observation;
+ 	}
+diff --git a/packages/storage-node/src/internal/node-issuance-store.ts b/packages/storage-node/src/internal/node-issuance-store.ts
+index 815a6117..8eefeb33 100644
+--- a/packages/storage-node/src/internal/node-issuance-store.ts
++++ b/packages/storage-node/src/internal/node-issuance-store.ts
+@@ -1,6 +1,7 @@
+ import {
+ 	applySettlementPlanEffect,
+ 	assertDurableIssueScope,
++	assertSettlementPlanProgressTransition,
+ 	captureSettlementPlanWriteInput,
+ 	classifyDurableIssuanceTerminalSuppression,
+ 	cloneDurableIssueCommit,
+@@ -31,6 +32,8 @@ import {
+ 	isValidDurableScopeField,
+ 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
+ 	type SettlementPlan,
++	settlementPlanHasExactEffectLink,
++	settlementReplacementLastLogicalTime,
+ } from "@ts-drp/issuance-store";
+ import {
+ 	bindDurableIssuancePruningMaintenance,
+@@ -377,6 +380,16 @@ function settlementPlanEntriesJson(plan: SettlementPlan): string {
+ 	return JSON.stringify(
+ 		plan.entries.map((entry) => ({
+ 			disposition: entry.disposition,
++			...(entry.replacementProgress === undefined
++				? {}
++				: {
++						replacementProgress: {
++							chunks: entry.replacementProgress.chunks.map((chunk) => ({ ...chunk })),
++							intentCount: entry.replacementProgress.intentCount,
++							intentDigest: [...entry.replacementProgress.intentDigest],
++							version: 1,
++						},
++					}),
+ 			replacementSequence: entry.replacementSequence,
+ 			sourceDigest: [...entry.sourceDigest],
+ 			sourceSequence: entry.sourceSequence,
+@@ -407,6 +420,26 @@ function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): Settle
+ 			) {
+ 				return entry;
+ 			}
++			const replacementProgress = Reflect.get(entry, "replacementProgress");
++			if (replacementProgress !== undefined) {
++				if (typeof replacementProgress !== "object" || replacementProgress === null) return entry;
++				const intentDigest = Reflect.get(replacementProgress, "intentDigest");
++				if (
++					!Array.isArray(intentDigest) ||
++					intentDigest.length !== 32 ||
++					intentDigest.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
++				) {
++					return entry;
++				}
++				return {
++					...entry,
++					replacementProgress: {
++						...replacementProgress,
++						intentDigest: Uint8Array.from(intentDigest as number[]),
++					},
++					sourceDigest: Uint8Array.from(sourceDigest as number[]),
++				};
++			}
+ 			return { ...entry, sourceDigest: Uint8Array.from(sourceDigest as number[]) };
+ 		});
+ 		return copySettlementPlan({ entries, fenceSequence, revision, scope }, scope);
+@@ -611,6 +644,7 @@ class NodeIssuanceImplementation {
+ 			if ((current?.revision ?? null) !== captured.expectedRevision) {
+ 				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+ 			}
++			assertSettlementPlanProgressTransition(current, captured.plan);
+ 			const changes =
+ 				current === null
+ 					? statement(
+@@ -930,6 +964,7 @@ class NodeIssuanceImplementation {
+ 	#commitCandidate(scope: DurableIssueScope, prior: NativeLineage, candidate: DurableIssueCommit): DurableIssueCommit {
+ 		let began = false;
+ 		let committing = false;
++		let expectedPlan: SettlementPlan | undefined;
+ 		try {
+ 			this.#database.exec("BEGIN IMMEDIATE");
+ 			began = true;
+@@ -944,7 +979,13 @@ class NodeIssuanceImplementation {
+ 				const plan = readSettlementPlanRow(this.#database, scope);
+ 				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+ 				if (plan === null) throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+-				const updated = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
++				const updated = applySettlementPlanEffect(
++					plan,
++					candidate.planEffect,
++					candidate.authorSequence,
++					settlementReplacementLastLogicalTime(candidate)
++				);
++				expectedPlan = updated;
+ 				const planChanges = statement(
+ 					this.#database,
+ 					"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
+@@ -1002,24 +1043,25 @@ class NodeIssuanceImplementation {
+ 					// Preserve the mutation failure.
+ 				}
+ 			}
+-			if (committing) return this.#classifyAfterTerminalSuppression(scope, prior, candidate);
++			if (committing) return this.#classifyAfterTerminalSuppression(scope, prior, candidate, expectedPlan);
+ 			if (error === this.#poison) throw error;
+ 			if (this.#hasCode(error, "ISSUANCE_RETRY_REQUIRED")) throw error;
+ 			if (this.#isConstraint(error)) throw this.#latchCorruption("issuance child-key collision");
+ 			throw mapSubstrate(error, "issuance write failed");
+ 		}
+-		return this.#classifyAfterTerminalSuppression(scope, prior, candidate);
++		return this.#classifyAfterTerminalSuppression(scope, prior, candidate, expectedPlan);
+ 	}
+ 
+ 	#classifyAfterTerminalSuppression(
+ 		scope: DurableIssueScope,
+ 		prior: NativeLineage,
+-		candidate: DurableIssueCommit
++		candidate: DurableIssueCommit,
++		expectedPlan?: SettlementPlan
+ 	): DurableIssueCommit {
+ 		const priorLineage = { exhausted: prior.exhausted, next: prior.next };
+ 		let observation: TerminalReadback;
+ 		try {
+-			observation = this.#readTerminal(scope, candidate.authorSequence, candidate);
++			observation = this.#readTerminal(scope, candidate.authorSequence, candidate, expectedPlan);
+ 		} catch (error) {
+ 			if (error === this.#poison) throw error;
+ 			const committed = classifyDurableIssuanceTerminalSuppression({
+@@ -1049,30 +1091,38 @@ class NodeIssuanceImplementation {
+ 	#assertPlanEffectReadback(
+ 		plan: SettlementPlan | null,
+ 		observation: TerminalReadback,
+-		candidate: DurableIssueCommit
++		candidate: DurableIssueCommit,
++		expectedPlan?: SettlementPlan
+ 	): void {
+ 		const effect = candidate.planEffect;
+ 		if (effect === undefined) return;
+-		const linked =
+-			effect.kind === "fence"
+-				? plan?.fenceSequence === candidate.authorSequence
+-				: plan?.entries.some(
+-						(entry) =>
+-							entry.sourceSequence === effect.sourceSequence && entry.replacementSequence === candidate.authorSequence
+-					);
++		const linked = settlementPlanHasExactEffectLink(plan, effect, candidate.authorSequence);
+ 		if ((observation.issuedRecord !== null) !== linked) {
+ 			throw this.#latchCorruption("issued row and settlement plan link are inconsistent");
+ 		}
++		if (
++			linked &&
++			(plan === null ||
++				expectedPlan === undefined ||
++				JSON.stringify(cloneSettlementPlan(plan)) !== JSON.stringify(cloneSettlementPlan(expectedPlan)))
++		) {
++			throw this.#latchCorruption("settlement plan differs from the committed revision and exact effect");
++		}
+ 	}
+ 
+-	#readTerminal(scope: DurableIssueScope, authorSequence: number, candidate?: DurableIssueCommit): TerminalReadback {
++	#readTerminal(
++		scope: DurableIssueScope,
++		authorSequence: number,
++		candidate?: DurableIssueCommit,
++		expectedPlan?: SettlementPlan
++	): TerminalReadback {
+ 		this.#database.exec("BEGIN");
+ 		try {
+ 			const observation = this.#queryTerminal(scope, authorSequence);
+ 			if (candidate?.planEffect !== undefined) {
+ 				const plan = readSettlementPlanRow(this.#database, scope);
+ 				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+-				this.#assertPlanEffectReadback(plan, observation, candidate);
++				this.#assertPlanEffectReadback(plan, observation, candidate, expectedPlan);
+ 			}
+ 			this.#database.exec("COMMIT");
+ 			return observation;
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index f29c3a8d..187c9f7f 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -344,6 +344,9 @@ importers:
+       "@ts-drp/ephemeral":
+         specifier: workspace:*
+         version: link:../../packages/ephemeral
++      "@ts-drp/issuance-store":
++        specifier: workspace:*
++        version: link:../../packages/issuance-store
+       "@ts-drp/message-queue":
+         specifier: workspace:*
+         version: link:../../packages/message-queue

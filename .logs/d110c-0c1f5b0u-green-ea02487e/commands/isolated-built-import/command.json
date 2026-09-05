@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import assert from \"node:assert/strict\";const live=await import(\"@ts-drp/node/v3-live\");const issuance=await import(\"@ts-drp/issuance-store\");assert.equal(typeof live.recoverV3LiveReplica,\"function\");assert.equal(issuance.SETTLEMENT_REPLACEMENT_MAX_INTENTS,16);console.log(JSON.stringify({node:process.version,live:import.meta.resolve(\"@ts-drp/node/v3-live\"),issuance:import.meta.resolve(\"@ts-drp/issuance-store\"),maxIntents:issuance.SETTLEMENT_REPLACEMENT_MAX_INTENTS,loaded:true}));"
+  ],
+  "start": "2026-09-05T06:51:18.791Z"
+}

@@ -1,0 +1,43 @@
+{
+  "head": "ea02487e9c80d25ab6e7038cdf35330b72f29de6",
+  "tree": "7ba509ebd0748e7014c12fab4d76235fd3f8bc0c",
+  "signature": "G",
+  "branch": "",
+  "runtime": {
+    "node": "v22.15.0",
+    "execPath": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "pnpm": "10.24.0",
+    "imports": {
+      "@ts-drp/node/v3-live": {
+        "path": "/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/dist/src/v3-live.js",
+        "sha256": "221334d451a1b4402fa0736cd3511d7e4485c7ca9cc3f7f9ba5fa082324de0b8"
+      },
+      "@ts-drp/issuance-store": {
+        "path": "/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/issuance-store/dist/src/index.js",
+        "sha256": "62b3b2c62e7cc230820ba56e8867be76f17861dde3b45d645c2855a11b6afa93"
+      },
+      "@ts-drp/protocol-v3": {
+        "path": "/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/dist/src/public.js",
+        "sha256": "e03c81e8a730064872bf4246ac97fff427c4d18af5bdc29ca7a323891ff8b572"
+      }
+    }
+  },
+  "lockfile": "56e8b9b56d7e76d4651daec66b6ff8c0bc8150ce9fab588b97b1887f417d1251",
+  "stashes": {
+    "count": 27,
+    "hash": "382adffafb1bcaaff7def4d01213b0b0f70f7a446e60d9ac1225b8d6b81b5fc7"
+  },
+  "protected": {
+    ".agents": null,
+    ".claude": null,
+    "packages/protocol-v2/tests/author-sequence-0g2.test.ts": null,
+    "packages/protocol-v2/tests/local-author-sequence-issuance-0g2.test.ts": null,
+    "CPU.20260901.090022.81530.0.001.cpuprofile": null,
+    "skills-lock.json": null
+  },
+  "otherProtectedExistence": {
+    ".pnpm-store": false,
+    "_apalache-out": false
+  },
+  "trackedStatus": ""
+}
