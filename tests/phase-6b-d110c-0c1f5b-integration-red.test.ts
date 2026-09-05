@@ -1,11 +1,33 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Transparent test observers retain real runtime signatures. */
 /* eslint-disable @typescript-eslint/consistent-type-imports -- importOriginal describes the observed production module. */
+// Parent case ownership (all calls below remain after the single causal RED):
+// 1-3,10,13-negative,14,22,26: checkpoint-terminal open-progress continuation.
+// 4,15,16,19: delayedPublication; 5,11: manualReviewHold; 6-9: sameKeyReentry.
+// 12,23: creatorFenceScan; 13-positive: positiveAuthenticatedPruning;
+// 14,24c and the 64-writer product golden path: sixtyFourWriterGoldenPath;
+// 17: unchanged v1 control; 19-21: displacedControls; 24a: staleLocalHead;
+// 25: ambiguousPlanIssue. Case 24 follows signed clarification 62f71f4d:
+// no committed floor regression, no Superseded-generation readoption.
+// Closed nonduplicated primitives: 18 and 26-27 are exact vectors in
+// d110c-0c1f5b0a-settlement-codec-red.test.ts, "puts ACL membership, genesis
+// admission, adjacency, and monotonicity in the bounded advance predicate",
+// "signs with successor authority and cold-opens with floor trust only, without
+// predecessor bytes", and "keeps predecessor checks shape-only in the opener
+// and rejects malformed predecessor fields". Interrupted adoption: retained
+// phase-6b-d110c-0b0a-staged-handoff-red.test.ts, "stages without a head swap and
+// publishes through one owner-bound CAS" and "recovers equivalent Complete
+// retries deterministically across both AHE orderings", plus D.110c-b evidence.
+// Later >=100-transition acceptance remains a retained, separately authorized
+// same-room workload with bounded durable structures/custody/fresh-process
+// memory checks. This fixture executes three wide transitions, not that campaign.
 import "fake-indexeddb/auto";
 
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import type { DurableIssuanceStore, DurableIssueCommit } from "@ts-drp/issuance-store";
+import type { DurableIssuanceStore, DurableIssueCommit, SettlementPlan } from "@ts-drp/issuance-store";
+import type { DurableIssuancePruningReceipt } from "@ts-drp/issuance-store/maintenance";
 import type { V3PlaneHandle } from "@ts-drp/node/v3-live";
+import { type GenerationRecord, parseStorageObjectId } from "@ts-drp/storage";
 import { Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +47,7 @@ import {
 	openCreatorAuthorSettlement,
 	resolveCreatorAuthorSettlement,
 } from "../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
+import { createBrowserAheDurableStore } from "../packages/storage-browser/src/index.js";
 import { createBrowserDurableIssuanceStore } from "../packages/storage-browser/src/issuance.js";
 
 const observed = vi.hoisted(() => ({
@@ -34,6 +57,32 @@ const observed = vi.hoisted(() => ({
 	advances: [] as Record<string, unknown>[],
 	failSuffixFor: "",
 	faults: 0,
+	ambiguous: undefined as
+		| { database: string; kind: "fence" | "replacement"; committed: boolean; recoveryFails?: boolean }
+		| undefined,
+	failRecoveryReadFor: "",
+	issueAttempts: [] as DurableIssueCommit[],
+	commitHandles: new Map<DurableIssueCommit, V3PlaneHandle | undefined>(),
+	ambiguities: [] as {
+		database: string;
+		candidate: DurableIssueCommit;
+		handle: V3PlaneHandle | undefined;
+		plan: SettlementPlan | null;
+		lineage: { next: number; exhausted: boolean };
+		row: DurableIssueCommit | null;
+		publicationOffset: number;
+		commitOffset: number;
+	}[],
+	publications: [] as { database: string; sequence: number; digest: string; handle: V3PlaneHandle | undefined }[],
+	planWrites: [] as { database: string; plan: SettlementPlan }[],
+	prunes: [] as {
+		database: string;
+		input: unknown;
+		stack: string;
+		receipt?: DurableIssuancePruningReceipt;
+		error?: unknown;
+	}[],
+	cleanup: [] as { input: unknown; result: unknown }[],
 }));
 
 // All aliases point at the existing implementations, sharing their actual opaque
@@ -47,10 +96,35 @@ vi.mock(
 	"../packages/node/dist/src/creator-adoption-recover.js",
 	() => import("../packages/node/src/creator-adoption-recover.js")
 );
-vi.mock(
-	"../packages/node/dist/src/creator-adoption-activate.js",
-	() => import("../packages/node/src/creator-adoption-activate.js")
-);
+vi.mock("../packages/node/dist/src/creator-adoption-activate.js", async () => {
+	const real = await import("../packages/node/src/creator-adoption-activate.js");
+	const capture =
+		(name: "activateCreatorSuccessorAdoption" | "reopenCreatorSuccessorAdoption") => async (input: unknown) => {
+			const result = await real[name](input);
+			if (result.ok === true) {
+				const network = Reflect.get(input as object, "networkNode") as { peerId: string };
+				observed.planes.set(network.peerId, result.handle as V3PlaneHandle);
+			}
+			return result;
+		};
+	return {
+		...real,
+		activateCreatorSuccessorAdoption: capture("activateCreatorSuccessorAdoption"),
+		reopenCreatorSuccessorAdoption: capture("reopenCreatorSuccessorAdoption"),
+	};
+});
+
+vi.mock("../packages/node/src/internal/closed-epoch-cleanup.js", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../packages/node/src/internal/closed-epoch-cleanup.js")>();
+	return {
+		...real,
+		planClosedEpochCleanup: (input: unknown) => {
+			const result = real.planClosedEpochCleanup(input);
+			observed.cleanup.push({ input, result });
+			return result;
+		},
+	};
+});
 
 vi.mock("../packages/node/src/internal/creator-transition-advance.js", async (importOriginal) => {
 	const real = await importOriginal<typeof import("../packages/node/src/internal/creator-transition-advance.js")>();
@@ -63,37 +137,110 @@ vi.mock("../packages/node/src/internal/creator-transition-advance.js", async (im
 	};
 });
 
-vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOriginal) => {
-	const real = await importOriginal<typeof import("@ts-drp/storage-browser/issuance")>();
+vi.mock("../packages/storage-browser/dist/src/issuance.js", async () => {
+	const real = await import("../packages/storage-browser/src/issuance.js");
+	const { browserIssuanceImplementationForTest } = await import(
+		"../packages/storage-browser/src/internal/browser-issuance-store.js"
+	);
+	const { DurableIssuanceUnknownOutcomeError } = await import("../packages/issuance-store/src/contract.js");
 	return {
 		...real,
 		createBrowserDurableIssuanceStore: async (input: { primaryDatabaseName: string }) => {
 			const store = await real.createBrowserDurableIssuanceStore(input);
-			const wrapped: DurableIssuanceStore = {
-				...store,
-				transactIssue: async (scope, build) => {
-					let selected: DurableIssueCommit | undefined;
-					const result = await store.transactIssue(scope, async (sequence) => {
-						const candidate = await build(sequence);
-						const effect = candidate.planEffect;
-						if (
-							input.primaryDatabaseName === observed.failSuffixFor &&
-							effect?.kind === "replacement" &&
-							"fromIntent" in effect &&
-							effect.fromIntent > 0
-						) {
-							observed.faults += 1;
-							throw new Error("F5B_SIGNED_SUFFIX_NOT_COMMITTED");
-						}
-						selected = candidate;
-						return candidate;
-					});
-					if (selected !== undefined) observed.commits.push(selected);
-					return result;
-				},
+			const transactIssue = store.transactIssue;
+			const readLineage = store.readLineage;
+			Reflect.set(store, "readLineage", (scope: Parameters<typeof readLineage>[0]) => {
+				if (observed.failRecoveryReadFor === input.primaryDatabaseName)
+					return Promise.reject(new Error("F5B_RECOVERY_DURABLE_READ_UNAVAILABLE"));
+				return readLineage(scope);
+			});
+			const ambiguousReadback = async (candidate: DurableIssueCommit) => {
+				const scope = candidate.issuedRecord.scope;
+				observed.ambiguities.push({
+					database: input.primaryDatabaseName,
+					candidate,
+					handle: observed.planes.get(input.primaryDatabaseName),
+					plan: await store.readSettlementPlan(scope),
+					lineage: await readLineage(scope),
+					row: await store.readIssued(scope, candidate.authorSequence),
+					publicationOffset: observed.publications.length,
+					commitOffset: observed.commits.length,
+				});
 			};
-			observed.stores.set(input.primaryDatabaseName, wrapped);
-			return wrapped;
+			// Observe methods on the EXACT backend facade. Its existing maintenance
+			// WeakMap identity remains intact; no capability is minted or rebound.
+			Reflect.set(store, "transactIssue", (async (scope, build) => {
+				let selected: DurableIssueCommit | undefined;
+				const ambiguity = observed.ambiguous?.database === input.primaryDatabaseName ? observed.ambiguous : undefined;
+				const result = await transactIssue(scope, async (sequence) => {
+					const candidate = await build(sequence);
+					observed.issueAttempts.push(candidate);
+					const effect = candidate.planEffect;
+					if (ambiguity !== undefined && ambiguity.kind === effect?.kind && !ambiguity.committed) {
+						await ambiguousReadback(candidate);
+						if (ambiguity.recoveryFails === true) observed.failRecoveryReadFor = input.primaryDatabaseName;
+						observed.ambiguous = undefined;
+						throw new DurableIssuanceUnknownOutcomeError(scope);
+					}
+					if (
+						input.primaryDatabaseName === observed.failSuffixFor &&
+						effect?.kind === "replacement" &&
+						"fromIntent" in effect &&
+						effect.fromIntent > 0
+					) {
+						observed.faults += 1;
+						throw new Error("F5B_SIGNED_SUFFIX_NOT_COMMITTED");
+					}
+					selected = candidate;
+					return candidate;
+				});
+				if (selected !== undefined) {
+					observed.commits.push(selected);
+					observed.commitHandles.set(selected, observed.planes.get(input.primaryDatabaseName));
+				}
+				if (ambiguity !== undefined && ambiguity.kind === selected?.planEffect?.kind && ambiguity.committed) {
+					await ambiguousReadback(selected);
+					if (ambiguity.recoveryFails === true) observed.failRecoveryReadFor = input.primaryDatabaseName;
+					observed.ambiguous = undefined;
+					throw new DurableIssuanceUnknownOutcomeError(scope);
+				}
+				return result;
+			}) satisfies DurableIssuanceStore["transactIssue"]);
+			const publish = store.compareAndMarkOutboxPublished;
+			Reflect.set(store, "compareAndMarkOutboxPublished", (async (value) => {
+				await publish(value);
+				observed.publications.push({
+					database: input.primaryDatabaseName,
+					sequence: value.authorSequence,
+					digest: Buffer.from(value.digest).toString("hex"),
+					handle: observed.planes.get(input.primaryDatabaseName),
+				});
+			}) satisfies DurableIssuanceStore["compareAndMarkOutboxPublished"]);
+			const writePlan = store.transactWriteSettlementPlan;
+			Reflect.set(store, "transactWriteSettlementPlan", (async (value) => {
+				const plan = await writePlan(value);
+				observed.planWrites.push({ database: input.primaryDatabaseName, plan: structuredClone(plan) });
+				return plan;
+			}) satisfies DurableIssuanceStore["transactWriteSettlementPlan"]);
+			const implementation = browserIssuanceImplementationForTest(store);
+			if (implementation === undefined) throw new Error("F5B_NATIVE_ISSUANCE_IDENTITY_LOST");
+			const prune = implementation.pruneAuthenticatedSettledPrefix.bind(implementation);
+			vi.spyOn(implementation, "pruneAuthenticatedSettledPrefix").mockImplementation(async (value) => {
+				const event: (typeof observed.prunes)[number] = {
+					database: input.primaryDatabaseName,
+					input: structuredClone(value),
+					stack: new Error().stack ?? "",
+				};
+				observed.prunes.push(event);
+				try {
+					return (event.receipt = await prune(value));
+				} catch (error) {
+					event.error = error;
+					throw error;
+				}
+			});
+			observed.stores.set(input.primaryDatabaseName, store);
+			return store;
 		},
 	};
 });
@@ -123,6 +270,8 @@ const parameters = Object.freeze({
 });
 const hex = (value: Uint8Array) => Buffer.from(value).toString("hex");
 const record = (value: Uint8Array) => decodeCanonical(value) as Record<string, unknown>;
+const STALE_LOCAL_HEAD_FAILURE =
+	"v3 room successor reopen failed: D110C_FLOOR_MISMATCH: creator successor differs from the authenticated room-head floor";
 let ordinal = 0;
 
 function required<T>(value: T | undefined | null): T {
@@ -284,7 +433,7 @@ interface Peer {
 	room: V3RoomSession;
 }
 
-async function openRoom(writerCount: number, legacy = false) {
+async function openRoom(writerCount: number, legacy = false, secondaryAdmin = false) {
 	const id = ++ordinal;
 	const objectId = `creator:${(8000 + id).toString(16).padStart(32, "0")}`;
 	const identities = Array.from({ length: writerCount }, (_, index) => {
@@ -309,7 +458,12 @@ async function openRoom(writerCount: number, legacy = false) {
 				.map(({ author }, index) => ({
 					author,
 					finalityKey: index === 0 ? author : null,
-					groups: index === 0 ? ["admin", "finality", "writer"] : ["writer"],
+					groups:
+						index === 0
+							? ["admin", "finality", "writer"]
+							: secondaryAdmin && index === 1
+								? ["admin", "writer"]
+								: ["writer"],
 				}))
 				.sort((a, b) => (a.author < b.author ? -1 : 1)),
 		}),
@@ -329,10 +483,18 @@ async function openRoom(writerCount: number, legacy = false) {
 	const received = new Set<string>();
 	const waiters = new Map<string, () => void>();
 	const held = new Set<string>();
+	const publicationFailures = new Set<string>();
+	const heldApplications = new Set<string>();
 	const envelopes: Message[] = [];
 	const peers: Peer[] = [];
 	const send = async (sender: string, message: Message) => {
 		envelopes.push(structuredClone(message));
+		if (publicationFailures.has(sender)) return false;
+		if (heldApplications.has(sender)) {
+			const action = (record(V3Envelope.decode(message.data).canonicalPreimage).operation as Record<string, unknown>)
+				.action;
+			if (action !== "$drp.author-fence.v1" && action !== "join" && action !== "causalJoin") return true;
+		}
 		if (held.has(sender) || sender === `d110c-f5b-parent-${id}-peer-0`) return true;
 		const target = required(peers[0]);
 		const envelope = V3Envelope.decode(message.data);
@@ -454,7 +616,7 @@ async function openRoom(writerCount: number, legacy = false) {
 			const detail = error instanceof Error ? error.message : String(error);
 			if (detail === "creator close actor failed: CERTIFIED_VALUE_MISMATCH") {
 				// The first preserved run established this earlier compatibility seam.
-				// Pin all three existing successor sites; do not substitute a profile,
+				// Pin all five successor/cold-checkpoint sites; do not substitute a profile,
 				// checkpoint, signature, successful actor result or synthetic authority.
 				const source = readFileSync(new URL("../packages/protocol-v3/src/creator-close.ts", import.meta.url), "utf8");
 				const owner = (name: string) => {
@@ -472,6 +634,24 @@ async function openRoom(writerCount: number, legacy = false) {
 				expect(owner("openCreatorSuccessorTrust"), "F5B_SUCCESSOR_PROFILE_OPEN_V1_ONLY").toContain(
 					'decodedRecord.profileId !== "creator-trusted-v1"'
 				);
+				const checkpointSource = readFileSync(
+					new URL("../packages/protocol-v3/src/creator-checkpoint.ts", import.meta.url),
+					"utf8"
+				);
+				expect(
+					checkpointSource.slice(
+						checkpointSource.indexOf("function trustRecord("),
+						checkpointSource.indexOf("function bytesHex(")
+					),
+					"F5B_CHECKPOINT_CURRENT_PROFILE_V1_ONLY"
+				).toContain('decoded.profileId !== "creator-trusted-v1"');
+				expect(
+					checkpointSource.slice(
+						checkpointSource.indexOf("const genesisRecordBytes = encodeCanonical({"),
+						checkpointSource.indexOf("const genesis = openCurrentAnchorTrust({")
+					),
+					"F5B_CHECKPOINT_RECONSTRUCTED_GENESIS_PROFILE_V1_ONLY"
+				).toContain('profileId: "creator-trusted-v1"');
 				throw new Error(
 					"F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production",
 					{ cause: error }
@@ -529,10 +709,30 @@ async function openRoom(writerCount: number, legacy = false) {
 			),
 			"F5B_NO_LEGACY_CONTROLS"
 		).toHaveLength(0);
-		return { capability: opened.capability, identity: required(resolveCreatorAuthorSettlement(opened.capability)) };
+		return {
+			capability: opened.capability,
+			identity: required(resolveCreatorAuthorSettlement(opened.capability)),
+			bytes: settled.bytes,
+			cut: record(cut.bytes),
+			candidates: proposed.candidates,
+		};
 	};
 	const deliver = (message: Message) => required(ingress.get(required(peers[0]).databaseName))(message);
-	return { peers, objectId, issue, close, checkpoint, reopen, stop, held, envelopes, deliver };
+	return {
+		peers,
+		objectId,
+		issue,
+		close,
+		checkpoint,
+		reopen,
+		stop,
+		held,
+		publicationFailures,
+		heldApplications,
+		envelopes,
+		deliver,
+		received,
+	};
 }
 
 async function durable(peer: Peer) {
@@ -541,10 +741,639 @@ async function durable(peer: Peer) {
 		const scope = { author: peer.author, objectId: peer.input.objectId };
 		const lineage = await store.readLineage(scope);
 		const plan = await store.readSettlementPlan(scope);
-		return { lineage, plan };
+		const rows = await store.readOutboxPage({ scope, limit: 256 });
+		return { lineage, plan, rows };
 	} finally {
 		await store.close();
 	}
+}
+
+function productState(peer: Peer): Uint8Array {
+	return required(peer.input.application.migration).canonicalStateBytes(peer.room.projection());
+}
+
+function messages(peer: Peer) {
+	return decodeCanonical(productState(peer)) as { clientOperationId: string; text: string }[];
+}
+
+function ownCommits(peer: Peer) {
+	return observed.commits.filter(
+		(row) => row.issuedRecord.scope.objectId === peer.input.objectId && row.issuedRecord.scope.author === peer.author
+	);
+}
+
+function applicationOperations(commit: DurableIssueCommit): Record<string, unknown>[] {
+	const operation = record(commit.envelope.canonicalPreimageBytes).operation as Record<string, unknown>;
+	return operation.action === "applicationBatch"
+		? (operation.batch as { entries: { operation: Record<string, unknown> }[] }).entries.map((entry) => entry.operation)
+		: operation.action === "message"
+			? [operation]
+			: [];
+}
+
+async function aheFacts(peer: Peer) {
+	const store = await createBrowserAheDurableStore({ databaseName: `${peer.databaseName}--ahe` });
+	try {
+		const objectId = parseStorageObjectId(peer.input.objectId);
+		if (!objectId.ok) throw new Error("F5B_REAL_OBJECT_ID_REQUIRED");
+		const recovered = await store.recoverActiveGeneration(objectId.value);
+		expect(recovered.ok, "F5B_C24C_GENUINE_ACTIVE_HEAD_RECOVERY").toBe(true);
+		if (!recovered.ok || recovered.value.kind !== "active") throw new Error("F5B_ACTIVE_GENERATION_REQUIRED");
+		const generations: GenerationRecord[] = [];
+		let cursor: Parameters<typeof store.readGenerationPage>[0]["cursor"];
+		do {
+			const page = await store.readGenerationPage({
+				objectId: objectId.value,
+				limit: 64,
+				...(cursor === undefined ? {} : { cursor }),
+			});
+			if (!page.ok) throw new Error(`F5B_AHE_ENUMERATION_${page.reason}`);
+			generations.push(...page.value.generations);
+			cursor = page.value.nextCursor ?? undefined;
+		} while (cursor !== undefined);
+		return { head: recovered.value.head, generations };
+	} finally {
+		await store.close();
+	}
+}
+
+async function assertRetainedRollbackPair(peer: Peer) {
+	const facts = await aheFacts(peer);
+	const retained = facts.generations.filter((generation) => generation.state === "Superseded");
+	expect(retained, "F5B_C13_C24C_EXACT_TWO_SUPERSEDED_ROLLBACK_GENERATIONS").toHaveLength(2);
+	const active = required(facts.generations.find((generation) => generation.generationId === facts.head.generationId));
+	expect(active.state).toBe("Adopted");
+	let base = active.baseExpectedHead;
+	for (let index = 0; index < 2; index += 1) {
+		if (base.kind !== "present") throw new Error("F5B_C13_ROLLBACK_LINEAGE_GAP");
+		const id = base.generationId;
+		const prior = required(retained.find((generation) => generation.generationId === id));
+		expect(prior.closure.length, "F5B_C13_RETAINED_COMPLETE_CLOSURE").toBeGreaterThan(0);
+		expect(prior.closureDigest).toBe(base.closureDigest);
+		base = prior.baseExpectedHead;
+	}
+	return facts;
+}
+
+async function displacedFixture() {
+	const fixture = await openRoom(2);
+	const creator = required(fixture.peers[0]);
+	const writer = required(fixture.peers[1]);
+	await fixture.issue(creator, "timing-creator");
+	await fixture.issue(writer, "timing-writer");
+	fixture.held.add(writer.databaseName);
+	await fixture.issue(writer, "timing-displaced");
+	const source = required((await durable(writer)).rows.at(-1));
+	expect(source.publishState, "F5B_C19_PUBLISHED_SOURCE_REALLY_DURABLE").toBe("published");
+	await fixture.close();
+	const checkpoint = fixture.checkpoint();
+	await creator.room.adoptCreatorSuccessor();
+	fixture.held.delete(writer.databaseName);
+	return { fixture, creator, writer, source: source.commit, checkpoint };
+}
+
+async function delayedPublication(mode: "unpublished-fence" | "delayed-replacement" | "delayed-fence") {
+	const { fixture, creator, writer, source, checkpoint } = await displacedFixture();
+	if (mode === "unpublished-fence") fixture.publicationFailures.add(writer.databaseName);
+	if (mode === "delayed-replacement") fixture.heldApplications.add(writer.databaseName);
+	if (mode === "delayed-fence") fixture.held.add(writer.databaseName);
+	await fixture.reopen(writer, 0, true);
+	if (mode === "unpublished-fence") await expect(fixture.issue(writer, "unpublished-fence-barrier")).rejects.toThrow();
+	else await fixture.issue(writer, "delayed-dependent-application");
+	const before = await durable(writer);
+	const plan = required(before.plan);
+	const fence = required(plan.fenceSequence);
+	const sourceEntry = required(plan.entries.find((entry) => entry.sourceSequence === source.authorSequence));
+	if (mode === "unpublished-fence") {
+		expect(
+			required(before.rows.find((row) => row.commit.authorSequence === fence)).publishState,
+			"F5B_C04_FENCE_DURABLE_UNPUBLISHED"
+		).toBe("pending");
+		expect(sourceEntry.replacementSequence, "F5B_C04_NO_REPLACEMENT_BEFORE_FENCE_PUBLICATION").toBeNull();
+		await fixture.stop(writer);
+		fixture.publicationFailures.delete(writer.databaseName);
+		await fixture.reopen(writer, 0);
+		await fixture.issue(writer, "after-unpublished-fence-crash");
+		expect((await durable(writer)).plan?.fenceSequence, "F5B_C04_REPUBLISH_SAME_FENCE_BEFORE_CHECKPOINT").toBe(fence);
+		expect(
+			ownCommits(writer).filter(
+				(row) => row.planEffect?.kind === "fence" && record(row.envelope.canonicalPreimageBytes).epoch === 1
+			),
+			"F5B_C04_ONE_FENCE_FOR_SAME_PLAN"
+		).toHaveLength(1);
+	} else {
+		const replacement = required(sourceEntry.replacementSequence);
+		await fixture.stop(writer);
+		await fixture.issue(creator, "close-while-transport-delayed");
+		await fixture.close();
+		const next = fixture.checkpoint();
+		expect(
+			frontierFor(next.capability, writer.author)?.[2],
+			mode === "delayed-fence" ? "F5B_C16_DELAYED_FENCE_DEPENDENTS_NOT_ADMITTED" : "F5B_C15_ONLY_FENCE_ADMITTED"
+		).toBe(mode === "delayed-fence" ? frontierFor(checkpoint.capability, writer.author)?.[2] : fence);
+		await creator.room.adoptCreatorSuccessor();
+		fixture.held.delete(writer.databaseName);
+		fixture.heldApplications.delete(writer.databaseName);
+		await fixture.reopen(writer, 1, true);
+		await fixture.issue(writer, "after-delayed-close");
+		const recovered = required((await durable(writer)).plan);
+		expect(recovered.fenceSequence, "F5B_C16_NEXT_EPOCH_LARGER_FENCE").toBeGreaterThan(fence);
+		expect(
+			recovered.entries.some((entry) => entry.sourceSequence === replacement && entry.replacementSequence !== null),
+			"F5B_C15_DISPLACED_REPLACEMENT_BECOMES_SOURCE"
+		).toBe(true);
+	}
+	expect(
+		messages(creator).filter((row) => row.clientOperationId === "timing-displaced"),
+		"F5B_C15_C16_ONE_APPLICATION_EFFECT"
+	).toEqual([{ clientOperationId: "timing-displaced", text: "r".repeat(33_000) }]);
+	await Promise.all(fixture.peers.map(fixture.stop));
+}
+
+async function ambiguousPlanIssue(kind: "fence" | "replacement", committed: boolean, recoveryFails = false) {
+	const { fixture, creator, writer, source } = await displacedFixture();
+	observed.ambiguous = { database: writer.databaseName, kind, committed, recoveryFails };
+	await fixture.reopen(writer, 0, true);
+	// Clarification: the ambiguous owner must halt, but the existing room owner
+	// may authenticate a fresh owner and retry once inside the same public call.
+	// No activation result/capability is supplied by this fixture.
+	const issue = fixture.issue(writer, "unknown-outcome-barrier");
+	if (recoveryFails) await expect(issue, "F5B_C25_FAILED_RECOVERY_STAYS_CLOSED").rejects.toThrow();
+	else await issue;
+	const boundary = required(observed.ambiguities.findLast((row) => row.database === writer.databaseName));
+	const entry = required(boundary.plan?.entries.find((row) => row.sourceSequence === source.authorSequence));
+	const link = kind === "fence" ? boundary.plan?.fenceSequence : entry.replacementSequence;
+	expect(link !== null, `F5B_C25_${kind}_${committed ? "ROW_AND_LINK" : "NEITHER"}`).toBe(committed);
+	expect(boundary.row, "F5B_C25_EXACT_DURABLE_ROW_AT_AMBIGUITY").toEqual(committed ? boundary.candidate : null);
+	expect(boundary.lineage.next, "F5B_C25_ATOMIC_LINEAGE_WITH_ROW_AND_LINK").toBe(
+		boundary.candidate.authorSequence + (committed ? 1 : 0)
+	);
+	expect(required(boundary.handle).currentEphemeralAuthority(), "F5B_C25_AMBIGUOUS_OWNER_DEACTIVATED").toBeUndefined();
+	if (recoveryFails) {
+		const unchanged = await durable(writer);
+		await expect(fixture.issue(writer, "still-halted")).rejects.toThrow();
+		expect(await durable(writer), "F5B_C25_FAILED_RECOVERY_NO_MUTATION").toEqual(unchanged);
+		observed.failRecoveryReadFor = "";
+		await fixture.reopen(writer, 0);
+		await fixture.issue(writer, "recovered-ambiguous-outcome");
+	}
+	expect(observed.planes.get(writer.databaseName), "F5B_C25_GENUINE_AUTHENTICATED_OWNER_IDENTITY_CHANGES").not.toBe(
+		boundary.handle
+	);
+	for (const row of observed.commits
+		.slice(boundary.commitOffset)
+		.filter(
+			(row) => row.issuedRecord.scope.objectId === fixture.objectId && row.issuedRecord.scope.author === writer.author
+		))
+		expect(observed.commitHandles.get(row), "F5B_C25_FRESH_OWNER_BEFORE_SUBSEQUENT_ISSUE").not.toBe(boundary.handle);
+	for (const publication of observed.publications
+		.slice(boundary.publicationOffset)
+		.filter((row) => row.database === writer.databaseName))
+		expect(publication.handle, "F5B_C25_FRESH_OWNER_BEFORE_SUBSEQUENT_PUBLICATION").not.toBe(boundary.handle);
+	const after = required((await durable(writer)).plan);
+	const recoveredLink =
+		kind === "fence"
+			? after.fenceSequence
+			: required(after.entries.find((row) => row.sourceSequence === source.authorSequence)).replacementSequence;
+	if (committed) {
+		expect(recoveredLink, "F5B_C25_LINK_FROM_DURABLE_TRUTH").toBe(link);
+	} else expect(recoveredLink, "F5B_C25_UNCOMMITTED_SLOT_REUSED").toBe(boundary.lineage.next);
+	expect(
+		ownCommits(writer).filter(
+			(row) => record(row.envelope.canonicalPreimageBytes).epoch === 1 && row.planEffect?.kind === kind
+		),
+		"F5B_C25_EXACT_ONE_DURABLE_FENCE_OR_REPLACEMENT"
+	).toHaveLength(1);
+	const attempts = observed.issueAttempts.filter(
+		(row) =>
+			row.issuedRecord.scope.objectId === fixture.objectId &&
+			row.issuedRecord.scope.author === writer.author &&
+			record(row.envelope.canonicalPreimageBytes).epoch === 1 &&
+			row.planEffect?.kind === kind
+	);
+	expect(attempts, "F5B_C25_AT_MOST_ONE_AUTHENTICATED_SIGNED_RETRY").toHaveLength(committed ? 1 : 2);
+	expect(
+		after.entries.filter((row) => row.sourceSequence === source.authorSequence),
+		"F5B_C25_NO_DUPLICATE_DISPOSITION"
+	).toHaveLength(1);
+	expect(required(after.entries.find((row) => row.sourceSequence === source.authorSequence)).disposition).toBe(
+		entry.disposition
+	);
+	expect(
+		messages(creator).filter((row) => row.clientOperationId === "timing-displaced"),
+		"F5B_C25_EXACTLY_ONCE_RECOVERY_EFFECT"
+	).toHaveLength(1);
+	await Promise.all(fixture.peers.map(fixture.stop));
+}
+
+async function staleLocalHead() {
+	const { fixture, creator, writer } = await displacedFixture();
+	await fixture.reopen(writer, 0, true);
+	await fixture.issue(writer, "linked-before-newer-floor");
+	const linked = await durable(writer);
+	expect(
+		linked.plan?.entries.some((entry) => entry.replacementSequence !== null),
+		"F5B_C24A_REAL_LINKED_PLAN_PRECONDITION"
+	).toBe(true);
+	await fixture.stop(writer);
+	await fixture.close();
+	fixture.checkpoint();
+	await creator.room.adoptCreatorSuccessor();
+	// Only the genuinely newer floor is transported. Local AHE/snapshot and
+	// issuance bytes remain untouched; no old floor is restored or manufactured.
+	writer.floor.receive(creator.floor.read());
+	const newer = writer.floor.read();
+	const mutations = observed.commits.length;
+	await expect(fixture.reopen(writer, 0), "F5B_C24A_STALE_LOCAL_HEAD_FAILS_CLOSED").rejects.toThrow(
+		STALE_LOCAL_HEAD_FAILURE
+	);
+	expect(
+		encodeCanonical(await durable(writer)),
+		"F5B_C24A_PLAN_REVISION_FENCE_ENTRIES_PROGRESS_LINEAGE_UNCHANGED"
+	).toEqual(encodeCanonical(linked));
+	expect(writer.floor.read(), "F5B_C24A_NEWER_FLOOR_NEVER_REGRESSES").toEqual(newer);
+	expect(observed.commits.length, "F5B_C24A_REJECTED_REOPEN_ISSUES_NOTHING").toBe(mutations);
+	const offset = ownCommits(writer).length;
+	await fixture.reopen(writer, 1, true);
+	await fixture.issue(writer, "after-authenticated-state-transfer");
+	expect(
+		ownCommits(writer)
+			.slice(offset)
+			.filter((row) => row.planEffect?.kind === "replacement"),
+		"F5B_C24A_NO_REPLACEMENT_REISSUE"
+	).toHaveLength(0);
+	const remaining = required((await durable(writer)).plan).entries;
+	for (const entry of required(linked.plan).entries) {
+		const survived = remaining.find((row) => row.sourceSequence === entry.sourceSequence);
+		// Authenticated terminal retirement may remove an entry; it may not
+		// erase its link and redisposition its already-replaced source.
+		if (survived !== undefined) expect(survived, "F5B_C24A_NO_REDISPOSITION").toEqual(entry);
+	}
+	await Promise.all(fixture.peers.map(fixture.stop));
+}
+
+async function sixtyFourWriterGoldenPath() {
+	const fixture = await openRoom(64);
+	const creator = required(fixture.peers[0]);
+	const expected = new Map<string, string>();
+	const contributions: { peer: Peer; epoch: number; id: string; commit: DurableIssueCommit }[] = [];
+	const displaced: { peer: Peer; source: DurableIssueCommit; id: string; epoch: number }[] = [];
+	const adopted: { epoch: number; anchor: string; historyRoot: string; historySize: number; revision: number }[] = [];
+	const expectedMembers = fixture.peers
+		.map((peer, index) => ({
+			author: peer.author,
+			finalityKey: index === 0 ? peer.author : null,
+			groups: index === 0 ? ["admin", "finality", "writer"] : ["writer"],
+		}))
+		.sort((left, right) => (left.author < right.author ? -1 : 1));
+	let priorCheckpoint: ReturnType<typeof fixture.checkpoint> | undefined;
+	let sealedState: Uint8Array | undefined;
+	const semanticState = (rows: { clientOperationId: string; text: string }[]) =>
+		encodeCanonical([...rows].sort((left, right) => left.clientOperationId.localeCompare(right.clientOperationId)));
+	for (let epoch = 0; epoch <= 3; epoch += 1) {
+		for (const [index, peer] of fixture.peers.entries()) {
+			const acl = peer.room.previewLatchedAcl().current;
+			expect(acl, "F5B_64_EXACT_PRODUCT_ACL_AFTER_RECOVERY").toEqual({
+				epoch,
+				kind: "drp-v3-latched-acl",
+				objectId: fixture.objectId,
+				permissionless: false,
+				version: 3,
+				members: expectedMembers,
+			});
+			const id = `wide-${epoch}-${index}`;
+			await fixture.issue(peer, id);
+			const matching = ownCommits(peer).filter((commit) =>
+				applicationOperations(commit).some((operation) => operation.clientOperationId === id)
+			);
+			expect(matching, `F5B_64_E${epoch}_AUTHOR_${index}_EXACT_ONE_ISSUED_OPERATION`).toHaveLength(1);
+			const commit = required(matching[0]);
+			expect(record(commit.envelope.canonicalPreimageBytes).epoch, "F5B_64_OPERATION_ISSUED_IN_CURRENT_EPOCH").toBe(
+				epoch
+			);
+			expect(
+				observed.publications.some(
+					(row) =>
+						row.database === peer.databaseName &&
+						row.sequence === commit.authorSequence &&
+						row.digest === hex(commit.envelope.digest)
+				),
+				"F5B_64_BACKEND_CONFIRMED_PUBLICATION"
+			).toBe(true);
+			expect(fixture.received.has(hex(commit.envelope.digest)), "F5B_64_CREATOR_AUTHENTICATED_ADMISSION_ACK").toBe(
+				true
+			);
+			expect(
+				messages(peer).filter((row) => row.clientOperationId === id),
+				"F5B_64_AUTHOR_PRODUCT_APPLIED_OWN_OPERATION"
+			).toEqual([{ clientOperationId: id, text: id }]);
+			contributions.push({ peer, epoch, id, commit });
+			expected.set(id, id);
+			if (epoch > 0) {
+				const current = required(peer.room.authority());
+				expect(current.epoch, "F5B_64_REJOIN_CONTRIBUTES_BEFORE_NEXT_CLOSE").toBe(epoch);
+				expect(current.anchorDigest).toBe(required(priorCheckpoint).identity.successorAnchorDigest);
+				expect(current.aclDigest).toBe(required(priorCheckpoint).identity.successorAclDigest);
+				expect(current.aclDigest, "F5B_64_AUTHORITY_BINDS_EXACT_RECOVERED_ACL").toBe(
+					hex(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(acl)))
+				);
+				expect(current.profileId, "F5B_64_SETTLEMENT_AUTHORITY_NO_DOWNGRADE").toBe("creator-trusted-settlement-v1");
+				const floor = peer.floor.read();
+				expect(floor.pending).toBeNull();
+				expect(floor.stable).toMatchObject({ epoch, currentAnchorDigest: current.anchorDigest });
+				const ownRecovered = displaced.filter((row) => row.peer === peer && row.epoch === epoch - 1);
+				const expectedLocal = [
+					...(decodeCanonical(required(sealedState)) as { clientOperationId: string; text: string }[]),
+					...ownRecovered.map((row) => ({ clientOperationId: row.id, text: "r".repeat(33_000) })),
+					{ clientOperationId: id, text: id },
+				];
+				// Creator also receives peers' automatically drained replacements; its
+				// complete shared projection is checked after all 64 admission acks.
+				if (peer !== creator)
+					expect(semanticState(messages(peer)), "F5B_64_EXACT_RECOVERED_PRODUCT_STATE_PER_AUTHOR").toEqual(
+						semanticState(expectedLocal)
+					);
+				for (const source of ownRecovered) {
+					const plan = required((await durable(peer)).plan);
+					const entry = required(plan.entries.find((row) => row.sourceSequence === source.source.authorSequence));
+					const replacement = required(entry.replacementSequence);
+					expect(entry.disposition, "F5B_64_REAL_TRANSFORM_DISPOSITION").toBe("transform");
+					expect(required(plan.fenceSequence), "F5B_64_PLAN_FENCE_REPLACEMENT_ORDER").toBeLessThan(replacement);
+					expect(
+						ownCommits(peer).filter(
+							(row) =>
+								row.planEffect?.kind === "replacement" && row.planEffect.sourceSequence === source.source.authorSequence
+						),
+						"F5B_64_EXACT_ONE_REPLACEMENT_LINK"
+					).toHaveLength(1);
+					expected.set(source.id, "r".repeat(33_000));
+				}
+			}
+		}
+		const expectedMessages = [...expected].map(([clientOperationId, text]) => ({ clientOperationId, text }));
+		expect(semanticState(messages(creator)), "F5B_64_EXACT_CREATOR_APPLICATION_STATE").toEqual(
+			semanticState(expectedMessages)
+		);
+		expect(
+			hex(hashDomain("ts-drp/state/v3", semanticState(messages(creator)))),
+			"F5B_64_EXACT_PRODUCT_SEMANTIC_DIGEST"
+		).toBe(hex(hashDomain("ts-drp/state/v3", semanticState(expectedMessages))));
+		if (epoch === 3) break;
+		// Rotating eight-author cohort has ALREADY issued/admitted/applied/published
+		// in this epoch. It remains genuinely stopped over close/adopt and the
+		// selected creator cold restart, then rejoins before the next epoch's issue.
+		const cohort = fixture.peers.slice(1 + epoch * 8, 9 + epoch * 8);
+		for (const [index, peer] of cohort.slice(0, 2).entries()) {
+			const id = `wide-displaced-${epoch}-${index}`;
+			if (index === 0) fixture.held.add(peer.databaseName);
+			else fixture.publicationFailures.add(peer.databaseName);
+			if (index === 0) await fixture.issue(peer, id);
+			else await expect(fixture.issue(peer, id), "F5B_64_SELECTED_PENDING_PUBLICATION_FAILURE").rejects.toThrow();
+			const row = required(
+				(await durable(peer)).rows.find((candidate) =>
+					applicationOperations(candidate.commit).some((operation) => operation.clientOperationId === id)
+				)
+			);
+			expect(row.publishState, "F5B_64_PENDING_AND_PUBLISHED_DISPLACED_INPUTS").toBe(
+				index === 0 ? "published" : "pending"
+			);
+			displaced.push({ peer, source: row.commit, id, epoch });
+		}
+		await Promise.all(cohort.map(fixture.stop));
+		sealedState = productState(creator);
+		await fixture.close();
+		const checkpoint = fixture.checkpoint();
+		expect(checkpoint.identity.frontiers, "F5B_64_AUTHENTICATED_ACL_MEMBER_VECTOR").toHaveLength(64);
+		expect(checkpoint.cut.stateDigest, "F5B_64_SNAPSHOT_BINDS_EXACT_PRODUCT_STATE").toBe(
+			hex(hashDomain("ts-drp/state/v3", sealedState))
+		);
+		for (const contribution of contributions.filter((row) => row.epoch === epoch))
+			expect(
+				frontierFor(checkpoint.capability, contribution.peer.author)?.[2],
+				"F5B_64_CHECKPOINT_ACCOUNTS_EVERY_AUTHOR_APPLICATION"
+			).toBeGreaterThanOrEqual(contribution.commit.authorSequence);
+		if (priorCheckpoint !== undefined) {
+			expect(checkpoint.identity.closedAnchorDigest, "F5B_64_CONTIGUOUS_ANCHOR_LINEAGE").toBe(
+				priorCheckpoint.identity.successorAnchorDigest
+			);
+			expect(checkpoint.identity.priorCheckpointDigest, "F5B_64_ADJACENT_CHECKPOINT_LINK").toBe(
+				hex(hashDomain("ts-drp/creator-author-settlement/v1", priorCheckpoint.bytes))
+			);
+			expect(checkpoint.identity.historySize, "F5B_64_MONOTONE_HISTORY_ACCOUNTING").toBeGreaterThan(
+				priorCheckpoint.identity.historySize
+			);
+			expect(checkpoint.identity.historyRoot, "F5B_64_HISTORY_ROOT_ADVANCES").not.toBe(
+				priorCheckpoint.identity.historyRoot
+			);
+		}
+		await creator.room.adoptCreatorSuccessor();
+		expect(productState(creator), "F5B_64_ADOPTION_EXACT_STATE_BYTES").toEqual(sealedState);
+		const authority = required(creator.room.authority());
+		const head = await assertRetainedRollbackPair(creator);
+		expect(authority.anchorDigest).toBe(checkpoint.identity.successorAnchorDigest);
+		expect(authority.aclDigest).toBe(checkpoint.identity.successorAclDigest);
+		expect(creator.floor.read().stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
+		const previous = adopted.at(-1);
+		if (previous !== undefined)
+			expect(head.head.revision, "F5B_C24C_MONOTONE_ACTIVE_HEAD_REVISION").toBeGreaterThan(previous.revision);
+		adopted.push({
+			epoch: authority.epoch,
+			anchor: authority.anchorDigest,
+			historyRoot: checkpoint.identity.historyRoot,
+			historySize: checkpoint.identity.historySize,
+			revision: head.head.revision,
+		});
+		if (epoch === 1) {
+			await fixture.reopen(creator, epoch);
+			expect(productState(creator), "F5B_64_CREATOR_RESTART_EXACT_PRODUCT_STATE").toEqual(sealedState);
+			expect(creator.room.authority(), "F5B_64_CREATOR_RESTART_AUTHORITY_IDENTICAL").toEqual(authority);
+			expect((await aheFacts(creator)).head, "F5B_64_RESTART_PRESERVES_ACTIVE_HEAD").toEqual(head.head);
+		}
+		for (const peer of cohort) {
+			fixture.held.delete(peer.databaseName);
+			fixture.publicationFailures.delete(peer.databaseName);
+		}
+		// Reopen only: all publication remains explicitly awaited by next epoch's
+		// issue. Independent stores/transport receivers can authenticate in parallel.
+		await Promise.all(fixture.peers.slice(1).map((peer) => fixture.reopen(peer, epoch, true)));
+		priorCheckpoint = checkpoint;
+	}
+	expect(contributions, "F5B_64_EXACT_256_CURRENT_EPOCH_APPLICATION_ISSUES").toHaveLength(256);
+	expect(displaced, "F5B_64_SIX_BOUNDED_PENDING_PUBLISHED_RECOVERY_SOURCES").toHaveLength(6);
+	expect(
+		adopted.map((row) => row.epoch),
+		"F5B_C24C_THREE_MONOTONE_TRANSITIONS"
+	).toEqual([1, 2, 3]);
+	for (const peer of fixture.peers) {
+		expect(
+			contributions.filter((row) => row.peer === peer).map((row) => row.epoch),
+			"F5B_64_PER_AUTHOR_FOUR_EPOCH_ACCOUNTING"
+		).toEqual([0, 1, 2, 3]);
+		const commits = ownCommits(peer);
+		const lineage = (await durable(peer)).lineage;
+		expect(
+			commits.map((row) => row.authorSequence),
+			"F5B_64_NO_HOLE_OR_DUPLICATE_DEVICE_LINEAGE"
+		).toEqual(Array.from({ length: lineage.next }, (_, sequence) => sequence));
+		const publications = new Set(
+			observed.publications.filter((row) => row.database === peer.databaseName).map((row) => row.sequence)
+		);
+		const intentionallyNeverPublished = displaced
+			.filter((row) => row.peer === peer)
+			.filter((row) => !publications.has(row.source.authorSequence));
+		expect(
+			publications.size + intentionallyNeverPublished.length,
+			"F5B_64_PER_AUTHOR_OPERATION_PUBLICATION_CONSERVATION"
+		).toBe(commits.length);
+	}
+	const aggregate = fixture.peers.flatMap(ownCommits);
+	expect(
+		aggregate
+			.flatMap(applicationOperations)
+			.filter((operation) => String(operation.clientOperationId).startsWith("wide-")).length,
+		"F5B_64_AGGREGATE_ISSUES_INCLUDE_SOURCES_AND_REPLACEMENTS"
+	).toBe(268);
+	expect(messages(creator), "F5B_64_EXACT_262_UNIQUE_APPLICATION_EFFECTS").toHaveLength(262);
+	await fixture.reopen(creator, 2);
+	expect(semanticState(messages(creator)), "F5B_64_FINAL_CREATOR_COLD_REOPEN_EXACT_STATE").toEqual(
+		semanticState([...expected].map(([clientOperationId, text]) => ({ clientOperationId, text })))
+	);
+	await Promise.all(fixture.peers.map(fixture.stop));
+}
+
+async function positiveAuthenticatedPruning() {
+	const fixture = await openRoom(2);
+	const creator = required(fixture.peers[0]);
+	for (let epoch = 0; epoch < 3; epoch += 1) {
+		await Promise.all(fixture.peers.map((peer, index) => fixture.issue(peer, `prune-${epoch}-${index}`)));
+		const before = observed.prunes.length;
+		await fixture.close();
+		const checkpoint = fixture.checkpoint();
+		expect(
+			observed.prunes
+				.slice(before)
+				.some((event) => event.receipt?.deletedAuthorSequenceRange !== null && event.receipt !== undefined),
+			"F5B_C13_NO_PRUNING_FROM_STAGING_ALONE"
+		).toBe(false);
+		await creator.room.adoptCreatorSuccessor();
+		await fixture.reopen(required(fixture.peers[1]), epoch, true);
+		await fixture.issue(required(fixture.peers[1]), `prune-reopened-${epoch}`);
+		for (const peer of fixture.peers) {
+			const events = observed.prunes.filter(
+				(event) =>
+					event.database === peer.databaseName &&
+					event.receipt?.deletedAuthorSequenceRange !== null &&
+					event.receipt !== undefined
+			);
+			expect(events.length, "F5B_C13_PARENT_OWNER_ACTUALLY_DELETES_ISSUANCE").toBeGreaterThan(0);
+			const first = required(events[0]);
+			expect(
+				first.receipt?.deletedAuthorSequenceRange?.from,
+				"F5B_C13_PARENT_IS_FIRST_DELETING_MUTATION_NOT_RECEIPT_REPLAY"
+			).toBe(0);
+			expect(first.stack, "F5B_C13_PRODUCT_OWNER_CALL_CHAIN").toMatch(/packages\/node\/|examples\/v3-room\//u);
+			const current = required(events.at(-1));
+			const receipt = required(current.receipt);
+			expect(receipt.scope).toEqual({ objectId: fixture.objectId, author: peer.author });
+			expect(receipt.snapshotManifestDigest).toBe(checkpoint.identity.snapshotManifestDigest);
+			expect(receipt.commitQcRef).toEqual(checkpoint.identity.commitQcRef);
+			const proof = observed.cleanup.findLast((event) => {
+				const input = event.input as {
+					issuance?: { scope?: { author?: string } };
+					close?: { closedEpoch?: number; objectId?: string };
+				};
+				return (
+					input.issuance?.scope?.author === peer.author &&
+					input.close?.closedEpoch === epoch &&
+					input.close.objectId === fixture.objectId
+				);
+			});
+			expect(required(proof).result, "F5B_C13_AUTHENTICATED_ADOPTION_ROLLBACK_AVAILABILITY_GATE_OWNER").toMatchObject({
+				ok: true,
+			});
+			expect(required(proof).input).toMatchObject({
+				adoption: { adopted: true },
+				close: { verified: true, closedEpoch: epoch, commitQcRef: checkpoint.identity.commitQcRef },
+				snapshot: { adopted: true, manifestDigest: checkpoint.identity.snapshotManifestDigest },
+				issuance: { complete: true },
+			});
+			await assertRetainedRollbackPair(peer);
+			const durableState = await durable(peer);
+			expect(
+				durableState.rows.every((row) => row.commit.authorSequence > receipt.prunedThroughAuthorSequence),
+				"F5B_C13_REAL_ISSUANCE_PREFIX_GONE"
+			).toBe(true);
+		}
+	}
+	await Promise.all(fixture.peers.map(fixture.stop));
+}
+
+async function displacedControls() {
+	const fixture = await openRoom(2, false, true);
+	const creator = required(fixture.peers[0]);
+	const writer = required(fixture.peers[1]);
+	await fixture.issue(creator, "control-creator");
+	await fixture.issue(writer, "control-writer");
+	fixture.held.add(writer.databaseName);
+	await writer.room.issue({ action: "join", clientId: "alice" });
+	const join = required(ownCommits(writer).at(-1));
+	await writer.room.issue({ action: "acl", group: "writer", kind: "revoke", target: creator.author });
+	const acl = required(ownCommits(writer).at(-1));
+	await fixture.close();
+	fixture.checkpoint();
+	await creator.room.adoptCreatorSuccessor();
+	const decisions: { action: string; commits: number; planWrites: number }[] = [];
+	const application: CreateV3RoomSessionInput["application"] = {
+		...writer.input.application,
+		displacedOperationIdentity: (operation) =>
+			operation.action === "acl"
+				? hex(encodeCanonical(operation))
+				: writer.input.application.displacedOperationIdentity(operation),
+		displacementPolicies: {
+			...writer.input.application.displacementPolicies,
+			get acl() {
+				decisions.push({ action: "acl", commits: ownCommits(writer).length, planWrites: observed.planWrites.length });
+				return "manual-review" as const;
+			},
+		},
+	};
+	const before = ownCommits(writer).length;
+	await fixture.reopen(writer, 0, true, application);
+	await expect(
+		fixture.issue(writer, "acl-review-barrier"),
+		"F5B_C21_DISPLACED_ACL_HOLDS_BEFORE_FENCE"
+	).rejects.toThrow();
+	expect(decisions.length, "F5B_C21_ACL_SURFACED_TO_REAL_APPLICATION_POLICY").toBeGreaterThan(0);
+	expect(
+		decisions.every((decision) => decision.commits === before),
+		"F5B_C21_POLICY_PRECEDES_ANY_NEW_ISSUE"
+	).toBe(true);
+	const held = await durable(writer);
+	expect(held.plan).toMatchObject({
+		fenceSequence: null,
+		entries: [{ sourceSequence: acl.authorSequence, disposition: "manual-review", replacementSequence: null }],
+	});
+	expect(
+		held.plan?.entries.some((entry) => entry.sourceSequence === join.authorSequence),
+		"F5B_C21_DISPLACED_JOIN_HAS_NO_APPLICATION_DISPOSITION"
+	).toBe(false);
+	expect(messages(creator), "F5B_C21_CONTROL_HAS_NO_APPLICATION_EFFECT").toHaveLength(2);
+	const plane = required(observed.planes.get(writer.databaseName));
+	await expect(
+		plane.completeRebaseSource({ authorSequence: acl.authorSequence, digest: hex(acl.envelope.digest) }),
+		"F5B_C20_REAL_SETTLEMENT_HANDLE_CANNOT_MARK_SOURCE_COMPLETE"
+	).resolves.toMatchObject({
+		ok: false,
+		kind: "not-active",
+		detail: "v3 displaced source completion is unavailable under settlement",
+	});
+	expect(await durable(writer), "F5B_C20_PLAN_IS_ONLY_COMPLETION_OWNER").toEqual(held);
+	// No new parent behavior is duplicated for the identical structural-no-intent
+	// causalJoin classifier: exact closed signed cross-anchor vector is retained in
+	// phase-6b-d110c-0c1f5b0b-node-red.test.ts, "[control] classifies signed same-key
+	// cross-anchor causalJoin without application intents". Its reserved local ABI
+	// remains covered by phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts.
+	await Promise.all(fixture.peers.map(fixture.stop));
 }
 
 async function sameKeyReentry() {
@@ -680,7 +1509,7 @@ async function manualReviewHold() {
 	await fixture.stop(creator);
 }
 
-async function creatorFenceScan() {
+async function creatorFenceScan(duplicate = false) {
 	const fixture = await openRoom(2);
 	const creator = required(fixture.peers[0]);
 	const writer = required(fixture.peers[1]);
@@ -721,18 +1550,22 @@ async function creatorFenceScan() {
 	const lower = makeFence(10_000, 10_000);
 	const largest = makeFence(10_001, 10_001, lower.digest);
 	fixture.deliver(lower.message);
+	if (duplicate) fixture.deliver(makeFence(10_000, 9999).message);
 	fixture.deliver(largest.message);
 	fixture.deliver(makeFence(10_002, 10_003).message); // m > f: malformed control
 	await fixture.issue(writer, "scan-after-fences"); // FIFO ingress acknowledgement
 	await fixture.issue(creator, "scan-independent-creator");
 	await fixture.close();
 	const second = fixture.checkpoint();
-	expect(frontierFor(second.capability, writer.author)?.[2], "F5B_C12_LARGEST_VALID_FENCE_THEN_CONTIGUOUS_SCAN").toBe(
-		10_001
-	);
+	expect(
+		frontierFor(second.capability, writer.author)?.[2],
+		duplicate
+			? "F5B_C23_SAME_SLOT_DUPLICATE_BELOW_FENCE_FREEZES_PRIOR_BOUNDARY"
+			: "F5B_C12_LARGEST_VALID_FENCE_THEN_CONTIGUOUS_SCAN"
+	).toBe(duplicate ? frontierFor(first.capability, writer.author)?.[2] : 10_001);
 	expect(
 		frontierFor(second.capability, creator.author)?.[2],
-		"F5B_C12_BYZANTINE_JUMP_ONLY_BURNS_OWN_SPACE"
+		duplicate ? "F5B_C23_OTHER_AUTHOR_ADVANCES_DESPITE_DUPLICATE" : "F5B_C12_BYZANTINE_JUMP_ONLY_BURNS_OWN_SPACE"
 	).toBeGreaterThan(required(frontierFor(first.capability, creator.author)?.[2]));
 	await creator.room.adoptCreatorSuccessor();
 	await fixture.stop(writer);
@@ -752,11 +1585,23 @@ beforeEach(() => {
 	observed.advances = [];
 	observed.failSuffixFor = "";
 	observed.faults = 0;
+	observed.ambiguous = undefined;
+	observed.failRecoveryReadFor = "";
+	observed.issueAttempts = [];
+	observed.commitHandles.clear();
+	observed.ambiguities = [];
+	observed.publications = [];
+	observed.planWrites = [];
+	observed.prunes = [];
+	observed.cleanup = [];
 });
 afterEach(async () => {
 	observed.failSuffixFor = "";
+	observed.ambiguous = undefined;
+	observed.failRecoveryReadFor = "";
 	await Promise.all([...sessions].map((room) => room.close().catch(() => undefined)));
 	sessions.clear();
+	vi.restoreAllMocks();
 	if (originalStorage === undefined) Reflect.deleteProperty(navigator, "storage");
 	else Object.defineProperty(navigator, "storage", originalStorage);
 });
@@ -807,6 +1652,17 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 			"F5B_AUTHENTICATED_SOURCE_IS_TERMINAL"
 		).toBeGreaterThanOrEqual(source.authorSequence);
 		await creator.room.adoptCreatorSuccessor();
+		const incompleteSource = await durable(writer);
+		expect(
+			incompleteSource.rows.some((row) => row.commit.authorSequence === source.authorSequence),
+			"F5B_C13_INCOMPLETE_PLAN_SOURCE_RETAINED_AFTER_AUTHENTICATED_ADOPTION"
+		).toBe(true);
+		expect(
+			observed.prunes
+				.filter((event) => event.database === writer.databaseName)
+				.every((event) => event.receipt?.deletedAuthorSequenceRange === null || event.receipt === undefined),
+			"F5B_C13_PARENT_REFUSES_DELETE_WHILE_PLAN_UNLINKED"
+		).toBe(true);
 		observed.failSuffixFor = "";
 		await fixture.reopen(writer, 1, true);
 		await fixture.issue(writer, "after-cold-reopen");
@@ -833,34 +1689,20 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 			expect(peer.room.authority()?.epoch, "F5B_C14_THREE_TRANSITIONS_AND_COLD_REOPEN").toBe(3);
 		await Promise.all(fixture.peers.map(fixture.stop));
 
-		// Exactly 64 active writers, not a membership census: each public issue is
-		// awaited through real publication and creator ingress in epochs 0,1,2,3.
-		const wide = await openRoom(64);
-		const contributions: { author: string; epoch: number; clientOperationId: string }[] = [];
-		for (let epoch = 0; epoch <= 3; epoch += 1) {
-			for (const [index, peer] of wide.peers.entries()) {
-				const clientOperationId = `wide-${epoch}-${index}`;
-				await wide.issue(peer, clientOperationId);
-				contributions.push({ author: peer.author, epoch, clientOperationId });
-			}
-			if (epoch === 3) break;
-			await wide.close();
-			const current = wide.checkpoint();
-			expect(current.identity.frontiers, "F5B_64_AUTHENTICATED_FRONTIERS").toHaveLength(64);
-			await required(wide.peers[0]).room.adoptCreatorSuccessor();
-			for (const peer of wide.peers.slice(1)) await wide.reopen(peer, epoch, true);
-			if (epoch === 1) await wide.reopen(required(wide.peers[0]), epoch);
-		}
-		expect(contributions, "F5B_64_ACTIVE_WRITERS_EVERY_EPOCH").toHaveLength(256);
-		for (let epoch = 0; epoch <= 3; epoch += 1)
-			expect(
-				new Set(contributions.filter((row) => row.epoch === epoch).map((row) => row.author)).size,
-				`F5B_64_GENUINE_WRITERS_EPOCH_${epoch}`
-			).toBe(64);
-		await Promise.all(wide.peers.map(wide.stop));
+		await sixtyFourWriterGoldenPath();
 		await sameKeyReentry();
 		await manualReviewHold();
 		await creatorFenceScan();
+		await creatorFenceScan(true);
+		await delayedPublication("unpublished-fence");
+		await delayedPublication("delayed-replacement");
+		await delayedPublication("delayed-fence");
+		await displacedControls();
+		await staleLocalHead();
+		for (const kind of ["fence", "replacement"] as const)
+			for (const committed of [false, true]) await ambiguousPlanIssue(kind, committed);
+		await ambiguousPlanIssue("fence", false, true);
+		await positiveAuthenticatedPruning();
 	}, 60_000);
 
 	it("keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged", async () => {
@@ -873,5 +1715,29 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		await fixture.reopen(creator, 0);
 		await fixture.issue(creator, "v1-after-reopen");
 		expect(creator.room.authority()?.epoch, "F5B_V1_COLD_REOPEN_CONTROL").toBe(1);
+		await fixture.stop(creator);
+		// Observe the exact pre-existing floor rejection independently of the
+		// settlement carrier RED. Case 24a uses this same error with a linked plan.
+		const floorControl = await openRoom(2, true);
+		const floorCreator = required(floorControl.peers[0]);
+		const floorWriter = required(floorControl.peers[1]);
+		await floorControl.issue(floorCreator, "v1-floor-creator");
+		await floorControl.issue(floorWriter, "v1-floor-writer");
+		await floorControl.close();
+		await floorCreator.room.adoptCreatorSuccessor();
+		await floorControl.reopen(floorWriter, 0, true);
+		await floorControl.issue(floorWriter, "v1-floor-writer-next");
+		await floorControl.stop(floorWriter);
+		const untouched = await durable(floorWriter);
+		await floorControl.close();
+		await floorCreator.room.adoptCreatorSuccessor();
+		floorWriter.floor.receive(floorCreator.floor.read());
+		const currentFloor = floorWriter.floor.read();
+		await expect(
+			floorControl.reopen(floorWriter, 0),
+			"F5B_C24A_EXACT_REACHABLE_FLOOR_REJECTION_CONTROL"
+		).rejects.toThrow(STALE_LOCAL_HEAD_FAILURE);
+		expect(await durable(floorWriter)).toEqual(untouched);
+		expect(floorWriter.floor.read()).toEqual(currentFloor);
 	});
 });
