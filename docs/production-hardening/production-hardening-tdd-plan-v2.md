@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (preserve parent focused GREEN and correct its retained counter harness):
+Current work (resume parent retained GREEN after the accepted counter-harness correction):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18552,8 +18552,11 @@ Current work (preserve parent focused GREEN and correct its retained counter har
   assertions, including the complete 64-writer three-transition workload, at
   `.logs/d110c-0c1f5b-green-89f147cc/`. Retained execution stops with 167 passes
   and one failure: the f5b0d source-extraction harness omits the counter's real
-  resolver binding. Correct that harness prospectively through the separate
-  test owner below; do not change production or the legacy window assertion.
+  resolver binding. The separate helper-only correction is accepted at
+  signed/pushed tests `bc7d615b` / evidence `9c9e66b3`, with one clean source-
+  built 19/19 baseline pass and unchanged assertions. Resume the separate GREEN
+  owner at gate 07 against the preserved patch, then the remaining frozen gates;
+  do not change production or the legacy window assertion for this correction.
   Do not rerun the accepted parent RED. Retained/static/isolated closure and
   the later long campaign remain unproved.
   Product state, batch, epoch and snapshot ceilings remain unchanged.
@@ -18564,8 +18567,8 @@ Blocked, and on what:
   and final review of the now-focused-passing cleanup and 64-writer composition.
   The discovery prerequisite f5b0z and independent observer RED are
   closed; neither needs another execution or review. The narrow scalar
-  case-25 and checkpoint-link oracle corrections are also accepted. First
-  correct the retained counter harness below, then resume the existing gates
+  case-25, checkpoint-link and retained counter-harness corrections are also
+  accepted. Resume the existing gates
   without a Node-to-browser dependency or invented authority.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
@@ -100804,7 +100807,9 @@ under the unchanged isolated causal matrix. The separate Astra-high GREEN owner
 now records 28 focused passes and no failures on the unchanged patch, including
 the complete three-transition 64-writer case. Retained execution stops at the
 f5b0d counter harness's missing resolver binding (167 passes / one failure).
-The prospective test-only correction below precedes further execution. The
+Its helper-only correction is now accepted at signed/pushed tests `bc7d615b` /
+evidence `9c9e66b3`, with one isolated 19/19 baseline pass. The separate GREEN
+owner resumes at the affected gate against the unchanged production patch. The
 partial production patch is preserved, not committed or accepted; remaining
 static, retained, isolated and final review gates remain open.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
@@ -101572,6 +101577,30 @@ No additional slice, model confirmation or recursive prose review is needed.
 The existing final parent Grok/Sol-high/Fable-xhigh review must inspect this
 preserved functional GREEN, retained stop, narrow harness correction and
 remaining gates before closure. No new API or campaign is authorized here.
+
+Retained counter-harness acceptance (2026-09-05): tests-only
+`bc7d615b40c5125ed5b48ff90d0be64dcdca4b15` and evidence
+`9c9e66b3bb7d2fab6dc86e68b013790e95bd5548` are signed and pushed. The helper
+now supplies the existing real resolver to its extracted function; every
+assertion and all bytes outside that helper remain unchanged. Evidence is
+`.logs/d110c-0c1f5b-retained-counter-bc7d615b/`; its complete 66-entry
+self-excluding manifest SHA-256 is
+`aade868d5db834154c300c5d60a68cc217a792f8eecc90c4e8811b67d9d9a69d`.
+Root verified signed/pushed identity, every manifest entry and complete inventory,
+and the full raw reporter: one exact file, 19 passes, zero failures/skips or
+suite errors, with the stopped gate's exact title multiset. The clean checkout
+`/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout` independently installed
+and built the signed test tree without the pending production patch or copied
+artifacts. Bounded typecheck has zero target and external diagnostics; lint,
+format, syntax, scope and diff checks pass. This baseline's counter does not
+yet call the resolver: the run proves compatibility, not the pending GREEN
+counter's behavior. The separate GREEN owner must therefore execute gate 07
+once against the unchanged eight-owner patch before resuming later gates.
+The already-passing focused workload, covered retained gates 01–06 and 26,
+accepted parent causal RED and prior evidence are not rerun or relabeled.
+Full remaining static/retained/isolated/final-review gates stay open. The
+assessment records exact commands, all outcomes and root's corrected
+summary-versus-reporter inspection; no additional prose review is required.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
