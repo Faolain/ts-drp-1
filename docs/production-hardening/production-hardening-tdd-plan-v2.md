@@ -18439,7 +18439,8 @@ Authorized now (tests-only RED first, then GREEN):
 - **f5b0u settlement restart/reconciliation prerequisite** below. The signed
   f5b0t RED and corrected RED are causal, but the first incomplete GREEN audit
   demonstrated missing failure classification, fresh-handle recovery and
-  constant-ownership seams. Complete the bounded high-risk f5b0u plan review,
+  constant-ownership seams. Its initial bounded high-risk review returned a
+  material P1 union; complete the single confirmation of the corrected plan,
   then its causal tests-only RED and the combined f5b0t/f5b0u GREEN. No parent
   f5b integration or further production edit is authorized before that
   checkpoint.
@@ -99576,7 +99577,10 @@ Selected bounded contract:
   it refreshes and continues from that prefix. An unchanged permanent mismatch
   halts. A post-sign/store-recheck or outcome-unknown failure with no exact
   link closes the halted handle and reopens from durable truth; it never loops
-  on the same handle.
+  on the same handle. **f5b0u supersedes only the handle-custody implication of
+  this paragraph:** after any post-sign or unclassified outcome, including an
+  exact committed link, publication and continuation occur only on the fresh
+  authenticated replacement handle, never on the halted handle.
 - The room resumes at the durable consumed prefix. It submits the remaining
   suffix once under the effect form selected above; `split-required(p)` remains
   nonmutating, after which it submits the exact prefix that fits with the
@@ -99727,8 +99731,9 @@ prerequisite neither satisfies nor weakens any of them.
 
 ###### D.110c-0c1f5b0u settlement restart/reconciliation prerequisite
 
-**Status: PLAN REVIEW REQUIRED; tests-only RED is blocked until that review has
-an empty P0/P1 union.** The signed f5b0t RED `fb3c5c59` and its tests-only
+**Status: PLAN REVIEW CORRECTION REQUIRED; tests-only RED is blocked until the
+one material confirmation of the corrected plan has an empty P0/P1 union.**
+The signed f5b0t RED `fb3c5c59` and its tests-only
 timing correction `c1d602f6` remain accepted causal evidence under
 `.logs/d110c-0c1f5b0t-red-fb3c5c59/` and
 `.logs/d110c-0c1f5b0t-red-correction-c1d602f6/`. The incomplete f5b0t GREEN
@@ -99762,12 +99767,30 @@ Bounded source/architecture audit and selected construction:
   authority carrier. For genesis startup, privately separate same-store
   prepare/recover/activate from `prepareDurableRoomState` so the already-open
   AHE, issuance and journal stores, transport and queue manager remain owned by
-  the session. For successor startup, first await wrapper deactivation and
-  then use `reopenCreatorSuccessorAdoption` against the same authenticated
-  stable room-head floor, current snapshot declaration and already-open
-  stores. Deactivation must precede recovery because same-head activation may
-  otherwise return the old registration. Whole-session `shutdown()` is not a
-  recovery primitive: it closes stores, transport and the queue manager.
+  the session. Each genesis re-recovery constructs a fresh
+  `input.createOperationAdmissionPolicy` instance and preserves the existing
+  genesis ACL, anchor, epoch and object-id reconstruction unchanged; it does
+  not reuse the policy instance that already admitted the journal. For
+  successor startup, first await wrapper deactivation and then use
+  `reopenCreatorSuccessorAdoption` against the same authenticated stable
+  room-head floor, current snapshot declaration and already-open stores. The
+  successor path must rerun the existing `successorAuthority` derivation,
+  `bindV3BlueprintLivePlane` `projection-base` binding, state-digest check and
+  projected-state byte equality before installing the replacement. Deactivation
+  must precede recovery because same-head activation may otherwise return the
+  old registration. Whole-session `shutdown()` is not a recovery primitive:
+  it closes stores, transport and the queue manager.
+- Recovery is one owner transition, not an auxiliary promise beside startup
+  settlement. Serialize it on the existing `enqueueLifetimeTransition` tail
+  shared with close/adopt, block and drain public issue before retirement, and
+  do not resume either path until fresh activation and reconciliation finish.
+  Feed every `recovered.descriptor.recoveredVertices` member through the
+  existing room `commit()` path before publishing or issuing the suffix. If
+  creator-close authority was bound, rebind it to the fresh handle through
+  existing `bindCurrentCreatorClose` before installing that handle or
+  resuming work; use the existing `D110C_B_CLOSE_REBIND_FAILED` terminal
+  disposition on failure. A room with no bound close authority remains
+  unaffected. This uses existing private seams only.
 - Before an attempted replacement issue, capture the exact prior plan revision
   and prefix. After a failed/unknown call, only a readback with the same entry,
   digest and count, prior prefix plus exactly one matching range, one newly
@@ -99787,12 +99810,19 @@ Bounded source/architecture audit and selected construction:
   hot epochs. If existing storage/close seams cannot provide it without a new
   API, authority carrier or schema, parent f5b stops and reslices; f5b0u must
   not invent a fixture-only declaration.
-- `lastLogicalTime` comes from the exact signed vertex input. Only an exact
-  `operation.action === "applicationBatch"` with the existing closed nested
-  `batch { entries, version }` grammar may select the final child logical time;
-  an ordinary application operation containing an `entries` or `batch` field
-  retains the vertex logical time. The current test helper's invented direct
-  `entries` grammar is removed rather than supported in production.
+- `lastLogicalTime` comes from the exact signed vertex input.
+  `packages/issuance-store/src/contract.ts` owns a closed local parser for the
+  real Node application-batch grammar: exact action `applicationBatch`, exact
+  outer keys `action`/`batch`, exact nested keys `entries`/`version`, exact
+  entry keys `logicalTime`/`operation`, version `1`, and `2..16` entries. Only
+  that form may select the final child logical time; an ordinary application
+  operation containing an `entries` or `batch.entries` field retains the
+  vertex logical time. Issuance-store cannot import Node, and Node must not
+  import this parser back as its admission owner. A real Node-assembled batch
+  behavioral test pins the parser's final-child result and the existing
+  sixteen-entry bound across that dependency direction. The current test
+  helper's invented `$drp.application-batch.v1` direct `entries` grammar is
+  removed rather than supported in production.
 - Validate every existing progress entry's count and digest against the fully
   rederived ordered operation list before issuing a missing fence. A mismatch
   issues and signs nothing, leaves lineage/plan unchanged and remains
@@ -99805,7 +99835,7 @@ Bounded source/architecture audit and selected construction:
   classification and room-level recovery must agree; neither digest/range
   resemblance nor a mutable later plan is sufficient by itself.
 - Remove the room-local copies of the issuance-store count and digest limits.
-  The narrow compatibility amendment is one direct workspace dependency in
+  The narrow compatibility amendment is one new direct workspace dependency in
   `examples/v3-room/package.json` plus its importer entry in `pnpm-lock.yaml`,
   importing the already-public issuance-store constants/helper types. This is
   no external package, version, runtime-policy or cryptographic dependency.
@@ -99833,11 +99863,17 @@ not future missing imports or exports:
    through deactivation, no work continues on it, fresh authenticated startup
    recovery owns publication/resume, and every operation appears exactly once.
    A compatible pre-sign race is distinguished as plan truth but still cannot
-   authorize reuse of an unclassified old handle.
+   authorize reuse of an unclassified old handle. The approved deterministic
+   fault technique is a one-shot post-commit
+   `ISSUANCE_OUTCOME_UNKNOWN` injection around the real store transaction,
+   following the accepted f5b0b store-seam pattern; the underlying store,
+   Node plane and room remain real.
 6. Exercise one real room-to-Node legal deterministic transform whose assembled
    batch exceeds 65,536 bytes, observes nonmutating `split-required`, and
-   commits at least two progress vertices. A mocked room split and a separate
-   Node split do not satisfy this case.
+   commits at least two progress vertices. The durable chunk
+   `lastLogicalTime` must equal the real Node-assembled batch's final child
+   logical time, including the sixteen-entry equality control. A mocked room
+   split and a separate Node split do not satisfy this case.
 7. Cold reopen with the original authenticated source below a supplied
    `terminalThrough`: open progress exposes it only for digest/suffix
    rederivation, admitted chunks are not repeated, completion restores normal
@@ -99845,7 +99881,11 @@ not future missing imports or exports:
    override.
 8. Race public issue, close/adopt and settlement recovery; only one active
    owner survives, the fence stays first, the plan stays monotonic and cleanup
-   failure is terminal. Retain the legacy one-shot and creator-trusted-v1 byte
+   failure is terminal. Recovered vertices are committed before resumed issue;
+   a previously bound creator-close authority is rebound to the fresh plane,
+   and subsequent `sealEpoch()`/adoption operates on that plane. A controlled
+   rebind failure is exactly `D110C_B_CLOSE_REBIND_FAILED` and never falls back
+   to the retired plane. Retain the legacy one-shot and creator-trusted-v1 byte
    and behavior controls.
 
 GREEN is limited to the previously authorized seven f5b0t production paths,
@@ -99859,6 +99899,27 @@ recovery/creator-successor/active-owner suites and an isolated clean-checkout
 gate. Timing-sensitive retained files may run sequentially, but every selected
 test and unchanged timeout must be recorded; host starvation is not a product
 failure and is not permission to change a threshold.
+
+Plan-review checkpoint: signed/pushed plan `fefa6805` was reviewed under
+`.logs/d110c-0c1f5b0u-plan-review-fefa6805/`. Grok's first service run was
+honestly preserved as `NO_VERDICT` after cancellation, then the exact session
+`01a06f69-b8ac-7650-ac0b-6cb3f4d05459` resumed and returned one P1 plus one
+P2. Direct Kimi session `session_81c44d3d-8a18-453b-81fe-3e5cc364cfaa`
+returned `PASS` with three P2s. Opus session
+`8a3558cd-5083-41e5-8e2d-3fd2efcdd9ab` returned two P1s and three P2s. The
+blocking union is: commit recovered vertices to room projection; serialize
+recovery with close/adopt/public issue; rebind creator-close to the fresh
+plane; and give issuance-store an exact closed local application-batch parser
+with a real Node behavioral equality control. Those obligations are adopted
+above and in RED cases 5, 6 and 8. P2 disposition is also exact: fresh
+admission-policy construction and successor projection-base validation are
+adopted; the f5b0t same-handle wording is explicitly superseded; the approved
+real-store one-shot fault seam is named; the dependency is correctly called
+new; and the pre-existing room/Node batch-limit duplication is accepted only
+as a behaviorally pinned compatibility seam, not a new ownership or threshold
+channel. Because these corrections materially change executable recovery and
+acceptance, one confirmation of this corrected signed plan is required before
+RED; no further prose-only round follows an empty P0/P1 confirmation.
 
 Because this adds recovery behavior beside signed issuance and one explicit
 workspace dependency edge, one bounded Grok 4.6/high, direct Kimi K3 with

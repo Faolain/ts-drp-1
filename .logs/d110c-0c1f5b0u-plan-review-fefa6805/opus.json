@@ -1,0 +1,35 @@
+{
+  "verdict": "CHANGES_REQUIRED",
+  "reviewed_commit": "fefa6805e16066f55d15bb95701b3ced290553b3",
+  "session_id": "8a3558cd-5083-41e5-8e2d-3fd2efcdd9ab",
+  "model": "claude-opus-5",
+  "effort": "xhigh",
+  "summary": "Most seams and compatibility claims are valid, but batch-grammar ownership and creator-close rebind were missing before RED.",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "applicationBatch logical-time grammar has no owner across the issuance-store package boundary",
+      "remediation": "Make issuance-store own a closed local grammar parser and pin its result against a real Node-assembled batch."
+    },
+    {
+      "severity": "P1",
+      "title": "Fresh-handle settlement recovery never rebinds creator-close authority",
+      "remediation": "Rebind through existing bindCurrentCreatorClose and retain the existing terminal rebind-failure disposition."
+    },
+    {
+      "severity": "P2",
+      "title": "Room keeps a pre-existing duplicate Node batch budget and grammar",
+      "remediation": "Treat it as an accepted behaviorally pinned compatibility seam, not a new threshold owner."
+    },
+    {
+      "severity": "P2",
+      "title": "Separated recovery must construct a fresh admission policy",
+      "remediation": "Construct a fresh policy for every recoverV3LiveReplica call."
+    },
+    {
+      "severity": "P2",
+      "title": "Workspace dependency edge is new, not existing",
+      "remediation": "Describe it as one new direct edge to the existing workspace package."
+    }
+  ]
+}
