@@ -1160,20 +1160,18 @@ async function ambiguousPlanIssue(kind: "fence" | "replacement", committed: bool
 		committedPlan = { ...priorPlan, fenceSequence: candidate.authorSequence, revision: priorPlan.revision + 1 };
 	} else {
 		const priorEntry = required(priorPlan.entries.find((row) => row.sourceSequence === source.authorSequence));
-		const progress = required(priorEntry.replacementProgress);
-		expect(effect, "F5B_C25_EXACT_REPLACEMENT_INSTRUCTION").toEqual({
+		expect(effect, "F5B_C25_EXACT_REPLACEMENT_INSTRUCTION").toStrictEqual({
 			kind: "replacement",
 			sourceSequence: source.authorSequence,
-			fromIntent: 0,
-			throughIntent: 1,
-			intentDigest: progress.intentDigest,
 		});
-		expect(progress, "F5B_C25_EXACT_UNCOMMITTED_REPLACEMENT_PROGRESS").toEqual({
-			version: 1,
-			intentCount: 1,
-			intentDigest: progress.intentDigest,
-			chunks: [],
+		expect(priorEntry, "F5B_C25_EXACT_UNCOMMITTED_SCALAR_ENTRY").toStrictEqual({
+			sourceSequence: source.authorSequence,
+			sourceDigest: source.envelope.digest,
+			disposition: "transform",
+			replacementSequence: null,
 		});
+		expect(priorEntry, "F5B_C25_NO_PROGRESS_BEFORE_TRANSACTION").not.toHaveProperty("replacementProgress");
+		expect(entry, "F5B_C25_NO_PROGRESS_AT_AMBIGUITY").not.toHaveProperty("replacementProgress");
 		expect(priorEntry.replacementSequence, "F5B_C25_REPLACEMENT_LINK_ABSENT_BEFORE_TRANSACTION").toBeNull();
 		expect(applicationOperations(candidate), "F5B_C25_EXACT_SINGLE_TRANSFORMED_INTENT").toEqual([
 			{ action: "message", clientOperationId: "timing-displaced", text: "r".repeat(256) },
@@ -1182,26 +1180,13 @@ async function ambiguousPlanIssue(kind: "fence" | "replacement", committed: bool
 			...priorPlan,
 			revision: priorPlan.revision + 1,
 			entries: priorPlan.entries.map((row) =>
-				row.sourceSequence === source.authorSequence
-					? {
-							...row,
-							replacementSequence: candidate.authorSequence,
-							replacementProgress: {
-								...progress,
-								chunks: [
-									{
-										replacementSequence: candidate.authorSequence,
-										throughIntent: 1,
-										lastLogicalTime: Number(record(candidate.envelope.canonicalPreimageBytes).logicalTime),
-									},
-								],
-							},
-						}
-					: row
+				row.sourceSequence === source.authorSequence ? { ...row, replacementSequence: candidate.authorSequence } : row
 			),
 		};
 	}
-	expect(boundary.plan, "F5B_C25_EXACT_ATOMIC_PLAN_LINK_AND_PROGRESS").toEqual(committed ? committedPlan : priorPlan);
+	expect(boundary.plan, "F5B_C25_EXACT_ATOMIC_PLAN_LINK_AND_PROGRESS").toStrictEqual(
+		committed ? committedPlan : priorPlan
+	);
 	expect(boundary.lineage.next, "F5B_C25_ATOMIC_LINEAGE_WITH_ROW_AND_LINK").toBe(
 		boundary.candidate.authorSequence + (committed ? 1 : 0)
 	);
@@ -1228,6 +1213,11 @@ async function ambiguousPlanIssue(kind: "fence" | "replacement", committed: bool
 		.filter((row) => row.database === writer.databaseName))
 		expect(publication.handle, "F5B_C25_FRESH_OWNER_BEFORE_SUBSEQUENT_PUBLICATION").not.toBe(boundary.handle);
 	const after = required((await durable(writer)).plan);
+	if (kind === "replacement")
+		expect(
+			required(after.entries.find((row) => row.sourceSequence === source.authorSequence)),
+			"F5B_C25_NO_PROGRESS_AFTER_RECOVERY"
+		).not.toHaveProperty("replacementProgress");
 	const recoveredLink =
 		kind === "fence"
 			? after.fenceSequence
