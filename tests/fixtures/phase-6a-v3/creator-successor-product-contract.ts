@@ -332,6 +332,164 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+export const D108D2_FORBIDDEN_PRODUCT_RETURNS = Object.freeze([
+	"intent",
+	"capability",
+	"activationResult",
+	"exactCanonicalTrust",
+	"snapshotReceipt",
+	"signingAuthority",
+	"displacedSource",
+] as const);
+
+/**
+ * Checks direct exported/global return shapes and their local construction aliases.
+ * @param source - One room/chat module, injectable only for diagnostic mutants.
+ * @returns False for a sensitive carrier or an unparseable product surface.
+ */
+export function d108d2HasClosedProductReturns(source: string): boolean {
+	const fileName = "/d108d2-product.ts";
+	const parsed = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const host: ts.CompilerHost = {
+		getSourceFile: (name) => (name === fileName ? parsed : undefined),
+		getDefaultLibFileName: () => "lib.d.ts",
+		writeFile: () => undefined,
+		getCurrentDirectory: () => "/",
+		getDirectories: () => [],
+		fileExists: (name) => name === fileName,
+		readFile: (name) => (name === fileName ? source : undefined),
+		getCanonicalFileName: (name) => name,
+		useCaseSensitiveFileNames: () => true,
+		getNewLine: () => "\n",
+	};
+	const program = ts.createProgram([fileName], { noLib: true, noResolve: true, noEmit: true }, host);
+	if (program.getSyntacticDiagnostics(parsed).length !== 0) return false;
+	const checker = program.getTypeChecker();
+	const sensitive = new Set<string>(D108D2_FORBIDDEN_PRODUCT_RETURNS);
+	const active = new Set<ts.Node>();
+	const key = (name: ts.PropertyName): string | undefined =>
+		ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
+			? name.text
+			: ts.isComputedPropertyName(name) && ts.isStringLiteral(name.expression)
+				? name.expression.text
+				: undefined;
+	const resolveSymbol = (node: ts.Node): ts.Symbol | undefined => {
+		const symbol = checker.getSymbolAtLocation(node);
+		return symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0
+			? checker.getAliasedSymbol(symbol)
+			: symbol;
+	};
+	const inspectBody = (node: ts.FunctionLikeDeclaration): boolean => {
+		if (node.body === undefined || active.has(node)) return false;
+		active.add(node);
+		const found = ts.isBlock(node.body)
+			? executableDescendants(node.body).some(
+					(item) => ts.isReturnStatement(item) && item.expression !== undefined && inspect(item.expression)
+				)
+			: inspect(node.body);
+		active.delete(node);
+		return found;
+	};
+	const inspectDeclaration = (node: ts.Declaration): boolean => {
+		if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isGetAccessorDeclaration(node))
+			return inspectBody(node);
+		return ts.isVariableDeclaration(node) && node.initializer !== undefined ? inspect(node.initializer) : false;
+	};
+	const inspect = (raw: ts.Expression): boolean => {
+		const value = unwrapExpression(raw);
+		if (active.has(value)) return false;
+		if (ts.isAwaitExpression(value) || ts.isSatisfiesExpression(value)) return inspect(value.expression);
+		if (ts.isArrowFunction(value) || ts.isFunctionExpression(value)) return inspectBody(value);
+		if (ts.isIdentifier(value)) {
+			if (sensitive.has(value.text)) return true;
+			active.add(value);
+			const found = resolveSymbol(value)?.declarations?.some(inspectDeclaration) === true;
+			active.delete(value);
+			return found;
+		}
+		if (ts.isObjectLiteralExpression(value))
+			return value.properties.some((property) => {
+				if (ts.isSpreadAssignment(property)) return inspect(property.expression);
+				const name = key(property.name);
+				if (name === undefined || sensitive.has(name)) return true;
+				if (ts.isPropertyAssignment(property)) return inspect(property.initializer);
+				if (ts.isShorthandPropertyAssignment(property))
+					return checker.getShorthandAssignmentValueSymbol(property)?.declarations?.some(inspectDeclaration) === true;
+				return ts.isMethodDeclaration(property) || ts.isGetAccessorDeclaration(property)
+					? inspectBody(property)
+					: false;
+			});
+		if (ts.isArrayLiteralExpression(value))
+			return value.elements.some((item) => inspect(ts.isSpreadElement(item) ? item.expression : item));
+		if (ts.isConditionalExpression(value)) return inspect(value.whenTrue) || inspect(value.whenFalse);
+		// Comparisons return primitives. Only value-selecting operators expose operands.
+		if (ts.isBinaryExpression(value))
+			return [
+				ts.SyntaxKind.AmpersandAmpersandToken,
+				ts.SyntaxKind.BarBarToken,
+				ts.SyntaxKind.QuestionQuestionToken,
+			].includes(value.operatorToken.kind)
+				? inspect(value.left) || inspect(value.right)
+				: false;
+		if (ts.isPropertyAccessExpression(value)) return sensitive.has(value.name.text);
+		if (ts.isElementAccessExpression(value))
+			return ts.isStringLiteral(value.argumentExpression) && sensitive.has(value.argumentExpression.text);
+		if (ts.isCallExpression(value)) {
+			if (
+				ts.isPropertyAccessExpression(value.expression) &&
+				ts.isIdentifier(value.expression.expression) &&
+				((value.expression.expression.text === "Object" && value.expression.name.text === "freeze") ||
+					(value.expression.expression.text === "Promise" && value.expression.name.text === "resolve"))
+			)
+				return value.arguments.some(inspect);
+			// Follow directly returned local factories (the room delegates to its owned factory).
+			return (
+				ts.isIdentifier(value.expression) &&
+				resolveSymbol(value.expression)?.declarations?.some(inspectDeclaration) === true
+			);
+		}
+		return false;
+	};
+	for (const statement of parsed.statements) {
+		const exported =
+			ts.canHaveModifiers(statement) &&
+			ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+		if (exported && ts.isFunctionDeclaration(statement) && inspectBody(statement)) return false;
+		if (
+			exported &&
+			ts.isVariableStatement(statement) &&
+			statement.declarationList.declarations.some(inspectDeclaration)
+		)
+			return false;
+		if (ts.isExportAssignment(statement) && inspect(statement.expression)) return false;
+		if (
+			ts.isExportDeclaration(statement) &&
+			statement.exportClause !== undefined &&
+			ts.isNamedExports(statement.exportClause)
+		) {
+			if (
+				statement.exportClause.elements.some((item) => resolveSymbol(item.name)?.declarations?.some(inspectDeclaration))
+			)
+				return false;
+		}
+	}
+	for (const node of descendants(parsed)) {
+		if (
+			!ts.isCallExpression(node) ||
+			!ts.isPropertyAccessExpression(node.expression) ||
+			!ts.isIdentifier(node.expression.expression) ||
+			node.expression.expression.text !== "Object"
+		)
+			continue;
+		const target = node.arguments[0];
+		if (target === undefined || !ts.isIdentifier(target) || !["globalThis", "window"].includes(target.text)) continue;
+		if (node.expression.name.text === "assign" && node.arguments.slice(1).some(inspect)) return false;
+		if (node.expression.name.text === "defineProperty" && node.arguments[2] !== undefined && inspect(node.arguments[2]))
+			return false;
+	}
+	return true;
+}
+
 /**
  * Enforces the product-only ownership and non-escalation boundary around D.108d2.
  * @returns Frozen source-governance facts.
@@ -356,10 +514,7 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
 			/V3RoomHeadAuthority/u.test(chat) && /roomHeadAuthority:\s*chatRoomHeadAuthority/u.test(chat),
 		chatInputAllowsOnlyDeclarationWhenProductExists:
 			!productExists || sameStrings(interfaceKeys(chat, "JoinInput"), [...D108D2_CHAT_JOIN_INPUT_KEYS].sort()),
-		noForbiddenProductReturn:
-			!/return\s+[^;]*(?:intent|capability|activationResult|exactCanonicalTrust|snapshotReceipt|signingAuthority|displacedSource)/u.test(
-				`${room}\n${chat}`
-			),
+		noForbiddenProductReturn: d108d2HasClosedProductReturns(room) && d108d2HasClosedProductReturns(chat),
 		noNodeRootWidening: !ADOPTION_MARKER.test(root),
 		roomInputAllowsOnlyDeclarationWhenProductExists:
 			!productExists ||

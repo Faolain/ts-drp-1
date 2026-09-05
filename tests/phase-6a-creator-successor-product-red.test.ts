@@ -6,6 +6,8 @@ import { REPOSITORY_ROOT } from "./fixtures/phase-6a-v3/creator-successor-activa
 import {
 	D108D2_AUTHORITY_KEYS,
 	D108D2_BROWSER_BEHAVIORS,
+	D108D2_FORBIDDEN_PRODUCT_RETURNS,
+	d108d2HasClosedProductReturns,
 	d108d2SourceGovernance,
 	D108E2B_BROWSER_BEHAVIORS,
 	D108E2B_GREEN_PATHS,
@@ -27,6 +29,51 @@ function replaceExactlyOnce(source: string, before: string, after: string): stri
 	}
 	return `${source.slice(0, index)}${after}${source.slice(index + before.length)}`;
 }
+
+describe("D.108d2 public return AST oracle", () => {
+	it("accepts private computations and primitive comparisons without confusing operand names with returned authority", () => {
+		for (const source of [
+			"function unused() { return capability; } export function room() { return { ready: true }; }",
+			"function readSettlementEffect(progress) { return progress.intentCount === 2 && progress.intentDigest !== undefined; } export function room() { return { ready: readSettlementEffect(progress) }; }",
+			"export function room() { return { ready: capability === undefined, intentCount: 2, intentDigest: 'public-digest' }; }",
+			"export function room() { const privateHelper = () => ({ capability }); return Object.freeze({ ready: true }); }",
+			"// return capability\nexport function room() { return 'return signingAuthority'; }",
+		])
+			expect.soft(d108d2HasClosedProductReturns(source), source).toBe(true);
+	});
+	it("rejects exact sensitive properties and values on exported returned shapes", () => {
+		expect(D108D2_FORBIDDEN_PRODUCT_RETURNS).toEqual([
+			"intent",
+			"capability",
+			"activationResult",
+			"exactCanonicalTrust",
+			"snapshotReceipt",
+			"signingAuthority",
+			"displacedSource",
+		]);
+		for (const name of D108D2_FORBIDDEN_PRODUCT_RETURNS) {
+			for (const expression of [name, `{ ${name}: safe }`, `{ safe: ${name} }`]) {
+				expect
+					.soft(d108d2HasClosedProductReturns(`export function room() { return ${expression}; }`), expression)
+					.toBe(false);
+			}
+		}
+	});
+	it("follows local returned aliases, helpers, methods, export aliases and global product surfaces", () => {
+		for (const source of [
+			"const result = { capability }; export function room() { return result; }",
+			"const result = { intent }; export const room = () => Object.freeze({ ...result });",
+			"function privateOwner() { return { activationResult }; } export function room() { return privateOwner(); }",
+			"export function room() { return Promise.resolve({ ['capability']: owner.capability }); }",
+			"export function room() { return { read() { return snapshotReceipt; } }; }",
+			"const room = () => ({ exactCanonicalTrust }); export { room };",
+			"const api = { read() { return displacedSource; } }; Object.defineProperty(globalThis, 'room', { value: api });",
+			"Object.assign(window, { room() { return capability; } });",
+		])
+			expect.soft(d108d2HasClosedProductReturns(source), source).toBe(false);
+		expect(d108d2HasClosedProductReturns("export function malformed( {")).toBe(false);
+	});
+});
 
 describe("D.108e2b creator successor room lifetime RED", () => {
 	it("freezes exactly five RED owners, one GREEN owner and seven browser behaviors", () => {
