@@ -120,7 +120,7 @@ vi.mock("../packages/storage-browser/dist/src/live-journal.js", async (importOri
 	},
 }));
 
-vi.mock("../packages/protocol-v3/dist/src/public.js", async (importOriginal) => ({
+vi.mock("@ts-drp/protocol-v3", async (importOriginal) => ({
 	...(await importOriginal()),
 	createAdmissionBoundTransactionalVertexIssuer: () => ({
 		issue: () => {
@@ -132,7 +132,7 @@ vi.mock("../packages/protocol-v3/dist/src/public.js", async (importOriginal) => 
 	prepareBlueprintAdmission: () => ({}),
 }));
 
-vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
+vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 	...(await importOriginal()),
 	prepareV3LiveGeneration: (input: { pinnedGenesisAnchorDigest: string }) => {
 		probe.nextCapabilityId += 1;
