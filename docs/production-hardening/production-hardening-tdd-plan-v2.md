@@ -104669,6 +104669,31 @@ defect or additional authority seam requires diagnosis and explicit reslicing,
 not widening this tests-only batch. Preserve protected paths, stashes, eight
 pending production owners, seven built identities and all consumed evidence.
 
+**W0 observation RED handoff (2026-09-06).** The separate RED owner signed
+and pushed the exact two-owner patch `d1aa3d9d` and evidence `1eb9ad7f`;
+both signatures verify `G`. Evidence lives in
+`.logs/d110c-w0-current-profile-red-0bca5b6d/`, with 67 self-excluding
+manifest entries and manifest SHA
+`d73606842eff4227d61e199a8f440e899d690377b267d2fb2123136388d25f8f`.
+Root independently verified every manifest entry and inspected the source
+diff. The AST equivalence proof removes only the enumerated observations
+and assertion diagnostic to recover the complete frozen programs. Before
+and after source-mapped typechecks passed with zero diagnostics; changed-file
+format, source diff, lint and equivalence commands exited zero. Lint retains
+one pre-existing missing-parameter-description warning in an untouched
+function. A separate broad raw-evidence whitespace check reported unified-diff
+context and captured-output whitespace; raw evidence was preserved unchanged,
+and this does not replace the passing source-diff gate.
+
+No new runtime test was executed. The consumed historical reporter remains
+six cases, five passing and one aggregate mismatch; none of the newly added
+observation values is attributed to that execution. Custody checks retain
+the eight production owners, seven built artifacts, 27 stashes, protected
+paths and sealed evidence roots. A different Astra-high GREEN owner may now
+implement the frozen tests-only profile reconciliation above. This handoff
+is neither GREEN acceptance nor release of any long workload; the combined
+Grok/Sol/Fable review and fresh-source acceptance remain required.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
