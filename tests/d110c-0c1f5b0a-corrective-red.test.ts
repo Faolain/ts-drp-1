@@ -177,6 +177,8 @@ function proofCandidates(pair: EpochPair): Readonly<{ cut: Candidate; qc: Candid
 	const cut = candidate(
 		encodeCanonical({
 			epoch: 0,
+			historyRoot: "7".repeat(64),
+			historySize: 1,
 			kind: "drp-hard-epoch-cut",
 			objectId: pair.objectId,
 			previousAnchor: pair.currentTrust.currentAnchorDigest,
@@ -388,8 +390,26 @@ describe("D.110c-0c1f5b0a final-review corrective RED", () => {
 	});
 
 	it("binds genesis advance to the exported settlement sentinel and retains settled-v1 digest adjacency", () => {
-		const currentAcl = Object.freeze({ epoch: 0, members: Object.freeze([{ author: AUTHOR }]) });
-		const successorAcl = Object.freeze({ epoch: 1, members: Object.freeze([{ author: AUTHOR }]) });
+		const currentAcl = Object.freeze({
+			epoch: 0,
+			kind: "drp-v3-latched-acl",
+			members: Object.freeze([
+				Object.freeze({ author: AUTHOR, finalityKey: AUTHOR, groups: Object.freeze(["admin", "finality", "writer"]) }),
+			]),
+			objectId: anchorContract.objectId,
+			permissionless: false,
+			version: 3,
+		});
+		const successorAcl = Object.freeze({
+			epoch: 1,
+			kind: "drp-v3-latched-acl",
+			members: Object.freeze([
+				Object.freeze({ author: AUTHOR, finalityKey: AUTHOR, groups: Object.freeze(["admin", "finality", "writer"]) }),
+			]),
+			objectId: anchorContract.objectId,
+			permissionless: false,
+			version: 3,
+		});
 		const genesis = Object.freeze({
 			closedEpoch: 0,
 			frontiers: Object.freeze([[AUTHOR, 0, 0]]),
