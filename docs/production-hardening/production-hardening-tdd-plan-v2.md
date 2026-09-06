@@ -103783,8 +103783,13 @@ cases explicitly filtered; do not silently include the imported room-runtime
 suite. Run once in a fresh process, with no later selected case sharing its
 worker, complete JSON/stdout/stderr/exit status and incremental observations.
 Do not run the full 45-case suite, isolated acceptance, profiling campaign,
-second diagnostic attempt or larger deadline under this authority. Preserve
-the existing launcher hard process-lifetime bound and record quiescence/exit;
+second diagnostic attempt or larger test deadline under this authority. A
+read-only check of the earlier launcher found no outer process deadline; the
+earlier wording implying one existed was a planning diagnostic mistake. Bound
+this diagnostic process tree at 180 seconds (including load and teardown),
+then SIGTERM and at most five seconds before SIGKILL of that owned tree only.
+This containment limit cannot extend the 70-second test verdict or grant a
+pass; record explicit watchdog actions and quiescence/exit. In particular,
 the test timeout must not be treated as callback cancellation.
 
 Fable may inspect source/evidence and perform small diagnostic probes, but
