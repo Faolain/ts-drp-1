@@ -1,0 +1,24 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ❯ tests/phase-6b-d110c-0b1-boundaries.test.ts (4 tests | 1 failed) 1674ms
+   ✓ D.110c-0b1 bounded protocol and control boundaries > authenticates the full aggregate-bearing closure before trust-only projection 81ms
+   ✓ D.110c-0b1 bounded protocol and control boundaries > opens both aggregates against independent authenticated checkpoint and closure bindings 31ms
+   ✓ D.110c-0b1 bounded protocol and control boundaries > opens the genuine immediate predecessor and current checkpoint from pinned genesis 60ms
+   × D.110c-0b1 bounded protocol and control boundaries > retires exactly the stale Cut QC and predecessor ACL from the genuine staged closure 9ms
+     → expected { ok: false, …(1) } to deeply equal { kind: 'successor', ok: true }
+ ❯ tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts (3 tests | 2 failed) 1350ms
+   ✓ D.110c-0b1 bounded checkpoint and control-proof GREEN > opens the genuine epoch-two checkpoint from pinned genesis and its immediate pair 1ms
+   × D.110c-0b1 bounded checkpoint and control-proof GREEN > retires the stale proof pair and predecessor ACL under the bounded advance 6ms
+     → expected { ok: false, …(1) } to deeply equal { kind: 'successor', ok: true }
+   × D.110c-0b1 bounded checkpoint and control-proof GREEN > cold reopens the genuine active epoch-two room through the bounded checkpoint owner 4ms
+     → expected [ { pinMatchesOriginal: false, …(2) } ] to deeply equal [ { pinMatchesOriginal: true, …(2) } ]
+     → expected { …(3) } to match object { handle: { epoch: 2 }, …(3) }
+(2 matching properties omitted from actual)
+
+ Test Files  2 failed (2)
+      Tests  3 failed | 4 passed (7)
+   Start at  06:55:01
+   Duration  4.65s (transform 869ms, setup 0ms, collect 1.13s, tests 3.02s, environment 0ms, prepare 102ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-retained-consumer-red-b7e498bc/runtime-checkpoint/result.json

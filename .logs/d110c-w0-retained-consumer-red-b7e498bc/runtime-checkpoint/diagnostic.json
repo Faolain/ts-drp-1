@@ -1,0 +1,314 @@
+{
+  "bounded": {
+    "ok": false,
+    "reason": "TRUST_CLOSURE_INVALID"
+  },
+  "checkpoint": {
+    "currentTrust": {
+      "currentAnchorDigest": "fbf757eb90d1439c930e75ea42feec47b93cd5e94537757325754f4bf3cf2a71",
+      "currentEpoch": 2,
+      "genesisAnchorDigest": "61e16c6bbdef967621055eace74c462aac45f656adae6258e2a4f90f4baaf909",
+      "objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profileId": "creator-trusted-v1"
+    },
+    "ok": true,
+    "predecessorTrust": {
+      "currentAnchorDigest": "1b9835db607cb7a4e720fc78607d209f565fec9810ca7fd8e458ddada9a5df23",
+      "currentEpoch": 1,
+      "genesisAnchorDigest": "61e16c6bbdef967621055eace74c462aac45f656adae6258e2a4f90f4baaf909",
+      "objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profileId": "creator-trusted-v1"
+    }
+  },
+  "coldReopen": {
+    "detail": "creator predecessor recovery failed: admission-rejected",
+    "kind": "recovery-rejected",
+    "ok": false
+  },
+  "coldBootstrap": {
+    "inputs": [
+      {
+        "pinMatchesOriginal": false,
+        "pinPresent": false,
+        "site": "epoch-two"
+      }
+    ],
+    "original": {
+      "anchorDigest": "61e16c6bbdef967621055eace74c462aac45f656adae6258e2a4f90f4baaf909",
+      "author": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+      "authorSequence": 0,
+      "epoch": 0,
+      "logicalTime": 1,
+      "objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "operationBytes": {
+        "0": 8,
+        "1": 2,
+        "2": 5,
+        "3": 5,
+        "4": 118,
+        "5": 97,
+        "6": 108,
+        "7": 117,
+        "8": 101,
+        "9": 3,
+        "10": 2,
+        "11": 5,
+        "12": 6,
+        "13": 97,
+        "14": 99,
+        "15": 116,
+        "16": 105,
+        "17": 111,
+        "18": 110,
+        "19": 5,
+        "20": 3,
+        "21": 97,
+        "22": 100,
+        "23": 100
+      },
+      "vertexDigest": "67adebb144a26c955ea20ea96ee9166db32eceeaa8d9bc342c49cfe37409d42b"
+    }
+  },
+  "census": {
+    "active": [
+      {
+        "byteLength": 1780,
+        "digest": "5c3802b8acac7625ecc5a1c45e79c2c376ad99e34d7109c05e2b28bd506798a5",
+        "epoch": 2,
+        "kind": "drp-anchor-trust-state"
+      },
+      {
+        "byteLength": 1146,
+        "digest": "aeffce9486df7f4bc3aeb0279e778eb987b86aae21b33b712986a79cfbd2e012",
+        "epoch": 1,
+        "kind": "drp-creator-author-issuance-frontiers-state"
+      },
+      {
+        "byteLength": 1058,
+        "digest": "27ab6a1ea3c1157724cc38790a0f8a50e2c1b5e569ff25a48478487beb49e4ed",
+        "epoch": 1,
+        "kind": "drp-creator-issuance-retirement-state"
+      },
+      {
+        "byteLength": 1435,
+        "digest": "a690b8cb4165b6f0ef25b10e05d73e9e86e6cea2893a598cf1107f649d2cafe7",
+        "epoch": 1,
+        "kind": "drp-hard-epoch-cut"
+      },
+      {
+        "byteLength": 518,
+        "digest": "1666641c9205a4deafeb833d590a66477f13de1c4806f271064e58d0d6503021",
+        "epoch": 1,
+        "kind": "drp-seal-qc",
+        "phase": "commit"
+      },
+      {
+        "byteLength": 318,
+        "digest": "9c108f606e2a8e34e22742f37481271bf2d260bd34bd00059473d28370b9bf72",
+        "epoch": 1,
+        "kind": "drp-v3-latched-acl"
+      },
+      {
+        "byteLength": 1758,
+        "digest": "d4986d43cea506cd144a443b4d38605d4acd2f2a7aea0670b5fea0a017bf8001",
+        "epoch": 2,
+        "kind": "v3-live-generation-2"
+      }
+    ],
+    "current": [
+      {
+        "byteLength": 1780,
+        "digest": "6b8fc2adb95bee7f3a3bf893435dbb4c8fae3dac3d6ac0c26d71fe008b07cb54",
+        "epoch": 1,
+        "kind": "drp-anchor-trust-state"
+      },
+      {
+        "byteLength": 1146,
+        "digest": "17c34ec6eb3284a408be67927347eb60ef288d90c04eb4cda37a8a871a07dff7",
+        "epoch": 0,
+        "kind": "drp-creator-author-issuance-frontiers-state"
+      },
+      {
+        "byteLength": 1057,
+        "digest": "1200c34265cc27f836e82c2f5f3dfbe9a76c29d7adefd8d7e855e5e19098ed03",
+        "epoch": 0,
+        "kind": "drp-creator-issuance-retirement-state"
+      },
+      {
+        "byteLength": 1435,
+        "digest": "0dc7fb6623d7ac0e5c3d7df5e1caf244679cb9757d7ce4bdf2a067ddfc82682e",
+        "epoch": 0,
+        "kind": "drp-hard-epoch-cut"
+      },
+      {
+        "byteLength": 518,
+        "digest": "6ac38a9572a86796b2e0842cdc2f938923f3535621e725b896c9dddcc8ca83f6",
+        "epoch": 0,
+        "kind": "drp-seal-qc",
+        "phase": "commit"
+      },
+      {
+        "byteLength": 318,
+        "digest": "c3701179acfc9911e1ea4b0c8fed4e5c310298364fae8a0655288b586fd3608d",
+        "epoch": 0,
+        "kind": "drp-v3-latched-acl"
+      },
+      {
+        "byteLength": 1725,
+        "digest": "9e1f4528da1561834127b8a575cc9ab5b2ffeb1e0fee8319a244950b71fb2b6a",
+        "epoch": 1,
+        "kind": "v3-live-generation-2"
+      }
+    ],
+    "proposed": [
+      {
+        "byteLength": 1780,
+        "digest": "5c3802b8acac7625ecc5a1c45e79c2c376ad99e34d7109c05e2b28bd506798a5",
+        "epoch": 2,
+        "kind": "drp-anchor-trust-state"
+      },
+      {
+        "byteLength": 1146,
+        "digest": "aeffce9486df7f4bc3aeb0279e778eb987b86aae21b33b712986a79cfbd2e012",
+        "epoch": 1,
+        "kind": "drp-creator-author-issuance-frontiers-state"
+      },
+      {
+        "byteLength": 1058,
+        "digest": "27ab6a1ea3c1157724cc38790a0f8a50e2c1b5e569ff25a48478487beb49e4ed",
+        "epoch": 1,
+        "kind": "drp-creator-issuance-retirement-state"
+      },
+      {
+        "byteLength": 1435,
+        "digest": "a690b8cb4165b6f0ef25b10e05d73e9e86e6cea2893a598cf1107f649d2cafe7",
+        "epoch": 1,
+        "kind": "drp-hard-epoch-cut"
+      },
+      {
+        "byteLength": 518,
+        "digest": "1666641c9205a4deafeb833d590a66477f13de1c4806f271064e58d0d6503021",
+        "epoch": 1,
+        "kind": "drp-seal-qc",
+        "phase": "commit"
+      },
+      {
+        "byteLength": 1725,
+        "digest": "9e1f4528da1561834127b8a575cc9ab5b2ffeb1e0fee8319a244950b71fb2b6a",
+        "epoch": 1,
+        "kind": "v3-live-generation-2"
+      }
+    ]
+  },
+  "durableHeads": {
+    "active": {
+      "kind": "present",
+      "objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "generationId": "8056173a749083fb83e830d2e00382d66bb503635776f8a028aa71beeea0663e",
+      "revision": 6,
+      "closureDigest": "9f18fae9e93e90da4af11f7347fb6165642745b2878765f89e2a4d35c5acb0db"
+    },
+    "current": {
+      "kind": "present",
+      "objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "generationId": "eca3be380a42c2e5f72b34f991cb8f7874e115d8265cf074a6a2a173130a805e",
+      "revision": 4,
+      "closureDigest": "c6a045afa5161a713b3e1f1de031dca16b9f35826b903733caa702ee2930acc4"
+    },
+    "proposed": {
+      "kind": "present",
+      "objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "generationId": "1644edcc2fcdf333988b3dda30d66ab8b4904a6939a064a6a3e8af3f2a33f583",
+      "revision": 5,
+      "closureDigest": "0a499cb04a0cbd51eb4e9b1285fc2e59051d47658ac1b4eb13ca0eaa5a32bbd4"
+    }
+  },
+  "durableReferences": {
+    "active": [
+      {
+        "byteLength": 518,
+        "digest": "1666641c9205a4deafeb833d590a66477f13de1c4806f271064e58d0d6503021"
+      },
+      {
+        "byteLength": 1058,
+        "digest": "27ab6a1ea3c1157724cc38790a0f8a50e2c1b5e569ff25a48478487beb49e4ed"
+      },
+      {
+        "byteLength": 1780,
+        "digest": "5c3802b8acac7625ecc5a1c45e79c2c376ad99e34d7109c05e2b28bd506798a5"
+      },
+      {
+        "byteLength": 318,
+        "digest": "9c108f606e2a8e34e22742f37481271bf2d260bd34bd00059473d28370b9bf72"
+      },
+      {
+        "byteLength": 1435,
+        "digest": "a690b8cb4165b6f0ef25b10e05d73e9e86e6cea2893a598cf1107f649d2cafe7"
+      },
+      {
+        "byteLength": 1146,
+        "digest": "aeffce9486df7f4bc3aeb0279e778eb987b86aae21b33b712986a79cfbd2e012"
+      },
+      {
+        "byteLength": 1758,
+        "digest": "d4986d43cea506cd144a443b4d38605d4acd2f2a7aea0670b5fea0a017bf8001"
+      }
+    ],
+    "current": [
+      {
+        "byteLength": 1435,
+        "digest": "0dc7fb6623d7ac0e5c3d7df5e1caf244679cb9757d7ce4bdf2a067ddfc82682e"
+      },
+      {
+        "byteLength": 1057,
+        "digest": "1200c34265cc27f836e82c2f5f3dfbe9a76c29d7adefd8d7e855e5e19098ed03"
+      },
+      {
+        "byteLength": 1146,
+        "digest": "17c34ec6eb3284a408be67927347eb60ef288d90c04eb4cda37a8a871a07dff7"
+      },
+      {
+        "byteLength": 518,
+        "digest": "6ac38a9572a86796b2e0842cdc2f938923f3535621e725b896c9dddcc8ca83f6"
+      },
+      {
+        "byteLength": 1780,
+        "digest": "6b8fc2adb95bee7f3a3bf893435dbb4c8fae3dac3d6ac0c26d71fe008b07cb54"
+      },
+      {
+        "byteLength": 1725,
+        "digest": "9e1f4528da1561834127b8a575cc9ab5b2ffeb1e0fee8319a244950b71fb2b6a"
+      },
+      {
+        "byteLength": 318,
+        "digest": "c3701179acfc9911e1ea4b0c8fed4e5c310298364fae8a0655288b586fd3608d"
+      }
+    ],
+    "proposed": [
+      {
+        "byteLength": 518,
+        "digest": "1666641c9205a4deafeb833d590a66477f13de1c4806f271064e58d0d6503021"
+      },
+      {
+        "byteLength": 1058,
+        "digest": "27ab6a1ea3c1157724cc38790a0f8a50e2c1b5e569ff25a48478487beb49e4ed"
+      },
+      {
+        "byteLength": 1780,
+        "digest": "5c3802b8acac7625ecc5a1c45e79c2c376ad99e34d7109c05e2b28bd506798a5"
+      },
+      {
+        "byteLength": 1725,
+        "digest": "9e1f4528da1561834127b8a575cc9ab5b2ffeb1e0fee8319a244950b71fb2b6a"
+      },
+      {
+        "byteLength": 1435,
+        "digest": "a690b8cb4165b6f0ef25b10e05d73e9e86e6cea2893a598cf1107f649d2cafe7"
+      },
+      {
+        "byteLength": 1146,
+        "digest": "aeffce9486df7f4bc3aeb0279e778eb987b86aae21b33b712986a79cfbd2e012"
+      }
+    ]
+  }
+}

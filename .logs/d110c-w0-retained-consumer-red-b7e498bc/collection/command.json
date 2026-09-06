@@ -1,0 +1,26 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "list",
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+    "tests/phase-6a-creator-successor-infrastructure-red.test.ts",
+    "tests/phase-6a-creator-successor-local-author-red.test.ts",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+    "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+    "tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts",
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts",
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts",
+    "tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts",
+    "tests/phase-6b-d110c-a-repeat-close-red.test.ts",
+    "tests/phase-6b-d110c-b-hot-adoption.test.ts",
+    "tests/protocol-v3-creator-author-issuance-frontiers.test.ts",
+    "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+    "--json"
+  ],
+  "budgetMs": 120000,
+  "start": "2026-09-06T10:47:20.164Z"
+}

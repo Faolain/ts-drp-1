@@ -1,0 +1,15 @@
+{
+  "authority": "root agent explicit runtime-checkpoint release",
+  "baseline": "b7e498bcb4a4cd4ec7a7215cd151237e6ce005ec",
+  "runtimeRosterSha256": "e40a9fb79fb034f1b09376d7cde4e0e39324bf514879f50f583f98da9eb995a8",
+  "sourcePatchSha256": "de542f01a1eabbe1d215d10c2939150c55326d9510c62e3100d3e3f13483933a",
+  "gate": "runtime-checkpoint",
+  "files": 2,
+  "cases": 7,
+  "budgetMs": 120000,
+  "maxInvocations": 1,
+  "predictedOutcomeIsNotEvidence": true,
+  "requiresImmediateReadinessAndHashRecheck": true,
+  "prohibited": ["other tests", "heavy skip-budget child", "full 51-case roster", "W0 runtime", "browser", "retries", "source edits", "reviewers", "builds", "commits"],
+  "postRun": "Validate actual complete failure roster, preserve streams and process-group cleanup, recheck custody, seal evidence, and hand off to root."
+}

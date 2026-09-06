@@ -104844,6 +104844,60 @@ without exclusions, followed by browser, source-built isolation and the frozen
 three reviews. Preserve all pending production/build/stash/path custody. On a
 new failure, diagnose and reslice before replaying; no campaign is released.
 
+**W0 retained-consumer RED checkpoint (2026-09-06).** Separate RED source is
+signed at `a662be530ddd1b46c424bb8fd2cb943d91c38b41`; its six owners are the
+frozen observation/assertion surface, not the three GREEN implementation
+corrections. The runtime handoff and authoritative roster live under
+`.logs/d110c-w0-retained-consumer-red-b7e498bc/`. Root verified all 174 entries
+of its self-excluding manifest, SHA
+`d8f841e7815fbd95c566368776941cdf1f2a56dcae92b9885b9f9650a8fcad6d`,
+and all 942 runtime inputs, runtime binaries and exact full-index source patch.
+The staged whitespace warnings are confined to preserved `red.patch` context
+and the terminal blank line in `runtime-checkpoint/stderr.log`; exclude only
+those two raw evidence files from the second whitespace check, not from custody.
+
+The single released checkpoint invocation ran seven cases in two files:
+four pass, three fail, no skipped/pending/todo cases, 5.826 seconds, no timeout.
+Both new full-closure and independent aggregate-opener controls pass, including
+the genuine wrong-predecessor-authority control with unchanged signed bytes.
+The exact expected failures remain: two trust-only bounded projections and
+epoch-two cold recovery. The latter records both the new absent-pin observation
+failure and the original predecessor admission rejection. Original bootstrap
+provenance is genuine epoch-zero journal material; no pin was added during RED.
+The other cold-input site is observed statically only because it belongs to the
+separate failure-recovery lifecycle. Existing genuine committed-issuance
+recovery controls must cover that site during GREEN; do not claim RED measured
+it. The heavy child's consumed store-shape failure remains causal evidence;
+the added public-surface observer was not replayed through that child.
+
+The dependency-derived retained roster supersedes the freeze's preliminary
+eight-file estimate, not any historical report. Child source inspection adds
+the local-author suite and four reverse-import consumers. Actual collection is
+14 files and 51 unique cases: 46 exact inherited identities, two new closure
+controls and three explicitly supplemental bootstrap-policy controls. Preserve
+the full graph and roster in evidence; no old identity was relabeled or omitted.
+
+Exact-owner lint, format, diff and observation-only equivalence pass. Both cold
+input object expressions and the child implementation remain unchanged.
+Selected strict compilation is baseline-equivalent, **not a clean typecheck**:
+26 retained diagnostics, zero new, with exact source-line anchors. Three are in
+the frozen fixture owners; the remaining diagnostics belong to retained
+consumers. Do not present the unchanged baseline as whole-program success or
+widen this RED patch to repair inherited type debt.
+
+Preserve the failed static attempts and their corrections: missing return types
+and import ordering, an overbroad equivalence assertion selector, and printer
+layout differences after observer removal. Corrected AST comparison plus the
+parser-directed token comparison proves the narrow change. Root's first patch
+comparison used abbreviated Git index headers; the recorded full-index check
+then matched exactly. These checks did not waive any semantic difference.
+Post-run custody preserves all protected source/build/stash/path/evidence
+identities; the owned process group exited without cleanup signals. No other
+runtime, build or reviewer ran. Separate GREEN now implements only the three
+frozen fixture corrections, establishes fresh source/input custody, and requests
+root release before runtime. The 51-case consumer gate, original W0/retained
+gates, browser, source-built isolation and frozen reviews remain open.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;

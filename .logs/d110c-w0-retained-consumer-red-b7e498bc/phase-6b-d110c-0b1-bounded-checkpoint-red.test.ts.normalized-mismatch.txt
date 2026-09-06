@@ -1,0 +1,9 @@
+import "fake-indexeddb/auto";
+import { writeFileSync } from "node:fs";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { type D110c0b1ClosureEntry, type D110c0b1RedFixture, openD110c0b1RedFixture, } from "./fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.js";
+import { inspectBoundedCreatorTrustAdvance } from "../packages/control-plane/src/creator-trust-checkpoint-advance.js";
+import { openCreatorCheckpointTrust } from "../packages/protocol-v3/src/creator-checkpoint.js";
+function entries(census: readonly D110c0b1ClosureEntry[], kind: string, epoch: number, phase?: string): readonly D110c0b1ClosureEntry[] {
+    return census.filter((entry) => entry.kind === kind && entry.epoch === epoch && (phase === undefined || entry.phase === phase));
+}

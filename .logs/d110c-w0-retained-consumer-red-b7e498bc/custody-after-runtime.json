@@ -1,0 +1,28 @@
+{
+  "baseline": "b7e498bcb4a4cd4ec7a7215cd151237e6ce005ec",
+  "signature": "G",
+  "indexEmpty": true,
+  "protectedSources": 11,
+  "redSources": 6,
+  "sourceHashes": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "2486ee5e05f9f6cfcda21e7c268145a4ed16c23b768ada0b6783bd37673255a0",
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts": "f3d177abf638aa1711c4f63ebfe37e5196f98c5aefda6a59041e5c802e1d5de9",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "44dc8f6ab301bbb2474a5e058e69e55546d99e6182e87a83e47958c7b64fcef5",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts": "5f0803176121ef6af6d3bf250fb992ab6bca3801b0e770cc2aa04b53b59be266",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts": "5f7db7d9539acabefcdbd842f5833f5e41f790349f56c5045aa785b0ffdac1de",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "99e97911dada4795819dca5423f4d6bd4b851de6ee17b8e077c1766a8d6c01d8"
+  },
+  "builtIdentities": 7,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "manifestRoots": 41,
+  "protectedEvidenceFiles": 4664,
+  "inputCount": 942,
+  "allHashesAndPathsPreserved": true,
+  "sourcePatchSha256": "de542f01a1eabbe1d215d10c2939150c55326d9510c62e3100d3e3f13483933a",
+  "runtimeBinariesExact": true,
+  "ownedProcessGroup": 88909,
+  "remainingOwnedGroup": [],
+  "quiescent": true,
+  "trackedStatus": "M examples/v3-room/src/index.ts\n M packages/node/src/creator-adoption.ts\n M packages/node/src/creator-close.ts\n M packages/node/src/internal/closed-epoch-cleanup.ts\n M packages/node/src/internal/creator-transition-advance.ts\n M packages/node/src/v3-live.ts\n M packages/protocol-v3/src/creator-checkpoint.ts\n M packages/protocol-v3/src/creator-close.ts\n M packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs\n M packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts\n M tests/fixtures/phase-6a-v3/creator-adoption-contract.ts\n M tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts\n M tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts\n M tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts\n M tests/phase-6b-d110c-0b1-boundaries.test.ts\n M tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts\n M tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts"
+}
