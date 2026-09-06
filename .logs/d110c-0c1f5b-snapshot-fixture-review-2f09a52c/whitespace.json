@@ -1,0 +1,12 @@
+{
+  "fullStatus": 2,
+  "fullStdout": ".logs/d110c-0c1f5b-snapshot-fixture-review-2f09a52c/grok/review.diff:163840: trailing whitespace.\n+ \n.logs/d110c-0c1f5b-snapshot-fixture-review-2f09a52c/grok/review.diff:163846: trailing whitespace.\n+ \n",
+  "fullStderr": "",
+  "exactRawException": ".logs/d110c-0c1f5b-snapshot-fixture-review-2f09a52c/grok/review.diff",
+  "rawLines": [
+    163840,
+    163846
+  ],
+  "excludedStatus": 0,
+  "bytesPreserved": true
+}

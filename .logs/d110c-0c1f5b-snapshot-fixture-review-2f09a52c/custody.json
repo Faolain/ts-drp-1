@@ -1,0 +1,10 @@
+{
+  "head": "248f40d05f2c4686699fa012eb5f82b57f4938f6",
+  "signature": "G",
+  "originExact": true,
+  "greenManifestSha256": "ffc0675b98cd5c650a17d8f020c6e6cc437f82bd48bc7e220f7cd71684f9d201",
+  "promptSha256": "7933fcef8e78335b4e6e8272c7751bc7764afc85a5e1a53636adf8c15fcd11e5",
+  "status": "M examples/v3-room/src/index.ts\n M packages/node/src/creator-adoption.ts\n M packages/node/src/creator-close.ts\n M packages/node/src/internal/closed-epoch-cleanup.ts\n M packages/node/src/internal/creator-transition-advance.ts\n M packages/node/src/v3-live.ts\n M packages/protocol-v3/src/creator-checkpoint.ts\n M packages/protocol-v3/src/creator-close.ts",
+  "source": "2f09a52ce58e81000850d73594ca1f3ab4c9309a",
+  "runtimeNotExecuted": true
+}

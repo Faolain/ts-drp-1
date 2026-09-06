@@ -18608,7 +18608,11 @@ That narrow GREEN is now signed/pushed at `2f09a52c`; focused 1/1 and
 retained 118/118 pass in both main and fresh source-built isolation, with
 zero selected compiler diagnostics. **Snapshot-fixture GREEN evidence**
 below owns the exact evidence and coverage boundary. Final three-model
-review remains pending; neither this batch nor parent f5b is yet closed.
+review is now complete: Grok/Sol/Fable all PASS, P0/P1 union empty, one
+already-disclosed P2 dispositioned. **Snapshot-fixture final acceptance**
+below closes the three-error fixture batch. Parent f5b remains open; the
+next boundary is the separately owned registry/W0/grid decisions, followed
+by combined, browser, signed-production isolated and final parent gates.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104465,6 +104469,61 @@ and Fable xhigh formal review over signed plan, causal RED and GREEN with
 their evidence. Only that batch's empty P0/P1 union can close these three
 fixture errors; grid authority, registry/W0 compatibility and full parent
 acceptance remain separately owned and open.
+
+**Snapshot-fixture final acceptance (2026-09-06).** Signed/pushed GREEN
+evidence and plan commit `248f40d05f2c4686699fa012eb5f82b57f4938f6` was
+the exact review HEAD. Grok 4.6 high, Codex `gpt-5.6-sol` high and Fable
+5.1 xhigh through `claude-phel` each return explicit schema-valid PASS,
+`batch_ready=true`, `parent_ready=false`. The P0/P1 union is empty. Root
+revalidated terminal schemas, full RED/GREEN manifests, live source/runtime
+identities, production overlay, stashes and protected paths after review.
+No test, build, profile, browser or campaign was repeated. The three
+snapshot-fixture interface/type diagnostics are now closed at their exact
+scope, without reopening any accepted milestone or claiming parent closure.
+
+Review evidence is
+`.logs/d110c-0c1f5b-snapshot-fixture-review-2f09a52c/`, with 34-entry
+self-excluding manifest SHA
+`4ce2fefce56784624c5fd4faae38873e5c72b83ca0581bc85f30dbffb94b64a0`.
+`validation.json` owns exact session identities and terminal classifications;
+the three `validated-verdict.json` records and raw streams preserve each
+reviewer's findings and limitations. Fable's sole P2 identifies the sealed
+RED-owner summary's undercount of raw-log whitespace exceptions. Root owns
+and accepts it as already fully disclosed in the earlier RED-acceptance
+paragraph; the immutable RED root is not amended. Future sealers enumerate
+actual staged raw-log warnings mechanically. This review's full staged
+diff check reports only two trailing-space lines, 163840 and 163846, in
+its raw `grok/review.diff`; exact-path exclusion passes. `whitespace.json`
+preserves the complete check, and no raw bytes were normalized. No P2
+confirmation or prose-review loop is required.
+
+Grok's wrapper returned status 2 / `NO_VERDICT` even though the model exited
+0 with `end_turn` and a complete PASS JSON. The wrapper's line 207 checks
+only prose markers such as `VERDICT:`, not the requested JSON schema.
+Root's deterministic validator requires normal termination and parses the
+actual terminal JSON against the full schema, yielding
+`TERMINAL_SCHEMA_PASS`. Both classifications remain recorded. This was
+neither cancellation nor an absent verdict; no session was resumed or
+relaunched, and the wrapper was not changed. Sol's initial invalid jq query
+was corrected read-only; its subshell `cd` for hash checks deviated from
+the absolute-path instruction without mutating files. Root independently
+revalidated custody with absolute paths. These inspection diagnostics are
+not product/test failures or reasons to repeat a review.
+
+The finite fixture batch is complete. The remaining actual decisions are
+unchanged: reconcile the optional registry-field addition with frozen
+governance evidence; settle W0's legacy-profile fence expectation against
+settlement-only admission; and supply a reviewed grid room-head authority
+composition. These are not permission to repin immutable evidence, admit
+legacy fences, invent a genesis floor or weaken the room API. The current
+batch expressly excludes those changes, so implementation needs their
+smallest explicit authority/compatibility boundary rather than another
+fixture cleanup slice. Afterwards run the already-required combined and
+browser gates, sign the pending production owners, validate fresh-source
+isolation and complete final parent review. D.110c-c remains remaining-gap
+closure after f5b acceptance; the reviewed workload/evidence freeze precedes
+D.110c-d's genuine 100-transition, 64-active-writer control. No long-run
+prerequisite is waived by this fixture acceptance.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

@@ -1,0 +1,13 @@
+{
+  "verdict": "PASS",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 0,
+  "findings": [],
+  "red_causality": "Confirmed causal. tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts remains at SHA 24b7a57a. RED reports exactly one intended final-token failure observing missing-required-rejection; all 15 preceding controls, including genuine epoch-zero recovery, passed without loader, export, undefined-call, timeout, or cleanup failures.",
+  "scope_assessment": "GREEN commit 2f09a52c changes only tests/fixtures/phase-4b-v3/live-snapshot.ts and implements exactly the three authorized repairs: explicit asynchronous installEpochAnchor rejection, published settlement-write input typing, and a non-null local SettlementPlan assignment/return. No production/API/authority change, successor-install success, state mutation, broad cast, suppression, or behavior change outside those spans was found. The eight production-owner overlay files remain byte-identical to custody and were not reviewed as production changes.",
+  "evidence_assessment": "Evidence is adequate for this bounded batch. RED and GREEN manifests independently validate 115/115 and 262/262 entries; specified hashes match. Main and isolated reporters pass focused 1/1 and retained 118/118 with zero failures/skips/todos/errors and quiescent status. All 48 captured statuses are zero; both selected strict compilers report zero diagnostics, clearing the three helper errors. The seven direct and four indirect consumers ran. Five fakeNetwork-only consumers have unchanged body/import/module evidence. The shadow driver's genuine genesis recovery is source-covered, but its eager 100-close setup was not run and receives no runtime credit. Isolated custody verifies the exact overlay, 103 source identities, independent preparation/build, and seven initially absent outputs matching afterward. The 913-versus-532 compiler graphs are correctly limited to identical shared sources/options plus 381 main-only ancestor ambient declarations, not claimed as whole-graph identity. No wide64, browser, profile, campaign, or whole-parent acceptance credit is inferred.",
+  "remaining_debt": "This batch closes only the snapshot-fixture contract repair. Parent grid-authority composition, registry/W0 compatibility findings, combined and browser acceptance, signed-production isolation, and final whole-parent review remain open under their existing owners.",
+  "batch_ready": true,
+  "parent_ready": false
+}
