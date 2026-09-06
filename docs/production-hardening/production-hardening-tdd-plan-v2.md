@@ -18604,6 +18604,11 @@ Snapshot-fixture RED is now signed/pushed (`dc2f8dc2`, evidence `1fc3d039`):
 the one test fails at its intended outcome assertion after all 15 controls,
 including genuine epoch-zero recovery, pass. **Snapshot-fixture RED acceptance
 and retained scope** below releases the separate narrow GREEN owner.
+That narrow GREEN is now signed/pushed at `2f09a52c`; focused 1/1 and
+retained 118/118 pass in both main and fresh source-built isolation, with
+zero selected compiler diagnostics. **Snapshot-fixture GREEN evidence**
+below owns the exact evidence and coverage boundary. Final three-model
+review remains pending; neither this batch nor parent f5b is yet closed.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104409,6 +104414,57 @@ initialization; the added unsupported method is unreachable on the inspected
 epoch-zero recovery branch. Thus the targeted direct/indirect retained
 roster is 11 files plus the new focused test, without a wide or long-run
 replay. Final review must inspect this coverage boundary explicitly.
+
+**Snapshot-fixture GREEN evidence (2026-09-06).** Separate GREEN source
+`2f09a52ce58e81000850d73594ca1f3ab4c9309a` is signed/pushed and changes only
+the authorized helper. Its SHA is
+`fddfff2be4f1913b7e27a1b20b82efbabee1fc07ea36efe0a0e467c8b1781864`;
+the accepted RED test remains byte-identical. The three changes supply the
+explicit asynchronous unsupported-installer rejection, published plan input
+type and equivalent non-null local plan result. Full-file reversal and
+emitted-code comparison preserve all other behavior, including CAS, scope,
+revision, entry copies, effects, fake network and module initialization.
+
+Root independently validated the complete 262-entry self-excluding manifest
+under `.logs/d110c-0c1f5b-snapshot-fixture-green-dc2f8dc2/`, SHA
+`ffc0675b98cd5c650a17d8f020c6e6cc437f82bd48bc7e220f7cd71684f9d201`,
+and all four complete reporters/statuses. Main and fresh isolation each
+pass focused 1/1 and eleven-file retained 118/118, with no failures, skips,
+todos, soft failures or top-level errors; runners exit zero and quiesce.
+The exact commands and report hashes live in `seal-summary.json` and the
+recorded command directories. All 48 captured command statuses are zero.
+Exact-owner lint/format/diff, equivalence and selected strict compiler pass
+in both environments; all three inherited helper diagnostics disappear.
+This is the selected parent two-root program plus the new test, not a
+whole-repository typecheck or a grid waiver.
+
+The isolated checkout is
+`/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout`, using that
+signed source plus only the exact eight-owner pending production overlay
+`6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`.
+Its own offline frozen install, locked official native preparation, direct
+native import, package source build and fresh Node package import pass.
+All seven tracked built identities were absent before building and match
+afterwards; no host dist, node_modules or native cache was copied.
+All 103 effective source identities are verified. Main's 913-source
+compiler and isolated 532-source compiler share identical project bytes
+and relocated options; the 381 main-only sources are ancestor ambient
+declarations, not omitted workspace sources. The whole ambient graphs are
+not claimed identical. Final custody preserves eight production owners,
+seven built owners, 27 stashes, 86,522 protected paths and prior evidence.
+
+No runtime was retried. Two guessed recorder paths were absent during
+read-only preparation; their tool errors are disclosed in `assessment.md`,
+not recast as workload failures. Actual collection supersedes preliminary
+literal test counts. The approved shadow-driver source-equivalence boundary
+remains explicit: no eager 100-close comparison, wide test, browser or
+campaign ran here and none receives new runtime credit. Final review must
+inspect this boundary and genuine epoch-zero recovery, not infer successor
+support from the rejecting mock. Next is the existing Grok high, Sol high
+and Fable xhigh formal review over signed plan, causal RED and GREEN with
+their evidence. Only that batch's empty P0/P1 union can close these three
+fixture errors; grid authority, registry/W0 compatibility and full parent
+acceptance remain separately owned and open.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

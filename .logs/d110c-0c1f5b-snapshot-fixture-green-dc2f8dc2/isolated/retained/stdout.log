@@ -1,0 +1,32 @@
+
+ RUN  v3.1.1 /private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout
+
+ ✓ tests/phase-4b-v3-live-snapshot-composition-red.test.ts (7 tests) 1049ms
+   ✓ Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > fails closed on digest, identity, ACL, schema, oversize, and unsafe carriers before registration effects  478ms
+ ✓ tests/phase-4c-snapshot-pull-red.test.ts (12 tests) 15306ms
+   ✓ Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > adds only fixed non-root owners with exact types and unchanged roots  4073ms
+   ✓ Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > resumes a non-prefix durable subset, rejects corrupt and slow peers, and completes through 4c-a/4c-b  10163ms
+   ✓ Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > serves only a verified scope to an exactly authorized peer with bound manifest and chunk frames  404ms
+   ✓ Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > admits one scope-peer transfer and four global sessions, then aborts every live body without a write  330ms
+ ✓ tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts (5 tests) 2872ms
+   ✓ Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > uses three genuine nodes to reject a corrupt source, switch to an honest source, and activate without dialing  801ms
+   ✓ Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > folds, transfers, verifies and activates one fresh snapshot-closed replacement without mutating its source  840ms
+   ✓ Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > consumes the verified transfer once and rejects substitution before live effects  1041ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts (22 tests) 261ms
+ ✓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts (27 tests) 2600ms
+   ✓ D.110c-0c1f5b0b Node settlement RED > [RED] classifies signed same-key cross-anchor join without application intents  566ms
+   ✓ D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a displaced ACL source before fence issuance  517ms
+ ✓ tests/e5-01-v3-operation-admission-red.test.ts (8 tests) 438ms
+ ✓ tests/protocol-v3-latched-acl-referee-successor-red.test.ts (7 tests) 138ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts (12 tests) 230ms
+ ✓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts (13 tests) 1396ms
+   ✓ D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress  305ms
+ ✓ tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts (3 tests) 176ms
+ ✓ tests/phase-4a-v3-live-blueprint-fold.test.ts (2 tests) 223ms
+
+ Test Files  11 passed (11)
+      Tests  118 passed (118)
+   Start at  04:42:22
+   Duration  32.13s (transform 2.12s, setup 0ms, collect 5.28s, tests 24.69s, environment 1ms, prepare 600ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-green-dc2f8dc2/isolated/retained/result.json

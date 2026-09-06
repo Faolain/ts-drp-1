@@ -1,0 +1,8 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout",
+  "command": "node",
+  "args": [
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-green-dc2f8dc2/isolated/typecheck.mjs"
+  ],
+  "start": "2026-09-06T08:41:01.887Z"
+}

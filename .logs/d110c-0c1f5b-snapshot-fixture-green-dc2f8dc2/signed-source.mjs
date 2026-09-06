@@ -1,0 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),file='tests/fixtures/phase-4b-v3/live-snapshot.ts',hash=b=>crypto.createHash('sha256').update(b).digest('hex'),git=(...a)=>execFileSync('git',a,{cwd:root,encoding:'utf8'}).trim(),head=git('rev-parse','HEAD'),eq=JSON.parse(fs.readFileSync(path.join(out,'equivalence.json')));
+if(git('log','-1','--format=%G?')!=='G'||git('rev-parse','HEAD^')!=='7ee552b59b3123223b19141b9fef1cd5be6cb2b0'||git('diff-tree','--no-commit-id','--name-only','-r','HEAD')!==file||git('diff','--cached','--name-only')||git('ls-remote','origin','refs/heads/codex/phase3a1b-p6-golden-path').split(/\s/u)[0]!==head||hash(fs.readFileSync(path.join(root,file)))!==eq.afterSha256||hash(execFileSync('git',['show',head+':'+file],{cwd:root}))!==eq.afterSha256)throw Error('Signed helper custody');fs.writeFileSync(path.join(out,'signed-source.json'),JSON.stringify({head,signature:'G',originExact:true,indexEmpty:true,file,sha256:eq.afterSha256},null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({head,signature:'G',originExact:true,sha256:eq.afterSha256}));

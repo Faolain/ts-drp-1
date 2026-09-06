@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "commit",
+    "-S",
+    "--only",
+    "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+    "-m",
+    "test: satisfy live snapshot fixture store contracts"
+  ],
+  "start": "2026-09-06T08:34:49.954Z"
+}
