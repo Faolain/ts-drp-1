@@ -18492,19 +18492,17 @@ and archive/paging work do not gate that independently bounded control without
 a demonstrated shared dependency. This clarification creates no review round,
 new implementation authorization or long-run invocation.
 
-The current transport fixture correction is signed at `772e96bd`; its stopped
-isolated evidence is signed/pushed at `8e121d2d`, under
-`.logs/d110c-0c1f5b-retained-transport-772e96bd/`. All three corrected cases pass,
-but the sole complete selection is 23 pass / 1 fail / 0 skip: an untouched
-Node-root import case cannot load the existing `node-datachannel` native
-binary after an isolated install with scripts disabled. The gate is not
-accepted or retried; thirteen exactly baseline-attributed target type
-diagnostics remain open. This does not change the eight unresolved failures
-in the original retained inventory or interrupt the existing repair sequence.
-The parent record now freezes a fresh isolated native-prerequisite
-continuation using the already-locked installer and unchanged transport tests;
-the consumed attempt is not reopened. This is dependency preparation under
-the existing repository policy, not a dependency or product change.
+The transport fixture gate is now repaired: tests `772e96bd`, signed/pushed
+isolated evidence `e122e280`, and the separate GREEN root
+`.logs/d110c-0c1f5b-green-transport-e122e280/` pass the same complete 24/24
+selection in both the clean source-built checkout and preserved parent patch.
+The stopped 23-pass/one-native-loader-failure attempt at `8e121d2d` remains
+immutable. Fresh continuation used the already-locked native installer under
+existing repository policy; no dependency, production or test change was
+needed after that stop. The parent record owns full evidence and custody.
+This closes three original runtime failures, leaving five from the original
+retained inventory. Thirteen baseline-identical transport type diagnostics
+remain open; no blanket typecheck or parent GREEN acceptance is claimed.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18624,11 +18622,14 @@ Blocked, and on what:
   GREEN run, closing gate 67's stale export expectation. The settlement-codec
   correction at signed/pushed tests `de961884` / isolated evidence `0240e9ea`
   then passes 4/4 in both its clean source-built checkout and separate GREEN
-  run, closing gate 56's two incomplete-fixture failures. Eight other observed
-  runtime failures and blocked supplement coverage remain open. The inherited
+  run, closing gate 56's two incomplete-fixture failures. Transport tests
+  `772e96bd` then pass 24/24 in fresh source-built isolation at evidence
+  `e122e280` and the separate GREEN run, closing gate 70's three failures.
+  Five other observed runtime failures and blocked supplement coverage remain open. The inherited
   certificate, room-test and grid-wrapper type diagnostics retain their named
   owners and deadlines; no blanket typecheck pass. The parent record owns
-  exact evidence and the next bounded transport fixture correction. Registry-freeze
+  exact evidence, transport's thirteen inherited type diagnostics and remaining
+  authority-read-order, registry-freeze and W0 compatibility decisions. Registry-freeze
   repair remains outside authorized implementation scope; no production
   edit occurred in these retained fixture corrections.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
@@ -101004,9 +101005,14 @@ roster correction at signed/pushed tests `d9781349` / isolated evidence
 GREEN run, closing gate 67's one observed failure. The settlement-codec
 correction at signed/pushed tests `de961884` / isolated evidence `0240e9ea`
 then passes 4/4 in the clean source-built checkout and separate GREEN run,
-closing gate 56's two incomplete-fixture failures. Eight other observed runtime
-failures, blocked supplement coverage and inherited static debts remain open;
-the transport fixture correction below is next.
+closing gate 56's two incomplete-fixture failures. Transport tests `772e96bd`
+then pass 24/24 in fresh source-built isolation at signed/pushed evidence
+`e122e280` and in the separate GREEN run against the preserved patch, closing
+gate 70's three original runtime failures. The stopped native-loader attempt
+remains immutable. Five other observed runtime failures, blocked supplement
+coverage and inherited static debts remain open, including thirteen transport
+type diagnostics; the authority-read-order, registry-freeze and W0 compatibility
+decisions retain their distinct boundaries.
 The partial eight-owner production patch is preserved, not committed or
 accepted. Other retained repair, browser/static/isolated and final review gates
 remain open.** The
@@ -102495,6 +102501,59 @@ infrastructure slice is created; the existing final parent review consumes
 both the stopped evidence and this continuation. All protected paths, stashes,
 eight pending production owners, built owners and earlier evidence remain
 unchanged. Registry-freeze and W0 compatibility decisions stay out of scope.
+
+**Retained transport acceptance (2026-09-05).** Gate 70's three original
+fixture/source-expectation failures are closed without production changes.
+Tests remain signed `772e96bd`; the stopped isolated result `8e121d2d` stays
+immutable and nonaccepted. The fresh native continuation is signed/pushed
+`e122e2806eee036404e812080c658f9804df7852` from exact signed plan checkout
+`a430272a0e8dd361c9139e66c140870d4ece7e1f` at
+`/private/tmp/d110c-f5b-retained-transport-native-uwMjHN/checkout`. Its own
+offline frozen install, package-local locked prebuild preparation, direct addon
+import, full workspace source build and fresh Node-root import all pass.
+No main dependency tree, native binary, compiled output or pending production
+patch was copied into that checkout. Native archive/binary hashes and full
+commands/streams/statuses are retained in the isolated root, not inferred from
+the main workspace.
+
+One isolated unfiltered run passes all 24 original titles, zero failures,
+skips or top-level errors. Root independently accepts its complete 116-entry
+manifest, SHA-256
+`6ede5fcfebd419cecb1045e461fa836fff169fee87767bd2a7f11ebc21031775`,
+raw reporter
+`8e4e4556cdedd86d5de3194e8f7630a85e6de92c02fdec3ae0410e9e4085029e`,
+native provenance/import/build gates, unchanged tests and exact source/runtime
+custody. Thirteen target/zero external type diagnostics are exactly identical
+to the stopped attempt and signed pre-correction baseline after location
+mapping. The unchanged six-character `return` token inside the edited helper
+remains the explicit diagnostic overlap. All thirteen stay open under retained
+transport fixture static contract, deadline parent static closure; static
+attribution is not a typecheck pass. Lint/format/source diff and exact listing
+pass without fixture edits or a runtime retry.
+
+Only after that signed/pushed isolation acceptance, the separate Astra-high
+GREEN owner runs the same file once against the unchanged parent patch:
+24/24 pass, zero failures/skips/reporter errors, command status 0. No rebuild,
+native installation, repeated listing or other runtime gate occurs. Its root
+`.logs/d110c-0c1f5b-green-transport-e122e280/` has sixteen self-excluding
+manifest entries, SHA-256
+`176f0ba9cf755bbdd1158b7f97f471137caf24668c44abfaa8e077800985524b`;
+raw reporter is
+`75b1e5bccc535b3b465137226237fdd7974be9922cacde1eefafd81762a80570`.
+Root independently verifies the exact complete inventory/hashes and original
+file-bound title multiset, raw outcomes, before/after and live owner hashes,
+eight-owner patch, seven built owners, the 78-entry retained roster plus its
+separately pinned shared fixture, 27 stashes and 86,522 protected paths.
+Evidence whitespace checks and bounded plan formatting/diff checks pass before
+this plan/evidence closure is signed; no prior evidence is edited.
+
+This closes only the three observed gate-70 runtime failures. Five original
+retained runtime failures remain: one authority-read-order, three registry-
+freeze and one W0 compatibility failure. Their existing separate scope
+boundaries, blocked supplement coverage, other static debts, parent browser/
+isolated gates and final Grok/Sol/Fable review remain open. No new full-suite
+aggregate, parent production acceptance, review verdict or long-run claim is
+manufactured, and the eight-owner production patch remains uncommitted.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
