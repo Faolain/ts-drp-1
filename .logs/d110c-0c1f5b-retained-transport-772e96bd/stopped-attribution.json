@@ -1,0 +1,87 @@
+{
+  "classification": "STOPPED_ISOLATED_NATIVE_DEPENDENCY_LOADER_PREREQUISITE",
+  "notAccepted": true,
+  "root": "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout",
+  "package": {
+    "name": "node-datachannel",
+    "version": "0.32.3",
+    "sha256": "a6a0b17747730ea5a4c64831790465656ef95fa56d8ebe4f7b92412d5c70efb3",
+    "install": "prebuild-install -r napi || (npm install --ignore-scripts --production=false && npm run _prebuild)",
+    "binary": {
+      "napi_versions": [
+        8
+      ]
+    }
+  },
+  "loader": {
+    "file": "node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel/dist/esm/lib/node-datachannel.mjs",
+    "sha256": "e17d28d31aa5a07b3fd4fb8b82fd7f003836eb09eb582cf317b69e9fa006c4fd",
+    "text": "\n// -- Shims --\nimport cjsUrl from 'node:url';\nimport cjsPath from 'node:path';\nimport cjsModule from 'node:module';\nconst __filename = cjsUrl.fileURLToPath(import.meta.url);\nconst __dirname = cjsPath.dirname(__filename);\nconst require = cjsModule.createRequire(import.meta.url);\nconst nodeDataChannel = require(\"../../../build/Release/node_datachannel.node\");\n\nexport { nodeDataChannel as default };\n//# sourceMappingURL=node-datachannel.mjs.map\n"
+  },
+  "native": {
+    "file": "node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel/build/Release/node_datachannel.node",
+    "exists": false
+  },
+  "installation": {
+    "command": {
+      "cwd": "/tmp/d110c-f5b-retained-transport-7dFMyG/checkout",
+      "command": "pnpm",
+      "args": [
+        "install",
+        "--offline",
+        "--frozen-lockfile",
+        "--ignore-scripts"
+      ],
+      "start": "2026-09-06T01:28:34.405Z"
+    },
+    "status": {
+      "code": 0,
+      "signal": null,
+      "start": "2026-09-06T01:28:34.405Z",
+      "finish": "2026-09-06T01:28:41.949Z",
+      "pid": 70328
+    }
+  },
+  "reporterSha256": "5b564a839666ccdab855235c50cdbb29a4fb4524b6f851d7225120731ba622ab",
+  "total": 24,
+  "passed": 23,
+  "failed": 1,
+  "skipped": 0,
+  "correctedCases": [
+    {
+      "title": "reaches genuine recovered activation, binding conflict, ingress queueing, egress and deactivation",
+      "status": "passed",
+      "duration": 127.31995800000004,
+      "failureMessages": []
+    },
+    {
+      "title": "serializes genuine egress and classifies page, publish and mark deactivation races",
+      "status": "passed",
+      "duration": 198.0295839999999,
+      "failureMessages": []
+    },
+    {
+      "title": "decodes one canonical envelope then invokes only the genuine Seam-1 extractor with exact seven keys",
+      "status": "passed",
+      "duration": 86.7754160000004,
+      "failureMessages": []
+    }
+  ],
+  "failure": {
+    "ancestorTitles": [
+      "Phase 3a-1B Seam 3 private live-plane RED"
+    ],
+    "fullName": "Phase 3a-1B Seam 3 private live-plane RED keeps the Seam3 owner private and excludes protocol-v2, B effects and extra authority",
+    "status": "failed",
+    "title": "keeps the Seam3 owner private and excludes protocol-v2, B effects and extra authority",
+    "duration": 575.4327090000006,
+    "failureMessages": [
+      "Error: Cannot find module '../../../build/Release/node_datachannel.node'\nRequire stack:\n- /private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel/dist/esm/lib/node-datachannel.mjs\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)\n    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)\n    at Function._load (node:internal/modules/cjs/loader:1211:37)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Module.require (node:internal/modules/cjs/loader:1487:12)\n    at require (node:internal/modules/helpers:135:16)\n    at file:///private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel/src/lib/node-datachannel.ts:2:1\n    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)"
+    ],
+    "meta": {}
+  },
+  "stderr": "(node:78323) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+  "topLevelErrors": [],
+  "sourceAttribution": "Full workspace TypeScript source build succeeded, but dependency install scripts were intentionally disabled; the required native binary is absent. The unchanged Node-root import reaches this loader. No native bootstrap, source fix, or runtime repetition was attempted.",
+  "sourceFixtureScopePreserved": true
+}

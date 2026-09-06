@@ -1,0 +1,1 @@
+{"classification":"BASELINE_IDENTICAL_WITH_AUTHORIZED_HELPER_OVERLAP_REQUIRES_ROOT_DISPOSITION","equal":true,"targetDiagnostics":13,"externalDiagnostics":0,"changedLineDiagnostics":0,"authorizedHelperOverlap":[{"code":2322,"line":461,"baselineLine":457,"owner":{"kind":"FunctionDeclaration","name":"fakeIssuanceStore","startLine":456}}]}
