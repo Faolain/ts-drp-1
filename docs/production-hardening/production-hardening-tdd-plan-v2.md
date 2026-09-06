@@ -18519,20 +18519,21 @@ The subsequent transport-static repair is also complete: signed RED `41686d6f`,
 signed one-file GREEN `c5b5f36a`, corrected strict compilers and 24/24 in both
 main and fresh source-built isolation. The initial lint-syntax and launcher
 diagnostics remain preserved; none required a product change. The parent
-record's **Consolidated remaining fixture/type acceptance batch** is next:
-its sole combined compiler found the seven known fixture errors, the separate
-grid error, and two additional fixture diagnostics. The original eight-row
-matrix failed and is preserved; the complete-set audit below folds only the
-hex-key verification argument and detached-clone typing corrections into this
-same batch. Its four source owners and four retained consumers remain separate from the
-grid `roomHeadAuthority` composition diagnostic and four recorded runtime
-failures. Those runtime counts describe the audited existing inventory, not a newly
-executed whole-parent pass. No blanket typecheck or parent GREEN acceptance is
-claimed; registry-freeze repair still requires its explicit prospective
-governance decision. After the batch, run the existing combined acceptance
-gates against current production bytes, inspect the complete failure set and
-diagnose shared causes before further edits. Do not extend fixture cleanup
-one diagnostic/checkpoint at a time.
+record's **Consolidated remaining fixture/type acceptance batch** now has signed
+RED/amendment `f8ec9daf` and four-source GREEN `8336eb77`: all nine fixture
+diagnostics are removed, with only the unchanged grid error in both compilers.
+Main passes 49/49, but clean isolation stops at 48/49: the unchanged pacemaker
+trace-replay test exceeds its inherited 10-second runner limit (10.93 seconds;
+main 9.04 seconds). The complete-set audit finds no other isolated failure.
+The batch is not accepted; its **Consolidated fixture-exit isolated stop** below
+owns evidence and the pending test-budget decision. No retry, threshold edit,
+product-defect conclusion or new review-only slice follows automatically.
+Grid `roomHeadAuthority` composition and four still-recorded original runtime
+failures remain separate; those four are not a newly executed whole-parent
+aggregate. Registry-freeze repair retains its explicit governance boundary.
+After the compatible batch's acceptance, return to the existing combined
+parent gates and inspect their complete failure set before further edits.
+Do not extend fixture cleanup one diagnostic/checkpoint at a time.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -101052,6 +101053,11 @@ transport diagnostics are subsequently repaired at signed source `c5b5f36a`,
 with strict compiler and 24/24 main/isolated proofs below. The 41 external guard-program fixture
 diagnostics are subsequently repaired by the two-fixture GREEN below, with
 78/78 main and isolated retained passes; this does not clear the other debts.
+The consolidated four-source fixture GREEN at `8336eb77` then removes nine
+more fixture diagnostics and passes 49/49 in main, but its clean-isolated
+acceptance stops at 48/49 on the unchanged pacemaker replay's 10-second runner
+limit. The detailed stop below preserves that result and owns the test-budget
+decision; no production performance defect is established and no retry occurs.
 Registry-freeze and W0 compatibility decisions retain their distinct boundaries.
 The partial eight-owner production patch is preserved, not committed or
 accepted. Other retained repair, browser/static/isolated and final review gates
@@ -103341,6 +103347,73 @@ error retained, with compiler failure reported explicitly. Additional failures
 stop edits for complete-set/shared-cause diagnosis, not new per-diagnostic
 slices. The existing static, retained, isolated and final parent review gates
 still apply; no extra review round, production edit or long run is introduced.
+
+**Consolidated fixture-exit isolated stop (2026-09-06).** The tests-only
+GREEN is signed/pushed `8336eb777e775263d4983a76ffea8a699b8faf60`, following
+signed RED/amendment `f8ec9daf`. Main's sole retained command passes all 49
+cases; fresh isolation executes the same exact four-file/title multiset and
+reports 48 passes, one failure and zero skips, with no additional assertion,
+suite or reported top-level errors. The failure is the unchanged pacemaker
+test "replays every checked trace through the genuine voter, pacemaker, and
+fake-IDB store": `Test timed out in 10000ms`, reported duration
+10,927.524875ms versus main's passing 9,039.930208ms. This is not batch closure.
+
+Evidence is `.logs/d110c-0c1f5b-green-fixture-exit-f8ec9daf/`; root validated
+the complete 223-entry self-excluding manifest with SHA-256
+`e8a41ccb8c1129f0ef86d04e1ad59feec0faf07c3b35110c53fb496e534ccdf0`.
+`final-assessment.md` owns all commands, identities, source equivalence,
+complete results and diagnostic dispositions. Main and isolated reporter hashes
+are respectively `e1aff50cad1e9daf31537ab39ccfa8f1286992b54a0a9b4fc2164ca2779a8a91`
+and `94fbf00d33cf54fb73a1c8d92657ef545e1803556282d6002c154074d899e1bd`.
+Both strict compilers remove the nine fixture errors but retain the exact grid
+TS2345 and exit 1; both matrix checks pass. Lint, formatting, source whitespace
+and 274-assertion/five-span equivalence pass in both environments. All other
+emitted behavior is unchanged except the declared same-key hex-to-byte argument.
+
+The clean checkout `/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout`
+contains signed `8336eb77` plus only the preserved eight-owner production
+overlay `6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`.
+Its own frozen install, first-invocation official native preparation, fresh
+package build and Node/native imports pass. All 93 source identities and seven
+fresh build artifacts match main; no host runtime artifacts are copied. Main's
+1,309-source and isolation's 928-source compiler graphs differ only by 381
+main-only ancestor ambient declarations, with identical common source hashes
+and root-normalized options. The graphs are not falsely called identical.
+
+Read-only attribution proves the failed registration/body and three trace hashes
+unchanged. One test combines genuine replay, two intentional 1,100ms waits and
+three synchronous Quint subprocesses under the generic 10-second test budget.
+These are static workload facts, not a CPU profile or attribution of elapsed
+time. The timeout does not establish which operation crossed the limit or that
+every assertion in that test completed. No production regression or harmless
+variance is claimed. The full Apalache witness and other 48 cases pass.
+
+Owner: root and the existing test owner. Deadline: disposition the test-only
+timing boundary before another affected run or claiming isolated acceptance.
+The smallest proposed action is a test-local harness-budget amendment (20
+seconds proposed), leaving global configuration, product round timers, trace
+work, assertions and all other thresholds unchanged. This is a proposal only:
+explicit authorization and the applicable existing TDD/review boundary remain
+required; no timeout edit, retry, profiling or production optimization is
+authorized by this stop record. Do not create a review round for this prose.
+Nine compiler repairs and main's 49 passes are preserved, not rerun or relabeled.
+The existing combined parent gates remain next after this acceptance boundary;
+grid composition and the four original recorded runtime failures are not waived.
+
+All 38 captured command statuses remain: the two expected grid-only compiler
+failures, isolated runtime failure and an initial read-only AST-attribution
+guard error are the four nonzero results. The corrected attribution succeeds
+without test repetition. Safe process-inspection corrections are disclosed
+without publishing unrelated process titles. Final custody preserves the
+effective 85-entry test/shared map, eight production and seven built owners,
+27 stashes and 86,522 protected paths. Prior evidence remains immutable.
+
+The unfiltered staged evidence whitespace check exits 2: exactly 27 warnings
+are context-prefix spaces before tabs in `fixture-only.patch`, and one is a
+final blank line in raw `isolated/runtime-49/stderr.log`. Root verified each
+against its retained raw line. Excluding only these two exact artifacts passes;
+source and edited-plan checks pass independently. No sealed bytes are changed
+and no blanket staged-whitespace pass is claimed.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

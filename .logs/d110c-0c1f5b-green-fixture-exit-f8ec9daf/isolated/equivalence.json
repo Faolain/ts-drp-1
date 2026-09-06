@@ -1,0 +1,83 @@
+{
+  "valid": true,
+  "changedPaths": [
+    "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+    "tests/genesis-profile.test.ts",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "tests/phase-5d-pacemaker-red.test.ts"
+  ],
+  "spanCount": 5,
+  "files": [
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "beforeSha256": "f246f32b157fd3426cf4330028a347d055b4eacb800a36d77c58a6fcc320696a",
+      "afterSha256": "b0b62272dd8d1768152433fff658ce55b4de7e58cffeb8ba57a343511b88cfd5",
+      "authorizedSpans": 1,
+      "assertions": 32,
+      "sourceOutsideFrozenSpansEqual": true,
+      "typeErasedJavaScriptEqualExceptSingleGenesisKeyArgument": true,
+      "wholeAssertionByteIdentityClaimed": false,
+      "explicitKeyRepresentationCorrection": true
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "beforeSha256": "3f849d43e92056e19e94d89619a792b6bbd962ae4ee9165c0e88fbaf141991bb",
+      "afterSha256": "3f849d43e92056e19e94d89619a792b6bbd962ae4ee9165c0e88fbaf141991bb",
+      "authorizedSpans": 0,
+      "assertions": 75,
+      "sourceOutsideFrozenSpansEqual": true,
+      "typeErasedJavaScriptEqualExceptSingleGenesisKeyArgument": true,
+      "wholeAssertionByteIdentityClaimed": true,
+      "explicitKeyRepresentationCorrection": false
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "beforeSha256": "2fae9a927becec0858c7de9ab61a6aca7b901fd97897bcb636807f9fc658456a",
+      "afterSha256": "cf0ec7df87e6ac58c2e03d139d25078d372bb6e4ccc9005ab621744444f288db",
+      "authorizedSpans": 1,
+      "assertions": 62,
+      "sourceOutsideFrozenSpansEqual": true,
+      "typeErasedJavaScriptEqualExceptSingleGenesisKeyArgument": true,
+      "wholeAssertionByteIdentityClaimed": true,
+      "explicitKeyRepresentationCorrection": false
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "beforeSha256": "8bd15f99348fc67c02cf20ea172819c1c96cdfbf9439d768b184f57496129f80",
+      "afterSha256": "862a039ecd4dfe02a220b42eb8eb8c5f89123886282f35eaebf7c1da8ba19259",
+      "authorizedSpans": 2,
+      "assertions": 105,
+      "sourceOutsideFrozenSpansEqual": true,
+      "typeErasedJavaScriptEqualExceptSingleGenesisKeyArgument": true,
+      "wholeAssertionByteIdentityClaimed": true,
+      "explicitKeyRepresentationCorrection": false
+    },
+    {
+      "file": "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+      "beforeSha256": "0dee33e6f09e81fed931f842f70311109bebf7ea56adc2a07a670132a1f031e2",
+      "afterSha256": "96db123a0d3bb05f5616c2f1c1cbec3c323eea6579e075964b8a269658a87a16",
+      "authorizedSpans": 1,
+      "assertions": 0,
+      "sourceOutsideFrozenSpansEqual": true,
+      "typeErasedJavaScriptEqualExceptSingleGenesisKeyArgument": true,
+      "wholeAssertionByteIdentityClaimed": true,
+      "explicitKeyRepresentationCorrection": false
+    },
+    {
+      "file": "tests/fixtures/phase-5d-v3/pacemaker-fixture.ts",
+      "beforeSha256": "12add1a4d285ba0c66368d6c34fd5a5a20356873ec0bf8aff17463a17fd3e3bf",
+      "afterSha256": "12add1a4d285ba0c66368d6c34fd5a5a20356873ec0bf8aff17463a17fd3e3bf",
+      "authorizedSpans": 0,
+      "assertions": 0,
+      "sourceOutsideFrozenSpansEqual": true,
+      "typeErasedJavaScriptEqualExceptSingleGenesisKeyArgument": true,
+      "wholeAssertionByteIdentityClaimed": true,
+      "explicitKeyRepresentationCorrection": false
+    }
+  ],
+  "allAssertionPredicatesPreservedExceptExplicitKeyRepresentation": true,
+  "canonicalBytesAndZip215FalseAndTrueAssertionUnchanged": true,
+  "detachedCloneAndDurableRevisionMinusOneAndTraceStateMismatchUnchanged": true,
+  "sharedTraceTypesParsersHashesAndMutantsUnchanged": true,
+  "noNewRuntimeInstrumentation": true
+}

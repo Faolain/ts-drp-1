@@ -1,0 +1,1 @@
+{"runtimeValid":true,"changedPaths":["tests/fixtures/phase-3b-v3/certified-genesis-contract.ts","tests/genesis-profile.test.ts","tests/phase-3g-v3-room-rebase-red.test.ts","tests/phase-5d-pacemaker-red.test.ts"],"patchSha256":"2e92d30960020a6959d4469907ebcd2f56f04c2642f1b9d36425729cae8bbccb","effectiveTestHashes":85}

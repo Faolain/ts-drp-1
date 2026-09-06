@@ -1,0 +1,18 @@
+{
+  "numericOnly": true,
+  "noArgvOrComm": true,
+  "candidates": [
+    {
+      "pid": 55398,
+      "status": "55398 50611 Ss",
+      "taskRelevantCwd": false
+    },
+    {
+      "pid": 55399,
+      "status": "55399 55398 S",
+      "taskRelevantCwd": false
+    }
+  ],
+  "taskCompetitors": 0,
+  "unrelatedProcessesDoNotBlock": true
+}
