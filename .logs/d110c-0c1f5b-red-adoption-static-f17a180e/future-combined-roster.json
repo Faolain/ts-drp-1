@@ -1,0 +1,1008 @@
+{
+  "classification": "PROSPECTIVE_CORRECTION_PENDING_ROOT_SIGNED_RED_EVIDENCE_AND_PLAN_COMMIT",
+  "coreFiles": 8,
+  "coreTotal": 72,
+  "additionalFiles": 4,
+  "additionalTotal": 6,
+  "files": 12,
+  "total": 78,
+  "sources": [
+    {
+      "gate": 17,
+      "file": ".logs/d110c-0c1f5b-green-ab98cce6/retained-17/result.json",
+      "sha256": "126fcb03f8b4a87e0e0a7ae405d33c5e5ef0f594872d2ed2d9c49865c13e6d89",
+      "count": 17
+    },
+    {
+      "gate": 20,
+      "file": ".logs/d110c-0c1f5b-green-ab98cce6/retained-20/result.json",
+      "sha256": "fe7eb3dceda9a605f545b1181a3abf359e46cffcc66f71e8f62b151be9654f0d",
+      "count": 3
+    },
+    {
+      "gate": 22,
+      "file": ".logs/d110c-0c1f5b-green-room-guard-db8a8615/focused-13/focused.json",
+      "sha256": "78a2d9c146d96dc727da0b141114551f7b727c544d0b99f1b9e69c59b16ffdc7",
+      "count": 13
+    },
+    {
+      "gate": 35,
+      "file": ".logs/d110c-0c1f5b-green-ab98cce6/retained-35/result.json",
+      "sha256": "fbdaf89fcad983ce8697a07e0e13838e5f625d458b7eb7c83187a688115a1af0",
+      "count": 13
+    },
+    {
+      "gate": 36,
+      "file": ".logs/d110c-0c1f5b-green-ab98cce6/retained-36/result.json",
+      "sha256": "7a51e8abbffb72f7a9fa4d474738fcf558db0e6e1e3b2d0189cd5ec7288b5b55",
+      "count": 9
+    },
+    {
+      "gate": 42,
+      "file": ".logs/d110c-0c1f5b-green-ab98cce6/retained-42/result.json",
+      "sha256": "d864838a1d862b3a61554acd3143285c2edcaf54fb4d859951b645344ae9fc43",
+      "count": 11
+    },
+    {
+      "gate": 49,
+      "file": ".logs/d110c-0c1f5b-green-ab98cce6/retained-49/result.json",
+      "sha256": "e8ee1a8a171e68c32406a796a9340c698503626374562433e76db3c1ed419bc8",
+      "count": 2
+    },
+    {
+      "gate": 50,
+      "file": ".logs/d110c-0c1f5b-green-ab98cce6/retained-50/result.json",
+      "sha256": "5663013ee33a4e815115055afe111b4c3b85f39412c4a9b36a77ef5ae4e0a4bc",
+      "count": 4
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": ".logs/d110c-0a-green-0b7a1cf6/batch1-corrected-vitest.json",
+      "sha256": "3b073cd6332bba24b46fc1f4f3213dfceffd1b76af1d2375a9483e3c1f14cefc",
+      "count": 1
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": ".logs/d110c-0a-green-0b7a1cf6/batch2-genuine-actor-matrix-vitest.json",
+      "sha256": "4639118d5c6b3e3f2b33e1834b5ab7448292a0063233d9b14572043c42ca2768",
+      "count": 1
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": ".logs/d110c-0b0-green-798489fd/focused.json",
+      "sha256": "3d8f2391d4ba1059bca42eb86a0dfc330b92563fcdede49415935a6c5320386d",
+      "count": 1
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": ".logs/d110c-0b0a-green-c1e443fc/focused.json",
+      "sha256": "dea13e05881f9563d051b9e024ae669f53204a8fe53b4f402e14b6e514243349",
+      "count": 3
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "sha256": "01c3ef28d514f472a4b7d14455f73682eaa1b8ad8430157b00c1fe73a1cb5e73",
+      "reporterTitleCount": 17
+    },
+    {
+      "file": "tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+      "sha256": "45a46ab2a15a45f7a5b00a10b7ada89a1752e3d3aa7972549e454e2647fbe462",
+      "reporterTitleCount": 3
+    },
+    {
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "sha256": "66c26d38e25ed8bc3c765faab58a0167ca289efb4d97f438eac695c5af93e2a1",
+      "reporterTitleCount": 13
+    },
+    {
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "sha256": "a13863e5e9e32c3514155a9b9d5613c5f509812287adabd3255c56ee41fc8a57",
+      "reporterTitleCount": 13
+    },
+    {
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "sha256": "fb46aeacb16c468d7295d246dc3e397c665635b7309ce43ba75568286c531164",
+      "reporterTitleCount": 9
+    },
+    {
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "sha256": "5c1c5c7fc9b4357fd80d2a04e0060e54e154fa4f375e7b191549250ca705116d",
+      "reporterTitleCount": 11
+    },
+    {
+      "file": "tests/phase-6c-creator-replay-pagination-red.test.ts",
+      "sha256": "6ed4729e3e0d22ad1dadd5e4a6f82f50355c096895527f11fb4c7efb8c5e4833",
+      "reporterTitleCount": 2
+    },
+    {
+      "file": "tests/protocol-v3-creator-author-issuance-frontiers.test.ts",
+      "sha256": "75709cc5da499dba0cf7c620902aea5271b687b5e916e88016056faf76f2842f",
+      "reporterTitleCount": 4
+    },
+    {
+      "file": "tests/phase-6b-d110c-0a-authority-red.test.ts",
+      "sha256": "a56eb9a1932497cc1dce23d8faba196eb6853228970de71ba32b55da016e86c2",
+      "reporterTitleCount": 1
+    },
+    {
+      "file": "tests/phase-6b-d110c-0a-browser-custody-red.test.ts",
+      "sha256": "f2c2156fd048e880646b0af5f9de2f24e52d616dab3f47b442b82da649da7ab4",
+      "reporterTitleCount": 1
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b0-floor-red.test.ts",
+      "sha256": "5f65a4d51e1d37284d349a29316fd9cc33b0ab3553e7c7c9e1202efa208442e1",
+      "reporterTitleCount": 1
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts",
+      "sha256": "c0ba21bd814ec48b0d1bbc59d69b79dccb0cddfa3a8ac0820da004c4e04b6e6f",
+      "reporterTitleCount": 3
+    }
+  ],
+  "entries": [
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "freezes the D.108e2a activation boundary and its single topic owner",
+      "fullName": "D.108d1 creator successor activation RED freezes the D.108e2a activation boundary and its single topic owner",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "rejects a hostile cold authentication profile before every downstream effect",
+      "fullName": "D.108d1 creator successor activation RED rejects a hostile cold authentication profile before every downstream effect",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "freezes exactly seven RED and eight GREEN owners",
+      "fullName": "D.108d1 creator successor activation RED freezes exactly seven RED and eight GREEN owners",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster",
+      "fullName": "D.108d1 creator successor activation RED retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "derives the exact epoch-one identity and pending epoch-zero lineage independently",
+      "fullName": "D.108d1 creator successor activation RED derives the exact epoch-one identity and pending epoch-zero lineage independently",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "keeps the root and products outside D.108d1",
+      "fullName": "D.108d1 creator successor activation RED keeps the root and products outside D.108d1",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "pins the complete zero-skip GREEN inventory",
+      "fullName": "D.108d1 creator successor activation RED pins the complete zero-skip GREEN inventory",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "imports the shipped successor activation owner without a source-pattern readiness gate",
+      "fullName": "D.108d1 creator successor activation RED imports the shipped successor activation owner without a source-pattern readiness gate",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "genuine successor imports its verified snapshot before epoch-one activation",
+      "fullName": "D.108d1 creator successor activation RED genuine successor imports its verified snapshot before epoch-one activation",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "private custody alone selects installEpochAnchor",
+      "fullName": "D.108d1 creator successor activation RED private custody alone selects installEpochAnchor",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "divergent genesis identity fails before every live effect",
+      "fullName": "D.108d1 creator successor activation RED divergent genesis identity fails before every live effect",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "pending epoch-zero outbox is classified and never published as epoch one",
+      "fullName": "D.108d1 creator successor activation RED pending epoch-zero outbox is classified and never published as epoch one",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "old handle registration author and prepared capability are terminal",
+      "fullName": "D.108d1 creator successor activation RED old handle registration author and prepared capability are terminal",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "hot duplicate returns the same handle before a second source claim",
+      "fullName": "D.108d1 creator successor activation RED hot duplicate returns the same handle before a second source claim",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "conflicting hot duplicate bindings fail closed",
+      "fullName": "D.108d1 creator successor activation RED conflicting hot duplicate bindings fail closed",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "post-adoption activation failure cleans up and fresh reverify performs no second swapHead",
+      "fullName": "D.108d1 creator successor activation RED post-adoption activation failure cleans up and fresh reverify performs no second swapHead",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 17,
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "title": "TTL expiry performs one bounded full reverify attempt",
+      "fullName": "D.108d1 creator successor activation RED TTL expiry performs one bounded full reverify attempt",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 20,
+      "file": "tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1a successor handle registration identity RED"
+      ],
+      "title": "freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface",
+      "fullName": "D.108d1a successor handle registration identity RED freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 20,
+      "file": "tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1a successor handle registration identity RED"
+      ],
+      "title": "[RED readiness] requires the private one-shot handle-alias bridge",
+      "fullName": "D.108d1a successor handle registration identity RED [RED readiness] requires the private one-shot handle-alias bridge",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 20,
+      "file": "tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1a successor handle registration identity RED"
+      ],
+      "title": "returned hot wrapper retains route, admission, targeted replay and deactivation identity",
+      "fullName": "D.108d1a successor handle registration identity RED returned hot wrapper retains route, admission, targeted replay and deactivation identity",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108d2 public return AST oracle"
+      ],
+      "title": "accepts private computations and primitive comparisons without confusing operand names with returned authority",
+      "fullName": "D.108d2 public return AST oracle accepts private computations and primitive comparisons without confusing operand names with returned authority",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108d2 public return AST oracle"
+      ],
+      "title": "rejects exact sensitive properties and values on exported returned shapes",
+      "fullName": "D.108d2 public return AST oracle rejects exact sensitive properties and values on exported returned shapes",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108d2 public return AST oracle"
+      ],
+      "title": "tracks the returned operands of assignment, comma and logical assignment expressions",
+      "fullName": "D.108d2 public return AST oracle tracks the returned operands of assignment, comma and logical assignment expressions",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108d2 public return AST oracle"
+      ],
+      "title": "follows local returned aliases, helpers, methods, export aliases and global product surfaces",
+      "fullName": "D.108d2 public return AST oracle follows local returned aliases, helpers, methods, export aliases and global product surfaces",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108e2b creator successor room lifetime RED"
+      ],
+      "title": "freezes exactly five RED owners, one GREEN owner and seven browser behaviors",
+      "fullName": "D.108e2b creator successor room lifetime RED freezes exactly five RED owners, one GREEN owner and seven browser behaviors",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108e2b creator successor room lifetime RED"
+      ],
+      "title": "pins the exact seven-key successor authority and rejects pre-successor or widened values",
+      "fullName": "D.108e2b creator successor room lifetime RED pins the exact seven-key successor authority and rejects pre-successor or widened values",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108e2b creator successor room lifetime RED"
+      ],
+      "title": "keeps node-root and chat authority closed while assigning the room as sole node consumer",
+      "fullName": "D.108e2b creator successor room lifetime RED keeps node-root and chat authority closed while assigning the room as sole node consumer",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108e2b creator successor room lifetime RED"
+      ],
+      "title": "runs all product behaviors without a source-pattern readiness gate",
+      "fullName": "D.108e2b creator successor room lifetime RED runs all product behaviors without a source-pattern readiness gate",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108e2b creator successor room lifetime RED"
+      ],
+      "title": "rejects only unsupported cold successor compositions before reading room authorities",
+      "fullName": "D.108e2b creator successor room lifetime RED rejects only unsupported cold successor compositions before reading room authorities",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108e3 room lifetime transition RED"
+      ],
+      "title": "freezes four test owners, one room GREEN owner and twelve causal browser behaviors",
+      "fullName": "D.108e3 room lifetime transition RED freezes four test owners, one room GREEN owner and twelve causal browser behaviors",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108e5 bounded redirected lifetime RED"
+      ],
+      "title": "bounds migration activation bytes before constructing the call-time owner",
+      "fullName": "D.108e5 bounded redirected lifetime RED bounds migration activation bytes before constructing the call-time owner",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [
+        "D.108e5 bounded redirected lifetime RED"
+      ],
+      "title": "bounds every migration invite encode before copying caller-controlled bodies",
+      "fullName": "D.108e5 bounded redirected lifetime RED bounds every migration invite encode before copying caller-controlled bodies",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 22,
+      "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+      "ancestorTitles": [],
+      "title": "classifies complete legacy and settlement successor compositions before reading room authorities",
+      "fullName": "classifies complete legacy and settlement successor compositions before reading room authorities",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "freezes the exact tests-only and GREEN owner rosters",
+      "fullName": "D.108b read-only creator-successor adoption RED freezes the exact tests-only and GREEN owner rosters",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "freezes the exact v3-live-generation-2 grammar and compact-history carrier",
+      "fullName": "D.108b read-only creator-successor adoption RED freezes the exact v3-live-generation-2 grammar and compact-history carrier",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "enumerates every registered CutValue field and every cross-owner causal mutant",
+      "fullName": "D.108b read-only creator-successor adoption RED enumerates every registered CutValue field and every cross-owner causal mutant",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "pins owner-bound one-use intent behavior independently of serialization",
+      "fullName": "D.108b read-only creator-successor adoption RED pins owner-bound one-use intent behavior independently of serialization",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership",
+      "fullName": "D.108b read-only creator-successor adoption RED forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "executes every CutValue mutant against the genuine certified successor chain",
+      "fullName": "D.108b read-only creator-successor adoption RED executes every CutValue mutant against the genuine certified successor chain",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants",
+      "fullName": "D.108b read-only creator-successor adoption RED executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "executes predecessor-lineage, close-order and append-only history mutants",
+      "fullName": "D.108b read-only creator-successor adoption RED executes predecessor-lineage, close-order and append-only history mutants",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "replays the genuine durable journal/issuance pair and rejects missing local-issued custody",
+      "fullName": "D.108b read-only creator-successor adoption RED replays the genuine durable journal/issuance pair and rejects missing local-issued custody",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "executes manifest, chunk, payload, catalog and artifact cross-pair mutants",
+      "fullName": "D.108b read-only creator-successor adoption RED executes manifest, chunk, payload, catalog and artifact cross-pair mutants",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "detects a durable vertex appended after the sealed journal snapshot",
+      "fullName": "D.108b read-only creator-successor adoption RED detects a durable vertex appended after the sealed journal snapshot",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "derives the exact canonical generation-2 projection and reopens its compact history",
+      "fullName": "D.108b read-only creator-successor adoption RED derives the exact canonical generation-2 projection and reopens its compact history",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 35,
+      "file": "tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "title": "has one composite readiness gate for the genuine future verifier",
+      "fullName": "D.108b read-only creator-successor adoption RED has one composite readiness gate for the genuine future verifier",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "freezes exactly ten RED and four GREEN owners",
+      "fullName": "D.108c one-CAS creator adoption RED freezes exactly ten RED and four GREEN owners",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "freezes the closed public contract and finite fault vocabulary",
+      "fullName": "D.108c one-CAS creator adoption RED freezes the closed public contract and finite fault vocabulary",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "constructs one sorted generation-2 replacement without a manifest ref",
+      "fullName": "D.108c one-CAS creator adoption RED constructs one sorted generation-2 replacement without a manifest ref",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "classifies exact active-new independently of a retrying generation id",
+      "fullName": "D.108c one-CAS creator adoption RED classifies exact active-new independently of a retrying generation id",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "keeps root/product/transport/issuance/activation owners outside the GREEN roster",
+      "fullName": "D.108c one-CAS creator adoption RED keeps root/product/transport/issuance/activation owners outside the GREEN roster",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "[RED readiness] requires all four candidate owners and the non-root package export",
+      "fullName": "D.108c one-CAS creator adoption RED [RED readiness] requires all four candidate owners and the non-root package export",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "consumes only a genuine owner-bound intent and commits one exact successor",
+      "fullName": "D.108c one-CAS creator adoption RED consumes only a genuine owner-bound intent and commits one exact successor",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "accepts a byte-identical second intent without a second head swap",
+      "fullName": "D.108c one-CAS creator adoption RED accepts a byte-identical second intent without a second head swap",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 36,
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "title": "reopens pending-old or exact active-new at every logical request fault",
+      "fullName": "D.108c one-CAS creator adoption RED reopens pending-old or exact active-new at every logical request fault",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "freezes one tests-only RED owner, one internal GREEN owner, the policy vector, and refusal precedence",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED freezes one tests-only RED owner, one internal GREEN owner, the policy vector, and refusal precedence",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "proves the dangling-parent mutant and exact local lineage-floor normalization",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED proves the dangling-parent mutant and exact local lineage-floor normalization",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "keeps the candidate package-internal and free of deletion effects",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED keeps the candidate package-internal and free of deletion effects",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "[RED readiness] requires the sole closed-epoch cleanup planner",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED [RED readiness] requires the sole closed-epoch cleanup planner",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "returns the exact immutable active/two-ancestor/floor plan",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED returns the exact immutable active/two-ancestor/floor plan",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "continues planning from a numeric pruning watermark across restart and a later epoch",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED continues planning from a numeric pruning watermark across restart and a later epoch",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "rejects every causal mutant with the exact closed reason",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED rejects every causal mutant with the exact closed reason",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "refuses gaps, surviving branches, wrong floor parents, and incomplete closures",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED refuses gaps, surviving branches, wrong floor parents, and incomplete closures",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "applies exact refusal precedence",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED applies exact refusal precedence",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "is permutation-invariant and returns detached output",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED is permutation-invariant and returns detached output",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 42,
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "title": "accepts genuine Phase-6a close/adoption material without reopening verification",
+      "fullName": "D.109a closed-epoch cleanup eligibility RED accepts genuine Phase-6a close/adoption material without reopening verification",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 49,
+      "file": "tests/phase-6c-creator-replay-pagination-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-p creator durable-replay pagination RED"
+      ],
+      "title": "closes a genuine 129-row creator journal across the public page boundary",
+      "fullName": "D.110a-p creator durable-replay pagination RED closes a genuine 129-row creator journal across the public page boundary",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 49,
+      "file": "tests/phase-6c-creator-replay-pagination-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-p creator durable-replay pagination RED"
+      ],
+      "title": "keeps the public bound and requires bounded private-owner pagination",
+      "fullName": "D.110a-p creator durable-replay pagination RED keeps the public bound and requires bounded private-owner pagination",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 50,
+      "file": "tests/protocol-v3-creator-author-issuance-frontiers.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f2 creator author-issuance frontier carrier"
+      ],
+      "title": "reproduces the exact legal maximum tuple shape below the unchanged ceiling",
+      "fullName": "D.110c-0c1f2 creator author-issuance frontier carrier reproduces the exact legal maximum tuple shape below the unchanged ceiling",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 50,
+      "file": "tests/protocol-v3-creator-author-issuance-frontiers.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f2 creator author-issuance frontier carrier"
+      ],
+      "title": "round-trips the genuine creator-signed carrier and consumes preparation once",
+      "fullName": "D.110c-0c1f2 creator author-issuance frontier carrier round-trips the genuine creator-signed carrier and consumes preparation once",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 50,
+      "file": "tests/protocol-v3-creator-author-issuance-frontiers.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f2 creator author-issuance frontier carrier"
+      ],
+      "title": "rejects every malformed tuple/vector form and permits an exact empty writer set",
+      "fullName": "D.110c-0c1f2 creator author-issuance frontier carrier rejects every malformed tuple/vector form and permits an exact empty writer set",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": 50,
+      "file": "tests/protocol-v3-creator-author-issuance-frontiers.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f2 creator author-issuance frontier carrier"
+      ],
+      "title": "fails closed for every authenticated field, tuple, signature, and size substitution",
+      "fullName": "D.110c-0c1f2 creator author-issuance frontier carrier fails closed for every authenticated field, tuple, signature, and size substitution",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": "tests/phase-6b-d110c-0a-authority-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0a epoch-relative seal-authority causal RED"
+      ],
+      "title": "opens the genuine adopted epoch-one creator trust under the same authorized finality key",
+      "fullName": "D.110c-0a epoch-relative seal-authority causal RED opens the genuine adopted epoch-one creator trust under the same authorized finality key",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": "tests/phase-6b-d110c-0a-browser-custody-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0a browser epoch-custody causal RED"
+      ],
+      "title": "uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers",
+      "fullName": "D.110c-0a browser epoch-custody causal RED uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": "tests/phase-6b-d110c-0b0-floor-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0b0 authenticated room-head floor causal RED"
+      ],
+      "title": "refuses a genuine advanced cold reopen when no independent room-head authority is supplied",
+      "fullName": "D.110c-0b0 authenticated room-head floor causal RED refuses a genuine advanced cold reopen when no independent room-head authority is supplied",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": "tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0b0a staged adoption and pending recovery GREEN"
+      ],
+      "title": "stages without a head swap and publishes through one owner-bound CAS",
+      "fullName": "D.110c-0b0a staged adoption and pending recovery GREEN stages without a head swap and publishes through one owner-bound CAS",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": "tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0b0a staged adoption and pending recovery GREEN"
+      ],
+      "title": "recovers equivalent Complete retries deterministically across both AHE orderings",
+      "fullName": "D.110c-0b0a staged adoption and pending recovery GREEN recovers equivalent Complete retries deterministically across both AHE orderings",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    },
+    {
+      "gate": "additional-accepted-direct-consumer",
+      "file": "tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0b0a staged adoption and pending recovery GREEN"
+      ],
+      "title": "fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates",
+      "fullName": "D.110c-0b0a staged adoption and pending recovery GREEN fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates",
+      "priorStatus": "passed",
+      "expectedStatus": "passed"
+    }
+  ],
+  "reporterDerivedTitleIdentity": true,
+  "staticLiteralScannerNotUsed": true,
+  "noVitestCollection": true,
+  "runtimeExecutions": 0,
+  "rootDisposition": "All four additional files have accepted GREEN reports; the initial superseded-history classification was incorrect. Preserve f17 history; root corrects the prose without repeating compiler RED."
+}

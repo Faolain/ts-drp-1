@@ -18511,9 +18511,10 @@ remain immutable. The pending eight-owner patch has changed only in the room
 constructor; prior 45/45 integration evidence is not proof for these new bytes.
 Next is remaining parent acceptance/debt closure within existing authority
 boundaries, not another room-guard execution. The next bounded action is the
-parent record's **Retained adoption-fixture static contract repair**: causal
-compiler RED followed by a separate tests-only GREEN for the guard program's
-41 external fixture diagnostics. Thirteen inherited transport diagnostics
+parent record's **Retained adoption-fixture static contract repair**. Its sole
+compiler RED reproduced exactly the 41 external fixture diagnostics and its
+independent matrix validator passed; separate tests-only GREEN is next.
+Thirteen inherited transport diagnostics
 and the other named static debts remain separately open. No blanket typecheck or
 parent GREEN acceptance is claimed; registry-freeze repair still requires its
 explicit prospective governance decision.
@@ -102865,13 +102866,20 @@ fixed. Any additional production, authority, API or workload need stops this
 batch rather than widening it.
 
 GREEN requires zero diagnostics in the exact formerly failing program,
-exact-owner lint/format/diff and source-shape checks, and the eight presently
-retained direct-consumer selections corresponding to original inventory gates
-17, 20, 22, 35, 36, 42, 49 and 50: 72 tests with the current thirteen-title
-gate 22. Freeze their exact title/file roster from retained evidence before
-execution; run each once, with complete reporters and no exclusions. The four
-other direct imports in superseded historical RED files are not automatically
-new acceptance gates. Validate fresh source-built isolated execution under
+exact-owner lint/format/diff and source-shape checks, and all twelve retained
+direct-consumer files: the eight original inventory selections 17, 20, 22, 35,
+36, 42, 49 and 50 contribute 72 tests with the current thirteen-title gate 22;
+the accepted 0a authority/browser, 0b0 floor and 0b0a staged-handoff files add
+six. The complete roster is 78 tests, not just the original inventory subset.
+Root corrected the mistaken superseded-file attribution in signed freeze
+`f17a180e` before any GREEN or runtime execution: accepted reports are the
+0a GREEN root's `batch1-corrected-vitest.json` and
+`batch2-genuine-actor-matrix-vitest.json`, and `focused.json` in the 0b0
+`798489fd` and 0b0a `c1e443fc` GREEN roots. Historical commits and reports are
+unchanged; this adds required regression validation, not reopened milestones.
+Freeze the exact title/file roster from those reports before execution; run
+each once per main/isolated environment, with complete reporters and no
+exclusions. Validate fresh source-built isolated execution under
 the existing native/workspace recipe, without reusing host dist. Record all
 statuses and anomalies; stop on unexpected failures instead of broadening the
 matrix. No browser, parent 45-case integration or long workload is authorized
@@ -102879,6 +102887,32 @@ by this static batch. Preserve the known four original runtime failures and
 all other static debts separately. Closure remains due before parent static
 acceptance; the existing final parent Grok/Sol/Fable review covers this repair,
 with no separate prose or bookkeeping confirmation round.
+
+**Compiler RED acceptance.** The separate Astra-high RED owner executed
+exactly one actual TypeScript 5.8.2 program under signed freeze `f17a180e`.
+Evidence is `.logs/d110c-0c1f5b-red-adoption-static-f17a180e/`; the exact
+53-entry self-excluding manifest is
+`006f8a5e49d0107922ea09a7f380cb84a406bd01dfe46cff56be0ba455ebee4b`.
+Compiler terminal status is 1, with all 41 complete diagnostic rows and
+effective options identical to the preceding accepted record; separate matrix
+validation status is 0. No missing import, loader failure or source replacement
+causes RED. Target/production diagnostic counts remain zero. The evidence owns
+full streams/statuses, 906 source inputs, 1,132 read inputs, 2,107 module
+resolutions, 37 type resolutions and their identities. Root independently
+checked the full raw diagnostics, program-source/configuration hashes and
+complete manifest inventory. All prior production/runtime/test custody,
+protected paths and stashes are preserved; no fixture or production edit,
+runtime test, install or build occurred.
+
+The future combined roster records all twelve accepted direct consumers and
+78 titles. An initial literal-only title scanner missed a retained
+`it.skipIf(...)(constant, ...)` call; that failed recorder is preserved as a
+diagnostic error, not a compiler or test failure. The corrected recorder uses
+the complete accepted reports and current source hashes. Actual GREEN reporters
+must confirm execution selection; no static collection equivalence is claimed.
+No compiler or runtime was repeated. This accepted causal RED releases only
+the frozen separate two-fixture GREEN after this evidence is signed and pushed;
+it does not close the static debt or the parent checkpoint.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
