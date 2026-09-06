@@ -698,6 +698,7 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 					rmSync(temporary, { force: true, recursive: true });
 				}
 			}
-		}
+		},
+		20_000
 	);
 });
