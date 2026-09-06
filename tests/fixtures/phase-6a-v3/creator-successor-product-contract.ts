@@ -232,7 +232,8 @@ function unwrapExpression(value: ts.Expression): ts.Expression {
 }
 
 function isIdentifierExpression(value: ts.Expression | undefined, name: string): boolean {
-	return value !== undefined && ts.isIdentifier(unwrapExpression(value)) && unwrapExpression(value).text === name;
+	const expression = value === undefined ? undefined : unwrapExpression(value);
+	return expression !== undefined && ts.isIdentifier(expression) && expression.text === name;
 }
 
 function isBoundGuard(
@@ -594,6 +595,7 @@ export function d108e5SourceOwnership(room = read(D108E3_GREEN_PATHS[0])): Reado
 				ts.isForOfStatement(statement) &&
 				ts.isIdentifier(statement.expression) &&
 				statement.expression.text === "CREATOR_INVITE_BYTE_FIELDS" &&
+				ts.isVariableDeclarationList(statement.initializer) &&
 				statement.initializer.declarations.length === 1 &&
 				statement.initializer.declarations[0] !== undefined &&
 				ts.isIdentifier(statement.initializer.declarations[0].name) &&

@@ -28,8 +28,10 @@ import {
 } from "@ts-drp/storage";
 import type {
 	SnapshotQuarantineDeclaration,
+	SnapshotQuarantinePort,
 	SnapshotQuarantineScope,
 	SnapshotQuarantineStore,
+	SnapshotVerificationQuarantine,
 	SnapshotVerificationReceipt,
 } from "@ts-drp/storage/snapshot-transfer";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
@@ -590,7 +592,7 @@ function decoratedAheStore(
 			return result;
 		});
 	}
-	return Object.freeze({
+	return Object.freeze<AheDurableStore>({
 		capabilities: backend.capabilities,
 		beginGeneration: (input) => mutate("beginGeneration", () => backend.beginGeneration(input)),
 		close: () => backend.close(),
@@ -628,9 +630,10 @@ function decoratedAheStore(
 					...last,
 					baseExpectedHead: Object.freeze({
 						...base,
+						// Preserve the intentionally invalid predecessor revision, including zero.
 						...(controls.generationMutation === "cycle"
 							? { generationId: last.generationId }
-							: { revision: Math.max(0, base.revision - 1) }),
+							: { revision: Math.max(0, base.revision - 1) as typeof base.revision }),
 					}),
 				});
 			}
@@ -702,23 +705,25 @@ function decoratedSnapshotStore(
 	controls: GenuineCreatorAdoptionFixture["controls"],
 	observeDeclaration: (declaration: SnapshotQuarantineDeclaration) => void
 ): SnapshotQuarantineStore<SnapshotVerificationReceipt> {
-	return Object.freeze({
+	return Object.freeze<SnapshotQuarantineStore<SnapshotVerificationReceipt>>({
 		close: () => backend.close(),
 		openScope: async (declaration, options) => {
 			observeDeclaration(declaration);
 			const scope = await backend.openScope(declaration, options);
 			if (!controls.adoptionPhase) return scope;
-			const decorated: SnapshotQuarantineScope<SnapshotVerificationReceipt> = Object.freeze({
+			const decorated: SnapshotQuarantineScope<SnapshotVerificationReceipt> = Object.freeze<
+				SnapshotQuarantineScope<SnapshotVerificationReceipt>
+			>({
 				cancel: (selected) => scope.cancel(selected),
 				complete: (receipt, selected) => scope.complete(receipt, selected),
 				missingIndices: (selected) => scope.missingIndices(selected),
 				release: () => scope.release(),
 				scope: scope.scope,
 				status: (selected) => scope.status(selected),
-				verificationQuarantine: Object.freeze({
+				verificationQuarantine: Object.freeze<SnapshotVerificationQuarantine>({
 					open(signal) {
 						const port = scope.verificationQuarantine.open(signal);
-						return Object.freeze({
+						return Object.freeze<SnapshotQuarantinePort>({
 							discard: () => port.discard(),
 							read: async (descriptor) => {
 								controls.durableReadHook?.(Object.freeze({ identity: descriptor.digest, owner: "snapshot-chunk" }));
@@ -800,7 +805,7 @@ async function recoverWithDurableStores(
 	const issuanceMaintenance = modules.resolveNodeDurableIssuancePruningMaintenance(rawIssuanceStore);
 	if (issuanceMaintenance === undefined) throw new TypeError("D.108b fixture issuance maintenance is unavailable");
 	const rawJournal = modules.createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
-	const baseIssuanceStore: DurableIssuanceStore = Object.freeze({
+	const baseIssuanceStore: DurableIssuanceStore = Object.freeze<DurableIssuanceStore>({
 		close: () => rawIssuanceStore.close(),
 		compareAndMarkOutboxPublished: (input) => rawIssuanceStore.compareAndMarkOutboxPublished(input),
 		readIssued: async (scope, sequence) => {
@@ -820,10 +825,12 @@ async function recoverWithDurableStores(
 			}
 			return result;
 		},
+		readSettlementPlan: (scope) => rawIssuanceStore.readSettlementPlan(scope),
 		transactIssue: (scope, buildAndSign) => rawIssuanceStore.transactIssue(scope, buildAndSign),
+		transactWriteSettlementPlan: (input) => rawIssuanceStore.transactWriteSettlementPlan(input),
 	});
 	const issuanceStore = decorateIssuanceStore?.(baseIssuanceStore) ?? baseIssuanceStore;
-	const baseJournal: DurableLiveJournalStore = Object.freeze({
+	const baseJournal: DurableLiveJournalStore = Object.freeze<DurableLiveJournalStore>({
 		appendAccepted: (input) => rawJournal.appendAccepted(input),
 		close: () => rawJournal.close(),
 		installEpochAnchor: (input) => rawJournal.installEpochAnchor(input),
