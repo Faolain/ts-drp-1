@@ -1,0 +1,8 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-green-transport-static-z5iavL/checkout",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-06T04:52:52.277Z"
+}

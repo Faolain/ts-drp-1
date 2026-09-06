@@ -18515,16 +18515,21 @@ adoption-fixture static contract repair** now clears all 41 external fixture
 diagnostics: signed RED `393eda67`, signed two-fixture GREEN `210fecb0`, and
 78/78 retained cases in both main and fresh source-built isolated environments.
 The parent record owns the evidence and precise environment attribution.
-Thirteen inherited transport diagnostics and the other named static debts
-remain separately open. The parent record's **Retained transport-fixture
-static contract repair** owns the next one-file, separate RED/GREEN batch.
-Its compiler RED is accepted at exactly thirteen complete diagnostics with
-zero external errors. Initial GREEN clears compilation but its seven frozen
-non-null assertions conflict with lint; the parent record's bounded type-only
-syntax correction governs continuation before any runtime. It does not reopen
-accepted transport runtime behavior. No blanket typecheck or
-parent GREEN acceptance is claimed; registry-freeze repair still requires its
-explicit prospective governance decision.
+The subsequent transport-static repair is also complete: signed RED `41686d6f`,
+signed one-file GREEN `c5b5f36a`, corrected strict compilers and 24/24 in both
+main and fresh source-built isolation. The initial lint-syntax and launcher
+diagnostics remain preserved; none required a product change. The parent
+record's **Consolidated remaining fixture/type acceptance batch** is next:
+the seven known compatible fixture errors are one batch, not seven new slices.
+Its two source owners and four retained consumers remain separate from the
+grid `roomHeadAuthority` composition diagnostic and four recorded runtime
+failures. Those counts describe the audited existing inventory, not a newly
+executed whole-parent pass. No blanket typecheck or parent GREEN acceptance is
+claimed; registry-freeze repair still requires its explicit prospective
+governance decision. After the batch, run the existing combined acceptance
+gates against current production bytes, inspect the complete failure set and
+diagnose shared causes before further edits. Do not extend fixture cleanup
+one diagnostic/checkpoint at a time.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -101039,8 +101044,9 @@ gate 70's three original runtime failures. The stopped native-loader attempt
 remains immutable. The subsequent accepted additive room-guard RED at
 `db8a8615` is closed causally by the narrow room-only GREEN below: 13/13,
 bootstrap 3/3 and room-rebase 20/20. Four other original runtime failures,
-blocked supplement coverage and inherited static debts remain open, including
-thirteen transport diagnostics. The 41 external guard-program fixture
+blocked supplement coverage and other static debts remain open. The thirteen
+transport diagnostics are subsequently repaired at signed source `c5b5f36a`,
+with strict compiler and 24/24 main/isolated proofs below. The 41 external guard-program fixture
 diagnostics are subsequently repaired by the two-fixture GREEN below, with
 78/78 main and isolated retained passes; this does not clear the other debts.
 Registry-freeze and W0 compatibility decisions retain their distinct boundaries.
@@ -103141,6 +103147,151 @@ source bytes. Use fresh write-once subpaths in the same evidence root; no
 original command, source snapshot or result is overwritten. This correction
 adds no production scope, RED rerun, review round or new slice; all original
 runtime, isolation, custody and parent final-review requirements remain.
+
+**Transport-fixture static GREEN acceptance (2026-09-06).** Signed/pushed
+source `c5b5f36a3d3201633ae7bab1d9959ab52fa14526` changes only the frozen test
+file, SHA-256
+`6368a03369061aab9859160eb888cdbb0ee50012eaa55ee12e719fb95ee7511c`.
+Evidence is `.logs/d110c-0c1f5b-green-transport-static-41686d6f/`; its
+210-entry self-excluding manifest is
+`fc8d31311a2a6b1853c6d76737b63c4e80940c3a1256546d888893e48250187a`.
+The corrected actual compiler has zero diagnostics. Exact-owner lint, format,
+diff, all 295 semantic assertion statements and the 123-statement subset,
+full-source/emitted equivalence outside the three rejectors and initializer
+guard, rejector/override/receiver/optional-chain controls and actual Vite query
+identity/order checks pass. The source delta is 34 insertions and 10 deletions;
+no production, assertion-value, workload or configuration change occurred.
+
+Main and isolated each execute the same unfiltered 24-title file exactly once:
+24 pass, zero failures/skips, complete reporter sets and no reported suite,
+soft or top-level errors. The genuine hostile cached-encoder assertion passes
+in both. Main reporter SHA-256 is
+`9187d70a1ddc6276f268dcf1a88e8529a73a7ca72af88bf4671b41a629fa5014`;
+isolated reporter SHA-256 is
+`8f2c957d8fbbd2aeb90fa1fa3e2d0cdea5695ae5526df90a97ace3dd14cbb3f3`.
+Both stderr files contain only the recorded SQLite experimental warning.
+
+The exact clean checkout is
+`/private/tmp/d110c-f5b-green-transport-static-z5iavL/checkout`, signed
+`c5b5f36a` plus the exact preserved eight-owner production overlay
+`6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`.
+It uses its own offline frozen install, fresh approved official native
+download and source build, then direct native and fresh Node-root imports.
+All seven compared compiled artifacts were absent before the build and match
+main afterward. The isolated strict compiler passes with all 910 source inputs
+physically inside its checkout. Main has 1,291 inputs: the exact 381 additional
+files are ancestor ambient declarations under `/Users/aristotle/node_modules`.
+All common source hashes and root-normalized options match; no workspace source
+is omitted, and no identical whole-ambient-graph claim is made.
+
+All 37 command statuses are retained. Three initial nonzero attempts remain:
+the missing-cwd recorder spawn (`-2`, wrapper exit 254), seven lint errors for
+the initially frozen `!` syntax, and native preparation from the wrong cwd.
+The latter stopped before download/cache/target creation; root verified the
+installed `rc.js` and corrected only the invocation to the already-established
+package cwd. Neither compiler or runtime failure is fabricated from those
+diagnostic mistakes. Root's initial read-only status audit also used `.code`
+where the runtime recorder stores `.status`; the corrected complete audit
+passes without rerunning anything. The final assessment owns these dispositions.
+
+Root independently verified the complete main/isolated reporters, compiler
+source identities, source delta, controls, command statuses and manifest
+inventory. Final custody preserves all eight pending production owners, seven
+built artifacts, effective 81-file test/shared hash map, 27 stashes and 86,522
+protected paths. `custody-final.json` is the next custody baseline. This closes
+only the thirteen transport-fixture static diagnostics. Parent static,
+retained/browser/current-byte integration, isolated production acceptance and
+the existing final Grok/Sol/Fable review remain required; no campaign or
+D.110c-c implementation begins from this result.
+
+The unfiltered staged evidence diff check returns 2 solely for the preserved
+initial lint stdout's final blank line and 62 raw `transport-only.patch`
+context-prefix whitespace reports. Excluding only those two exact evidence files
+passes; test-source and edited-plan whitespace checks pass independently.
+Neither immutable capture is reformatted and no blanket staged-diff pass is
+claimed.
+
+**Consolidated remaining fixture/type acceptance batch (2026-09-06).**
+The user's finite-exit clarification governs the remainder of parent f5b:
+finish compatible already-known fixture repairs together, then execute the
+required combined acceptance gates. This is one bounded batch inside the
+existing parent, not a new slice or review-only checkpoint. The bounded
+read-only audit finds three type-annotation edits across two owners:
+
+- `tests/fixtures/phase-3b-v3/certified-genesis-contract.ts::installInput`:
+  its generic record return hides the real five-field installation input and
+  causes the four recorded seal-safety TS2345 errors. Use an independent
+  readonly structural return with its four existing `Uint8Array` carriers and
+  `pinnedGenesisAnchorDigest: string`. Preserve every returned expression,
+  defensive copy, freeze, canonical byte and signature. No production import
+  or new API is needed; the existing public installation type confirms the
+  shape, while the anonymous structural type retains record compatibility.
+- `tests/phase-3g-v3-room-rebase-red.test.ts`: the two projection callback
+  annotations erase each row's `operation` object and cause three recorded
+  TS2345 errors. Describe that existing readonly row field as
+  `Readonly<Record<string, unknown>>`; keep `authenticatedBase`, callback
+  bodies, rejection behavior, tests, carriers and every runtime expression
+  unchanged. No cast, runtime guard or product change is authorized.
+
+The existing failure evidence is in `typecheck.json` and its exact inherited
+attribution under the retained-finality `867d7f09` and retained-room-mocks
+`e384a40c` roots. Reconcile current diagnostics against this inventory, rather
+than manufacturing a fresh RED for accepted runtime behavior. The separate
+existing Astra-high RED owner captures one actual combined strict program and
+its complete failure set before edits, with the seven expected fixture rows
+and the separate grid-authority diagnostic distinguished. Freeze complete
+messages, owners, options and source identities; a successful matrix check is
+not a typecheck pass. If additional diagnostics appear, stop and inspect all
+of them for shared causes before editing or changing the batch's scope.
+Do not exclude the grid owner or suppress its diagnostic to obtain GREEN.
+
+After signed/pushed causal RED, the separate existing Astra-high GREEN owner
+makes only the three type edits, proves identical type-erased JavaScript and
+unchanged assertions, and runs the combined static and retained gates against
+the current eight-owner production patch. The direct-consumer roster is four
+files and 49 historically accepted cases: `genesis-profile.test.ts` (9,
+signed Phase-3b closure `57e125cd`, D.93.42.1); seal-safety (7, the finality
+GREEN reporter committed at `840ced5b`); pacemaker (13, 0a's
+`retained-corrected-vitest.json`, committed at `93fe946a`); and room-rebase
+(20, room-mocks GREEN reporter committed at `262e0096`). The pacemaker fixture
+is the only intermediate helper consumer. The original genesis raw reporter
+was not located; do not invent one. Its signed closure and unchanged test are
+retained evidence, and executed current reports must establish current results.
+The initial read-only suspicion of a stale genesis export roster was ruled out:
+it loads the unchanged twelve-export `public.ts`, not the expanded package
+root. No export expectation change is indicated or authorized.
+
+Preserve the existing bounded Quint/Apalache witnesses and their limits in
+these retained files; do not add a formal workload or remove their assertions.
+Use the existing focused/static/retained/isolated governance, exact-owner
+lint/format/diff, signed source/evidence and self-excluding manifests. Complete
+reporter file/title multisets, skipped/failed/error states and all diagnostics
+must be inspected together. If the seven fixture diagnostics disappear but
+the grid error remains, report that precise result and compiler failure, not
+a whole-program static pass. No automatic pin update or acceptance waiver is
+part of this batch. The existing final parent review covers its signed
+RED-to-GREEN history; there is no additional fixture/prose review round.
+
+Root reparsed the existing runtime reports: retained-30 has two failures and
+three readiness-blocked skips; retained-40 has one failure; retained-58 has one
+failure among six cases. These are the four still-recorded original failures,
+not a newly executed current-parent aggregate. The registry source/checker
+reconciliation and W0 legacy-versus-settlement fence contract retain their
+explicit boundaries; W0's raw report does not expose the differing value.
+`examples/grid/src/v3-zone.ts` really omits required `roomHeadAuthority` and
+is a separate production composition obligation, not fixture typing. No
+new API, authority, registry, schema, dependency, threshold or compatibility
+decision is made by this finite-exit instruction. Close actual shared
+prerequisites through their existing explicit boundaries, never fabricate a
+floor or switch a profile to make an assertion pass.
+
+After compatible fixture repairs, return directly to the existing combined
+parent static/retained, browser-16, current-byte integration, isolated and final
+review gates. Collect and diagnose the complete additional failure set before
+more edits; do not default to a new checkpoint per diagnostic. The intended
+exit is final f5b acceptance, then the already-reconciled D.110c-c gaps and
+reviewed D.110c-d execution freeze, not expanding fixture certification.
+No completed milestone is reopened and no long workload is authorized here.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
