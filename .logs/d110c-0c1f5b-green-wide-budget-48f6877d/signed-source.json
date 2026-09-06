@@ -1,0 +1,9 @@
+{
+  "head": "5ea4a5ed44385cf6a33138c27fc09ab92dab5829",
+  "signature": "G",
+  "originExact": true,
+  "indexEmpty": true,
+  "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+  "sha256": "a1bbf534aa93f5990a442c974035f5aa73c4982569886876a957b6b62da37a0d",
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb"
+}

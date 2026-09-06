@@ -18548,6 +18548,10 @@ acceptance, final review or long-run release follows from this stopped result.
 The user subsequently authorized a test-local watchdog increase to 65 or 70
 seconds. The same-parent **Authorized wide-fixture watchdog amendment** below
 selects 70 seconds, preserves this failure, and owns the bounded next execution.
+That amendment is signed/pushed at `5ea4a5ed`, but its sole main execution also
+stopped: 44 passed and the wide case timed out at 70,025.111834ms. No fresh
+isolated run followed. **Wide-fixture watchdog amendment stop** below owns this
+new evidence; bounded diagnosis is next, not another deadline increase or rerun.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -103633,6 +103637,55 @@ this amendment does not authorize repairing those boundaries or rerunning the
 whole 72-file roster. The existing final Grok/Sol/Fable parent review must
 inspect the signed RED, this explicit timing amendment and GREEN evidence.
 No additional review-only slice or prose confirmation is introduced.
+
+**Wide-fixture watchdog amendment stop (2026-09-06).** Source commit
+`5ea4a5ed44385cf6a33138c27fc09ab92dab5829` is signed/pushed and changes only
+the authorized registration literal and adjacent comment. Current owner hash
+is `a1bbf534aa93f5990a442c974035f5aa73c4982569886876a957b6b62da37a0d`;
+reversing those two replacements restores the previous full file exactly,
+including callback-body hash `5772c9807c1d9152f7f89e0f7fe0ad38ede650793c7a571dd63a364862c82ee5`.
+Exact-owner lint/format/diff/equivalence pass. The strict compiler retains only
+the same three external snapshot-fixture errors; its exact matrix passes,
+not the whole-program compiler. Production owners and runtime artifacts are
+unchanged.
+
+The sole main unfiltered integration execution selects exactly 45 cases:
+44 pass, one fails and none skip. The same wide case reports
+`Test timed out in 70000ms` at 70,025.111834ms, with no assertion-specific
+failure or reported completed internal phase. Root independently read the
+raw reporter. This is not an accepted GREEN; the 70-second source remains
+honestly signed as the authorized attempt, not a successful repair. There is
+no isolated execution, retry, additional budget increase, profile or new
+instrumentation. The earlier 60-second failure remains immutable.
+
+Evidence is `.logs/d110c-0c1f5b-green-wide-budget-48f6877d/`.
+Root verified all 90 self-excluding entries and complete file inventory;
+manifest SHA-256 is
+`9194385277408758e320263928babd093786d4170a1f1cdfb851b3088d152826`.
+Raw reporter SHA-256 is
+`f2e9f5f17aa2383170caf67f13b878e7702b314900756887a619c55ce550c3c9`.
+All 15 captured command statuses are retained: the compiler, runtime and
+initial custody check are the three exit-1 results. Corrected final custody
+passes with the same eight production owners, seven built artifacts, 85
+test/shared identities, 27 stashes and 86,522 protected paths.
+The staged whitespace check reports only a final blank line in sealed
+`main-45/stderr.log:35`; excluding that exact raw artifact passes. The edited
+plan passes bounded formatting and diff checks; raw stderr is preserved.
+The first final-custody check refused root's concurrently edited exact plan
+path, and an early seal attempt found the resulting missing custody output.
+Both recorder failures are preserved; the corrected check allows only that
+root-owned plan path, without source or runtime repetition.
+The second timeout establishes that this execution did not complete inside
+the authorized additional ten seconds. Neither timeout measures successful
+completion, proves a product defect, nor distinguishes CPU work, fixture cost,
+scheduling or a stalled await. Before any next execution, diagnose the actual
+wide-fixture path from the existing source and captured evidence, state the
+remaining uncertainty, and select the smallest justified next action under
+the existing scope/review boundaries. Do not keep raising the watchdog to
+obtain a pass. The other four retained runtime failures, three snapshot type
+errors and grid authority composition retain their existing dispositions.
+The current-byte 64-writer proof, parent acceptance, fresh isolation and final
+review remain pending; no Phase-6 or long-run claim is released.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
