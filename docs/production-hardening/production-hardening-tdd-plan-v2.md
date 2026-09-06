@@ -18519,7 +18519,9 @@ Thirteen inherited transport diagnostics and the other named static debts
 remain separately open. The parent record's **Retained transport-fixture
 static contract repair** owns the next one-file, separate RED/GREEN batch.
 Its compiler RED is accepted at exactly thirteen complete diagnostics with
-zero external errors; separate GREEN remains pending. It does not reopen
+zero external errors. Initial GREEN clears compilation but its seven frozen
+non-null assertions conflict with lint; the parent record's bounded type-only
+syntax correction governs continuation before any runtime. It does not reopen
 accepted transport runtime behavior. No blanket typecheck or
 parent GREEN acceptance is claimed; registry-freeze repair still requires its
 explicit prospective governance decision.
@@ -103099,6 +103101,46 @@ runtime test or new reviewer was introduced. Root's plan-only formatting and
 diff checks pass. After this RED evidence is signed and pushed, release only
 the frozen separate one-file GREEN; parent acceptance and all other debts
 remain open.
+
+**Transport-fixture GREEN syntax correction (2026-09-06).** Accepted RED is
+signed/pushed `41686d6f`. The separate GREEN owner implemented only the frozen
+test-file delta. Its sole strict compiler exits 0 with zero diagnostics;
+formatting and source diff checks pass. Exact-owner lint instead reports seven
+`@typescript-eslint/no-non-null-assertion` errors, all on the seven syntax
+choices explicitly frozen above. This is a plan/lint-policy conflict, not a
+transport product failure or grounds to weaken lint. No runtime has executed.
+Preserve the initial compiler, lint and stopped source bytes under the existing
+`.logs/d110c-0c1f5b-green-transport-static-41686d6f/` evidence root. Its first
+custody recorder also omitted the required cwd argument and failed to spawn;
+the corrected custody check passes without source/compiler/runtime execution
+in the failed attempt. Neither result is relabeled as passing.
+
+Prospectively replace only the seven new `!` expressions with exact type-only
+forms. The five already-guarded calls use
+`(surface.method as NonNullable<typeof surface.method>)(arguments)`, retaining
+each actual method and argument list. The two mock assertions cast the selected
+call tuple, before `?.`, to
+`readonly [NonNullable<Parameters<DurableIssuanceStore["readOutboxPage"]>[0]>] | undefined`;
+an erased local alias for this exact tuple type is permitted. Keep the original
+`?.[0].scope` chain, never parenthesize the complete optional expression before
+`.scope`, and preserve its distinction between an absent call and a missing
+argument. No other casts, suppression, lint/configuration change, new runtime
+guard, extracted/bound method or optional-chain relaxation is authorized.
+
+Root's bounded TypeScript 5.8.2 emit/VM diagnostic confirms these exact forms
+emit the original member call and optional chain: one getter read, original
+receiver, absent-call short circuit, missing-argument TypeError and valid-scope
+result are unchanged. That was not a compiler program or workload invocation.
+GREEN records equivalent controls against the actual edited fixture and
+preserves all 295 semantic assertion statements, including the 123-statement
+subset. After this correction is signed/pushed, the same separate GREEN owner
+may make only these type-only substitutions, then run one corrected strict
+compiler, lint/format/diff, equivalence/query gates and the originally authorized
+runtime selections. The initial compiler result does not certify the later
+source bytes. Use fresh write-once subpaths in the same evidence root; no
+original command, source snapshot or result is overwritten. This correction
+adds no production scope, RED rerun, review round or new slice; all original
+runtime, isolation, custody and parent final-review requirements remain.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
