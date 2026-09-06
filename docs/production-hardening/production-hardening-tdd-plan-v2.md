@@ -18578,6 +18578,12 @@ Verification and canonical encoding are substantial sampled costs, not a
 demonstrated redundant-work defect. **Session-reopen CPU attribution result**
 below owns the evidence and the remaining bounded caller-audit boundary. No
 additional run, deadline increase or production optimization follows from it.
+The subsequent **Bounded hot-caller audit disposition** completes that audit:
+cross-peer/reopen/storage validation cannot be assumed redundant; a same-call
+snapshot copy is duplicated but has no demonstrated timeout-sized cost.
+Root proposes a separately explicit 90-second test-local budget amendment,
+pending user authorization, not an authentication optimization or another
+diagnostic. All golden-path assertions and existing failure evidence remain.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104052,6 +104058,59 @@ checks. Evidence diff checking reports only the raw child's trailing blank
 line at `.logs/d110c-0c1f5b-wide-cpu-ae67fe3f/wide-only/stderr.log:8`;
 excluding that exact preserved artifact passes. Do not rewrite raw stderr
 to satisfy a source whitespace check.
+
+**Bounded hot-caller audit disposition (2026-09-06).** Read-only source audit
+at signed `99f0f055` completes the caller-audit action above. No source,
+fixture, dependency, configuration or evidence artifact was changed; no test,
+profile or reviewer was launched. The source remains the same eight-owner
+pending production overlay used by the sealed diagnostic. This finding is
+source evidence, not a new runtime pass.
+
+`packages/node/src/v3-live.ts` owns the inspected verification callers:
+`extractAuthorizedV3Vertex` binds ingress to the current admission, anchor,
+epoch and object; `authenticatedSettlementSourceRow` checks historical
+frontier membership and verifies the row using the applicable authority;
+the predecessor outbox filter and cleanup independently read durable rows
+and compare issuance/outbox pairs. Repetition across peers, restarts,
+generations and storage reads is not proof of redundant validation of an
+unchanged input. A digest-only cache or skipping historical authentication
+would not preserve the inspected authority and corruption boundaries.
+
+`packages/storage-browser/src/live-journal.ts` reads a fresh durable snapshot
+for readiness and each page. `captureAddressedClosure` validates addressed
+writer state as well. `packages/live-journal/src/contract.ts` derives tokens
+from ordered rows, exact canonical bytes and scope; complete-store
+validation precedes a requested prefix. A cached prefix must not conceal
+corruption in the remaining durable closure. The existing contract test's
+detached-byte and hostile-record cases are relevant retained obligations,
+not permissions to trust mutable storage or share returned byte buffers.
+
+There is one concrete same-call copy duplication: `deriveLiveJournalSnapshot`
+captures its input, and private `deriveToken` immediately captures that
+already detached snapshot again. Its other call receives a locally derived
+prefix. Eliminating that private recapture is a possible narrow future
+optimization, with no public API required, but it does not eliminate the
+dominant canonical validation or signature verification. Neither the profile
+nor this audit measures its isolated savings. Do not label it the cause of
+the wide timeout or insert an unreviewed production repair into acceptance.
+Any future optimization must retain hostile-input capture, detached outputs,
+full-store corruption refusal, exact token bytes and prefix validation.
+
+Disposition: no demonstrated semantic production defect, deadlock or memory
+leak; no safe, measured timeout-closing optimization selected. The immediate
+proposal is an explicit test-infrastructure amendment of this one wide
+fixture's watchdog from 70 to 90 seconds, without changing its 64 active
+writers, operations, transitions, reopen/prune/accounting assertions or any
+product resource/timing contract. Twenty seconds of additional fixture
+headroom is a proposed engineering budget, not a measured completion bound
+or a promised pass. It requires user authorization before source edits or
+execution. Use the existing separate RED/GREEN ownership and acceptance
+review, not a review-only investigation slice; retain the already consumed
+timeouts as evidence, and do not launch another profiling run. If authorized,
+freeze the exact focused selection and single execution before running it;
+only a complete semantic pass can release the subsequent combined gates.
+The audit closes now rather than recursively extending instrumentation.
+The separate snapshot, grid and registry/W0 blockers remain open.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
