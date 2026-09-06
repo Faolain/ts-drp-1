@@ -1,0 +1,1277 @@
+{
+  "root": "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout",
+  "compilerVersion": "5.8.2",
+  "options": {
+    "strict": true,
+    "allowJs": true,
+    "target": 9,
+    "module": 199,
+    "lib": [
+      "lib.es2023.d.ts",
+      "lib.es2023.array.d.ts",
+      "lib.dom.d.ts",
+      "lib.dom.iterable.d.ts",
+      "lib.webworker.d.ts"
+    ],
+    "esModuleInterop": true,
+    "moduleResolution": 99,
+    "declaration": false,
+    "declarationMap": false,
+    "composite": false,
+    "skipLibCheck": true,
+    "stripInternal": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@ts-drp/*": [
+        "./packages/*"
+      ],
+      "@ts-drp/blueprint-catalog": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/blueprint-catalog/dist/src/index.d.ts"
+      ],
+      "@ts-drp/blueprint-toolchain": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/blueprint-toolchain/dist/src/index.d.ts"
+      ],
+      "@ts-drp/blueprints": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/blueprints/dist/src/index.d.ts"
+      ],
+      "@ts-drp/canonical": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/canonical/dist/src/index.d.ts"
+      ],
+      "@ts-drp/canonical/domain-hash-stream": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/canonical/src/domain-hash-stream.ts"
+      ],
+      "@ts-drp/compaction": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/compaction/dist/src/index.d.ts"
+      ],
+      "@ts-drp/compaction/blueprint-fold": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/compaction/src/blueprint-fold.ts"
+      ],
+      "@ts-drp/compaction/blueprint-snapshot": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/compaction/src/blueprint-snapshot.ts"
+      ],
+      "@ts-drp/compaction/snapshot-stream": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/compaction/src/snapshot-stream.ts"
+      ],
+      "@ts-drp/compaction/snapshot-quarantine-receipt": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/compaction/dist/src/snapshot-quarantine-receipt.d.ts"
+      ],
+      "@ts-drp/control-plane": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/control-plane/src/index.ts"
+      ],
+      "@ts-drp/control-plane/creator-trust-advance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/control-plane/src/creator-trust-advance.ts"
+      ],
+      "@ts-drp/control-plane/creator-trust-checkpoint-advance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/control-plane/src/creator-trust-checkpoint-advance.ts"
+      ],
+      "@ts-drp/ephemeral": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/ephemeral/dist/src/index.d.ts"
+      ],
+      "@ts-drp/errors": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/errors/src/index.ts"
+      ],
+      "eslint-plugin-ts-drp": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/eslint-plugin-ts-drp/dist/src/index.d.ts"
+      ],
+      "@ts-drp/interval-discovery": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/interval-discovery/dist/src/index.d.ts"
+      ],
+      "@ts-drp/interval-reconnect": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/interval-reconnect/dist/src/index.d.ts"
+      ],
+      "@ts-drp/interval-runner": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/interval-runner/dist/src/index.d.ts"
+      ],
+      "@ts-drp/issuance-store": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/issuance-store/dist/src/index.d.ts"
+      ],
+      "@ts-drp/issuance-store/conformance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/issuance-store/dist/src/conformance.d.ts"
+      ],
+      "@ts-drp/issuance-store/maintenance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/issuance-store/dist/src/maintenance.d.ts"
+      ],
+      "@ts-drp/keychain": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/keychain/dist/src/index.d.ts"
+      ],
+      "@ts-drp/keychain/finality": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/keychain/src/finality.ts"
+      ],
+      "@ts-drp/live-journal": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/live-journal/dist/src/index.d.ts"
+      ],
+      "@ts-drp/logger": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/logger/dist/src/index.d.ts"
+      ],
+      "@ts-drp/membership": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/membership/src/index.ts"
+      ],
+      "@ts-drp/message-queue": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/message-queue/dist/src/index.d.ts"
+      ],
+      "@ts-drp/network": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network/src/index.ts"
+      ],
+      "@ts-drp/network/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/network/seal": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network/src/seal.ts"
+      ],
+      "@ts-drp/network-spike": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/index.d.ts"
+      ],
+      "@ts-drp/network-spike/probe": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/probe/index.d.ts"
+      ],
+      "@ts-drp/network-spike/browser-dht": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/browser-dht/index.d.ts"
+      ],
+      "@ts-drp/network-spike/record/fixture": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/record/fixture.d.ts"
+      ],
+      "@ts-drp/network-spike/registry/fixture": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/registry/fixture.d.ts"
+      ],
+      "@ts-drp/network-spike/relay/fixture": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/relay/fixture.d.ts"
+      ],
+      "@ts-drp/network-spike/grid": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/grid/index.d.ts"
+      ],
+      "@ts-drp/network-spike/grid/http-directory": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/grid/http-directory.d.ts"
+      ],
+      "@ts-drp/network-spike/grid/fixture": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/grid/fixture.d.ts"
+      ],
+      "@ts-drp/network-spike/failure-campaign": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/failure-campaign/index.d.ts"
+      ],
+      "@ts-drp/network-spike/public-campaign": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/public-campaign/index.d.ts"
+      ],
+      "@ts-drp/network-spike/public-only": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/public-only/index.d.ts"
+      ],
+      "@ts-drp/network-spike/public-only/node": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/public-only/node.d.ts"
+      ],
+      "@ts-drp/network-spike/public-only/browser": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/public-only/browser.d.ts"
+      ],
+      "@ts-drp/network-spike/public-only/browser-fixture": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/network-spike/dist/src/public-only/browser-fixture.d.ts"
+      ],
+      "@ts-drp/node": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/dist/src/index.d.ts"
+      ],
+      "@ts-drp/node/runtime": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/dist/src/runtime.d.ts"
+      ],
+      "@ts-drp/node/v3-live": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/src/v3-live.ts"
+      ],
+      "@ts-drp/node/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/node/creator-seal": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/src/creator-seal.ts"
+      ],
+      "@ts-drp/node/creator-close": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/src/creator-close.ts"
+      ],
+      "@ts-drp/node/creator-adoption": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/dist/src/creator-adoption.d.ts"
+      ],
+      "@ts-drp/node/creator-adoption-commit": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/dist/src/creator-adoption-commit.d.ts"
+      ],
+      "@ts-drp/node/creator-adoption-stage": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/dist/src/creator-adoption-stage.d.ts"
+      ],
+      "@ts-drp/node/creator-adoption-recover": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/dist/src/creator-adoption-recover.d.ts"
+      ],
+      "@ts-drp/node/creator-adoption-activate": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/node/dist/src/creator-adoption-activate.d.ts"
+      ],
+      "@ts-drp/object": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/object/src/index.ts"
+      ],
+      "@ts-drp/object/internal/authenticated-commit": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/object/src/authenticated-commit.ts"
+      ],
+      "@ts-drp/outcome-commit": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/outcome-commit/dist/src/index.d.ts"
+      ],
+      "@ts-drp/protocol-v2": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v2/dist/src/index.d.ts"
+      ],
+      "@ts-drp/protocol-v2/registry/field-registry.json": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v2/registry/field-registry.json"
+      ],
+      "@ts-drp/protocol-v3": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/public.ts"
+      ],
+      "@ts-drp/protocol-v3/author-authorization": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/author-authorization.ts"
+      ],
+      "@ts-drp/protocol-v3/blueprint-application": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/blueprint-application.ts"
+      ],
+      "@ts-drp/protocol-v3/latched-acl": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/latched-acl.ts"
+      ],
+      "@ts-drp/protocol-v3/creator-close": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/creator-close.ts"
+      ],
+      "@ts-drp/protocol-v3/creator-checkpoint": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/creator-checkpoint.ts"
+      ],
+      "@ts-drp/protocol-v3/creator-issuance-retirement": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/creator-issuance-retirement.ts"
+      ],
+      "@ts-drp/protocol-v3/creator-author-issuance-frontiers": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/creator-author-issuance-frontiers.ts"
+      ],
+      "@ts-drp/protocol-v3/settlement-profile": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/settlement-profile.ts"
+      ],
+      "@ts-drp/protocol-v3/seal": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/seal.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/seal-signing-request": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/internal/seal-signing-request.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/creator-anchor-signing-request": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/internal/creator-anchor-signing-request.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/creator-issuance-retirement-signing-request": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/internal/creator-issuance-retirement-signing-request.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/received-vertex-authentication": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/internal/received-vertex-authentication.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/seal-authority-identity": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/internal/seal-authority-identity.ts"
+      ],
+      "@ts-drp/protocol-v3/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/src/snapshot-transfer.ts"
+      ],
+      "@ts-drp/protocol-v3/registry/registry-v1.json": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/protocol-v3/registry/registry-v1.json"
+      ],
+      "@ts-drp/relay-policy": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/relay-policy/src/index.ts"
+      ],
+      "@ts-drp/rendezvous": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/rendezvous/src/index.ts"
+      ],
+      "@ts-drp/rendezvous/service": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/rendezvous/dist/src/service.d.ts"
+      ],
+      "@ts-drp/rendezvous/node": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/rendezvous/dist/src/node.d.ts"
+      ],
+      "@ts-drp/routing-browser": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/routing-browser/src/index.ts"
+      ],
+      "@ts-drp/routing-node": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/routing-node/src/index.ts"
+      ],
+      "@ts-drp/routing-node/constants": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/routing-node/src/constants.ts"
+      ],
+      "@ts-drp/seal": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/seal/src/index.ts"
+      ],
+      "@ts-drp/seal/pacemaker": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/seal/src/pacemaker.ts"
+      ],
+      "@ts-drp/seal/creator": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/seal/src/creator.ts"
+      ],
+      "@ts-drp/seal/internal/creator-close-intent": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/seal/src/internal/creator-close-intent.ts"
+      ],
+      "@ts-drp/seal/internal/storage-port": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/seal/src/storage-port.ts"
+      ],
+      "@ts-drp/storage": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage/dist/src/index.d.ts"
+      ],
+      "@ts-drp/storage/contract": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage/dist/src/contract.d.ts"
+      ],
+      "@ts-drp/storage/maintenance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage/dist/src/maintenance.d.ts"
+      ],
+      "@ts-drp/storage/adapter": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage/dist/src/adapter.d.ts"
+      ],
+      "@ts-drp/storage/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/storage-browser": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-browser/dist/src/index.d.ts"
+      ],
+      "@ts-drp/storage-browser/issuance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-browser/dist/src/issuance.d.ts"
+      ],
+      "@ts-drp/storage-browser/issuance-maintenance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-browser/dist/src/issuance-maintenance.d.ts"
+      ],
+      "@ts-drp/storage-browser/live-journal": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-browser/dist/src/live-journal.d.ts"
+      ],
+      "@ts-drp/storage-browser/maintenance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-browser/dist/src/maintenance.d.ts"
+      ],
+      "@ts-drp/storage-browser/seal-vote": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-browser/src/seal-vote.ts"
+      ],
+      "@ts-drp/storage-browser/seal-evidence": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-browser/src/seal-evidence.ts"
+      ],
+      "@ts-drp/storage-browser/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-browser/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/storage-node": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-node/dist/src/index.d.ts"
+      ],
+      "@ts-drp/storage-node/issuance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-node/dist/src/issuance.d.ts"
+      ],
+      "@ts-drp/storage-node/issuance-maintenance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-node/dist/src/issuance-maintenance.d.ts"
+      ],
+      "@ts-drp/storage-node/live-journal": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-node/dist/src/live-journal.d.ts"
+      ],
+      "@ts-drp/storage-node/maintenance": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-node/dist/src/maintenance.d.ts"
+      ],
+      "@ts-drp/storage-node/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/storage-node/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/test-utils": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/test-utils/src/index.ts"
+      ],
+      "@ts-drp/test-utils/shadow-comparison": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/test-utils/src/shadow-comparison.ts"
+      ],
+      "@ts-drp/test-utils/shadow-runner": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/test-utils/src/shadow-runner.ts"
+      ],
+      "@ts-drp/test-utils/shadow-telemetry": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/test-utils/src/shadow-telemetry.ts"
+      ],
+      "@ts-drp/tracer": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/tracer/dist/src/index.d.ts"
+      ],
+      "@ts-drp/types": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/types/dist/src/index.d.ts"
+      ],
+      "@ts-drp/utils": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/utils/dist/src/index.d.ts"
+      ],
+      "@ts-drp/utils/debug": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/utils/dist/src/debug/index.d.ts"
+      ],
+      "@ts-drp/utils/promise/deferred": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/utils/dist/src/promise/deferred/index.d.ts"
+      ],
+      "@ts-drp/utils/promise/timeout": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/utils/dist/src/promise/timeout/index.d.ts"
+      ],
+      "@ts-drp/utils/hash": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/utils/dist/src/hash/index.d.ts"
+      ],
+      "@ts-drp/utils/serialization": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/utils/src/serialization/index.ts"
+      ],
+      "@ts-drp/utils/serialization/equality": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/utils/src/serialization/equality.ts"
+      ],
+      "@ts-drp/utils/memory-benchmark": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/utils/dist/src/memory-benchmark/index.d.ts"
+      ],
+      "@ts-drp/validation": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/validation/src/index.ts"
+      ],
+      "@ts-drp/validation/vertex": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/validation/dist/src/vertex.d.ts"
+      ],
+      "@ts-drp/validation/message": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/validation/src/schemas/message.ts"
+      ],
+      "@ts-drp/validation/errors": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/validation/src/errors.ts"
+      ],
+      "@ts-drp/worker-host": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/worker-host/dist/src/index.d.ts"
+      ],
+      "@ts-drp/worker-host/host": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/worker-host/dist/src/host.d.ts"
+      ],
+      "@ts-drp/worker-host/worker": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/packages/worker-host/dist/src/worker.d.ts"
+      ],
+      "@ts-drp/example-browser-network": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/examples/browser-network/src/index.ts"
+      ],
+      "@ts-drp/example-browser-network/config": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/examples/browser-network/src/config.ts"
+      ],
+      "@ts-drp/example-browser-network/env": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/examples/browser-network/src/env.ts"
+      ],
+      "@ts-drp/example-browser-network/session": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/examples/browser-network/src/session.ts"
+      ],
+      "@ts-drp/example-v3-room": [
+        "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout/examples/v3-room/src/index.ts"
+      ]
+    },
+    "pathsBasePath": "/private/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout",
+    "noEmit": true
+  },
+  "baselineCommit": "61a793d38a9fa1eafd9639aa41de2335f9891695",
+  "currentCommit": "ba15bb894d324bb8d8a0d8a7da3f3e61042a0283",
+  "currentTestSha256": "66c26d38e25ed8bc3c765faab58a0167ca289efb4d97f438eac695c5af93e2a1",
+  "baselineTestSha256": "446ac50e8f84d9ae8940fd670eab92930f9179fb26dafc7807d245113d578333",
+  "sameProgramOptions": true,
+  "onlyTargetTextReplacedInMemory": true,
+  "noFilesMutated": true,
+  "externalExactlyEqual": true,
+  "currentTargetCount": 0,
+  "baselineTargetCount": 0,
+  "externalCount": 41,
+  "current": [
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 595,
+      "column": 21,
+      "length": 5,
+      "start": 23446,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 597,
+      "column": 24,
+      "length": 5,
+      "start": 23576,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 598,
+      "column": 23,
+      "length": 5,
+      "start": 23679,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'digest' implicitly has an 'any' type.",
+      "line": 599,
+      "column": 19,
+      "length": 6,
+      "start": 23776,
+      "token": "digest"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 607,
+      "column": 22,
+      "length": 5,
+      "start": 24225,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 608,
+      "column": 19,
+      "length": 5,
+      "start": 24320,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 609,
+      "column": 30,
+      "length": 5,
+      "start": 24420,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ baseExpectedHead: Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>; ... 4 more ...; state: GenerationState; }>' is not assignable to type 'GenerationRecord'.\n  Types of property 'baseExpectedHead' are incompatible.\n    Type 'Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>' is not assignable to type 'ExpectedHead'.\n      Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'ExpectedHead'.\n        Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'PresentHead'.\n          Types of property 'revision' are incompatible.\n            Type 'number' is not assignable to type 'HeadRevision'.\n              Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.",
+      "line": 627,
+      "column": 5,
+      "length": 18,
+      "start": 25372,
+      "token": "generations[index]"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type.",
+      "line": 639,
+      "column": 20,
+      "length": 8,
+      "start": 25778,
+      "token": "objectId"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type.",
+      "line": 644,
+      "column": 35,
+      "length": 8,
+      "start": 26003,
+      "token": "objectId"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 696,
+      "column": 14,
+      "length": 5,
+      "start": 28147,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'declaration' implicitly has an 'any' type.",
+      "line": 707,
+      "column": 21,
+      "length": 11,
+      "start": 28575,
+      "token": "declaration"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type.",
+      "line": 707,
+      "column": 34,
+      "length": 7,
+      "start": 28588,
+      "token": "options"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 712,
+      "column": 14,
+      "length": 8,
+      "start": 28852,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'receipt' implicitly has an 'any' type.",
+      "line": 713,
+      "column": 16,
+      "length": 7,
+      "start": 28904,
+      "token": "receipt"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 713,
+      "column": 25,
+      "length": 8,
+      "start": 28913,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 714,
+      "column": 22,
+      "length": 8,
+      "start": 28982,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 717,
+      "column": 14,
+      "length": 8,
+      "start": 29100,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'signal' implicitly has an 'any' type.",
+      "line": 719,
+      "column": 11,
+      "length": 6,
+      "start": 29191,
+      "token": "signal"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type.",
+      "line": 723,
+      "column": 21,
+      "length": 10,
+      "start": 29350,
+      "token": "descriptor"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type.",
+      "line": 733,
+      "column": 16,
+      "length": 10,
+      "start": 29949,
+      "token": "descriptor"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'bytes' implicitly has an 'any' type.",
+      "line": 733,
+      "column": 28,
+      "length": 5,
+      "start": 29961,
+      "token": "bytes"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type.",
+      "line": 740,
+      "column": 18,
+      "length": 7,
+      "start": 30078,
+      "token": "options"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2739,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (scope: any, sequence: any) => Promise<DurableIssueCommit | null>; readLineage: (scope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (scope: any, buildAndSign: any) =...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "line": 803,
+      "column": 8,
+      "length": 17,
+      "start": 32661,
+      "token": "baseIssuanceStore"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 805,
+      "column": 35,
+      "length": 5,
+      "start": 32794,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 806,
+      "column": 22,
+      "length": 5,
+      "start": 32880,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'sequence' implicitly has an 'any' type.",
+      "line": 806,
+      "column": 29,
+      "length": 8,
+      "start": 32887,
+      "token": "sequence"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 811,
+      "column": 23,
+      "length": 5,
+      "start": 33147,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 816,
+      "column": 26,
+      "length": 5,
+      "start": 33368,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 823,
+      "column": 19,
+      "length": 5,
+      "start": 33635,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "line": 823,
+      "column": 26,
+      "length": 12,
+      "start": 33642,
+      "token": "buildAndSign"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 827,
+      "column": 20,
+      "length": 5,
+      "start": 33886,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 829,
+      "column": 24,
+      "length": 5,
+      "start": 33988,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 830,
+      "column": 20,
+      "length": 5,
+      "start": 34055,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 831,
+      "column": 15,
+      "length": 5,
+      "start": 34113,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 832,
+      "column": 20,
+      "length": 5,
+      "start": 34171,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'text' does not exist on type 'Expression'.",
+      "line": 235,
+      "column": 100,
+      "length": 4,
+      "start": 9082,
+      "token": "text"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 597,
+      "column": 27,
+      "length": 12,
+      "start": 24950,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 598,
+      "column": 27,
+      "length": 12,
+      "start": 25005,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 599,
+      "column": 43,
+      "length": 12,
+      "start": 25080,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 600,
+      "column": 27,
+      "length": 12,
+      "start": 25131,
+      "token": "declarations"
+    }
+  ],
+  "baseline": [
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 595,
+      "column": 21,
+      "length": 5,
+      "start": 23446,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 597,
+      "column": 24,
+      "length": 5,
+      "start": 23576,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 598,
+      "column": 23,
+      "length": 5,
+      "start": 23679,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'digest' implicitly has an 'any' type.",
+      "line": 599,
+      "column": 19,
+      "length": 6,
+      "start": 23776,
+      "token": "digest"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 607,
+      "column": 22,
+      "length": 5,
+      "start": 24225,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 608,
+      "column": 19,
+      "length": 5,
+      "start": 24320,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 609,
+      "column": 30,
+      "length": 5,
+      "start": 24420,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ baseExpectedHead: Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>; ... 4 more ...; state: GenerationState; }>' is not assignable to type 'GenerationRecord'.\n  Types of property 'baseExpectedHead' are incompatible.\n    Type 'Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>' is not assignable to type 'ExpectedHead'.\n      Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'ExpectedHead'.\n        Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'PresentHead'.\n          Types of property 'revision' are incompatible.\n            Type 'number' is not assignable to type 'HeadRevision'.\n              Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.",
+      "line": 627,
+      "column": 5,
+      "length": 18,
+      "start": 25372,
+      "token": "generations[index]"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type.",
+      "line": 639,
+      "column": 20,
+      "length": 8,
+      "start": 25778,
+      "token": "objectId"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type.",
+      "line": 644,
+      "column": 35,
+      "length": 8,
+      "start": 26003,
+      "token": "objectId"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 696,
+      "column": 14,
+      "length": 5,
+      "start": 28147,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'declaration' implicitly has an 'any' type.",
+      "line": 707,
+      "column": 21,
+      "length": 11,
+      "start": 28575,
+      "token": "declaration"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type.",
+      "line": 707,
+      "column": 34,
+      "length": 7,
+      "start": 28588,
+      "token": "options"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 712,
+      "column": 14,
+      "length": 8,
+      "start": 28852,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'receipt' implicitly has an 'any' type.",
+      "line": 713,
+      "column": 16,
+      "length": 7,
+      "start": 28904,
+      "token": "receipt"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 713,
+      "column": 25,
+      "length": 8,
+      "start": 28913,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 714,
+      "column": 22,
+      "length": 8,
+      "start": 28982,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 717,
+      "column": 14,
+      "length": 8,
+      "start": 29100,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'signal' implicitly has an 'any' type.",
+      "line": 719,
+      "column": 11,
+      "length": 6,
+      "start": 29191,
+      "token": "signal"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type.",
+      "line": 723,
+      "column": 21,
+      "length": 10,
+      "start": 29350,
+      "token": "descriptor"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type.",
+      "line": 733,
+      "column": 16,
+      "length": 10,
+      "start": 29949,
+      "token": "descriptor"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'bytes' implicitly has an 'any' type.",
+      "line": 733,
+      "column": 28,
+      "length": 5,
+      "start": 29961,
+      "token": "bytes"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type.",
+      "line": 740,
+      "column": 18,
+      "length": 7,
+      "start": 30078,
+      "token": "options"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2739,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (scope: any, sequence: any) => Promise<DurableIssueCommit | null>; readLineage: (scope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (scope: any, buildAndSign: any) =...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "line": 803,
+      "column": 8,
+      "length": 17,
+      "start": 32661,
+      "token": "baseIssuanceStore"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 805,
+      "column": 35,
+      "length": 5,
+      "start": 32794,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 806,
+      "column": 22,
+      "length": 5,
+      "start": 32880,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'sequence' implicitly has an 'any' type.",
+      "line": 806,
+      "column": 29,
+      "length": 8,
+      "start": 32887,
+      "token": "sequence"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 811,
+      "column": 23,
+      "length": 5,
+      "start": 33147,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 816,
+      "column": 26,
+      "length": 5,
+      "start": 33368,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 823,
+      "column": 19,
+      "length": 5,
+      "start": 33635,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "line": 823,
+      "column": 26,
+      "length": 12,
+      "start": 33642,
+      "token": "buildAndSign"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 827,
+      "column": 20,
+      "length": 5,
+      "start": 33886,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 829,
+      "column": 24,
+      "length": 5,
+      "start": 33988,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 830,
+      "column": 20,
+      "length": 5,
+      "start": 34055,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 831,
+      "column": 15,
+      "length": 5,
+      "start": 34113,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 832,
+      "column": 20,
+      "length": 5,
+      "start": 34171,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'text' does not exist on type 'Expression'.",
+      "line": 235,
+      "column": 100,
+      "length": 4,
+      "start": 9082,
+      "token": "text"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 597,
+      "column": 27,
+      "length": 12,
+      "start": 24950,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 598,
+      "column": 27,
+      "length": 12,
+      "start": 25005,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 599,
+      "column": 43,
+      "length": 12,
+      "start": 25080,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 600,
+      "column": 27,
+      "length": 12,
+      "start": 25131,
+      "token": "declarations"
+    }
+  ],
+  "typecheckPassed": false,
+  "newTargetDiagnostic": []
+}
