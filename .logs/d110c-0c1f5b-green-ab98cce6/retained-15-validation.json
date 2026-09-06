@@ -1,0 +1,42 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 2,
+  "passed": 2,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.93.36 authorized durable recovery RED"
+      ],
+      "fullName": "D.93.36 authorized durable recovery RED recovers one genuine local commit before any live effect",
+      "status": "passed",
+      "title": "recovers one genuine local commit before any live effect",
+      "duration": 629.391166,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.93.36 authorized durable recovery RED"
+      ],
+      "fullName": "D.93.36 authorized durable recovery RED replays the complete local issuance outbox in dependency order",
+      "status": "passed",
+      "title": "replays the complete local issuance outbox in dependency order",
+      "duration": 43.467874999999935,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

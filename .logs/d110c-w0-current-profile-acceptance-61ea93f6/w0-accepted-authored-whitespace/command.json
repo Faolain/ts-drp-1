@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude).logs/d110c-w0-final-review-7efe33dd/public/w0-green.patch"
+  ],
+  "start": "2026-09-06T12:39:25.845Z"
+}

@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"shippingTargets": [
+		{
+			"id": "electron-desktop",
+			"runtime": "electron",
+			"state": "shipped",
+			"versions": [
+				{
+					"version": "42.0.0",
+					"runner": "shipping/electron-42-conformance.mjs"
+				}
+			]
+		}
+	]
+}

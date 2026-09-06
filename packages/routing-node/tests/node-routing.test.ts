@@ -1,3 +1,4 @@
+import { DRPNetworkNode } from "@ts-drp/network";
 import {
 	AMINO_DHT_PROTOCOL,
 	createNodeRouting,
@@ -5,7 +6,7 @@ import {
 	type NodeRouting,
 	PUBLIC_NETWORK_ACKNOWLEDGEMENT,
 } from "@ts-drp/routing-node";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 describe("NodeRouting", () => {
 	it("performs local Amino peer lookup and provider publication through the production host seam", async () => {
@@ -63,6 +64,32 @@ describe("NodeRouting", () => {
 		await expect(createNodeRouting({ limits: { maxAddressesPerPeer: Number.NaN } })).rejects.toThrow(
 			/maxAddressesPerPeer/u
 		);
+	});
+
+	it("routes explicit connects through the production bounded-dial owner", async (context) => {
+		if (
+			typeof Object.getOwnPropertyDescriptor(DRPNetworkNode.prototype, "getPeerSelectionSnapshot")?.value !== "function"
+		) {
+			context.skip();
+			return;
+		}
+		const safeDial = vi.spyOn(DRPNetworkNode.prototype, "safeDial").mockResolvedValue(undefined);
+		const routing = await createNodeRouting({
+			bootstrapPeers: [],
+			mode: "client",
+			network: "local",
+		});
+		try {
+			safeDial.mockClear();
+			const address = "/ip4/127.0.0.1/tcp/65530/p2p/12D3KooWJ5w8fHqYvP6SgT4DcNeRuXMxLPrTbW1YsAqkH8u9mZ2R";
+			await routing.connect(address);
+			expect(safeDial).toHaveBeenCalledOnce();
+			expect(safeDial.mock.calls[0]?.[0].toString()).toBe(address);
+			expect(safeDial.mock.calls[0]?.[2]).toBeInstanceOf(AbortSignal);
+		} finally {
+			await routing.stop();
+			safeDial.mockRestore();
+		}
 	});
 });
 

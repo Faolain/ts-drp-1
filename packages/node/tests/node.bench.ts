@@ -228,9 +228,9 @@ async function runObjectBenchmark(numberOfMessages: number, numberOfNodes: numbe
 	const nodes = await createNodes(numberOfNodes);
 	const objects: IDRPObject<AddMulDRP>[] = [];
 	const admins = nodes.map((node) => node.networkNode.peerId);
-	const acl = createACL({ admins, permissionless: true });
 	for (let i = 0; i < nodes.length; i++) {
 		const obj = new AddMulDRP();
+		const acl = createACL({ admins, permissionless: true });
 		if (i === 0) {
 			objects.push(await nodes[i].createObject({ id: "addmul", drp: obj, acl, log_config: { level: "silent" } }));
 			continue;

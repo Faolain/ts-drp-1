@@ -1,0 +1,54 @@
+name: Protocol v3 atomic freeze change control
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-freeze:
+    name: Require protocol-v3 atomic freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run unchanged v2 and merge-base-pinned v3 freeze checkers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          V2_CHECKER: packages/protocol-v2/scripts/check-protocol-freeze.mjs
+          V3_CHECKER: packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs
+          V3_POLICY: packages/protocol-v3/conformance/freeze-policy-v3.json
+          V3_ORIGINAL_LOCK: packages/protocol-v3/conformance/reference.lock.json
+          V3_REGENERATED_LOCK: packages/protocol-v3/conformance/reference-regen.lock.json
+          V3_REGISTRY: packages/protocol-v3/registry/registry-v1.json
+          V3_ORIGINAL_REFERENCE: packages/protocol-v3/conformance/original-reference/reference.mjs
+          V3_REGENERATED_REFERENCE: packages/protocol-v3/conformance/regenerated-reference/reference.mjs
+          V3_VECTORS: packages/protocol-v3/conformance/vectors/registry-v1.json
+        run: |
+          git show "$BASE_SHA:$V2_CHECKER" > "$RUNNER_TEMP/check-protocol-v2-freeze.mjs"
+          PROTOCOL_FREEZE_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+            node "$RUNNER_TEMP/check-protocol-v2-freeze.mjs" "$BASE_SHA"
+          if git cat-file -e "$BASE_SHA:$V3_CHECKER"; then
+            git show "$BASE_SHA:$V3_CHECKER" > "$RUNNER_TEMP/check-protocol-v3-freeze.mjs"
+            PROTOCOL_V3_FREEZE_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-protocol-v3-freeze.mjs" "$BASE_SHA"
+          elif ! git cat-file -e "$BASE_SHA:$V3_POLICY" \
+            && ! git cat-file -e "$BASE_SHA:$V3_ORIGINAL_LOCK" \
+            && ! git cat-file -e "$BASE_SHA:$V3_REGENERATED_LOCK" \
+            && ! git cat-file -e "$BASE_SHA:$V3_REGISTRY" \
+            && ! git cat-file -e "$BASE_SHA:$V3_ORIGINAL_REFERENCE" \
+            && ! git cat-file -e "$BASE_SHA:$V3_REGENERATED_REFERENCE" \
+            && ! git cat-file -e "$BASE_SHA:$V3_VECTORS"; then
+            node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs "$BASE_SHA"
+          else
+            echo "Protocol-v3 freeze bootstrap is fail-closed and single-use." >&2
+            exit 1
+          fi

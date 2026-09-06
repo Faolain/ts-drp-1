@@ -1,0 +1,54 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+const root = '/Users/aristotle/Documents/Projects/ts-drp-1';
+const out = path.dirname(new URL(import.meta.url).pathname);
+const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const read = file => JSON.parse(fs.readFileSync(path.join(root, file)));
+const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 }).trim();
+const head = '0181584496cb213fc8872b57f473f911589fd4d8';
+assert.equal(git('rev-parse', 'HEAD'), head);
+assert.equal(git('rev-parse', '@{u}'), head);
+assert.equal(git('log', '-1', '--format=%G?'), 'G');
+assert.equal(git('diff', '--cached', '--name-only'), '');
+const iso = '.logs/d110c-w0-isolated-7efe33dd';
+const regression = '.logs/d110c-w0-regression-readiness-7efe33dd';
+const browser = '.logs/d110c-w0-browser-7efe33dd';
+const custody = read(iso + '/custody-before.json');
+const manifests = { ...custody.manifests, [iso]: '18e88cd975bf18553a71850d6da012a99f2f1d2389ff54274bcb76ed5d2c9258' };
+const inputs = { ...custody.sources, ...custody.built };
+for (const directory of [iso, regression]) {
+  const roster = read(directory + '/runtime-roster.json');
+  for (const gate of roster.gates) {
+    const validation = read(directory + '/' + gate.label + '/validation.json');
+    const status = read(directory + '/' + gate.label + '/status.json');
+    assert.equal(validation.green, true);
+    assert.equal(validation.exactRoster, true);
+    assert.equal(validation.passed, gate.entries.length);
+    assert.equal(status.code, 0);
+    assert.equal(status.timedOut, false);
+    assert.deepEqual(status.cleanup, []);
+    assert.equal(status.quiescent, true);
+  }
+  Object.assign(inputs, roster.inputHashes);
+  inputs[roster.node] = roster.nodeSha256;
+  inputs[roster.vitest] = roster.vitestSha256;
+}
+const browserValidation = read(browser + '/validation.json');
+assert.equal(browserValidation.green, true);
+Object.assign(inputs, read(browser + '/runtime-roster.json').inputHashes);
+for (const file of ['requirements.md', 'prompt.md', 'schema.json', 'source-capture.json', 'w0-green.patch', 'run.mjs', 'freeze.mjs']) inputs[path.join(out, file)] = hash(path.join(out, file));
+const plan = 'docs/production-hardening/production-hardening-tdd-plan-v2.md';
+inputs[plan] = hash(path.join(root, plan));
+for (const [file, digest] of Object.entries(inputs)) assert.equal(hash(path.resolve(root, file)), digest, file);
+const old = read('.logs/d110c-0c1f5b-green-57834387/custody-before.json');
+const stashes = git('stash', 'list', '--format=%H %gd %gs');
+assert.equal(stashes, old.stashes.trim());
+for (const file of old.untracked) assert.ok(fs.existsSync(path.join(root, file)));
+assert.deepEqual(git('diff', '--name-only').split('\n').sort(), custody.dirty);
+const patch = execFileSync('git', ['-C', root, 'diff', '--binary', '--full-index']);
+assert.equal(crypto.createHash('sha256').update(patch).digest('hex'), custody.sourcePatchSha256);
+fs.writeFileSync(path.join(out, 'review-freeze.json'), JSON.stringify({ head, manifests, inputs, stashes, protectedPaths: old.untracked, sourcePatchSha256: custody.sourcePatchSha256, reviewScope: 'Pending three-owner W0 GREEN plus separately committed consumer RED/GREEN; no parent production acceptance', runtimeGatePrerequisitesVerified: true, distinctMainAndIsolatedCaseIdentities: 232, browserCases: 24, reviewers: ['Grok 4.6 high', 'Sol high', 'Fable 5.1 xhigh'], maxInvocationsPerReviewer: 1 }, null, 2) + '\n', { flag: 'wx' });
+console.log(JSON.stringify({ head, frozenInputs: Object.keys(inputs).length, sealedRoots: Object.keys(manifests).length, protectedPaths: old.untracked.length, runtimeComplete: true, reviewersLaunched: 0 }));

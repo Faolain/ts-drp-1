@@ -1,0 +1,32 @@
+const custody = read('custody-after.json');
+const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 }).trim();
+if (git('rev-parse', 'HEAD') !== release.baseline || git('log', '-1', '--format=%G?') !== 'G' || git('diff', '--cached', '--name-only')) throw Error('HEAD/signature/index drift');
+for (const [file, digest] of Object.entries(roster.inputHashes)) if (hash(fs.readFileSync(file)) !== digest) throw Error('Runtime input drift: ' + file);
+for (const [file, digest] of Object.entries({ ...custody.targetHashes, ...custody.protectedSources, ...custody.built })) if (hash(fs.readFileSync(path.join(root, file))) !== digest) throw Error('Protected source/build drift: ' + file);
+if (hash(fs.readFileSync(roster.node)) !== roster.nodeSha256 || hash(fs.readFileSync(roster.vitest)) !== roster.vitestSha256) throw Error('Runtime binary drift');
+const patch = execFileSync('git', ['-C', root, 'diff', '--binary', '--full-index', '--', ...custody.targets], { maxBuffer: 128 * 1024 * 1024 });
+if (hash(patch) !== release.sourcePatchSha256) throw Error('Source patch changed');
+const original = JSON.parse(fs.readFileSync(path.join(root, '.logs/d110c-0c1f5b-green-57834387/custody-before.json')));
+if (git('stash', 'list', '--format=%H %gd %gs') !== original.stashes.trim()) throw Error('Stashes changed');
+for (const file of original.untracked) if (!fs.existsSync(path.join(root, file))) throw Error('Protected path missing: ' + file);
+let protectedEvidenceFiles = 0;
+for (const [directory, digest] of Object.entries(custody.manifests)) {
+  const manifest = fs.readFileSync(path.join(root, directory, 'manifest.sha256'));
+  if (hash(manifest) !== digest) throw Error('Protected manifest changed: ' + directory);
+  for (const line of manifest.toString().trim().split('\n')) {
+    const match = line.match(/^([a-f0-9]{64})\s+(.+)$/u);
+    if (!match) throw Error('Protected manifest syntax');
+    const [, expected, file] = match;
+    if (hash(fs.readFileSync(path.join(root, file.startsWith('.logs/') ? file : directory + '/' + file))) !== expected) throw Error('Protected evidence changed: ' + file);
+    protectedEvidenceFiles += 1;
+  }
+}
+const group = read(gate.label + '/execution-start.json').ownedProcessGroup;
+const ps = spawnSync('ps', ['-axo', 'pid=,ppid=,pgid=,stat='], { encoding: 'utf8' });
+if (ps.status !== 0) throw Error('Owned group verification failed');
+const groupMembers = ps.stdout.trim().split('\n').map(line => line.trim().split(/\s+/u)).filter(fields => Number(fields[2]) === group);
+if (groupMembers.length !== 0) throw Error('Owned process group still active');
+const expectedDirty = [...Object.keys(custody.protectedSources), ...custody.targets].sort();
+if (JSON.stringify(git('diff', '--name-only').split('\n').filter(Boolean).sort()) !== JSON.stringify(expectedDirty)) throw Error('Tracked dirty-owner set changed');
+const protectedResult = { baseline: release.baseline, signature: 'G', indexEmpty: true, protectedSources: 11, greenSources: 3, sourceHashes: custody.targetHashes, builtIdentities: 7, stashes: 27, protectedPaths: original.untracked.length, manifestRoots: Object.keys(custody.manifests).length, protectedEvidenceFiles, inputCount: Object.keys(roster.inputHashes).length, allHashesAndPathsPreserved: true, sourcePatchSha256: hash(patch), runtimeBinariesExact: true, ownedProcessGroup: group, remainingOwnedGroup: [], quiescent: true, trackedStatus: git('status', '--short', '--untracked-files=no') };
+write('custody-after-' + gate.label + '.json', protectedResult);

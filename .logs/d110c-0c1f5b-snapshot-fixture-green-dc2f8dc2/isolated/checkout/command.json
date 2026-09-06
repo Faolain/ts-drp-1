@@ -1,0 +1,10 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout",
+  "command": "git",
+  "args": [
+    "checkout",
+    "--detach",
+    "2f09a52ce58e81000850d73594ca1f3ab4c9309a"
+  ],
+  "start": "2026-09-06T08:37:38.913Z"
+}

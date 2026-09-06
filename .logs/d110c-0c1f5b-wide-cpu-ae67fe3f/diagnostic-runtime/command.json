@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-0c1f5b-wide-cpu-ae67fe3f/runtime.mjs",
+    "run"
+  ],
+  "start": "2026-09-06T07:34:06.004Z"
+}

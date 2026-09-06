@@ -1,0 +1,9 @@
+tests_commit=9a4b35f4c29afc813ff1a24abe27a370be2278df
+tests_signature=G
+remote=9a4b35f4c29afc813ff1a24abe27a370be2278df
+stashes=27
+tracked_status_lines=0
+{"numTotalTests":39,"numPassedTests":25,"numFailedTests":14,"numPendingTests":0,"success":false}
+diagnostic_exit=1
+final_red_exit=1
+candidate_patch_sha256=a0e72eee874611eba8bb1703c6ee28a1ad6064b200701efeb6991b78c7e50db0

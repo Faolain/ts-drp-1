@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "show",
+    "--format=%H %G? %s",
+    "--unified=0",
+    "HEAD",
+    "--",
+    "tests/phase-3g-v3-room-rebase-red.test.ts"
+  ],
+  "start": "2026-09-06T00:18:49.965Z"
+}

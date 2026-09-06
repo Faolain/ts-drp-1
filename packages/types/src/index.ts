@@ -27,6 +27,7 @@ export {
 	DRPDiscoveryResponse,
 	DRPDiscoveryResponse_Subscribers,
 	DRPDiscoveryResponse_SubscribersEntry,
+	V3Envelope,
 } from "./proto/drp/v1/messages_pb.js";
 
 export * from "./acl.js";
@@ -44,6 +45,7 @@ export type * from "./metrics.js";
 export type * from "./network.js";
 export type * from "./node.js";
 export type * from "./object.js";
+export type * from "./staged-state-machine.js";
 export type * from "./drp-interval-discovery.js";
 export type * from "./drp-interval-reconnect.js";
 

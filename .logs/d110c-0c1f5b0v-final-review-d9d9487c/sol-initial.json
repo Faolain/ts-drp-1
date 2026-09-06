@@ -1,0 +1,21 @@
+{
+  "verdict": "CHANGES_REQUIRED",
+  "p0_count": 0,
+  "p1_count": 1,
+  "p2_count": 0,
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Exported Node sink falsely promises fail-closed rejection",
+      "evidence": "packages/node/src/v3-live.ts:381-386 says rejection fails the current session closed, but ordinary authenticated ingress catches the sink rejection and only logs it at :4119-4132, while local issue likewise catches it and still returns success at :6679-6698; tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts:8-12 and :46-52 enforce the same context-free wording on both callback surfaces",
+      "impact": "A direct Node consumer can rely on the new public contract and assume throwing stops the plane, while the plane actually remains active and continues admission. The statement is true for room-owned recovery/session cleanup, but not for the exported sink across its ordinary live call sites, so the contract correction is not yet honest.",
+      "required_action": "f5b0v owner: keep runtime unchanged, replace the shared wording with surface-specific JSDoc that limits fail-closed rejection to room sessions and successor-recovery activation, explicitly states the legacy ordinary Node sink behavior, and update the contract test to pin that distinction."
+    }
+  ],
+  "red_green_causality": "The original settlement/recovery REDs remain closed by the accepted nine-path candidate, the AST operand RED is causally closed, and the genuine two-row callback RED correctly demonstrates d1,d1,d2 notification attempts while canonical state, issuance, authority and cleanup remain exact.",
+  "replay_contract_assessment": "Replayable authenticated notification with digest-keyed consumer idempotency is a sound contract, and the GREEN directly preserves exact canonical projection and issuance across failed and successful reopen. The room surface implements fail-closed rejection, but the identical documentation applied to the general exported Node sink overclaims behavior outside successor recovery.",
+  "scope_assessment": "The staged 21-path binary diff matches af2beca5ae335e267e9102534675177f4abbc8248a5cbf8cfb54992eb36c4ced. The f5b0v production-source delta is exactly two five-line JSDoc additions with unchanged token streams and ASTs; no runtime, callback shape, export, schema, wire, authority, dependency, threshold, timeout or workload change was introduced.",
+  "evidence_assessment": "All five named self-excluding manifests validate, authoritative commits have good signatures and are pushed, and local/isolated focused, governance, build, retained-baseline and typecheck-equivalence records support their stated results. The evidence faithfully proves the recovery-path behavior but its source-contract test also locks in the inaccurate general Node rejection claim.",
+  "parent_f5b_ready": false
+}
+

@@ -1,0 +1,186 @@
+[
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2345,
+    "line": 356,
+    "character": 20,
+    "start": 13291,
+    "length": 16,
+    "message": "Argument of type 'Expression | undefined' is not assignable to parameter of type 'Node'.\n  Type 'undefined' is not assignable to type 'Node'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 349
+    },
+    "sourceLine": "\t\t\tts.isIdentifier(node.initializer) &&"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2322,
+    "line": 457,
+    "character": 2,
+    "start": 16873,
+    "length": 6,
+    "message": "Type '{ transactIssue: DurableTransactIssue; compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) => Promise<void>; ... 5 more ...; close: () => Promise<void>; }' is not assignable to type 'DurableIssuanceStore'.\n  Types of property 'readSettlementPlan' are incompatible.\n    Type '((scope: DurableIssueScope) => Promise<SettlementPlan | null>) | undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'.\n      Type 'undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'.",
+    "owner": {
+      "kind": "FunctionDeclaration",
+      "name": "fakeIssuanceStore",
+      "startLine": 456
+    },
+    "sourceLine": "\treturn {"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2741,
+    "line": 551,
+    "character": 2,
+    "start": 19759,
+    "length": 6,
+    "message": "Property 'installEpochAnchor' is missing in type 'Readonly<{ installGenesis: Mock<() => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>>; readiness: Mock<...>; readPage: Mock<...>; appendAccepted: Mock<...>; close: Mock<...>; }>' but required in type 'DurableLiveJournalStore'.",
+    "owner": {
+      "kind": "FunctionDeclaration",
+      "name": "journalStoreForFixture",
+      "startLine": 533
+    },
+    "sourceLine": "\treturn Object.freeze({"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2322,
+    "line": 789,
+    "character": 28,
+    "start": 28328,
+    "length": 31,
+    "message": "Type 'number' is not assignable to type 'void'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 789
+    },
+    "sourceLine": "\t\t\t\tsubscribe: (): void => effects.push(\"queue.subscribe\"),"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2322,
+    "line": 790,
+    "character": 24,
+    "start": 28384,
+    "length": 27,
+    "message": "Type 'number' is not assignable to type 'void'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 790
+    },
+    "sourceLine": "\t\t\t\tclose: (): void => effects.push(\"queue.close\"),"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2722,
+    "line": 875,
+    "character": 13,
+    "start": 31449,
+    "length": 27,
+    "message": "Cannot invoke an object which is possibly 'undefined'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 874
+    },
+    "sourceLine": "\t\t\t\tfirst = surface.activateV3LivePlane(candidate as V3PlaneActivationInputContract);"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2722,
+    "line": 878,
+    "character": 14,
+    "start": 31575,
+    "length": 27,
+    "message": "Cannot invoke an object which is possibly 'undefined'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 877
+    },
+    "sourceLine": "\t\t\t\tsecond = surface.activateV3LivePlane(candidate as V3PlaneActivationInputContract);"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2722,
+    "line": 922,
+    "character": 15,
+    "start": 33436,
+    "length": 27,
+    "message": "Cannot invoke an object which is possibly 'undefined'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 921
+    },
+    "sourceLine": "\t\t\t\t\tresult = surface.activateV3LivePlane(input);"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2722,
+    "line": 1160,
+    "character": 12,
+    "start": 43747,
+    "length": 22,
+    "message": "Cannot invoke an object which is possibly 'undefined'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 1151
+    },
+    "sourceLine": "\t\t\t\texpect(surface.routeV3Ingress(network, message)).toBe(expectedClaim);"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2532,
+    "line": 1231,
+    "character": 11,
+    "start": 46814,
+    "length": 33,
+    "message": "Object is possibly 'undefined'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 1025
+    },
+    "sourceLine": "\t\t\texpect(readOutboxPage.mock.calls[0]?.[0].scope).not.toBe(scope);"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2532,
+    "line": 1232,
+    "character": 11,
+    "start": 46882,
+    "length": 33,
+    "message": "Object is possibly 'undefined'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 1025
+    },
+    "sourceLine": "\t\t\texpect(readOutboxPage.mock.calls[1]?.[0].scope).not.toBe(scope);"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2722,
+    "line": 1770,
+    "character": 12,
+    "start": 69090,
+    "length": 27,
+    "message": "Cannot invoke an object which is possibly 'undefined'.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 1764
+    },
+    "sourceLine": "\t\t\t\treturn surface.activateV3LivePlane({"
+  },
+  {
+    "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "code": 2307,
+    "line": 2193,
+    "character": 5,
+    "start": 87118,
+    "length": 72,
+    "message": "Cannot find module '../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder' or its corresponding type declarations.",
+    "owner": {
+      "kind": "ArrowFunction",
+      "startLine": 2067
+    },
+    "sourceLine": "\t\t\t\t\"../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder\""
+  }
+]

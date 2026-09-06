@@ -1,0 +1,9 @@
+{
+	"extends": "../../../packages/protocol-v3/tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"rootDir": "../../..",
+		"tsBuildInfoFile": "../../../packages/protocol-v3/node_modules/.tmp/phase-0o-b3-public-entry.tsbuildinfo"
+	},
+	"files": ["public-entry-type-audit.ts"]
+}

@@ -1,0 +1,19 @@
+{
+  "verdict": "APPROVED",
+  "blocking_union_empty": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "title": "Same-head idempotence names publishStaged active-new, whose staged capability cannot be reused after the first publish",
+      "evidence": "docs/production-hardening/production-hardening-tdd-plan-v2.md:94211-94213 names publishStagedCreatorSuccessorAdoption() as the idempotence producer. That kernel consumes the one-use staged capability at creator-adoption-commit.ts:635-640, and a later stage() of an already-published head fails stale-head at :614. After first activate, terminalizeSource also revokes close facts (creator-close.ts:638-642), so a second publishStaged call has no remaining staged input. The genuine second capability is commitCreatorSuccessorAdoption's already-published active-new path at creator-adoption-commit.ts:683-684 while facts still exist.",
+      "disposition": "GREEN should mint the second same-head capability from commitCreatorSuccessorAdoption after publish and before first activate (fresh verify intent, no remint). Keep the plan's no-replay rule. No further confirmation."
+    },
+    {
+      "title": "Frozen audit still promises usable-predecessor retention after consume/alias",
+      "evidence": ".logs/d110c-b-plan-audit-3118da76/audit.md:57 still says failed consumption/aliasing retains the old owner and lock, contradicting the corrected plan at production-hardening-tdd-plan-v2.md:94195-94202.",
+      "disposition": "Leave the signed audit frozen. GREEN implements the plan's pre-transfer retain vs post-transfer stall split, not the audit sentence."
+    }
+  ],
+  "summary": "Correction 4b357a37 closes the aa002e78 blocking union without new public/wire/crypto/threshold/cold-reopen scope. Pre-transfer refusals retain the predecessor; post-transfer terminalize/alias/cleanup tears down, drops any false active entry, releases the lock after teardown, and leaves recovery to D.110c-0c. Replacement marks in-flight before the first await, defers deactivate/lock release, and CASes the owner token immediately before map swap, so mid-flight shutdown cannot install an unlocked successor or delete a later owner. Duplicate adopt proceeds on successor-pending-adoption even at the predecessor floor; active is a no-op only on exact authority/floor/plane agreement with no pending successor; sealed/successor-adopted fail closed. isD108d2Authority, D108D2_AUTHORITY_KEYS, exportSuccessor epoch-1 raw derivation, and retained equality stay exact beside tests-only isD110cBSuccessorAuthority. Audit/source-shape/manifest are in the signed correction and match the plan pins 61d34473/49bb0fc6/1ea2c137. Node GREEN is map custody without a synthetic LockManager; Chromium proves the one lock; the new title uses a fourth server plus d110c-b-hot-creator/d110c-b-hot-rollover and snapshots the three retained realms. D.108e2b predecessor-deactivation cleanup is retained; close bind is after that success; bind failure keeps new live/authority/floor with D110C_B_CLOSE_REBIND_FAILED; post-transfer activation failure is D110C_B_ACTIVATION_STALLED. creator-adoption.ts:1030 is 0b1/c debt with epoch-2 reopen still chain-invalid; Phase-5e is the anonymous sealEpoch() declaration."
+}

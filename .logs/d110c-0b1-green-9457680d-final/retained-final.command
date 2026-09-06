@@ -1,0 +1,1 @@
+xargs pnpm exec vitest run --no-coverage --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=.logs/d110c-0b1-green-9457680d-final/retained-final.json < .logs/d110c-0b1-green-9457680d-final/retained-final.files

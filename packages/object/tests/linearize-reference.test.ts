@@ -38,13 +38,13 @@ function topologicalSortReference(graph: ReferenceGraph, origin: Hash, subgraph:
 	let stackIndex = 0;
 	stack[stackIndex] = origin;
 
-	while (resultIndex >= 0) {
+	while (stackIndex >= 0) {
 		const node = stack[stackIndex];
 		if (visited.has(node)) {
-			result[resultIndex] = node;
 			stackIndex--;
+			if (!processing.delete(node)) continue;
+			result[resultIndex] = node;
 			resultIndex--;
-			processing.delete(node);
 			continue;
 		}
 
@@ -57,6 +57,9 @@ function topologicalSortReference(graph: ReferenceGraph, origin: Hash, subgraph:
 				stack[stackIndex] = neighbor;
 			}
 		}
+	}
+	if (resultIndex !== -1 || new Set(result).size !== subgraph.size) {
+		throw new Error("Reference topological sort did not emit every subgraph vertex exactly once");
 	}
 
 	return result;
@@ -187,7 +190,9 @@ function linearizeMultipleReference(graph: ReferenceGraph, origin: Hash, subgrap
 			const resolved = graph.resolveConflicts(concurrent.map((hash) => graph.vertices.get(hash) as Vertex));
 			switch (resolved.action) {
 				case ActionType.Drop:
-					for (const hash of resolved.vertices ?? []) dropped[indices.get(hash) || -1] = true;
+					for (const hash of resolved.vertices ?? []) {
+						dropped[indices.get(hash) || -1] = true;
+					}
 					if (dropped[i]) j = order.length;
 					break;
 				case ActionType.Nop:
@@ -380,7 +385,7 @@ describe("linearizer legacy reference differential", () => {
 		}
 	});
 
-	test("pins the 9-vertex Swap regression to the literal legacy order", () => {
+	test("pins the 9-vertex Swap regression after unique-emission DFS", () => {
 		const resolver: Resolver = (vertices) =>
 			vertices[0].hash > vertices[1].hash ? { action: ActionType.Swap } : { action: ActionType.Nop };
 		const built = buildGraph(9, "chain", 0, SemanticsType.pair, resolver);
@@ -415,7 +420,7 @@ describe("linearizer legacy reference differential", () => {
 		const reference = labelOrder(linearizePairReference(built.reference, HashGraph.rootHash, subgraph), built.labels);
 		const actual = labelOrder(built.graph.linearizeVertices(), built.labels);
 
-		expect(reference).toEqual([2, 8, 4, 5, 6, 3, 15, 9, 15]);
+		expect(reference).toEqual([1, 2, 8, 4, 5, 6, 3, 9, 15]);
 		expect(actual).toEqual(reference);
 	});
 

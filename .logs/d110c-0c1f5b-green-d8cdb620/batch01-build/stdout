@@ -1,0 +1,38 @@
+
+> ts-drp@0.11.0 build:packages /Users/aristotle/Documents/Projects/ts-drp-1
+> pnpm --filter '@ts-drp/*' build
+
+Scope: 40 of 48 workspace projects
+packages/canonical build$ tsc -b tsconfig.build.json
+packages/ephemeral build$ tsc -b tsconfig.build.json
+packages/errors build$ tsc -b tsconfig.build.json
+packages/membership build$ tsc -b tsconfig.build.json
+packages/ephemeral build: Done
+packages/types build$ tsc -b tsconfig.build.json && node build.mjs
+packages/errors build: Done
+packages/canonical build: Done
+packages/membership build: Done
+packages/types build: Done
+packages/protocol-v3 build$ tsc -b tsconfig.build.json
+packages/blueprints build$ tsc -b tsconfig.build.json && node build.mjs
+packages/logger build$ tsc -b tsconfig.build.json && node build.mjs
+packages/outcome-commit build$ tsc -b tsconfig.build.json
+packages/outcome-commit build: Done
+packages/rendezvous build$ tsc -b tsconfig.build.json
+packages/logger build: Done
+packages/storage build$ tsc -b tsconfig.build.json
+packages/blueprints build: Done
+packages/test-utils build$ tsc -b tsconfig.build.json
+packages/rendezvous build: Done
+packages/utils prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+packages/test-utils build: Done
+packages/utils prebuild: Done
+packages/utils build$ tsc -b tsconfig.build.json && node build.mjs
+packages/utils build: Done
+packages/protocol-v3 build: src/creator-checkpoint.ts(145,71): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+packages/protocol-v3 build: src/creator-close.ts(277,72): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+packages/protocol-v3 build: Failed
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @ts-drp/protocol-v3@0.11.0 build: `tsc -b tsconfig.build.json`
+Exit status 1
+ ELIFECYCLE  Command failed with exit code 1.

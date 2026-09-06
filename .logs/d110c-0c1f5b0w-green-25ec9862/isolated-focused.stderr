@@ -1,0 +1,14 @@
+stderr | tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > single-generation internal redirect pins target hold refusal and orderly source cleanup
+::v3-ingress sink-rejected
+
+stderr | tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock
+::v3-ingress sink-rejected
+
+(node:33047) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33051) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33055) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33062) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)

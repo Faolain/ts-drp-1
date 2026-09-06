@@ -1,0 +1,233 @@
+{
+  "green": true,
+  "exactRoster": true,
+  "passed": 24,
+  "failed": 0,
+  "skipped": 0,
+  "flaky": 0,
+  "retries": 0,
+  "elapsedMs": 40335,
+  "cleanup": [],
+  "quiescent": true,
+  "shimAbsent": true,
+  "custodyExact": true,
+  "allInputHashesExact": true,
+  "tests": [
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "pins the complete browser behavior inventory",
+      "project": "chromium",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+      "project": "chromium",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile worker LockManager authority fails closed before activation",
+      "project": "chromium",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "wrong-key and throwing browser possession fail before writer activation",
+      "project": "chromium",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+      "project": "chromium",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+      "project": "chromium",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile LockManager authority fails activation closed",
+      "project": "chromium",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
+      "project": "chromium",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "pins the complete browser behavior inventory",
+      "project": "firefox",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+      "project": "firefox",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile worker LockManager authority fails closed before activation",
+      "project": "firefox",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "wrong-key and throwing browser possession fail before writer activation",
+      "project": "firefox",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+      "project": "firefox",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+      "project": "firefox",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile LockManager authority fails activation closed",
+      "project": "firefox",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
+      "project": "firefox",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "pins the complete browser behavior inventory",
+      "project": "webkit",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+      "project": "webkit",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile worker LockManager authority fails closed before activation",
+      "project": "webkit",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "wrong-key and throwing browser possession fail before writer activation",
+      "project": "webkit",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+      "project": "webkit",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+      "project": "webkit",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile LockManager authority fails activation closed",
+      "project": "webkit",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
+      "project": "webkit",
+      "timeout": 60000,
+      "expectedStatus": "passed",
+      "status": "expected",
+      "resultStatus": "passed"
+    }
+  ]
+}

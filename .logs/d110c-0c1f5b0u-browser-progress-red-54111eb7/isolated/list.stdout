@@ -1,0 +1,98 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/private/tmp/d110c-browser-progress-red-CY5hdf/checkout/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6b-settlement-progress.config.ts",
+      "--list",
+      "--reporter=json"
+    ],
+    "configFile": "/private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/playwright.phase-6b-settlement-progress.config.ts",
+    "rootDir": "/private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": "/private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/tests/phase-6b-settlement-progress-global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 120000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6b-settlement-progress-red.pw.ts"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6b-settlement-progress-red.pw.ts",
+      "file": "phase-6b-settlement-progress-red.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Chromium preserves atomic settlement progress and exact CAS refusal across reopen",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f7af9a1b872fb6f90f50-d8bfef8d857604fafb27",
+          "file": "phase-6b-settlement-progress-red.pw.ts",
+          "line": 35,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-05T06:21:49.202Z",
+    "duration": 64.32600000000002,
+    "expected": 0,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

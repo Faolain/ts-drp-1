@@ -1,0 +1,31 @@
+name: Protocol v3 author authorization freeze
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  author-authorization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check atomic author-authorization freeze
+        run: node packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: Run author-authorization RED and preservation
+        run: pnpm exec vitest run tests/protocol-v3-current-epoch-author-authorization-p6-red.test.ts tests/protocol-v3-author-authorization-p6-pack-red.test.ts tests/protocol-v3-anchor-trust-3a0.test.ts tests/protocol-v3-admitted-vertex-extraction-3a1b-seam1-red.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+      - run: node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs
+      - run: node packages/protocol-v2/scripts/check-protocol-freeze.mjs

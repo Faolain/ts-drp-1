@@ -1,0 +1,116 @@
+{
+  "activation_floor": {
+    "conflicting_quorums": [
+      [
+        "A",
+        "Z"
+      ],
+      [
+        "B",
+        "Z"
+      ]
+    ],
+    "honest_intersection": [],
+    "n": 3,
+    "quorum": 2,
+    "reason_for_minimum_four_signers": "n=3 with one Byzantine violates the strict <1/3 assumption"
+  },
+  "algebraic_intersections": {
+    "checks": 9997,
+    "n_max": 10000,
+    "n_min": 4
+  },
+  "elapsed_seconds": 0.008352,
+  "model": "hard-epoch-seal-finite-checks-v1",
+  "quorum_intersections": {
+    "cases": [
+      {
+        "f": 1,
+        "minimum_intersection": 2,
+        "n": 4,
+        "q": 3,
+        "quorum_count": 4
+      },
+      {
+        "f": 1,
+        "minimum_intersection": 3,
+        "n": 5,
+        "q": 4,
+        "quorum_count": 5
+      },
+      {
+        "f": 1,
+        "minimum_intersection": 2,
+        "n": 6,
+        "q": 4,
+        "quorum_count": 15
+      },
+      {
+        "f": 2,
+        "minimum_intersection": 3,
+        "n": 7,
+        "q": 5,
+        "quorum_count": 21
+      },
+      {
+        "f": 2,
+        "minimum_intersection": 4,
+        "n": 8,
+        "q": 6,
+        "quorum_count": 28
+      },
+      {
+        "f": 2,
+        "minimum_intersection": 3,
+        "n": 9,
+        "q": 6,
+        "quorum_count": 84
+      },
+      {
+        "f": 3,
+        "minimum_intersection": 4,
+        "n": 10,
+        "q": 7,
+        "quorum_count": 120
+      }
+    ],
+    "pair_checks": 11612
+  },
+  "retroactive_commit_regression": {
+    "byzantine": "Z",
+    "corrected_rule_round_0_commits_X": [
+      "A",
+      "Z"
+    ],
+    "monotone_entered_round_blocks_fork": true,
+    "n": 4,
+    "old_rule_forks": true,
+    "old_rule_round_0_commit_qc_X_after_late_delivery": [
+      "A",
+      "B",
+      "Z"
+    ],
+    "quorum": 3,
+    "round_0_prepare_qc_X": [
+      "A",
+      "B",
+      "Z"
+    ],
+    "round_1_commit_qc_Y": [
+      "B",
+      "C",
+      "Z"
+    ],
+    "round_1_prepare_qc_Y": [
+      "B",
+      "C",
+      "Z"
+    ]
+  },
+  "same_round_value_binding": {
+    "n_max": 9,
+    "n_min": 4,
+    "qc_pair_checks": 8547
+  },
+  "verdict": "pass"
+}

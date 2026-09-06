@@ -1,0 +1,15 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/closed-epoch-cleanup.ts
+  481:1  warning  Missing JSDoc @param "input.settlement" description  jsdoc/require-param-description
+  481:1  warning  Missing JSDoc @param "input.settlement" description  jsdoc/require-param-description
+
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-transition-advance.ts
+  876:97  error  Missing return type on function  @typescript-eslint/explicit-function-return-type
+  899:4   error  Missing return type on function  @typescript-eslint/explicit-function-return-type
+
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts
+  8622:51  error  Missing return type on function  @typescript-eslint/explicit-function-return-type
+  8632:10  error  Forbidden non-null assertion     @typescript-eslint/no-non-null-assertion
+
+✖ 6 problems (4 errors, 2 warnings)
+

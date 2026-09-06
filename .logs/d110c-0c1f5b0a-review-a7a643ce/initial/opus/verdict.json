@@ -1,0 +1,89 @@
+{
+  "verdict": "BLOCK",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [
+    {
+      "id": "P1-PROFILE-UNREACHABLE",
+      "finding": "The whole settlement path is unreachable with genuine trust material, so all seven `settlementProfileFor` consumers are dead code. `createAnchorTrustApi` rejects any profile that is not `creator-trusted-v1` (`index.ts:1335`, `:1423`, `:1431`) and hard-sets `profileId: CREATOR_PROFILE` on every minted `CurrentAnchorTrust` (`:1352`, `:1369`, `:1477`, `:1717`, `:1768`), and protocol-v3's own registry still enumerates only the three legacy profiles (`registry/registry-v1.json:1553`, `trustProfiles` at `:1688`). Therefore `settlementProfileFor(currentTrust.profileId)` at `creator-author-issuance-frontiers.ts:666`/`:667` and `settlementProfileFor(floorTrust.profileId)` at `:802` are statically `\"none\"` for every real trust object; the codec always returns TRUST_INVALID. GREEN admitted the new profile in the protocol-v2 registry (which no workspace package depends on) but not in protocol-v3, so the same design item is implemented on one side of the split only. The RED passes solely because it `vi.mock`s `resolveCreatorAnchorTrustMaterial` (`tests/d110c-0c1f5b0a-settlement-codec-red.test.ts:15-24`), so no test can observe this. No slice in the accepted design owns `index.ts:1335/1423/1431`.",
+      "evidence": "packages/protocol-v3/src/index.ts:1423",
+      "requiredFix": "Route the protocol-v3 anchor-trust profile gates and `registry-v1.json` profile/`trustProfiles` enums through `settlementProfileFor`, propagate the decoded profile id into `mintAnchorTrust` instead of hard-setting `CREATOR_PROFILE`, widen `CurrentAnchorTrust.profileId` off the `\"creator-trusted-v1\"` literal, and add a RED vector that opens genuine (unmocked) settlement trust and prepares/opens a checkpoint through it. If this is deliberately deferred, name the owning slice in the plan and record f5b0a as partial."
+    },
+    {
+      "id": "P1-HOLLOW-ADVANCE-CONSUMER",
+      "finding": "`creator-transition-advance.ts` does not actually consult the predicate. `const SETTLEMENT_PROFILE = settlementProfileFor(\"creator-trusted-settlement-v1\")` is a literal-argument constant that is unconditionally `\"v1\"`, and its only use is the permanently-false guard `SETTLEMENT_PROFILE !== \"v1\"` at `:151`. Its sole effect is to satisfy the RED's file-content grep for `settlementProfileFor(` (`tests/d110c-0c1f5b0a-settlement-codec-red.test.ts:741-744`). The sites the design names for this file — `:326-328` (retirement record: `currentMatches.length !== (currentEpoch === 0 ? 0 : 1)`, `proposedMatches.length !== 1`) and `:397-398` (aggregate record: `proposedMatches.length !== 1`) — are untouched, so a settlement closure, which by design emits zero retirement and zero aggregate records, is still rejected. The retained finding \"closure validators reject the new profile\" is assigned to f5b0a and remains open.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:60",
+      "requiredFix": "Delete the literal-argument constant. Thread the room's authenticated `profileId` into the closure validators and branch the retirement/aggregate cardinality rules on `settlementProfileFor(profileId)` (zero retirement, zero aggregate, exactly one settlement checkpoint under `v1`), with a RED vector that drives a settlement-profile closure through them. Replace the grep-based consumer test with a behavioural one."
+    },
+    {
+      "id": "P1-AUTHOR-CARRIER-BYTE-CEILING",
+      "finding": "The author-list cap was raised to 256 under the settlement profile but the carrier's byte ceiling was not, so the 256 target is unreachable. `AUTHOR_AUTHORIZATION_MAX_BYTES` stays 8,192 (`index.ts:412`) and is enforced on `exactCanonicalAuthorAuthorizationBytes` at `index.ts:1562`. Each author is a 64-char hex string costing ~66 canonical bytes, so the carrier crosses 8,192 bytes at roughly 122 authors; a 256-author carrier is ~17 KB and fails with `malformed-input` before `isAuthorAuthorizationCarrier` ever sees the raised cap. This is the same class of defect the plan just corrected for W0 in 909f4f5c (\"impossible under the 8,192-byte ceiling\"), and the RED has no vector for the author-authorization carrier at all.",
+      "evidence": "packages/protocol-v3/src/index.ts:785",
+      "requiredFix": "Raise `AUTHOR_AUTHORIZATION_MAX_BYTES` under `settlementProfileFor(...) === \"v1\"` to a ceiling that admits 256 authors (leaving the legacy 8,192 ceiling byte-for-byte unchanged), and add RED vectors pinning the 256-author carrier accept, the 257 reject, and the exact oversized-byte reject — or correct the plan/design to state the real cap this slice delivers."
+    },
+    {
+      "id": "P1-GENESIS-SENTINEL-UNBOUND",
+      "finding": "`CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL` is computed and exported at `creator-author-issuance-frontiers.ts:444` but is referenced by no production code. The design assigns adjacency — \"genesis sentinel or exactly one adjacent `settled-v1`\" — to the bounded-advance predicate. The `settled-v1` half is enforced (`creator-transition-advance.ts:184` binds `priorCheckpointDigest` to `predecessor.candidateDigest`), but the genesis branch checks only `closedEpoch === 0` and `priorCheckpointKind === \"genesis\"` and never constrains `priorCheckpointDigest`. The codec likewise only shape-checks it (`:603`). `priorCheckpointDigest` is thus the one free, signed 32-byte field in a genesis checkpoint. The RED encodes the hole: it asserts `ok: true` for a genesis proposal with `priorCheckpointDigest: \"f\".repeat(64)`.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:160",
+      "requiredFix": "In the genesis branch of `inspectCreatorAuthorSettlementAdvance` (and/or `validSettlementRecordFields`), require `priorCheckpointDigest === CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL` whenever `priorCheckpointKind === \"genesis\"`, and add the RED vector rejecting a genesis checkpoint with any other digest."
+    }
+  ],
+  "p2": [
+    {
+      "id": "P2-OPEN-KEYS-SHARED",
+      "finding": "`openCreatorAuthorSettlement` reuses the legacy `OPEN_KEYS` constant for its exact-key contract, coupling the settlement opener's input surface to the legacy issuance-frontiers opener. A future key added for the legacy record silently widens the settlement opener, and the settlement opener can never gain its own expected-binding key without editing the legacy contract.",
+      "evidence": "packages/protocol-v3/src/creator-author-issuance-frontiers.ts:781",
+      "owner": "f5b0a (protocol-v3 codec owner)",
+      "disposition": "Introduce a dedicated `SETTLEMENT_OPEN_KEYS` constant with the same current membership; no behaviour change, removes the coupling before f5b0b/f5b add consumers."
+    },
+    {
+      "id": "P2-SETTLEMENT-PROFILE-FAT-SEAM",
+      "finding": "`settlement-profile.ts` is a pure re-export of `./index.js`, so the new narrow subpath drags the entire protocol-v3 index (blueprint artifact profile compilation, `es-module-lexer`) into every importer. `packages/protocol-v2` and the previously lean `latched-acl` subpath now load it at import time. No package or example currently depends on `@ts-drp/protocol-v2`, so the blast radius is contained today, and there is no import cycle (protocol-v3 does not depend on protocol-v2, and `index.ts` does not import `latched-acl.ts`).",
+      "evidence": "packages/protocol-v3/src/settlement-profile.ts:1",
+      "owner": "f5b0a (protocol-v3 codec owner)",
+      "disposition": "Move the ~4-line `settlementProfileFor`/`SettlementProfile` definition into `settlement-profile.ts` and have `index.ts` re-export from it, inverting the edge so the seam stays cheap."
+    },
+    {
+      "id": "P2-CONTROL-PLANE-SITE-SUBSTITUTED",
+      "finding": "The design names `creator-trust-checkpoint-advance.ts:198-207` (closure-composition normalization: the `retiring` set of three and `retained.length !== closure.length - 4`) as the control-plane consumer. GREEN instead added the predicate to `trustIdentity` at `:123`, a profile-string acceptance check, and left the normalization untouched — so a settlement closure's different record composition is still rejected.",
+      "evidence": "packages/control-plane/src/creator-trust-checkpoint-advance.ts:210",
+      "owner": "f5b (creator settlement and recovery integration)",
+      "disposition": "Accept the `trustIdentity` edit as the f5b0a-scoped part; record the closure-composition normalization explicitly against f5b in the plan so it is not lost. The `trustIdentity` tightening is safe for the retained 0b1 fixtures, which use genuine `drp-anchor-trust-state` records carrying `profileId`."
+    },
+    {
+      "id": "P2-NODE-PREDICATE-SHAPE-LAXITY",
+      "finding": "`settlementFrontiers`/`settlementMembers` in the node advance predicate accept any `Array.isArray` value without the prototype and exact-own-key checks the codec applies (`copiedSettlementFrontiers` checks `Object.getPrototypeOf(value) === Array.prototype` and `Reflect.ownKeys(value).length === value.length + 1`), and read ACL fields via `Reflect.get` without a plain-record or exact-key guard. Inputs are opened-codec output today, so this is latent rather than live.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:80",
+      "owner": "f5b0b (Node slice)",
+      "disposition": "Reuse the codec's strict frontier copier (export it from protocol-v3) before f5b0b wires untrusted or partially-trusted callers into the predicate."
+    },
+    {
+      "id": "P2-GREEN-GATE-COVERAGE",
+      "finding": "`examples/v3-room/src/index.ts` was modified by GREEN, but `build:packages` is `pnpm --filter '@ts-drp/*' build` and the recorded typechecks cover only protocol-v3, protocol-v2 and control-plane. No listed gate typechecks or builds the room, and the RED only greps that file for the literal `settlementProfileFor(`. The two edits are type-safe on inspection, but the evidence does not establish it.",
+      "evidence": ".logs/d110c-0c1f5b0a-green-5bf45aab/commands.md:8",
+      "owner": "f5b0a GREEN evidence owner",
+      "disposition": "Add an `examples/v3-room` typecheck to the GREEN command set for any slice that edits it; carry the requirement forward to f5b0c, which edits the room substantially."
+    },
+    {
+      "id": "P2-MAX-RECORD-MEASUREMENT-DRIFT",
+      "finding": "Three different figures exist for the 256-triple maximum settlement record: design says \"about 23,937 bytes\", plan W1 measured 23,106, and the RED pins exactly 23,450 (with a 256-character `objectId`). All are under the 32,768 ceiling, so no limit is at risk, but the documents no longer agree with the executable pin.",
+      "evidence": "tests/d110c-0c1f5b0a-settlement-codec-red.test.ts:656",
+      "owner": "f5b0a plan/design record owner",
+      "disposition": "Restate the design and plan figures against the RED's exact fixture (23,450 at a 256-char objectId) so the numeric pin has one authority, per the derived-constant adjacency rule."
+    }
+  ],
+  "notes": [
+    "RED is causal for all ten cases. Every fallback in the RED surface fails the assertion it guards: the synthetic fence fallback accepts all four malformed operations (expected `[true,true,true,true]`), `prepare` falls back to the legacy `PREPARE_KEYS` codec and returns MALFORMED_INPUT, `CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES` falls back to the legacy 8,192, the advance fallback rejects the genesis proposal, ACL v3 is rejected, `settlementProfileFor` resolves to `none`, blueprint preparation does not throw, and the cross-anchor pair materializes a proof. The correction 62f164b6 fixed two genuine self-failures (the wrong-signer helper asserting its own success; successor-ACL fixtures not matching the proposed frontier authors) and did not weaken any assertion.",
+    "No wire, protobuf or cryptographic widening. No `.proto` or `packages/validation` change; `ed25519` was already imported by the frontiers module; the only lockfile change is the `protocol-v2 -> protocol-v3` workspace link. `public.ts` is an explicit allowlist and was not touched, so `settlementProfileFor`, `AUTHOR_FENCE_ACTION`, `openAuthorFenceOperation` and the settlement codec are not in the root product API; the only surface addition is the `./settlement-profile` subpath, which the design requires.",
+    "Legacy paths verified byte-for-byte: `prepareCreatorAuthorIssuanceFrontiers`/`completeCreatorAuthorIssuanceFrontiers`/`openCreatorAuthorIssuanceFrontiers` are unmodified, including the current-vs-successor and current-vs-floor key comparisons the design says must not be carried over — and they are not carried over (settlement prepare signs under `successor.publicKey`, settlement open verifies under `floor.publicKey`, with no key equality check). Legacy ACL constants are intact: 64-member cap for versions 1/2, 8,192-byte ceiling, `maxItems: 512`; the settlement branch uses exactly `{maxBytes: 65_536, maxDepth: 4, maxItems: 8_192}` and cap 256 as specified.",
+    "Byte and item limits check out where they are exercised: `CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES` is 32,768 and enforced on both the prepare-side record projection (preimage plus a 64-byte signature placeholder) and the open-side input length; the settlement decode budget `{32_768, 4, 4_096}` is comfortable for a 256-line record (~1,068 items, depth 3) under the canonical decoder's accounting (array of N costs N, object of N costs 2N, root depth 0); the v3 ACL at 256 full-shape members costs ~2,828 items against the 8,192 budget. The legacy `maxItems: 512` against ~652 items for 64 members is the pre-existing W0 defect, unchanged here.",
+    "Prototype, getter and aliasing hazards in the new codec are handled correctly: `exactKeys` requires enumerable data descriptors, `plainRecord` pins `Object.prototype`/`null`, `exactSettlementFrontier`/`copiedSettlementFrontiers` pin `Array.prototype` and exact own keys, frontiers are copied and frozen on both ingest and egress (`frontierFor` returns a fresh frozen tuple, `copiedSettlementIdentity` deep-copies), capabilities are `WeakMap`-keyed opaque frozen objects, and `completeCreatorAuthorSettlement` deletes the preparation before use so it is one-shot. Sorting uses code-unit `<=`, not `localeCompare`. Failure codes are consistent with the legacy codec (MALFORMED_INPUT / TRUST_INVALID / IDENTITY_INVALID / RECORD_INVALID / RECORD_TOO_LARGE / SIGNATURE_INVALID / PREPARATION_UNAVAILABLE).",
+    "The same-anchor equivocation rule is genuine, not shape-only: `first.witness.expectedAnchor !== second.witness.expectedAnchor` is compared on values already detached by `detachCurrentEquivocationVertex`, so there is no getter re-read, and each vertex is independently authenticated against its own `expectedAnchor` with `preimage.anchor === expectedAnchor` enforced inside `authenticateReceivedVertex`.",
+    "`historyRoot`, `historySize` and `closedAnchorDigest` have no `expected*` opener input, but this is design-conforming (the opener verifies floor trust plus cut/QC/manifest/ACL) and consumers can still bind them because `resolveCreatorAuthorSettlement` exposes all three on the detached identity. Not filed.",
+    "The `(snapshot.version === 3) !== (settlementProfile === \"v1\")` biconditional in `openCanonicalLatchedAclSnapshot` means v3 ACLs are currently unopenable by every production caller (none pass `expectedProfileId`) and `stageLatchedAclOperations` has no member cap at all. Both are consistent with the design's slice split (f5b0b and D.110c-0c1k W0 respectively) and are not filed against this diff.",
+    "Package graph is sound: protocol-v3 does not depend on protocol-v2, `index.ts` does not import `latched-acl.ts` or the frontiers module, and `public.ts`/`settlement-profile.ts` both resolve `./index.js` to one module instance under the vite alias set and the dist export map, so there is no cycle and no dual-instance split of the anchor-trust custody singletons.",
+    "Verified inherited failures (Phase-6a unsupported-composition ordering, the older 0b1 aggregate-retirement/cold-reopen fixture) were treated as outside this diff. Nothing in GREEN appears to worsen them; in particular the `trustIdentity` tightening is compatible with the 0b1 fixtures, which consume genuine `drp-anchor-trust-state` candidates carrying `profileId: \"creator-trusted-v1\"`. This was established by reading the fixtures, not by running them, per the read-only constraint.",
+    "GREEN modified no existing test file; the four test commits after 5bf45aab (6cc120eb, 0508133f, 9fad8a59, 8860b432) belong to f5b0s and D.110c-0c1k W0 and were not reviewed as part of this record."
+  ]
+}

@@ -1,0 +1,8 @@
+^D
+> @ts-drp/node@0.11.0 prebuild /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
+> node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+
+
+> @ts-drp/node@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
+> tsc -b tsconfig.build.json && node build.mjs
+

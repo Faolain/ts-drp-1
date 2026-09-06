@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 600.103,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-b-plan-confirmation-4b357a37/grok/events.jsonl",
+  "exit_code": 0,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-b-plan-confirmation-4b357a37/grok/public.txt",
+  "stop_reason": "end_turn",
+  "timed_out": false
+}

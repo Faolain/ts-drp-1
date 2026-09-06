@@ -1,0 +1,5 @@
+a0e72eee874611eba8bb1703c6ee28a1ad6064b200701efeb6991b78c7e50db0  /tmp/d110c-0c1f5b0b-corrective-green-v2.patch
+7e1d8b709b2dd79367297cf0bd621608b125409d4898c10cb4ea93d61e8879e6  /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0b-red-9a4b35f4/diagnostic.stdout
+821c4b13a736583fee53650a6ae775f05185426863a2c5a7f130700d09dec2c2  /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0b-red-9a4b35f4/diagnostic.stderr
+cb2954d07b268939746aaea100cb08c54a06f37c78efe1c6dc17c2f12b0f3268  /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0b-red-9a4b35f4/final-red-39.json
+08571c9b96301615b716c4fde34bdb79613a78b73b007b6cf9b1ea1bad139dec  /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0b-red-9a4b35f4/tests-only.diff

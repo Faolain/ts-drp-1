@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "-e",
+    "const fs=require(\"fs\"),cp=require(\"child_process\"),p=process.argv[1];const files=fs.readdirSync(p).filter(f=>f.endsWith(\".mjs\"));for(const f of files)cp.execFileSync(process.execPath,[\"--check\",p+\"/\"+f]);console.log(files.length+\" scripts parse\");",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-transport-native-a430272a"
+  ],
+  "start": "2026-09-06T01:59:56.239Z"
+}

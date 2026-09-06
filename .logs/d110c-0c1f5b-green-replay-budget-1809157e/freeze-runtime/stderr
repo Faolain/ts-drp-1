@@ -1,0 +1,19 @@
+node:fs:562
+  return binding.open(
+                 ^
+
+Error: ENOENT: no such file or directory, open '/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-replay-budget-1809157e/lint/status.json'
+    at Object.openSync (node:fs:562:18)
+    at Object.readFileSync (node:fs:446:35)
+    at read (file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-replay-budget-1809157e/runtime.mjs:6:270)
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-replay-budget-1809157e/runtime.mjs:10:119
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-replay-budget-1809157e/lint/status.json'
+}
+
+Node.js v22.15.0

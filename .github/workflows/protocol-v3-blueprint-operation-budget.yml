@@ -1,0 +1,58 @@
+name: Protocol v3 blueprint operation budget freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-blueprint-operation-budget:
+    name: Require immutable protocol-v3 operation budget enforcement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_PATH: ${{ github.workspace }}/packages/protocol-v3/node_modules
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - name: Install pinned workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run merge-base-pinned operation budget checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT: ${{ github.workspace }}
+          SUCCESSOR: packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
+        run: |
+          mapfile -t MERGE_BASES < <(git merge-base --all "$BASE_SHA" HEAD)
+          if [ "${#MERGE_BASES[@]}" -ne 1 ]; then exit 1; fi
+          MERGE_BASE="${MERGE_BASES[0]}"
+          if git cat-file -e "$MERGE_BASE:$SUCCESSOR"; then
+            git show "$MERGE_BASE:$SUCCESSOR" > "$RUNNER_TEMP/base-freeze-successor.mjs"
+            PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/base-freeze-successor.mjs" "$BASE_SHA"
+          fi
+          node "$SUCCESSOR" "$BASE_SHA"
+      - name: Run ordinary successor provenance
+        run: |
+          pnpm exec vitest run tests/protocol-v3-freeze-successor-v1-red.test.ts \
+            --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Run independent control and production contract serially
+        run: |
+          PHASE_0P2_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p2-v3/controlled-blueprint-operation-budget.ts \
+            pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts \
+              --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts \
+            --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Audit build, type surface and runtime surface
+        run: |
+          pnpm --filter @ts-drp/protocol-v3 build
+          pnpm --filter @ts-drp/protocol-v3 typecheck
+          pnpm --filter @ts-drp/protocol-v3 smoke:public-package

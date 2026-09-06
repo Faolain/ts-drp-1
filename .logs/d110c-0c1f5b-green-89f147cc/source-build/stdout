@@ -1,0 +1,99 @@
+
+> ts-drp@0.11.0 build:packages /Users/aristotle/Documents/Projects/ts-drp-1
+> pnpm --filter '@ts-drp/*' build
+
+Scope: 40 of 48 workspace projects
+packages/canonical build$ tsc -b tsconfig.build.json
+packages/ephemeral build$ tsc -b tsconfig.build.json
+packages/errors build$ tsc -b tsconfig.build.json
+packages/membership build$ tsc -b tsconfig.build.json
+packages/ephemeral build: Done
+packages/types build$ tsc -b tsconfig.build.json && node build.mjs
+packages/membership build: Done
+packages/canonical build: Done
+packages/errors build: Done
+packages/types build: Done
+packages/blueprints build$ tsc -b tsconfig.build.json && node build.mjs
+packages/logger build$ tsc -b tsconfig.build.json && node build.mjs
+packages/outcome-commit build$ tsc -b tsconfig.build.json
+packages/protocol-v3 build$ tsc -b tsconfig.build.json
+packages/blueprints build: Done
+packages/rendezvous build$ tsc -b tsconfig.build.json
+packages/outcome-commit build: Done
+packages/storage build$ tsc -b tsconfig.build.json
+packages/protocol-v3 build: Done
+packages/test-utils build$ tsc -b tsconfig.build.json
+packages/logger build: Done
+packages/utils prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+packages/rendezvous build: Done
+packages/storage build: Done
+packages/test-utils build: Done
+packages/utils prebuild: Done
+packages/utils build$ tsc -b tsconfig.build.json && node build.mjs
+packages/utils build: Done
+packages/blueprint-catalog build$ tsc -b tsconfig.build.json
+packages/control-plane build$ tsc -b tsconfig.build.json
+packages/interval-runner prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+packages/issuance-store build$ tsc -b tsconfig.build.json
+packages/interval-runner prebuild: Done
+packages/interval-runner build$ tsc -b tsconfig.build.json && node build.mjs
+packages/control-plane build: Done
+packages/keychain build$ tsc -b tsconfig.build.json && node build.mjs
+packages/issuance-store build: Done
+packages/live-journal build$ tsc -b tsconfig.build.json
+packages/blueprint-catalog build: Done
+packages/message-queue prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+packages/message-queue prebuild: Done
+packages/message-queue build$ tsc -b tsconfig.build.json
+packages/live-journal build: Done
+packages/protocol-v2 build$ tsc -b tsconfig.build.json
+packages/interval-runner build: Done
+packages/relay-policy build$ tsc -b tsconfig.build.json
+packages/keychain build: Done
+packages/routing-browser build$ tsc -b tsconfig.build.json
+packages/message-queue build: Done
+packages/tracer build$ tsc -b tsconfig.build.json && node build.mjs
+packages/protocol-v2 build: Done
+packages/validation prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+packages/relay-policy build: Done
+packages/validation prebuild: Done
+packages/validation build$ tsc -b tsconfig.build.json && node build.mjs
+packages/routing-browser build: Done
+packages/validation build: Done
+packages/tracer build: Done
+packages/blueprint-toolchain build$ tsc -b tsconfig.build.json
+packages/interval-discovery prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+packages/interval-reconnect prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+packages/network build$ tsc -b tsconfig.build.json && node build.mjs
+packages/interval-discovery prebuild: Done
+packages/interval-discovery build$ tsc -b tsconfig.build.json
+packages/interval-reconnect prebuild: Done
+packages/interval-reconnect build$ tsc -b tsconfig.build.json
+packages/network build: Done
+packages/object build$ tsc -b tsconfig.build.json
+packages/interval-discovery build: Done
+packages/seal build$ tsc -b tsconfig.build.json
+packages/blueprint-toolchain build: Done
+packages/interval-reconnect build: Done
+packages/seal build: Done
+packages/object build: Done
+packages/compaction build$ tsc -b tsconfig.build.json
+packages/routing-node build$ tsc -b tsconfig.build.json
+packages/compaction build: Done
+packages/routing-node build: Done
+packages/node prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+packages/worker-host build$ tsc -b tsconfig.build.json
+packages/storage-node build$ tsc -b tsconfig.build.json
+packages/node prebuild: Done
+packages/node build$ tsc -b tsconfig.build.json && node build.mjs
+packages/storage-node build: Done
+packages/worker-host build: Done
+packages/node build: Done
+examples/browser-network build$ tsc --noEmit -p tsconfig.build.json
+packages/storage-browser build$ tsc -b tsconfig.build.json
+packages/network-spike build$ tsc -b tsconfig.build.json
+packages/network-spike build: Done
+packages/storage-browser build: Done
+examples/browser-network build: Done
+examples/v3-room build$ tsc --noEmit -p tsconfig.build.json
+examples/v3-room build: Done

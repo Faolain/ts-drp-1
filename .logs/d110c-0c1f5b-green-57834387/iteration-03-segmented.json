@@ -1,0 +1,21 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "--config",
+    ".logs/d110c-0c1f5b-green-57834387/segmented-observer-03.config.mts",
+    "-t",
+    "retains checkpoint-terminal open progress",
+    "--reporter=json",
+    "--outputFile=.logs/d110c-0c1f5b-green-57834387/iteration-03-segmented-reporter.json"
+  ],
+  "startedAt": "2026-09-05T17:56:36.664Z",
+  "endedAt": "2026-09-05T17:56:43.697Z",
+  "status": 1,
+  "signal": null,
+  "stdout": "JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-57834387/iteration-03-segmented-reporter.json\n",
+  "stderr": "F5B_SEGMENTED_RESULT {\"epoch\":0,\"count\":1,\"effect\":{\"kind\":\"fence\"},\"next\":1,\"signed\":true,\"ok\":true}\nF5B_SEGMENTED_RESULT {\"epoch\":0,\"count\":1,\"effect\":{\"kind\":\"fence\"},\"next\":1,\"signed\":true,\"ok\":true}\nF5B_SEGMENTED_RESULT {\"epoch\":1,\"count\":1,\"effect\":{\"kind\":\"fence\"},\"next\":4,\"signed\":true,\"ok\":true}\nF5B_SEGMENTED_RESULT {\"epoch\":1,\"count\":2,\"effect\":{\"kind\":\"replacement\",\"sourceSequence\":3},\"next\":5,\"signed\":false,\"ok\":false,\"kind\":\"split-required\",\"detail\":\"v3 local issue application batch requires an exact prefix split\"}\nF5B_SEGMENTED_RESULT {\"epoch\":1,\"count\":1,\"effect\":{\"fromIntent\":0,\"intentDigest\":{\"0\":30,\"1\":92,\"2\":113,\"3\":16,\"4\":161,\"5\":76,\"6\":68,\"7\":143,\"8\":167,\"9\":224,\"10\":48,\"11\":188,\"12\":94,\"13\":165,\"14\":49,\"15\":8,\"16\":235,\"17\":47,\"18\":126,\"19\":41,\"20\":196,\"21\":221,\"22\":224,\"23\":73,\"24\":202,\"25\":179,\"26\":155,\"27\":159,\"28\":156,\"29\":142,\"30\":140,\"31\":246},\"kind\":\"replacement\",\"sourceSequence\":3,\"throughIntent\":1},\"next\":5,\"signed\":true,\"ok\":true}\nF5B_SEGMENTED_RESULT {\"epoch\":1,\"count\":1,\"effect\":{\"fromIntent\":1,\"intentDigest\":{\"0\":30,\"1\":92,\"2\":113,\"3\":16,\"4\":161,\"5\":76,\"6\":68,\"7\":143,\"8\":167,\"9\":224,\"10\":48,\"11\":188,\"12\":94,\"13\":165,\"14\":49,\"15\":8,\"16\":235,\"17\":47,\"18\":126,\"19\":41,\"20\":196,\"21\":221,\"22\":224,\"23\":73,\"24\":202,\"25\":179,\"26\":155,\"27\":159,\"28\":156,\"29\":142,\"30\":140,\"31\":246},\"kind\":\"replacement\",\"sourceSequence\":3,\"throughIntent\":2},\"next\":6,\"signed\":true,\"ok\":false,\"kind\":\"admission-rejected\",\"detail\":\"v3 local issue signature was not admitted\"}\nF5B_SEGMENTED_RESULT {\"epoch\":1,\"count\":1,\"effect\":{\"fromIntent\":1,\"intentDigest\":{\"0\":30,\"1\":92,\"2\":113,\"3\":16,\"4\":161,\"5\":76,\"6\":68,\"7\":143,\"8\":167,\"9\":224,\"10\":48,\"11\":188,\"12\":94,\"13\":165,\"14\":49,\"15\":8,\"16\":235,\"17\":47,\"18\":126,\"19\":41,\"20\":196,\"21\":221,\"22\":224,\"23\":73,\"24\":202,\"25\":179,\"26\":155,\"27\":159,\"28\":156,\"29\":142,\"30\":140,\"31\":246},\"kind\":\"replacement\",\"sourceSequence\":3,\"throughIntent\":2},\"next\":6,\"signed\":true,\"ok\":false,\"kind\":\"admission-rejected\",\"detail\":\"v3 local issue signature was not admitted\"}\n"
+}

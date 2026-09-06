@@ -1,0 +1,139 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 9,
+  "passed": 9,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-11/result.json",
+  "baselineSha256": "230818aecb6f7699a7a3c51e3ebda407a1659ff157ba680a111e84383089bc14",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED uses genuine trust, issuance and recovery, signs the record last, and reopens durable target state",
+      "status": "passed",
+      "title": "uses genuine trust, issuance and recovery, signs the record last, and reopens durable target state",
+      "duration": 646.5265829999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED rejects a caller-selected target, a foreign creator, and hostile nonce views before target effects",
+      "status": "passed",
+      "title": "rejects a caller-selected target, a foreign creator, and hostile nonce views before target effects",
+      "duration": 133.3559580000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED rejects duplicate source identity, unstable prepare, source substitution, and target-state divergence",
+      "status": "passed",
+      "title": "rejects duplicate source identity, unstable prepare, source substitution, and target-state divergence",
+      "duration": 364.92287499999975,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED rejects oversized state and import descriptions before target reservation",
+      "status": "passed",
+      "title": "rejects oversized state and import descriptions before target reservation",
+      "duration": 300.20666600000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED linearizes the source snapshot before a concurrently queued source write",
+      "status": "passed",
+      "title": "linearizes the source snapshot before a concurrently queued source write",
+      "duration": 341.57050000000027,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED rejects a genuine target import failure and a foreign registered-vertex signature without poisoning the source",
+      "status": "passed",
+      "title": "rejects a genuine target import failure and a foreign registered-vertex signature without poisoning the source",
+      "duration": 440.9203749999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED contains a malformed signed remote migration record before projection and keeps recovery usable",
+      "status": "passed",
+      "title": "contains a malformed signed remote migration record before projection and keeps recovery usable",
+      "duration": 697.9850000000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED rejects noncreator and creator-signed malformed decisions before the exact creator activation",
+      "status": "passed",
+      "title": "rejects noncreator and creator-signed malformed decisions before the exact creator activation",
+      "duration": 1278.6817910000009,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h shared-room reversible rehearsal RED"
+      ],
+      "fullName": "Phase 3h shared-room reversible rehearsal RED recovers irreversible activation commits without reopening source authority",
+      "status": "passed",
+      "title": "recovers irreversible activation commits without reopening source authority",
+      "duration": 5640.055249999999,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "d6005f582923f302d6b27568d059a7fcec5b2408ebd33d8d456c983a5309851f",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

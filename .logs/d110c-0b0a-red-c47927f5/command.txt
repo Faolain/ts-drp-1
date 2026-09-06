@@ -1,0 +1,1 @@
+pnpm exec vitest run tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts --reporter=json --outputFile=.logs/d110c-0b0a-red-c47927f5/vitest.json

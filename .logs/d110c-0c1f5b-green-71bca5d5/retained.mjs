@@ -1,0 +1,26 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {spawnSync,execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),read=f=>JSON.parse(fs.readFileSync(path.join(out,f))),write=(f,v)=>fs.writeFileSync(path.join(out,f),JSON.stringify(v,null,2)+'\n',{flag:'wx'}),frozen=read('retained-runtime-roster.json'),custody=read('custody-before.json');
+const begin=Number(process.argv[2]??0),end=Number(process.argv[3]??frozen.roster.length);
+if(read('static-disposition/status.json').code!==0)throw Error('Static attribution/readiness');
+for(let index=begin;index<end;index++){
+ const row=frozen.roster[index];if(!row||row.coveredBy)throw Error('Unknown/historical gate');
+ if(execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()!==frozen.head)throw Error('HEAD drift');
+ for(const map of [custody.ownerHashes,custody.built,custody.testHashes])for(const[file,h]of Object.entries(map))if(hash(fs.readFileSync(path.join(root,file)))!==h)throw Error('Source/runtime drift '+file);
+ if(process.env.TS_DRP_PHASE_3A1B_P4_NODE_DEATH!==undefined)throw Error('Long enabled');
+ const baselineRelative=row.label==='retained-22'?'.logs/d110c-0c1f5b-green-room-guard-db8a8615/focused-13/focused.json':'.logs/'+(index<6||row.label==='retained-26'?'d110c-0c1f5b-green-89f147cc/':'d110c-0c1f5b-green-ab98cce6/')+(row.label==='retained-26'?'retained-02':row.label)+'/result.json',baselinePath=path.join(root,baselineRelative),baseline=JSON.parse(fs.readFileSync(baselinePath));
+ const expected=baseline.testResults.filter(s=>row.files.includes(path.relative(root,s.name))).flatMap(s=>s.assertionResults.map(a=>({file:s.name,...a}))),id=a=>JSON.stringify([a.file,a.title,a.ancestorTitles,a.fullName]),expectedNames=expected.map(id).sort();
+ const frozenNames=[...row.entries,...row.conditionalEntries].map(e=>e.file+'\0'+e.name).sort(),baselineNames=expected.map(a=>a.file+'\0'+[...a.ancestorTitles,a.title].join(' > ')).sort();if(JSON.stringify(frozenNames)!==JSON.stringify(baselineNames))throw Error('Baseline/frozen selection differs '+row.label);
+ const result=spawnSync(process.execPath,[path.join(out,'run.mjs'),row.label,root,...row.command],{stdio:'inherit'});
+ let validation={status:result.status,missingReporter:true};
+ if(fs.existsSync(row.output)){
+  const report=JSON.parse(fs.readFileSync(row.output)),assertions=report.testResults.flatMap(s=>s.assertionResults.map(a=>({file:s.name,...a}))),exactNames=JSON.stringify(assertions.map(id).sort())===JSON.stringify(expectedNames),exactFiles=JSON.stringify(report.testResults.map(s=>path.relative(root,s.name)).sort())===JSON.stringify([...row.files].sort()),failures=assertions.filter(a=>a.status==='failed'),skips=assertions.filter(a=>a.status==='skipped'),messages=assertions.filter(a=>a.failureMessages.length),suiteErrors=report.testResults.filter(s=>s.message||s.testExecError),runtimeErrors=Boolean(report.numRuntimeErrorTestSuites||report.numUnhandledErrors||report.unhandledErrors?.length),knownOnly=failures.every(a=>row.knownFailures.some(k=>k.file===a.file&&k.name===[...a.ancestorTitles,a.title].join(' > ')&&JSON.stringify(k.firstErrors)===JSON.stringify(a.failureMessages.map(m=>m.split('\n')[0])))),skipsExact=JSON.stringify(skips.map(a=>a.file+'\0'+[...a.ancestorTitles,a.title].join(' > ')).sort())===JSON.stringify(row.conditionalEntries.map(e=>e.file+'\0'+e.name).sort()),expectedExit=failures.length?1:0;
+  const countsMatch=report.numTotalTests===expected.length&&report.numPassedTests===assertions.filter(a=>a.status==='passed').length&&report.numFailedTests===failures.length&&report.numPendingTests===skips.length;
+  const attributable=countsMatch&&exactNames&&exactFiles&&!runtimeErrors&&suiteErrors.length===0&&knownOnly&&skipsExact&&result.status===expectedExit&&report.success===(failures.length===0)&&messages.every(a=>a.status==='failed')&&assertions.every(a=>['passed','failed','skipped'].includes(a.status));
+  validation={status:result.status,success:report.success,total:report.numTotalTests,passed:report.numPassedTests,failed:report.numFailedTests,pending:report.numPendingTests,exactNames,exactFiles,attributable,knownFailureFamilyOnly:knownOnly,skipsExact,baselineSource:baselineRelative,baselineSha256:hash(fs.readFileSync(baselinePath)),numRuntimeErrorTestSuites:report.numRuntimeErrorTestSuites??null,numUnhandledErrors:report.numUnhandledErrors??null,unhandledErrors:report.unhandledErrors??[],suiteMessages:report.testResults.map(s=>({name:s.name,message:s.message,testExecError:s.testExecError??null})),nonemptyFailureMessages:messages,assertions,reporterSha256:hash(fs.readFileSync(row.output)),allPass:attributable&&failures.length===0&&skips.length===0,knownFailuresNotWaived:failures.length>0};
+ }
+ write(row.label+'-validation.json',validation);console.log(JSON.stringify({gate:index+1,label:row.label,total:validation.total,passed:validation.passed,failed:validation.failed,pending:validation.pending,status:result.status,exactNames:validation.exactNames,attributable:validation.attributable}));
+ if(!validation.attributable){process.exitCode=1;break;}
+}

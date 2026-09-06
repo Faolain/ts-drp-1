@@ -1,0 +1,19 @@
+{
+  "failed": [],
+  "predicates": {
+    "activationDeletesTopicWithoutOwnerToken": true,
+    "activationSameBindingsReturnsExistingWrapper": true,
+    "commitStagedRequiresGenerationOnePredecessor": true,
+    "commitTerminalRequiresGenerationOnePredecessor": true,
+    "currentChainRequiresGenerationOneProjection": true,
+    "liveSeedRequiresGenerationOnePredecessor": true,
+    "productHasNoPostAdoptionCloseBind": true,
+    "productHasOneTransitionLatch": true,
+    "productPublicAuthorityEpochIsLiteralOne": true,
+    "productReturnedAuthorityEpochIsLiteralOne": true,
+    "productTrustEpochIsLiteralOne": true,
+    "projectionGraphEpochIsLiteralOne": true,
+    "projectionRecordEpochIsLiteralOne": true,
+    "successorCommitRequiresGenerationOnePredecessor": true
+  }
+}

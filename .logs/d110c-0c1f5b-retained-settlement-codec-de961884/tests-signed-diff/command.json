@@ -1,0 +1,14 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "show",
+    "--format=fuller",
+    "--patch",
+    "--unified=0",
+    "de961884d9d3204f2c67561e96434995c6f0fafe",
+    "--",
+    "tests/d110c-0c1f5b0a-corrective-red.test.ts"
+  ],
+  "start": "2026-09-06T01:13:58.600Z"
+}

@@ -1,0 +1,1385 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ts-drp.org/protocol-v3/registry-v1.schema.json",
+	"title": "TS-DRP protocol v3 registry v1 kind schemas",
+	"description": "Review-order schemas for every registered protocol-v3 kind; canonical object encoding orders keys by encoded key bytes.",
+	"$defs": {
+		"signerSet": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/signer-set/v3",
+			"x-encoding": "canonical-array",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["signers"],
+			"properties": {
+				"signers": {
+					"type": "array",
+					"x-registry-type": "array<{signerId:string,publicKey:string}>",
+					"x-registry-constraints": {
+						"uniqueBy": "signerId",
+						"signerIdCharset": "unicode-scalar-excluding-controls",
+						"maxSignerIdUtf16Units": 512
+					}
+				}
+			}
+		},
+		"parameters": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/parameters/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": [
+				"maxEpochVertices",
+				"maxEpochBytes",
+				"maxDependencies",
+				"snapshotChunkBytes",
+				"maxSnapshotBytes",
+				"maxPendingEntries",
+				"maxPendingBytes"
+			],
+			"properties": {
+				"maxEpochVertices": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 32,
+						"maximum": 1000000
+					},
+					"minimum": 32,
+					"maximum": 1000000
+				},
+				"maxEpochBytes": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 65536,
+						"maximum": 1073741824
+					},
+					"minimum": 65536,
+					"maximum": 1073741824
+				},
+				"maxDependencies": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1,
+						"maximum": 256
+					},
+					"minimum": 1,
+					"maximum": 256
+				},
+				"snapshotChunkBytes": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 16384,
+						"maximum": 1048576
+					},
+					"minimum": 16384,
+					"maximum": 1048576
+				},
+				"maxSnapshotBytes": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1048576,
+						"maximum": 4294967296
+					},
+					"minimum": 1048576,
+					"maximum": 4294967296
+				},
+				"maxPendingEntries": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1,
+						"maximum": 1000000
+					},
+					"minimum": 1,
+					"maximum": 1000000
+				},
+				"maxPendingBytes": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 65536,
+						"maximum": 1073741824
+					},
+					"minimum": 65536,
+					"maximum": 1073741824
+				}
+			}
+		},
+		"vertex": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/vertex/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": [
+				"kind",
+				"protocolMajor",
+				"objectId",
+				"epoch",
+				"anchor",
+				"author",
+				"authorSequence",
+				"logicalTime",
+				"dependencies",
+				"operation"
+			],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-vertex"
+				},
+				"protocolMajor": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {},
+					"const": 3
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"anchor": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32,
+						"case": "lower"
+					}
+				},
+				"author": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"authorSequence": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0,
+						"maximum": 9007199254740991,
+						"initial": 0,
+						"reset": "never",
+						"overflow": "reject"
+					},
+					"minimum": 0,
+					"maximum": 9007199254740991,
+					"x-initial": 0,
+					"x-reset": "never",
+					"x-overflow": "reject"
+				},
+				"logicalTime": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1
+					},
+					"minimum": 1
+				},
+				"dependencies": {
+					"type": "array",
+					"x-registry-type": "array<digest-hex>",
+					"x-registry-constraints": {
+						"minimumItems": 1,
+						"unique": true
+					},
+					"minItems": 1,
+					"uniqueItems": true
+				},
+				"operation": {
+					"type": "object",
+					"x-registry-type": "canonical-object",
+					"x-registry-constraints": {}
+				}
+			}
+		},
+		"cutValue": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/hard-epoch-cut/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": [
+				"kind",
+				"protocolMajor",
+				"encodingVersion",
+				"objectId",
+				"epoch",
+				"previousAnchor",
+				"previousCutDigest",
+				"previousHistoryRoot",
+				"previousHistorySize",
+				"closeSetRoot",
+				"closeSetCount",
+				"historyRoot",
+				"historySize",
+				"stateDigest",
+				"aclDigest",
+				"snapshotManifestDigest",
+				"blueprintDigest",
+				"archiveIndexRoot",
+				"availabilityPolicyDigest",
+				"nextSignerSet",
+				"parameters",
+				"closeReason"
+			],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-hard-epoch-cut"
+				},
+				"protocolMajor": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {},
+					"const": 3
+				},
+				"encodingVersion": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-canonical-profile-1"
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"previousAnchor": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"previousCutDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"previousHistoryRoot": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"previousHistorySize": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"closeSetRoot": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"closeSetCount": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"historyRoot": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"historySize": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"stateDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"aclDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"snapshotManifestDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"blueprintDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"archiveIndexRoot": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"availabilityPolicyDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"nextSignerSet": {
+					"type": "array",
+					"x-registry-type": "array<signer>",
+					"x-registry-constraints": {
+						"uniqueBy": "signerId"
+					}
+				},
+				"parameters": {
+					"type": "object",
+					"x-registry-type": "parameters",
+					"x-registry-constraints": {}
+				},
+				"closeReason": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"maximumUtf16Units": 128
+					}
+				}
+			}
+		},
+		"epochAnchor": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/epoch-anchor/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": [
+				"kind",
+				"protocolMajor",
+				"objectId",
+				"epoch",
+				"previousAnchor",
+				"cutDigest",
+				"stateDigest",
+				"aclDigest",
+				"historyRoot",
+				"historySize",
+				"archiveIndexRoot",
+				"blueprintDigest",
+				"signerSetDigest",
+				"parametersDigest",
+				"profileDigest",
+				"cryptoSuiteId"
+			],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-epoch-anchor"
+				},
+				"protocolMajor": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {},
+					"const": 3
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"previousAnchor": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"cutDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"stateDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"aclDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"historyRoot": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"historySize": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"archiveIndexRoot": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"blueprintDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"signerSetDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"parametersDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"profileDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"cryptoSuiteId": {
+					"type": "string",
+					"x-registry-type": "enum",
+					"x-registry-constraints": {
+						"values": ["ed25519-sha256-v3", "ed25519-seal-v3"],
+						"reservedValues": ["p256-sha256-v3"],
+						"negotiatedAt": "genesis-only"
+					},
+					"enum": ["ed25519-sha256-v3", "ed25519-seal-v3"],
+					"x-reserved-values": ["p256-sha256-v3"]
+				}
+			}
+		},
+		"historyLeaf": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/history-leaf/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["kind", "protocolMajor", "objectId", "epoch", "ordinal", "vertexHash"],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-history-leaf"
+				},
+				"protocolMajor": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {},
+					"const": 3
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"ordinal": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"vertexHash": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				}
+			}
+		},
+		"snapshotPayload": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/snapshot-payload/v3",
+			"x-encoding": "canonical-object-as-single-part",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": [
+				"kind",
+				"protocolMajor",
+				"objectId",
+				"epoch",
+				"anchor",
+				"schemaVersion",
+				"blueprintDigest",
+				"archiveIndexRoot",
+				"application",
+				"acl"
+			],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-snapshot-payload"
+				},
+				"protocolMajor": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {},
+					"const": 3
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"anchor": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"schemaVersion": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1
+					},
+					"minimum": 1
+				},
+				"blueprintDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"archiveIndexRoot": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"application": {
+					"x-registry-type": "canonical-value",
+					"x-registry-constraints": {}
+				},
+				"acl": {
+					"x-registry-type": "canonical-value",
+					"x-registry-constraints": {}
+				}
+			}
+		},
+		"snapshotChunk": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/snapshot-chunk/v3",
+			"x-encoding": "domain-framed-parts",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["index", "bytes"],
+			"properties": {
+				"index": {
+					"type": "integer",
+					"x-registry-type": "canonical-safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"bytes": {
+					"x-registry-type": "bytes",
+					"x-registry-constraints": {}
+				}
+			}
+		},
+		"snapshotManifest": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/snapshot-manifest/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": [
+				"kind",
+				"protocolMajor",
+				"encodingVersion",
+				"objectId",
+				"epoch",
+				"anchor",
+				"schemaVersion",
+				"stateDigest",
+				"aclDigest",
+				"payloadDigest",
+				"totalBytes",
+				"chunks"
+			],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-snapshot-manifest"
+				},
+				"protocolMajor": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {},
+					"const": 3
+				},
+				"encodingVersion": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-canonical-profile-1"
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"anchor": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"schemaVersion": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1
+					},
+					"minimum": 1
+				},
+				"stateDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"aclDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"payloadDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"totalBytes": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"chunks": {
+					"type": "array",
+					"x-registry-type": "array<{index,digest,byteLength}>",
+					"x-registry-constraints": {
+						"minimumItems": 1,
+						"contiguous": true
+					},
+					"minItems": 1
+				}
+			}
+		},
+		"archivePayload": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/archive-payload/v3",
+			"x-encoding": "canonical-object-as-single-part",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["kind", "protocolMajor", "schemaVersion", "objectId", "epoch", "startOrdinal", "records"],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-archive-segment-payload"
+				},
+				"protocolMajor": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {},
+					"const": 3
+				},
+				"schemaVersion": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1
+					},
+					"minimum": 1
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"startOrdinal": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"records": {
+					"type": "array",
+					"x-registry-type": "array<canonical-value>",
+					"x-registry-constraints": {
+						"minimumItems": 1
+					},
+					"minItems": 1
+				}
+			}
+		},
+		"archiveChunk": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/archive-chunk/v3",
+			"x-encoding": "domain-framed-parts",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["objectId", "startOrdinal", "index", "bytes"],
+			"properties": {
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "canonical-string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"startOrdinal": {
+					"type": "integer",
+					"x-registry-type": "canonical-safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"index": {
+					"type": "integer",
+					"x-registry-type": "canonical-safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"bytes": {
+					"x-registry-type": "bytes",
+					"x-registry-constraints": {}
+				}
+			}
+		},
+		"archiveSegment": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/archive-segment/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": [
+				"kind",
+				"protocolMajor",
+				"encodingVersion",
+				"schemaVersion",
+				"objectId",
+				"epoch",
+				"startOrdinal",
+				"endOrdinal",
+				"recordCount",
+				"payloadDigest",
+				"totalBytes",
+				"chunks"
+			],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-archive-segment"
+				},
+				"protocolMajor": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {},
+					"const": 3
+				},
+				"encodingVersion": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-canonical-profile-1"
+				},
+				"schemaVersion": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1
+					},
+					"minimum": 1
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"startOrdinal": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"endOrdinal": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"recordCount": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 1
+					},
+					"minimum": 1
+				},
+				"payloadDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"totalBytes": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"chunks": {
+					"type": "array",
+					"x-registry-type": "array<{index,digest,byteLength}>",
+					"x-registry-constraints": {
+						"minimumItems": 1,
+						"contiguous": true
+					},
+					"minItems": 1
+				}
+			}
+		},
+		"sealProposal": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/seal-proposal/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["kind", "objectId", "epoch", "round", "valueDigest"],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-seal-proposal"
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"round": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"valueDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				}
+			}
+		},
+		"sealVote": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/seal-vote/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["kind", "objectId", "epoch", "round", "phase", "proposalDigest", "proposalHash", "signerId"],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-seal-vote"
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"round": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"phase": {
+					"type": "string",
+					"x-registry-type": "enum",
+					"x-registry-constraints": {
+						"values": ["prepare", "commit"]
+					},
+					"enum": ["prepare", "commit"]
+				},
+				"proposalDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"proposalHash": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"signerId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"charset": "unicode-scalar-excluding-controls",
+						"maximumUtf16Units": 512
+					}
+				}
+			}
+		},
+		"sealQC": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/seal-qc/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["kind", "objectId", "epoch", "round", "phase", "proposalDigest", "proposalHash", "votes"],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-seal-qc"
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"round": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"phase": {
+					"type": "string",
+					"x-registry-type": "enum",
+					"x-registry-constraints": {
+						"values": ["prepare", "commit"]
+					},
+					"enum": ["prepare", "commit"]
+				},
+				"proposalDigest": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"proposalHash": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32
+					}
+				},
+				"votes": {
+					"type": "array",
+					"x-registry-type": "array<signed-seal-vote>",
+					"x-registry-constraints": {
+						"uniqueBy": "signerId"
+					}
+				}
+			}
+		},
+		"roundChange": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/round-change/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["kind", "objectId", "epoch", "anchor", "round", "phase", "highestPrepareQC", "signerId"],
+			"properties": {
+				"kind": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "drp-round-change"
+				},
+				"objectId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1,
+						"maximumUtf16Units": 1024
+					}
+				},
+				"epoch": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"anchor": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32,
+						"case": "lower"
+					}
+				},
+				"round": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"phase": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {},
+					"const": "round-change"
+				},
+				"highestPrepareQC": {
+					"type": ["object", "null"],
+					"x-registry-type": "seal-qc|null",
+					"x-registry-constraints": {}
+				},
+				"signerId": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {
+						"charset": "unicode-scalar-excluding-controls",
+						"maximumUtf16Units": 512
+					}
+				}
+			}
+		},
+		"profile": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/profile/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["profileId", "signers", "quorum", "cryptoSuiteId"],
+			"properties": {
+				"profileId": {
+					"type": "string",
+					"x-registry-type": "enum",
+					"x-registry-constraints": {
+						"values": ["creator-trusted-v1", "delegated-trusted-v1", "attested-bft-v1"]
+					},
+					"enum": ["creator-trusted-v1", "delegated-trusted-v1", "attested-bft-v1"]
+				},
+				"signers": {
+					"type": "array",
+					"x-registry-type": "array<signer>",
+					"x-registry-constraints": {
+						"uniqueBy": "signerId"
+					}
+				},
+				"quorum": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"creator": 1,
+						"delegatedMinimum": 2,
+						"attestedFormula": "ceil(2*n/3)"
+					}
+				},
+				"cryptoSuiteId": {
+					"type": "string",
+					"x-registry-type": "enum",
+					"x-registry-constraints": {
+						"values": ["ed25519-sha256-v3", "ed25519-seal-v3"],
+						"reservedValues": ["p256-sha256-v3"],
+						"negotiatedAt": "genesis-only"
+					},
+					"enum": ["ed25519-sha256-v3", "ed25519-seal-v3"],
+					"x-reserved-values": ["p256-sha256-v3"]
+				}
+			}
+		},
+		"availabilityPolicy": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/availability-policy/v3",
+			"x-encoding": "canonical-object",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["mode", "minRollbackGenerations", "minLocalCopies", "minMirrorReceipts"],
+			"properties": {
+				"mode": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {}
+				},
+				"minRollbackGenerations": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"minLocalCopies": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				},
+				"minMirrorReceipts": {
+					"type": "integer",
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					},
+					"minimum": 0
+				}
+			}
+		},
+		"state": {
+			"type": "object",
+			"additionalProperties": false,
+			"x-domain": "ts-drp/state/v3",
+			"x-encoding": "canonical-value-as-single-part",
+			"x-canonical-key-order": "encoded-key-bytes",
+			"required": ["state"],
+			"properties": {
+				"state": {
+					"x-registry-type": "canonical-value",
+					"x-registry-constraints": {}
+				}
+			}
+		}
+	}
+}

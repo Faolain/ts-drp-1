@@ -1,0 +1,17 @@
+{
+	"campaignTitleSelected": false,
+	"expectedErrorToken": "D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING",
+	"expectedErrorTokenCount": 1,
+	"failedTests": 1,
+	"focusedFile": "tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts",
+	"passedTests": 0,
+	"pendingTests": 0,
+	"prettierStatus": 0,
+	"reportSuccess": false,
+	"runnerStatus": 0,
+	"selectedFiles": 1,
+	"selectedTests": 1,
+	"sourceSha256": "295515e5fc3dc980c0b40291632ff5c39e7d608acb73fec59cb7fa2152820ce9",
+	"unexpectedErrorCount": 0,
+	"vitestReportSha256": "db4dcd8218055f0d1ab323634faa74511bc977ac244de3c9a4265388db4d9ac9"
+}

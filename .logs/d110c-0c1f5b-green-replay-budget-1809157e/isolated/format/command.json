@@ -1,0 +1,11 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-green-replay-budget-zIt6Xr/checkout",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "tests/phase-5d-pacemaker-red.test.ts"
+  ],
+  "start": "2026-09-06T06:02:56.604Z"
+}

@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 300.376,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/phase-6b-d109c-plan-confirmation/grok/events.jsonl",
+  "exit_code": 1,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/phase-6b-d109c-plan-confirmation/grok/public.txt",
+  "stop_reason": "cancelled",
+  "timed_out": false
+}

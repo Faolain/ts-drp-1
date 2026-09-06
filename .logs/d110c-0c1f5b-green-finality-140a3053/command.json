@@ -1,0 +1,22 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-5a-c-seal-safety-red.test.ts",
+    "tests/phase-5e-creator-actor-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-finality-140a3053/focused.json"
+  ],
+  "head": "140a305304dcd7b74f9ab7bdae85aba5e18d99a6",
+  "expected": {
+    "total": 19,
+    "passed": 19,
+    "failed": 0,
+    "skipped": 0
+  }
+}

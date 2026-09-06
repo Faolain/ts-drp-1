@@ -1,0 +1,159 @@
+diff --git a/packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs b/packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs
+index b8f588883332c4cc0d33045946aebfde0540ac1d..91bce7abb2a986d5c4ea210377c5a3d8b2e3011c 100644
+--- a/packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs
++++ b/packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs
+@@ -740,6 +740,7 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit, initialD
+ 			terminalEmpty: telemetry.terminalEmpty,
+ 		});
+ 	const store = Object.freeze({
++		...raw,
+ 		close: () => measureFacade("close", () => raw.close()),
+ 		compareAndMarkOutboxPublished: (...args) =>
+ 			measureFacade("compareAndMarkOutboxPublished", () => raw.compareAndMarkOutboxPublished(...args)),
+diff --git a/tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts b/tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts
+index 5bb3ebdf364ba4ce0c21b6ac79f3b607b496864e..27b3f8818fa6650bd15ba48cb8b708158791491e 100644
+--- a/tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts
+@@ -2,9 +2,15 @@ import { decodeCanonical } from "@ts-drp/canonical";
+ 
+ import { inspectCreatorTrustAdvance } from "../../../packages/control-plane/src/creator-trust-advance.js";
+ import type { InspectBoundedCreatorTrustAdvanceInput } from "../../../packages/control-plane/src/creator-trust-checkpoint-advance.js";
++import { inspectCreatorTransitionAdvance } from "../../../packages/node/src/internal/creator-transition-advance.js";
+ import { openCurrentAnchorTrust } from "../../../packages/protocol-v3/src/anchor-trust-singleton.js";
+-import type { OpenCreatorCheckpointTrustInput } from "../../../packages/protocol-v3/src/creator-checkpoint.js";
++import { CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND } from "../../../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
++import {
++	openCreatorCheckpointTrust,
++	type OpenCreatorCheckpointTrustInput,
++} from "../../../packages/protocol-v3/src/creator-checkpoint.js";
+ import { openCreatorSuccessorTrust } from "../../../packages/protocol-v3/src/creator-close.js";
++import { CREATOR_ISSUANCE_RETIREMENT_KIND } from "../../../packages/protocol-v3/src/creator-issuance-retirement.js";
+ import { type D110c0b1RedMaterial, openD110cARepeatCloseFixture } from "../phase-6b-d110c-a/repeat-close-contract.js";
+ 
+ export const D110C_0B1_CHECKPOINT_OPENER_MISSING = "D110C_0B1_CHECKPOINT_OPENER_MISSING";
+@@ -124,11 +130,39 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
+ 		const newQc = candidate(material.proposed.candidates, "drp-seal-qc", 1, "commit");
+ 		const expectedObjectId = material.genesisTrust.objectId;
+ 		const pinnedGenesisAnchorDigest = material.genesisTrust.genesisAnchorDigest;
+-		const retirementDigests = new Set(
+-			[...material.current.candidates, ...material.proposed.candidates].flatMap((entry) =>
+-				record(entry).kind === "drp-creator-issuance-retirement-state" ? [entry.ref.digest] : []
+-			)
+-		);
++		const checkpointInput: OpenCreatorCheckpointTrustInput = Object.freeze({
++			...material.checkpointGenesis,
++			exactCanonicalCommitQcBytes: Uint8Array.from(newQc.bytes),
++			exactCanonicalCurrentTrustStateRecordBytes: Uint8Array.from(epochTwoTrust.bytes),
++			exactCanonicalCutValueBytes: Uint8Array.from(newCut.bytes),
++			exactCanonicalPredecessorTrustStateRecordBytes: Uint8Array.from(epochOneTrust.bytes),
++			expectedCurrentHead: Object.freeze({
++				currentAnchorDigest: String(record(epochTwoTrust).currentAnchorDigest),
++				epoch: 2,
++				objectId: expectedObjectId,
++			}),
++		});
++		const checkpoint = openCreatorCheckpointTrust(checkpointInput);
++		if (!checkpoint.ok) throw new TypeError(`D110C_0B1_CHECKPOINT_INVALID:${checkpoint.reason}`);
++		const transition = inspectCreatorTransitionAdvance({
++			current: { candidates: material.current.candidates, closure: material.current.references },
++			currentTrust: checkpoint.predecessorTrust,
++			mode: "verify",
++			proofRefs: [newCut.ref, newQc.ref],
++			proposed: { candidates: material.proposed.candidates, closure: material.proposed.references },
++			successorTrust: checkpoint.currentTrust,
++		});
++		if (!transition.ok) throw new TypeError(`D110C_0B1_TRANSITION_INVALID:${transition.reason}`);
++		const authenticatedControlRefs = [...material.current.candidates, ...material.proposed.candidates]
++			.filter((entry) => {
++				const kind = record(entry).kind;
++				return kind === CREATOR_ISSUANCE_RETIREMENT_KIND || kind === CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND;
++			})
++			.map((entry) => entry.ref);
++		const isAuthenticatedControlRef = (ref: Candidate["ref"]): boolean =>
++			authenticatedControlRefs.some(
++				(control) => control.digest === ref.digest && control.byteLength === ref.byteLength
++			);
+ 		const openedEpochOne = openCurrentAnchorTrust({
+ 			exactCanonicalTrustStateRecordBytes: epochOneTrust.bytes,
+ 			expectedObjectId,
+@@ -143,20 +177,20 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
+ 		const retiredDigests = new Set([retiringCut.ref.digest, retiringQc.ref.digest, retiringAcl.ref.digest]);
+ 		const boundedReferences = Object.freeze(
+ 			material.proposed.references
+-				.filter((ref) => !retiredDigests.has(ref.digest) && !retirementDigests.has(ref.digest))
++				.filter((ref) => !retiredDigests.has(ref.digest) && !isAuthenticatedControlRef(ref))
+ 				.map((ref) => Object.freeze({ ...ref }))
+ 				.sort((left, right) => left.digest.localeCompare(right.digest))
+ 		);
+ 		const boundedCandidates = Object.freeze(
+ 			material.proposed.candidates.filter(
+-				(entry) => !retiredDigests.has(entry.ref.digest) && !retirementDigests.has(entry.ref.digest)
++				(entry) => !retiredDigests.has(entry.ref.digest) && !isAuthenticatedControlRef(entry.ref)
+ 			)
+ 		);
+ 		const boundedCurrentReferences = Object.freeze(
+-			material.current.references.filter((ref) => !retirementDigests.has(ref.digest))
++			material.current.references.filter((ref) => !isAuthenticatedControlRef(ref))
+ 		);
+ 		const boundedCurrentCandidates = Object.freeze(
+-			material.current.candidates.filter((entry) => !retirementDigests.has(entry.ref.digest))
++			material.current.candidates.filter((entry) => !isAuthenticatedControlRef(entry.ref))
+ 		);
+ 		return Object.freeze({
+ 			close: fixture.close,
+@@ -169,18 +203,7 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
+ 					retiringPredecessorAclRef: retiringAcl.ref,
+ 					retiringProofRefs: Object.freeze([retiringCut.ref, retiringQc.ref]),
+ 				}),
+-				checkpointInput: Object.freeze({
+-					...material.checkpointGenesis,
+-					exactCanonicalCommitQcBytes: Uint8Array.from(newQc.bytes),
+-					exactCanonicalCurrentTrustStateRecordBytes: Uint8Array.from(epochTwoTrust.bytes),
+-					exactCanonicalCutValueBytes: Uint8Array.from(newCut.bytes),
+-					exactCanonicalPredecessorTrustStateRecordBytes: Uint8Array.from(epochOneTrust.bytes),
+-					expectedCurrentHead: Object.freeze({
+-						currentAnchorDigest: String(record(epochTwoTrust).currentAnchorDigest),
+-						epoch: 2,
+-						objectId: expectedObjectId,
+-					}),
+-				}),
++				checkpointInput,
+ 				coldBootstrap: material.coldBootstrap,
+ 				coldIssued: material.coldIssued,
+ 				coldPublished: material.coldPublished,
+diff --git a/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts b/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+index b606ccc05cb9394c6c3a21051d1dfaab45ce4196..41ab797074f64440089796df2c781feff087b01f 100644
+--- a/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+@@ -629,6 +629,7 @@ export async function openD110cARepeatCloseFixture(
+ 		await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
+ 	};
+ 	const recoverCurrentSuccessor = async (): Promise<Readonly<Record<string, unknown>>> => {
++		if (originalBootstrap === undefined) throw new TypeError("D110C_0B1_ORIGINAL_BOOTSTRAP_UNAVAILABLE");
+ 		const coldFacts = hot.predecessorColdFacts as unknown as D110c0b1ColdFacts;
+ 		const genesisTrustCandidate = hot.base.evidence.current.candidates.find((candidate) => {
+ 			const record = canonicalRecord(candidate.bytes);
+@@ -656,6 +657,7 @@ export async function openD110cARepeatCloseFixture(
+ 						genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+ 					),
+ 					exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
++					exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array.from(originalBootstrap.operationBytes),
+ 					expectedRoomHead: Object.freeze({
+ 						currentAnchorDigest: currentAuthority.anchorDigest,
+ 						epoch: currentAuthority.epoch,
+@@ -1025,6 +1027,7 @@ export async function openD110cARepeatCloseFixture(
+ 					throw new TypeError(`D110C_B_PUBLISH_FAILED:${String(published.kind)}:${String(published.detail)}`);
+ 				}
+ 				d110c0b1ActiveInspection = await adoptionHandle.inspectDurableHead();
++				if (originalBootstrap === undefined) throw new TypeError("D110C_0B1_ORIGINAL_BOOTSTRAP_UNAVAILABLE");
+ 				d110c0b1ColdInput = observeColdInput(
+ 					Object.freeze({
+ 						authenticationProfile: "creator-only",
+@@ -1035,6 +1038,7 @@ export async function openD110cARepeatCloseFixture(
+ 							genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+ 						),
+ 						exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
++						exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array.from(originalBootstrap.operationBytes),
+ 						expectedRoomHead,
+ 						issuanceStore: hot.base.evidence.issuanceStore,
+ 						liveJournalStore: hot.base.journal,

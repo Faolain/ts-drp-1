@@ -1,0 +1,26 @@
+commit d97813494f06a0c0913ac1a7b2f7760ed67bf2a8
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Sat Sep 5 20:50:44 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Sat Sep 5 20:50:44 2026 -0400
+
+    test: align retained issuance settlement export roster
+---
+ tests/phase-3a1b-p2-outbox-publication-contract.test.ts | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/tests/phase-3a1b-p2-outbox-publication-contract.test.ts b/tests/phase-3a1b-p2-outbox-publication-contract.test.ts
+index f73335ac..13ff8f5c 100644
+--- a/tests/phase-3a1b-p2-outbox-publication-contract.test.ts
++++ b/tests/phase-3a1b-p2-outbox-publication-contract.test.ts
+@@ -582,0 +583,2 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
++			"SETTLEMENT_REPLACEMENT_DIGEST_LIMITS",
++			"SETTLEMENT_REPLACEMENT_MAX_INTENTS",
+@@ -584,0 +587 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
++			"assertSettlementPlanProgressTransition",
+@@ -604,0 +608,2 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
++			"settlementPlanHasExactEffectLink",
++			"settlementReplacementLastLogicalTime",
+@@ -607 +612 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
+-			"49ac5a1d2b44f69a6becc3f3bcd4e44c2d4e178512a0d8489ae28766fa636cf7"
++			"2e2d160f7e59d643d01fb4d10e321c573ace252bef43040156ff26d92e837042"

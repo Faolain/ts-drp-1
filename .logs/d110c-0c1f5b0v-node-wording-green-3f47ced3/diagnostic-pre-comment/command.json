@@ -1,0 +1,17 @@
+{
+  "cwd": "/tmp/d110c-f5b0v-green-LLxy4p/checkout",
+  "commit": "c66e09c2937eaf54853340a8c4c0907c0c986162",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "--testNamePattern=reaches genuine recovered activation, binding conflict, ingress queueing, egress and deactivation",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/tmp/d110c-f5b0v-legacy-ingress-c66e09c2.json"
+  ],
+  "reporterStartTime": "2026-09-05T08:31:56.202Z"
+}

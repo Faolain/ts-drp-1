@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./finality": {
+			"types": "./dist/src/finality.d.ts",
+			"import": "./dist/src/finality.js"
 		}
 	},
 	"scripts": {
@@ -35,6 +39,7 @@
 		"@libp2p/interface": "^3.2.5",
 		"@noble/hashes": "^1.7.1",
 		"@noble/secp256k1": "^2.2.3",
+		"@ts-drp/protocol-v3": "0.11.0",
 		"@ts-drp/types": "^0.11.0",
 		"uint8arrays": "^5.1.0"
 	},

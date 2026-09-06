@@ -1,0 +1,7 @@
+{
+  "code": -2,
+  "signal": null,
+  "spawnError": "Error: spawn .logs/d110c-0c1f5b-green-transport-static-41686d6f/custody.mjs ENOENT",
+  "start": "2026-09-06T04:35:23.623Z",
+  "finish": "2026-09-06T04:35:23.627Z"
+}

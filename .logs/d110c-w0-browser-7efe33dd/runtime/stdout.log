@@ -1,0 +1,37 @@
+
+Running 24 tests using 1 worker
+
+
+
+[1/24] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:144:1 › pins the complete browser behavior inventory
+
+[2/24] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:164:1 › dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it
+[3/24] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:199:1 › missing or hostile worker LockManager authority fails closed before activation
+[4/24] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:231:1 › wrong-key and throwing browser possession fail before writer activation
+[5/24] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:262:1 › window probes distinguish production lock contention from fixture busy state and isolate possession failures
+[6/24] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:347:1 › window observes lock authority before durable store opening and possession probes use exact suffixed databases
+[7/24] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:394:1 › missing or hostile LockManager authority fails activation closed
+[8/24] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:412:1 › two tabs elect one lifetime-held writer then a freshly reverified loser wins after release
+
+
+[9/24] [firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:144:1 › pins the complete browser behavior inventory
+
+[10/24] [firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:164:1 › dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it
+[11/24] [firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:199:1 › missing or hostile worker LockManager authority fails closed before activation
+[12/24] [firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:231:1 › wrong-key and throwing browser possession fail before writer activation
+[13/24] [firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:262:1 › window probes distinguish production lock contention from fixture busy state and isolate possession failures
+[14/24] [firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:347:1 › window observes lock authority before durable store opening and possession probes use exact suffixed databases
+[15/24] [firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:394:1 › missing or hostile LockManager authority fails activation closed
+[16/24] [firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:412:1 › two tabs elect one lifetime-held writer then a freshly reverified loser wins after release
+
+
+[17/24] [webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:144:1 › pins the complete browser behavior inventory
+
+[18/24] [webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:164:1 › dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it
+[19/24] [webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:199:1 › missing or hostile worker LockManager authority fails closed before activation
+[20/24] [webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:231:1 › wrong-key and throwing browser possession fail before writer activation
+[21/24] [webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:262:1 › window probes distinguish production lock contention from fixture busy state and isolate possession failures
+[22/24] [webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:347:1 › window observes lock authority before durable store opening and possession probes use exact suffixed databases
+[23/24] [webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:394:1 › missing or hostile LockManager authority fails activation closed
+[24/24] [webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:412:1 › two tabs elect one lifetime-held writer then a freshly reverified loser wins after release
+  24 passed (38.2s)

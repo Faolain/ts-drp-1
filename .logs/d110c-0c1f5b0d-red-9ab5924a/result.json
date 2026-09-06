@@ -1,0 +1,13 @@
+{
+	"baseCommit": "325e2c31b94dec78afb0a7574f45a91185208bb6",
+	"changedPaths": ["tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"],
+	"failed": 19,
+	"files": 1,
+	"passed": 2,
+	"redCommit": "9ab5924a34faf9cd1e0f42b79026ef5313318da8",
+	"skipped": 0,
+	"stopRuleFired": false,
+	"success": false,
+	"tests": 21,
+	"topLevelErrors": 0
+}

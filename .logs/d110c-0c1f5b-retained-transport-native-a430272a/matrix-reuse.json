@@ -1,0 +1,14 @@
+{
+  "originalRoot": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-transport-772e96bd",
+  "originalMatrixSha256": "d1a9def798dc56d439112e7051138014e7362a38048e363469e0abb56271235d",
+  "byteIdentical": true,
+  "signedCheckout": "a430272a0e8dd361c9139e66c140870d4ece7e1f",
+  "originalTests": "772e96bdad4f1b881fd547e09e849c97226cb980",
+  "testSha256": "809c5b7858ac5d530179a35167b65bf2ec600b7adee78aa0d4ecb028f563056a",
+  "selected": 24,
+  "frozenAt": "2026-09-06T02:01:03.027Z",
+  "targetDiagnostics": 13,
+  "externalDiagnostics": 0,
+  "notTypecheckPass": true,
+  "sameOriginalDiagnosticAttribution": true
+}

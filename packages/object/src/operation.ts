@@ -1,8 +1,19 @@
 import { type DRPState, type IACL, type IDRP, type LowestCommonAncestorResult, type Vertex } from "@ts-drp/types";
 
+/** Shared retry ceiling for local and received frontier-CAS publication. */
+export const MAX_ADOPTION_COMMIT_ATTEMPTS = 3;
+
 export interface ReplayState {
 	drpState: DRPState;
 	aclState: DRPState;
+}
+
+export interface OperationJournal {
+	/**
+	 * Records an inverse mutation to run if the enclosing batch fails.
+	 * @param undo - Identity-checked inverse mutation
+	 */
+	record(undo: () => void): void;
 }
 
 export interface BaseOperation {
@@ -18,6 +29,9 @@ export interface BaseOperation {
 
 	/** True only for a vertex created by this local call pipeline. */
 	isLocal?: boolean;
+
+	/** Present only while a remote batch is applying transactionally. */
+	journal?: OperationJournal;
 }
 
 export interface PostLCAOperation extends BaseOperation {
@@ -38,6 +52,12 @@ export interface PostSplitOperation extends PostLCAOperation {
 export interface Operation<T extends IDRP> extends PostSplitOperation {
 	acl: IACL;
 	drp?: T;
+	/** Top-level snapshot keys observed as mutated by this operation. */
+	mutatedKeys?: readonly string[];
+	/** Effective live-state deltas found during the existing local capture. */
+	ambientMutatedKeys?: Readonly<{ acl: readonly string[]; drp: readonly string[] }>;
+	/** Side-local names awaiting the publisher's governed-key filter after raw egress. */
+	rawEgress?: Readonly<{ side: "acl" | "drp"; candidateKeys: readonly string[] }>;
 
 	/**
 	 * Detached state used to stage the current operation before it is committed.
@@ -48,4 +68,7 @@ export interface Operation<T extends IDRP> extends PostSplitOperation {
 export interface PostOperation<T extends IDRP> extends Operation<T> {
 	result: unknown;
 	stateChanged?: boolean;
+
+	/** Internal publication result; local retries remain inside the proxy boundary. */
+	commitOutcome?: "committed" | "duplicate" | "retry";
 }

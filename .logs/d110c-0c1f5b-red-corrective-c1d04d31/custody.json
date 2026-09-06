@@ -1,0 +1,43 @@
+{
+  "testsHead": "c1d04d31149cd4ed1e8631203213df99852036a2",
+  "signature": "G",
+  "remote": "c1d04d31149cd4ed1e8631203213df99852036a2\trefs/heads/codex/phase3a1b-p6-golden-path",
+  "trackedDiff": "",
+  "stagedDiff": "",
+  "testsOnlyChangedPaths": [
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  ],
+  "stashes": 27,
+  "frozenTestHashesUnchanged": true,
+  "verifiedManifests": [
+    {
+      "directory": ".logs/d110c-0c1f5b0r-design-3a156aca",
+      "entries": 3,
+      "sha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0",
+      "valid": true
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b-red-cecde972",
+      "entries": 11,
+      "sha256": "356ef503c16b1f500781350a41704bcec514e7505a64a96ca0f3614519094009",
+      "valid": true
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b-red-review-b7751f72",
+      "entries": 14,
+      "sha256": "69720f84caefc5f3571c449e11a2ae1da27f94f1668577ddad40eca430fecadb",
+      "valid": true
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b0w-final-review-ad38e6c4",
+      "entries": 15,
+      "sha256": "43cd8a3f75654bc7a55612cd7e20323b1fdeed0dea7805c99f3a857d50ee625f",
+      "valid": true
+    }
+  ],
+  "noProductionChanges": true,
+  "noRerun": true,
+  "noCampaign": true,
+  "noReviewers": true
+}

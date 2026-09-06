@@ -1,0 +1,4 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const out=path.dirname(new URL(import.meta.url).pathname),read=f=>JSON.parse(fs.readFileSync(f)),prior='/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-71bca5d5/typecheck.json',actual=read(path.join(out,'typecheck-final.json')),same=JSON.stringify(actual)===JSON.stringify(read(prior)),valid=same&&actual.targetDiagnostics.length===0&&actual.externalDiagnostics.length===3&&read(path.join(out,'typecheck-final/status.json')).code===1;
+fs.writeFileSync(path.join(out,'typecheck-matrix-final.json'),JSON.stringify({valid,same,prior,actual,wholeProgramPass:false,grid:'Separate unchanged grid diagnostic remains open; not part of selected-two-test program'},null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({valid,target:0,external:3,compiler:1}));if(!valid)process.exitCode=1;

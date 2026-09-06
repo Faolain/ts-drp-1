@@ -15,6 +15,12 @@ enum MessageType {
   MESSAGE_TYPE_CUSTOM = 8;
   MESSAGE_TYPE_DRP_DISCOVERY = 9;
   MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE = 10;
+  MESSAGE_TYPE_V3_ENVELOPE = 11;
+}
+
+message V3Envelope {
+  bytes canonical_preimage = 1;
+  bytes signature = 2;
 }
 
 message Message {
@@ -45,6 +51,9 @@ message AttestationUpdate {
 
 message Sync {
   repeated string vertex_hashes = 1;
+  repeated string heads = 2;
+  repeated string shared_heads = 3;
+  repeated string requested_hashes = 4;
 }
 
 message SyncAccept {
@@ -53,7 +62,10 @@ message SyncAccept {
   repeated string requesting = 3;
 }
 
-message SyncReject {}
+message SyncReject {
+  string reason = 1;
+  repeated string missing_hashes = 2;
+}
 
 message DRPDiscovery {}
 

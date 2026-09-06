@@ -1,0 +1,891 @@
+commit 3c305872fbee759b1b6386c10a1d1ebbde3dd6e6
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Thu Sep 3 17:59:13 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Thu Sep 3 17:59:13 2026 -0400
+
+    test: record isolated foreign frontier proof
+
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/SHA256SUMS b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/SHA256SUMS
+new file mode 100644
+index 00000000..64cf5ad1
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/SHA256SUMS
+@@ -0,0 +1,32 @@
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./checkout.status
++5c9729931923af677a644399cc402175db44f69d60c8f69ba08617a8ef213eec  ./checkout.stderr.txt
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./checkout.stdout.txt
++6302d4b28bed58b97e4fa6c477f4a1aad4ee11a2cde1d1a644ead3135a8fd48c  ./f5a.json
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./f5a.status
++ac1afe00fd4fe44eb77581dd7cd588b3fbaf4022df07dbef2fe8007c24506c46  ./f5a.stderr.txt
++40bb56527f440c29efb7964220163798793e9975ecb67ba28b4502f1ebe2cbca  ./f5a.stdout.txt
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./final-worktree-status.txt
++faf353f9c9a03ff876d4ca3ca5a1d6d6a9b24ea1a2a9c0524ba5c709b80f7a77  ./fixture-boundary.json
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./fixture-boundary.status
++d1096691e3974ea98f569b4048cf6f96c5eaa6d1116e56202cc9d915d55840b0  ./fixture-boundary.stderr.txt
++6e1aab3c55fc7ad04a72e11e363290221fd754f8841b1ad110e6146c4d52eaac  ./fixture-boundary.stdout.txt
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./install.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./install.stderr.txt
++2a98eeab12510462e2e36619a7e4b029144c10c223a60bbc4fe92a5042993e6e  ./install.stdout.txt
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./listing.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./listing.stderr.txt
++33e94ccace7bffc63d6edc93bbcb8d7a3582b31445aaeaa9acba5ccbb8fb3437  ./listing.txt
++abc7cceeb024c54d95589f2c38292cd4aa9d8d39bb7e36a11fb45ebec2f07af2  ./playwright.json
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./playwright.status
++3a687347bfe83102aa1be584605116262a09f97b1bda16d0b2e3b6ef31b26956  ./playwright.stderr.txt
++bb018e7533b9ea60f26ae19e7233a397d93567487149e7fee9c48a2b8944de1e  ./playwright.stdout.txt
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./post-vitest-status.txt
++8a5c84a6a3d76452ccc6dce1caee3386e015fa48b235cb1fb51c0281d9115341  ./pre-browser-process-ports.txt
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./pre-checkout-status.txt
++e1aabdd763a82388f3fbf0cffd758e4f89915d03f473384c5b3de08deb385e0d  ./proof.md
++66bc084d6b796fbcea278eb64a73981fa0c0063e2c3c4b91bd110152e79e33a2  ./source-identity.txt
++63625e6a3b86a3c836cd459842f7903b9ffc6209f98312b6ade05ed02dc7773a  ./validate.mjs
++19562f5e8ef1954ba080c6b7b03a2b8c7a87b3b3a77cd81eea21a276cc8a6503  ./validation.txt
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./verify-commit.status
++6460d166092c9ece16ff372fe7116fd7f147535d4d3edf15bdda8b2cbae32902  ./verify-commit.stderr.txt
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./verify-commit.stdout.txt
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/checkout.status b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/checkout.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/checkout.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/checkout.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/checkout.stderr.txt
+new file mode 100644
+index 00000000..2755e24a
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/checkout.stderr.txt
+@@ -0,0 +1,2 @@
++Previous HEAD position was e379cfd2 test: prove foreign frontier close liveness red
++HEAD is now at 52fe3b44 fix: keep foreign frontier anomalies author-local
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/checkout.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/checkout.stdout.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.json b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.json
+new file mode 100644
+index 00000000..6138f96f
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.json
+@@ -0,0 +1 @@
++{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":1,"numPassedTests":1,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788472606213,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["D.110c-0c1f5 foreign-author close liveness"],"fullName":"D.110c-0c1f5 foreign-author close liveness keeps foreign frontier anomalies author-local while creator corruption stays fail closed","status":"passed","title":"keeps foreign frontier anomalies author-local while creator corruption stays fail closed","duration":7307.100125,"failureMessages":[],"meta":{}}],"startTime":1788472607609,"endTime":1788472614916.1,"status":"passed","message":"","name":"/private/tmp/ts-drp-d109d-baseline.18SC07/tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts"}]}
+\ No newline at end of file
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.status b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.stderr.txt
+new file mode 100644
+index 00000000..34449912
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.stderr.txt
+@@ -0,0 +1,2 @@
++(node:79106) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.stdout.txt
+new file mode 100644
+index 00000000..7a6f63f0
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.stdout.txt
+@@ -0,0 +1 @@
++JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5a-clean-52fe3b44-v2/f5a.json
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/final-worktree-status.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/final-worktree-status.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.json b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.json
+new file mode 100644
+index 00000000..181be346
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.json
+@@ -0,0 +1 @@
++{"numTotalTestSuites":4,"numPassedTestSuites":4,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":14,"numPassedTests":2,"numFailedTests":0,"numPendingTests":12,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788472626010,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["D.110c-0c1f2 bounded multi-author issuance frontier"],"fullName":"D.110c-0c1f2 bounded multi-author issuance frontier authenticates the exact creator-signed frontiers from a genuine two-writer close","status":"passed","title":"authenticates the exact creator-signed frontiers from a genuine two-writer close","duration":520.7253329999999,"failureMessages":[],"meta":{}}],"startTime":1788472627037,"endTime":1788472627557.7253,"status":"passed","message":"","name":"/private/tmp/ts-drp-d109d-baseline.18SC07/tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts"},{"assertionResults":[{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED freezes the original RED owners and corrected GREEN owner set","status":"skipped","title":"freezes the original RED owners and corrected GREEN owner set","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED freezes the closed input, result, error and precedence contracts","status":"skipped","title":"freezes the closed input, result, error and precedence contracts","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED freezes the complete receipt, identity, replay and census matrices","status":"skipped","title":"freezes the complete receipt, identity, replay and census matrices","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED keeps runtime reclamation internal and the legacy object runtime detached","status":"skipped","title":"keeps runtime reclamation internal and the legacy object runtime detached","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED [RED readiness] requires the private runtime and creator-close release kernels","status":"skipped","title":"[RED readiness] requires the private runtime and creator-close release kernels","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED uses genuine close, verify, commit and hot activation identities","status":"skipped","title":"uses genuine close, verify, commit and hot activation identities","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED enforces the exact refusal matrix and precedence with zero writes","status":"skipped","title":"enforces the exact refusal matrix and precedence with zero writes","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED accepts hot and cold real receipts and latches every authority field","status":"skipped","title":"accepts hot and cold real receipts and latches every authority field","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED serializes behind successor and predecessor gates with atomic observation","status":"skipped","title":"serializes behind successor and predecessor gates with atomic observation","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED D.109f preserves owner-observed Discord and MMORPG projections with zero deleted durable reads","status":"skipped","title":"D.109f preserves owner-observed Discord and MMORPG projections with zero deleted durable reads","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED releases every predecessor owner while preserving the live successor","status":"passed","title":"releases every predecessor owner while preserving the live successor","duration":666.6632500000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED returns frozen replay success and refuses changed authority after release","status":"skipped","title":"returns frozen replay success and refuses changed authority after release","failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED keeps precommit construction failure byte-identical and subsequently usable","status":"skipped","title":"keeps precommit construction failure byte-identical and subsequently usable","failureMessages":[],"meta":{}}],"startTime":1788472627084,"endTime":1788472627750.6633,"status":"passed","message":"","name":"/private/tmp/ts-drp-d109d-baseline.18SC07/tests/phase-6b-runtime-reclamation-red.test.ts"}]}
+\ No newline at end of file
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.status b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.stderr.txt
+new file mode 100644
+index 00000000..9e2f7414
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.stderr.txt
+@@ -0,0 +1,4 @@
++(node:79387) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:79386) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.stdout.txt
+new file mode 100644
+index 00000000..4149ac07
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.stdout.txt
+@@ -0,0 +1 @@
++JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5a-clean-52fe3b44-v2/fixture-boundary.json
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/install.status b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/install.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/install.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/install.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/install.stderr.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/install.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/install.stdout.txt
+new file mode 100644
+index 00000000..6c781aaa
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/install.stdout.txt
+@@ -0,0 +1,104 @@
++Scope: all 48 workspace projects
++Lockfile is up to date, resolution step is skipped
++Already up to date
++
++. postinstall$ node scripts/ensure-native-deps.mjs && pnpm build:packages
++. postinstall: > ts-drp@0.11.0 build:packages /private/tmp/ts-drp-d109d-baseline.18SC07
++. postinstall: > pnpm --filter '@ts-drp/*' build
++. postinstall: Scope: 40 of 48 workspace projects
++. postinstall: packages/canonical build$ tsc -b tsconfig.build.json
++. postinstall: packages/ephemeral build$ tsc -b tsconfig.build.json
++. postinstall: packages/membership build$ tsc -b tsconfig.build.json
++. postinstall: packages/errors build$ tsc -b tsconfig.build.json
++. postinstall: packages/canonical build: Done
++. postinstall: packages/membership build: Done
++. postinstall: packages/types build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/errors build: Done
++. postinstall: packages/ephemeral build: Done
++. postinstall: packages/types build: Done
++. postinstall: packages/blueprints build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/logger build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/protocol-v2 build$ tsc -b tsconfig.build.json
++. postinstall: packages/outcome-commit build$ tsc -b tsconfig.build.json
++. postinstall: packages/protocol-v2 build: Done
++. postinstall: packages/protocol-v3 build$ tsc -b tsconfig.build.json
++. postinstall: packages/outcome-commit build: Done
++. postinstall: packages/rendezvous build$ tsc -b tsconfig.build.json
++. postinstall: packages/blueprints build: Done
++. postinstall: packages/storage build$ tsc -b tsconfig.build.json
++. postinstall: packages/logger build: Done
++. postinstall: packages/test-utils build$ tsc -b tsconfig.build.json
++. postinstall: packages/protocol-v3 build: Done
++. postinstall: packages/utils prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/rendezvous build: Done
++. postinstall: packages/storage build: Done
++. postinstall: packages/test-utils build: Done
++. postinstall: packages/utils prebuild: Done
++. postinstall: packages/utils build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/utils build: Done
++. postinstall: packages/interval-runner prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/issuance-store build$ tsc -b tsconfig.build.json
++. postinstall: packages/blueprint-catalog build$ tsc -b tsconfig.build.json
++. postinstall: packages/control-plane build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-runner prebuild: Done
++. postinstall: packages/interval-runner build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/issuance-store build: Done
++. postinstall: packages/keychain build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/blueprint-catalog build: Done
++. postinstall: packages/live-journal build$ tsc -b tsconfig.build.json
++. postinstall: packages/control-plane build: Done
++. postinstall: packages/message-queue prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/message-queue prebuild: Done
++. postinstall: packages/message-queue build$ tsc -b tsconfig.build.json
++. postinstall: packages/live-journal build: Done
++. postinstall: packages/relay-policy build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-runner build: Done
++. postinstall: packages/routing-browser build$ tsc -b tsconfig.build.json
++. postinstall: packages/message-queue build: Done
++. postinstall: packages/tracer build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/keychain build: Done
++. postinstall: packages/validation prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/relay-policy build: Done
++. postinstall: packages/routing-browser build: Done
++. postinstall: packages/validation prebuild: Done
++. postinstall: packages/validation build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/tracer build: Done
++. postinstall: packages/validation build: Done
++. postinstall: packages/blueprint-toolchain build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-reconnect prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/interval-discovery prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/network build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/interval-discovery prebuild: Done
++. postinstall: packages/interval-discovery build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-reconnect prebuild: Done
++. postinstall: packages/interval-reconnect build$ tsc -b tsconfig.build.json
++. postinstall: packages/blueprint-toolchain build: Done
++. postinstall: packages/object build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-discovery build: Done
++. postinstall: packages/seal build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-reconnect build: Done
++. postinstall: packages/network build: Done
++. postinstall: packages/object build: Done
++. postinstall: packages/seal build: Done
++. postinstall: packages/compaction build$ tsc -b tsconfig.build.json
++. postinstall: packages/routing-node build$ tsc -b tsconfig.build.json
++. postinstall: packages/compaction build: Done
++. postinstall: packages/routing-node build: Done
++. postinstall: packages/storage-node build$ tsc -b tsconfig.build.json
++. postinstall: packages/worker-host build$ tsc -b tsconfig.build.json
++. postinstall: packages/node prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/node prebuild: Done
++. postinstall: packages/node build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/storage-node build: Done
++. postinstall: packages/worker-host build: Done
++. postinstall: packages/node build: Done
++. postinstall: packages/network-spike build$ tsc -b tsconfig.build.json
++. postinstall: packages/storage-browser build$ tsc -b tsconfig.build.json
++. postinstall: examples/browser-network build$ tsc --noEmit -p tsconfig.build.json
++. postinstall: packages/storage-browser build: Done
++. postinstall: packages/network-spike build: Done
++. postinstall: examples/browser-network build: Done
++. postinstall: examples/v3-room build$ tsc --noEmit -p tsconfig.build.json
++. postinstall: examples/v3-room build: Done
++. postinstall: Done
++Done in 16.5s using pnpm v10.24.0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/listing.status b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/listing.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/listing.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/listing.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/listing.stderr.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/listing.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/listing.txt
+new file mode 100644
+index 00000000..3adc5e03
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/listing.txt
+@@ -0,0 +1 @@
++tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts > D.110c-0c1f5 foreign-author close liveness > keeps foreign frontier anomalies author-local while creator corruption stays fail closed
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.json b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.json
+new file mode 100644
+index 00000000..5f0a2883
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.json
+@@ -0,0 +1,197 @@
++{
++  "config": {
++    "argv": [
++      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
++      "/private/tmp/ts-drp-d109d-baseline.18SC07/node_modules/@playwright/test/cli.js",
++      "test",
++      "--config",
++      "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
++      "--project=chromium",
++      "--grep",
++      "D\\.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen|D\\.110c-0c1f2 non-creator writer requires an authenticated historical frontier",
++      "--reporter=json",
++      "--fail-on-flaky-tests"
++    ],
++    "configFile": "/private/tmp/ts-drp-d109d-baseline.18SC07/packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
++    "rootDir": "/private/tmp/ts-drp-d109d-baseline.18SC07/packages/storage-browser/tests",
++    "failOnFlakyTests": true,
++    "forbidOnly": true,
++    "fullyParallel": false,
++    "globalSetup": null,
++    "globalTeardown": null,
++    "globalTimeout": 600000,
++    "grep": {},
++    "grepInvert": null,
++    "maxFailures": 0,
++    "metadata": {
++      "actualWorkers": 1
++    },
++    "preserveOutput": "always",
++    "projects": [
++      {
++        "outputDir": "/private/tmp/ts-drp-d109d-baseline.18SC07/packages/storage-browser/test-results",
++        "repeatEach": 1,
++        "retries": 0,
++        "metadata": {
++          "actualWorkers": 1
++        },
++        "id": "chromium",
++        "name": "chromium",
++        "testDir": "/private/tmp/ts-drp-d109d-baseline.18SC07/packages/storage-browser/tests",
++        "testIgnore": [],
++        "testMatch": [
++          "phase-6a-creator-successor-product.pw.ts"
++        ],
++        "timeout": 90000
++      },
++      {
++        "outputDir": "/private/tmp/ts-drp-d109d-baseline.18SC07/packages/storage-browser/test-results",
++        "repeatEach": 1,
++        "retries": 0,
++        "metadata": {
++          "actualWorkers": 1
++        },
++        "id": "firefox",
++        "name": "firefox",
++        "testDir": "/private/tmp/ts-drp-d109d-baseline.18SC07/packages/storage-browser/tests",
++        "testIgnore": [],
++        "testMatch": [
++          "phase-6a-creator-successor-product.pw.ts"
++        ],
++        "timeout": 90000
++      },
++      {
++        "outputDir": "/private/tmp/ts-drp-d109d-baseline.18SC07/packages/storage-browser/test-results",
++        "repeatEach": 1,
++        "retries": 0,
++        "metadata": {
++          "actualWorkers": 1
++        },
++        "id": "webkit",
++        "name": "webkit",
++        "testDir": "/private/tmp/ts-drp-d109d-baseline.18SC07/packages/storage-browser/tests",
++        "testIgnore": [],
++        "testMatch": [
++          "phase-6a-creator-successor-product.pw.ts"
++        ],
++        "timeout": 90000
++      }
++    ],
++    "quiet": false,
++    "reporter": [
++      [
++        "json"
++      ]
++    ],
++    "reportSlowTests": {
++      "max": 5,
++      "threshold": 300000
++    },
++    "shard": null,
++    "tags": [],
++    "updateSnapshots": "missing",
++    "updateSourceMethod": "patch",
++    "version": "1.62.1",
++    "workers": 1,
++    "webServer": null
++  },
++  "suites": [
++    {
++      "title": "phase-6a-creator-successor-product.pw.ts",
++      "file": "phase-6a-creator-successor-product.pw.ts",
++      "column": 0,
++      "line": 0,
++      "specs": [
++        {
++          "title": "D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen",
++          "ok": true,
++          "tags": [],
++          "tests": [
++            {
++              "timeout": 90000,
++              "annotations": [],
++              "expectedStatus": "passed",
++              "projectId": "chromium",
++              "projectName": "chromium",
++              "results": [
++                {
++                  "workerIndex": 0,
++                  "parallelIndex": 0,
++                  "status": "passed",
++                  "duration": 1747,
++                  "errors": [],
++                  "stdout": [],
++                  "stderr": [],
++                  "retry": 0,
++                  "startTime": "2026-09-03T21:57:29.560Z",
++                  "annotations": [],
++                  "attachments": [
++                    {
++                      "name": "d110c-0c1f4-product-green",
++                      "contentType": "application/json",
++                      "body": "eyJib290c3RyYXBSb3dzIjpbW3siYW5jaG9yIjoiNDg5ZDQxMzJhNDI1N2EyM2U4NDExYzc2NmU3YWJlMWI0YjA4Y2UwMzM0YzRlOGMxM2RjZjIwN2Y5Y2FkYzkyZSIsImF1dGhvciI6IjMzMmRjNzRhMGIyNjg3NTEzYjBmYjA1YzczNTY4ODgyY2FjNTdhMDI1OTQ1NjlkMWJiMjY2YmU4MDc0YmIxMzYiLCJhdXRob3JTZXF1ZW5jZSI6MCwiZGlnZXN0IjoiOWEzNDFlZTUyODQxOWIxMTc4OTRjNDkxYmU4ZjUyZjZkYmZhNzZjNTRkMzU3NTE4N2ZlNTFjNjk0OWJlNWUyMiIsImVwb2NoIjowLCJvYmplY3RJZCI6ImNyZWF0b3I6ZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGQiLCJwcmVpbWFnZUhleCI6IjA4MGEwNTA0NmI2OTZlNjQwNTBhNjQ3MjcwMmQ3NjY1NzI3NDY1NzgwNTA1NjU3MDZmNjM2ODAzMDAwNTA2NjE2ZTYzNjg2ZjcyMDU0MDM0MzgzOTY0MzQzMTMzMzI2MTM0MzIzNTM3NjEzMjMzNjUzODM0MzEzMTYzMzczNjM2NjUzNzYxNjI2NTMxNjIzNDYyMzAzODYzNjUzMDMzMzMzNDYzMzQ2NTM4NjMzMTMzNjQ2MzY2MzIzMDM3NjYzOTYzNjE2NDYzMzkzMjY1MDUwNjYxNzU3NDY4NmY3MjA1NDAzMzMzMzI2NDYzMzczNDYxMzA2MjMyMzYzODM3MzUzMTMzNjIzMDY2NjIzMDM1NjMzNzMzMzUzNjM4MzgzODMyNjM2MTYzMzUzNzYxMzAzMjM1MzkzNDM1MzYzOTY0MzE2MjYyMzIzNjM2NjI2NTM4MzAzNzM0NjI2MjMxMzMzNjA1MDg2ZjYyNmE2NTYzNzQ0OTY0MDUyODYzNzI2NTYxNzQ2ZjcyM2E2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0MDUwOTZmNzA2NTcyNjE3NDY5NmY2ZTA4MDIwNTA2NjE2Mzc0Njk2ZjZlMDUwNDZhNmY2OTZlMDUwODYzNmM2OTY1NmU3NDQ5NjQwNTAzNjI2ZjYyMDUwYjZjNmY2NzY5NjM2MTZjNTQ2OTZkNjUwMzAyMDUwYzY0NjU3MDY1NmU2NDY1NmU2MzY5NjU3MzA3MDEwNTQwMzQzODM5NjQzNDMxMzMzMjYxMzQzMjM1Mzc2MTMyMzM2NTM4MzQzMTMxNjMzNzM2MzY2NTM3NjE2MjY1MzE2MjM0NjIzMDM4NjM2NTMwMzMzMzM0NjMzNDY1Mzg2MzMxMzM2NDYzNjYzMjMwMzc2NjM5NjM2MTY0NjMzOTMyNjUwNTBkNzA3MjZmNzQ2ZjYzNmY2YzRkNjE2YTZmNzIwMzA2MDUwZTYxNzU3NDY4NmY3MjUzNjU3MTc1NjU2ZTYzNjUwMzAwIiwicHVibGlzaFN0YXRlIjoicGVuZGluZyJ9XSxbeyJhbmNob3IiOiI0ODlkNDEzMmE0MjU3YTIzZTg0MTFjNzY2ZTdhYmUxYjRiMDhjZTAzMzRjNGU4YzEzZGNmMjA3ZjljYWRjOTJlIiwiYXV0aG9yIjoiMzMyZGM3NGEwYjI2ODc1MTNiMGZiMDVjNzM1Njg4ODJjYWM1N2EwMjU5NDU2OWQxYmIyNjZiZTgwNzRiYjEzNiIsImF1dGhvclNlcXVlbmNlIjowLCJkaWdlc3QiOiI5YTM0MWVlNTI4NDE5YjExNzg5NGM0OTFiZThmNTJmNmRiZmE3NmM1NGQzNTc1MTg3ZmU1MWM2OTQ5YmU1ZTIyIiwiZXBvY2giOjAsIm9iamVjdElkIjoiY3JlYXRvcjpkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZCIsInByZWltYWdlSGV4IjoiMDgwYTA1MDQ2YjY5NmU2NDA1MGE2NDcyNzAyZDc2NjU3Mjc0NjU3ODA1MDU2NTcwNmY2MzY4MDMwMDA1MDY2MTZlNjM2ODZmNzIwNTQwMzQzODM5NjQzNDMxMzMzMjYxMzQzMjM1Mzc2MTMyMzM2NTM4MzQzMTMxNjMzNzM2MzY2NTM3NjE2MjY1MzE2MjM0NjIzMDM4NjM2NTMwMzMzMzM0NjMzNDY1Mzg2MzMxMzM2NDYzNjYzMjMwMzc2NjM5NjM2MTY0NjMzOTMyNjUwNTA2NjE3NTc0Njg2ZjcyMDU0MDMzMzMzMjY0NjMzNzM0NjEzMDYyMzIzNjM4MzczNTMxMzM2MjMwNjY2MjMwMzU2MzM3MzMzNTM2MzgzODM4MzI2MzYxNjMzNTM3NjEzMDMyMzUzOTM0MzUzNjM5NjQzMTYyNjIzMjM2MzY2MjY1MzgzMDM3MzQ2MjYyMzEzMzM2MDUwODZmNjI2YTY1NjM3NDQ5NjQwNTI4NjM3MjY1NjE3NDZmNzIzYTY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQwNTA5NmY3MDY1NzI2MTc0Njk2ZjZlMDgwMjA1MDY2MTYzNzQ2OTZmNmUwNTA0NmE2ZjY5NmUwNTA4NjM2YzY5NjU2ZTc0NDk2NDA1MDM2MjZmNjIwNTBiNmM2ZjY3Njk2MzYxNmM1NDY5NmQ2NTAzMDIwNTBjNjQ2NTcwNjU2ZTY0NjU2ZTYzNjk2NTczMDcwMTA1NDAzNDM4Mzk2NDM0MzEzMzMyNjEzNDMyMzUzNzYxMzIzMzY1MzgzNDMxMzE2MzM3MzYzNjY1Mzc2MTYyNjUzMTYyMzQ2MjMwMzg2MzY1MzAzMzMzMzQ2MzM0NjUzODYzMzEzMzY0NjM2NjMyMzAzNzY2Mzk2MzYxNjQ2MzM5MzI2NTA1MGQ3MDcyNmY3NDZmNjM2ZjZjNGQ2MTZhNmY3MjAzMDYwNTBlNjE3NTc0Njg2ZjcyNTM2NTcxNzU2NTZlNjM2NTAzMDAiLCJwdWJsaXNoU3RhdGUiOiJwZW5kaW5nIn1dLFt7ImFuY2hvciI6IjQ4OWQ0MTMyYTQyNTdhMjNlODQxMWM3NjZlN2FiZTFiNGIwOGNlMDMzNGM0ZThjMTNkY2YyMDdmOWNhZGM5MmUiLCJhdXRob3IiOiIzMzJkYzc0YTBiMjY4NzUxM2IwZmIwNWM3MzU2ODg4MmNhYzU3YTAyNTk0NTY5ZDFiYjI2NmJlODA3NGJiMTM2IiwiYXV0aG9yU2VxdWVuY2UiOjAsImRpZ2VzdCI6IjlhMzQxZWU1Mjg0MTliMTE3ODk0YzQ5MWJlOGY1MmY2ZGJmYTc2YzU0ZDM1NzUxODdmZTUxYzY5NDliZTVlMjIiLCJlcG9jaCI6MCwib2JqZWN0SWQiOiJjcmVhdG9yOmRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkIiwicHJlaW1hZ2VIZXgiOiIwODBhMDUwNDZiNjk2ZTY0MDUwYTY0NzI3MDJkNzY2NTcyNzQ2NTc4MDUwNTY1NzA2ZjYzNjgwMzAwMDUwNjYxNmU2MzY4NmY3MjA1NDAzNDM4Mzk2NDM0MzEzMzMyNjEzNDMyMzUzNzYxMzIzMzY1MzgzNDMxMzE2MzM3MzYzNjY1Mzc2MTYyNjUzMTYyMzQ2MjMwMzg2MzY1MzAzMzMzMzQ2MzM0NjUzODYzMzEzMzY0NjM2NjMyMzAzNzY2Mzk2MzYxNjQ2MzM5MzI2NTA1MDY2MTc1NzQ2ODZmNzIwNTQwMzMzMzMyNjQ2MzM3MzQ2MTMwNjIzMjM2MzgzNzM1MzEzMzYyMzA2NjYyMzAzNTYzMzczMzM1MzYzODM4MzgzMjYzNjE2MzM1Mzc2MTMwMzIzNTM5MzQzNTM2Mzk2NDMxNjI2MjMyMzYzNjYyNjUzODMwMzczNDYyNjIzMTMzMzYwNTA4NmY2MjZhNjU2Mzc0NDk2NDA1Mjg2MzcyNjU2MTc0NmY3MjNhNjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDA1MDk2ZjcwNjU3MjYxNzQ2OTZmNmUwODAyMDUwNjYxNjM3NDY5NmY2ZTA1MDQ2YTZmNjk2ZTA1MDg2MzZjNjk2NTZlNzQ0OTY0MDUwMzYyNmY2MjA1MGI2YzZmNjc2OTYzNjE2YzU0Njk2ZDY1MDMwMjA1MGM2NDY1NzA2NTZlNjQ2NTZlNjM2OTY1NzMwNzAxMDU0MDM0MzgzOTY0MzQzMTMzMzI2MTM0MzIzNTM3NjEzMjMzNjUzODM0MzEzMTYzMzczNjM2NjUzNzYxNjI2NTMxNjIzNDYyMzAzODYzNjUzMDMzMzMzNDYzMzQ2NTM4NjMzMTMzNjQ2MzY2MzIzMDM3NjYzOTYzNjE2NDYzMzkzMjY1MDUwZDcwNzI2Zjc0NmY2MzZmNmM0ZDYxNmE2ZjcyMDMwNjA1MGU2MTc1NzQ2ODZmNzI1MzY1NzE3NTY1NmU2MzY1MDMwMCIsInB1Ymxpc2hTdGF0ZSI6InBlbmRpbmcifV1dLCJjb25maWd1cmVkQUhleCI6IjA4MDIwNTA2NjE2Mzc0Njk2ZjZlMDUwNDZhNmY2OTZlMDUwODYzNmM2OTY1NmU3NDQ5NjQwNTAzNjI2ZjYyIiwiY29uZmlndXJlZEJIZXgiOiIwODAyMDUwNjYxNjM3NDY5NmY2ZTA1MDQ2YTZmNjk2ZTA1MDg2MzZjNjk2NTZlNzQ0OTY0MDUwNDY0NjE3NjY1IiwiY29udHJvbCI6eyJjb2xkUmVvcGVuQ291bnQiOjEsInJvd3MiOlt7ImFuY2hvciI6IjQ4OWQ0MTMyYTQyNTdhMjNlODQxMWM3NjZlN2FiZTFiNGIwOGNlMDMzNGM0ZThjMTNkY2YyMDdmOWNhZGM5MmUiLCJhdXRob3IiOiIzMzJkYzc0YTBiMjY4NzUxM2IwZmIwNWM3MzU2ODg4MmNhYzU3YTAyNTk0NTY5ZDFiYjI2NmJlODA3NGJiMTM2IiwiYXV0aG9yU2VxdWVuY2UiOjAsImRpZ2VzdCI6IjlhMzQxZWU1Mjg0MTliMTE3ODk0YzQ5MWJlOGY1MmY2ZGJmYTc2YzU0ZDM1NzUxODdmZTUxYzY5NDliZTVlMjIiLCJlcG9jaCI6MCwib2JqZWN0SWQiOiJjcmVhdG9yOmRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkIiwicHJlaW1hZ2VIZXgiOiIwODBhMDUwNDZiNjk2ZTY0MDUwYTY0NzI3MDJkNzY2NTcyNzQ2NTc4MDUwNTY1NzA2ZjYzNjgwMzAwMDUwNjYxNmU2MzY4NmY3MjA1NDAzNDM4Mzk2NDM0MzEzMzMyNjEzNDMyMzUzNzYxMzIzMzY1MzgzNDMxMzE2MzM3MzYzNjY1Mzc2MTYyNjUzMTYyMzQ2MjMwMzg2MzY1MzAzMzMzMzQ2MzM0NjUzODYzMzEzMzY0NjM2NjMyMzAzNzY2Mzk2MzYxNjQ2MzM5MzI2NTA1MDY2MTc1NzQ2ODZmNzIwNTQwMzMzMzMyNjQ2MzM3MzQ2MTMwNjIzMjM2MzgzNzM1MzEzMzYyMzA2NjYyMzAzNTYzMzczMzM1MzYzODM4MzgzMjYzNjE2MzM1Mzc2MTMwMzIzNTM5MzQzNTM2Mzk2NDMxNjI2MjMyMzYzNjYyNjUzODMwMzczNDYyNjIzMTMzMzYwNTA4NmY2MjZhNjU2Mzc0NDk2NDA1Mjg2MzcyNjU2MTc0NmY3MjNhNjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDA1MDk2ZjcwNjU3MjYxNzQ2OTZmNmUwODAyMDUwNjYxNjM3NDY5NmY2ZTA1MDQ2YTZmNjk2ZTA1MDg2MzZjNjk2NTZlNzQ0OTY0MDUwMzYyNmY2MjA1MGI2YzZmNjc2OTYzNjE2YzU0Njk2ZDY1MDMwMjA1MGM2NDY1NzA2NTZlNjQ2NTZlNjM2OTY1NzMwNzAxMDU0MDM0MzgzOTY0MzQzMTMzMzI2MTM0MzIzNTM3NjEzMjMzNjUzODM0MzEzMTYzMzczNjM2NjUzNzYxNjI2NTMxNjIzNDYyMzAzODYzNjUzMDMzMzMzNDYzMzQ2NTM4NjMzMTMzNjQ2MzY2MzIzMDM3NjYzOTYzNjE2NDYzMzkzMjY1MDUwZDcwNzI2Zjc0NmY2MzZmNmM0ZDYxNmE2ZjcyMDMwNjA1MGU2MTc1NzQ2ODZmNzI1MzY1NzE3NTY1NmU2MzY1MDMwMCIsInB1Ymxpc2hTdGF0ZSI6InBlbmRpbmcifV0sInRyYWNlIjpbeyJhdXRob3JTZXF1ZW5jZSI6MCwiY2xhc3NpZmljYXRpb24iOiJjdXJyZW50IiwiZGlnZXN0IjoiOWEzNDFlZTUyODQxOWIxMTc4OTRjNDkxYmU4ZjUyZjZkYmZhNzZjNTRkMzU3NTE4N2ZlNTFjNjk0OWJlNWUyMiIsInBheWxvYWRFcG9jaCI6MCwib3duZXIiOm51bGwsInBoYXNlIjpudWxsfSx7ImNsYXNzaWZpY2F0aW9uIjoiYWN0aXZhdGlvbiIsImRpc3BsYWNlZElzc3VhbmNlQm91bmRhcnkiOm51bGwsInBheWxvYWRFcG9jaCI6MCwib3duZXIiOm51bGwsInBoYXNlIjpudWxsfSx7ImF1dGhvclNlcXVlbmNlIjowLCJjbGFzc2lmaWNhdGlvbiI6InBpbm5lZC1nZW5lc2lzIiwiZGlnZXN0IjoiOWEzNDFlZTUyODQxOWIxMTc4OTRjNDkxYmU4ZjUyZjZkYmZhNzZjNTRkMzU3NTE4N2ZlNTFjNjk0OWJlNWUyMiIsInBheWxvYWRFcG9jaCI6Mywib3duZXIiOiJwcmVkZWNlc3Nvci12YWxpZGF0aW9uIiwicGhhc2UiOm51bGx9LHsiYXV0aG9yU2VxdWVuY2UiOjAsImNsYXNzaWZpY2F0aW9uIjoicGlubmVkLWdlbmVzaXMiLCJkaWdlc3QiOiI5YTM0MWVlNTI4NDE5YjExNzg5NGM0OTFiZThmNTJmNmRiZmE3NmM1NGQzNTc1MTg3ZmU1MWM2OTQ5YmU1ZTIyIiwicGF5bG9hZEVwb2NoIjoyLCJvd25lciI6InByZWRlY2Vzc29yLXZhbGlkYXRpb24iLCJwaGFzZSI6bnVsbH0seyJhdXRob3JTZXF1ZW5jZSI6MCwiY2xhc3NpZmljYXRpb24iOiJwaW5uZWQtZ2VuZXNpcyIsImRpZ2VzdCI6IjlhMzQxZWU1Mjg0MTliMTE3ODk0YzQ5MWJlOGY1MmY2ZGJmYTc2YzU0ZDM1NzUxODdmZTUxYzY5NDliZTVlMjIiLCJwYXlsb2FkRXBvY2giOjMsIm93bmVyIjoic3VjY2Vzc29yLXJlY292ZXJ5IiwicGhhc2UiOm51bGx9LHsiYXV0aG9yU2VxdWVuY2UiOjAsImNsYXNzaWZpY2F0aW9uIjoicGlubmVkLWdlbmVzaXMiLCJkaWdlc3QiOiI5YTM0MWVlNTI4NDE5YjExNzg5NGM0OTFiZThmNTJmNmRiZmE3NmM1NGQzNTc1MTg3ZmU1MWM2OTQ5YmU1ZTIyIiwicGF5bG9hZEVwb2NoIjozLCJvd25lciI6InN1Y2Nlc3Nvci1yZWNvdmVyeSIsInBoYXNlIjpudWxsfSx7ImNsYXNzaWZpY2F0aW9uIjoiYWN0aXZhdGlvbiIsImRpc3BsYWNlZElzc3VhbmNlQm91bmRhcnkiOm51bGwsInBheWxvYWRFcG9jaCI6Mywib3duZXIiOm51bGwsInBoYXNlIjpudWxsfSx7ImF1dGhvclNlcXVlbmNlIjowLCJjbGFzc2lmaWNhdGlvbiI6InBpbm5lZC1nZW5lc2lzIiwiZGlnZXN0IjoiOWEzNDFlZTUyODQxOWIxMTc4OTRjNDkxYmU4ZjUyZjZkYmZhNzZjNTRkMzU3NTE4N2ZlNTFjNjk0OWJlNWUyMiIsInBheWxvYWRFcG9jaCI6Mywib3duZXIiOm51bGwsInBoYXNlIjpudWxsfV19LCJjb250cm9sRGV0YWlsIjoiZnVsZmlsbGVkIiwiY3JlYXRvckpvdXJuYWxCZWZvcmUiOlt7ImF1dGhvciI6ImFiZjNiMjEzZGIxYTBlMzdjZjNmMGYxYjdhMDBiZTUwM2RlYzM2NTAwODBmNWMzNTM2Njc4ZTk4ODdkN2JlMWQiLCJhdXRob3JTZXF1ZW5jZSI6MCwiZGlnZXN0IjoiNWM3MjhmZjljMGIyOWVlMjAzNjRjYmI5ZDg2MzYwMTg1MzU2MTg3YThlMzgzOWU5MTZmYTZmNGEwZmVmZWQ5YyIsImVwb2NoIjowLCJvYmplY3RJZCI6ImNyZWF0b3I6ZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGQifV0sIm1pc3NpbmciOnsiY29sZFJlb3BlbkNvdW50IjoxLCJyb3dzIjpbeyJhbmNob3IiOiI0ODlkNDEzMmE0MjU3YTIzZTg0MTFjNzY2ZTdhYmUxYjRiMDhjZTAzMzRjNGU4YzEzZGNmMjA3ZjljYWRjOTJlIiwiYXV0aG9yIjoiMzMyZGM3NGEwYjI2ODc1MTNiMGZiMDVjNzM1Njg4ODJjYWM1N2EwMjU5NDU2OWQxYmIyNjZiZTgwNzRiYjEzNiIsImF1dGhvclNlcXVlbmNlIjowLCJkaWdlc3QiOiI5YTM0MWVlNTI4NDE5YjExNzg5NGM0OTFiZThmNTJmNmRiZmE3NmM1NGQzNTc1MTg3ZmU1MWM2OTQ5YmU1ZTIyIiwiZXBvY2giOjAsIm9iamVjdElkIjoiY3JlYXRvcjpkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZCIsInByZWltYWdlSGV4IjoiMDgwYTA1MDQ2YjY5NmU2NDA1MGE2NDcyNzAyZDc2NjU3Mjc0NjU3ODA1MDU2NTcwNmY2MzY4MDMwMDA1MDY2MTZlNjM2ODZmNzIwNTQwMzQzODM5NjQzNDMxMzMzMjYxMzQzMjM1Mzc2MTMyMzM2NTM4MzQzMTMxNjMzNzM2MzY2NTM3NjE2MjY1MzE2MjM0NjIzMDM4NjM2NTMwMzMzMzM0NjMzNDY1Mzg2MzMxMzM2NDYzNjYzMjMwMzc2NjM5NjM2MTY0NjMzOTMyNjUwNTA2NjE3NTc0Njg2ZjcyMDU0MDMzMzMzMjY0NjMzNzM0NjEzMDYyMzIzNjM4MzczNTMxMzM2MjMwNjY2MjMwMzU2MzM3MzMzNTM2MzgzODM4MzI2MzYxNjMzNTM3NjEzMDMyMzUzOTM0MzUzNjM5NjQzMTYyNjIzMjM2MzY2MjY1MzgzMDM3MzQ2MjYyMzEzMzM2MDUwODZmNjI2YTY1NjM3NDQ5NjQwNTI4NjM3MjY1NjE3NDZmNzIzYTY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQwNTA5NmY3MDY1NzI2MTc0Njk2ZjZlMDgwMjA1MDY2MTYzNzQ2OTZmNmUwNTA0NmE2ZjY5NmUwNTA4NjM2YzY5NjU2ZTc0NDk2NDA1MDM2MjZmNjIwNTBiNmM2ZjY3Njk2MzYxNmM1NDY5NmQ2NTAzMDIwNTBjNjQ2NTcwNjU2ZTY0NjU2ZTYzNjk2NTczMDcwMTA1NDAzNDM4Mzk2NDM0MzEzMzMyNjEzNDMyMzUzNzYxMzIzMzY1MzgzNDMxMzE2MzM3MzYzNjY1Mzc2MTYyNjUzMTYyMzQ2MjMwMzg2MzY1MzAzMzMzMzQ2MzM0NjUzODYzMzEzMzY0NjM2NjMyMzAzNzY2Mzk2MzYxNjQ2MzM5MzI2NTA1MGQ3MDcyNmY3NDZmNjM2ZjZjNGQ2MTZhNmY3MjAzMDYwNTBlNjE3NTc0Njg2ZjcyNTM2NTcxNzU2NTZlNjM2NTAzMDAiLCJwdWJsaXNoU3RhdGUiOiJwZW5kaW5nIn1dLCJ0cmFjZSI6W3siYXV0aG9yU2VxdWVuY2UiOjAsImNsYXNzaWZpY2F0aW9uIjoiY3VycmVudCIsImRpZ2VzdCI6IjlhMzQxZWU1Mjg0MTliMTE3ODk0YzQ5MWJlOGY1MmY2ZGJmYTc2YzU0ZDM1NzUxODdmZTUxYzY5NDliZTVlMjIiLCJwYXlsb2FkRXBvY2giOjAsIm93bmVyIjpudWxsLCJwaGFzZSI6bnVsbH0seyJjbGFzc2lmaWNhdGlvbiI6ImFjdGl2YXRpb24iLCJkaXNwbGFjZWRJc3N1YW5jZUJvdW5kYXJ5IjpudWxsLCJwYXlsb2FkRXBvY2giOjAsIm93bmVyIjpudWxsLCJwaGFzZSI6bnVsbH0seyJhdXRob3JTZXF1ZW5jZSI6MCwiY2xhc3NpZmljYXRpb24iOiJyZWplY3RlZCIsImRpZ2VzdCI6IjlhMzQxZWU1Mjg0MTliMTE3ODk0YzQ5MWJlOGY1MmY2ZGJmYTc2YzU0ZDM1NzUxODdmZTUxYzY5NDliZTVlMjIiLCJwYXlsb2FkRXBvY2giOjMsIm93bmVyIjoicHJlZGVjZXNzb3ItdmFsaWRhdGlvbiIsInBoYXNlIjpudWxsfSx7ImF1dGhvclNlcXVlbmNlIjowLCJjbGFzc2lmaWNhdGlvbiI6InJlamVjdGVkIiwiZGlnZXN0IjoiOWEzNDFlZTUyODQxOWIxMTc4OTRjNDkxYmU4ZjUyZjZkYmZhNzZjNTRkMzU3NTE4N2ZlNTFjNjk0OWJlNWUyMiIsInBheWxvYWRFcG9jaCI6Miwib3duZXIiOiJwcmVkZWNlc3Nvci12YWxpZGF0aW9uIiwicGhhc2UiOm51bGx9XX0sIm1pc3NpbmdEZXRhaWwiOiJwYWdlLmV2YWx1YXRlOiBUeXBlRXJyb3I6IHYzIHJvb20gc3VjY2Vzc29yIHJlb3BlbiBmYWlsZWQ6IHJlY292ZXJ5LXJlamVjdGVkOiBjcmVhdG9yIHByZWRlY2Vzc29yIHJlY292ZXJ5IGZhaWxlZDogYWRtaXNzaW9uLXJlamVjdGVkXG4gICAgYXQgY3JlYXRlVjNSb29tU2Vzc2lvbk93bmVkIChodHRwOi8vMTI3LjAuMC4xOjQ5NDU4L2VudHJ5LmpzOjQ0NzMzOjE1KVxuICAgIGF0IGFzeW5jIGpvaW5Sb29tIChodHRwOi8vMTI3LjAuMC4xOjQ5NDU4L2VudHJ5LmpzOjU1MzMwOjE2KVxuICAgIGF0IGFzeW5jIE9iamVjdC5qb2luIChodHRwOi8vMTI3LjAuMC4xOjQ5NDU4L2VudHJ5LmpzOjU1NDMyOjE4KVxuICAgIGF0IGFzeW5jIDxhbm9ueW1vdXM+OjMzNzozMCIsInRyZWF0bWVudCI6eyJjb2xkUmVvcGVuQ291bnQiOjEsInJvd3MiOlt7ImFuY2hvciI6IjQ4OWQ0MTMyYTQyNTdhMjNlODQxMWM3NjZlN2FiZTFiNGIwOGNlMDMzNGM0ZThjMTNkY2YyMDdmOWNhZGM5MmUiLCJhdXRob3IiOiIzMzJkYzc0YTBiMjY4NzUxM2IwZmIwNWM3MzU2ODg4MmNhYzU3YTAyNTk0NTY5ZDFiYjI2NmJlODA3NGJiMTM2IiwiYXV0aG9yU2VxdWVuY2UiOjAsImRpZ2VzdCI6IjlhMzQxZWU1Mjg0MTliMTE3ODk0YzQ5MWJlOGY1MmY2ZGJmYTc2YzU0ZDM1NzUxODdmZTUxYzY5NDliZTVlMjIiLCJlcG9jaCI6MCwib2JqZWN0SWQiOiJjcmVhdG9yOmRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkIiwicHJlaW1hZ2VIZXgiOiIwODBhMDUwNDZiNjk2ZTY0MDUwYTY0NzI3MDJkNzY2NTcyNzQ2NTc4MDUwNTY1NzA2ZjYzNjgwMzAwMDUwNjYxNmU2MzY4NmY3MjA1NDAzNDM4Mzk2NDM0MzEzMzMyNjEzNDMyMzUzNzYxMzIzMzY1MzgzNDMxMzE2MzM3MzYzNjY1Mzc2MTYyNjUzMTYyMzQ2MjMwMzg2MzY1MzAzMzMzMzQ2MzM0NjUzODYzMzEzMzY0NjM2NjMyMzAzNzY2Mzk2MzYxNjQ2MzM5MzI2NTA1MDY2MTc1NzQ2ODZmNzIwNTQwMzMzMzMyNjQ2MzM3MzQ2MTMwNjIzMjM2MzgzNzM1MzEzMzYyMzA2NjYyMzAzNTYzMzczMzM1MzYzODM4MzgzMjYzNjE2MzM1Mzc2MTMwMzIzNTM5MzQzNTM2Mzk2NDMxNjI2MjMyMzYzNjYyNjUzODMwMzczNDYyNjIzMTMzMzYwNTA4NmY2MjZhNjU2Mzc0NDk2NDA1Mjg2MzcyNjU2MTc0NmY3MjNhNjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDA1MDk2ZjcwNjU3MjYxNzQ2OTZmNmUwODAyMDUwNjYxNjM3NDY5NmY2ZTA1MDQ2YTZmNjk2ZTA1MDg2MzZjNjk2NTZlNzQ0OTY0MDUwMzYyNmY2MjA1MGI2YzZmNjc2OTYzNjE2YzU0Njk2ZDY1MDMwMjA1MGM2NDY1NzA2NTZlNjQ2NTZlNjM2OTY1NzMwNzAxMDU0MDM0MzgzOTY0MzQzMTMzMzI2MTM0MzIzNTM3NjEzMjMzNjUzODM0MzEzMTYzMzczNjM2NjUzNzYxNjI2NTMxNjIzNDYyMzAzODYzNjUzMDMzMzMzNDYzMzQ2NTM4NjMzMTMzNjQ2MzY2MzIzMDM3NjYzOTYzNjE2NDYzMzkzMjY1MDUwZDcwNzI2Zjc0NmY2MzZmNmM0ZDYxNmE2ZjcyMDMwNjA1MGU2MTc1NzQ2ODZmNzI1MzY1NzE3NTY1NmU2MzY1MDMwMCIsInB1Ymxpc2hTdGF0ZSI6InBlbmRpbmcifV0sInRyYWNlIjpbeyJhdXRob3JTZXF1ZW5jZSI6MCwiY2xhc3NpZmljYXRpb24iOiJjdXJyZW50IiwiZGlnZXN0IjoiOWEzNDFlZTUyODQxOWIxMTc4OTRjNDkxYmU4ZjUyZjZkYmZhNzZjNTRkMzU3NTE4N2ZlNTFjNjk0OWJlNWUyMiIsInBheWxvYWRFcG9jaCI6MCwib3duZXIiOm51bGwsInBoYXNlIjpudWxsfSx7ImNsYXNzaWZpY2F0aW9uIjoiYWN0aXZhdGlvbiIsImRpc3BsYWNlZElzc3VhbmNlQm91bmRhcnkiOm51bGwsInBheWxvYWRFcG9jaCI6MCwib3duZXIiOm51bGwsInBoYXNlIjpudWxsfSx7ImF1dGhvclNlcXVlbmNlIjowLCJjbGFzc2lmaWNhdGlvbiI6InJlamVjdGVkIiwiZGlnZXN0IjoiOWEzNDFlZTUyODQxOWIxMTc4OTRjNDkxYmU4ZjUyZjZkYmZhNzZjNTRkMzU3NTE4N2ZlNTFjNjk0OWJlNWUyMiIsInBheWxvYWRFcG9jaCI6Mywib3duZXIiOiJwcmVkZWNlc3Nvci12YWxpZGF0aW9uIiwicGhhc2UiOm51bGx9LHsiYXV0aG9yU2VxdWVuY2UiOjAsImNsYXNzaWZpY2F0aW9uIjoicmVqZWN0ZWQiLCJkaWdlc3QiOiI5YTM0MWVlNTI4NDE5YjExNzg5NGM0OTFiZThmNTJmNmRiZmE3NmM1NGQzNTc1MTg3ZmU1MWM2OTQ5YmU1ZTIyIiwicGF5bG9hZEVwb2NoIjoyLCJvd25lciI6InByZWRlY2Vzc29yLXZhbGlkYXRpb24iLCJwaGFzZSI6bnVsbH1dfSwidHJlYXRtZW50RGV0YWlsIjoicGFnZS5ldmFsdWF0ZTogVHlwZUVycm9yOiB2MyByb29tIHN1Y2Nlc3NvciByZW9wZW4gZmFpbGVkOiByZWNvdmVyeS1yZWplY3RlZDogY3JlYXRvciBwcmVkZWNlc3NvciByZWNvdmVyeSBmYWlsZWQ6IGFkbWlzc2lvbi1yZWplY3RlZFxuICAgIGF0IGNyZWF0ZVYzUm9vbVNlc3Npb25Pd25lZCAoaHR0cDovLzEyNy4wLjAuMTo0OTQ2MS9lbnRyeS5qczo0NDczMzoxNSlcbiAgICBhdCBhc3luYyBqb2luUm9vbSAoaHR0cDovLzEyNy4wLjAuMTo0OTQ2MS9lbnRyeS5qczo1NTMzMDoxNilcbiAgICBhdCBhc3luYyBPYmplY3Quam9pbiAoaHR0cDovLzEyNy4wLjAuMTo0OTQ2MS9lbnRyeS5qczo1NTQzMjoxOClcbiAgICBhdCBhc3luYyA8YW5vbnltb3VzPjozMzc6MzAifQ=="
++                    }
++                  ]
++                }
++              ],
++              "status": "expected"
++            }
++          ],
++          "id": "a27ca8e8a7840963c3e5-38a08726d8f148169a3d",
++          "file": "phase-6a-creator-successor-product.pw.ts",
++          "line": 3045,
++          "column": 1
++        },
++        {
++          "title": "D.110c-0c1f2 non-creator writer requires an authenticated historical frontier",
++          "ok": true,
++          "tags": [],
++          "tests": [
++            {
++              "timeout": 90000,
++              "annotations": [],
++              "expectedStatus": "passed",
++              "projectId": "chromium",
++              "projectName": "chromium",
++              "results": [
++                {
++                  "workerIndex": 0,
++                  "parallelIndex": 0,
++                  "status": "passed",
++                  "duration": 2053,
++                  "errors": [],
++                  "stdout": [],
++                  "stderr": [],
++                  "retry": 0,
++                  "startTime": "2026-09-03T21:57:32.422Z",
++                  "annotations": [],
++                  "attachments": [
++                    {
++                      "name": "d110c-0c1f2-product-green",
++                      "contentType": "application/json",
++                      "body": "eyJib290c3RyYXBSb3dzIjpbeyJhbmNob3IiOiI0ODlkNDEzMmE0MjU3YTIzZTg0MTFjNzY2ZTdhYmUxYjRiMDhjZTAzMzRjNGU4YzEzZGNmMjA3ZjljYWRjOTJlIiwiYXV0aG9yIjoiMzMyZGM3NGEwYjI2ODc1MTNiMGZiMDVjNzM1Njg4ODJjYWM1N2EwMjU5NDU2OWQxYmIyNjZiZTgwNzRiYjEzNiIsImF1dGhvclNlcXVlbmNlIjowLCJkaWdlc3QiOiI5YTM0MWVlNTI4NDE5YjExNzg5NGM0OTFiZThmNTJmNmRiZmE3NmM1NGQzNTc1MTg3ZmU1MWM2OTQ5YmU1ZTIyIiwiZXBvY2giOjAsIm9iamVjdElkIjoiY3JlYXRvcjpkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZCIsInByZWltYWdlSGV4IjoiMDgwYTA1MDQ2YjY5NmU2NDA1MGE2NDcyNzAyZDc2NjU3Mjc0NjU3ODA1MDU2NTcwNmY2MzY4MDMwMDA1MDY2MTZlNjM2ODZmNzIwNTQwMzQzODM5NjQzNDMxMzMzMjYxMzQzMjM1Mzc2MTMyMzM2NTM4MzQzMTMxNjMzNzM2MzY2NTM3NjE2MjY1MzE2MjM0NjIzMDM4NjM2NTMwMzMzMzM0NjMzNDY1Mzg2MzMxMzM2NDYzNjYzMjMwMzc2NjM5NjM2MTY0NjMzOTMyNjUwNTA2NjE3NTc0Njg2ZjcyMDU0MDMzMzMzMjY0NjMzNzM0NjEzMDYyMzIzNjM4MzczNTMxMzM2MjMwNjY2MjMwMzU2MzM3MzMzNTM2MzgzODM4MzI2MzYxNjMzNTM3NjEzMDMyMzUzOTM0MzUzNjM5NjQzMTYyNjIzMjM2MzY2MjY1MzgzMDM3MzQ2MjYyMzEzMzM2MDUwODZmNjI2YTY1NjM3NDQ5NjQwNTI4NjM3MjY1NjE3NDZmNzIzYTY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQwNTA5NmY3MDY1NzI2MTc0Njk2ZjZlMDgwMjA1MDY2MTYzNzQ2OTZmNmUwNTA0NmE2ZjY5NmUwNTA4NjM2YzY5NjU2ZTc0NDk2NDA1MDM2MjZmNjIwNTBiNmM2ZjY3Njk2MzYxNmM1NDY5NmQ2NTAzMDIwNTBjNjQ2NTcwNjU2ZTY0NjU2ZTYzNjk2NTczMDcwMTA1NDAzNDM4Mzk2NDM0MzEzMzMyNjEzNDMyMzUzNzYxMzIzMzY1MzgzNDMxMzE2MzM3MzYzNjY1Mzc2MTYyNjUzMTYyMzQ2MjMwMzg2MzY1MzAzMzMzMzQ2MzM0NjUzODYzMzEzMzY0NjM2NjMyMzAzNzY2Mzk2MzYxNjQ2MzM5MzI2NTA1MGQ3MDcyNmY3NDZmNjM2ZjZjNGQ2MTZhNmY3MjAzMDYwNTBlNjE3NTc0Njg2ZjcyNTM2NTcxNzU2NTZlNjM2NTAzMDAiLCJwdWJsaXNoU3RhdGUiOiJwZW5kaW5nIn1dLCJjcmVhdG9ySm91cm5hbEFmdGVyV3JpdGVyT25lIjpbeyJhdXRob3IiOiJhYmYzYjIxM2RiMWEwZTM3Y2YzZjBmMWI3YTAwYmU1MDNkZWMzNjUwMDgwZjVjMzUzNjY3OGU5ODg3ZDdiZTFkIiwiYXV0aG9yU2VxdWVuY2UiOjAsImRpZ2VzdCI6IjVjNzI4ZmY5YzBiMjllZTIwMzY0Y2JiOWQ4NjM2MDE4NTM1NjE4N2E4ZTM4MzllOTE2ZmE2ZjRhMGZlZmVkOWMiLCJlcG9jaCI6MCwib2JqZWN0SWQiOiJjcmVhdG9yOmRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkIn0seyJhdXRob3IiOiJhYmYzYjIxM2RiMWEwZTM3Y2YzZjBmMWI3YTAwYmU1MDNkZWMzNjUwMDgwZjVjMzUzNjY3OGU5ODg3ZDdiZTFkIiwiYXV0aG9yU2VxdWVuY2UiOjEsImRpZ2VzdCI6ImQ4YTg2NDY2MDhmYTU1OTU5YTFkMTM2ZDI2NDFmMWIyZDE5NWNlZDg4YzY2NDdjYjk0MjM0NWEzOTBjNDQ3MzQiLCJlcG9jaCI6MCwib2JqZWN0SWQiOiJjcmVhdG9yOmRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkIn0seyJhdXRob3IiOiIzMzJkYzc0YTBiMjY4NzUxM2IwZmIwNWM3MzU2ODg4MmNhYzU3YTAyNTk0NTY5ZDFiYjI2NmJlODA3NGJiMTM2IiwiYXV0aG9yU2VxdWVuY2UiOjEsImRpZ2VzdCI6IjJlZWY0ZjgxYjAyMmM0MWM1OTc1NGYyY2RmYzEzZTExYmFiMTM2NzAzMjFiMDA0ZGJmZWIyYjFjYmFmNGViODEiLCJlcG9jaCI6MSwib2JqZWN0SWQiOiJjcmVhdG9yOmRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkIn1dLCJjcmVhdG9ySm91cm5hbEJlZm9yZSI6W3siYXV0aG9yIjoiYWJmM2IyMTNkYjFhMGUzN2NmM2YwZjFiN2EwMGJlNTAzZGVjMzY1MDA4MGY1YzM1MzY2NzhlOTg4N2Q3YmUxZCIsImF1dGhvclNlcXVlbmNlIjowLCJkaWdlc3QiOiI1YzcyOGZmOWMwYjI5ZWUyMDM2NGNiYjlkODYzNjAxODUzNTYxODdhOGUzODM5ZTkxNmZhNmY0YTBmZWZlZDljIiwiZXBvY2giOjAsIm9iamVjdElkIjoiY3JlYXRvcjpkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZCJ9XSwiY3VycmVudEVwb2NoIjozLCJkaXNwbGFjZWRFcG9jaCI6MiwiaW50ZXJtZWRpYXRlUm93cyI6W3siYW5jaG9yIjoiMTIyNTdiNThlNGNiOTAzYjc3NDMzMmQ4ODYxOTNhYzQwM2E2ODM1OTg4ZjI5Njk5NjI3NTRjYTZkNjI0ZDY0OSIsImF1dGhvciI6IjMzMmRjNzRhMGIyNjg3NTEzYjBmYjA1YzczNTY4ODgyY2FjNTdhMDI1OTQ1NjlkMWJiMjY2YmU4MDc0YmIxMzYiLCJhdXRob3JTZXF1ZW5jZSI6MSwiZGlnZXN0IjoiMmVlZjRmODFiMDIyYzQxYzU5NzU0ZjJjZGZjMTNlMTFiYWIxMzY3MDMyMWIwMDRkYmZlYjJiMWNiYWY0ZWI4MSIsImVwb2NoIjoxLCJvYmplY3RJZCI6ImNyZWF0b3I6ZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGQiLCJwcmVpbWFnZUhleCI6IjA4MGEwNTA0NmI2OTZlNjQwNTBhNjQ3MjcwMmQ3NjY1NzI3NDY1NzgwNTA1NjU3MDZmNjM2ODAzMDIwNTA2NjE2ZTYzNjg2ZjcyMDU0MDMxMzIzMjM1Mzc2MjM1Mzg2NTM0NjM2MjM5MzAzMzYyMzczNzM0MzMzMzMyNjQzODM4MzYzMTM5MzM2MTYzMzQzMDMzNjEzNjM4MzMzNTM5MzgzODY2MzIzOTM2MzkzOTM2MzIzNzM1MzQ2MzYxMzY2NDM2MzIzNDY0MzYzNDM5MDUwNjYxNzU3NDY4NmY3MjA1NDAzMzMzMzI2NDYzMzczNDYxMzA2MjMyMzYzODM3MzUzMTMzNjIzMDY2NjIzMDM1NjMzNzMzMzUzNjM4MzgzODMyNjM2MTYzMzUzNzYxMzAzMjM1MzkzNDM1MzYzOTY0MzE2MjYyMzIzNjM2NjI2NTM4MzAzNzM0NjI2MjMxMzMzNjA1MDg2ZjYyNmE2NTYzNzQ0OTY0MDUyODYzNzI2NTYxNzQ2ZjcyM2E2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0MDUwOTZmNzA2NTcyNjE3NDY5NmY2ZTA4MDMwNTA0NzQ2NTc4NzQwNTFjNjQzMTMxMzA2MzJkMzA2MzMxNjYzMjJkNzc3MjY5NzQ2NTcyMmQ2NTcwNmY2MzY4MmQ2ZjZlNjUwNTA2NjE2Mzc0Njk2ZjZlMDUwNzZkNjU3MzczNjE2NzY1MDUxMTYzNmM2OTY1NmU3NDRmNzA2NTcyNjE3NDY5NmY2ZTQ5NjQwNTI0MzUzODMwMzEzOTMwNjEzNjJkMzEzMTYxMzUyZDM0MzYzOTM0MmQzOTYyMzgzNzJkMzk2MjM3MzM2MzMxMzE2MTM3MzU2NDY0MDUwYjZjNmY2NzY5NjM2MTZjNTQ2OTZkNjUwMzA4MDUwYzY0NjU3MDY1NmU2NDY1NmU2MzY5NjU3MzA3MDEwNTQwMzEzMjMyMzUzNzYyMzUzODY1MzQ2MzYyMzkzMDMzNjIzNzM3MzQzMzMzMzI2NDM4MzgzNjMxMzkzMzYxNjMzNDMwMzM2MTM2MzgzMzM1MzkzODM4NjYzMjM5MzYzOTM5MzYzMjM3MzUzNDYzNjEzNjY0MzYzMjM0NjQzNjM0MzkwNTBkNzA3MjZmNzQ2ZjYzNmY2YzRkNjE2YTZmNzIwMzA2MDUwZTYxNzU3NDY4NmY3MjUzNjU3MTc1NjU2ZTYzNjUwMzAyIiwicHVibGlzaFN0YXRlIjoicHVibGlzaGVkIn1dLCJyZW9wZW5lZFJvd3MiOlt7ImFuY2hvciI6IjQ4OWQ0MTMyYTQyNTdhMjNlODQxMWM3NjZlN2FiZTFiNGIwOGNlMDMzNGM0ZThjMTNkY2YyMDdmOWNhZGM5MmUiLCJhdXRob3IiOiIzMzJkYzc0YTBiMjY4NzUxM2IwZmIwNWM3MzU2ODg4MmNhYzU3YTAyNTk0NTY5ZDFiYjI2NmJlODA3NGJiMTM2IiwiYXV0aG9yU2VxdWVuY2UiOjAsImRpZ2VzdCI6IjlhMzQxZWU1Mjg0MTliMTE3ODk0YzQ5MWJlOGY1MmY2ZGJmYTc2YzU0ZDM1NzUxODdmZTUxYzY5NDliZTVlMjIiLCJlcG9jaCI6MCwib2JqZWN0SWQiOiJjcmVhdG9yOmRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkIiwicHJlaW1hZ2VIZXgiOiIwODBhMDUwNDZiNjk2ZTY0MDUwYTY0NzI3MDJkNzY2NTcyNzQ2NTc4MDUwNTY1NzA2ZjYzNjgwMzAwMDUwNjYxNmU2MzY4NmY3MjA1NDAzNDM4Mzk2NDM0MzEzMzMyNjEzNDMyMzUzNzYxMzIzMzY1MzgzNDMxMzE2MzM3MzYzNjY1Mzc2MTYyNjUzMTYyMzQ2MjMwMzg2MzY1MzAzMzMzMzQ2MzM0NjUzODYzMzEzMzY0NjM2NjMyMzAzNzY2Mzk2MzYxNjQ2MzM5MzI2NTA1MDY2MTc1NzQ2ODZmNzIwNTQwMzMzMzMyNjQ2MzM3MzQ2MTMwNjIzMjM2MzgzNzM1MzEzMzYyMzA2NjYyMzAzNTYzMzczMzM1MzYzODM4MzgzMjYzNjE2MzM1Mzc2MTMwMzIzNTM5MzQzNTM2Mzk2NDMxNjI2MjMyMzYzNjYyNjUzODMwMzczNDYyNjIzMTMzMzYwNTA4NmY2MjZhNjU2Mzc0NDk2NDA1Mjg2MzcyNjU2MTc0NmY3MjNhNjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDA1MDk2ZjcwNjU3MjYxNzQ2OTZmNmUwODAyMDUwNjYxNjM3NDY5NmY2ZTA1MDQ2YTZmNjk2ZTA1MDg2MzZjNjk2NTZlNzQ0OTY0MDUwMzYyNmY2MjA1MGI2YzZmNjc2OTYzNjE2YzU0Njk2ZDY1MDMwMjA1MGM2NDY1NzA2NTZlNjQ2NTZlNjM2OTY1NzMwNzAxMDU0MDM0MzgzOTY0MzQzMTMzMzI2MTM0MzIzNTM3NjEzMjMzNjUzODM0MzEzMTYzMzczNjM2NjUzNzYxNjI2NTMxNjIzNDYyMzAzODYzNjUzMDMzMzMzNDYzMzQ2NTM4NjMzMTMzNjQ2MzY2MzIzMDM3NjYzOTYzNjE2NDYzMzkzMjY1MDUwZDcwNzI2Zjc0NmY2MzZmNmM0ZDYxNmE2ZjcyMDMwNjA1MGU2MTc1NzQ2ODZmNzI1MzY1NzE3NTY1NmU2MzY1MDMwMCIsInB1Ymxpc2hTdGF0ZSI6InB1Ymxpc2hlZCJ9LHsiYW5jaG9yIjoiMTIyNTdiNThlNGNiOTAzYjc3NDMzMmQ4ODYxOTNhYzQwM2E2ODM1OTg4ZjI5Njk5NjI3NTRjYTZkNjI0ZDY0OSIsImF1dGhvciI6IjMzMmRjNzRhMGIyNjg3NTEzYjBmYjA1YzczNTY4ODgyY2FjNTdhMDI1OTQ1NjlkMWJiMjY2YmU4MDc0YmIxMzYiLCJhdXRob3JTZXF1ZW5jZSI6MSwiZGlnZXN0IjoiMmVlZjRmODFiMDIyYzQxYzU5NzU0ZjJjZGZjMTNlMTFiYWIxMzY3MDMyMWIwMDRkYmZlYjJiMWNiYWY0ZWI4MSIsImVwb2NoIjoxLCJvYmplY3RJZCI6ImNyZWF0b3I6ZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGQiLCJwcmVpbWFnZUhleCI6IjA4MGEwNTA0NmI2OTZlNjQwNTBhNjQ3MjcwMmQ3NjY1NzI3NDY1NzgwNTA1NjU3MDZmNjM2ODAzMDIwNTA2NjE2ZTYzNjg2ZjcyMDU0MDMxMzIzMjM1Mzc2MjM1Mzg2NTM0NjM2MjM5MzAzMzYyMzczNzM0MzMzMzMyNjQzODM4MzYzMTM5MzM2MTYzMzQzMDMzNjEzNjM4MzMzNTM5MzgzODY2MzIzOTM2MzkzOTM2MzIzNzM1MzQ2MzYxMzY2NDM2MzIzNDY0MzYzNDM5MDUwNjYxNzU3NDY4NmY3MjA1NDAzMzMzMzI2NDYzMzczNDYxMzA2MjMyMzYzODM3MzUzMTMzNjIzMDY2NjIzMDM1NjMzNzMzMzUzNjM4MzgzODMyNjM2MTYzMzUzNzYxMzAzMjM1MzkzNDM1MzYzOTY0MzE2MjYyMzIzNjM2NjI2NTM4MzAzNzM0NjI2MjMxMzMzNjA1MDg2ZjYyNmE2NTYzNzQ0OTY0MDUyODYzNzI2NTYxNzQ2ZjcyM2E2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0MDUwOTZmNzA2NTcyNjE3NDY5NmY2ZTA4MDMwNTA0NzQ2NTc4NzQwNTFjNjQzMTMxMzA2MzJkMzA2MzMxNjYzMjJkNzc3MjY5NzQ2NTcyMmQ2NTcwNmY2MzY4MmQ2ZjZlNjUwNTA2NjE2Mzc0Njk2ZjZlMDUwNzZkNjU3MzczNjE2NzY1MDUxMTYzNmM2OTY1NmU3NDRmNzA2NTcyNjE3NDY5NmY2ZTQ5NjQwNTI0MzUzODMwMzEzOTMwNjEzNjJkMzEzMTYxMzUyZDM0MzYzOTM0MmQzOTYyMzgzNzJkMzk2MjM3MzM2MzMxMzE2MTM3MzU2NDY0MDUwYjZjNmY2NzY5NjM2MTZjNTQ2OTZkNjUwMzA4MDUwYzY0NjU3MDY1NmU2NDY1NmU2MzY5NjU3MzA3MDEwNTQwMzEzMjMyMzUzNzYyMzUzODY1MzQ2MzYyMzkzMDMzNjIzNzM3MzQzMzMzMzI2NDM4MzgzNjMxMzkzMzYxNjMzNDMwMzM2MTM2MzgzMzM1MzkzODM4NjYzMjM5MzYzOTM5MzYzMjM3MzUzNDYzNjEzNjY0MzYzMjM0NjQzNjM0MzkwNTBkNzA3MjZmNzQ2ZjYzNmY2YzRkNjE2YTZmNzIwMzA2MDUwZTYxNzU3NDY4NmY3MjUzNjU3MTc1NjU2ZTYzNjUwMzAyIiwicHVibGlzaFN0YXRlIjoicHVibGlzaGVkIn0seyJhbmNob3IiOiIzMWZjYjRmMjMyMzY3ZTU5OWRiZTQzYWViY2RmMjgzYmFmY2UwNjFjYzYyNzc0ZjkwMmE3YTZmM2YxY2M5MDIwIiwiYXV0aG9yIjoiMzMyZGM3NGEwYjI2ODc1MTNiMGZiMDVjNzM1Njg4ODJjYWM1N2EwMjU5NDU2OWQxYmIyNjZiZTgwNzRiYjEzNiIsImF1dGhvclNlcXVlbmNlIjoyLCJkaWdlc3QiOiJiM2Q2ZmYzN2Q3ODlhYzJhNDI0NTI1ZDBiYzM5Y2E3YjljNDg5MmY1MTAwMzAyNjViYWY0ZGQxZmEyMTVjYzNmIiwiZXBvY2giOjMsIm9iamVjdElkIjoiY3JlYXRvcjpkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZCIsInByZWltYWdlSGV4IjoiMDgwYTA1MDQ2YjY5NmU2NDA1MGE2NDcyNzAyZDc2NjU3Mjc0NjU3ODA1MDU2NTcwNmY2MzY4MDMwNjA1MDY2MTZlNjM2ODZmNzIwNTQwMzMzMTY2NjM2MjM0NjYzMjMzMzIzMzM2Mzc2NTM1MzkzOTY0NjI2NTM0MzM2MTY1NjI2MzY0NjYzMjM4MzM2MjYxNjY2MzY1MzAzNjMxNjM2MzM2MzIzNzM3MzQ2NjM5MzAzMjYxMzc2MTM2NjYzMzY2MzE2MzYzMzkzMDMyMzAwNTA2NjE3NTc0Njg2ZjcyMDU0MDMzMzMzMjY0NjMzNzM0NjEzMDYyMzIzNjM4MzczNTMxMzM2MjMwNjY2MjMwMzU2MzM3MzMzNTM2MzgzODM4MzI2MzYxNjMzNTM3NjEzMDMyMzUzOTM0MzUzNjM5NjQzMTYyNjIzMjM2MzY2MjY1MzgzMDM3MzQ2MjYyMzEzMzM2MDUwODZmNjI2YTY1NjM3NDQ5NjQwNTI4NjM3MjY1NjE3NDZmNzIzYTY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQ2NDY0NjQwNTA5NmY3MDY1NzI2MTc0Njk2ZjZlMDgwMzA1MDQ3NDY1Nzg3NDA1MWU2NDMxMzEzMDYzMmQzMDYzMzE2NjMyMmQ3NzcyNjk3NDY1NzIyZDY1NzA2ZjYzNjgyZDc0Njg3MjY1NjUwNTA2NjE2Mzc0Njk2ZjZlMDUwNzZkNjU3MzczNjE2NzY1MDUxMTYzNmM2OTY1NmU3NDRmNzA2NTcyNjE3NDY5NmY2ZTQ5NjQwNTI0MzczNTMzNjMzMjY2MzkzOTJkMzM2NDM1MzYyZDM0MzI2NDYyMmQ2MjM1MzczNTJkMzUzMjYxMzQzMzM1MzEzNTY0MzkzMTYyMDUwYjZjNmY2NzY5NjM2MTZjNTQ2OTZkNjUwMzA4MDUwYzY0NjU3MDY1NmU2NDY1NmU2MzY5NjU3MzA3MDEwNTQwMzMzMTY2NjM2MjM0NjYzMjMzMzIzMzM2Mzc2NTM1MzkzOTY0NjI2NTM0MzM2MTY1NjI2MzY0NjYzMjM4MzM2MjYxNjY2MzY1MzAzNjMxNjM2MzM2MzIzNzM3MzQ2NjM5MzAzMjYxMzc2MTM2NjYzMzY2MzE2MzYzMzkzMDMyMzAwNTBkNzA3MjZmNzQ2ZjYzNmY2YzRkNjE2YTZmNzIwMzA2MDUwZTYxNzU3NDY4NmY3MjUzNjU3MTc1NjU2ZTYzNjUwMzA0IiwicHVibGlzaFN0YXRlIjoicHVibGlzaGVkIn1dLCJ0YXJnZXRSZWZ1c2FscyI6W119"
++                    }
++                  ]
++                }
++              ],
++              "status": "expected"
++            }
++          ],
++          "id": "a27ca8e8a7840963c3e5-0b643455daa45fd96b4e",
++          "file": "phase-6a-creator-successor-product.pw.ts",
++          "line": 3271,
++          "column": 1
++        }
++      ]
++    }
++  ],
++  "errors": [],
++  "stats": {
++    "startTime": "2026-09-03T21:57:28.566Z",
++    "duration": 5960.203,
++    "expected": 2,
++    "skipped": 0,
++    "unexpected": 0,
++    "flaky": 0
++  }
++}
+\ No newline at end of file
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.status b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.stderr.txt
+new file mode 100644
+index 00000000..f2dc801f
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.stderr.txt
+@@ -0,0 +1,2 @@
++(node:80057) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
++(Use `node --trace-warnings ...` to show where the warning was created)
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.stdout.txt
+new file mode 100644
+index 00000000..3cc74437
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/playwright.stdout.txt
+@@ -0,0 +1,8 @@
++
++Running 2 tests using 1 worker
++
++
++
++[1/2] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:3045:1 › D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen
++[2/2] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:3271:1 › D.110c-0c1f2 non-creator writer requires an authenticated historical frontier
++  2 passed (6.0s)
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/post-vitest-status.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/post-vitest-status.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/pre-browser-process-ports.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/pre-browser-process-ports.txt
+new file mode 100644
+index 00000000..59d7787d
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/pre-browser-process-ports.txt
+@@ -0,0 +1 @@
++79854
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/pre-checkout-status.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/pre-checkout-status.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/proof.md b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/proof.md
+new file mode 100644
+index 00000000..cdf94350
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/proof.md
+@@ -0,0 +1,24 @@
++# D.110c-0c1f5a clean-isolated proof
++
++- Temporary worktree: `/private/tmp/ts-drp-d109d-baseline.18SC07`
++- Signed commit: `52fe3b44a40ab025102cad7637bbd10fae6edaac`
++- Tree: `a174b6717d26ff2a1a41dd5e8b398efcaf996bd4`
++- `git verify-commit HEAD`: good RSA signature from
++  `Faolain <Faolain@users.noreply.github.com>`.
++- Installation: `pnpm install --offline --frozen-lockfile`, status zero.
++
++The worktree was tracked-clean before checkout and after all isolated gates.
++The offline install reused the existing pnpm store and ran the repository's
++normal workspace preparation; it did not depend on the main worktree's
++untracked paths.
++
++The RED-named f5a retained control passed its exact one file/title. A targeted
++two-file boundary then passed the multi-author registered-gossip case and the
++D.109d post-reclamation direct-retained case together (2 passed, 12 unselected
++tests pending), proving the temporary fixture classifier survives through
++authenticated admission and is restored before ordinary retained ingress.
++
++The exact two Chromium compatibility titles passed with expected/skipped/
++unexpected/flaky `2/0/0/0` and zero top-level errors. The f5a listing contains
++one exact file/title. No long campaign, D.110a invocation, dependency change,
++threshold change, Fable run, or collaboration subagent occurred.
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/source-identity.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/source-identity.txt
+new file mode 100644
+index 00000000..eeb2a82f
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/source-identity.txt
+@@ -0,0 +1,2 @@
++52fe3b44a40ab025102cad7637bbd10fae6edaac
++a174b6717d26ff2a1a41dd5e8b398efcaf996bd4
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/validate.mjs b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/validate.mjs
+new file mode 100644
+index 00000000..dcf1c56d
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/validate.mjs
+@@ -0,0 +1,58 @@
++import { readFileSync } from "node:fs";
++
++const read = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
++const json = (name) => JSON.parse(read(name));
++const invariant = (value, message) => {
++	if (!value) throw new TypeError(message);
++};
++for (const name of [
++	"checkout.status",
++	"verify-commit.status",
++	"install.status",
++	"f5a.status",
++	"fixture-boundary.status",
++	"listing.status",
++	"playwright.status",
++]) {
++	invariant(read(name).trim() === "0", `${name}:STATUS_INVALID`);
++}
++invariant(read("pre-checkout-status.txt") === "", "PRE_CHECKOUT_DIRTY");
++invariant(read("post-vitest-status.txt") === "", "POST_VITEST_DIRTY");
++invariant(read("final-worktree-status.txt") === "", "FINAL_WORKTREE_DIRTY");
++invariant(
++	read("source-identity.txt") ===
++		"52fe3b44a40ab025102cad7637bbd10fae6edaac\na174b6717d26ff2a1a41dd5e8b398efcaf996bd4\n",
++	"SOURCE_IDENTITY_INVALID"
++);
++const f5a = json("f5a.json");
++invariant(
++	f5a.testResults.length === 1 &&
++		f5a.numTotalTests === 1 &&
++		f5a.numPassedTests === 1 &&
++		f5a.numFailedTests === 0 &&
++		f5a.numPendingTests === 0 &&
++		f5a.success === true,
++	"F5A_REPORT_INVALID"
++);
++const boundary = json("fixture-boundary.json");
++invariant(
++	boundary.testResults.length === 2 &&
++		boundary.numTotalTests === 14 &&
++		boundary.numPassedTests === 2 &&
++		boundary.numFailedTests === 0 &&
++		boundary.numPendingTests === 12 &&
++		boundary.success === true,
++	"FIXTURE_BOUNDARY_REPORT_INVALID"
++);
++const playwright = json("playwright.json");
++invariant(playwright.errors.length === 0, "PLAYWRIGHT_TOP_LEVEL_ERROR");
++invariant(playwright.stats.expected === 2, "PLAYWRIGHT_EXPECTED_INVALID");
++invariant(playwright.stats.skipped === 0, "PLAYWRIGHT_SKIPPED_INVALID");
++invariant(playwright.stats.unexpected === 0, "PLAYWRIGHT_UNEXPECTED_INVALID");
++invariant(playwright.stats.flaky === 0, "PLAYWRIGHT_FLAKY_INVALID");
++invariant(
++	read("listing.txt").trim() ===
++		"tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts > D.110c-0c1f5 foreign-author close liveness > keeps foreign frontier anomalies author-local while creator corruption stays fail closed",
++	"LISTING_INVALID"
++);
++process.stdout.write(JSON.stringify({ browser: 2, f5a: 1, fixtureBoundary: 2, status: "VALID" }) + "\n");
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/validation.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/validation.txt
+new file mode 100644
+index 00000000..fd439832
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/validation.txt
+@@ -0,0 +1 @@
++{"browser":2,"f5a":1,"fixtureBoundary":2,"status":"VALID"}
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/verify-commit.status b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/verify-commit.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/verify-commit.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/verify-commit.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/verify-commit.stderr.txt
+new file mode 100644
+index 00000000..973f433f
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/verify-commit.stderr.txt
+@@ -0,0 +1,3 @@
++gpg: Signature made Thu Sep  3 17:55:03 2026 AST
++gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
++gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44-v2/verify-commit.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44-v2/verify-commit.stdout.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/SHA256SUMS b/.logs/d110c-0c1f5a-clean-52fe3b44/SHA256SUMS
+new file mode 100644
+index 00000000..a88dfa87
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/SHA256SUMS
+@@ -0,0 +1,12 @@
++56292515f7d3a7110811eb8de26b3f75f82a0766aa5a1fd66ebcfcb84fe6d5ff  ./checkout.status
++45e2253df11332734285ff97ef560ca6e0de21187267bea743111b70671c0644  ./checkout.stderr.txt
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./checkout.stdout.txt
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./install.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./install.stderr.txt
++e3075bfabbff369b61f0e35cf2ed26e9bae281d86984943286707e1a8ceee994  ./install.stdout.txt
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./pre-checkout-status.txt
++0a06ad1b228efff9534ae7fc12b0e821bb5d811127d0ea630b5d112288842d5e  ./setup-failure.md
++709f9a590f53645058c67e2179438c99dbf904913615f7d82d98cca42124e9a8  ./source-identity.txt
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./verify-commit.status
++768863d228982bc02d51ab05f7522d5115de74fd8f125c73481695665b4886ea  ./verify-commit.stderr.txt
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./verify-commit.stdout.txt
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/checkout.status b/.logs/d110c-0c1f5a-clean-52fe3b44/checkout.status
+new file mode 100644
+index 00000000..a949a93d
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/checkout.status
+@@ -0,0 +1 @@
++128
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/checkout.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44/checkout.stderr.txt
+new file mode 100644
+index 00000000..4d923655
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/checkout.stderr.txt
+@@ -0,0 +1 @@
++fatal: unable to read tree (52fe3b44e30a946f42bea2095d1ea2a85c0f72a9)
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/checkout.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44/checkout.stdout.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/install.status b/.logs/d110c-0c1f5a-clean-52fe3b44/install.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/install.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/install.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44/install.stderr.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/install.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44/install.stdout.txt
+new file mode 100644
+index 00000000..439bf870
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/install.stdout.txt
+@@ -0,0 +1,104 @@
++Scope: all 48 workspace projects
++Lockfile is up to date, resolution step is skipped
++Already up to date
++
++. postinstall$ node scripts/ensure-native-deps.mjs && pnpm build:packages
++. postinstall: > ts-drp@0.11.0 build:packages /private/tmp/ts-drp-d109d-baseline.18SC07
++. postinstall: > pnpm --filter '@ts-drp/*' build
++. postinstall: Scope: 40 of 48 workspace projects
++. postinstall: packages/canonical build$ tsc -b tsconfig.build.json
++. postinstall: packages/ephemeral build$ tsc -b tsconfig.build.json
++. postinstall: packages/errors build$ tsc -b tsconfig.build.json
++. postinstall: packages/membership build$ tsc -b tsconfig.build.json
++. postinstall: packages/ephemeral build: Done
++. postinstall: packages/types build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/canonical build: Done
++. postinstall: packages/errors build: Done
++. postinstall: packages/membership build: Done
++. postinstall: packages/types build: Done
++. postinstall: packages/blueprints build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/outcome-commit build$ tsc -b tsconfig.build.json
++. postinstall: packages/protocol-v2 build$ tsc -b tsconfig.build.json
++. postinstall: packages/logger build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/outcome-commit build: Done
++. postinstall: packages/protocol-v3 build$ tsc -b tsconfig.build.json
++. postinstall: packages/protocol-v2 build: Done
++. postinstall: packages/rendezvous build$ tsc -b tsconfig.build.json
++. postinstall: packages/blueprints build: Done
++. postinstall: packages/storage build$ tsc -b tsconfig.build.json
++. postinstall: packages/logger build: Done
++. postinstall: packages/test-utils build$ tsc -b tsconfig.build.json
++. postinstall: packages/protocol-v3 build: Done
++. postinstall: packages/utils prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/rendezvous build: Done
++. postinstall: packages/storage build: Done
++. postinstall: packages/test-utils build: Done
++. postinstall: packages/utils prebuild: Done
++. postinstall: packages/utils build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/utils build: Done
++. postinstall: packages/blueprint-catalog build$ tsc -b tsconfig.build.json
++. postinstall: packages/control-plane build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-runner prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/issuance-store build$ tsc -b tsconfig.build.json
++. postinstall: packages/blueprint-catalog build: Done
++. postinstall: packages/keychain build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/interval-runner prebuild: Done
++. postinstall: packages/interval-runner build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/issuance-store build: Done
++. postinstall: packages/live-journal build$ tsc -b tsconfig.build.json
++. postinstall: packages/control-plane build: Done
++. postinstall: packages/message-queue prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/message-queue prebuild: Done
++. postinstall: packages/message-queue build$ tsc -b tsconfig.build.json
++. postinstall: packages/live-journal build: Done
++. postinstall: packages/relay-policy build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-runner build: Done
++. postinstall: packages/routing-browser build$ tsc -b tsconfig.build.json
++. postinstall: packages/keychain build: Done
++. postinstall: packages/tracer build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/message-queue build: Done
++. postinstall: packages/validation prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/relay-policy build: Done
++. postinstall: packages/routing-browser build: Done
++. postinstall: packages/validation prebuild: Done
++. postinstall: packages/validation build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/tracer build: Done
++. postinstall: packages/validation build: Done
++. postinstall: packages/blueprint-toolchain build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-discovery prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/interval-reconnect prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/network build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/interval-discovery prebuild: Done
++. postinstall: packages/interval-discovery build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-reconnect prebuild: Done
++. postinstall: packages/interval-reconnect build$ tsc -b tsconfig.build.json
++. postinstall: packages/blueprint-toolchain build: Done
++. postinstall: packages/object build$ tsc -b tsconfig.build.json
++. postinstall: packages/interval-reconnect build: Done
++. postinstall: packages/interval-discovery build: Done
++. postinstall: packages/seal build$ tsc -b tsconfig.build.json
++. postinstall: packages/network build: Done
++. postinstall: packages/object build: Done
++. postinstall: packages/seal build: Done
++. postinstall: packages/compaction build$ tsc -b tsconfig.build.json
++. postinstall: packages/routing-node build$ tsc -b tsconfig.build.json
++. postinstall: packages/compaction build: Done
++. postinstall: packages/routing-node build: Done
++. postinstall: packages/node prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++. postinstall: packages/storage-node build$ tsc -b tsconfig.build.json
++. postinstall: packages/worker-host build$ tsc -b tsconfig.build.json
++. postinstall: packages/node prebuild: Done
++. postinstall: packages/node build$ tsc -b tsconfig.build.json && node build.mjs
++. postinstall: packages/storage-node build: Done
++. postinstall: packages/worker-host build: Done
++. postinstall: packages/node build: Done
++. postinstall: examples/browser-network build$ tsc --noEmit -p tsconfig.build.json
++. postinstall: packages/network-spike build$ tsc -b tsconfig.build.json
++. postinstall: packages/storage-browser build$ tsc -b tsconfig.build.json
++. postinstall: packages/storage-browser build: Done
++. postinstall: packages/network-spike build: Done
++. postinstall: examples/browser-network build: Done
++. postinstall: examples/v3-room build$ tsc --noEmit -p tsconfig.build.json
++. postinstall: examples/v3-room build: Done
++. postinstall: Done
++Done in 24s using pnpm v10.24.0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/pre-checkout-status.txt b/.logs/d110c-0c1f5a-clean-52fe3b44/pre-checkout-status.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/setup-failure.md b/.logs/d110c-0c1f5a-clean-52fe3b44/setup-failure.md
+new file mode 100644
+index 00000000..16406b4b
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/setup-failure.md
+@@ -0,0 +1,8 @@
++# D.110c-0c1f5a isolated setup diagnostic
++
++This root is not the accepted isolated proof. The requested checkout used the
++incorrect expanded hash `52fe3b44e30a946f42bea2095d1ea2a85c0f72a9` and stopped with checkout status
++128 before any f5a test ran. The worktree remained at the preceding signed RED
++anchor. Verification and offline installation therefore describe that
++unchanged anchor, not GREEN. The fresh sibling root ending in `-v2` uses the
++actual signed GREEN commit and is the accepted proof.
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/source-identity.txt b/.logs/d110c-0c1f5a-clean-52fe3b44/source-identity.txt
+new file mode 100644
+index 00000000..6ae11281
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/source-identity.txt
+@@ -0,0 +1,2 @@
++e379cfd2854cbcb9db117960388e311251c9f086
++43d9b691eb4b3665ebd80ea9c7891c6146aa0524
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/verify-commit.status b/.logs/d110c-0c1f5a-clean-52fe3b44/verify-commit.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/verify-commit.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/verify-commit.stderr.txt b/.logs/d110c-0c1f5a-clean-52fe3b44/verify-commit.stderr.txt
+new file mode 100644
+index 00000000..b7a6b6df
+--- /dev/null
++++ b/.logs/d110c-0c1f5a-clean-52fe3b44/verify-commit.stderr.txt
+@@ -0,0 +1,3 @@
++gpg: Signature made Thu Sep  3 17:28:22 2026 AST
++gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
++gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+diff --git a/.logs/d110c-0c1f5a-clean-52fe3b44/verify-commit.stdout.txt b/.logs/d110c-0c1f5a-clean-52fe3b44/verify-commit.stdout.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 91893079..a0b5a9cf 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -98037,9 +98037,9 @@ not independently rederived by the transition closure.
+ 
+ **Status: the first execution from `eeaaaca8` remains a noncausal diagnostic;
+ the corrected tests-only RED from signed/pushed anchor `466169aa` is causal and
+-complete. The bounded production GREEN and its local runtime/static evidence
+-are prepared from signed/pushed RED commit `e379cfd2`; signed clean-isolated
+-replay and the one final Grok/Kimi/Opus review remain required before f5a may
++complete. The bounded production GREEN is signed/pushed at
++`52fe3b44a40ab025102cad7637bbd10fae6edaac`, and its clean-isolated replay is
++complete. The one final Grok/Kimi/Opus review remains required before f5a may
+ close.** Owner:
+ `packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()` at the
+ construction of `byAuthor`, duplicate detection, prior/null boundary checks,
+@@ -98233,8 +98233,32 @@ and deterministic validation are under
+ `.logs/d110c-0c1f5a-green-e379cfd2/`. Its 72-entry self-excluding manifest
+ validates and has SHA-256
+ `e5e1a84486363b10fcbf04288affacfba04fd63ef9a2d53ed5efd4fecada3a12`.
+-This is working GREEN evidence pending the signed clean-isolated replay and
+-final review; it does not close f5a or authorize f5b production work.
++This local GREEN evidence is anchored by the signed checkpoint below; it does
++not close f5a or authorize f5b production work before final review.
++
++The GREEN implementation/evidence checkpoint is signed and pushed at
++`52fe3b44a40ab025102cad7637bbd10fae6edaac`, tree
++`a174b6717d26ff2a1a41dd5e8b398efcaf996bd4`. Its signature verifies. The
++source/document diff check is clean. A blanket staged check additionally
++reported whitespace embedded in the preserved generated `green.patch` and raw
++coverage table; those immutable captures are not rewritten or represented as
++source-format failures.
++
++That exact signed commit was then checked out detached in
++`/private/tmp/ts-drp-d109d-baseline.18SC07`. A frozen
++`pnpm install --offline --frozen-lockfile` succeeded, the worktree remained
++tracked-clean, the f5a RED-named retained control passed its exact one
++file/title, the registered-gossip/direct-retained fixture boundary passed both
++selected assertions together, and the two Chromium compatibility titles again
++reported `2/0/0/0` with zero top-level errors. Complete proof and deterministic
++validation are under `.logs/d110c-0c1f5a-clean-52fe3b44-v2/`; its 32-entry
++self-excluding manifest validates and has SHA-256
++`677ffc036196a3d82d6c69eee276700e5baab60b83ba231fda9bf7bed26ec2f1`.
++The sibling `.logs/d110c-0c1f5a-clean-52fe3b44/` honestly preserves an initial
++setup-only failure caused by an incorrectly expanded commit hash; no f5a test
++ran there. Its 12-entry manifest validates at
++`39add4a1adc7f5e4e792a397a9eea9a7c427f1e13e33327058f0a5e812b36792`.
++The final three-model review is now the only remaining f5a closure gate.
+ 
+ GREEN changes only the close-side per-author classification. It must make all
+ foreign treatments close successfully, keep the affected frontier unchanged or

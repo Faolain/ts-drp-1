@@ -1,0 +1,11 @@
+.logs/d110c-0c-red-causal-2cb28a1a/command.txt: OK
+.logs/d110c-0c-red-causal-2cb28a1a/playwright.json: OK
+.logs/d110c-0c-red-causal-2cb28a1a/playwright.status: OK
+.logs/d110c-0c-red-causal-2cb28a1a/selection.command.txt: OK
+.logs/d110c-0c-red-causal-2cb28a1a/selection.status: OK
+.logs/d110c-0c-red-causal-2cb28a1a/selection.txt: OK
+.logs/d110c-0c-red-causal-2cb28a1a/static-gates.md: OK
+.logs/d110c-0c-red-causal-2cb28a1a/validate-red.command.txt: OK
+.logs/d110c-0c-red-causal-2cb28a1a/validate-red.json: OK
+.logs/d110c-0c-red-causal-2cb28a1a/validate-red.mjs: OK
+.logs/d110c-0c-red-causal-2cb28a1a/validate-red.status: OK

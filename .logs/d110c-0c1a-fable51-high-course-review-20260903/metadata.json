@@ -1,0 +1,15 @@
+{
+  "effectiveModel": "claude-fable-5-1",
+  "effort": "high",
+  "sessionId": "1d97d050-d284-49c1-ae23-aebdb33708fc",
+  "durationApiMs": 443842,
+  "durationMs": 445452,
+  "turns": 62,
+  "isError": false,
+  "terminalReason": "completed",
+  "permissionDenials": [],
+  "subagentsSpawned": 0,
+  "verdict": "PROCEED_TO_D110C_0C1A_RED",
+  "p0": 0,
+  "p1": 0
+}

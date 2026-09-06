@@ -1,0 +1,15 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6a-creator-successor-local-author-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-green-working-747ce566/retained-19/result.json"
+  ],
+  "start": "2026-09-05T06:28:40.484Z"
+}

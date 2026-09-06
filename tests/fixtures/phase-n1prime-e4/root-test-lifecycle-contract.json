@@ -1,0 +1,67 @@
+{
+	"schemaVersion": "phase-n1prime-e4-root-test-lifecycle-v1",
+	"rootConfig": {
+		"path": "vite.config.mts",
+		"infrastructureExclusions": [
+			"**/node_modules",
+			"**/e2e",
+			"**/dist",
+			"**/conformance/**",
+			"**/.stryker-tmp/**",
+			"docs/**"
+		],
+		"historicalRedExclusion": "tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts",
+		"forbiddenBroadeningMutants": [
+			"tests/protocol-v3-*",
+			"tests/protocol-v3-independent-reference-vectors-n1prime-c*",
+			"tests/**"
+		]
+	},
+	"workspace": {
+		"path": "vitest.workspace.ts",
+		"projects": [
+			"./vite.config.mts",
+			"./examples/grid/vite.config.mts",
+			"./examples/local-bootstrap/vite.config.mts",
+			"./examples/canvas/vite.config.mts",
+			"./examples/chat/vite.config.mts"
+		]
+	},
+	"ordinaryCi": {
+		"path": ".github/workflows/test.yml",
+		"command": "pnpm test"
+	},
+	"historicalArtifacts": [
+		{
+			"path": "tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts",
+			"sha256": "10f1f8b502cb599da6350cc13192e8fbe407710698c187e26ffe2e84d47374a2"
+		},
+		{
+			"path": "tests/fixtures/phase-n1prime-c/reference-vector-contract.json",
+			"sha256": "1f84788cad31a3fd737cf55d5da053748ea4e997bd4c5dbf4cf50fa568816840"
+		}
+	],
+	"acceptedSuccessorTests": [
+		"tests/protocol-v3-formal-action-model-n1prime-a.test.ts",
+		"tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+		"tests/protocol-v3-canonical-grammar-n1prime-b2a.test.ts",
+		"tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+		"tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+		"tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts",
+		"tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+		"tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+		"tests/protocol-v3-freeze-governance-n1prime-e.test.ts",
+		"tests/protocol-v3-freeze-governance-n1prime-e2.test.ts",
+		"tests/protocol-v3-freeze-governance-n1prime-e3.test.ts",
+		"tests/protocol-v3-freeze-governance-n1prime-e4.test.ts"
+	],
+	"governance": {
+		"checkerPath": "packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+		"policyPath": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+		"requiredSlice": "phase-n1prime-e4",
+		"evidencePaths": [
+			"tests/protocol-v3-freeze-governance-n1prime-e4.test.ts",
+			"tests/fixtures/phase-n1prime-e4/root-test-lifecycle-contract.json"
+		]
+	}
+}

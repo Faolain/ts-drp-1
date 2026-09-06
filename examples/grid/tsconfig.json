@@ -4,15 +4,12 @@
 		"module": "ESNext",
 		"rootDir": ".",
 		"strict": true,
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"allowSyntheticDefaultImports": true,
 		"allowJs": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"exclude": [
-		"node_modules",
-		"dist"
-	]
+	"exclude": ["node_modules", "dist"]
 }

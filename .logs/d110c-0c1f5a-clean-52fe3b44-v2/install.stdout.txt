@@ -1,0 +1,104 @@
+Scope: all 48 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+. postinstall$ node scripts/ensure-native-deps.mjs && pnpm build:packages
+. postinstall: > ts-drp@0.11.0 build:packages /private/tmp/ts-drp-d109d-baseline.18SC07
+. postinstall: > pnpm --filter '@ts-drp/*' build
+. postinstall: Scope: 40 of 48 workspace projects
+. postinstall: packages/canonical build$ tsc -b tsconfig.build.json
+. postinstall: packages/ephemeral build$ tsc -b tsconfig.build.json
+. postinstall: packages/membership build$ tsc -b tsconfig.build.json
+. postinstall: packages/errors build$ tsc -b tsconfig.build.json
+. postinstall: packages/canonical build: Done
+. postinstall: packages/membership build: Done
+. postinstall: packages/types build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/errors build: Done
+. postinstall: packages/ephemeral build: Done
+. postinstall: packages/types build: Done
+. postinstall: packages/blueprints build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/logger build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/protocol-v2 build$ tsc -b tsconfig.build.json
+. postinstall: packages/outcome-commit build$ tsc -b tsconfig.build.json
+. postinstall: packages/protocol-v2 build: Done
+. postinstall: packages/protocol-v3 build$ tsc -b tsconfig.build.json
+. postinstall: packages/outcome-commit build: Done
+. postinstall: packages/rendezvous build$ tsc -b tsconfig.build.json
+. postinstall: packages/blueprints build: Done
+. postinstall: packages/storage build$ tsc -b tsconfig.build.json
+. postinstall: packages/logger build: Done
+. postinstall: packages/test-utils build$ tsc -b tsconfig.build.json
+. postinstall: packages/protocol-v3 build: Done
+. postinstall: packages/utils prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+. postinstall: packages/rendezvous build: Done
+. postinstall: packages/storage build: Done
+. postinstall: packages/test-utils build: Done
+. postinstall: packages/utils prebuild: Done
+. postinstall: packages/utils build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/utils build: Done
+. postinstall: packages/interval-runner prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+. postinstall: packages/issuance-store build$ tsc -b tsconfig.build.json
+. postinstall: packages/blueprint-catalog build$ tsc -b tsconfig.build.json
+. postinstall: packages/control-plane build$ tsc -b tsconfig.build.json
+. postinstall: packages/interval-runner prebuild: Done
+. postinstall: packages/interval-runner build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/issuance-store build: Done
+. postinstall: packages/keychain build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/blueprint-catalog build: Done
+. postinstall: packages/live-journal build$ tsc -b tsconfig.build.json
+. postinstall: packages/control-plane build: Done
+. postinstall: packages/message-queue prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+. postinstall: packages/message-queue prebuild: Done
+. postinstall: packages/message-queue build$ tsc -b tsconfig.build.json
+. postinstall: packages/live-journal build: Done
+. postinstall: packages/relay-policy build$ tsc -b tsconfig.build.json
+. postinstall: packages/interval-runner build: Done
+. postinstall: packages/routing-browser build$ tsc -b tsconfig.build.json
+. postinstall: packages/message-queue build: Done
+. postinstall: packages/tracer build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/keychain build: Done
+. postinstall: packages/validation prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+. postinstall: packages/relay-policy build: Done
+. postinstall: packages/routing-browser build: Done
+. postinstall: packages/validation prebuild: Done
+. postinstall: packages/validation build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/tracer build: Done
+. postinstall: packages/validation build: Done
+. postinstall: packages/blueprint-toolchain build$ tsc -b tsconfig.build.json
+. postinstall: packages/interval-reconnect prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+. postinstall: packages/interval-discovery prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+. postinstall: packages/network build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/interval-discovery prebuild: Done
+. postinstall: packages/interval-discovery build$ tsc -b tsconfig.build.json
+. postinstall: packages/interval-reconnect prebuild: Done
+. postinstall: packages/interval-reconnect build$ tsc -b tsconfig.build.json
+. postinstall: packages/blueprint-toolchain build: Done
+. postinstall: packages/object build$ tsc -b tsconfig.build.json
+. postinstall: packages/interval-discovery build: Done
+. postinstall: packages/seal build$ tsc -b tsconfig.build.json
+. postinstall: packages/interval-reconnect build: Done
+. postinstall: packages/network build: Done
+. postinstall: packages/object build: Done
+. postinstall: packages/seal build: Done
+. postinstall: packages/compaction build$ tsc -b tsconfig.build.json
+. postinstall: packages/routing-node build$ tsc -b tsconfig.build.json
+. postinstall: packages/compaction build: Done
+. postinstall: packages/routing-node build: Done
+. postinstall: packages/storage-node build$ tsc -b tsconfig.build.json
+. postinstall: packages/worker-host build$ tsc -b tsconfig.build.json
+. postinstall: packages/node prebuild$ node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+. postinstall: packages/node prebuild: Done
+. postinstall: packages/node build$ tsc -b tsconfig.build.json && node build.mjs
+. postinstall: packages/storage-node build: Done
+. postinstall: packages/worker-host build: Done
+. postinstall: packages/node build: Done
+. postinstall: packages/network-spike build$ tsc -b tsconfig.build.json
+. postinstall: packages/storage-browser build$ tsc -b tsconfig.build.json
+. postinstall: examples/browser-network build$ tsc --noEmit -p tsconfig.build.json
+. postinstall: packages/storage-browser build: Done
+. postinstall: packages/network-spike build: Done
+. postinstall: examples/browser-network build: Done
+. postinstall: examples/v3-room build$ tsc --noEmit -p tsconfig.build.json
+. postinstall: examples/v3-room build: Done
+. postinstall: Done
+Done in 16.5s using pnpm v10.24.0

@@ -1,6 +1,7 @@
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { type Address, type PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	type AdmissionCredential,
 	AdmissionPolicy,
@@ -55,7 +56,7 @@ describe("room presence retirement", () => {
 		runner.stop();
 
 		const retiredRoomId = "quota-room-a";
-		await node.createObject({ id: retiredRoomId });
+		await node.createObject({ id: retiredRoomId, acl: createPermissionlessACL() });
 		const firstCycleStart = registrations.length;
 		await runner.fn();
 		const firstRoom = registrations
@@ -68,7 +69,7 @@ describe("room presence retirement", () => {
 		await vi.advanceTimersByTimeAsync(5_500);
 
 		const replacementRoomId = "quota-room-b";
-		await node.createObject({ id: replacementRoomId });
+		await node.createObject({ id: replacementRoomId, acl: createPermissionlessACL() });
 		const replacementCycleStart = registrations.length;
 		await runner.fn();
 		const replacementRoom = registrations
@@ -188,6 +189,8 @@ function fakeNetwork(): DRPNetworkNode {
 		getAllPeers: vi.fn((): string[] => []),
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn((): Promise<void> => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn((): Promise<void> => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn((): Promise<void> => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((): void => undefined),

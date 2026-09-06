@@ -1,0 +1,1988 @@
+commit f2066512f0311a56863be0d769531c6b783d9fef
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Wed Sep 2 14:04:12 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Wed Sep 2 14:04:12 2026 -0400
+
+    feat(node): complete D.110c-b hot epoch adoption
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index ff433e70..9b2bb1df 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -94422,6 +94422,143 @@ contract. The RED ledger SHA-256 is
+ the validating self-excluding evidence manifest SHA-256 is
+ `44f4d03737162f99e3825c26c5445a0ce36e4200a5837d18669633851ee8ad04`.
+ 
++The first Batch-1 GREEN execution selected the exact one test/one file once and
++failed before transfer with `D110C_B_ACTIVATION_FAILED:recovery-rejected` after
++the verifier, durable commit, frozen refusal matrix, and pre-transfer cleanup
++had completed. No Batch-2 code or browser execution followed. The bounded
++source diagnosis identified the additional conditional owner anticipated by
++the reviewed plan's “`v3-live.ts` unchanged unless RED proves another owner”
++clause: `recoverV3LiveReplica()` selected `installGenesis()` solely from the
++absence of successor-recovery metadata. A genuine epoch-1 predecessor has no
++such metadata during its independent validation, but its authenticated anchor
++is non-genesis, so the journal contract rejects that install before live
++transfer. The narrow correction selects `installGenesis()` only for
++authenticated epoch zero and `installEpochAnchor()` for every positive
++authenticated epoch. It changes no record, wire, public API, dependency,
++authority, threshold, workload, or cold-reopen contract. The failed reporter
++is retained at
++`.logs/d110c-b-green-working-90147e3c/batch1-vitest.json`; it is diagnostic
++evidence, not a passing GREEN result. The first corrected execution at
++`batch1-vitest-corrected.json` advanced through epoch-anchor installation and
++then exposed exact predecessor replay failure
++`admission-rejected:v3 recovery vertex is not authenticated`. Bounded
++temporary diagnostics, removed before acceptance, proved that the unpruned
++issuance store contained an authenticated inherited epoch-0 row while the
++epoch-1 predecessor and epoch-2 successor were being recovered. The existing
++private filter already excluded authenticated future rows, but the epoch-1
++live registration's authenticated one-generation displaced-source authority
++was not supplied to predecessor validation or successor filtering.
++
++The corrected single private owner therefore carries that already-retained
++displaced-source authority through a one-use WeakMap into predecessor recovery,
++and uses one shared exact-authentication issuance filter to omit those inherited
++rows while reconstructing the successor and while that successor remains the
++active plane. Any unrecognized, malformed, same/current-epoch, backing-store,
++or signature failure remains visible and fails closed. The underlying durable
++issuance store remains complete and receives every delegated read, write, and
++publication transition; only the bounded authenticated inherited row is
++omitted from the live recovery/publication view until D.110c-c's authenticated
++pruning retires it. This is bounded to the one already-retained displaced
++generation and does not construct a growing history chain: D.110c-c still owns
++authenticated pruning and catch-up before deeper repetition. The diagnostic
++fixture, inner-detail expansion, and row telemetry were removed after the
++narrow diagnostic passed at the injected post-recovery terminalization
++boundary. A final replacement focused execution is required after exact
++source/static gates; these local runs do not retry a consuming campaign or
++scarce workload.
++
++That replacement completed the genuine main fixture and all pre-transfer
++mutants, then failed only on a stale tests-only assertion that expected a
++nonexistent verifier `lifecycle` field. The shipped verifier success contract
++has always been exact `{descriptor, intent, ok: true}`. The assertion is
++corrected to require `descriptor.epoch === 2` and `ok === true`; this diagnostic
++mistake is not classified as a product failure. Because the assertion stopped
++the test before its isolated post-transfer fixtures, one final focused
++execution remains necessary to exercise the complete frozen matrix.
++
++That execution completed activation and a genuine post-epoch-2 issue, then
++showed that restoring the unfiltered issuance port to the active plane exposed
++the same inherited epoch-0 row during `publishPending()`. The correction keeps
++the complete underlying store but retains the authenticated bounded view as the
++private epoch-2 runtime port. Exact publication failure detail is now preserved
++by the fixture if any later owner refuses.
++
++The next execution reached the isolated post-transfer setup and correctly
++refused its attempted 0->1 activation because the fixture had reused the main
++room's still-active default object ID and stable topic. This is a tests-only
++isolation defect, not a product failure: the terminalization and retirement
++mutants now use two distinct genuine object IDs while retaining the same real
++product path and thresholds.
++
++Batch 1 then passed its complete focused one-test/one-file matrix at
++`.logs/d110c-b-green-working-90147e3c/batch1-vitest-isolated.json`. It proved
++real 1->2 verify/stage/publish/floor-checked activation, same-head idempotence,
++old-plane terminality, exact active-owner custody, post-epoch-2 issue/publish,
++the complete frozen refusal matrix, and both isolated post-transfer failure
++classes. The emitted terminal token was `D110C_B_HOT_ADOPTION_COMPLETE`.
++
++Batch 2 generalized product authority to every positive safe authenticated
++epoch, retains the singular creator-close store owners as a private rebinding
++closure, replaces the first-transition latch with the exact close-lifecycle
++predicate, and installs a fresh close handle only after successful activation
++and predecessor deactivation. Activation failure after the durable room-head
++floor advances clears stale live/close custody and enters exact
++`D110C_B_ACTIVATION_STALLED`. Close-rebind failure keeps the genuine new active
++plane and authority but clears terminal close custody and enters exact
++`D110C_B_CLOSE_REBIND_FAILED`. The redirected adoption forwarding path now
++returns the forwarded adoption from the source lifetime queue instead of
++placing its promise in a side wrapper; therefore later redirected lifecycle
++work cannot settle ahead of the already-enqueued adoption.
++
++The first anchored Batch-2 Playwright execution selector again selected zero
++because Playwright applies the expression to its larger full-title string; no
++test ran. The corrected literal selector selected one test in one file and ran
++once. Chromium completed the genuine production-room sequence 0->1, published
++at epoch 1, completed 1->2, published at epoch 2, and closed the rebound epoch-2
++plane to exact successor epoch 3 without adopting epoch 3. Exact accepted
++messages, stable object/genesis authority, current anchor/room identity, and
++all three retained realm snapshots passed; the terminal token was
++`D110C_B_PRODUCT_HOT_LOOP_COMPLETE`. Its reporter is
++`packages/storage-browser/.logs/d110c-b-green-working-90147e3c/batch2-chromium.json`
++with expected=1, skipped=0, unexpected=0 and flaky=0.
++
++The first complete retained product-browser pass exposed one stale expectation
++in all engines: an unsealed active-plane adoption now correctly stops before
++verification, so verifier count is zero. The second pass exposed the same
++change at the remaining injected activation and retry expectations:
++post-floor activation failure is now exact `D110C_B_ACTIVATION_STALLED`, and an
++invalid first request plus a valid sealed retry invokes the verifier once, not
++twice. The third pass exposed a real retained redirect-ordering regression:
++the obsolete forwarding wrapper let a later redirected operation's observable
++promise settle before the earlier invalid adoption once that adoption no
++longer paused inside verification. The narrow product correction makes the
++source lifetime queue await that forwarded adoption. A bounded three-engine
++ordering test then passed, proving both requests were pending before redirect
++release, the invalid adoption remained exact
++`D110C_B_ACTIVATION_STALLED` with zero verifier calls, and its settlement
++preceded the later rehearsal or activation. These failed reporters and the
++corrected focused reporter remain immutable diagnostic evidence under the
++working root; they are not presented as GREEN passes.
++
++The final retained gates are green. Root Vitest passed 62/62 suites and
++282/282 tests with zero failures or pending tests in `retained-node.json`.
++The complete successor-product config passed 30/30, successor activation
++passed 24/24, and Phase-5e creator live close passed 9/9 across Chromium,
++Firefox, and WebKit, each with zero skipped, unexpected or flaky results.
++Node and storage-browser builds and build-source no-emit checks, v3-room
++typecheck/build, independent v3-chat typecheck, the private D.110c-a fixture
++typecheck, exact-owner ESLint, 12-GiB formatter check, diff check, and the
++thirteen-predicate GREEN source-shape audit all exited zero. The broad
++storage-browser test-root diagnostic still reports only the already-recorded
++unrelated Phase-6b branded fixture and private-alias debt; its build-source
++owner is green. No cold-reopen literal, wire/schema/API, dependency, threshold,
++workload, campaign, D.110a, or long multi-epoch execution changed or ran.
++The consolidated immutable GREEN evidence root is
++`.logs/d110c-b-green-90147e3c/`. Its ledger SHA-256 is
++`5dadc749185265d332f1a5588133b230b23b8a616e8321ad67e4e2833448cc7c`;
++its validated 17-entry self-excluding manifest SHA-256 is
++`ce501e519d7bb726d896938ada4443540c9dfecfe9e1299ba9202a37be4dc469`.
++
+ The four prerequisite decisions, including the newly demonstrated 0b0
+ freshness-floor authority question, are reviewed before their production edits;
+ each executable sub-slice receives its own bounded causal RED and GREEN. The
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index 98e3408c..9c4de59d 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -235,7 +235,7 @@ export interface V3RoomProjectionAuthority {
+ export interface V3RoomSuccessorAuthority {
+ 	readonly aclDigest: string;
+ 	readonly anchorDigest: string;
+-	readonly epoch: 1;
++	readonly epoch: number;
+ 	readonly genesisAnchorDigest: string;
+ 	readonly lifecycle: "active";
+ 	readonly objectId: string;
+@@ -466,7 +466,9 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
+ 		!/^[0-9a-f]{64}$/u.test(current.aclDigest) ||
+ 		typeof currentAnchorDigest !== "string" ||
+ 		!/^[0-9a-f]{64}$/u.test(currentAnchorDigest) ||
+-		currentEpoch !== 1 ||
++		typeof currentEpoch !== "number" ||
++		!Number.isSafeInteger(currentEpoch) ||
++		currentEpoch < 1 ||
+ 		typeof genesisAnchorDigest !== "string" ||
+ 		!/^[0-9a-f]{64}$/u.test(genesisAnchorDigest) ||
+ 		typeof objectId !== "string" ||
+@@ -480,7 +482,7 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
+ 	return Object.freeze({
+ 		aclDigest: current.aclDigest,
+ 		anchorDigest: currentAnchorDigest,
+-		epoch: 1 as const,
++		epoch: currentEpoch,
+ 		genesisAnchorDigest,
+ 		lifecycle: "active" as const,
+ 		objectId,
+@@ -1879,6 +1881,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
+ 	let activeHandle: RoomPlaneHandle | undefined;
+ 	let creatorCloseHandle: CreatorLiveCloseHandle | undefined;
++	let bindCurrentCreatorClose: ((plane: RoomPlaneHandle) => ReturnType<typeof bindCreatorLiveClose>) | undefined;
+ 	let creatorCloseUnavailableContinuity: CreatorLiveCloseStatus["continuity"] = "continuous";
+ 	const creatorCloseStoreClosers: Array<() => Promise<void>> = [];
+ 	let transport: V3RoomTransport | undefined;
+@@ -2263,6 +2266,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			if (!result.ok) throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
+ 		});
+ 		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
++			const creatorFinalitySigner = input.creatorFinalitySigner;
+ 			const voteStore = await openBrowserSealVoteStore({ databaseName: input.databaseName });
+ 			creatorCloseStoreClosers.push(voteStore.close);
+ 			const evidenceStore = await openBrowserSealEvidenceStore({ databaseName: input.databaseName });
+@@ -2274,16 +2278,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			if (voteStore.observation.incarnation !== evidenceStore.observation.incarnation) {
+ 				throw new TypeError("v3 room creator-close storage incarnation differs");
+ 			}
+-			const bound = await bindCreatorLiveClose({
+-				evidenceStore: evidenceStore.store,
+-				exactCanonicalAvailabilityPolicyBytes: CREATOR_LOCAL_AVAILABILITY_POLICY_BYTES,
+-				onObservation: () => undefined,
+-				plane: activeHandle,
+-				signer: input.creatorFinalitySigner,
+-				snapshotStore,
+-				storageIncarnation: voteStore.observation.incarnation,
+-				voteStore: voteStore.store,
+-			});
++			bindCurrentCreatorClose = (plane): ReturnType<typeof bindCreatorLiveClose> =>
++				bindCreatorLiveClose({
++					evidenceStore: evidenceStore.store,
++					exactCanonicalAvailabilityPolicyBytes: CREATOR_LOCAL_AVAILABILITY_POLICY_BYTES,
++					onObservation: () => undefined,
++					plane,
++					signer: creatorFinalitySigner,
++					snapshotStore,
++					storageIncarnation: voteStore.observation.incarnation,
++					voteStore: voteStore.store,
++				});
++			const bound = await bindCurrentCreatorClose(activeHandle);
+ 			if (bound.ok) creatorCloseHandle = bound.handle;
+ 			else {
+ 				creatorCloseUnavailableContinuity = [
+@@ -3499,14 +3505,36 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	};
+ 	const performCreatorSuccessorAdoption = async (): Promise<void> => {
+ 		if (terminalFailure !== undefined) throw terminalFailure;
+-		if (successorProjectionAuthority !== null) return;
+ 		if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
+ 		if (activeHandle === undefined || transport === undefined) {
+ 			throw new TypeError("v3 room live plane is unavailable");
+ 		}
++		const closeStatus = creatorCloseHandle.status();
++		if (successorProjectionAuthority !== null && closeStatus.lifecycle === "active") {
++			const current = activeHandle.currentEphemeralAuthority();
++			const stable = openedRoomHeadState?.stable;
++			if (
++				current !== undefined &&
++				stable !== undefined &&
++				current.aclDigest === successorProjectionAuthority.aclDigest &&
++				current.anchorDigest === successorProjectionAuthority.anchorDigest &&
++				current.epoch === successorProjectionAuthority.epoch &&
++				current.objectId === successorProjectionAuthority.objectId &&
++				stable.currentAnchorDigest === successorProjectionAuthority.anchorDigest &&
++				stable.epoch === successorProjectionAuthority.epoch &&
++				stable.objectId === successorProjectionAuthority.objectId
++			) {
++				return;
++			}
++			throw new TypeError("D110C_B_ACTIVATION_STALLED");
++		}
++		if (closeStatus.lifecycle !== "successor-pending-adoption") {
++			throw new TypeError("D110C_B_ACTIVATION_STALLED");
++		}
++		const predecessorClose = creatorCloseHandle;
+ 		const verified = await verifyCreatorSuccessorAdoption({
+ 			catalog: input.application.catalog,
+-			handle: creatorCloseHandle,
++			handle: predecessorClose,
+ 		});
+ 		if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
+ 		if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+@@ -3514,7 +3542,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		}
+ 		assertSessionOpen();
+ 		const staged = await stageCreatorSuccessorAdoption({
+-			handle: creatorCloseHandle,
++			handle: predecessorClose,
+ 			intent: verified.intent,
+ 		});
+ 		if (!staged.ok) throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`);
+@@ -3528,7 +3556,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		assertSessionOpen();
+ 		const published = await publishStagedCreatorSuccessorAdoption({
+ 			capability: staged.capability,
+-			handle: creatorCloseHandle,
++			handle: predecessorClose,
+ 		});
+ 		if (!published.ok) throw new TypeError(`v3 room successor publication failed: ${String(published.kind)}`);
+ 		openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pendingRoomHead);
+@@ -3539,13 +3567,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		const activated = await activateCreatorSuccessorAdoption({
+ 			capability: published.capability,
+ 			expectedRoomHead: openedRoomHeadState.stable,
+-			handle: creatorCloseHandle,
++			handle: predecessorClose,
+ 			messageQueueManager,
+ 			networkNode: transport.networkNode,
+ 			onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+ 		});
+ 		if (activated.ok !== true) {
+-			throw new TypeError(`v3 room successor activation failed: ${String(activated.kind)}`);
++			const failure = new TypeError("D110C_B_ACTIVATION_STALLED");
++			terminalFailure = failure;
++			creatorCloseHandle = undefined;
++			creatorCloseUnavailableContinuity = "stalled";
++			const stale = activeHandle;
++			activeHandle = undefined;
++			await Promise.allSettled([predecessorClose.stop(), Promise.resolve().then(() => stale.deactivate())]);
++			throw failure;
+ 		}
+ 		const replacement = activated.handle as RoomPlaneHandle;
+ 		let replacementOwned = true;
+@@ -3581,23 +3616,42 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			activeHandle = undefined;
+ 			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+ 		}
++		if (bindCurrentCreatorClose === undefined) {
++			activeHandle = replacement;
++			replacementOwned = false;
++			successorProjectionAuthority = authority;
++			creatorCloseHandle = undefined;
++			creatorCloseUnavailableContinuity = "stalled";
++			terminalFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
++			throw terminalFailure;
++		}
++		const rebound = await bindCurrentCreatorClose(replacement);
++		if (!rebound.ok) {
++			activeHandle = replacement;
++			replacementOwned = false;
++			successorProjectionAuthority = authority;
++			creatorCloseHandle = undefined;
++			creatorCloseUnavailableContinuity = "stalled";
++			terminalFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
++			throw terminalFailure;
++		}
+ 		activeHandle = replacement;
+ 		replacementOwned = false;
+ 		successorProjectionAuthority = authority;
++		creatorCloseHandle = rebound.handle;
++		creatorCloseUnavailableContinuity = "continuous";
++		await predecessorClose.stop();
+ 	};
+ 	const adoptCreatorSuccessor = (): Promise<void> => {
+ 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
+-		const forwarded: { result?: Promise<void> } = {};
+-		const dispatch = enqueueLifetimeTransition(async () => {
++		const attempt = enqueueLifetimeTransition(async () => {
+ 			if (redirectPromise !== undefined) await redirectPromise;
+ 			assertSessionOpen();
+ 			if (redirectedSession !== undefined) {
+-				forwarded.result = redirectedSession.adoptCreatorSuccessor();
+-				return;
++				return redirectedSession.adoptCreatorSuccessor();
+ 			}
+ 			return performCreatorSuccessorAdoption();
+ 		});
+-		const attempt = dispatch.then(() => forwarded.result);
+ 		const shared = attempt.finally(() => {
+ 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
+ 		});
+diff --git a/packages/node/src/creator-adoption-activate.ts b/packages/node/src/creator-adoption-activate.ts
+index 2bc46a82..991a47cf 100644
+--- a/packages/node/src/creator-adoption-activate.ts
++++ b/packages/node/src/creator-adoption-activate.ts
+@@ -49,9 +49,24 @@ interface HeldLock {
+ 	release(): Promise<void>;
+ }
+ 
++interface ActiveHead {
++	readonly anchorDigest: string;
++	readonly epoch: number;
++	readonly genesisAnchorDigest: string;
++	readonly objectId: string;
++}
++
+ interface ActiveOwner {
+ 	readonly bindings: CreatorSuccessorRuntimeBindings;
+-	readonly handle: object;
++	handle: object;
++	readonly head: ActiveHead;
++	readonly lock: HeldLock | undefined;
++	replacementInFlight: boolean;
++	replacementSettled: Promise<void> | undefined;
++	resolveReplacement: (() => void) | undefined;
++	retirementRequested: boolean;
++	readonly token: object;
++	readonly topic: string;
+ }
+ 
+ const activeOwners = new Map<string, ActiveOwner>();
+@@ -103,6 +118,153 @@ function sameBindings(left: CreatorSuccessorRuntimeBindings, right: CreatorSucce
+ 	);
+ }
+ 
++function activeHead(value: unknown): ActiveHead | undefined {
++	if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
++	const trust = value as Readonly<Record<string, unknown>>;
++	return typeof trust.currentAnchorDigest === "string" &&
++		/^[0-9a-f]{64}$/u.test(trust.currentAnchorDigest) &&
++		typeof trust.currentEpoch === "number" &&
++		Number.isSafeInteger(trust.currentEpoch) &&
++		trust.currentEpoch >= 0 &&
++		typeof trust.genesisAnchorDigest === "string" &&
++		/^[0-9a-f]{64}$/u.test(trust.genesisAnchorDigest) &&
++		typeof trust.objectId === "string"
++		? Object.freeze({
++				anchorDigest: trust.currentAnchorDigest,
++				epoch: trust.currentEpoch,
++				genesisAnchorDigest: trust.genesisAnchorDigest,
++				objectId: trust.objectId,
++			})
++		: undefined;
++}
++
++function sameActiveHead(left: ActiveHead, right: ActiveHead): boolean {
++	return (
++		left.anchorDigest === right.anchorDigest &&
++		left.epoch === right.epoch &&
++		left.genesisAnchorDigest === right.genesisAnchorDigest &&
++		left.objectId === right.objectId
++	);
++}
++
++function transitionHeads(
++	material: CreatorSuccessorLiveMaterial
++): Readonly<{ readonly predecessor: ActiveHead; readonly successor: ActiveHead }> | undefined {
++	const predecessor = activeHead(material.predecessor.trust);
++	const successor = activeHead(material.successor.trust);
++	return predecessor !== undefined &&
++		successor !== undefined &&
++		predecessor.objectId === successor.objectId &&
++		predecessor.genesisAnchorDigest === successor.genesisAnchorDigest &&
++		predecessor.genesisAnchorDigest === material.pinnedGenesisAnchorDigest &&
++		successor.epoch === predecessor.epoch + 1 &&
++		material.predecessor.head.objectId === predecessor.objectId &&
++		material.successor.head.objectId === successor.objectId
++		? Object.freeze({ predecessor, successor })
++		: undefined;
++}
++
++function beginReplacement(owner: ActiveOwner): void {
++	owner.replacementInFlight = true;
++	owner.replacementSettled = new Promise<void>((resolve) => {
++		owner.resolveReplacement = resolve;
++	});
++}
++
++function finishReplacement(owner: ActiveOwner): void {
++	owner.replacementInFlight = false;
++	const resolve = owner.resolveReplacement;
++	owner.resolveReplacement = undefined;
++	owner.replacementSettled = undefined;
++	resolve?.();
++}
++
++function currentOwner(owner: ActiveOwner): boolean {
++	return activeOwners.get(owner.topic)?.token === owner.token;
++}
++
++async function deactivateOwner(owner: ActiveOwner): Promise<void> {
++	const deactivate = Reflect.get(owner.handle, "deactivate");
++	try {
++		if (typeof deactivate === "function") await Reflect.apply(deactivate, owner.handle, []);
++	} finally {
++		if (currentOwner(owner)) activeOwners.delete(owner.topic);
++		await owner.lock?.release();
++	}
++}
++
++async function abandonOwner(owner: ActiveOwner): Promise<void> {
++	owner.retirementRequested = true;
++	finishReplacement(owner);
++	await deactivateOwner(owner);
++}
++
++async function ignoreCleanupFailure(task: Promise<void>): Promise<void> {
++	await task.catch(() => undefined);
++}
++
++function deactivateRawHandle(handle: Readonly<{ deactivate(): void | Promise<void> }>): Promise<void> {
++	return Promise.resolve().then(() => handle.deactivate());
++}
++
++function failureMayFollowTransfer(result: Readonly<{ readonly detail: string; readonly kind: string }>): boolean {
++	if (result.kind === "source-unavailable") return true;
++	if (result.kind !== "internal-invariant") return false;
++	return !["creator predecessor recovery custody failed", "creator successor live owner is unavailable"].includes(
++		result.detail
++	);
++}
++
++function wrapOwner(
++	topic: string,
++	rawHandle: Record<string, unknown> & Readonly<{ deactivate(): void | Promise<void> }>,
++	bindings: CreatorSuccessorRuntimeBindings,
++	head: ActiveHead,
++	lock: HeldLock | undefined
++): ActiveOwner {
++	const token = Object.freeze({});
++	let rawDeactivation: Promise<void> | undefined;
++	let wrapperDeactivation: Promise<void> | undefined;
++	const owner: ActiveOwner = {
++		bindings,
++		handle: rawHandle,
++		head,
++		lock,
++		replacementInFlight: false,
++		replacementSettled: undefined,
++		resolveReplacement: undefined,
++		retirementRequested: false,
++		token,
++		topic,
++	};
++	const deactivateRaw = (): Promise<void> => {
++		rawDeactivation ??= Promise.resolve().then(() => rawHandle.deactivate());
++		return rawDeactivation;
++	};
++	const wrapped = Object.freeze({
++		...rawHandle,
++		deactivate: (): Promise<void> => {
++			wrapperDeactivation ??= (async (): Promise<void> => {
++				if (owner.replacementInFlight) {
++					owner.retirementRequested = true;
++					await owner.replacementSettled;
++				}
++				try {
++					await deactivateRaw();
++				} finally {
++					if (currentOwner(owner)) {
++						activeOwners.delete(topic);
++						await lock?.release();
++					}
++				}
++			})();
++			return wrapperDeactivation;
++		},
++	});
++	owner.handle = wrapped;
++	return owner;
++}
++
+ function browserLockRealm(): boolean {
+ 	if (typeof window !== "undefined" && window === globalThis) return true;
+ 	return (
+@@ -190,12 +352,54 @@ async function activateMaterial(
+ 	material: CreatorSuccessorLiveMaterial,
+ 	bindings: CreatorSuccessorRuntimeBindings
+ ): Promise<Readonly<Record<string, unknown>>> {
++	const heads = transitionHeads(material);
++	if (heads === undefined) return failure("chain-invalid", "creator successor authority transition is invalid");
+ 	const topic = deriveV3StableTopic(material.successor.trust.objectId, material.pinnedGenesisAnchorDigest);
+ 	const existing = activeOwners.get(topic);
+ 	if (existing !== undefined) {
+-		return sameBindings(existing.bindings, bindings)
+-			? success(material, existing.handle)
+-			: failure("authority-unavailable", "creator successor already has a conflicting active owner");
++		if (!sameBindings(existing.bindings, bindings)) {
++			return failure("authority-unavailable", "creator successor already has a conflicting active owner");
++		}
++		if (existing.replacementInFlight) {
++			return failure("authority-unavailable", "creator successor replacement is already active");
++		}
++		if (sameActiveHead(existing.head, heads.successor)) return success(material, existing.handle);
++		if (!sameActiveHead(existing.head, heads.predecessor)) {
++			return heads.predecessor.objectId === existing.head.objectId &&
++				heads.predecessor.genesisAnchorDigest === existing.head.genesisAnchorDigest &&
++				heads.predecessor.epoch < existing.head.epoch
++				? failure("stale-head", "creator successor predecessor is stale")
++				: failure("chain-invalid", "creator successor predecessor differs from the active owner");
++		}
++		beginReplacement(existing);
++		const activated = await consumeCreatorSuccessorLive(material, bindings);
++		if (!activated.ok) {
++			if (failureMayFollowTransfer(activated)) await ignoreCleanupFailure(abandonOwner(existing));
++			else {
++				const retire = existing.retirementRequested;
++				finishReplacement(existing);
++				if (retire) await ignoreCleanupFailure(deactivateOwner(existing));
++			}
++			return failure(activated.kind, activated.detail);
++		}
++		const rawHandle = activated.handle as Record<string, unknown> &
++			Readonly<{
++				deactivate(): void | Promise<void>;
++			}>;
++		const replacement = wrapOwner(topic, rawHandle, bindings, heads.successor, existing.lock);
++		if (!consumeCreatorSuccessorHandleAlias(rawHandle, replacement.handle)) {
++			await ignoreCleanupFailure(deactivateRawHandle(rawHandle));
++			await ignoreCleanupFailure(abandonOwner(existing));
++			return failure("internal-invariant", "creator successor handle identity is unavailable");
++		}
++		if (!currentOwner(existing) || existing.retirementRequested) {
++			await ignoreCleanupFailure(deactivateRawHandle(rawHandle));
++			await ignoreCleanupFailure(abandonOwner(existing));
++			return failure("authority-unavailable", "creator successor active ownership changed during replacement");
++		}
++		activeOwners.set(topic, replacement);
++		finishReplacement(existing);
++		return success(material, replacement.handle);
+ 	}
+ 	const held = await acquireBrowserLock(topic);
+ 	if (held !== undefined && "ok" in held && held.ok === false) return held;
+@@ -206,18 +410,8 @@ async function activateMaterial(
+ 		return failure(activated.kind, activated.detail);
+ 	}
+ 	const rawHandle = activated.handle as Record<string, unknown> & Readonly<{ deactivate(): void | Promise<void> }>;
+-	let active = true;
+-	const wrapped = Object.freeze({
+-		...rawHandle,
+-		deactivate: async (): Promise<void> => {
+-			if (!active) return;
+-			active = false;
+-			await Promise.resolve(rawHandle.deactivate());
+-			activeOwners.delete(topic);
+-			await lock?.release();
+-		},
+-	});
+-	if (!consumeCreatorSuccessorHandleAlias(rawHandle, wrapped)) {
++	const owner = wrapOwner(topic, rawHandle, bindings, heads.successor, lock);
++	if (!consumeCreatorSuccessorHandleAlias(rawHandle, owner.handle)) {
+ 		try {
+ 			await Promise.resolve(rawHandle.deactivate());
+ 		} catch {
+@@ -226,8 +420,8 @@ async function activateMaterial(
+ 		await lock?.release();
+ 		return failure("internal-invariant", "creator successor handle identity is unavailable");
+ 	}
+-	activeOwners.set(topic, Object.freeze({ bindings, handle: wrapped }));
+-	return success(material, wrapped);
++	activeOwners.set(topic, owner);
++	return success(material, owner.handle);
+ }
+ 
+ /**
+diff --git a/packages/node/src/creator-adoption-commit.ts b/packages/node/src/creator-adoption-commit.ts
+index 678edd90..a1a52ead 100644
+--- a/packages/node/src/creator-adoption-commit.ts
++++ b/packages/node/src/creator-adoption-commit.ts
+@@ -101,6 +101,21 @@ function record(value: unknown): value is Readonly<Record<string, unknown>> {
+ 	return value !== null && typeof value === "object" && !Array.isArray(value);
+ }
+ 
++function predecessorProjectionKind(
++	material: CreatorAdoptionIntentMaterial
++): "v3-live-generation-1" | "v3-live-generation-2" | undefined {
++	const currentEpoch = material.activation.predecessor.trust.currentEpoch;
++	const successorEpoch = material.activation.successor.trust.currentEpoch;
++	return Number.isSafeInteger(currentEpoch) &&
++		currentEpoch >= 0 &&
++		Number.isSafeInteger(successorEpoch) &&
++		successorEpoch === currentEpoch + 1
++		? currentEpoch === 0
++			? "v3-live-generation-1"
++			: "v3-live-generation-2"
++		: undefined;
++}
++
+ function captureInput(value: unknown): CapturedInput | undefined {
+ 	try {
+ 		if (!record(value) || Object.keys(value).sort().join(",") !== "handle,intent") return undefined;
+@@ -307,7 +322,14 @@ function validStagedLineage(
+ 
+ function validProjection(material: CreatorAdoptionIntentMaterial): Readonly<Record<string, unknown>> | undefined {
+ 	const descriptor = canonicalRecord(material.exactCanonicalProjectionBytes);
+-	if (descriptor?.kind !== "v3-live-generation-2") return undefined;
++	const predecessorKind = predecessorProjectionKind(material);
++	if (
++		descriptor?.kind !== "v3-live-generation-2" ||
++		predecessorKind === undefined ||
++		descriptor.epoch !== material.activation.successor.trust.currentEpoch
++	) {
++		return undefined;
++	}
+ 	const digest = digestBlob(material.exactCanonicalProjectionBytes);
+ 	if (!digest.ok) return undefined;
+ 	const projectionRef = Object.freeze({
+@@ -431,7 +453,8 @@ async function authenticatedTerminal(
+ 		}
+ 		const predecessor = currentCandidates.filter(
+ 			({ bytes, ref }) =>
+-				sameRef(ref, material.predecessorLiveRef) && canonicalRecord(bytes)?.kind === "v3-live-generation-1"
++				sameRef(ref, material.predecessorLiveRef) &&
++				canonicalRecord(bytes)?.kind === predecessorProjectionKind(material)
+ 		);
+ 		return predecessor.length === 1
+ 			? Object.freeze({ head: Object.freeze({ ...active.head }), kind: candidate ? "active-new" : "pending-old" })
+@@ -488,7 +511,8 @@ async function authenticatedStaged(
+ 		const projection = stagedCandidates.filter(({ bytes }) => sameBytes(bytes, material.exactCanonicalProjectionBytes));
+ 		const predecessor = currentCandidates.filter(
+ 			({ bytes, ref }) =>
+-				sameRef(ref, material.predecessorLiveRef) && canonicalRecord(bytes)?.kind === "v3-live-generation-1"
++				sameRef(ref, material.predecessorLiveRef) &&
++				canonicalRecord(bytes)?.kind === predecessorProjectionKind(material)
+ 		);
+ 		return projection.length === 1 && predecessor.length === 1
+ 			? Object.freeze({ kind: "staged" })
+diff --git a/packages/node/src/creator-adoption.ts b/packages/node/src/creator-adoption.ts
+index 277e0a5f..670c9f40 100644
+--- a/packages/node/src/creator-adoption.ts
++++ b/packages/node/src/creator-adoption.ts
+@@ -108,10 +108,13 @@ interface VerifiedChain {
+ 		readonly runtimeProfile: string;
+ 	}>;
+ 	readonly currentAnchor: Readonly<Record<string, unknown>>;
++	readonly currentEpoch: number;
++	readonly currentProjectionKind: "v3-live-generation-1" | "v3-live-generation-2";
+ 	readonly currentTrustRecord: Readonly<Record<string, unknown>>;
+ 	readonly cut: Readonly<Record<string, unknown>>;
+ 	readonly successorAnchor: Readonly<Record<string, unknown>>;
+ 	readonly successorAnchorBytes: Uint8Array;
++	readonly successorEpoch: number;
+ 	readonly successorTrust: CurrentAnchorTrust;
+ 	readonly successorTrustRecord: Readonly<Record<string, unknown>>;
+ }
+@@ -181,6 +184,10 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+ 	return left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);
+ }
+ 
++function currentProjectionKind(epoch: number): "v3-live-generation-1" | "v3-live-generation-2" {
++	return epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2";
++}
++
+ function canonicalRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {
+ 	try {
+ 		const decoded = decodeCanonical(bytes);
+@@ -368,14 +375,33 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
+ 	const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+ 	const successorAnchorBytes = Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+ 	const successorAnchor = canonicalRecord(successorAnchorBytes);
++	const currentEpoch = facts.currentTrust.currentEpoch;
++	const successorEpoch = opened.trust.currentEpoch;
++	if (
++		!Number.isSafeInteger(currentEpoch) ||
++		currentEpoch < 0 ||
++		!Number.isSafeInteger(successorEpoch) ||
++		successorEpoch !== currentEpoch + 1 ||
++		facts.closeResult.epoch !== currentEpoch ||
++		facts.closeResult.successorEpoch !== successorEpoch ||
++		currentTrustRecord.currentEpoch !== currentEpoch ||
++		successorTrustRecord.currentEpoch !== successorEpoch ||
++		currentAnchor?.epoch !== currentEpoch ||
++		successorAnchor?.epoch !== successorEpoch ||
++		successorAnchor?.previousAnchor !== facts.currentTrust.currentAnchorDigest
++	) {
++		return undefined;
++	}
++	const expectedCurrentProjectionKind = currentProjectionKind(currentEpoch);
+ 	const projections = closure.currentCandidates
+ 		.map(({ bytes }) => canonicalRecord(bytes))
+-		.filter((candidate) => candidate?.kind === "v3-live-generation-1");
++		.filter((candidate) => candidate?.kind === expectedCurrentProjectionKind);
+ 	const currentProjection = projections.length === 1 ? projections[0] : undefined;
+ 	if (
+ 		currentAnchor === undefined ||
+ 		successorAnchor === undefined ||
+ 		currentProjection === undefined ||
++		currentProjection.epoch !== currentEpoch ||
+ 		typeof currentProjection.artifactDigest !== "string" ||
+ 		typeof currentProjection.artifactId !== "string" ||
+ 		typeof currentProjection.blueprintDigest !== "string" ||
+@@ -388,6 +414,8 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
+ 	}
+ 	return Object.freeze({
+ 		currentAnchor,
++		currentEpoch,
++		currentProjectionKind: expectedCurrentProjectionKind,
+ 		currentTrustRecord,
+ 		currentCatalog: Object.freeze({
+ 			artifactDigest: currentProjection.artifactDigest,
+@@ -399,6 +427,7 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
+ 		cut,
+ 		successorAnchor,
+ 		successorAnchorBytes,
++		successorEpoch,
+ 		successorTrust: opened.trust,
+ 		successorTrustRecord,
+ 	});
+@@ -542,7 +571,7 @@ function projection(
+ 			vertices: [
+ 				{
+ 					dependencies: [],
+-					epoch: 1,
++					epoch: chain.successorEpoch,
+ 					hash: facts.closeResult.successorAnchorDigest,
+ 					kind: "drp-epoch-anchor",
+ 					objectId: chain.successorAnchor.objectId,
+@@ -562,7 +591,7 @@ function projection(
+ 			byteCharge: chain.successorAnchorBytes.byteLength,
+ 			catalogDigest: resolved.evidence.catalogDigest,
+ 			compactHistory: facts.history.historySnapshot,
+-			epoch: 1,
++			epoch: chain.successorEpoch,
+ 			graphDigest: graphDigest.value,
+ 			historyRoot: facts.history.historyRoot,
+ 			historySize: facts.history.historySize,
+@@ -595,7 +624,8 @@ function projection(
+ function successorCommitMaterial(
+ 	facts: SealedAdoptionFacts,
+ 	closure: RecoveredClosure,
+-	exactCanonicalProjectionBytes: Uint8Array
++	exactCanonicalProjectionBytes: Uint8Array,
++	predecessorKind: VerifiedChain["currentProjectionKind"]
+ ):
+ 	| Readonly<{
+ 			readonly candidateReferences: readonly GenerationRef[];
+@@ -606,10 +636,7 @@ function successorCommitMaterial(
+ 	try {
+ 		const predecessors = closure.currentCandidates.filter(({ bytes, ref }) => {
+ 			const decoded = canonicalRecord(bytes);
+-			return (
+-				decoded?.kind === "v3-live-generation-1" &&
+-				facts.proposedReferences.some((candidate) => sameRef(candidate, ref))
+-			);
++			return decoded?.kind === predecessorKind && facts.proposedReferences.some((candidate) => sameRef(candidate, ref));
+ 		});
+ 		if (predecessors.length !== 1) return undefined;
+ 		const predecessorLiveRef = predecessors[0]?.ref;
+@@ -663,7 +690,7 @@ function creatorSuccessorLiveSeed(
+ 	try {
+ 		const predecessorProjection = closure.currentCandidates.filter(
+ 			({ bytes, ref }) =>
+-				canonicalRecord(bytes)?.kind === "v3-live-generation-1" && sameRef(ref, commitMaterial.predecessorLiveRef)
++				canonicalRecord(bytes)?.kind === chain.currentProjectionKind && sameRef(ref, commitMaterial.predecessorLiveRef)
+ 		);
+ 		const exactCanonicalLatchedAclBytes = encodeCanonical(snapshot.payload.acl);
+ 		if (
+@@ -773,7 +800,7 @@ export async function verifyCreatorSuccessorAdoption(input: unknown): Promise<Ad
+ 		if (resolved === undefined) return failure("blueprint-invalid", "creator successor blueprint is invalid");
+ 		const projected = projection(facts, chain, snapshot, resolved);
+ 		if (projected === undefined) return failure("internal-invariant", "creator successor projection failed");
+-		const commitMaterial = successorCommitMaterial(facts, closure, projected.bytes);
++		const commitMaterial = successorCommitMaterial(facts, closure, projected.bytes, chain.currentProjectionKind);
+ 		if (commitMaterial === undefined) {
+ 			return failure("internal-invariant", "creator successor commit material failed");
+ 		}
+@@ -1006,6 +1033,7 @@ async function reopenCreatorSuccessorMaterial(
+ 		}
+ 		const chain: VerifiedChain = Object.freeze({
+ 			currentAnchor,
++			currentEpoch: 0,
+ 			currentCatalog: Object.freeze({
+ 				artifactDigest: String(currentProjection.record.artifactDigest),
+ 				artifactId: String(currentProjection.record.artifactId),
+@@ -1013,10 +1041,12 @@ async function reopenCreatorSuccessorMaterial(
+ 				catalogDigest: String(currentProjection.record.catalogDigest),
+ 				runtimeProfile: String(currentProjection.record.runtimeProfile),
+ 			}),
++			currentProjectionKind: "v3-live-generation-1",
+ 			currentTrustRecord,
+ 			cut: cutCandidate.record,
+ 			successorAnchor,
+ 			successorAnchorBytes,
++			successorEpoch: 1,
+ 			successorTrust: openedSuccessor.trust,
+ 			successorTrustRecord,
+ 		});
+@@ -1291,6 +1321,7 @@ async function authenticatePendingCandidate(
+ 		if (currentAnchor === undefined || successorAnchor === undefined) return undefined;
+ 		const chain: VerifiedChain = Object.freeze({
+ 			currentAnchor,
++			currentEpoch: 0,
+ 			currentCatalog: Object.freeze({
+ 				artifactDigest: String(currentProjection.record.artifactDigest),
+ 				artifactId: String(currentProjection.record.artifactId),
+@@ -1298,10 +1329,12 @@ async function authenticatePendingCandidate(
+ 				catalogDigest: String(currentProjection.record.catalogDigest),
+ 				runtimeProfile: String(currentProjection.record.runtimeProfile),
+ 			}),
++			currentProjectionKind: "v3-live-generation-1",
+ 			currentTrustRecord,
+ 			cut: cutCandidate.record,
+ 			successorAnchor,
+ 			successorAnchorBytes: Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
++			successorEpoch: 1,
+ 			successorTrust: openedSuccessor.trust,
+ 			successorTrustRecord,
+ 		});
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index 0f150124..dd5a3fac 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -832,6 +832,7 @@ const creatorSuccessorRecovery = new WeakMap<
+ 		readonly sourceCapability: PreparedV3Live;
+ 	}>
+ >();
++const creatorPredecessorRecoverySource = new WeakMap<object, V3DisplacedSourceAuthority>();
+ const creatorSuccessorInitialState = new WeakMap<
+ 	object,
+ 	Readonly<{
+@@ -4511,12 +4512,12 @@ function matchingOutboxRows(left: SnapshottedOutboxRow, right: SnapshottedOutbox
+ 	);
+ }
+ 
+-function creatorPredecessorIssuanceStore(
++function creatorFilteredIssuanceStore(
+ 	issuanceStore: DurableIssuanceStore,
+ 	issuanceScope: DurableIssueScope,
+-	successorPayload: PreparedV3LivePayload,
+-	successorAuthorization: V3LiveAuthorization,
+-	expectedEpoch: number
++	filterPayload: PreparedV3LivePayload,
++	filterAuthorization: V3LiveAuthorization,
++	excludedAfterEpoch?: number
+ ): DurableIssuanceStore {
+ 	let skipped = 0;
+ 	return ObjectFreeze({
+@@ -4539,8 +4540,8 @@ function creatorPredecessorIssuanceStore(
+ 					return page;
+ 				}
+ 				const authenticated = authenticateRecoveryVertex(
+-					successorPayload,
+-					successorAuthorization,
++					filterPayload,
++					filterAuthorization,
+ 					row.canonicalPreimageBytes,
+ 					row.signature
+ 				);
+@@ -4551,7 +4552,7 @@ function creatorPredecessorIssuanceStore(
+ 					authenticated.author === issuanceScope.author &&
+ 					authenticated.authorSequence === row.authorSequence &&
+ 					typeof candidateEpoch === "number" &&
+-					candidateEpoch > expectedEpoch
++					(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch)
+ 				) {
+ 					const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+ 					const issuedRow = outboxRowSnapshot(
+@@ -4560,7 +4561,7 @@ function creatorPredecessorIssuanceStore(
+ 					);
+ 					if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
+ 					skipped += 1;
+-					if (skipped > successorPayload.parameters.maxEpochVertices) return page;
++					if (skipped > filterPayload.parameters.maxEpochVertices) return page;
+ 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
+ 						string,
+ 						string,
+@@ -4621,6 +4622,10 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
+ 		const successorRecovery = creatorSuccessorRecovery.get(input.capability as object);
+ 		if (successorRecovery !== undefined) creatorSuccessorRecovery.delete(input.capability as object);
++		const predecessorRecoverySource = creatorPredecessorRecoverySource.get(input.capability as object);
++		if (predecessorRecoverySource !== undefined) {
++			creatorPredecessorRecoverySource.delete(input.capability as object);
++		}
+ 		const rawOperationAdmissionPolicy = Reflect.get(input, OPERATION_ADMISSION_POLICY_KEY);
+ 		const selectedOperationAdmissionPolicy = operationAdmissionPolicy(rawOperationAdmissionPolicy);
+ 		if (rawOperationAdmissionPolicy !== undefined && selectedOperationAdmissionPolicy === undefined) {
+@@ -4662,9 +4667,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 			return recoveryFailure("authorization-rejected", "v3 recovery author is not authorized");
+ 		}
+ 
+-		let displacedSource: V3DisplacedSourceAuthority | undefined;
++		let displacedSource = predecessorRecoverySource;
+ 		const rawDisplacedSource = Reflect.get(input, "displacedSource");
+ 		if (rawDisplacedSource !== undefined) {
++			if (displacedSource !== undefined) {
++				return recoveryFailure("malformed-input", "v3 displaced source authority is ambiguous");
++			}
+ 			const legacySource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_LEGACY_SOURCE_KEYS);
+ 			const latchedSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_LATCHED_SOURCE_KEYS);
+ 			const crossSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_CROSS_OBJECT_SOURCE_KEYS);
+@@ -4745,7 +4753,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 		const scope = liveJournalScope(payload);
+ 		let installed;
+ 		try {
+-			installed = await (successorRecovery === undefined ? journal.installGenesis : journal.installEpochAnchor)({
++			installed = await (payload.provenance.epoch === 0 ? journal.installGenesis : journal.installEpochAnchor)({
+ 				detachedAnchorSignature: new Uint8ArrayConstructor(payload.input.detachedSignature),
+ 				exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(payload.input.exactCanonicalAnchorPreimageBytes),
+ 				exactCanonicalParametersCarrierBytes: new Uint8ArrayConstructor(
+@@ -7297,6 +7305,7 @@ async function activateCreatorSuccessorLive(
+ 	): Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }> =>
+ 		ObjectFreeze({ detail, kind, ok: false as const });
+ 	try {
++		const transportHandoff = creatorSuccessorTransportHandoff(material, bindings);
+ 		const [predecessorValidation, predecessorSource, successor, successorIssuanceAuthority] = await Promise.all([
+ 			prepareExistingCreatorGeneration(material.predecessor, material),
+ 			prepareExistingCreatorGeneration(material.predecessor, material),
+@@ -7319,13 +7328,16 @@ async function activateCreatorSuccessorLive(
+ 		if (successorPayload === undefined || successorAuthorization === undefined) {
+ 			return rejected("preparation-rejected", "creator successor issuance authority preparation failed");
+ 		}
+-		const predecessorIssuanceStore = creatorPredecessorIssuanceStore(
++		const predecessorIssuanceStore = creatorFilteredIssuanceStore(
+ 			material.issuanceStore,
+ 			material.issuanceScope,
+ 			successorPayload,
+ 			successorAuthorization,
+ 			material.predecessor.trust.currentEpoch
+ 		);
++		if (transportHandoff?.displacedSource !== undefined) {
++			creatorPredecessorRecoverySource.set(predecessorValidation, transportHandoff.displacedSource);
++		}
+ 		const validatedPredecessor = await recoverV3LiveReplica({
+ 			capability: predecessorValidation,
+ 			exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
+@@ -7348,6 +7360,15 @@ async function activateCreatorSuccessorLive(
+ 				sourceCapability: predecessorSource,
+ 			})
+ 		);
++		const successorIssuanceStore =
++			transportHandoff?.displacedSource === undefined
++				? material.issuanceStore
++				: creatorFilteredIssuanceStore(
++						material.issuanceStore,
++						material.issuanceScope,
++						transportHandoff.displacedSource.prepared,
++						transportHandoff.displacedSource.authorization
++					);
+ 		const recovered = await recoverV3LiveReplica({
+ 			capability: successor,
+ 			displacedSource: ObjectFreeze({
+@@ -7356,7 +7377,7 @@ async function activateCreatorSuccessorLive(
+ 			}),
+ 			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
+ 			issuanceScope: material.issuanceScope,
+-			issuanceStore: material.issuanceStore,
++			issuanceStore: successorIssuanceStore,
+ 			liveJournalStore: material.liveJournalStore,
+ 		});
+ 		if (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);
+@@ -7368,7 +7389,6 @@ async function activateCreatorSuccessorLive(
+ 				expectedPayloadDigest: material.snapshotPayloadDigest,
+ 			})
+ 		);
+-		const transportHandoff = creatorSuccessorTransportHandoff(material, bindings);
+ 		if (transportHandoff !== undefined) {
+ 			creatorSuccessorTransportHandoffs.set(recovered.capability, transportHandoff);
+ 		}
+diff --git a/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts b/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
+index a1301bba..606556b8 100644
+--- a/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
++++ b/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
+@@ -253,11 +253,11 @@ interface CreatorLiveCloseApi {
+ 			commitQcRef: Readonly<{ byteLength: number; digest: string }>;
+ 			currentTrustRef: Readonly<{ byteLength: number; digest: string }>;
+ 			cutValueRef: Readonly<{ byteLength: number; digest: string }>;
+-			epoch: 0;
++			epoch: number;
+ 			lifecycle: "successor-pending-adoption";
+ 			ok: true;
+ 			successorAnchorDigest: string;
+-			successorEpoch: 1;
++			successorEpoch: number;
+ 			successorTrustRef: Readonly<{ byteLength: number; digest: string }>;
+ 		}>
+ 	>;
+diff --git a/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts b/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+index 5cfae00b..c257a84f 100644
+--- a/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
++++ b/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+@@ -1044,6 +1044,7 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
+ 		},
+ 		failure: {
+ 			counts: failingCounts,
++			detail: failingSettlements[0].detail,
+ 			sameSettlement:
+ 				JSON.stringify(failingSettlements[0]) === JSON.stringify(failingSettlements[1]) &&
+ 				failingSettlements[0].status === "rejected",
+@@ -1094,8 +1095,9 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
+ 				predecessorDeactivateCount: 0,
+ 				replacementDeactivateCount: 0,
+ 				replacementDeactivateCompletedCount: 0,
+-				verificationCount: 1,
++				verificationCount: 0,
+ 			},
++			detail: "D110C_B_ACTIVATION_STALLED",
+ 			sameSettlement: true,
+ 		},
+ 		success: {
+@@ -1838,7 +1840,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
+ 				counts: { activationCount: 1, replacementDeactivateCount: 0 },
+ 				settlements: {
+ 					adoption: {
+-						detail: "v3 room successor activation failed: authority-unavailable",
++						detail: "D110C_B_ACTIVATION_STALLED",
+ 						lifetime: expect.any(Object),
+ 						order: 1,
+ 						status: "rejected",
+@@ -1960,7 +1962,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
+ 					{ order: 3, status: "rejected" },
+ 				],
+ 			},
+-			retry: { settled: ["rejected", "fulfilled"], verificationCount: 2 },
++			retry: { settled: ["rejected", "fulfilled"], verificationCount: 1 },
+ 		},
+ 	});
+ });
+@@ -1968,7 +1970,16 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
+ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
+ 	const runRedirectOrdering = async (
+ 		kind: "activation" | "rehearsal"
+-	): Promise<Readonly<{ readonly laterSettledAtVerification: boolean }>> => {
++	): Promise<
++		Readonly<{
++			readonly adoptionBeforeLater: boolean;
++			readonly adoptionDetail?: string;
++			readonly adoptionStatus: "fulfilled" | "rejected";
++			readonly beforeRelease: Readonly<{ readonly adoption: boolean; readonly later: boolean }>;
++			readonly redirectStatus: "fulfilled" | "rejected";
++			readonly verificationCount: number;
++		}>
++	> => {
+ 		const context = await openD108e3Creator(false);
+ 		const name = `d108e5-${kind}-${lifetimeScenario}`;
+ 		const redirectObservation = `${name}-redirect`;
+@@ -1981,7 +1992,6 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
+ 		await context.page.evaluate(() =>
+ 			window.phase6aCreatorSuccessorProduct.configureLifetime({
+ 				pauseRedirectRecovery: true,
+-				pauseVerification: true,
+ 			})
+ 		);
+ 		await context.page.evaluate(
+@@ -2016,17 +2026,16 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
+ 			},
+ 			{ observation: laterObservation, operation: kind, selected: name }
+ 		);
+-		await context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseRedirectRecovery());
+-		await expect
+-			.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))
+-			.toBe(1);
+-		await settleBrowserTurns(context.page);
+-		const laterSettledAtVerification = await context.page.evaluate(
+-			(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),
+-			laterObservation
++		const beforeRelease = await context.page.evaluate(
++			({ later, selected }) =>
++				Object.freeze({
++					adoption: window.phase6aCreatorSuccessorProduct.directAdoptionSettled(selected),
++					later: window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(later),
++				}),
++			{ later: laterObservation, selected: name }
+ 		);
+-		await context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseVerification());
+-		await Promise.all([
++		await context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseRedirectRecovery());
++		const [redirect, later, adoption] = await Promise.all([
+ 			context.page.evaluate(
+ 				(observation) => window.phase6aCreatorSuccessorProduct.waitForD108e5DirectOperation(observation),
+ 				redirectObservation
+@@ -2037,9 +2046,20 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
+ 			),
+ 			context.page.evaluate((selected) => window.phase6aCreatorSuccessorProduct.waitForDirectAdoption(selected), name),
+ 		]);
++		const verificationCount = await context.page.evaluate(
++			() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount
++		);
+ 		await context.page.evaluate((selected) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(selected), name);
+ 		await context.page.close();
+-		return Object.freeze({ laterSettledAtVerification });
++		return Object.freeze({
++			adoptionBeforeLater:
++				typeof adoption.order === "number" && typeof later.order === "number" && adoption.order < later.order,
++			adoptionDetail: adoption.detail,
++			adoptionStatus: adoption.status,
++			beforeRelease,
++			redirectStatus: redirect.status,
++			verificationCount,
++		});
+ 	};
+ 
+ 	const rehearsalOrdering = await runRedirectOrdering("rehearsal");
+@@ -2055,8 +2075,22 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
+ 	await bounds.page.evaluate((name) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(name), boundsName);
+ 	await bounds.page.close();
+ 
+-	expect.soft(rehearsalOrdering.laterSettledAtVerification).toBe(false);
+-	expect.soft(activationOrdering.laterSettledAtVerification).toBe(false);
++	expect.soft(rehearsalOrdering).toMatchObject({
++		adoptionBeforeLater: true,
++		adoptionDetail: "D110C_B_ACTIVATION_STALLED",
++		adoptionStatus: "rejected",
++		beforeRelease: { adoption: false, later: false },
++		redirectStatus: "fulfilled",
++		verificationCount: 0,
++	});
++	expect.soft(activationOrdering).toMatchObject({
++		adoptionBeforeLater: true,
++		adoptionDetail: "D110C_B_ACTIVATION_STALLED",
++		adoptionStatus: "rejected",
++		beforeRelease: { adoption: false, later: false },
++		redirectStatus: "fulfilled",
++		verificationCount: 0,
++	});
+ 	expect.soft(observations.overLimitHex).toBe("v3 room migration target invite is unbounded");
+ 	expect.soft(observations.exact65537).toBe("v3 room migration target invite is unbounded");
+ 	expect.soft(observations.oversizedDigest).toBe("v3 room creator invite anchor is invalid");
+@@ -2087,20 +2121,36 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
+ 			databaseName,
+ 		});
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-zero"));
+-		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
++		const closeZero = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
++		expect(closeZero).toMatchObject({ epoch: 0, successorEpoch: 1 });
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-one"));
+-		const beforeRejectedClose = await snapshot(page);
+-		expect(beforeRejectedClose.authority).toMatchObject({ epoch: 1 });
+-		await expect(page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch())).rejects.toThrow(
+-			"creator close authority is unavailable"
+-		);
+-		const afterRejectedClose = await snapshot(page);
+-		expect(afterRejectedClose.authority).toEqual(beforeRejectedClose.authority);
+-		expect(afterRejectedClose.roomId).toBe(beforeRejectedClose.roomId);
+-		expect(afterRejectedClose.accepted).toEqual(beforeRejectedClose.accepted);
++		const epochOne = await snapshot(page);
++		expect(epochOne.authority).toMatchObject({ epoch: 1 });
++		const closeOne = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
++		expect(closeOne).toMatchObject({ epoch: 1, successorEpoch: 2 });
++		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
++		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-two"));
++		const epochTwo = await snapshot(page);
++		expect(epochTwo.authority).toMatchObject({
++			epoch: 2,
++			genesisAnchorDigest: (epochOne.authority as Readonly<Record<string, unknown>>).genesisAnchorDigest,
++			objectId: (epochOne.authority as Readonly<Record<string, unknown>>).objectId,
++		});
++		expect(epochTwo.accepted).toHaveLength(3);
++		expect((epochTwo.accepted as readonly Readonly<Record<string, unknown>>[]).map(({ text }) => text)).toEqual([
++			"d110c-b-epoch-zero",
++			"d110c-b-epoch-one",
++			"d110c-b-epoch-two",
++		]);
++		expect(epochTwo.roomId).toBe((epochTwo.authority as Readonly<Record<string, unknown>>).anchorDigest);
++		const closeTwo = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
++		expect(closeTwo).toMatchObject({ epoch: 2, successorEpoch: 3 });
++		const pendingEpochThree = await snapshot(page);
++		expect(pendingEpochThree.authority).toEqual(epochTwo.authority);
++		expect(pendingEpochThree.accepted).toEqual(epochTwo.accepted);
+ 		expect(await Promise.all(retainedPages.map(snapshot))).toEqual(retainedBefore);
+-		process.stdout.write("D110C_B_CLOSE_NOT_REBOUND\n");
++		process.stdout.write("D110C_B_PRODUCT_HOT_LOOP_COMPLETE\n");
+ 	} finally {
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+ 		await page
+diff --git a/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts b/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+index 44246258..38b3c97b 100644
+--- a/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+@@ -16,15 +16,15 @@ import type {
+ } from "../../../packages/node/src/creator-close.js";
+ import {
+ 	consumeCreatorAdoptionIntent,
++	consumePreparedCreatorSuccessorAdoption,
+ 	createCreatorAdoptionIntent,
++	createPreparedCreatorSuccessorAdoption,
+ 	type CreatorAdoptionIntentMaterial,
+ } from "../../../packages/node/src/internal/creator-adoption-intent.js";
++import type { CreatorSuccessorLiveMaterial } from "../../../packages/node/src/internal/creator-successor-live.js";
+ import type { V3PlaneHandle } from "../../../packages/node/src/v3-live.js";
+ import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
+-import {
+-	type GenuineCreatorAdoptionFixtureModules,
+-	openGenuineCreatorAdoptionFixture,
+-} from "../phase-6a-v3/creator-adoption-contract.js";
++import { openGenuineCreatorAdoptionFixture } from "../phase-6a-v3/creator-adoption-contract.js";
+ import { type D109dHotFixture, openD109dHotFixture } from "../phase-6b/runtime-reclamation-contract.js";
+ 
+ const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
+@@ -89,13 +89,29 @@ export interface D110cARepeatCloseEvidence {
+ export interface D110cARepeatCloseFixture {
+ 	readonly evidence: D110cARepeatCloseEvidence;
+ 	close(): Promise<void>;
+-	verifyPendingSuccessor(): Promise<
+-		Readonly<{
+-			readonly afterHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
+-			readonly beforeHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
+-			readonly result: Awaited<ReturnType<GenuineCreatorAdoptionFixtureModules["verifyCreatorSuccessorAdoption"]>>;
+-		}>
+-	>;
++	advancePendingSuccessor(): Promise<D110cBPendingSuccessorEvidence>;
++	failPendingSuccessor(mode: "retirement" | "terminalize"): Promise<D110cBFailureEvidence>;
++}
++
++export interface D110cBFailureEvidence {
++	readonly oldIssue: Readonly<Record<string, unknown>>;
++	readonly result: Readonly<Record<string, unknown>>;
++}
++
++export interface D110cBPendingSuccessorEvidence {
++	readonly activation: Readonly<Record<string, unknown>>;
++	readonly activeAuthority: Readonly<Record<string, unknown>> | undefined;
++	readonly afterHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
++	readonly beforeHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
++	readonly committed: Readonly<Record<string, unknown>>;
++	readonly duplicateActivation: Readonly<Record<string, unknown>>;
++	readonly duplicateCommit: Readonly<Record<string, unknown>>;
++	readonly duplicateHandleIdentity: boolean;
++	readonly issued: Readonly<Record<string, unknown>>;
++	readonly mutants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
++	readonly oldIssue: Readonly<Record<string, unknown>>;
++	readonly published: Readonly<Record<string, unknown>>;
++	readonly verification: Readonly<Record<string, unknown>>;
+ }
+ 
+ function copiedRoomHead(plane: V3PlaneHandle): Readonly<Record<string, unknown>> | undefined {
+@@ -389,20 +405,30 @@ async function blobForRef(hot: D109dHotFixture, ref: GenerationRef): Promise<Uin
+ 
+ /**
+  * Executes a genuine adopted epoch-one close against the authenticated prior-history carrier.
++ * @param options - Optional genuine room identity and retained D.110c-a control selection.
+  * @returns Retained GREEN evidence and a cooperative cleanup owner.
+  */
+-export async function openD110cARepeatCloseFixture(): Promise<D110cARepeatCloseFixture> {
+-	const [carrierRefusals, overflow] = await Promise.all([hostileCarrierRefusals(), overflowRefusal()]);
+-	const hot = await openD109dHotFixture();
++export async function openD110cARepeatCloseFixture(
++	options: Readonly<{ readonly objectId?: string; readonly retainedControls?: boolean }> = {}
++): Promise<D110cARepeatCloseFixture> {
++	const [carrierRefusals, overflow] =
++		options.retainedControls === false
++			? [Object.freeze([]), "D110C_A_RETAINED_CONTROLS_NOT_RUN"]
++			: await Promise.all([hostileCarrierRefusals(), overflowRefusal()]);
++	const hot = await openD109dHotFixture({
++		...(options.objectId === undefined ? {} : { creator: { objectId: options.objectId } }),
++	});
+ 	const primaryDatabaseName = `d110c-a-seal-${crypto.randomUUID()}`;
+ 	const snapshotDatabaseName = `d110c-a-snapshot-${crypto.randomUUID()}`;
+ 	const closers: StoreCloser[] = [];
+ 	let closeHandle: CreatorLiveCloseHandle | undefined;
++	let latestSuccessor: D109dHotFixture["successor"] | undefined;
+ 	let closed = false;
+ 	let successorVerificationConsumed = false;
+ 	const cleanup = async (): Promise<void> => {
+ 		if (closed) return;
+ 		closed = true;
++		await Promise.resolve(latestSuccessor?.deactivate()).catch(() => undefined);
+ 		await closeHandle?.stop().catch(() => undefined);
+ 		await Promise.all(closers.map((closer) => closer.close().catch(() => undefined)));
+ 		await hot.close();
+@@ -502,18 +528,271 @@ export async function openD110cARepeatCloseFixture(): Promise<D110cARepeatCloseF
+ 					storageNodeBuiltUrl: pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js")).href,
+ 				}),
+ 			}),
+-			verifyPendingSuccessor: async () => {
++			advancePendingSuccessor: async () => {
+ 				if (successorVerificationConsumed) throw new TypeError("D110C_B_VERIFICATION_ALREADY_CONSUMED");
+ 				successorVerificationConsumed = true;
+ 				if (closeHandle === undefined) throw new TypeError("D110C_B_CLOSE_HANDLE_UNAVAILABLE");
+-				const beforeHead = await closeHandle.inspectDurableHead();
+-				const result = await hot.base.modules.verifyCreatorSuccessorAdoption({
++				const adoptionHandle = closeHandle;
++				const beforeHead = await adoptionHandle.inspectDurableHead();
++				const prepare = async (): Promise<
++					Readonly<{
++						readonly capability: object;
++						readonly descriptor: Readonly<Record<string, unknown>>;
++						readonly head: object;
++					}>
++				> => {
++					const verified = await hot.base.modules.verifyCreatorSuccessorAdoption({
++						catalog: hot.base.catalog,
++						handle: adoptionHandle,
++					});
++					if (!verified.ok) throw new TypeError(`D110C_B_VERIFY_FAILED:${verified.kind}`);
++					const result = await hot.base.modules.commitCreatorSuccessorAdoption({
++						handle: adoptionHandle,
++						intent: verified.intent,
++					});
++					if (!result.ok) throw new TypeError(`D110C_B_COMMIT_FAILED:${result.kind}`);
++					return result;
++				};
++				const verification = await hot.base.modules.verifyCreatorSuccessorAdoption({
+ 					catalog: hot.base.catalog,
+-					handle: closeHandle,
++					handle: adoptionHandle,
++				});
++				if (!verification.ok) throw new TypeError(`D110C_B_VERIFY_FAILED:${verification.kind}`);
++				const committed = await hot.base.modules.commitCreatorSuccessorAdoption({
++					handle: adoptionHandle,
++					intent: verification.intent,
++				});
++				if (!committed.ok) throw new TypeError(`D110C_B_COMMIT_FAILED:${committed.kind}`);
++				const duplicateCommit = await prepare();
++				const expectedRoomHead = Object.freeze({
++					currentAnchorDigest: String(committed.descriptor.anchorDigest),
++					epoch: Number(committed.descriptor.epoch),
++					objectId: String(committed.descriptor.objectId),
++				});
++				const activationInput = (
++					capability: object,
++					expected: unknown,
++					bindings: typeof hot.runtimeBindings = hot.runtimeBindings
++				): Promise<Readonly<Record<string, unknown>>> =>
++					hot.base.modules.activateCreatorSuccessorAdoption({
++						capability,
++						expectedRoomHead: expected,
++						handle: adoptionHandle,
++						...bindings,
++					});
++				const mutatedCapability = async (
++					mutate: (material: CreatorSuccessorLiveMaterial) => CreatorSuccessorLiveMaterial
++				): Promise<
++					Readonly<{
++						readonly capability: object;
++						readonly expectedRoomHead: Readonly<Record<string, unknown>>;
++					}>
++				> => {
++					const source = await prepare();
++					const material = consumePreparedCreatorSuccessorAdoption(source.capability, adoptionHandle);
++					if (material === undefined) throw new TypeError("D110C_B_MUTANT_MATERIAL_UNAVAILABLE");
++					const activation = mutate(material.activation);
++					return Object.freeze({
++						capability: createPreparedCreatorSuccessorAdoption(adoptionHandle, {
++							activation,
++							exactCanonicalProjectionBytes: material.exactCanonicalProjectionBytes,
++							head: material.head,
++						}),
++						expectedRoomHead: Object.freeze({
++							currentAnchorDigest: activation.successor.trust.currentAnchorDigest,
++							epoch: activation.successor.trust.currentEpoch,
++							objectId: activation.successor.trust.objectId,
++						}),
++					});
++				};
++				const withTrust = (
++					material: CreatorSuccessorLiveMaterial,
++					predecessor: Readonly<Record<string, unknown>>,
++					successor: Readonly<Record<string, unknown>>
++				): CreatorSuccessorLiveMaterial =>
++					Object.freeze({
++						...material,
++						predecessor: Object.freeze({
++							...material.predecessor,
++							trust: Object.freeze({ ...material.predecessor.trust, ...predecessor }),
++						}),
++						successor: Object.freeze({
++							...material.successor,
++							trust: Object.freeze({ ...material.successor.trust, ...successor }),
++						}),
++					});
++				const changedAnchor = (anchor: string): string => (anchor === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64));
++				const mutants: Record<string, Readonly<Record<string, unknown>>> = Object.create(null) as Record<
++					string,
++					Readonly<Record<string, unknown>>
++				>;
++				mutants.missingHotInput = await hot.base.modules.activateCreatorSuccessorAdoption({});
++				const malformedFloor = await prepare();
++				mutants.malformedFloor = await activationInput(malformedFloor.capability, Object.freeze({ epoch: "2" }));
++				for (const [name, expected] of [
++					["laggingFloor", Object.freeze({ ...expectedRoomHead, epoch: 1 })],
++					["aheadFloor", Object.freeze({ ...expectedRoomHead, epoch: 3 })],
++					[
++						"substitutedFloor",
++						Object.freeze({
++							...expectedRoomHead,
++							currentAnchorDigest: changedAnchor(expectedRoomHead.currentAnchorDigest),
++						}),
++					],
++				] as const) {
++					const floorPrepared = await prepare();
++					mutants[name] = await activationInput(floorPrepared.capability, expected);
++				}
++				const bindingPrepared = await prepare();
++				mutants.differentBindings = await activationInput(bindingPrepared.capability, expectedRoomHead, {
++					...hot.runtimeBindings,
++					onAdmittedVertex: () => undefined,
++				});
++				for (const [name, mutate] of [
++					[
++						"sameEpochDifferentAnchor",
++						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
++							withTrust(
++								material,
++								{ currentAnchorDigest: changedAnchor(material.predecessor.trust.currentAnchorDigest) },
++								{}
++							),
++					],
++					[
++						"stalePredecessor",
++						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
++							withTrust(
++								material,
++								{ currentAnchorDigest: changedAnchor(material.predecessor.trust.currentAnchorDigest), currentEpoch: 0 },
++								{ currentAnchorDigest: changedAnchor(material.successor.trust.currentAnchorDigest), currentEpoch: 1 }
++							),
++					],
++					[
++						"skippedPredecessor",
++						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
++							withTrust(material, { currentEpoch: 2 }, { currentEpoch: 3 }),
++					],
++					[
++						"crossObject",
++						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
++							withTrust(material, { objectId: `creator:${"c".repeat(32)}` }, {}),
++					],
++					[
++						"crossGenesis",
++						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
++							withTrust(material, { genesisAnchorDigest: changedAnchor(material.pinnedGenesisAnchorDigest) }, {}),
++					],
++					[
++						"nonExactSuccessor",
++						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
++							withTrust(material, {}, { currentEpoch: 3 }),
++					],
++				] as const) {
++					const mutant = await mutatedCapability(mutate);
++					mutants[name] = await activationInput(mutant.capability, mutant.expectedRoomHead);
++				}
++				const preTransfer = await mutatedCapability((material) =>
++					Object.freeze({
++						...material,
++						predecessor: Object.freeze({ ...material.predecessor, candidates: Object.freeze([]) }),
++					})
++				);
++				mutants.preTransferRefusal = await activationInput(preTransfer.capability, preTransfer.expectedRoomHead);
++				const activation = await hot.base.modules.activateCreatorSuccessorAdoption({
++					capability: committed.capability,
++					expectedRoomHead,
++					handle: adoptionHandle,
++					...hot.runtimeBindings,
+ 				});
++				if (!activation.ok || activation.handle === null || typeof activation.handle !== "object") {
++					throw new TypeError(`D110C_B_ACTIVATION_FAILED:${String(activation.kind)}:${String(activation.detail)}`);
++				}
++				latestSuccessor = activation.handle as D109dHotFixture["successor"];
++				const duplicateActivation = await hot.base.modules.activateCreatorSuccessorAdoption({
++					capability: duplicateCommit.capability,
++					expectedRoomHead,
++					handle: adoptionHandle,
++					...hot.runtimeBindings,
++				});
++				const oldIssue = await hot.successor.issueLocal({
++					operations: Object.freeze([
++						Object.freeze({ logicalTime: 42, operation: Object.freeze({ action: "add", value: 13 }) }),
++					]),
++					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
++				});
++				await Promise.resolve(hot.successor.deactivate());
++				const issued = await latestSuccessor.issueLocal({
++					operations: Object.freeze([
++						Object.freeze({ logicalTime: 43, operation: Object.freeze({ action: "add", value: 17 }) }),
++					]),
++					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
++				});
++				const published = await latestSuccessor.publishPending();
++				if (!published.ok) {
++					throw new TypeError(`D110C_B_PUBLISH_FAILED:${String(published.kind)}:${String(published.detail)}`);
++				}
+ 				return Object.freeze({
+-					afterHead: await closeHandle.inspectDurableHead(),
++					afterHead: await adoptionHandle.inspectDurableHead(),
++					activation,
++					activeAuthority: copiedRoomHead(latestSuccessor as V3PlaneHandle),
+ 					beforeHead,
++					committed,
++					duplicateActivation,
++					duplicateCommit,
++					duplicateHandleIdentity: duplicateActivation.ok === true && duplicateActivation.handle === activation.handle,
++					issued,
++					mutants: Object.freeze(mutants),
++					oldIssue,
++					published,
++					verification,
++				});
++			},
++			failPendingSuccessor: async (mode: "retirement" | "terminalize") => {
++				if (successorVerificationConsumed) throw new TypeError("D110C_B_VERIFICATION_ALREADY_CONSUMED");
++				successorVerificationConsumed = true;
++				if (closeHandle === undefined) throw new TypeError("D110C_B_CLOSE_HANDLE_UNAVAILABLE");
++				const adoptionHandle = closeHandle;
++				const verified = await hot.base.modules.verifyCreatorSuccessorAdoption({
++					catalog: hot.base.catalog,
++					handle: adoptionHandle,
++				});
++				if (!verified.ok) throw new TypeError(`D110C_B_FAILURE_VERIFY_FAILED:${verified.kind}`);
++				const committed = await hot.base.modules.commitCreatorSuccessorAdoption({
++					handle: adoptionHandle,
++					intent: verified.intent,
++				});
++				if (!committed.ok) throw new TypeError(`D110C_B_FAILURE_COMMIT_FAILED:${committed.kind}`);
++				const prepared = consumePreparedCreatorSuccessorAdoption(committed.capability, adoptionHandle);
++				if (prepared === undefined) throw new TypeError("D110C_B_FAILURE_MATERIAL_UNAVAILABLE");
++				const terminalizeSource =
++					mode === "terminalize"
++						? (): boolean => false
++						: (): boolean => {
++								void hot.successor.deactivate();
++								return prepared.activation.terminalizeSource();
++							};
++				const capability = createPreparedCreatorSuccessorAdoption(adoptionHandle, {
++					activation: Object.freeze({ ...prepared.activation, terminalizeSource }),
++					exactCanonicalProjectionBytes: prepared.exactCanonicalProjectionBytes,
++					head: prepared.head,
++				});
++				const result = await hot.base.modules.activateCreatorSuccessorAdoption({
++					capability,
++					expectedRoomHead: Object.freeze({
++						currentAnchorDigest: String(committed.descriptor.anchorDigest),
++						epoch: Number(committed.descriptor.epoch),
++						objectId: String(committed.descriptor.objectId),
++					}),
++					handle: adoptionHandle,
++					...hot.runtimeBindings,
++				});
++				return Object.freeze({
++					oldIssue: await hot.successor.issueLocal({
++						operations: Object.freeze([
++							Object.freeze({ logicalTime: 44, operation: Object.freeze({ action: "add", value: 19 }) }),
++						]),
++						signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
++					}),
+ 					result,
+ 				});
+ 			},
+diff --git a/tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts b/tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts
+index 9b4a148c..3148ba71 100644
+--- a/tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts
+@@ -1,13 +1,21 @@
+ import { openD110cARepeatCloseFixture } from "../phase-6b-d110c-a/repeat-close-contract.js";
+ 
+-export const D110C_B_EPOCH_PINNED_PREDECESSOR = "D110C_B_EPOCH_PINNED_PREDECESSOR";
++export const D110C_B_HOT_ADOPTION_COMPLETE = "D110C_B_HOT_ADOPTION_COMPLETE";
+ 
+ export interface D110cBHotAdoptionEvidence {
+-	readonly diagnostic: typeof D110C_B_EPOCH_PINNED_PREDECESSOR;
++	readonly activation: Readonly<Record<string, unknown>>;
++	readonly activeAuthority: Readonly<Record<string, unknown>> | undefined;
+ 	readonly closeEpoch: number;
++	readonly commit: Readonly<Record<string, unknown>>;
++	readonly diagnostic: typeof D110C_B_HOT_ADOPTION_COMPLETE;
++	readonly duplicateActivation: Readonly<Record<string, unknown>>;
++	readonly duplicateCommit: Readonly<Record<string, unknown>>;
++	readonly duplicateHandleIdentity: boolean;
+ 	readonly durableHeadAfterVerification: unknown;
+ 	readonly durableHeadBeforeVerification: unknown;
+ 	readonly issued: Readonly<Record<string, unknown>>;
++	readonly mutants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
++	readonly oldIssue: Readonly<Record<string, unknown>>;
+ 	readonly published: Readonly<Record<string, unknown>>;
+ 	readonly successorEpoch: number;
+ 	readonly verification: Readonly<Record<string, unknown>>;
+@@ -18,26 +26,45 @@ export interface D110cBHotAdoptionFixture {
+ 	close(): Promise<void>;
+ }
+ 
++export interface D110cBPostTransferEvidence {
++	readonly retirement: Readonly<{
++		readonly oldIssue: Readonly<Record<string, unknown>>;
++		readonly result: Readonly<Record<string, unknown>>;
++	}>;
++	readonly terminalize: Readonly<{
++		readonly oldIssue: Readonly<Record<string, unknown>>;
++		readonly result: Readonly<Record<string, unknown>>;
++	}>;
++}
++
+ /**
+- * Observes the general verifier against the genuine D.110c-a epoch-one close.
++ * Advances the genuine D.110c-a epoch-one close through hot epoch-two activation.
+  * The retained fixture owns every close, trust, snapshot, and durable-storage fact.
+- * @returns One-shot RED evidence and the inherited cleanup owner.
++ * @returns One-shot GREEN evidence and the inherited cleanup owner.
+  */
+ export async function openD110cBHotAdoptionFixture(): Promise<D110cBHotAdoptionFixture> {
+ 	const fixture = await openD110cARepeatCloseFixture();
+ 	try {
+-		const observed = await fixture.verifyPendingSuccessor();
++		const observed = await fixture.advancePendingSuccessor();
+ 		return Object.freeze({
+ 			close: fixture.close,
+ 			evidence: Object.freeze({
++				activation: observed.activation,
++				activeAuthority: observed.activeAuthority,
+ 				closeEpoch: fixture.evidence.closeResult.epoch,
+-				diagnostic: D110C_B_EPOCH_PINNED_PREDECESSOR,
++				commit: observed.committed,
++				diagnostic: D110C_B_HOT_ADOPTION_COMPLETE,
++				duplicateActivation: observed.duplicateActivation,
++				duplicateCommit: observed.duplicateCommit,
++				duplicateHandleIdentity: observed.duplicateHandleIdentity,
+ 				durableHeadAfterVerification: observed.afterHead,
+ 				durableHeadBeforeVerification: observed.beforeHead,
+-				issued: fixture.evidence.issued,
+-				published: fixture.evidence.published,
++				issued: observed.issued,
++				mutants: observed.mutants,
++				oldIssue: observed.oldIssue,
++				published: observed.published,
+ 				successorEpoch: fixture.evidence.closeResult.successorEpoch,
+-				verification: observed.result,
++				verification: observed.verification,
+ 			}),
+ 		});
+ 	} catch (error) {
+@@ -45,3 +72,32 @@ export async function openD110cBHotAdoptionFixture(): Promise<D110cBHotAdoptionF
+ 		throw error;
+ 	}
+ }
++
++/**
++ * Exercises the two post-transfer fail-closed boundaries in isolated genuine rooms.
++ * @returns Terminalization failure and in-flight retirement/CAS-loss evidence.
++ */
++export async function runD110cBPostTransferMutants(): Promise<D110cBPostTransferEvidence> {
++	const terminalizeFixture = await openD110cARepeatCloseFixture({
++		objectId: `creator:${"d".repeat(32)}`,
++		retainedControls: false,
++	});
++	let terminalize;
++	try {
++		terminalize = await terminalizeFixture.failPendingSuccessor("terminalize");
++	} finally {
++		await terminalizeFixture.close();
++	}
++	const retirementFixture = await openD110cARepeatCloseFixture({
++		objectId: `creator:${"e".repeat(32)}`,
++		retainedControls: false,
++	});
++	try {
++		return Object.freeze({
++			retirement: await retirementFixture.failPendingSuccessor("retirement"),
++			terminalize,
++		});
++	} finally {
++		await retirementFixture.close();
++	}
++}
+diff --git a/tests/fixtures/phase-6b-d110c-b/source-shape.mjs b/tests/fixtures/phase-6b-d110c-b/source-shape.mjs
+index 70165261..2c80d560 100644
+--- a/tests/fixtures/phase-6b-d110c-b/source-shape.mjs
++++ b/tests/fixtures/phase-6b-d110c-b/source-shape.mjs
+@@ -4,11 +4,13 @@ import { resolve } from "node:path";
+ 
+ const root = resolve(import.meta.dirname, "../../..");
+ const read = (path) => readFile(resolve(root, path), "utf8");
+-const [adoption, commit, activation, room] = await Promise.all([
++const [adoption, commit, activation, live, room, browser] = await Promise.all([
+ 	read("packages/node/src/creator-adoption.ts"),
+ 	read("packages/node/src/creator-adoption-commit.ts"),
+ 	read("packages/node/src/creator-adoption-activate.ts"),
++	read("packages/node/src/v3-live.ts"),
+ 	read("examples/v3-room/src/index.ts"),
++	read("packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts"),
+ ]);
+ 
+ function section(source, start, end) {
+@@ -18,25 +20,19 @@ function section(source, start, end) {
+ 	return source.slice(from, to);
+ }
+ 
+-const chain = section(adoption, "function verifyChain(", "async function verifySnapshot(");
+-const projection = section(adoption, "function projection(", "function successorCommitMaterial(");
+-const commitMaterial = section(adoption, "function successorCommitMaterial(", "function creatorSuccessorLiveSeed(");
+-const liveSeed = section(
+-	adoption,
+-	"function creatorSuccessorLiveSeed(",
+-	"export async function verifyCreatorSuccessorAdoption("
+-);
+-const authenticatedTerminal = section(
+-	commit,
+-	"async function authenticatedTerminal(",
+-	"async function authenticatedStaged("
+-);
+-const authenticatedStaged = section(commit, "async function authenticatedStaged(", "function successfulMutation(");
++const verifyChain = section(adoption, "function verifyChain(", "async function verifySnapshot(");
+ const activateMaterial = section(
+ 	activation,
+ 	"async function activateMaterial(",
+ 	"/**\n * Activates one freshly committed"
+ );
++const ownerWrapper = section(activation, "function wrapOwner(", "function browserLockRealm(");
++const filteredIssuance = section(live, "function creatorFilteredIssuanceStore(", "function openRecoveryAuthorization(");
++const liveActivation = section(
++	live,
++	"async function activateCreatorSuccessorLive(",
++	"if (!installCreatorSuccessorLive(activateCreatorSuccessorLive))"
++);
+ const roomAdoption = section(
+ 	room,
+ 	"const performCreatorSuccessorAdoption = async (): Promise<void> => {",
+@@ -44,34 +40,57 @@ const roomAdoption = section(
+ );
+ const roomAuthority = section(room, "export interface V3RoomSuccessorAuthority", "export interface V3RoomHead");
+ const successorAuthority = section(room, "function successorAuthority(", "function digest(");
++const productProofStart = browser.indexOf(
++	'test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody"'
++);
++if (productProofStart < 0) throw new TypeError("D110C_B_SOURCE_SECTION_MISSING:product-proof");
++const productProof = browser.slice(productProofStart);
+ 
+ const predicates = Object.freeze({
+-	activationDeletesTopicWithoutOwnerToken:
+-		/await Promise\.resolve\(rawHandle\.deactivate\(\)\);\s*activeOwners\.delete\(topic\);\s*await lock\?\.release\(\);/u.test(
+-			activateMaterial
+-		),
+-	activationSameBindingsReturnsExistingWrapper:
+-		/sameBindings\(existing\.bindings, bindings\)\s*\? success\(material, existing\.handle\)/u.test(activateMaterial),
+-	commitStagedRequiresGenerationOnePredecessor: authenticatedStaged.includes(
+-		'canonicalRecord(bytes)?.kind === "v3-live-generation-1"'
+-	),
+-	commitTerminalRequiresGenerationOnePredecessor: authenticatedTerminal.includes(
+-		'canonicalRecord(bytes)?.kind === "v3-live-generation-1"'
+-	),
+-	currentChainRequiresGenerationOneProjection: chain.includes(
+-		'.filter((candidate) => candidate?.kind === "v3-live-generation-1")'
+-	),
+-	liveSeedRequiresGenerationOnePredecessor: liveSeed.includes(
+-		'canonicalRecord(bytes)?.kind === "v3-live-generation-1"'
++	activationDefersRetirementDuringReplacement:
++		ownerWrapper.includes("if (owner.replacementInFlight)") &&
++		ownerWrapper.includes("owner.retirementRequested = true") &&
++		ownerWrapper.includes("await owner.replacementSettled"),
++	activationPerformsExactOwnerCas:
++		activateMaterial.includes("if (!currentOwner(existing) || existing.retirementRequested)") &&
++		activateMaterial.includes("activeOwners.set(topic, replacement)"),
++	activationRetainsAuthenticatedOwnerHeadAndToken:
++		activation.includes("readonly head: ActiveHead;") && activation.includes("readonly token: object;"),
++	commitRequiresExactNextEpoch:
++		commit.includes("successorEpoch === currentEpoch + 1") &&
++		commit.includes('currentEpoch === 0\n\t\t\t? "v3-live-generation-1"'),
++	currentProjectionKindIsEpochRelative:
++		adoption.includes('return epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2";') &&
++		verifyChain.includes("successorEpoch !== currentEpoch + 1"),
++	filteredIssuanceDelegatesToOneDurableOwner:
++		filteredIssuance.includes("issuanceStore.compareAndMarkOutboxPublished") &&
++		filteredIssuance.includes("issuanceStore.readIssued") &&
++		filteredIssuance.includes("issuanceStore.transactIssue"),
++	inheritedPredecessorRecoverySourceIsOneUse:
++		live.includes("creatorPredecessorRecoverySource.set(predecessorValidation, transportHandoff.displacedSource)") &&
++		live.includes("creatorPredecessorRecoverySource.get(input.capability as object)") &&
++		live.includes("creatorPredecessorRecoverySource.delete(input.capability as object)"),
++	liveActivationUsesOneFilteredStoreOwner:
++		(liveActivation.match(/creatorFilteredIssuanceStore\(/gu)?.length ?? 0) === 2,
++	productCloseIsReboundToReplacement:
++		roomAdoption.includes("const rebound = await bindCurrentCreatorClose(replacement)") &&
++		roomAdoption.includes("creatorCloseHandle = rebound.handle") &&
++		roomAdoption.includes("await predecessorClose.stop()"),
++	productHasNoPermanentFirstTransitionLatch: !roomAdoption.includes(
++		"if (successorProjectionAuthority !== null) return;"
+ 	),
+-	productHasNoPostAdoptionCloseBind: !roomAdoption.includes("bindCreatorLiveClose"),
+-	productHasOneTransitionLatch: roomAdoption.includes("if (successorProjectionAuthority !== null) return;"),
+-	productPublicAuthorityEpochIsLiteralOne: roomAuthority.includes("readonly epoch: 1;"),
+-	productReturnedAuthorityEpochIsLiteralOne: successorAuthority.includes("epoch: 1 as const"),
+-	productTrustEpochIsLiteralOne: successorAuthority.includes("currentEpoch !== 1"),
+-	projectionGraphEpochIsLiteralOne: /vertices:\s*\[\s*\{[\s\S]*?epoch: 1,/u.test(projection),
+-	projectionRecordEpochIsLiteralOne: /const bytes = encodeCanonical\(\{[\s\S]*?epoch: 1,/u.test(projection),
+-	successorCommitRequiresGenerationOnePredecessor: commitMaterial.includes('decoded?.kind === "v3-live-generation-1"'),
++	productPostTransferFailuresAreStalled:
++		roomAdoption.includes('new TypeError("D110C_B_ACTIVATION_STALLED")') &&
++		roomAdoption.includes('new TypeError("D110C_B_CLOSE_REBIND_FAILED")') &&
++		roomAdoption.includes('creatorCloseUnavailableContinuity = "stalled"'),
++	productProofClosesEpochTwoToThree:
++		productProof.includes("D110C_B_PRODUCT_HOT_LOOP_COMPLETE") &&
++		productProof.includes("{ epoch: 2, successorEpoch: 3 }"),
++	productPublicAuthorityEpochIsGeneral:
++		roomAuthority.includes("readonly epoch: number;") &&
++		successorAuthority.includes("Number.isSafeInteger(currentEpoch)") &&
++		successorAuthority.includes("currentEpoch < 1") &&
++		successorAuthority.includes("epoch: currentEpoch"),
+ });
+ 
+ const failed = Object.entries(predicates).filter(([, value]) => value !== true);
+diff --git a/tests/fixtures/phase-6b/runtime-reclamation-contract.ts b/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+index 04d7d55d..997d9b42 100644
+--- a/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
++++ b/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+@@ -173,6 +173,7 @@ export interface D109dHotFixture {
+ 	readonly committedHead: PresentHead;
+ 	readonly oracle: D108d1Oracle;
+ 	readonly predecessor: object;
++	readonly runtimeBindings: GenuineCreatorAdoptionFixture["runtimeBindings"];
+ 	readonly successor: Readonly<{
+ 		deactivate(): void | Promise<void>;
+ 		issueLocal(input: unknown): Promise<Readonly<Record<string, unknown>>>;
+@@ -257,6 +258,7 @@ async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions
+ 			oracle: deriveD108d1Oracle(base),
+ 			predecessor: base.handle,
+ 			readAdmittedVertices: () => Object.freeze([...admittedVertices]),
++			runtimeBindings,
+ 			successor,
+ 		});
+ 	} catch (error) {
+diff --git a/tests/phase-6b-d110c-b-hot-adoption.test.ts b/tests/phase-6b-d110c-b-hot-adoption.test.ts
+index 51ecef32..d93494ea 100644
+--- a/tests/phase-6b-d110c-b-hot-adoption.test.ts
++++ b/tests/phase-6b-d110c-b-hot-adoption.test.ts
+@@ -3,12 +3,13 @@ import "fake-indexeddb/auto";
+ import { describe, expect, it } from "vitest";
+ 
+ import {
+-	D110C_B_EPOCH_PINNED_PREDECESSOR,
++	D110C_B_HOT_ADOPTION_COMPLETE,
+ 	openD110cBHotAdoptionFixture,
++	runD110cBPostTransferMutants,
+ } from "./fixtures/phase-6b-d110c-b/hot-adoption-contract.js";
+ 
+-describe("D.110c-b general hot adoption RED", () => {
+-	it("rejects the genuine epoch-one close at the epoch-pinned predecessor selector", async () => {
++describe("D.110c-b general hot adoption GREEN", () => {
++	it("advances the genuine epoch-one close to one exact epoch-two active owner", async () => {
+ 		Object.defineProperty(navigator, "storage", {
+ 			configurable: true,
+ 			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+@@ -16,18 +17,80 @@ describe("D.110c-b general hot adoption RED", () => {
+ 		const fixture = await openD110cBHotAdoptionFixture();
+ 		try {
+ 			const evidence = fixture.evidence;
+-			expect(evidence.diagnostic).toBe(D110C_B_EPOCH_PINNED_PREDECESSOR);
++			expect(evidence.diagnostic).toBe(D110C_B_HOT_ADOPTION_COMPLETE);
++			expect(evidence.verification).toMatchObject({ descriptor: { epoch: 2 }, ok: true });
++			expect(evidence.commit).toMatchObject({
++				descriptor: { epoch: 2 },
++				lifecycle: "successor-prepared",
++				ok: true,
++				recovery: "active-new",
++			});
++			expect(evidence.duplicateCommit).toMatchObject({
++				descriptor: { epoch: 2 },
++				ok: true,
++				recovery: "active-new",
++			});
++			expect(evidence.activation).toMatchObject({
++				handle: { epoch: 2 },
++				lifecycle: "active",
++				ok: true,
++				recovery: "active-new",
++				trust: { currentEpoch: 2 },
++			});
++			expect(evidence.duplicateActivation).toMatchObject({ lifecycle: "active", ok: true });
++			expect(evidence.duplicateHandleIdentity).toBe(true);
++			expect(evidence.activeAuthority).toMatchObject({ epoch: 2 });
++			expect(evidence.mutants).toMatchObject({
++				aheadFloor: { kind: "D110C_FLOOR_MISMATCH", ok: false },
++				crossGenesis: { kind: "chain-invalid", ok: false },
++				crossObject: { kind: "chain-invalid", ok: false },
++				differentBindings: { kind: "authority-unavailable", ok: false },
++				laggingFloor: { kind: "D110C_FLOOR_MISMATCH", ok: false },
++				malformedFloor: { kind: "D110C_FLOOR_INVALID", ok: false },
++				missingHotInput: { kind: "malformed-input", ok: false },
++				nonExactSuccessor: { kind: "chain-invalid", ok: false },
++				preTransferRefusal: { kind: "preparation-rejected", ok: false },
++				sameEpochDifferentAnchor: { kind: "chain-invalid", ok: false },
++				skippedPredecessor: { kind: "chain-invalid", ok: false },
++				stalePredecessor: { kind: "stale-head", ok: false },
++				substitutedFloor: { kind: "D110C_FLOOR_MISMATCH", ok: false },
++			});
++			expect(evidence.oldIssue).toEqual({
++				detail: "v3 plane is not accepting local issues",
++				kind: "not-active",
++				ok: false,
++			});
+ 			expect(evidence.issued).toMatchObject({ kind: "accepted", ok: true });
+ 			expect(evidence.published).toEqual({ kind: "published", ok: true });
+ 			expect(evidence.closeEpoch).toBe(1);
+ 			expect(evidence.successorEpoch).toBe(2);
+-			expect(evidence.verification).toEqual({
+-				detail: "creator successor trust chain is invalid",
+-				kind: "chain-invalid",
+-				ok: false,
++			expect(evidence.durableHeadAfterVerification).not.toEqual(evidence.durableHeadBeforeVerification);
++			const postTransfer = await runD110cBPostTransferMutants();
++			expect(postTransfer.terminalize).toEqual({
++				oldIssue: {
++					detail: "v3 plane is not accepting local issues",
++					kind: "not-active",
++					ok: false,
++				},
++				result: {
++					detail: "creator predecessor could not be terminalized",
++					kind: "source-unavailable",
++					ok: false,
++				},
++			});
++			expect(postTransfer.retirement).toEqual({
++				oldIssue: {
++					detail: "v3 plane is not accepting local issues",
++					kind: "not-active",
++					ok: false,
++				},
++				result: {
++					detail: "creator successor active ownership changed during replacement",
++					kind: "authority-unavailable",
++					ok: false,
++				},
+ 			});
+-			expect(evidence.durableHeadAfterVerification).toEqual(evidence.durableHeadBeforeVerification);
+-			process.stdout.write(`${D110C_B_EPOCH_PINNED_PREDECESSOR}\n`);
++			process.stdout.write(`${D110C_B_HOT_ADOPTION_COMPLETE}\n`);
+ 		} finally {
+ 			await fixture.close();
+ 		}

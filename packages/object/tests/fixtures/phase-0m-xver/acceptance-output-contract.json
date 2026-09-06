@@ -1,0 +1,42 @@
+{
+	"schemaVersion": "phase-0m-xver-acceptance-output-v1",
+	"expected": {
+		"referenceSha": "1d40885ffb2ab666ffb2817a99fe69a42af83e77",
+		"primarySha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"primaryArtifactSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+		"referenceArtifactSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+		"primaryRuntimeClosureSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+		"referenceRuntimeClosureSha256": "4444444444444444444444444444444444444444444444444444444444444444"
+	},
+	"summary": {
+		"referenceSha": "1d40885ffb2ab666ffb2817a99fe69a42af83e77",
+		"primarySha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"primaryArtifactSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+		"referenceArtifactSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+		"primaryRuntimeClosureSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+		"referenceRuntimeClosureSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+		"fixtures": [
+			"fixed-three-vertex-noncanonical-cut",
+			"fixed-four-vertex-incomplete-tail",
+			"fixed-four-vertex-cross-group-authority-chain",
+			"fixed-held-group-coupling-regression",
+			"fixed-same-group-pair-with-descendant",
+			"fixed-three-way-held-group-attribution",
+			"fixed-admin-revoke-group-the-target-does-not-hold",
+			"fixed-critical-1-cross-type-acl-drop",
+			"fixed-critical-2-transitive-join-with-two-children"
+		],
+		"scheduleCount": 18,
+		"surfaces": [
+			"drp-state",
+			"acl-state",
+			"admission",
+			"engine-authored-vertex-hashes",
+			"raw-hash-membership",
+			"raw-hash-order"
+		],
+		"comparisons": 108,
+		"mapFixtures": ["fixed-three-vertex-noncanonical-cut"],
+		"approvedDeltaCount": 0
+	}
+}

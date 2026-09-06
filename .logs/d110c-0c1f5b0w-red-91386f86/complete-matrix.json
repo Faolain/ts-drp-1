@@ -1,0 +1,2136 @@
+[
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries treats a compatible pre-sign race as durable truth without reusing the unclassified handle",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 958.256
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries rejects stale message progress before the missing fence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.069334000000026
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries rejects stale transform-me progress before the missing fence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.105041999999912
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries does not interpret an absent legacy entry as a durable replacement link",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.7513749999998254
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses wrong-sequence ambiguous progress readback",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.2743749999999636
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses unchanged-revision ambiguous progress readback",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.1816670000000613
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses surplus-revision ambiguous progress readback",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.2457500000000437
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses skipped-range ambiguous progress readback",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.6887500000000273
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses duplicate-range ambiguous progress readback",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.048082999999906
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses incompatible-prefix ambiguous progress readback",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 4.114749999999958
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses wrong-final-scalar ambiguous progress readback",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.7993340000000444
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 8.745332999999846
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.133583000000044
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.600500000000011
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.9308750000000146
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.7240409999999429
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0w RED] keeps manual-review durable and promptly refuses public issue before any fence or replacement",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG: expected false to be true // Object.is equality\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:915:76\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 6.8912499999999
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.5602080000001024
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] clears a displaced fence and drops terminal plan rows before issuing one larger fence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.0458340000000135
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] rebases a published displaced source without requiring in-memory target-map presence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.198457999999846
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] surfaces an ACL source into a durable manual-review entry before any fence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.8515840000000026
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] covers reserved empty-intent rows with a settlement fence and never calls the legacy completion owner",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.9509160000000065
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] reads back an ambiguous atomic replacement link and never reissues it after reopen",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.9536249999998745
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED keeps creator-trusted-v1 on the retained completion path with no settlement plan or fence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.1268750000001546
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED pins the exact contract owners and case inventory without importing future exports",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.299416000000008
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory exposes the two plan methods at runtime",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 28.94500000000002
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser exposes the two plan methods at runtime",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 25.604792000000003
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node exposes the two plan methods at runtime",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 23.669040999999993
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory applies revision CAS and returns detached durable plans",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.545000000000016
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser applies revision CAS and returns detached durable plans",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.033832999999987
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node applies revision CAS and returns detached durable plans",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.4947500000000105
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory links a fence atomically with issuance",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.811208000000022
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser links a fence atomically with issuance",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.947167000000036
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node links a fence atomically with issuance",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.9374579999999924
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory links one replacement atomically and makes the source entry the restart idempotence key",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.7446669999999926
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser links one replacement atomically and makes the source entry the restart idempotence key",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.3617909999999824
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node links one replacement atomically and makes the source entry the restart idempotence key",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 5.222915999999998
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence when the durable plan is absent",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.3505000000000109
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence when the durable plan is absent",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.8262500000000159
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence when the durable plan is absent",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.7777080000000183
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence when fenceSequence is already set",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.36574999999999136
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence when fenceSequence is already set",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.0303329999999846
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence when fenceSequence is already set",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.8138340000000426
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence while manual review is unresolved",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.3435000000000059
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence while manual review is unresolved",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.1933329999999955
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence while manual review is unresolved",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.529042000000004
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a replacement for an absent entry",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.3849999999999909
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a replacement for an absent entry",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.09537499999999
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a replacement for an absent entry",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.6511659999999893
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses an already-linked replacement",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.5105829999999969
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses an already-linked replacement",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.4581249999999955
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node refuses an already-linked replacement",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.99508400000002
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a replacement for a manual-review entry",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.45141600000005155
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a replacement for a manual-review entry",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.2662920000000213
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a replacement for a manual-review entry",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.723458999999991
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.44212500000003274
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.20133300000003373
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.207583999999997
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.1419589999999857
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 7.4653749999999945
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 5.081082999999978
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses corrupt plan shapes without creating state",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.5407500000000027
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses corrupt plan shapes without creating state",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.8267079999999964
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node refuses corrupt plan shapes without creating state",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 9.995625000000018
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses pruning a published source while an unlinked plan entry references it",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.066500000000019
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses pruning a published source while an unlinked plan entry references it",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.881582999999978
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node refuses pruning a published source while an unlinked plan entry references it",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 5.9203750000000355
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED browser fresh schema is version 2 with exactly the fourth settlementPlans object store",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.6769170000000031
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "title": "D.110c-0c1f5b0s settlement-plan contract RED node migrates the exact v2 authority to a v3 settlement_plans table in place",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 5.033541999999954
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress codec RED keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.519124999999974
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress codec RED accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.1651669999999967
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress codec RED pins 16 as accepted and 17 as rejected without treating 17 as a settlement source",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.12129099999998516
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress codec RED rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.49229199999996354
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress codec RED accepts only the exact five-key progress effect and copies its digest",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.27558299999998326
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress codec RED validates a progress effect as a closed commit instead of failing on a future export",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.3406659999999988
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED memory atomically records a partial chunk, then only the final chunk projects replacementSequence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.6664580000000342
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED browser atomically records a partial chunk, then only the final chunk projects replacementSequence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 8.850833000000023
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED node atomically records a partial chunk, then only the final chunk projects replacementSequence",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 9.010250000000042
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.6130830000000174
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.5748749999999632
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.101624999999956
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.6860000000000355
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.644042000000013
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.4571660000000293
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED uses exact error ownership for malformed commits, stale progress and corrupt stored values",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.5065000000000168
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED round-trips nested progress through browser structured clone and Node JSON without changing schemas",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.7186250000000314
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED browser reopens before/after partial and final chunks without losing exact progress",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.148707999999999
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t settlement progress store RED node reopens before/after partial and final chunks without losing exact progress",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 6.376666999999998
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t Node pre-reservation and split RED keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 86.81637499999994
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t Node pre-reservation and split RED refuses malformed and stale progress before signing, while a valid exact prefix issues",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 41.10962499999994
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "title": "D.110c-0c1f5b0t Node pre-reservation and split RED pins the progress owners without confusing a source-shape diagnostic with runtime proof",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.0564170000000104
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics refuses held issue promptly after the real durable plan write without an issuance effect",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG: expected false to be true // Object.is equality\n    at expectPromptRefusal (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:511:41)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:524:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 292.142875
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics creator-held seal reaches the existing close owner and exact successor-codec terminus",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG: expected +0 to be 1 // Object.is equality\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:534:74\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 238.82387500000004
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics no-hold creator close retains the exact existing thrown codec terminus",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 231.91733299999999
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+    "status": "failed",
+    "tokens": [],
+    "failureMessages": [
+      "AssertionError: expected { issueTransactions: 1, …(5) } to deeply equal { issueTransactions: 1, …(5) }\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:564:93\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 245.36695899999995
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses rehearsal without target import or terminal effect",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_REHEARSAL_HANG"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_MANUAL_REVIEW_REHEARSAL_HANG: expected false to be true // Object.is equality\n    at expectPromptRefusal (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:511:41)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:583:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 179.489458
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses activation without target import or terminal effect",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_ACTIVATION_HANG"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_MANUAL_REVIEW_ACTIVATION_HANG: expected false to be true // Object.is equality\n    at expectPromptRefusal (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:511:41)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:583:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 371.09024999999997
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics changed retained held policy remains terminal source-diff refusal rather than redisposition",
+    "status": "failed",
+    "tokens": [],
+    "failureMessages": [
+      "DurableIssuanceError: durable issuance store is closed\n    at createDurableIssuanceFailure (/Users/aristotle/Documents/Projects/ts-drp-1/packages/issuance-store/dist/src/contract.js:45:12)\n    at BrowserIssuanceImplementation._BrowserIssuanceImplementation_assertAvailable (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:1039:43)\n    at BrowserIssuanceImplementation.<anonymous> (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:369:137)\n    at Generator.next (<anonymous>)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:7:71\n    at new Promise (<anonymous>)\n    at __awaiter (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:3:12)\n    at BrowserIssuanceImplementation.readSettlementPlan (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:368:16)\n    at Object.readSettlementPlan (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:1211:63)\n    at Object.readSettlementPlan (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:56:30)"
+    ],
+    "duration": 224.91758400000003
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics single-generation internal redirect pins target hold refusal and orderly source cleanup",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG"
+    ],
+    "failureMessages": [
+      "Error: D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:644:10\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 320.03091700000004
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 2 actual source intents and persists exact real Node batch times",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 206.23795900000005
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 16 actual source intents and persists exact real Node batch times",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 334.9708340000002
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed before-commit failure onto a fresh active owner",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 250.640625
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 254.81129099999998
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed final-unknown failure onto a fresh active owner",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 272.1337090000002
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 476.63245800000004
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition keeps a store-close cleanup failure terminal after signed recovery",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 247.6633750000001
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 274.0359580000004
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 230.50045800000044
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner pins a real Node-assembled sixteen-entry progress chunk to its final child logical time",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 122.034292
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner ordinary entries fields do not impersonate an application batch",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.693540999999982
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner ordinary batch.entries fields do not impersonate an application batch",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.9932909999999993
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner genuine nested applicationBatch derives the final child rather than outer time",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.8160000000000309
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner rejects negative child time without publishing a durable chunk",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.0646249999999782
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner rejects non-integer child time without publishing a durable chunk",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.7631670000000099
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner rejects duplicate child time without publishing a durable chunk",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.7439170000000104
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner rejects regressed child time without publishing a durable chunk",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.9120419999999854
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u exact store logical-time owner refuses a structurally batch-shaped carrier beyond the canonical operation ceiling",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.8310839999999757
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u zero-chunk origination ownership memory refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.5649160000000393
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u zero-chunk origination ownership browser refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 7.579708000000039
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "title": "D.110c-0c1f5b0u zero-chunk origination ownership node refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 8.387166999999977
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine successor recovered-delivery RED replays exact above-snapshot evidence once after authority/base validation and before resumed issue",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 439.87495799999994
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine successor recovered-delivery RED replays authenticated notifications after callback two rejects without duplicating canonical state or issuance",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 408.67587500000013
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine successor recovered-delivery RED fails closed and releases successor custody when recovered sink fails",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 327.42533300000014
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "title": "D.110c-0c1f5b0u genuine successor recovered-delivery RED fails closed and releases successor custody when recovered commit fails",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 292.54999999999995
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+    "title": "D.110c-0c1f5b0v replayable callback contract documents both existing callback surfaces without changing their type shapes",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 98.89233300000001
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+    "title": "D.110c-0c1f5b0v replayable callback contract pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 704.9630829999999
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries unlinked refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 9.335542000000004
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries unlinked refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.6083329999999876
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries unlinked refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.4670830000000024
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries unlinked refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.3871670000000051
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.766541000000018
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.5608339999999998
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.8342079999999896
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.2302080000000046
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries empty-progress refuses source-digest direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.6350830000000087
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries empty-progress refuses disposition direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.2393330000000162
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries empty-progress refuses link direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.1483749999999873
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries empty-progress refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.113917000000015
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries in-progress refuses source-digest direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.365667000000002
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries in-progress refuses disposition direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.8370419999999967
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries in-progress refuses link direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.219458000000003
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries in-progress refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.1187920000000133
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed-progress refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.722959000000003
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed-progress refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.5130829999999946
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed-progress refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7030839999999898
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed-progress refuses progress direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.5512920000000179
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries refuses final expire to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.874875000000003
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries refuses final rebase to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.4990829999999846
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries refuses final transform to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.042332999999985
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses manual-review redisposition without altering its link",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:146:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:146:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.0427500000000123
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed progress refuses manual-review redisposition even if progress is stripped",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:149:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:149:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.1733330000000137
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries manual-review retains its exact digest",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.245915999999994
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries manual-review retains its exact disposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.0257080000000087
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed progress cannot be removed while retaining its source and link",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:170:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:170:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.4422090000000196
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed progress freezes every chunk field and completion bounds",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 5.089292
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries retains undefined to exact empty progress initialization control",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.8535000000000252
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries store removal control permits an owner re-derived plan without claiming store authentication",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.5304999999999893
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries unlinked refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 5.529833999999994
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries unlinked refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.177625000000006
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries unlinked refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7810829999999953
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries unlinked refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.417209000000014
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7564170000000274
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7152920000000051
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.2390829999999937
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.4455000000000098
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries empty-progress refuses source-digest direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.9951660000000118
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries empty-progress refuses disposition direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.824374999999975
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries empty-progress refuses link direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.5929590000000076
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries empty-progress refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.6145830000000387
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries in-progress refuses source-digest direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.499167
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries in-progress refuses disposition direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.7024169999999685
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries in-progress refuses link direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.9101670000000013
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries in-progress refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.3774159999999824
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed-progress refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7117079999999874
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed-progress refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.5408330000000205
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed-progress refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7306659999999852
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed-progress refuses progress direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7688329999999723
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries refuses final expire to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.442624999999964
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries refuses final rebase to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 5.624082999999985
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries refuses final transform to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7305000000000064
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses manual-review redisposition without altering its link",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:146:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:146:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.6534169999999904
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed progress refuses manual-review redisposition even if progress is stripped",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:149:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:149:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.1810839999999985
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries manual-review retains its exact digest",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7389579999999683
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries manual-review retains its exact disposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.425542000000007
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed progress cannot be removed while retaining its source and link",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:170:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:170:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 1.7492090000000076
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed progress freezes every chunk field and completion bounds",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 5.086041000000023
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries retains undefined to exact empty progress initialization control",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 1.0709999999999695
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries store removal control permits an owner re-derived plan without claiming store authentication",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 0.6613340000000107
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries unlinked refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 4.110042000000021
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries unlinked refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.8082919999999945
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries unlinked refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 3.3511669999999754
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries unlinked refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.786457999999982
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 3.2279170000000477
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.9224170000000527
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 3.1232500000000414
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.6144580000000133
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries empty-progress refuses source-digest direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 4.141750000000002
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries empty-progress refuses disposition direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.771582999999964
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries empty-progress refuses link direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 3.576958999999988
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries empty-progress refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.730124999999987
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries in-progress refuses source-digest direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.603417000000036
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries in-progress refuses disposition direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.9599580000000287
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries in-progress refuses link direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.6932500000000346
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries in-progress refuses progress direct CAS",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 2.8485000000000014
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed-progress refuses source-digest direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 3.537540999999976
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed-progress refuses disposition direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 4.761875000000032
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed-progress refuses link direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 3.300584000000015
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed-progress refuses progress direct CAS",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:132:5\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 3.2247089999999616
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries refuses final expire to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.9560410000000275
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries refuses final rebase to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 3.051667000000009
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries refuses final transform to manual-review redisposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:139:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 3.1412919999999644
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses manual-review redisposition without altering its link",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:146:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:146:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 2.985834000000011
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed progress refuses manual-review redisposition even if progress is stripped",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:149:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:149:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 6.915166999999997
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries manual-review retains its exact digest",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 4.740165999999988
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries manual-review retains its exact disposition",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:159:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 4.40787499999999
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed progress cannot be removed while retaining its source and link",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:170:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:170:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 4.231458000000032
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed progress freezes every chunk field and completion bounds",
+    "status": "failed",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "failureMessages": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:114:75)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]\n    at refuseMutation (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:117:4)\n    at withStore (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:90:3)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts:183:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+    ],
+    "duration": 18.546583999999996
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries retains undefined to exact empty progress initialization control",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 5.445209000000034
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries store removal control permits an owner re-derived plan without claiming store authentication",
+    "status": "passed",
+    "tokens": [],
+    "failureMessages": [],
+    "duration": 4.300792000000001
+  }
+]

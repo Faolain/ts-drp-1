@@ -1,0 +1,35 @@
+{
+  "sourceCommit": "c1d602f6566d6a5a5743170efd62ef1aa7685712",
+  "sourceSignature": "G",
+  "isolatedCheckout": "/tmp/d110c-f5b0t-red-correction.lAIya8/checkout",
+  "install": 0,
+  "buildPackages": 0,
+  "vitest": {
+    "files": 2,
+    "tests": 35,
+    "passed": 12,
+    "failed": 23,
+    "unexpectedFailures": 0,
+    "missingImportOrExportFailures": 0,
+    "timingOnlyFailures": 0,
+    "correctedCursor": {
+      "observationPoint": "after awaited public issue and deterministic close",
+      "actualInRed": 21,
+      "requiredInGreen": 24,
+      "token": "D110C_0C1F5B0T_SPLIT_DID_NOT_ALLOCATE_AFTER_COMPLETION"
+    }
+  },
+  "static": {
+    "prettier": 0,
+    "eslint": 0,
+    "diffCheck": 0
+  },
+  "passingControls": [
+    "legacy four-key entry, two-key effect and one-chunk path remain exact",
+    "malformed progress vectors remain rejected",
+    "real Node byte ceiling returns nonmutating split-required",
+    "all nine retained f5b0c room settlement tests pass"
+  ],
+  "concurrentProductionPathsUntouched": 7,
+  "stashes": 27
+}

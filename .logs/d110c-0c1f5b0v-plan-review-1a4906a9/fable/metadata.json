@@ -1,0 +1,12 @@
+{
+  "alias": "claude-phel",
+  "canonicalModel": "claude-fable-5-1",
+  "durationMs": 249363,
+  "effectiveEffort": "xhigh",
+  "isError": false,
+  "permissionDenials": [],
+  "sessionId": "f06b1a58-7a54-4e04-8abe-514e611fd299",
+  "stopReason": "end_turn",
+  "subagentsSpawned": 0,
+  "terminalReason": "completed"
+}

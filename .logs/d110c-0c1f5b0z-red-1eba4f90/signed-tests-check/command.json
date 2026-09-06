@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "show",
+    "--check",
+    "--stat",
+    "--show-signature",
+    "1eba4f9065d220afb0d77d90aac4a05b250a05bb"
+  ],
+  "start": "2026-09-05T19:47:10.626Z"
+}

@@ -1,0 +1,28 @@
+{
+	"implementationModule": "../packages/protocol-v3/src/index.ts",
+	"controlledModule": "./fixtures/phase-0o-b1b-v3/controlled-author-projection.ts",
+	"publicEntryModule": "../packages/protocol-v3/src/public.ts",
+	"publicReexportMutantModule": "./fixtures/phase-0o-b1b-v3/public-reexport-mutant.ts",
+	"supplementDirectory": "../packages/protocol-v3/supplements/equivocation-author-projection-v1",
+	"workflow": ".github/workflows/protocol-v3-equivocation-author-projection.yml",
+	"profileId": "equivocation-author-projection-v1",
+	"baseProfileId": "equivocation-evidence-projection-v1",
+	"domain": "ts-drp/vertex/v3",
+	"suiteId": "ed25519-sha256-v3",
+	"privateKeySeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+	"author": "alice",
+	"objectId": "object:phase-0o-b1b-author-projection",
+	"anchor": "abababababababababababababababababababababababababababababababab",
+	"authorSequence": 29,
+	"epoch": 4,
+	"logicalTime": 101,
+	"dependencies": [
+		"1111111111111111111111111111111111111111111111111111111111111111",
+		"2222222222222222222222222222222222222222222222222222222222222222",
+		"3333333333333333333333333333333333333333333333333333333333333333"
+	],
+	"operation": {
+		"action": "append",
+		"value": "durable-author-projection"
+	}
+}

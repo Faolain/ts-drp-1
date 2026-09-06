@@ -1,0 +1,27 @@
+{
+  "forbidden_patterns": [
+    "commonjs_require",
+    "eval",
+    "node_buffer",
+    "node_builtin_import",
+    "node_process",
+    "path_globals",
+    "sync_xhr",
+    "web_storage"
+  ],
+  "model": "browser-surface-static-audit-v1",
+  "modules": 15,
+  "notes": [
+    "Date.now in indexeddb-store.js is intentionally excluded: it labels operational journal records and never participates in hashes, admission, ordering, authorization, or state folds.",
+    "setTimeout/performance.now in runtime.js are cooperative scheduling helpers and are intentionally outside semantic decisions."
+  ],
+  "semantic_nondeterminism_patterns": [
+    "json_hashing",
+    "random",
+    "wall_clock"
+  ],
+  "source_bytes": 109210,
+  "source_lines": 2624,
+  "verdict": "pass",
+  "violations": []
+}

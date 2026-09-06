@@ -1,0 +1,133 @@
+{
+  "frozenAt": "2026-09-05T22:52:01.036Z",
+  "base": "bc7d615b40c5125ed5b48ff90d0be64dcdca4b15",
+  "files": [
+    "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  ],
+  "selected": 19,
+  "expectedPassed": 19,
+  "expectedFailed": 0,
+  "intentionallyFiltered": 0,
+  "executionCount": 1,
+  "classification": "RETAINED_BASELINE_PRESERVATION_NOT_CAUSAL_RED",
+  "fileHashes": {
+    "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts": "b3e4eb073dfd3e660703957573dbfadfe8e2989396f1d77041632614edaa5c20",
+    "tests/fixtures/phase-6b-d110c-0c1f5b0s/settlement-plan-contract.ts": "8866e93e6b6fa306a1fc2bfbda601d75585816121e8b8fc0305cbab523288952"
+  },
+  "entries": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > pins the f5b0d boundary and hands non-issuance scope retirement to D.110c-c",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > installs one storage-neutral authenticated settled-prefix owner without relying on a missing import",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses a settlement-profile prefix when the durable plan is absent",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses a settlement-profile prefix when the durable plan is absent",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses a settlement-profile prefix when the durable plan is absent",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses while the required fence link is incomplete",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses while the required fence link is incomplete",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses while the required fence link is incomplete",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses manual review outside the selected prefix and deletes nothing",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses manual review outside the selected prefix and deletes nothing",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses manual review outside the selected prefix and deletes nothing",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node rolls back both tables and the watermark when an authenticated prune crashes mid-transaction",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > keeps creator-trusted-v1 historical issuance within one maxEpochVertices window",
+      "expectedStatus": "passed",
+      "token": null
+    }
+  ]
+}

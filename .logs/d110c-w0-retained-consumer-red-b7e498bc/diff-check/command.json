@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "-C",
+    "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "diff",
+    "--check",
+    "--",
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+  ],
+  "budgetMs": 120000,
+  "start": "2026-09-06T10:47:52.128Z"
+}

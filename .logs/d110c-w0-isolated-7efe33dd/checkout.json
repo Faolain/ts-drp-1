@@ -1,0 +1,10 @@
+{
+  "main": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "root": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+  "temp": "/private/tmp/d110c-w0-isolated-qA7HqL",
+  "sourceHead": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "overlayArtifact": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/source-overlay.patch",
+  "overlaySha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+  "noSharedNodeModulesOrDist": true,
+  "independentInstallationRequired": true
+}

@@ -1,0 +1,8 @@
+{
+	"initial_runner_classification": "NO_VERDICT",
+	"initial_stop_reason": "end_turn",
+	"initial_session_id": "01a071f3-84df-7f01-879f-f1f899135b6b",
+	"reason": "The substantive response contained the requested JSON in a Markdown fence after progress prose, so the strict runner did not accept its shape.",
+	"continuation": "The exact session was resumed once for schema-only re-emission without further inspection and returned the unchanged bare JSON PASS recorded in grok-normalized.json.",
+	"substantive_verdict_changed": false
+}

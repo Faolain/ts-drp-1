@@ -1,0 +1,11 @@
+file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-ab98cce6/prepare.mjs:24
+ else throw Error('No source map '+runtime);
+            ^
+
+Error: No source map packages/node/dist/src/creator-adoption.js
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-ab98cce6/prepare.mjs:24:13
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.15.0

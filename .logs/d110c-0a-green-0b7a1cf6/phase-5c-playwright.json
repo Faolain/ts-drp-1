@@ -1,0 +1,1087 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-5c-seal-vote.config.ts",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-5c-seal-vote.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 900000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5c-seal-vote-*.pw.ts"
+        ],
+        "timeout": 180000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5c-seal-vote-*.pw.ts"
+        ],
+        "timeout": 180000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5c-seal-vote-*.pw.ts"
+        ],
+        "timeout": 180000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-5c-seal-vote-death.pw.ts",
+      "file": "phase-5c-seal-vote-death.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "persistent Chromium death at every vote boundary reopens as old XOR exact-new",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11472,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:27.793Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2feca54ad3b4ce6935a9-a7946cad034931fbdd9b",
+          "file": "phase-5c-seal-vote-death.pw.ts",
+          "line": 125,
+          "column": 1
+        },
+        {
+          "title": "persistent Chromium death at every vote boundary reopens as old XOR exact-new",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "hard process-death evidence is Chromium-only",
+                  "location": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5c-seal-vote-death.pw.ts",
+                    "line": 29,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:41.198Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "hard process-death evidence is Chromium-only",
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5c-seal-vote-death.pw.ts",
+                        "line": 29,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "2feca54ad3b4ce6935a9-33370713db5a37220ee7",
+          "file": "phase-5c-seal-vote-death.pw.ts",
+          "line": 125,
+          "column": 1
+        },
+        {
+          "title": "persistent Chromium death at every vote boundary reopens as old XOR exact-new",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "hard process-death evidence is Chromium-only",
+                  "location": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5c-seal-vote-death.pw.ts",
+                    "line": 29,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:48.170Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "hard process-death evidence is Chromium-only",
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5c-seal-vote-death.pw.ts",
+                        "line": 29,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "2feca54ad3b4ce6935a9-ac1b32b1e9e6616b46bd",
+          "file": "phase-5c-seal-vote-death.pw.ts",
+          "line": 125,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "phase-5c-seal-vote-dispatch.pw.ts",
+      "file": "phase-5c-seal-vote-dispatch.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "same-context tabs drain only committed exact carriers across every LockManager failure mode",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 416,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:39.504Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-cb3c81d34551a5b7d776",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 46,
+          "column": 1
+        },
+        {
+          "title": "primary loss, bounded overflow and total volatile loss recover every durable nonempty key",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 144,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:40.046Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-686d7966c4bed40fcc24",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 71,
+          "column": 1
+        },
+        {
+          "title": "a separate BrowserContext is a negative control and cannot satisfy shared-lock takeover",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 128,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:40.196Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-4250bfb67b73187bed58",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 117,
+          "column": 1
+        },
+        {
+          "title": "same-context tabs drain only committed exact carriers across every LockManager failure mode",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1310,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:41.231Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-2d7dc0cccffd54223e7b",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 46,
+          "column": 1
+        },
+        {
+          "title": "primary loss, bounded overflow and total volatile loss recover every durable nonempty key",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 439,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:45.307Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-f65b2aeaae94914a4976",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 71,
+          "column": 1
+        },
+        {
+          "title": "a separate BrowserContext is a negative control and cannot satisfy shared-lock takeover",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 423,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:45.751Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-02af658eda5e13afc83f",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 117,
+          "column": 1
+        },
+        {
+          "title": "same-context tabs drain only committed exact carriers across every LockManager failure mode",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1439,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:48.203Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-2d0972e6467dd430287d",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 46,
+          "column": 1
+        },
+        {
+          "title": "primary loss, bounded overflow and total volatile loss recover every durable nonempty key",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 608,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:52.362Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-2ea3175f8b032799732b",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 71,
+          "column": 1
+        },
+        {
+          "title": "a separate BrowserContext is a negative control and cannot satisfy shared-lock takeover",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 555,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:52.977Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "fec251f0d11a77c476a9-aff9867c97575d6b3e3d",
+          "file": "phase-5c-seal-vote-dispatch.pw.ts",
+          "line": 117,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "phase-5c-seal-vote-schema.pw.ts",
+      "file": "phase-5c-seal-vote-schema.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "fresh and exact-v1 databases become the additive version-3 nine-store schema",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 87,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:40.341Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-dbb1c1fecbb69235356d",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 79,
+          "column": 1
+        },
+        {
+          "title": "one strict transaction owns incarnation, signer state, slot and outbox before release",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 86,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:40.453Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-82ec25ab10130b34b44e",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "voter enrollment scopes snapshots and round advancement across multiple lawful signer rows",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 84,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:40.545Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-01c95f345e32dc55ac84",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 168,
+          "column": 1
+        },
+        {
+          "title": "worker termination reopens only the committed exact vote state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 96,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:40.634Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-f9d050d9eee1bc8ae2e6",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 187,
+          "column": 1
+        },
+        {
+          "title": "blocked timeout and held-lock versionchange cannot commit late or retain authority",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 82,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:40.735Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-c585b3bfe97dbb938bbb",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 226,
+          "column": 1
+        },
+        {
+          "title": "fresh and exact-v1 databases become the additive version-3 nine-store schema",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 264,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:46.190Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-7e4d59cc88008d756d20",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 79,
+          "column": 1
+        },
+        {
+          "title": "one strict transaction owns incarnation, signer state, slot and outbox before release",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 256,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:46.481Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-681f0e1bcd20a1516905",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "voter enrollment scopes snapshots and round advancement across multiple lawful signer rows",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 256,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:46.742Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-00574220f8e242c95245",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 168,
+          "column": 1
+        },
+        {
+          "title": "worker termination reopens only the committed exact vote state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 288,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:47.004Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-4d30647f519bac268537",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 187,
+          "column": 1
+        },
+        {
+          "title": "blocked timeout and held-lock versionchange cannot commit late or retain authority",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 290,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:47.298Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-987ea72ac559f3d1c611",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 226,
+          "column": 1
+        },
+        {
+          "title": "fresh and exact-v1 databases become the additive version-3 nine-store schema",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 365,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:53.549Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-db86fce980f9924b10c6",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 79,
+          "column": 1
+        },
+        {
+          "title": "one strict transaction owns incarnation, signer state, slot and outbox before release",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 369,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:53.940Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-d6083012e0c7fc563da6",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "voter enrollment scopes snapshots and round advancement across multiple lawful signer rows",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 366,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:54.316Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-f221b240aa27e1ee51b7",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 168,
+          "column": 1
+        },
+        {
+          "title": "worker termination reopens only the committed exact vote state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 376,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:54.687Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-1b697d2970704d1b86cd",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 187,
+          "column": 1
+        },
+        {
+          "title": "blocked timeout and held-lock versionchange cannot commit late or retain authority",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 364,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:17:55.069Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba507be86c5e65d328d0-0e035a7367e0dc72e54d",
+          "file": "phase-5c-seal-vote-schema.pw.ts",
+          "line": 226,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-02T05:17:27.394Z",
+    "duration": 28069.787,
+    "expected": 25,
+    "skipped": 2,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

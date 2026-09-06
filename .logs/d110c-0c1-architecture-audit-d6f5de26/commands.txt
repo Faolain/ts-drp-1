@@ -1,0 +1,5 @@
+git rev-parse HEAD^{commit}
+git rev-parse HEAD^{tree}
+shasum -a 256 packages/node/src/v3-live.ts packages/node/src/creator-close.ts packages/node/src/internal/closed-epoch-cleanup.ts packages/issuance-store/src/types.ts packages/issuance-store/src/maintenance.ts packages/protocol-v3/src/creator-close.ts packages/protocol-v3/src/creator-checkpoint.ts packages/protocol-v3/registry/registry-v1.json examples/v3-room/src/index.ts
+rg -n "prunePublishedPrefix\\(" packages examples --glob '!**/tests/**' --glob '!**/test/**'
+rg -n "prunedThroughAuthorSequence|creatorFilteredIssuanceStore|readOutboxPage|readIssued|publishPending|readRebaseOutbox|previousAnchor|snapshotManifestDigest|historyRoot|authorSequence" packages/issuance-store/src packages/node/src packages/protocol-v3/src examples/v3-room/src

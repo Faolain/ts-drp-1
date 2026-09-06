@@ -1,0 +1,26 @@
+import { spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync, openSync, closeSync, writeSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+const [label, budget, command, ...args] = process.argv.slice(2);
+if (!/^[a-z0-9-]+$/u.test(label) || !Number.isSafeInteger(Number(budget)) || Number(budget) < 1 || !command) throw Error('Invalid recorder input');
+const cwd = '/Users/aristotle/Documents/Projects/ts-drp-1';
+const directory = resolve(dirname(new URL(import.meta.url).pathname), label);
+mkdirSync(directory);
+const start = new Date().toISOString();
+writeFileSync(resolve(directory, 'command.json'), JSON.stringify({ cwd, command, args, budgetMs: Number(budget), start }, null, 2) + '\n', { flag: 'wx' });
+const stdout = openSync(resolve(directory, 'stdout'), 'wx');
+const stderr = openSync(resolve(directory, 'stderr'), 'wx');
+const child = spawn(command, args, { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+child.stdout.on('data', bytes => { writeSync(stdout, bytes); process.stdout.write(bytes); });
+child.stderr.on('data', bytes => { writeSync(stderr, bytes); process.stderr.write(bytes); });
+let spawnError;
+let timeout = false;
+const timer = setTimeout(() => { timeout = true; child.kill('SIGTERM'); }, Number(budget));
+child.on('error', error => { spawnError = String(error); });
+child.on('close', (code, signal) => {
+  clearTimeout(timer);
+  closeSync(stdout);
+  closeSync(stderr);
+  writeFileSync(resolve(directory, 'status.json'), JSON.stringify({ code, signal, spawnError, timeout, pid: child.pid, start, finish: new Date().toISOString() }, null, 2) + '\n', { flag: 'wx' });
+  process.exitCode = timeout ? 124 : code ?? 1;
+});

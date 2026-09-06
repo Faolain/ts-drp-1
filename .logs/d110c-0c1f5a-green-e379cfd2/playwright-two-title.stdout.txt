@@ -1,0 +1,8 @@
+
+Running 2 tests using 1 worker
+
+
+
+[1/2] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:3045:1 › D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen
+[2/2] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:3271:1 › D.110c-0c1f2 non-creator writer requires an authenticated historical frontier
+  2 passed (6.4s)

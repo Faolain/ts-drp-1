@@ -1,0 +1,16 @@
+{
+	"decisionId": "PH-P5-D01",
+	"digestIdentities": {
+		"cutValueDigest": "hash-domain-exact-cut-value-bytes",
+		"proposalHash": "hash-domain-exact-seal-proposal-bytes",
+		"qcProposalDigest": "valueDigest",
+		"sealProposalValueDigest": "valueDigest",
+		"sealVoteProposalDigest": "valueDigest"
+	},
+	"lockIdentity": "valueDigest",
+	"profileId": "seal-digest-identity-v1",
+	"protocolMajor": 3,
+	"registryVersion": 1,
+	"roundChangeDisposition": "separate-kind-deferred-phase-5d",
+	"sameValueRoundCarryover": true
+}

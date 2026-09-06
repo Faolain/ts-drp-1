@@ -1,0 +1,41 @@
+changed owners:
+packages/issuance-store/src/conformance.ts
+packages/issuance-store/src/maintenance.ts
+packages/node/src/v3-live.ts
+packages/storage-browser/src/internal/browser-issuance-store.ts
+packages/storage-node/src/internal/node-issuance-store.ts
+authenticated prune occurrences:
+packages/issuance-store/src/maintenance.ts:42:	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/issuance-store/src/conformance.ts:358:	async pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+packages/issuance-store/src/conformance.ts:488:				pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/issuance-store/src/conformance.ts:510:		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/storage-node/src/internal/node-issuance-store.ts:771:	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+packages/storage-node/src/internal/node-issuance-store.ts:1293:		pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-node/src/internal/node-issuance-store.ts:1334:			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/storage-node/src/internal/node-issuance-store.ts:1366:			pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-browser/src/internal/browser-issuance-store.ts:694:	async pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+packages/storage-browser/src/internal/browser-issuance-store.ts:1367:			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/storage-browser/src/internal/browser-issuance-store.ts:1401:			pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-browser/src/internal/browser-issuance-store.ts:1409:		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/node/src/v3-live.ts:3194:					const replay = await maintenance.pruneAuthenticatedSettledPrefix({
+identity registry guards:
+61:				if (maintenanceByStore.has(store)) return false;
+packages/storage-node/src/internal/node-issuance-store.ts:1370:	return maintenanceByStore.get(store);
+packages/issuance-store/src/maintenance.ts:66:				return maintenanceByStore.get(store);
+packages/issuance-store/src/conformance.ts:506:	const implementation = implementationByStore.get(store);
+packages/storage-browser/src/internal/browser-issuance-store.ts:1405:	const implementation = implementationByStore.get(store);
+59:		return Object.freeze({
+269:			return Object.freeze({ epoch: record.epoch });
+289:	return Object.freeze({
+290:		lineage: Object.freeze({ ...lineage }),
+308:	return Object.freeze({
+310:		commitQcRef: Object.freeze({ ...input.commitQcRef }),
+312:			deletedFrom === null ? null : Object.freeze({ from: deletedFrom, through: input.throughAuthorSequence }),
+313:		observedLineage: Object.freeze({ ...observedLineage }),
+cleanup and recovery owners:
+3192:					// The receipt pair reaches this owner only after planClosedEpochCleanup(...) has
+4492:	const maxHistoricalIssuanceRows = context.maxEpochVertices * 3;
+ordinary facade remains unchanged:
+types/index diff empty: yes
+dependency/lockfile diff empty: yes
+raw global WeakMap exposure absent: yes

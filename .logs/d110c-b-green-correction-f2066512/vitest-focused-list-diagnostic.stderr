@@ -1,0 +1,16 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Collect Error ⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Workspace config file "../../vitest.workspace.ts" references a non-existing file or a directory: /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/vite.config.mts
+    at resolveTestProjectConfigs (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js:11891:12)
+    at resolveWorkspace (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js:11669:70)
+    at Vitest.resolveWorkspace (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js:12296:10)
+    at async Vitest._setServer (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js:12175:20)
+    at async handler (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js:13090:6)
+    at async _createServer (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:38657:20)
+    at async createViteServer (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js:10149:17)
+    at async createVitest (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js:13130:17)
+    at async prepareVitest (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js:13521:14)
+    at async collect (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cac.DK21mt6F.js:1497:15)
+
+
+

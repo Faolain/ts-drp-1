@@ -1,0 +1,24 @@
+I'll start from the accepted design, custody chain, and precomputed diffs, then inspect the RED/GREEN evidence against the settlement obligations.Next I’ll inspect the production/RED diffs and GREEN evidence so the later code review is grounded in what actually shipped.I’m now checking whether the close-graph rename and control classification actually keep join/ACL/fence on the intended sides of the custody split.I have enough to close: RED is causal, GREEN matches the Node-only settlement slice, and the remaining items are deferred f5b0c/f5b seams rather than blockers.{
+  "verdict": "PASS",
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "title": "Settlement recovery no longer cross-checks issued vs outbox",
+      "evidence": "packages/node/src/v3-live.ts:5648-5665 skips the readIssued/matchingOutboxRows equality check whenever settlementProfileFor(...) === \"v1\", while authenticatedOutboxRow at :6818-6824 still requires it for source scans. outboxRowSnapshot already accepts both ISSUE_COMMIT_KEYS and ISSUE_COMMIT_WITH_PLAN_EFFECT_KEYS (:4229-4231), so the skip is not required for planEffect shape.",
+      "owner": "f5b0b / f5b recovery integration",
+      "disposition": "defer with reason: honest adapters cannot diverge under atomic transactIssue, recovered bytes remain signature-authenticated, and v1 keeps the check byte-for-byte; restore it if recovery must keep detecting store-table skew"
+    },
+    {
+      "title": "Frontier-backed classifier treats terminal and old-incarnation rows as displaced until the reader skip",
+      "evidence": "packages/node/src/v3-live.ts:4803-4814 rejects only settlementOwnRowClass === \"current\"; terminal (seq <= terminalThrough) and old-incarnation (epoch < admissionEpoch) still authenticate as kind \"displaced\". readRebaseOutbox :6892-6900 continues past them only when a frontier is supplied. Public readSettlementSources (:8634-8638, :8084-8086) does not pass a frontier and the GREEN README correctly leaves that to f5b0c/f5b.",
+      "owner": "f5b0c / f5b",
+      "disposition": "defer with reason: current public callers cannot claim terminal/incarnation class and do not fabricate a dummy boundary; when the verified checkpoint frontier is threaded, reject those classes inside authenticatedSettlementSourceRow rather than only in the reader"
+    }
+  ],
+  "red_causal": true,
+  "green_closes_red": true,
+  "scope_preserved": true,
+  "evidence_valid": true,
+  "summary": "Causal tests-only RED (21 product fails / 6 controls) is closed by production GREEN 93585bf3 without widening exported issue/room contracts, wire, crypto, or creator/room/pruning integration. Fence issuance derives planEffect, binds fenceSequence to lineage.next, and fails closed on missing/manual-review/linked plans and unknown outcomes; legacy fences die before journal; close* maps own the complete graph with join/causalJoin/fence excluded from application fold/sink; published+pending sources scan under settlement; any-anchor classification exists but is correctly inert until f5b0c/f5b thread a verified frontier."
+}

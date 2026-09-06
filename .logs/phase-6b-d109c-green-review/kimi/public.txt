@@ -1,0 +1,40 @@
+All checks are complete. Here is the review.
+
+---
+
+## D.109c final GREEN review — commit `3d21264f`
+
+### 1. RED causality — holds
+
+RED evidence at `.logs/phase-6b-d109c-red/` shows the corrected focused Vitest run (`focused-vitest-final.json`) with exactly two failures — `D109C_SHARED_MAINTENANCE_MISSING` (`tests/phase-6b-ahe-reclamation-red.test.ts:103`) and `D109C_NODE_MAINTENANCE_MISSING` (`packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts:145`) — 6 controls passed, 30 semantic bodies skipped. The Chromium run failed only `D109C_BROWSER_MAINTENANCE_MISSING` with 3 skips, no flake, no top-level error. The initial 3-failure diagnostic (faulty facade shape check) is retained separately and documented in the RED README, not relabeled. GREEN closes the exact reason: the three owners now exist and the same readiness predicates resolve, with all 48/4 focused tests executing genuine bodies. The RED-era placeholder bodies (e.g. `expect(mutant.length).toBeGreaterThan(0)`) were replaced by real assertions at GREEN per the accepted readiness-skip design — nothing was left as a placeholder.
+
+### 2. Authority — strict, identity-based, owner-scoped
+
+Both backends use module-private `WeakMap<AheDurableStore, …>` registries populated only by the genuine factories: `SqliteAheDurableStore`'s constructor (`packages/storage-node/src/internal/create-scaffold.ts:146`) and `createBrowserAheDurableStore` (`packages/storage-browser/src/internal/idb-adapter.ts:969`). Copies, proxies, structural fakes, memory facades, and cross-backend facades resolve to `undefined` (exercised in the identity tests). Package roots contain no `maintenance`/`reclaimClosedEpoch` reference (verified in all three `index.ts` files); only the three authorized `./maintenance` subpaths were added; the facade remains 12-key; memory `TransitionOwner` byte-identical. Test-only installers live in `test-instrumentation.ts`/internal modules outside the export maps.
+
+### 3–6. Contract, validation, lineage, global scan, atomicity — sound
+
+`captureAheReclamationInput` enforces closed records/arrays (no accessors, inherited fields, symbols, sparse arrays, shared buffers), exact key sets, the frozen policy digest, disjoint/distinct identities, and deep-frozen detach. Errors are frozen with the exact six-code registry; invalid-before-lifecycle and async-rejection parity hold on both owners. The classifier rebuilds lineage by parent links with the exact revision-decrement predicate, rejects cycles/gaps/extras/stale sets with the correct retry-vs-corrupt split, requires `Adopted`/`Superseded` states, and scans generations, promotions, and blobs globally (Node: full-table scans; browser: `getAll` over the four stores) — shared, cross-object, staged/discarded, and orphan-blob cases all verified by the six reference tests. Both owners run one native transaction (`BEGIN IMMEDIATE` / strict four-store `readwrite`), enforce exact counts (Node `changes`; browser before/after `expectKey`), re-classify the post-state requiring a complete replay, and roll back/abort with poison latching only on `CORRUPT`. All 28 mutants and 4 count faults assert zero committed writes via full-database image equality plus poison polarity.
+
+### 7–8. Lifecycle and crash edges — genuine
+
+Empty-prefix, lost-receipt replay, reopen, two-handle (`[0,2]` split on both backends), successor adoption (revision 6), strict identity, and closed/invalid precedence are genuinely exercised. Node's six edges SIGKILL a forked child blocked via `Atomics.wait` *inside* the live transaction (five edges) or immediately post-commit; reopen asserts `integrity_check=ok` plus old-XOR-complete-new with `completeNew ⟺ after-commit`. Chromium terminates live workers blocked at the same six edges in a real strict IDB transaction, with the same XOR on reopen. Neither is a mocked or post-completion surrogate.
+
+### 9. Evidence — internally consistent
+
+Focused Vitest 48/48/0/0; focused Chromium 4 expected, 0 unexpected/flaky/skipped/top-level-error (internally covering 28 mutants, 6 reference cases, 6 crash edges); initial retained diagnostic 197 passed + exactly the predeclared D.109f stale assertion failed + the unrelated campaign skipped; corrected retained 197/197 with exactly those two filtered; export/planner 15/15; Chromium retained 12/12, 22/22, 1/1, 2/2. The 11-entry self-excluding manifest verifies against the committed bytes, and its own SHA-256 equals the documented `6e21d87a…`. Spot-checked `source-hashes.sha256` entries match committed content. Commit is GPG-signed and pushed (`origin/codex/phase3a1b-p6-golden-path`).
+
+### 10. Scope
+
+33 files: 12 evidence, 3 docs, 11 authorized product/integration paths, 7 RED-owned test paths. No lockfile, schema, root-export, dependency, or facade-key drift.
+
+### Findings (P2, nonblocking)
+
+- **P2 — impossible-input polarity.** `captureAheReclamationInput` (`packages/storage/src/maintenance.ts:181`) does not enforce the slice's "empty deletion list is valid only when the expected floor parent is already that same no-head value" rule. An empty `deleteGenerationIds` with a `present` `expectedBaseExpectedHead` passes capture and resolves inside the transaction as `AHE_RECLAMATION_RETRY_REQUIRED` — or even a zero-write replay success if the floor is already no-head — rather than `AHE_RECLAMATION_INVALID_ARGUMENT`. Zero writes, no poison, no unsafe deletion; smallest correction is one capture-time check. Does not block closure.
+- Observation (not a finding): direct `reclaimClosedEpoch`-on-poisoned-store refusal is implemented (`ahe-reclamation.ts` lifecycle checks) but only exercised indirectly via `readHead` after poisoning; closed/invalid precedence is directly tested.
+
+VERDICT: APPROVED
+
+P0_P1_UNION: none
+
+D109C_MAY_CLOSE: yes

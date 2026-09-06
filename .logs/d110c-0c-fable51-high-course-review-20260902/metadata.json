@@ -1,0 +1,12 @@
+{
+  "duration_api_ms": 520369,
+  "effective_model": "claude-fable-5-1",
+  "effort": "high",
+  "is_error": false,
+  "session_id": "3de42449-c135-4bf2-a060-de4782bce954",
+  "stop_reason": "end_turn",
+  "subagents_spawned": 0,
+  "terminal_reason": "completed",
+  "total_cost_usd": 4.944374249999999,
+  "turns": 42
+}

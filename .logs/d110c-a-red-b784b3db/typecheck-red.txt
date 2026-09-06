@@ -1,0 +1,9 @@
+command=pnpm exec tsc --project tests/fixtures/phase-6b-d110c-a/tsconfig.json --pretty false
+status=2
+classification=EXPECTED_CAUSAL_RED
+tests/fixtures/phase-6b-d110c-a/creator-live-close-result-contract.ts(20,36): error TS2344: Type 'false' does not satisfy the constraint 'true'.
+tests/fixtures/phase-6b-d110c-a/creator-live-close-result-contract.ts(21,45): error TS2344: Type 'false' does not satisfy the constraint 'true'.
+tests/fixtures/phase-6b-d110c-a/creator-live-close-result-contract.ts(31,14): error TS2322: Type 'Readonly<{ epoch: 1; successorEpoch: 2; ok: true; commitQcRef: GenerationRef; lifecycle: "successor-pending-adoption"; closedVertexCount: number; currentTrustRef: GenerationRef; cutValueRef: GenerationRef; successorAnchorDigest: string; successorTrustRef: GenerationRef; }>' is not assignable to type 'Readonly<{ closedVertexCount: number; commitQcRef: GenerationRef; currentTrustRef: GenerationRef; cutValueRef: GenerationRef; epoch: 0; lifecycle: "successor-pending-adoption"; ok: true; successorAnchorDigest: string; successorEpoch: 1; successorTrustRef: GenerationRef; }>'.
+  Types of property 'epoch' are incompatible.
+    Type '1' is not assignable to type '0'.
+tests/fixtures/phase-6b-d110c-a/creator-live-close-result-contract.ts(37,14): error TS2322: Type '3' is not assignable to type '0'.

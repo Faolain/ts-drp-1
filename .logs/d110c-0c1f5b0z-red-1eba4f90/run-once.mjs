@@ -1,0 +1,41 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {spawnSync,execFileSync} from 'node:child_process';
+const root=fs.realpathSync(process.cwd()),out=path.dirname(new URL(import.meta.url).pathname);
+const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
+const write=(name,value)=>fs.writeFileSync(path.join(out,name),JSON.stringify(value,null,2)+'\n',{flag:'wx'});
+const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
+if(fs.existsSync(path.join(out,'execution-start.json')))throw Error('Sole execution already consumed; do not rerun');
+const matrix=JSON.parse(fs.readFileSync(path.join(out,'matrix.json'),'utf8'));
+const signed=JSON.parse(fs.readFileSync(path.join(out,'signed-test.json'),'utf8'));
+const isolation=JSON.parse(fs.readFileSync(path.join(out,'isolation-before.json'),'utf8'));
+const head=git('rev-parse','HEAD');
+if(head!==signed.head||head!==isolation.head||root!==isolation.root||git('log','-1','--format=%G?')!=='G'||git('status','--short','--untracked-files=no')!=='')throw Error('Signed isolated source boundary differs');
+for(const [file,sha]of Object.entries(matrix.fileHashes))if(hash(fs.readFileSync(path.join(root,file)))!==sha)throw Error('Frozen test hash differs');
+const remote=execFileSync('git',['ls-remote','origin','refs/heads/codex/phase3a1b-p6-golden-path'],{cwd:signed.mainRoot,encoding:'utf8'}).trim().split(/\s/u)[0];
+if(remote!==head)throw Error('Pushed head differs before sole execution');
+write('execution-start.json',{head,remote,signature:'G',matrixSha256:hash(fs.readFileSync(path.join(out,'matrix.json'))),command:matrix.command,executionCount:1,startedAt:new Date().toISOString()});
+const result=spawnSync(matrix.command[0],matrix.command.slice(1),{cwd:root,encoding:'utf8',maxBuffer:32*1024*1024});
+fs.writeFileSync(path.join(out,'stdout.log'),result.stdout??'',{flag:'wx'});
+fs.writeFileSync(path.join(out,'stderr.log'),result.stderr??'',{flag:'wx'});
+const report=fs.existsSync(path.join(out,'focused.json'))?JSON.parse(fs.readFileSync(path.join(out,'focused.json'),'utf8')):null;
+const assertions=report?.testResults.flatMap(suite=>suite.assertionResults.map(row=>({file:path.relative(root,suite.name),...row})))??[];
+const violations=[],outcomes=[];
+for(const expected of matrix.entries){
+ const matches=assertions.filter(row=>row.file===expected.file&&row.fullName===expected.name);
+ if(matches.length!==1){violations.push({expected,reason:'Missing or repeated assertion',count:matches.length});continue;}
+ const row=matches[0],failures=row.failureMessages??[];
+ const actual={file:row.file,name:row.fullName,status:row.status,duration:row.duration,failureMessages:failures,expectedToken:expected.token};outcomes.push(actual);
+ if(row.status!==expected.expectedStatus||failures.length!==(expected.token?1:0)||(expected.token&&failures[0].split('\n')[0]!==`Error: ${expected.token}`))violations.push({reason:'Unexpected selected matrix',expected,actual});
+}
+const unexpected=assertions.filter(row=>!matrix.entries.some(expected=>row.file===expected.file&&row.fullName===expected.name));
+if(unexpected.length)violations.push({reason:'Unfrozen assertions',unexpected});
+const topLevel=report?.unhandledErrors??report?.testResults.flatMap(suite=>suite.message&&!suite.assertionResults.some(row=>row.failureMessages?.some(message=>suite.message.includes(message)))?[suite.message]:[])??[];
+if(result.status!==1||result.signal||result.error||report?.numTotalTests!==16||report?.numFailedTests!==14||report?.numPassedTests!==2||report?.numPendingTests!==0||report?.testResults.length!==1)violations.push({reason:'Runner/count mismatch',status:result.status,signal:result.signal,error:String(result.error??''),total:report?.numTotalTests,failed:report?.numFailedTests,passed:report?.numPassedTests,pending:report?.numPendingTests,files:report?.testResults.length});
+if(topLevel.length)violations.push({reason:'Top-level errors',topLevel});
+if(outcomes.some(row=>row.failureMessages.some(message=>/timed out|test timeout|hook timeout|Cannot find module|Failed to load url/iu.test(message))))violations.push({reason:'Timeout or loader failure'});
+const classification=violations.length?'REJECTED_MATRIX_STOPPED_NO_RERUN':'ACCEPTED_CAUSAL_MAINTENANCE_DISCOVERY_RED';
+write('result.json',{classification,executionCount:1,head,runnerStatus:result.status,total:report?.numTotalTests,selected:16,failed:report?.numFailedTests,passed:report?.numPassedTests,intentionallyFiltered:0,topLevel,violations,outcomes,finishedAt:new Date().toISOString(),warning:'No GREEN continuation, lifecycle completion, parent cleanup invocation, product epochs or campaign completion claimed.'});
+console.log(JSON.stringify({classification,failed:report?.numFailedTests,passed:report?.numPassedTests,violations},null,2));
+process.exitCode=violations.length?2:0;

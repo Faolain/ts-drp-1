@@ -1,0 +1,15 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "examples/v3-room/src/index.ts",
+    "packages/issuance-store/src/contract.ts"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:06:51.624Z",
+  "finished": "2026-09-05T14:06:52.393Z",
+  "status": 0,
+  "signal": null
+}

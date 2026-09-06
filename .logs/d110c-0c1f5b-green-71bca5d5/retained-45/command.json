@@ -1,0 +1,24 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-differential-exit-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-71bca5d5/retained-45/result.json",
+    "--exclude=**/node_modules",
+    "--exclude=**/.logs/**",
+    "--exclude=**/e2e",
+    "--exclude=**/dist",
+    "--exclude=**/conformance/**",
+    "--exclude=**/.stryker-tmp/**",
+    "--exclude=docs/**",
+    "--exclude=tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts",
+    "--exclude=packages/storage-node/tests/phase-6b-differential-exit-red.test.ts"
+  ],
+  "start": "2026-09-06T06:25:48.772Z"
+}

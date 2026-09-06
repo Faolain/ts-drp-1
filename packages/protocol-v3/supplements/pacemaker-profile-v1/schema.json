@@ -1,0 +1,41 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://drp.tech/schema/protocol-v3/pacemaker-profile-v1.json",
+	"title": "Protocol v3 pacemaker profile",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"bundleCutValue",
+		"decisionId",
+		"highestPrepareQCCustody",
+		"highestPrepareQCSelection",
+		"leaderOrdering",
+		"maxFutureRoundGap",
+		"newRoundCertificate",
+		"profileId",
+		"proposalAuthentication",
+		"protocolMajor",
+		"registryVersion",
+		"roundChangeDisposition",
+		"roundTimeoutBaseMs",
+		"roundTimeoutMaxMs",
+		"sealVotePhases"
+	],
+	"properties": {
+		"bundleCutValue": { "const": "exact-canonical-required" },
+		"decisionId": { "const": "PH-P5-D02" },
+		"highestPrepareQCCustody": { "const": "complete-canonical-qc" },
+		"highestPrepareQCSelection": { "const": "greatest-round-then-lowest-registered-qc-digest" },
+		"leaderOrdering": { "const": "raw-utf8-ascending" },
+		"maxFutureRoundGap": { "const": 8 },
+		"newRoundCertificate": { "const": "exact-certified-quorum-no-truncation" },
+		"profileId": { "const": "pacemaker-profile-v1" },
+		"proposalAuthentication": { "const": "durable-leader-prepare-vote" },
+		"protocolMajor": { "const": 3 },
+		"registryVersion": { "const": 1 },
+		"roundChangeDisposition": { "const": "distinct-registered-kind" },
+		"roundTimeoutBaseMs": { "const": 1000 },
+		"roundTimeoutMaxMs": { "const": 30000 },
+		"sealVotePhases": { "const": ["prepare", "commit"] }
+	}
+}

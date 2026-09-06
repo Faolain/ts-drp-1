@@ -1,0 +1,31 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-ACL-FRONTIER-INTEGRATION",
+      "finding": "inspectCreatorTransitionAdvance authenticates settlement cardinality and self-binds currentAclDigest but does not invoke inspectCreatorAuthorSettlementAdvance for admissionEpoch/monotonicity/successor-ACL vector laws.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:771",
+      "owner": "f5b0b",
+      "disposition": "deferred; not productized in this corrective GREEN"
+    },
+    {
+      "id": "P2-HISTORY-CONTROL-NORMALIZATION",
+      "finding": "openVerifiedCreatorHistoricalIssuance still requires exactly one retirement carrier and does not open settlement checkpoints.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:486",
+      "owner": "later integration slice",
+      "disposition": "deferred; legacy historical-issuance owner unchanged"
+    }
+  ],
+  "notes": [
+    "Corrective RED 6921ec65: 10/14 pass, 4 causal fails; GREEN b926a606 then 14/14.",
+    "P1-1 closed: isCreatorTrustProfile accepts creator-trusted-settlement-v1; install/open/successor preserve it; prepare signs successor, open verifies floor with no current-key compare.",
+    "P1-2 closed: settlement path accepts exactly one settlement and zero legacy carriers; legacy 1+1 cardinalities unchanged; currentAclDigest derived from authenticated current-anchor preimage.",
+    "P1-3 closed: 65536/256 only under settlement; legacy exact 8192/64; 256 accept, 257 cap-reject, 65537 malformed-input.",
+    "P1-4 closed: genesis requires exported sentinel ab5e3a215840aed1a4306b2a72505ff63d5ef7950d0e13052647249b8cae2a3a; settled-v1 adjacency remains; codec predecessor checks stay shape-only.",
+    "14-test contract is causal; no wire/protobuf/new crypto/root API/dependency change; reviewer P2s were not turned into product scope."
+  ]
+}

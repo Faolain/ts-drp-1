@@ -1,0 +1,8 @@
+{
+  "cwd": "/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-06T02:42:51.179Z"
+}

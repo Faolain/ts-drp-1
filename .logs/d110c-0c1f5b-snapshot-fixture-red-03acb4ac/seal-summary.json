@@ -1,0 +1,29 @@
+{
+  "testCommit": "dc2f8dc2170936fc491701614ba938767445468b",
+  "testSha256": "24b7a57addf2b77ca6987cee6ac5f4d10586b63a23e0ed6c79d4dbdc78d28181",
+  "runtime": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "token": "F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION"
+  },
+  "compiler": {
+    "status": 1,
+    "inherited": 3,
+    "target": 0,
+    "matrixStatus": 0
+  },
+  "custody": {
+    "production": 8,
+    "built": 7,
+    "retained": 85,
+    "supplementalNewTest": 1,
+    "stashes": 27,
+    "protected": 86522
+  },
+  "rawSha256": "d872372b11c080c720ccd6d967b582d570934b8d06ad7876a2a241be7d1feabe",
+  "authoredChecks": 0,
+  "rawWhitespaceExceptions": 1,
+  "rootAcceptancePending": true
+}

@@ -1,0 +1,22 @@
+{
+  "sessionId": "01a0609f-fa3b-7ec0-a4b6-638f25add775",
+  "stopReason": "end_turn",
+  "structuredOutput": {
+    "verdict": "APPROVE",
+    "red_causality_verified": true,
+    "green_closure_verified": true,
+    "scope_preserved": true,
+    "evidence_verified": true,
+    "findings": [
+      {
+        "severity": "P2",
+        "title": "Batch1 GREEN does not assert successor authority epoch === 1",
+        "owner": "tests/phase-6b-d110c-0a-authority-red.test.ts",
+        "evidence": "The accepted batch1 test opens the genuine successor authority but does not directly resolve and assert the registered identity epoch. Product epoch-one binding is proven by the authenticated state-to-cut checks and the genuine actor matrix's epoch-one prepare, commit, finality, and reopen rows.",
+        "required_action": "Accept. Do not reopen 0a; an optional direct identity assertion may be folded into a later retained test."
+      }
+    ],
+    "blocking_union": {"p0": 0, "p1": 0},
+    "summary": "The signed RED failed for the frozen authority and browser epoch-narrowing causes. Signed GREEN closes them through authenticated trust/carrier custody and the real creator actor/browser path while preserving certified epoch-zero authority and all frozen scope controls."
+  }
+}

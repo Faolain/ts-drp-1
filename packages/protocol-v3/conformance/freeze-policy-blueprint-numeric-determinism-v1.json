@@ -1,0 +1,42 @@
+{
+	"schemaVersion": "ts-drp-blueprint-numeric-determinism-freeze-v1",
+	"profileId": "blueprint-numeric-determinism-v1",
+	"protectedArtifacts": [
+		"docs/protocol/blueprint-numeric-determinism-v1.md",
+		"packages/protocol-v3/supplements/blueprint-numeric-determinism-v1/profile.json",
+		"packages/protocol-v3/conformance/freeze-policy-blueprint-numeric-determinism-v1.json",
+		"packages/protocol-v3/scripts/check-blueprint-numeric-determinism-freeze.mjs",
+		".github/workflows/protocol-v3-blueprint-numeric-determinism.yml",
+		"tests/eslint-plugin-ts-drp-numeric-determinism-0n-a.test.ts",
+		"tests/fixtures/phase-0n-a-v3/numeric-determinism-contract.json",
+		"packages/eslint-plugin-ts-drp/src/index.ts",
+		"packages/blueprint-toolchain/contracts/no-ambient-lint-v2.json",
+		"packages/blueprint-toolchain/src/index.js",
+		"tests/track-p2-a-authoring-emitter-lint-red.test.ts",
+		"tests/track-p2-a-opus-corrective-red.test.ts",
+		"tests/fixtures/track-p2-a/no-ambient-lint-v2.json",
+		"tests/fixtures/track-p2-a/preservation.json",
+		"tests/fixtures/track-p2-d/fixture-metadata.json",
+		"packages/protocol-v3/package.json",
+		".prettierignore"
+	],
+	"checkerSha256": "1d54337b247ef7c74e361c136dc5d763f2da529555881118ecbd04336d6ff31b",
+	"artifactSha256": {
+		"docs/protocol/blueprint-numeric-determinism-v1.md": "3ece061a2121357faabdba62b489e1ab87fca97f7af739b9dd2d8c94bf956bd4",
+		"packages/protocol-v3/supplements/blueprint-numeric-determinism-v1/profile.json": "2277ff05a250fd9fdccef0e44d8de5b1bffd060112df53645fd5d56e05857c23",
+		"packages/protocol-v3/scripts/check-blueprint-numeric-determinism-freeze.mjs": "1d54337b247ef7c74e361c136dc5d763f2da529555881118ecbd04336d6ff31b",
+		".github/workflows/protocol-v3-blueprint-numeric-determinism.yml": "a2aa497fd69d9975d9c9952d0d5e81c253c5d3a33c750f1ba8539f8b39b81584",
+		"tests/eslint-plugin-ts-drp-numeric-determinism-0n-a.test.ts": "a1cd3f34ee7a2b5858a7ed7b34f28b9bd6c010e528531b4a6575db11fddd12d2",
+		"tests/fixtures/phase-0n-a-v3/numeric-determinism-contract.json": "50ded55cebc5e69d776e67fd9747d9c1a2a14e1008f7335127e089cd18aca4c2",
+		"packages/eslint-plugin-ts-drp/src/index.ts": "1d80e3117a574fe24ff41c763c70c5132d49014f36b04e4ea25491558d95a0a0",
+		"packages/blueprint-toolchain/contracts/no-ambient-lint-v2.json": "5be07a8ce05d6e81000514df2d974b1d6aeaa504df597247bd6a76df854c02e3",
+		"packages/blueprint-toolchain/src/index.js": "b99101aeee65542b3f0e274b41fdde9cd133aff37f23bf13d40d0aedf03c506e",
+		"tests/track-p2-a-authoring-emitter-lint-red.test.ts": "0931aeb31afbbafb1fe439d28354f1427c70bf9c556e39bcd543afcf94e63659",
+		"tests/track-p2-a-opus-corrective-red.test.ts": "7fc7e45457a2be3f7bb50d9297a1fd300c0dea597751a8760ee2f2dfc1734993",
+		"tests/fixtures/track-p2-a/no-ambient-lint-v2.json": "5be07a8ce05d6e81000514df2d974b1d6aeaa504df597247bd6a76df854c02e3",
+		"tests/fixtures/track-p2-a/preservation.json": "18b9e7dc3e40e3ef3be12fdf2b4a7899562ff1baf5ed94d0fd13efd3623dc5b3",
+		"tests/fixtures/track-p2-d/fixture-metadata.json": "c75e3438b913846e1546b2fd3de1ed07636f913f281b40c3076c1b760424e534",
+		"packages/protocol-v3/package.json": "f3c9057181804f2691b7f4b58f4dd1d46782283cfc803fc9c56ec7eda69d413d",
+		".prettierignore": "1e4aca6505cef8ec51ad7da0db7b51b16f57de3c68fe0b3466c41b028c019633"
+	}
+}

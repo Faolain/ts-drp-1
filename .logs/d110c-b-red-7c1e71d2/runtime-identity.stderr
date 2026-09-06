@@ -1,0 +1,10 @@
+(node:10448) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+file:///Users/aristotle/Documents/Projects/ts-drp-1/[eval1]:1
+import { resolve } from "node:path"; import { pathToFileURL } from "node:url"; const creator=pathToFileURL(resolve("packages/node/src/creator-adoption.ts")).href; const storage=pathToFileURL(resolve("packages/storage-node/dist/src/index.js")).href; const [creatorModule,storageModule]=await Promise.all([import(creator),import(storage)]); if(typeof creatorModule.verifyCreatorSuccessorAdoption!=="function"||typeof storageModule.createNodeAheDurableStore!=="function") throw new TypeError("D110C_B_RUNTIME_IDENTITY_INVALID"); process.stdout.write(JSON.stringify({creatorAdoptionSourceUrl:creator,node:process.version,storageNodeBuiltUrl:storage})+"\n");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ^
+
+TypeError: D110C_B_RUNTIME_IDENTITY_INVALID
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/[eval1]:1:476
+
+Node.js v22.15.0

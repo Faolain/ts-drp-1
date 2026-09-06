@@ -1,6 +1,7 @@
 import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import { type Address, type PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	type AddressFilteredDrpRecord,
 	AddressPolicy,
@@ -101,7 +102,7 @@ describe("connectObject targeted creator rendezvous", () => {
 		const discoverSpies = directory.endpoints.map((endpoint) => vi.spyOn(endpoint, "discover"));
 		const registryDiscover = vi.spyOn(directory.registries, "discover");
 
-		pending.push(fixture.node.connectObject({ id: "legacy-object-without-creator" }));
+		pending.push(fixture.node.connectObject({ id: "legacy-object-without-creator", acl: createPermissionlessACL() }));
 		await flushMicrotasks();
 		expect(discoverSpies.flatMap((discover) => discover.mock.calls).map(([request]) => request.namespace)).toEqual([
 			roomNamespace("legacy-object-without-creator"),
@@ -408,6 +409,8 @@ function fakeNetwork(connect: ReturnType<typeof vi.fn>, getAllPeers: ReturnType<
 		getAllPeers,
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn((): Promise<void> => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn((): Promise<void> => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn((): Promise<void> => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((): void => undefined),

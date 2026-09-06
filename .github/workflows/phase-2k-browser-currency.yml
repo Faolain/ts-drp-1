@@ -1,0 +1,30 @@
+name: Phase 2k browser currency
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-currency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm exec playwright test --config playwright.browser-currency.config.ts
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: phase-2k-browser-currency
+          path: |
+            test-results/phase-2k/browser-matrix-currency.json
+            test-results/phase-2k/phase-2k/**
+            test-results/phase-2k/playwright/**

@@ -1,0 +1,11 @@
+{
+  "record": "D.110c-0c1f5b0s",
+  "checkpoint": "RED-accepted",
+  "commit": "5b286468c184da76a8c48941e8874056abd29fb4",
+  "focused": { "tests": 45, "passed": 24, "failed": 21 },
+  "retainedExactness": { "failed": 12, "skipped": 66 },
+  "browserExactness": { "failed": 4, "passed": 0 },
+  "unaffectedControls": { "unitPassed": 8, "browserPassed": 4, "registryPassed": 11 },
+  "causal": true,
+  "moduleResolutionFailure": false
+}

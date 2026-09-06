@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 225.117,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/phase-6b-d109f-final-review/grok/events.jsonl",
+  "exit_code": 1,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/phase-6b-d109f-final-review/grok/public.txt",
+  "stop_reason": "cancelled",
+  "timed_out": false
+}

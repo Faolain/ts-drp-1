@@ -1,0 +1,66 @@
+{
+  "stage": "after",
+  "root": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout",
+  "head": "6353eb617bc889365c6ab62494a18311d2ea5338",
+  "nodeVersion": "v22.15.0",
+  "nodeExecutable": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "pnpmVersion": "10.24.0",
+  "dependencies": {
+    "typescript": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript",
+    "vitest": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest",
+    "vite": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite"
+  },
+  "configHashes": {
+    "pnpm-lock.yaml": "56e8b9b56d7e76d4651daec66b6ff8c0bc8150ce9fab588b97b1887f417d1251",
+    "vite.config.mts": "6c15cd76cf3197d8f08608f28909731d55b7f07a661fada577aaecbe4b81c610",
+    "package.json": "1baa6c3967e63f1d8af5f1e70c6b6c62e032a90e770f18dd3d86f5cfc40e1a55"
+  },
+  "signature": "G",
+  "trackedStatus": "",
+  "sourceHashes": {
+    "examples/v3-room/src/index.ts": "e75a9edac9a8d13d4fdb9062003fde84b03d5120d3b18416af8fc9395b39e028",
+    "packages/node/src/creator-adoption.ts": "327742601981fc1444479c2315d37615638e2d5b12d61a2bce390c8c05eaace9",
+    "packages/node/src/creator-close.ts": "22f4300073e144f38f34382ebeabf88608cd2e11d2ea0d2e7c165d2f7eebaaf7",
+    "packages/node/src/internal/creator-transition-advance.ts": "535021629236480dba5e2040ce06a6b0a43281bf8a76d1e61f9f57c87efc4e25",
+    "packages/node/src/v3-live.ts": "cf1235b6d7e6944b19b9536d1ca9d911326ae86ce8252632df51c9aa270d462d",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "4a44cb2d12788bb3aec5b692e0ca2479b7ab7e4ca3a64c97f41915a8860e62f2",
+    "packages/protocol-v3/src/creator-close.ts": "abb54cdabda724888aabed2119df45c8678623e6d701f8366a9f7919f018c95b",
+    "packages/node/src/internal/closed-epoch-cleanup.ts": "72b78915f65ee60b4b1f38be4edcebf662731dcf24f8f9edd91db931912c39fe",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "c846038f5c5dc36a1d7e1acf54a495ea82ef4fd3e809850d626f8c0beb4f56c2",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c"
+  },
+  "runtimes": {
+    "packages/node/dist/src/creator-adoption.js": {
+      "path": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/packages/node/dist/src/creator-adoption.js",
+      "sha256": "7ff806a8ee802a0ff117efa77fff8c884b860e10877ea859c3f744936def9477"
+    },
+    "packages/node/dist/src/creator-close.js": {
+      "path": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/packages/node/dist/src/creator-close.js",
+      "sha256": "275f614b1493bb50c91d40a73a6b6cf5602ca1ce0fcdbcf520ae1651b5b767c8"
+    },
+    "packages/node/dist/src/v3-live.js": {
+      "path": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/packages/node/dist/src/v3-live.js",
+      "sha256": "221334d451a1b4402fa0736cd3511d7e4485c7ca9cc3f7f9ba5fa082324de0b8"
+    },
+    "packages/protocol-v3/dist/src/creator-checkpoint.js": {
+      "path": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/packages/protocol-v3/dist/src/creator-checkpoint.js",
+      "sha256": "3248f86e67af8b5fa8da7f9d9839393e200903dc424092b332775c1c0417aeb8"
+    },
+    "packages/protocol-v3/dist/src/creator-close.js": {
+      "path": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/packages/protocol-v3/dist/src/creator-close.js",
+      "sha256": "fadaf8dfb960406e59448826fad65dcebbb33842b5d9f03503479b466b881818"
+    },
+    "packages/storage-browser/dist/src/issuance.js": {
+      "path": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/packages/storage-browser/dist/src/issuance.js",
+      "sha256": "0c526d0a56685ae44579a4826e0ac45bf3eb4db41e5c19202a0aa386b1cb2b74"
+    },
+    "packages/issuance-store/dist/src/contract.js": {
+      "path": "/private/tmp/d110c-f5b-scalar-red-CWNpU6/checkout/packages/issuance-store/dist/src/contract.js",
+      "sha256": "08a1ae84c129ffe93ee5f67c2dfd7e5c3df5e18c7c4dfb9d0045c6ea60eee7a2"
+    }
+  },
+  "noProductionOverlay": true,
+  "buildMethod": "Fresh sparse signed checkout; independent frozen offline install; complete build:packages before collection or runtime."
+}

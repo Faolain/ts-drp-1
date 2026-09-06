@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "-C",
+    "/tmp/d110c-f5b-checkpoint-link-red-m2McIC/checkout",
+    "checkout",
+    "--detach",
+    "f83764c5a141972f13870168eb5b9a758cd92e1c"
+  ],
+  "start": "2026-09-05T22:06:51.870Z"
+}

@@ -1,0 +1,46 @@
+D.110c-b source-shape audit
+base=3118da762c17785a4a34a1f1d6b173370dc33a4a
+
+packages/node/src/creator-adoption.ts
+373: current projection filters kind === "v3-live-generation-1"
+545: projected graph vertex epoch: 1
+565: projected descriptor epoch: 1
+569: successor kind "v3-live-generation-2"
+610: commit predecessor requires "v3-live-generation-1"
+666: live-seed predecessor requires "v3-live-generation-1"
+840: cold reopen expectedEpoch: 1 (deferred D.110c-0b1/c)
+943-944: cold reopen root/successor kind pair (deferred D.110c-0b1/c)
+1052: cold predecessor ACL expectedEpoch: 0 (deferred D.110c-0b1/c)
+
+packages/node/src/creator-adoption-commit.ts
+310: successor projection kind remains "v3-live-generation-2"
+434: authenticated terminal predecessor requires "v3-live-generation-1"
+491: authenticated staged predecessor requires "v3-live-generation-1"
+
+packages/node/src/creator-adoption-activate.ts
+52-57: active owner contains only bindings and handle; map keyed by stable topic
+193-198: same bindings return existing wrapper without trust/head comparison
+208-229: wrapper deactivate unconditionally deletes topic/releases acquired lock
+
+packages/node/src/v3-live.ts
+1878-1930: existing preparation selects root kind at epoch 0 and successor kind at epoch >0
+7285-7397: existing installed live activation prepares predecessor and successor from authenticated material
+
+examples/v3-room/src/index.ts
+235-242: V3RoomSuccessorAuthority.epoch is literal 1
+453-488: successorAuthority requires/returns literal epoch 1
+1880-1883: singular active handle, close handle, continuity, and store closers
+2265-2287: creator-close binding occurs only during initial setup
+3502: first-successor authority is a permanent adoption no-op latch
+3574-3586: replacement live handle/authority install does not replace close handle
+3642-3766: authority, durable-head, seal, and status continue to use singular current fields
+
+tests
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+  Existing real browser/product adoption fixture, instrumentation, and contract owner.
+tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+  Existing genuine epoch-1 close and authenticated epoch-2 pending-head evidence.
+packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
+  Tests-only CreatorLiveCloseResult mirror still narrows epoch 0/successor 1.

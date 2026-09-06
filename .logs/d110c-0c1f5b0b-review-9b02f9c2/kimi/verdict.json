@@ -1,0 +1,60 @@
+{
+	"verdict": "PASS",
+	"p0": [],
+	"p1": [],
+	"p2": [
+		{
+			"title": "join/causalJoin control handling is unprofiled, changing observable legacy v1 treatment of already-reserved operations",
+			"evidence": "packages/node/src/v3-live.ts:3501-3505 (isControlOperation not gated on settlementProfileFor), :4051 (ingress early return for all control ops vs parent delivering causalJoin to onAdmittedVertex), :6559 (local issue), :7540-7561 (applicationProjectionVertices excludes all controlVertices, parent excluded only fence), :3964-3971/:5732/:5535 (reservation and recovery accounting skipped for controls under all profiles). causalJoin vertices are reachable in v1 rooms via v3-live.ts:6701 when the frontier exceeds maxDependencies.",
+			"owner": "D.110c-0c1f5b0b record maintainer",
+			"disposition": "defer with reason — the change is confined to operations that were already Node-reserved controls, which the design crash matrix ('control vertex in close graph → excluded from the application fold', unprofiled) and review obligation 6 ('legacy behavior unchanged unless the operation was already Node-reserved') explicitly carve out; direction is fail-closed and the parent's delivery of a reserved action to the application sink/fold was arguably defective. Record the deliberate unprofiled control handling in the slice record so the 'creator-trusted-v1 byte-for-byte' stop rule is read with this sanctioned exception."
+		},
+		{
+			"title": "Terminal/old-incarnation suppression enforced only in the readRebaseOutbox caller, not in the classifier",
+			"evidence": "packages/node/src/v3-live.ts:4805-4814 (classifyPlaneVertex hard-excludes only 'current' and would label an authenticated terminal/old-incarnation row 'displaced'); suppression exists solely at v3-live.ts:6892-6901 in readRebaseOutbox.",
+			"owner": "f5b (creator settlement and recovery integration)",
+			"disposition": "defer with reason — latent, not live: SettlementFrontierContext is module-private and no caller can supply a frontier today (sole entry v3-live.ts:8085 passes none), so the dangerous direction (displaced surfaced as terminal) is unreachable. Fold the class filter into the classifier when f5b threads the verified checkpoint frontier, as already flagged by the in-code comment at v3-live.ts:8638."
+		},
+		{
+			"title": "Settlement frontier context fields validated only structurally, not against an authenticated checkpoint",
+			"evidence": "packages/node/src/v3-live.ts:4868-4877 (validSettlementFrontierContext range-checks admissionEpoch/terminalThrough and pins currentEpoch to the authenticated payload epoch, but does not bind them to checkpoint bytes).",
+			"owner": "f5b0c/f5b",
+			"disposition": "defer with reason — this is the explicitly named future threading work; today the context is unsuppliable by any public caller, and without it the Node path makes no terminal/old-incarnation claim (verified at v3-live.ts:8078-8088, :8634-8640). The GREEN README represents this accurately and does not claim completion."
+		},
+		{
+			"title": "creator-transition-advance.ts rejection-reason surface changed and the file is not named in the f5b0b slice list",
+			"evidence": "production.diff lines 136-164: non-object input/proposed and non-null-non-object predecessor previously returned SETTLEMENT_ADVANCE_INVALID, now return SETTLEMENT_ADVANCE_SHAPE_INVALID after the Reflect.get→exact-key-capture refactor in packages/node/src/internal/creator-transition-advance.ts.",
+			"owner": "D.110c-0c1f5b0b record maintainer",
+			"disposition": "defer with reason — the refactor is stricter and fail-closed (prototype-pollution-resistant exact-key capture) and satisfies obligation 1; the reason-string delta is observable only to consumers branching on it. Note the file and the reason change in the slice record rather than reverting."
+		},
+		{
+			"title": "Replacement planEffect seam is capability-based, not caller-authenticated; publishTerminalIssue silently drops planEffect",
+			"evidence": "packages/node/src/v3-live.ts:6194-6212 (capture accepts a 3-key shape with planEffect on the same public issueLocal), :6260-6262 (profile gate is the only enforcement), :6638-6642 (reserved-action guard), :7389 (publishTerminalIssue runs capture but calls issueOneVertex without the planEffect argument, silently discarding it).",
+			"owner": "f5b0c (room integration)",
+			"disposition": "defer with reason — under the settlement profile the room is the intended replacement issuer (design step 6), so capability-based access matches the design and V3LocalIssueInput plus the room public contract are byte-unchanged; the silent drop in publishTerminalIssue applies no effect and signals nothing falsely. Reject or assert planEffect in publishTerminalIssue when f5b0c wires the room path."
+		},
+		{
+			"title": "Retained GREEN set omits other consumers of the modified shared fixture live-snapshot.ts",
+			"evidence": "red.diff modifies tests/fixtures/phase-4b-v3/live-snapshot.ts (readLineage now returns nextAuthorSequence; installGenesis idempotent on second call; additive settlement store methods), but the retained 87/87 set covers only phase-3a1b/3g/3h/5e/f5b0a/f5b0s — not phase-4b/4c/e5-01/phase-6a suites that also consume it.",
+			"owner": "f5b0c retained gate",
+			"disposition": "defer with reason — static analysis shows the changes are behavior-preserving for single-recovery flows (fresh journalStore per recover at live-snapshot.ts:309; phase-4b asserts transactIssue is never called), but run the omitted consumer suites in the next slice's retained gate to convert analysis into evidence."
+		},
+		{
+			"title": "Corrective RED de1eed2a loosened one assertion",
+			"evidence": "git show de1eed2a: tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts relaxed expect(durable?.planEffect).toEqual({kind:'fence'}) to expect(durable).not.toBeNull(), compensated by stronger restart verification (recomputed domain digest, strict Ed25519 via pre-existing @noble/curves devDependency, decoded preimage scope/sequence, exact fence shape).",
+			"owner": "D.110c-0c1f5b0b",
+			"disposition": "reject with reason — the loosening matches the accepted f5b0s store contract (packages/issuance-store/src/contract.ts:269-275 treats planEffect as transaction command metadata, not a stored field) and the compensating checks are strictly stronger; the correction was documented honestly in the immutable RED roots."
+		},
+		{
+			"title": "Inherited Node typecheck exit-2 equivalence claim is narrative-only in the evidence root",
+			"evidence": ".logs/d110c-0c1f5b0b-green-93585bf3/commands.md:62-75 asserts identical exit-2 categories at parent and GREEN, but no captured tsc output is stored in the evidence root.",
+			"owner": "D.110c-0c1f5b0b evidence",
+			"disposition": "defer with reason — plausibility is strong (GREEN touched only v3-live.ts, creator-transition-advance.ts, the new 3-line re-export, package exports and the Vite alias; the named error categories — worker-host rootDir, WebRTC route .emit, compact-history config union — live in untouched files) and protocol-v3 build/typecheck/public smoke passed with captured evidence; optionally attach the typecheck logs retroactively."
+		}
+	],
+	"red_causal": true,
+	"green_closes_red": true,
+	"scope_preserved": true,
+	"evidence_valid": true,
+	"summary": "PASS. RED was genuinely causal: all three RED commits plus evidence commits touched only tests/fixtures and .logs (verified per-commit), the shared-fixture edits are additive/opt-in and behavior-preserving for retained suites, and the 27 focused tests map 1:1 to the causal matrix as 6 controls passing and 21 product-behavior assertion failures (no import/fixture/setup errors); the two corrective REDs were documented expectation/portability fixes, not product edits. GREEN closes the intended reason: the byte-identical test file passes 27/27 and the retained set 87/87 with hash-verified manifests, GPG-verified signed custody chain, and detached-worktree reproduction. Deep inspection verified: fail-closed legacy fence ingress before journal/graph/reservation/ACL/projection/sink/accounting (v3-live.ts:3904-3907); replacement planEffect confined to settlement-profile non-reserved actions with V3LocalIssueInput and the room contract unchanged; graph split keeps controls in close/history/charge/frontier custody while excluding them from the application fold; any-anchor older-row authentication checks canonical bytes, registered digest, signature, object, author, sequence, epoch, dependencies and operation via the unchanged verifier, with terminal/old-incarnation claims unreachable without a validated frontier context that no current caller can supply (fail direction is safe — over-surfacing as displaced or clean rejection, never false terminal); the protocol-v3 internal subpath re-exports the unchanged verifier with an exactly-scoped Vite alias and no root leak (12-symbol public set retained, smoke guard intact). Scope preserved: exactly the 5 declared paths, no wire/protobuf/dependency/crypto/threshold/room/pruning/creator-close/codec/issuance-store change, no stop rule fired; the only legacy-visible delta concerns already Node-reserved join/causalJoin control handling, which the design and review obligation 6 explicitly carve out (recorded as P2). Fence-issuer, strict-input and completeRebaseSource obligations rest on the verified 27/27 causal tests plus corroborating code citations (issueAuthorFence refusals at v3-live.ts:6584-6595, fenceSequence===authorSequence binding, outcome-unknown halt; exact-key capture in creator-transition-advance.ts; profile-gated completion gate at v3-live.ts:7127-7129) rather than a dedicated deep pass, as two delegated workstreams were interrupted; no contradictory evidence exists and their RED failures were product-causal. Eight nonblocking P2s recorded with owners (chiefly f5b0c/f5b) and dispositions."
+}

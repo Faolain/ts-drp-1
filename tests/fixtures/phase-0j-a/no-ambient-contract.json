@@ -1,0 +1,1341 @@
+{
+	"ruleId": "drp/no-ambient-in-reducer",
+	"messages": {
+		"ambientAccess": "Ambient or unresolved identifier '{{name}}' is forbidden in a consensus reducer module.",
+		"ambientAlias": "Alias '{{name}}' reaches forbidden ambient state in a consensus reducer module.",
+		"randomness": "Ambient randomness '{{name}}' is forbidden in a consensus reducer module.",
+		"asyncSyntax": "Async functions and await are forbidden in a consensus reducer module.",
+		"promiseUsage": "Promise and thenable usage are forbidden in a consensus reducer module.",
+		"moduleImport": "Static and dynamic imports are forbidden in a consensus reducer module.",
+		"dynamicCode": "Dynamic code evaluation is forbidden in a consensus reducer module.",
+		"moduleMutation": "Module-scoped mutable state is forbidden in a consensus reducer module.",
+		"mutableCapture": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+	},
+	"mutantControls": {
+		"fail-open-or-no-op-wiring": ["date-time", "unresolved-free-identifier"],
+		"filename-only": ["exact-artifact-date-not-source-only", "whole-module-not-legacy-name-inference"],
+		"source-only-not-exact-artifact": ["exact-artifact-date-not-source-only"],
+		"static-reexport-linkage": [
+			"export-named-from-source",
+			"export-all-from-source",
+			"type-reexport-from-source",
+			"ordinary-local-export"
+		],
+		"import-meta-fail-open": ["import-meta-module-surface"],
+		"type-position-confusion": [
+			"type-only-ambient-names",
+			"function-local-as-const",
+			"module-as-const-captured-object",
+			"date-time",
+			"promise-constructor"
+		],
+		"whole-Math-ban": ["math-random", "deterministic-math-members"],
+		"Math-random-only": ["crypto-randomness"],
+		"ambient-name-without-scope": [
+			"math-random",
+			"crypto-randomness",
+			"shadowed-math-random",
+			"local-crypto-get-random-values"
+		],
+		"legacy-name-inference": [
+			"whole-module-not-legacy-name-inference",
+			"legacy-method-names-are-inert",
+			"computed-drp-property-is-inert",
+			"prototype-property-read-is-inert"
+		],
+		"partial-global-alias": [
+			"global-this-computed-alias",
+			"window-destructured-alias",
+			"self-computed-alias",
+			"global-computed-alias"
+		],
+		"shallow-pattern-alias": [
+			"global-this-nested-object-pattern",
+			"window-nested-object-array-pattern",
+			"self-nested-array-pattern",
+			"global-nested-array-object-pattern",
+			"local-nested-destructuring"
+		],
+		"ambient-declaration-smuggling": [
+			"module-ambient-declare-const",
+			"module-ambient-declare-function",
+			"type-only-ambient-names",
+			"pure-whole-typescript-source"
+		],
+		"for-await-gap": ["top-level-for-await-local-sync-iterable"],
+		"initializer-literal-only": [
+			"module-as-const-captured-object",
+			"captured-call-expression",
+			"captured-new-expression"
+		],
+		"mutable-destructure-propagation": [
+			"mutable-destructure-object-and-nested",
+			"mutable-destructure-rest-and-default",
+			"mutable-destructure-array-element",
+			"mutable-destructure-direct-escape",
+			"mutable-destructure-chained-alias",
+			"local-nested-destructuring"
+		],
+		"satisfies-initializer-unwrapping": [
+			"mutable-satisfies-capture",
+			"local-satisfies-expression",
+			"module-as-const-captured-object"
+		],
+		"module-property-write-gap": [
+			"module-function-property-write",
+			"module-class-property-write",
+			"module-object-property-write",
+			"nested-function-declaration-property-write",
+			"nested-class-prototype-property-write",
+			"nested-arrow-function-property-write",
+			"helper-mediated-object-mutation"
+		],
+		"write-target-shape-gap": [
+			"module-write-for-targets",
+			"module-write-assignment-patterns",
+			"module-write-ts-wrappers",
+			"local-write-shapes"
+		],
+		"write-target-expression-laundering": [
+			"module-write-sequence-expression-targets",
+			"module-write-conditional-expression-targets",
+			"module-write-logical-expression-targets",
+			"expression-target-pure-reads",
+			"expression-target-local-writes"
+		],
+		"member-expression-projection": ["member-projection-mutable", "member-projection-scalars"],
+		"expression-result-shape": ["expression-result-mutable", "expression-result-scalars"],
+		"inline-static-class-state": ["inline-static-class-state", "class-local-state-control"],
+		"class-field-module-capture": ["class-field-module-capture", "class-field-instance-owned"],
+		"stateful-regexp-capture": ["stateful-regexp-capture", "stateless-regexp-control"],
+		"tagged-template-result": ["tagged-template-capture", "untagged-template-scalar"],
+		"static-auto-accessor-state": ["static-auto-accessor-state", "instance-auto-accessor-control"],
+		"static-block-state": ["static-block-state"],
+		"module-callable-binding-write": [
+			"module-function-class-direct-write-operators",
+			"module-function-class-direct-write-patterns",
+			"ordinary-function-class-binding-reads",
+			"function-local-binding-writes"
+		],
+		"assignment-result-write-base": [
+			"assignment-result-module-binding-write-base",
+			"assignment-result-local-write-base",
+			"module-write-sequence-expression-targets"
+		],
+		"shallow-module-state": [
+			"module-assignment",
+			"module-update",
+			"module-delete",
+			"helper-mediated-object-mutation",
+			"captured-mutable-collection",
+			"host-intrinsic-mutation"
+		]
+	},
+	"cases": [
+		{
+			"id": "pure-whole-typescript-source",
+			"kind": "source",
+			"fixture": "whole-module-pure.ts",
+			"filename": "designated/neutral-authoring-module.ts",
+			"diagnostics": []
+		},
+		{
+			"id": "pure-exact-emitted-artifact",
+			"kind": "artifact",
+			"fixture": "exact-emitted-pure.mjs",
+			"filename": "designated/neutral-deployable-module.mjs",
+			"diagnostics": []
+		},
+		{
+			"id": "exact-artifact-date-not-source-only",
+			"kind": "artifact",
+			"fixture": "exact-emitted-date.mjs",
+			"filename": "designated/neutral-deployable-module.mjs",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'Date' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "date-time",
+			"kind": "source",
+			"filename": "designated/clock.ts",
+			"text": "export function value() { return Date.now(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'Date' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "math-random",
+			"kind": "source",
+			"filename": "designated/arithmetic.ts",
+			"text": "export function value() { return Math.random(); }",
+			"diagnostics": [
+				{
+					"messageId": "randomness",
+					"message": "Ambient randomness 'Math.random' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "deterministic-math-members",
+			"kind": "artifact",
+			"filename": "designated/arithmetic.mjs",
+			"text": "export function value(left, right) { return Math.fround(Math.imul(left, right)); }",
+			"diagnostics": []
+		},
+		{
+			"id": "crypto-randomness",
+			"kind": "artifact",
+			"filename": "designated/entropy.mjs",
+			"text": "export function value(bytes) { return crypto.getRandomValues(bytes); }",
+			"diagnostics": [
+				{
+					"messageId": "randomness",
+					"message": "Ambient randomness 'crypto.getRandomValues' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "async-function",
+			"kind": "source",
+			"filename": "designated/calculation.ts",
+			"text": "export async function value() { return 1; }",
+			"diagnostics": [
+				{
+					"messageId": "asyncSyntax",
+					"message": "Async functions and await are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "await-syntax",
+			"kind": "artifact",
+			"filename": "designated/calculation.mjs",
+			"text": "export async function value(input) { return await input; }",
+			"diagnostics": [
+				{
+					"messageId": "asyncSyntax",
+					"message": "Async functions and await are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "promise-constructor",
+			"kind": "source",
+			"filename": "designated/result.ts",
+			"text": "export function value() { return Promise.resolve(1); }",
+			"diagnostics": [
+				{
+					"messageId": "promiseUsage",
+					"message": "Promise and thenable usage are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "thenable-member",
+			"kind": "artifact",
+			"filename": "designated/result.mjs",
+			"text": "export function value(input) { return input.then((item) => item); }",
+			"diagnostics": [
+				{
+					"messageId": "promiseUsage",
+					"message": "Promise and thenable usage are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "timers-and-performance",
+			"kind": "artifact",
+			"filename": "designated/scheduling.mjs",
+			"text": "export function value(task) { setTimeout(task, 0); setInterval(task, 1); queueMicrotask(task); requestAnimationFrame(task); return performance.now(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'setTimeout' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'setInterval' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'queueMicrotask' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'requestAnimationFrame' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'performance' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "io-network-storage",
+			"kind": "artifact",
+			"filename": "designated/data.mjs",
+			"text": "export function value(url) { console.log(url); fetch(url); new XMLHttpRequest(); new WebSocket(url); localStorage.getItem('x'); indexedDB.open('x'); return caches.has('x'); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'console' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'fetch' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'XMLHttpRequest' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'WebSocket' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'localStorage' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'indexedDB' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'caches' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "dom-worker-process-module",
+			"kind": "artifact",
+			"filename": "designated/host.mjs",
+			"text": "export function value() { document.createElement('p'); navigator.sendBeacon('/'); new Worker('w.js'); new SharedWorker('w.js'); process.cwd(); module.require('x'); return require('y'); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'document' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'navigator' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'Worker' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'SharedWorker' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'process' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'module' is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'require' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "eval-and-function",
+			"kind": "artifact",
+			"filename": "designated/code.mjs",
+			"text": "export function value(source) { eval(source); return Function(source)(); }",
+			"diagnostics": [
+				{
+					"messageId": "dynamicCode",
+					"message": "Dynamic code evaluation is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "dynamicCode",
+					"message": "Dynamic code evaluation is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "static-import",
+			"kind": "artifact",
+			"filename": "designated/linked.mjs",
+			"text": "import value from './dependency.mjs'; export { value };",
+			"diagnostics": [
+				{
+					"messageId": "moduleImport",
+					"message": "Static and dynamic imports are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "dynamic-import",
+			"kind": "artifact",
+			"filename": "designated/linked.mjs",
+			"text": "export function value() { return import('./dependency.mjs'); }",
+			"diagnostics": [
+				{
+					"messageId": "moduleImport",
+					"message": "Static and dynamic imports are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "global-this-computed-alias",
+			"kind": "artifact",
+			"filename": "designated/alias-a.mjs",
+			"text": "const host = globalThis; const clock = host['Date']; export function value() { return clock.now(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAlias",
+					"message": "Alias 'clock' reaches forbidden ambient state in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "window-destructured-alias",
+			"kind": "artifact",
+			"filename": "designated/alias-b.mjs",
+			"text": "const { Date: clock } = window; export function value() { return clock.now(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAlias",
+					"message": "Alias 'clock' reaches forbidden ambient state in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "self-computed-alias",
+			"kind": "artifact",
+			"filename": "designated/alias-c.mjs",
+			"text": "const host = self; const schedule = host['setTimeout']; export function value(task) { return schedule(task, 0); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAlias",
+					"message": "Alias 'schedule' reaches forbidden ambient state in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "global-computed-alias",
+			"kind": "artifact",
+			"filename": "designated/alias-d.mjs",
+			"text": "const proc = global['process']; export function value() { return proc.cwd(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAlias",
+					"message": "Alias 'proc' reaches forbidden ambient state in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "unresolved-free-identifier",
+			"kind": "source",
+			"filename": "designated/free.ts",
+			"text": "export function value() { return mysteryEntropy(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'mysteryEntropy' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-non-const",
+			"kind": "source",
+			"filename": "designated/state-a.ts",
+			"text": "let count = 0; export function value() { return count; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-assignment",
+			"kind": "source",
+			"filename": "designated/state-b.ts",
+			"text": "let count = 0; export function value() { count = 1; return count; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-update",
+			"kind": "artifact",
+			"filename": "designated/state-c.mjs",
+			"text": "let count = 0; export function value() { count++; return count; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-delete",
+			"kind": "artifact",
+			"filename": "designated/state-d.mjs",
+			"text": "const record = { value: 1 }; export function value() { delete record.value; return 0; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "host-intrinsic-mutation",
+			"kind": "artifact",
+			"filename": "designated/state-host.mjs",
+			"text": "Object.prototype.phase0jMutation = 1; export function value(input) { return input; }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'Object' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "helper-mediated-object-mutation",
+			"kind": "source",
+			"filename": "designated/state-e.ts",
+			"text": "const cache = { value: 0 }; function write(value: number) { cache.value = value; } export function reduce(value: number) { write(value); return cache.value; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "captured-mutable-collection",
+			"kind": "artifact",
+			"filename": "designated/state-f.mjs",
+			"text": "const seen = []; function remember(value) { seen.push(value); } export function reduce(value) { remember(value); return seen.length; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "export-named-from-source",
+			"kind": "artifact",
+			"filename": "designated/reexport-named.mjs",
+			"text": "export { value } from './dependency.mjs';",
+			"diagnostics": [
+				{
+					"messageId": "moduleImport",
+					"message": "Static and dynamic imports are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "export-all-from-source",
+			"kind": "artifact",
+			"filename": "designated/reexport-all.mjs",
+			"text": "export * from './dependency.mjs';",
+			"diagnostics": [
+				{
+					"messageId": "moduleImport",
+					"message": "Static and dynamic imports are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "type-reexport-from-source",
+			"kind": "source",
+			"filename": "designated/reexport-type.ts",
+			"text": "export type { Value } from './dependency.js';",
+			"diagnostics": [
+				{
+					"messageId": "moduleImport",
+					"message": "Static and dynamic imports are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "ordinary-local-export",
+			"kind": "source",
+			"filename": "designated/local-export.ts",
+			"text": "const value = 1; export { value };",
+			"diagnostics": []
+		},
+		{
+			"id": "import-meta-module-surface",
+			"kind": "artifact",
+			"filename": "designated/import-meta.mjs",
+			"text": "export function value() { return import.meta.url; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleImport",
+					"message": "Static and dynamic imports are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "type-only-ambient-names",
+			"kind": "source",
+			"filename": "designated/type-only.ts",
+			"text": "type AmbientTypes = { readonly createdAt: Date; readonly pending: Promise<number>; readonly values: Record<string, number> }; export function count(input: AmbientTypes): number { return input.values.total; }",
+			"diagnostics": []
+		},
+		{
+			"id": "function-local-as-const",
+			"kind": "source",
+			"filename": "designated/local-as-const.ts",
+			"text": "export function value() { const result = { value: 1 } as const; return result.value; }",
+			"diagnostics": []
+		},
+		{
+			"id": "module-as-const-captured-object",
+			"kind": "source",
+			"filename": "designated/module-as-const.ts",
+			"text": "const cache = { value: 1 } as const; export function value() { return cache.value; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-ambient-declare-const",
+			"kind": "source",
+			"filename": "designated/ambient-declare-const.ts",
+			"text": "declare const runtimeClock: { now(): number }; export function value() { return runtimeClock.now(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'runtimeClock' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-ambient-declare-function",
+			"kind": "source",
+			"filename": "designated/ambient-declare-function.ts",
+			"text": "declare function runtimeEntropy(): number; export function value() { return runtimeEntropy(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'runtimeEntropy' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "global-this-nested-object-pattern",
+			"kind": "artifact",
+			"filename": "designated/nested-alias-global-this.mjs",
+			"text": "const { nested: { clock } } = globalThis; export function value() { return clock.now(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAlias",
+					"message": "Alias 'clock' reaches forbidden ambient state in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "window-nested-object-array-pattern",
+			"kind": "artifact",
+			"filename": "designated/nested-alias-window.mjs",
+			"text": "const { pair: [, schedule] } = window; export function value(task) { return schedule(task, 0); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAlias",
+					"message": "Alias 'schedule' reaches forbidden ambient state in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "self-nested-array-pattern",
+			"kind": "artifact",
+			"filename": "designated/nested-alias-self.mjs",
+			"text": "const [[clock]] = self; export function value() { return clock.now(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAlias",
+					"message": "Alias 'clock' reaches forbidden ambient state in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "global-nested-array-object-pattern",
+			"kind": "artifact",
+			"filename": "designated/nested-alias-global.mjs",
+			"text": "const [{ process: proc }] = global; export function value() { return proc.cwd(); }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAlias",
+					"message": "Alias 'proc' reaches forbidden ambient state in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "local-nested-destructuring",
+			"kind": "artifact",
+			"filename": "designated/local-destructuring.mjs",
+			"text": "const local = { nested: { value: 1 }, pair: [2, 3] }; const { nested: { value }, pair: [, second] } = local; export function result() { return value + second; }",
+			"diagnostics": []
+		},
+		{
+			"id": "shadowed-math-random",
+			"kind": "source",
+			"filename": "designated/shadowed-math.ts",
+			"text": "export function value(Math: { random(): number }) { return Math.random(); }",
+			"diagnostics": []
+		},
+		{
+			"id": "local-crypto-get-random-values",
+			"kind": "source",
+			"filename": "designated/local-crypto.ts",
+			"text": "export function value(input: number) { const crypto = { getRandomValues(value: number) { return value; } }; return crypto.getRandomValues(input); }",
+			"diagnostics": []
+		},
+		{
+			"id": "top-level-for-await-local-sync-iterable",
+			"kind": "artifact",
+			"filename": "designated/top-level-for-await.mjs",
+			"text": "const values = [1, 2]; for await (const value of values) { void value; } export const total = values.length;",
+			"diagnostics": [
+				{
+					"messageId": "asyncSyntax",
+					"message": "Async functions and await are forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "captured-call-expression",
+			"kind": "artifact",
+			"filename": "designated/captured-call.mjs",
+			"text": "const cache = (() => ({ value: 0 }))(); export function value() { return cache.value; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "captured-new-expression",
+			"kind": "artifact",
+			"filename": "designated/captured-new.mjs",
+			"text": "class Box { value = 0; } const cache = new Box(); export function value() { return cache.value; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-function-property-write",
+			"kind": "artifact",
+			"filename": "designated/function-property-write.mjs",
+			"text": "function helper() { return 1; } helper.cache = 1; export const value = helper.cache;",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-class-property-write",
+			"kind": "artifact",
+			"filename": "designated/class-property-write.mjs",
+			"text": "class LocalValue {} LocalValue.cache = 1; export const value = LocalValue.cache;",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-object-property-write",
+			"kind": "artifact",
+			"filename": "designated/object-property-write.mjs",
+			"text": "const cache = { value: 0 }; cache.value = 1; export const value = cache.value;",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "nested-function-declaration-property-write",
+			"kind": "artifact",
+			"filename": "designated/nested-function-property-write.mjs",
+			"text": "function accumulator() { return 0; } function mutate() { accumulator.total = (accumulator.total ?? 0) + 1; } export function reduce() { mutate(); return accumulator.total; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "nested-class-prototype-property-write",
+			"kind": "artifact",
+			"filename": "designated/nested-class-prototype-write.mjs",
+			"text": "class Registry {} function mutate() { Registry.prototype.total = 1; } export function reduce() { mutate(); return Registry.prototype.total; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "nested-arrow-function-property-write",
+			"kind": "source",
+			"filename": "designated/nested-arrow-property-write.ts",
+			"text": "const calculate = (): number => 1; export function reduce(): number { calculate.total = 1; return calculate.total; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "mutable-destructure-object-and-nested",
+			"kind": "artifact",
+			"filename": "designated/mutable-destructure-object.mjs",
+			"text": "const cache = { values: [], inner: { bucket: [] } }; const { values } = cache; const { inner: { bucket: renamed } } = cache; export function reduce(value) { values.push(value); renamed.push(value); return values.length + renamed.length; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "mutable-destructure-rest-and-default",
+			"kind": "artifact",
+			"filename": "designated/mutable-destructure-rest-default.mjs",
+			"text": "const cache = { values: [], spare: [] }; const { values = [], ...rest } = cache; export function reduce(value) { values.push(value); rest.spare.push(value); return values.length + rest.spare.length; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "mutable-destructure-array-element",
+			"kind": "artifact",
+			"filename": "designated/mutable-destructure-array.mjs",
+			"text": "const buckets = [[]]; const [first] = buckets; export function reduce(value) { first.push(value); return first.length; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "mutable-destructure-direct-escape",
+			"kind": "artifact",
+			"filename": "designated/mutable-destructure-direct-escape.mjs",
+			"text": "const cache = { values: [], metadata: {} }; const { values } = cache; export function reduce() { return values; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "mutable-destructure-chained-alias",
+			"kind": "artifact",
+			"filename": "designated/mutable-destructure-chained-alias.mjs",
+			"text": "const cache = { values: [] }; const { values } = cache; const alias = values; export function reduce(value) { alias.push(value); return alias.length; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "mutable-satisfies-capture",
+			"kind": "source",
+			"filename": "designated/mutable-satisfies.ts",
+			"text": "const cache = { items: [] as number[] } satisfies { items: number[] }; export function reduce(value: number): number { cache.items.push(value); return cache.items.length; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "local-satisfies-expression",
+			"kind": "source",
+			"filename": "designated/local-satisfies.ts",
+			"text": "export function value(input: number): number { const result = { value: input } satisfies { value: number }; return result.value; }",
+			"diagnostics": []
+		},
+		{
+			"id": "module-write-for-targets",
+			"kind": "artifact",
+			"filename": "designated/module-write-for-targets.mjs",
+			"text": "function helper() { return 0; } class Registry {} export function reduce(values, keys) { for (helper.count of values) {} for (Registry.count in keys) {} return helper.count + Registry.count; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-write-assignment-patterns",
+			"kind": "artifact",
+			"filename": "designated/module-write-assignment-patterns.mjs",
+			"text": "function objectTarget() { return 0; } class ArrayTarget {} export function reduce(objectInput, arrayInput) { ({ count: objectTarget.count } = objectInput); [ArrayTarget.count] = arrayInput; return objectTarget.count + ArrayTarget.count; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-write-ts-wrappers",
+			"kind": "source",
+			"filename": "designated/module-write-ts-wrappers.ts",
+			"text": "interface CallableWithCount { (): number; count: number } function asTarget() { return 0; } class NonNullTarget {} function angleTarget() { return 0; } class SatisfiesTarget {} export function reduce(input: number): number { (asTarget as CallableWithCount).count = input; NonNullTarget!.count = input; (<CallableWithCount>angleTarget).count = input; (SatisfiesTarget satisfies { count: number }).count = input; return input; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "local-write-shapes",
+			"kind": "source",
+			"filename": "designated/local-write-shapes.ts",
+			"text": "interface LocalValue { count: number } export function reduce(values: number[], keys: Record<string, number>): number { const local = { count: 0 }; for (local.count of values) {} for (local.count in keys) {} ({ count: local.count } = { count: 1 }); [local.count] = [2]; (local as LocalValue).count = 3; local!.count = 4; return local.count; }",
+			"diagnostics": []
+		},
+		{
+			"id": "module-write-sequence-expression-targets",
+			"kind": "artifact",
+			"filename": "designated/module-write-sequence-expression-targets.mjs",
+			"text": "function AssignTarget() { return 0; } class UpdateTarget {} function DeleteTarget() { return 0; } class ForTarget {} export function reduce(values) { (0, AssignTarget).count = 1; (0, UpdateTarget).deep.count++; delete (false, DeleteTarget).discarded; for ((null, ForTarget).current of values) {} return AssignTarget.count + UpdateTarget.deep.count + ForTarget.current; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-write-conditional-expression-targets",
+			"kind": "source",
+			"filename": "designated/module-write-conditional-expression-targets.ts",
+			"text": "class AssignTarget {} class DeepTarget {} class ForTarget {} export function reduce(input: number, keys: Record<string, number>, flag: boolean): number { (flag ? AssignTarget : AssignTarget).count = input; (flag ? DeepTarget : DeepTarget).nested.count++; for ((flag ? ForTarget : ForTarget).current in keys) {} return input; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-write-logical-expression-targets",
+			"kind": "artifact",
+			"filename": "designated/module-write-logical-expression-targets.mjs",
+			"text": "function AssignTarget() { return 0; } class DeleteTarget {} function ForTarget() { return 0; } export function reduce(input, values) { (AssignTarget || AssignTarget).count ??= input; delete (DeleteTarget && DeleteTarget).discarded; for ((ForTarget ?? ForTarget).current of values) {} return AssignTarget.count + ForTarget.current; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "expression-target-pure-reads",
+			"kind": "artifact",
+			"filename": "designated/expression-target-pure-reads.mjs",
+			"text": "export function reduce(left, right, flag) { return (left, right).count + (flag ? left : right).count + (left || right).count + (left && right).count + (left ?? right).count; }",
+			"diagnostics": []
+		},
+		{
+			"id": "expression-target-local-writes",
+			"kind": "source",
+			"filename": "designated/expression-target-local-writes.ts",
+			"text": "export function reduce(values: number[], keys: Record<string, number>, flag: boolean): number { const first = { count: 0, deep: { count: 0 }, stale: true, current: 0 }; const second = { count: 0, deep: { count: 0 }, stale: true, current: 0 }; (0, first).count = 1; (flag ? first : second).deep.count++; delete (first || second).stale; for ((first ?? second).current of values) {} for ((first && second).current in keys) {} return first.count + second.count; }",
+			"diagnostics": []
+		},
+		{
+			"id": "member-projection-mutable",
+			"kind": "artifact",
+			"filename": "designated/member-projection-mutable.mjs",
+			"text": "const store = { nested: { items: [] }, lists: [[]] }; const nested = store.nested; const computed = store['nested']; const indexed = store.lists[0]; export function reduce(value) { nested.items.push(value); computed.items.push(value); indexed.push(value); return { nested, computed, indexed }; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "member-projection-scalars",
+			"kind": "artifact",
+			"filename": "designated/member-projection-scalars.mjs",
+			"text": "const store = { nested: { count: 1 }, values: [2] }; const count = store.nested.count; const first = store.values[0]; export function value() { return count + first; }",
+			"diagnostics": []
+		},
+		{
+			"id": "expression-result-mutable",
+			"kind": "artifact",
+			"filename": "designated/expression-result-mutable.mjs",
+			"text": "const conditional = true ? { items: [] } : { items: [] }; const logical = null ?? { items: [] }; const sequence = (0, []); export function reduce(value) { conditional.items.push(value); logical.items.push(value); sequence.push(value); return conditional.items.length + logical.items.length + sequence.length; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "expression-result-scalars",
+			"kind": "artifact",
+			"filename": "designated/expression-result-scalars.mjs",
+			"text": "const conditional = true ? 1 : 2; const logical = false || 2; const sequence = (0, 3); export function value() { return conditional + logical + sequence; }",
+			"diagnostics": []
+		},
+		{
+			"id": "inline-static-class-state",
+			"kind": "artifact",
+			"filename": "designated/inline-static-class-state.mjs",
+			"text": "class Registry { static items = []; } const Counter = class { static count = 0; static increment() { this.count++; return this.count; } }; export function reduce(value) { Registry.items.push(value); return Registry.items.length + Counter.increment(); }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "class-local-state-control",
+			"kind": "artifact",
+			"filename": "designated/class-local-state-control.mjs",
+			"text": "class Calculator { static add(left, right) { return left + right; } items = []; add(value) { this.items.push(value); return this.items.length; } } export function reduce(value) { return Calculator.add(new Calculator().add(value), value); }",
+			"diagnostics": []
+		},
+		{
+			"id": "class-field-module-capture",
+			"kind": "artifact",
+			"filename": "designated/class-field-module-capture.mjs",
+			"text": "const shared = { items: [] }; class Holder { state = shared; push(value) { this.state.items.push(value); return this.state; } } export function reduce(value) { return new Holder().push(value); }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "class-field-instance-owned",
+			"kind": "artifact",
+			"filename": "designated/class-field-instance-owned.mjs",
+			"text": "class Holder { state = { items: [] }; push(value) { this.state.items.push(value); return this.state; } } export function reduce(value) { return new Holder().push(value); }",
+			"diagnostics": []
+		},
+		{
+			"id": "stateful-regexp-capture",
+			"kind": "artifact",
+			"filename": "designated/stateful-regexp-capture.mjs",
+			"text": "const globalPattern = /a/g; const stickyPattern = /b/y; export function reduce(text) { return globalPattern.test(text) || stickyPattern.test(text); }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "stateless-regexp-control",
+			"kind": "artifact",
+			"filename": "designated/stateless-regexp-control.mjs",
+			"text": "const pattern = /a/i; export function value(text) { return pattern.test(text); }",
+			"diagnostics": []
+		},
+		{
+			"id": "tagged-template-capture",
+			"kind": "artifact",
+			"filename": "designated/tagged-template-capture.mjs",
+			"text": "function tag() { return { items: [] }; } const pool = { tag() { return { items: [] }; } }; const direct = tag`x`; const member = pool.tag`y`; export function reduce(value) { direct.items.push(value); member.items.push(value); return direct.items.length + member.items.length; }",
+			"diagnostics": [
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "mutableCapture",
+					"message": "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "untagged-template-scalar",
+			"kind": "artifact",
+			"filename": "designated/untagged-template-scalar.mjs",
+			"text": "const value = `hello ${1}`; export function read() { return value; }",
+			"diagnostics": []
+		},
+		{
+			"id": "static-auto-accessor-state",
+			"kind": "source",
+			"filename": "designated/static-auto-accessor-state.ts",
+			"text": "class Registry { static accessor items: number[] = []; static accessor count = 0; static add(value: number): number { Registry.items.push(value); this.count++; return this.count; } } export function reduce(value: number): number { return Registry.add(value); }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "instance-auto-accessor-control",
+			"kind": "source",
+			"filename": "designated/instance-auto-accessor-control.ts",
+			"text": "class Holder { static add(left: number, right: number): number { return left + right; } accessor items: number[] = []; push(value: number): number { this.items.push(value); return this.items.length; } } export function reduce(value: number): number { return Holder.add(new Holder().push(value), value); }",
+			"diagnostics": []
+		},
+		{
+			"id": "static-block-state",
+			"kind": "artifact",
+			"filename": "designated/static-block-state.mjs",
+			"text": "class Registry { static { this.items = []; } static { Registry.values = []; } } export function reduce(value) { Registry.items.push(value); Registry.values.push(value); return Registry.items.length + Registry.values.length; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-function-class-direct-write-operators",
+			"kind": "source",
+			"filename": "designated/module-function-class-direct-write-operators.ts",
+			"text": "function AssignedFunction(): number { return 0; } class UpdatedClass {} AssignedFunction = function replacement(): number { return 1; }; export function reduce(): number { UpdatedClass++; return AssignedFunction(); }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "module-function-class-direct-write-patterns",
+			"kind": "artifact",
+			"filename": "designated/module-function-class-direct-write-patterns.mjs",
+			"text": "function ForOfTarget() { return 0; } class ForInTarget {} function ArrayTarget() { return 0; } class ObjectTarget {} function mutate(values, keys, arrayInput, objectInput) { for (ForOfTarget of values) {} for (ForInTarget in keys) {} [ArrayTarget] = arrayInput; ({ item: ObjectTarget } = objectInput); } export function reduce(values, keys, arrayInput, objectInput) { mutate(values, keys, arrayInput, objectInput); return 0; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "ordinary-function-class-binding-reads",
+			"kind": "artifact",
+			"filename": "designated/ordinary-function-class-binding-reads.mjs",
+			"text": "function helper() { return 1; } class Registry {} const helperAlias = helper; const RegistryAlias = Registry; export function reduce() { return helper() + (helperAlias === helper ? 1 : 0) + (RegistryAlias === Registry ? 1 : 0); }",
+			"diagnostics": []
+		},
+		{
+			"id": "function-local-binding-writes",
+			"kind": "source",
+			"filename": "designated/function-local-binding-writes.ts",
+			"text": "export function reduce(values: unknown[], keys: Record<string, unknown>, pair: [() => number], record: { item: new () => object }): number { function LocalFunction(): number { return 0; } class LocalClass {} LocalFunction = function replacement(): number { return 1; }; LocalClass++; for (LocalFunction of values as Array<() => number>) {} for (LocalClass in keys) {} [LocalFunction] = pair; ({ item: LocalClass } = record); return LocalFunction(); }",
+			"diagnostics": []
+		},
+		{
+			"id": "assignment-result-module-binding-write-base",
+			"kind": "artifact",
+			"filename": "designated/assignment-result-module-binding-write-base.mjs",
+			"text": "class AssignmentBase {} function UpdateBase() { return 0; } export function reduce(value) { let assigned; let updated; (assigned = AssignmentBase).count = value; (updated = UpdateBase).deep.count++; return assigned.count + updated.deep.count; }",
+			"diagnostics": [
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				},
+				{
+					"messageId": "moduleMutation",
+					"message": "Module-scoped mutable state is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "assignment-result-local-write-base",
+			"kind": "artifact",
+			"filename": "designated/assignment-result-local-write-base.mjs",
+			"text": "export function reduce(value) { let selected = { count: 0, deep: { count: 0 } }; const alternate = { count: 0, deep: { count: 0 } }; (selected = alternate).count = value; (selected = alternate).deep.count++; return selected.count + selected.deep.count; }",
+			"diagnostics": []
+		},
+		{
+			"id": "whole-module-not-legacy-name-inference",
+			"kind": "source",
+			"filename": "designated/ordinary-module.ts",
+			"text": "function unrelatedHelper() { return Date.now(); } export class InnocentName { apply(value: number) { return value + unrelatedHelper(); } }",
+			"diagnostics": [
+				{
+					"messageId": "ambientAccess",
+					"message": "Ambient or unresolved identifier 'Date' is forbidden in a consensus reducer module."
+				}
+			]
+		},
+		{
+			"id": "legacy-method-names-are-inert",
+			"kind": "source",
+			"filename": "designated/legacy-shaped.ts",
+			"text": "export class LegacyShape { query_isAdmin(value: number) { return value; } resolveConflicts(value: number) { return value; } toString() { return 'local'; } }",
+			"diagnostics": []
+		},
+		{
+			"id": "computed-drp-property-is-inert",
+			"kind": "artifact",
+			"filename": "designated/legacy-lookup.mjs",
+			"text": "export function lookup(property) { const drp = { constructor: 1, hasOwnProperty: 2 }; return drp[property]; }",
+			"diagnostics": []
+		},
+		{
+			"id": "prototype-method-name-is-inert",
+			"kind": "artifact",
+			"filename": "designated/prototype-shape.mjs",
+			"text": "export class LocalValue { constructor(value) { this.value = value; } hasOwnProperty() { return this.value; } }",
+			"diagnostics": []
+		},
+		{
+			"id": "prototype-property-read-is-inert",
+			"kind": "artifact",
+			"filename": "designated/prototype-lookup.mjs",
+			"text": "export function lookup(localValue) { return localValue.prototype; }",
+			"diagnostics": []
+		}
+	]
+}

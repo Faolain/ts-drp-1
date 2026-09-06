@@ -1,0 +1,18 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": false,
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"types": ["node", "vitest/globals"]
+	},
+	"include": [
+		"../../protocol-v3-freeze-successor-v1-red.test.ts",
+		"./*.ts",
+		"./analyzers/**/*.ts",
+		"./controlled-freeze-successor.mjs",
+		"./temporary-repository-harness.mjs"
+	]
+}

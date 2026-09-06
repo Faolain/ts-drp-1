@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "-e",
+    "const f=require(\"fs\"),p=require(\"path\"),c=require(\"crypto\"),a=require(\"assert/strict\"),d=\".logs/d110c-w0-regression-readiness-7efe33dd\",h=b=>c.createHash(\"sha256\").update(b).digest(\"hex\"),m=f.readFileSync(p.join(d,\"manifest.sha256\"));a.equal(h(m),\"7c50bb00d2160a7f0d4bf48d0713e9ba3cbec81d1c349e544095d6cae01afe10\");const names=[];for(const l of m.toString().trim().split(\"\\n\")){const z=l.match(/^([a-f0-9]{64})\\s+(.+)$/);a.ok(z);const file=z[2].startsWith(\".logs/\")?z[2]:p.join(d,z[2]);a.equal(h(f.readFileSync(file)),z[1],file);names.push(file)}const walk=q=>f.readdirSync(q,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(p.join(q,e.name)):[p.join(q,e.name)]);a.equal(names.length,51);a.equal(new Set(names).size,51);a.deepEqual(walk(d).sort(),[...names,p.join(d,\"manifest.sha256\")].sort());console.log(JSON.stringify({entries:names.length,exactFiles:52,manifestSha256:h(m),allEntryHashesExact:true}));"
+  ],
+  "start": "2026-09-06T11:41:49.239Z"
+}

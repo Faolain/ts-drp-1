@@ -1,0 +1,9 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from '/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/typescript/lib/typescript.js';
+const out=path.dirname(new URL(import.meta.url).pathname),source=fs.readFileSync(path.join(out,'runtime.mjs'),'utf8'),unit=ts.createSourceFile('runtime.mjs',source,ts.ScriptTarget.Latest,true),fn=unit.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='environmentAndPorts'),regexes=[];
+function visit(n){if(n.kind===ts.SyntaxKind.RegularExpressionLiteral)regexes.push(Function('return '+n.getText(unit))());ts.forEachChild(n,visit)}visit(fn);
+const whitespace=regexes.find(r=>r.source==='\\s'),digits=regexes.find(r=>r.source==='^\\d+$'),profilers=regexes.filter(r=>r.source.startsWith('--(?:cpu'));
+if(!whitespace||!digits||profilers.length!==2||JSON.stringify('123\n456 '.trim().split(whitespace).filter(s=>digits.test(s)))!==JSON.stringify(['123','456'])||!profilers.every(r=>['--prof','--prof-process','--cpu-prof','--cpu-prof-dir=/fresh','--heap-prof'].every(s=>r.test(s))&&!r.test('--stack-trace-limit=20')))throw Error('Literal guard predicate');
+const target=fs.readFileSync('/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts','utf8'),validator=fs.readFileSync(path.join(out,'validate-runtime.mjs'),'utf8');if(!target.includes('kind: "F5B_WIDE_DIAGNOSTIC"')||!validator.includes("stdout.includes('F5B_WIDE_DIAGNOSTIC')"))throw Error('Exact marker');
+fs.writeFileSync(path.join(out,'launcher-predicates.json'),JSON.stringify({valid:true,sourceRegexes:regexes.map(r=>r.toString()),numericPidControls:true,profilingFlagControls:true,exactSourceAndValidatorMarker:'F5B_WIDE_DIAGNOSTIC',runtimeExecuted:false},null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({valid:true,numericPidControls:true,profilingFlagControls:true,exactMarker:true}));

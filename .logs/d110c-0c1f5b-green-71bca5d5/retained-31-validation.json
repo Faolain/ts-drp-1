@@ -1,0 +1,115 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 7,
+  "passed": 7,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-31/result.json",
+  "baselineSha256": "e1666ceaef56718e0882f2d5422ffd0051634aec1dafea159ce6283637b57f8b",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED executes independent registry, identity, schema and transaction controls before readiness",
+      "status": "passed",
+      "title": "executes independent registry, identity, schema and transaction controls before readiness",
+      "duration": 10.705667000000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED typechecks and executes the exact bounded n=4 Quint witness",
+      "status": "passed",
+      "title": "typechecks and executes the exact bounded n=4 Quint witness",
+      "duration": 3418.641542,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED [RED readiness] requires the complete four-owner atomic product graph",
+      "status": "passed",
+      "title": "[RED readiness] requires the complete four-owner atomic product graph",
+      "duration": 0.23783300000013696,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED binds a genuine certified roster key to its independent signer ID",
+      "status": "passed",
+      "title": "binds a genuine certified roster key to its independent signer ID",
+      "duration": 128.61799999999994,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes",
+      "status": "passed",
+      "title": "authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes",
+      "duration": 33.82029199999988,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED releases only a detached durable carrier after the exact state-slot-outbox commit",
+      "status": "passed",
+      "title": "releases only a detached durable carrier after the exact state-slot-outbox commit",
+      "duration": 15.824499999999716,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED rejects wrong authority, stale revision and conflicting same-slot bytes without release",
+      "status": "passed",
+      "title": "rejects wrong authority, stale revision and conflicting same-slot bytes without release",
+      "duration": 22.099666999999954,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "8323882a56a79af8f7241b1c74d46963f20151033ac78bcd0684813d51a35b06",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

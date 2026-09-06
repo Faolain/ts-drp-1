@@ -1,0 +1,120 @@
+{
+  "status": "focused W0 implemented and proven; full local acceptance blocked by four required retained failures",
+  "sourceCommitted": false,
+  "evidenceCommitted": false,
+  "sourceCommitWithheldByRoot": true,
+  "baseline": "61ea93f69d055b96bd1e8776480a26f9ef83cfb3",
+  "baselineSignature": "G",
+  "protectedProductionOverlaySha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "currentPatch": "current-source/green-corrected.patch",
+  "currentPatchSha256": "6c002d98eb4764ebe9b153c9e52dba4adac47e48ff31f5134f08b15fa7dddf0a",
+  "sourceHashes": {
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts": "ae458ee7ec3bb031cf9fb05d65dbe95dffb48b08243b9fe7531738821105376b",
+    "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts": "da69a0229a1ffbaea8bcbbf20e99dd9f37baf745c0a097f20e39f327738e3630",
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts": "8108ebe74f1cb31d2508bf0b80ad8ed79a5b79135f6a8e1cde7e6e7d96fe959b"
+  },
+  "originalFailedInvocation": {
+    "path": "focused",
+    "tests": 7,
+    "passed": 6,
+    "failed": 1,
+    "source": "failed-source/green.patch",
+    "sourcePreserved": true,
+    "diagnosedAndCorrectedControlObserver": true
+  },
+  "correctedFocused": {
+    "path": "control-observer-correction/focused",
+    "tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "pending": 0,
+    "exactRoster": true,
+    "quiescent": true
+  },
+  "retained": {
+    "path": "control-observer-correction/retained",
+    "files": 34,
+    "tests": 220,
+    "passed": 216,
+    "failed": 4,
+    "pending": 0,
+    "exactRoster": true,
+    "quiescent": true,
+    "failures": [
+      {
+        "file": "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+        "displayName": "D.110c-0b1 bounded protocol and control boundaries > retires exactly the stale Cut QC and predecessor ACL from the genuine staged closure",
+        "fullName": "D.110c-0b1 bounded protocol and control boundaries retires exactly the stale Cut QC and predecessor ACL from the genuine staged closure",
+        "status": "failed",
+        "failureMessages": [
+          "AssertionError: expected { ok: false, …(1) } to deeply equal { kind: 'successor', ok: true }\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0b1-boundaries.test.ts:157:52\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at runSuite (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runFiles (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1545:3)"
+        ]
+      },
+      {
+        "file": "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+        "displayName": "D.110c-0b1 bounded checkpoint and control-proof GREEN > retires the stale proof pair and predecessor ACL under the bounded advance",
+        "fullName": "D.110c-0b1 bounded checkpoint and control-proof GREEN retires the stale proof pair and predecessor ACL under the bounded advance",
+        "status": "failed",
+        "failureMessages": [
+          "AssertionError: expected { ok: false, …(1) } to deeply equal { kind: 'successor', ok: true }\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts:104:19\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at runSuite (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runFiles (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1545:3)"
+        ]
+      },
+      {
+        "file": "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+        "displayName": "D.110c-0b1 bounded checkpoint and control-proof GREEN > cold reopens the genuine active epoch-two room through the bounded checkpoint owner",
+        "fullName": "D.110c-0b1 bounded checkpoint and control-proof GREEN cold reopens the genuine active epoch-two room through the bounded checkpoint owner",
+        "status": "failed",
+        "failureMessages": [
+          "AssertionError: expected { …(3) } to match object { handle: { epoch: 2 }, …(3) }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts:129:39\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)"
+        ]
+      },
+      {
+        "file": "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+        "displayName": "D.108d1b authenticated peer-local fresh-process issuance RED > fresh Node predecessor recovery enforces one cumulative authenticated future-row skip budget per recovery",
+        "fullName": "D.108d1b authenticated peer-local fresh-process issuance RED fresh Node predecessor recovery enforces one cumulative authenticated future-row skip budget per recovery",
+        "status": "failed",
+        "failureMessages": [
+          "AssertionError: expected { boundedStoreShape: false, …(3) } to deeply equal { boundedStoreShape: true, …(3) }\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts:1146:29\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+        ]
+      }
+    ],
+    "validator": "Use retained/roster-validation.json; original validation.json preserves the literal-m > f title normalization defect."
+  },
+  "frozenRoster": "control-observer-correction/runtime-roster.json",
+  "frozenRosterSha256": "27241e3b5e0ba7bda12026a94da04497010f09bba9aa45330c4e499e3ea81029",
+  "static": {
+    "sourceInputs": 883,
+    "diagnostics": 0,
+    "lintErrors": 0,
+    "unchangedJsdocWarnings": 1,
+    "formatPass": true,
+    "diffPass": true,
+    "sharedDefaultByteEquivalence": true,
+    "correctiveWorkloadByteEquivalence": true
+  },
+  "custody": {
+    "owners": 8,
+    "built": 7,
+    "stashes": 27,
+    "protectedPaths": 86522,
+    "manifestRoots": 40,
+    "allPreserved": true,
+    "all934FrozenInputsPreserved": true
+  },
+  "rootPending": [
+    "Diagnose/reslice four retained failures without repins or new exclusions",
+    "24 browser cases across Chromium/Firefox/WebKit per browser-handoff.json",
+    "Fresh independently installed/native-prepared source-built exact focused/retained/static gates",
+    "Formal Grok high, Sol high, Fable xhigh review of freeze, historical RED, observation patch, initial GREEN failure, correction and final evidence",
+    "Signed source/evidence commit decisions after required gates are genuinely handled"
+  ],
+  "noFurtherRuntimeReleased": true,
+  "noCampaignExecuted": true,
+  "rootRuntimeReleaseRecords": [
+    "root-runtime-release.json",
+    "control-observer-correction/root-runtime-release.json"
+  ],
+  "browserAndIsolationQueue": "browser-handoff.json",
+  "observations": "observations.json",
+  "diagnosis": "retained-diagnosis.json"
+}

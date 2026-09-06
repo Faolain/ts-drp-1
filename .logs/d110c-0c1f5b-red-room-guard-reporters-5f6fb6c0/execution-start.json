@@ -1,0 +1,20 @@
+{
+  "head": "5f6fb6c0e708dc31848931f06677e116659400e5",
+  "remote": "5f6fb6c0e708dc31848931f06677e116659400e5",
+  "signature": "G",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6a-creator-successor-product-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-room-guard-reporters-5f6fb6c0/focused.json"
+  ],
+  "matrixSha256": "b1f3f446fb9d3ab7f8e231aec872e8f6ffe6c43a40cdd689c18aaaa1f49019c4",
+  "executionCount": 1,
+  "startedAt": "2026-09-06T02:55:57.671Z"
+}

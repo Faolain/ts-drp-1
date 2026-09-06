@@ -1,0 +1,11 @@
+{
+	"schemaVersion": 1,
+	"shippingTargets": [
+		{
+			"id": "electron-desktop",
+			"runtime": "electron",
+			"state": "inactive",
+			"versions": []
+		}
+	]
+}

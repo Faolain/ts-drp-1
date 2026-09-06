@@ -1,0 +1,10 @@
+{
+  "code": 1,
+  "signal": null,
+  "timedOut": false,
+  "elapsedMs": 5826,
+  "endedAt": "2026-09-06T10:55:06.392Z",
+  "cleanup": [],
+  "remainingOwnedGroup": [],
+  "quiescent": true
+}

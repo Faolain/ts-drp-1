@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawn} from 'node:child_process';
+const out=path.dirname(new URL(import.meta.url).pathname);
+const cwd='/private/tmp/d110c-f5b0z-review-Kg6cuq/checkout';
+const dir=path.join(out,'sol-read-resume');fs.mkdirSync(dir);
+const args=['exec','--ignore-user-config','--sandbox','read-only','--model','gpt-5.6-sol','-c','model_reasoning_effort="high"','-c','features.multi_agent=false','resume','--json','--output-last-message',path.join(dir,'final.txt'),'01a072f7-6534-7f62-9fcf-2a6c64ee674e',fs.readFileSync(path.join(out,'sol-read-permission-correction.md'),'utf8')];
+const stdout=fs.openSync(path.join(dir,'events.jsonl'),'wx'),stderr=fs.openSync(path.join(dir,'stderr.log'),'wx');
+const start=new Date().toISOString();
+const child=spawn('codex',args,{cwd,stdio:['ignore',stdout,stderr]});
+fs.writeFileSync(path.join(dir,'launch.json'),JSON.stringify({command:'codex',args,cwd,start,pid:child.pid},null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({pid:child.pid,start}));
+child.on('close',(status,signal)=>{fs.closeSync(stdout);fs.closeSync(stderr);fs.writeFileSync(path.join(dir,'runner-status.json'),JSON.stringify({status,signal,start,finish:new Date().toISOString()},null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({status,signal}));});

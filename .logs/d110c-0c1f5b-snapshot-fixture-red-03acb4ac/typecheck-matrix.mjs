@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),read=f=>JSON.parse(fs.readFileSync(path.join(root,f)));
+const current=JSON.parse(fs.readFileSync(path.join(out,'typecheck.json'))),prior=read('.logs/d110c-0c1f5b-green-wide90-fd4140d5/typecheck.json');
+assert.deepEqual(current.targetDiagnostics,[]);
+assert.deepEqual(current.externalDiagnostics.map(({file,code,line,message})=>({file,code,line,message})),prior.externalDiagnostics);
+assert.equal(current.externalDiagnostics.length,3);
+assert.equal(JSON.parse(fs.readFileSync(path.join(out,'typecheck/status.json'))).code,1);
+const data={matrixPass:true,compilerPass:false,compilerStatus:1,targetDiagnostics:0,inheritedHelperDiagnostics:3,prior:'.logs/d110c-0c1f5b-green-wide90-fd4140d5/typecheck.json',comparison:'Exact file/code/line/complete-message equality; additional positions/tokens preserved in new focused program',owner:'tests/fixtures/phase-4b-v3/live-snapshot.ts',deadline:'Authorized snapshot-fixture GREEN',priorManifestVerifiedBy:'custody-before.json'};
+fs.writeFileSync(path.join(out,'typecheck-matrix.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(data));

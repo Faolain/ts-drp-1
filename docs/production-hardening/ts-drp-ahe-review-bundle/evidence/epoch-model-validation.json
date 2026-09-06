@@ -1,0 +1,58 @@
+{
+  "elapsed_seconds": 10.180542,
+  "exhaustive": {
+    "delivery_checks": 5231,
+    "deterministic_order_checks": 10462,
+    "graphs": 5231,
+    "max_vertices": 7
+  },
+  "legacy_origin_counterexample": {
+    "baked_vertices": [
+      0,
+      1
+    ],
+    "contracted_legacy_tail_order": [
+      2,
+      3,
+      4
+    ],
+    "dependencies": [
+      [],
+      [
+        0
+      ],
+      [
+        1
+      ],
+      [
+        1
+      ],
+      [
+        0,
+        2
+      ]
+    ],
+    "full_legacy_tail_order": [
+      2,
+      4,
+      3
+    ],
+    "non_antichain_vertex": 4,
+    "tail_vertices": [
+      2,
+      3,
+      4
+    ]
+  },
+  "model": "independent-hard-epoch-model-v1",
+  "randomized": {
+    "epochs": 10000,
+    "final_applied_operations": 132441,
+    "final_state_digest": "8100b91356db253d1048fb93f980c7caf6e2e0a2a536fb94f2081395510e7c5a",
+    "max_epoch_vertices": 48,
+    "schedule_permutations": 20000,
+    "seed": 2932088870,
+    "stale_envelope_checks": 10000
+  },
+  "verdict": "pass"
+}

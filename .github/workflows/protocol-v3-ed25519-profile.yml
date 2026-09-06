@@ -1,0 +1,48 @@
+name: Protocol v3 Ed25519 acceptance profile freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-ed25519-profile:
+    name: Require immutable protocol-v3 Ed25519 profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run merge-base-pinned Ed25519 profile checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHECKER: packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs
+          POLICY: packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json
+          ADDENDUM: docs/protocol/ed25519-acceptance-profile-v3.md
+          AMENDMENT: docs/protocol/ed25519-acceptance-profile-v3.json
+          VECTORS: packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json
+          RED_TEST: tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts
+          RED_FIXTURE: tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json
+        run: |
+          if git cat-file -e "$BASE_SHA:$CHECKER"; then
+            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-ed25519-profile-freeze.mjs"
+            PROTOCOL_V3_ED25519_PROFILE_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-ed25519-profile-freeze.mjs" "$BASE_SHA"
+          elif ! git cat-file -e "$BASE_SHA:$POLICY" \
+            && ! git cat-file -e "$BASE_SHA:$ADDENDUM" \
+            && ! git cat-file -e "$BASE_SHA:$AMENDMENT" \
+            && ! git cat-file -e "$BASE_SHA:$VECTORS" \
+            && ! git cat-file -e "$BASE_SHA:$RED_TEST" \
+            && ! git cat-file -e "$BASE_SHA:$RED_FIXTURE"; then
+            node packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs "$BASE_SHA"
+          else
+            echo "Ed25519 profile freeze bootstrap is fail-closed and atomic." >&2
+            exit 1
+          fi

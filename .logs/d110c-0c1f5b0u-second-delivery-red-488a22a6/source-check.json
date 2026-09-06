@@ -1,0 +1,7 @@
+{
+  "chunk_id": "697480",
+  "wall_time_seconds": 0.246359041,
+  "exit_code": 0,
+  "original_token_count": 47,
+  "output": "{\"syntax\":\"PASS\",\"changedOwner\":\"tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts\",\"genuineSealAdoptIssue\":\"PRESERVED\",\"sameDurableFixtureReopened\":true,\"productionChanges\":0}\n"
+}

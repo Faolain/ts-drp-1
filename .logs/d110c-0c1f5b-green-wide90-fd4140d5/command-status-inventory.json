@@ -1,0 +1,148 @@
+[
+  {
+    "file": "custody-after/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:52:48.436Z",
+    "finish": "2026-09-06T07:52:51.668Z",
+    "pid": 61662
+  },
+  {
+    "file": "custody-before/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:50:48.611Z",
+    "finish": "2026-09-06T07:50:51.781Z",
+    "pid": 59399
+  },
+  {
+    "file": "custody-final/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:57:00.424Z",
+    "finish": "2026-09-06T07:57:03.597Z",
+    "pid": 67083
+  },
+  {
+    "file": "diff/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:51:07.417Z",
+    "finish": "2026-09-06T07:51:07.456Z",
+    "pid": 60003
+  },
+  {
+    "file": "equivalence/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:51:04.486Z",
+    "finish": "2026-09-06T07:51:05.025Z",
+    "pid": 59810
+  },
+  {
+    "file": "focused-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:55:09.034Z",
+    "finish": "2026-09-06T07:56:22.986Z",
+    "pid": 64554
+  },
+  {
+    "file": "format/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:51:05.129Z",
+    "finish": "2026-09-06T07:51:06.067Z",
+    "pid": 59886
+  },
+  {
+    "file": "freeze-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:54:11.568Z",
+    "finish": "2026-09-06T07:54:12.835Z",
+    "pid": 63189
+  },
+  {
+    "file": "launcher-predicates/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:53:56.040Z",
+    "finish": "2026-09-06T07:53:56.462Z",
+    "pid": 62796
+  },
+  {
+    "file": "launcher-syntax/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:52:47.914Z",
+    "finish": "2026-09-06T07:52:48.052Z",
+    "pid": 61586
+  },
+  {
+    "file": "lint/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:51:06.176Z",
+    "finish": "2026-09-06T07:51:31.759Z",
+    "pid": 59933
+  },
+  {
+    "file": "signed-source/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:54:10.482Z",
+    "finish": "2026-09-06T07:54:11.370Z",
+    "pid": 62962
+  },
+  {
+    "file": "source-commit/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:53:10.365Z",
+    "finish": "2026-09-06T07:53:10.687Z",
+    "pid": 62241
+  },
+  {
+    "file": "source-push/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:53:54.823Z",
+    "finish": "2026-09-06T07:53:56.479Z",
+    "pid": 62751
+  },
+  {
+    "file": "typecheck-matrix/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:52:48.197Z",
+    "finish": "2026-09-06T07:52:48.338Z",
+    "pid": 61624
+  },
+  {
+    "file": "typecheck/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T07:51:07.587Z",
+    "finish": "2026-09-06T07:51:12.977Z",
+    "pid": 60042
+  },
+  {
+    "file": "validate-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:57:00.140Z",
+    "finish": "2026-09-06T07:57:00.303Z",
+    "pid": 67028
+  },
+  {
+    "file": "wide-only/status.json",
+    "code": 0,
+    "signal": null,
+    "elapsedMs": 72746.883334,
+    "endedAt": "2026-09-06T07:56:22.975Z",
+    "watchdogActions": [],
+    "ownedProcessGroup": 64803,
+    "quiescent": true
+  }
+]

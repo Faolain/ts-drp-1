@@ -1,0 +1,39 @@
+{
+	"implementationModule": "../packages/protocol-v3/src/index.ts",
+	"controlledModule": "./fixtures/phase-0o-b2-v3/controlled-gossip-budget.ts",
+	"publicEntryModule": "../packages/protocol-v3/src/public.ts",
+	"publicReexportMutantModule": "./fixtures/phase-0o-b2-v3/public-reexport-mutant.ts",
+	"supplementDirectory": "../packages/protocol-v3/supplements/equivocation-gossip-budget-v1",
+	"workflow": ".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+	"profileId": "equivocation-gossip-budget-v1",
+	"baseProfileId": "equivocation-author-projection-v1",
+	"author": "alice",
+	"objectA": "object:alpha",
+	"objectB": "object:beta",
+	"orderingAstralObjectId": "object:𐀀",
+	"orderingBmpObjectId": "object:",
+	"sequenceA": 7,
+	"sequenceB": 11,
+	"baseArtifactSha256": {
+		".github/workflows/protocol-v3-equivocation-author-projection.yml": "200d32a57906bbdeecd61929d67854b363daac64d0ecf41ad81cc2ff9b4185f8",
+		"packages/protocol-v3/supplements/equivocation-author-projection-v1/check-freeze.mjs": "04584062721a8707e4bf1d9069ee4456241f911ba624a8096b1c1859535b982c",
+		"packages/protocol-v3/supplements/equivocation-author-projection-v1/freeze-policy.json": "ccf31a35a19605eb71c6def08da5a4f74f0a793ab288dff5e32618d9eeaebf52",
+		"packages/protocol-v3/supplements/equivocation-author-projection-v1/profile.json": "d146df4b1b7d2066014cb4d14118238cd7e40e1a9af4cd9e53f93f98c3e86e64",
+		"packages/protocol-v3/supplements/equivocation-author-projection-v1/spec.md": "a6ffbfff8dd70870d01858f1823bfcc5c90cbbb8f9cd7f6f8a30793b1f573bf0",
+		"tests/fixtures/phase-0o-b1b-v3/author-projection-contract.json": "e6c77f1a54a23a3ee3fc24898a87b8c4c2be4e09c0155528203b6c78ec3265df",
+		"tests/fixtures/phase-0o-b1b-v3/built-package-type-audit.ts": "028806ff82b8d5f42589f2ed5949017aeb4deaf2131fef78fee550e124420d37",
+		"tests/fixtures/phase-0o-b1b-v3/controlled-author-projection.ts": "689fba68e3659433055117ccb711ac956dbef809e4f95c7904248686f4b65f05",
+		"tests/fixtures/phase-0o-b1b-v3/public-entry-type-audit.ts": "16d4cb6e38f772888af2d25fa9b56c804187f835298016b052e9d6d15688238f",
+		"tests/fixtures/phase-0o-b1b-v3/public-export-contract.mjs": "7a87853c90fe5169df9ec9fd9e721f4b67cdcc3e4faf549f56d3de1fe142351a",
+		"tests/fixtures/phase-0o-b1b-v3/public-reexport-mutant.ts": "2c6cbfd45387e4de80ef41b7204b7d3ffae7747c6e8e686c14ad559084ffb76d",
+		"tests/fixtures/phase-0o-b1b-v3/tsconfig.built-package-audit.json": "8f7c2315e97d06d97d0ca2ebb86769fab2d21d3353f25f48a9c429f4fef7f51f",
+		"tests/fixtures/phase-0o-b1b-v3/tsconfig.public-entry-audit.json": "0420a3ea15b79d2196dc26fa14747bc7473e080fb687fc39fa6ef5f1dd44238b",
+		"tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts": "1a89654947396489ac110803ceab611756a4ae9c05059ee8450ed38c273fc517"
+	},
+	"digests": [
+		"1111111111111111111111111111111111111111111111111111111111111111",
+		"2222222222222222222222222222222222222222222222222222222222222222",
+		"3333333333333333333333333333333333333333333333333333333333333333",
+		"4444444444444444444444444444444444444444444444444444444444444444"
+	]
+}

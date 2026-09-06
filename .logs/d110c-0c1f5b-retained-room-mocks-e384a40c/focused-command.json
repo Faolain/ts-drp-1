@@ -1,0 +1,15 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-retained-room-mocks-2C1IwR/checkout",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-room-mocks-e384a40c/focused.json"
+  ],
+  "executionCount": 1
+}

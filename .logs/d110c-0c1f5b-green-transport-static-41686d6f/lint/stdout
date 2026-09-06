@@ -1,0 +1,12 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p3-live-transport-red.test.ts
+   895:13  error  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+   898:14  error  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+   942:15  error  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  1186:12  error  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  1257:11  error  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  1258:11  error  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  1798:12  error  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+✖ 7 problems (7 errors, 0 warnings)
+

@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "build:packages"
+  ],
+  "startedAt": "2026-09-05T21:08:46.608Z",
+  "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+  "ownerHashes": {
+    "examples/v3-room/src/index.ts": "83136697eec6cae4ecc12fc7a977e4f1f87dada2d40f55ef9cb9c5fc13c798de",
+    "packages/node/src/creator-adoption.ts": "a668a8c02f28cb4f936a0883fdaeee37a327774860fe173213fba0c0e3ab870a",
+    "packages/node/src/creator-close.ts": "df18f730c730533c7943d41dab1f26cab3718b1206f35a2bae50da82cc499c9d",
+    "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+    "packages/node/src/v3-live.ts": "6b8c2f4bb01bae2ea3c1b5bcfeb355e3b6710ed091285575e0c3111dc4acff20",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+    "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+    "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+  }
+}

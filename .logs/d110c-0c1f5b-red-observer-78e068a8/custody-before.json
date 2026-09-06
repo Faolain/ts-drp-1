@@ -1,0 +1,132 @@
+{
+  "stage": "before",
+  "head": "b2f79baf0697c0a77dabdb10bf049f5289583580",
+  "signature": "G",
+  "productionHashes": {
+    "examples/v3-room/src/index.ts": "243d280b22f7aad3967e1a10aa82ffde3be8178b27d2cc23c8d03e5fc0f32cec",
+    "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+    "packages/node/src/creator-close.ts": "834b7877493d5feb3e883cb1e1de81211c64fa8d4d6b2fb6a6fdeb11c5532323",
+    "packages/node/src/internal/creator-transition-advance.ts": "19589ad05bf641e67a4e95ceb8d0bdd72b04fe7c90f1df47a132ab436cd03636",
+    "packages/node/src/v3-live.ts": "7683af0af26e29ab3186256dac377e0d7db3e0e70214dac21d60a4e0f4a0ddc3",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+    "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c"
+  },
+  "productionPreserved": true,
+  "stashCount": 27,
+  "stashesSha256": "b426dba61f4f05787e77e297b02dd2ed84ef692908df757777f0c328c1d0e9c3",
+  "protectedFunctions": [
+    {
+      "name": "required",
+      "sha256": "4f6f2c83773b264a1ef39465b6c3cd77ee9317dc35ba6e83142b696581b8e216"
+    },
+    {
+      "name": "request",
+      "sha256": "72934dcb3bad333e6c274e4abc96221e7d833533bc826fcef248d5ae333a04b8"
+    },
+    {
+      "name": "transactionDone",
+      "sha256": "aab37ceba6de68d18d77a25dca5309af077f29d9c2cad6f83eba390db39c304d"
+    },
+    {
+      "name": "transferDatabase",
+      "sha256": "b1e6cc1faf2a0027420e026f5c02214f5e68006c135094925d1b697ee9d2529e"
+    },
+    {
+      "name": "producedDeclaration",
+      "sha256": "0e0bb6546247095debcd73aef5b63756e25a8d3e5e9499b367bf6dc04299c64c"
+    },
+    {
+      "name": "floorOwner",
+      "sha256": "b71b5ba9a6a63716f1b2ec9ad0f1e6330c67e48d19ffd7b558bd2e8e186cd65c"
+    },
+    {
+      "name": "durable",
+      "sha256": "556522bd9042a452c5cc2f36b65216da96cedff50eaf5d5f6cd73c60ed087b34"
+    },
+    {
+      "name": "productState",
+      "sha256": "432f0ac32b79153249e7fdf106ef7112e7873877f4421b9f89ff2aea2d9c5693"
+    },
+    {
+      "name": "messages",
+      "sha256": "90d55cc84aad29a26389f070316acd14827898a805f7246dc19c04c46cb40b9b"
+    },
+    {
+      "name": "ownCommits",
+      "sha256": "4e09b604e4c24d6633a836108625164760a146dc8a04beb6f4b6be9aa842b792"
+    },
+    {
+      "name": "applicationOperations",
+      "sha256": "760d3fe7e501b981e0a0e099f57430f0bb7dcbbc1cf6868c923cc9471f73da3d"
+    },
+    {
+      "name": "aheFacts",
+      "sha256": "0c24c5d637fdd58a08ca50f1d681b3005c3e6aa6db1d7df800a87f8a448cf3cf"
+    },
+    {
+      "name": "assertRetainedRollbackPair",
+      "sha256": "59a4ee6249973d02021cf7c342cbdc9bafb7ae77dee67d70def77947492b2d19"
+    },
+    {
+      "name": "displacedFixture",
+      "sha256": "18a43adf4d2326570802475271654d5412ffe58c141a9c962bf18dbe922e1b19"
+    },
+    {
+      "name": "delayedDependency",
+      "sha256": "ee50b7f2c9e529ad0ffee7a41896fd70643be6f3cfc46ee27393874ddc57379f"
+    },
+    {
+      "name": "nullBoundaryClose",
+      "sha256": "07a695be2fcebd3b5fdb3bbef7c586e69e715dd257642e536b385266c2acda25"
+    },
+    {
+      "name": "delayedPublication",
+      "sha256": "cc97220e4902be17d2bcee9b2272ad1019055aee1633344ae7ded41ab798a114"
+    },
+    {
+      "name": "ambiguousPlanIssue",
+      "sha256": "7821a54aa4d7329fa7436cbebfeee07635755e77572990ad59e26d3835da3fea"
+    },
+    {
+      "name": "staleLocalHead",
+      "sha256": "fbed3a3d1215578bff7b11f25fcb1fcebb848cf4da6aab5d7dcc679281d40428"
+    },
+    {
+      "name": "sixtyFourWriterGoldenPath",
+      "sha256": "16466bacc5c945d0dbfdc8c0166889f44aa108507e96411760f7252d59369902"
+    },
+    {
+      "name": "positiveAuthenticatedPruning",
+      "sha256": "01fc0f0c3390b95dc551e91d7b0109098439a23ead1439383029c27a8195b68c"
+    },
+    {
+      "name": "displacedControls",
+      "sha256": "736c058fe21312057e7cd011cacb2b14230244d9ce58276ce475a9b57118afd7"
+    },
+    {
+      "name": "sameKeyReentry",
+      "sha256": "e81d4aae818ac81ccb617a23e0599dbe90a380b9bc6fc8fe6820b9ff93e93f8c"
+    },
+    {
+      "name": "manualReviewHold",
+      "sha256": "3f480a30cb7674f133ded9bcca349304bb4da0837ae5fdd8ef1beebd67cb5492"
+    },
+    {
+      "name": "creatorFenceScan",
+      "sha256": "34e1f3930b282dfc8ba7c7ee2bd7ca35c0ff0f2c5aa5ab5fc7ae835e0b3069c7"
+    }
+  ],
+  "retainedHashes": {
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c"
+  },
+  "obsoleteGetterReads": 0,
+  "explicitTerminalThrows": 2,
+  "ownerGenerationWithoutFallback": true,
+  "case3OnlyObserver": true,
+  "exactValueBeforeByteCopy": true,
+  "callbackPrecedesFinalCommitAssignment": true,
+  "segmentedWorkloadAndSiblingAssertionsUnchanged": true,
+  "status": "M examples/v3-room/src/index.ts\n M packages/node/src/creator-adoption.ts\n M packages/node/src/creator-close.ts\n M packages/node/src/internal/creator-transition-advance.ts\n M packages/node/src/v3-live.ts\n M packages/protocol-v3/src/creator-checkpoint.ts\n M packages/protocol-v3/src/creator-close.ts\n M tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+}

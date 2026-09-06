@@ -1,0 +1,59 @@
+{
+  "recordId": "D.110c-0c1f5b0b",
+  "checkpoint": "corrective-GREEN",
+  "productionCommit": "e07f8a94d5e2449289bebd7aa89f1dcdbd4d9536",
+  "parent": "449b95a3c93f163cd640535f3632c6095cffc6e1",
+  "signature": "G",
+  "changedPaths": ["packages/node/src/v3-live.ts"],
+  "tests": {
+    "canonicalPhase3g": { "selected": 14, "passed": 14, "failed": 0, "skipped": 0 },
+    "focused": { "selected": 39, "passed": 39, "failed": 0, "skipped": 0 },
+    "retained": { "selected": 87, "passed": 87, "failed": 0, "skipped": 0 },
+    "legacyConsumers": { "selected": 26, "passed": 26, "failed": 0, "skipped": 0 },
+    "sharedConsumersBuilt": { "selected": 64, "passed": 64, "failed": 0, "skipped": 0 },
+    "replacementBuiltChild": { "selected": 1, "passed": 1, "filtered": 16 },
+    "isolatedFocused": { "selected": 39, "passed": 39, "failed": 0, "skipped": 0 },
+    "isolatedBuiltChild": { "selected": 1, "passed": 1, "filtered": 16 }
+  },
+  "invalidGateOrderDiagnostics": {
+    "sharedConsumers": { "selected": 64, "passed": 63, "failed": 1 },
+    "isolatedTitle": { "selected": 1, "passed": 0, "failed": 1, "filtered": 16 },
+    "cause": "child imported stale gitignored Node dist predating the exact source patch"
+  },
+  "builds": {
+    "node": "passed",
+    "protocolV3": "passed",
+    "protocolV3Typecheck": "passed",
+    "protocolV3PublicPackageSmoke": "passed",
+    "isolatedDependencies": "passed"
+  },
+  "static": {
+    "eslint": "passed",
+    "prettier": "passed",
+    "diffCheck": "passed",
+    "sourceShape": "passed"
+  },
+  "nodeTypecheck": {
+    "currentExit": 2,
+    "parentExit": 2,
+    "normalizedOutputsEqual": true,
+    "classification": "inherited"
+  },
+  "isolated": {
+    "offlineFrozenInstall": "passed",
+    "exactPatchSha256": "6b56222c273f487d5e35bcc0acc30327bd43f4eeb28a33d8bb65fa079a9f359a",
+    "focused": "39/39 passed",
+    "builtChild": "1/1 passed",
+    "publicSmoke": "passed",
+    "builtImportSmoke": "passed"
+  },
+  "scope": {
+    "wireOrProtobufChanged": false,
+    "cryptographyChanged": false,
+    "dependencyChanged": false,
+    "apiChanged": false,
+    "thresholdChanged": false,
+    "fixtureChanged": false,
+    "stopRuleTriggered": false
+  }
+}

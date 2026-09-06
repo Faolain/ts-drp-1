@@ -25,6 +25,7 @@ export function getNetworkConfigFromEnv(environment: GridNetworkEnv, metricsOrig
 	const config: DRPNodeConfig = {
 		network_config: {
 			browser_metrics: true,
+			control_plane: { peer_selection: { expected_replicas: 50 } },
 		},
 	};
 

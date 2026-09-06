@@ -1,0 +1,150 @@
+{
+  "classification": "STOP_SHARED_FIXTURE_SOURCE_ATTRIBUTION",
+  "additionalDiagnostics": [
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "code": 2345,
+      "line": 124,
+      "character": 96,
+      "start": 4444,
+      "length": 13,
+      "message": "Argument of type 'string' is not assignable to parameter of type 'TArg<Uint8Array<ArrayBufferLike>>'.",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 105
+      },
+      "sourceLine": "\t\t\t\t\ted25519.verify(row.signature, Uint8Array.from(Buffer.from(material.anchorDigest, \"hex\")), row.publicKey, {",
+      "token": "row.publicKey"
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "code": 2542,
+      "line": 377,
+      "character": 4,
+      "start": 14366,
+      "length": 39,
+      "message": "Index signature in type 'readonly ItfTraceState[]' only permits reading.",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 365
+      },
+      "sourceLine": "\t\t\tmutant.states[mutant.states.length - 1] = {",
+      "token": "mutant.states[mutant.states.length - 1]"
+    }
+  ],
+  "knownFixtureDiagnostics": 7,
+  "separateGridDiagnostic": 1,
+  "dependencyVersion": "@noble/curves2.2.0 / @noble/hashes2.2.0",
+  "excerpts": [
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/genesis-profile.test.ts",
+      "sha256": "f246f32b157fd3426cf4330028a347d055b4eacb800a36d77c58a6fcc320696a",
+      "startLine": 108,
+      "endLine": 131,
+      "text": "\t\t\tmakeCertifiedGenesis({ profileId: \"attested-bft-v1\", quorum: 3 }),\n\t\t]) {\n\t\t\tconst certificate = decodeCanonical(material.certificateBytes) as {\n\t\t\t\treadonly signatures: readonly {\n\t\t\t\t\treadonly publicKey: string;\n\t\t\t\t\treadonly signature: Uint8Array;\n\t\t\t\t\treadonly signerId: string;\n\t\t\t\t}[];\n\t\t\t};\n\t\t\texpect(certificate.signatures.map(({ signerId }) => signerId)).toEqual(\n\t\t\t\t[...certificate.signatures.map(({ signerId }) => signerId)].sort((left, right) =>\n\t\t\t\t\tBuffer.from(left).compare(Buffer.from(right))\n\t\t\t\t)\n\t\t\t);\n\t\t\tfor (const row of certificate.signatures) {\n\t\t\t\texpect(\n\t\t\t\t\ted25519.verify(row.signature, Uint8Array.from(Buffer.from(material.anchorDigest, \"hex\")), row.publicKey, {\n\t\t\t\t\t\tzip215: false,\n\t\t\t\t\t})\n\t\t\t\t).toBe(true);\n\t\t\t}\n\t\t\texpect(encodeCanonical(decodeCanonical(material.anchorBytes))).toEqual(material.anchorBytes);\n\t\t\texpect(encodeCanonical(decodeCanonical(material.profileBytes))).toEqual(material.profileBytes);\n\t\t\texpect(encodeCanonical(decodeCanonical(material.signerSetBytes))).toEqual(material.signerSetBytes);"
+    },
+    {
+      "file": "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+      "sha256": "0dee33e6f09e81fed931f842f70311109bebf7ea56adc2a07a670132a1f031e2",
+      "startLine": 9,
+      "endLine": 26,
+      "text": "export interface CertifiedSignerMaterial {\n\treadonly privateKey: Uint8Array;\n\treadonly publicKey: string;\n\treadonly signerId: string;\n}\n\nexport interface CertifiedGenesisMaterial {\n\treadonly anchor: Readonly<Record<string, unknown>>;\n\treadonly anchorBytes: Uint8Array;\n\treadonly anchorDigest: string;\n\treadonly certificate: Readonly<Record<string, unknown>>;\n\treadonly certificateBytes: Uint8Array;\n\treadonly profile: Readonly<Record<string, unknown>>;\n\treadonly profileBytes: Uint8Array;\n\treadonly signerSet: readonly Readonly<Record<string, unknown>>[];\n\treadonly signerSetBytes: Uint8Array;\n\treadonly signers: readonly CertifiedSignerMaterial[];\n}"
+    },
+    {
+      "file": "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+      "sha256": "0dee33e6f09e81fed931f842f70311109bebf7ea56adc2a07a670132a1f031e2",
+      "startLine": 178,
+      "endLine": 191,
+      "text": " * Builds the exact five-field public installation input.\n * @param material - Valid certified genesis material.\n * @returns Detached public installation input.\n */\nexport function installInput(material = makeCertifiedGenesis()): Readonly<Record<string, unknown>> {\n\treturn Object.freeze({\n\t\texactCanonicalCertifiedGenesisCertificateBytes: new Uint8Array(material.certificateBytes),\n\t\texactCanonicalGenesisAnchorPreimageBytes: new Uint8Array(material.anchorBytes),\n\t\texactCanonicalProfileBytes: new Uint8Array(material.profileBytes),\n\t\texactCanonicalSignerSetBytes: new Uint8Array(material.signerSetBytes),\n\t\tpinnedGenesisAnchorDigest: material.anchorDigest,\n\t});\n}\n"
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5d-pacemaker-red.test.ts",
+      "sha256": "2fae9a927becec0858c7de9ab61a6aca7b901fd97897bcb636807f9fc658456a",
+      "startLine": 139,
+      "endLine": 157,
+      "text": "function rejectedTraceMutation(path: string, mutate: (states: ItfTraceMutableStates) => void): boolean {\n\tconst trace = structuredClone(readTrace(path)) as unknown as { states: ItfTraceMutableStates };\n\tmutate(trace.states);\n\ttry {\n\t\tassertClosedItfTrace(trace as unknown as ItfTrace);\n\t\treturn false;\n\t} catch {\n\t\treturn true;\n\t}\n}\n\ntype MutableTraceState = {\n\tdurableCommitQcCount: number;\n\tdurablePrepareQcCount: number;\n\tdurableRevision: number;\n\tlastEvent: string;\n\tpendingRoundChangeCount: number;\n};\ntype ItfTraceMutableStates = MutableTraceState[];"
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5d-pacemaker-red.test.ts",
+      "sha256": "2fae9a927becec0858c7de9ab61a6aca7b901fd97897bcb636807f9fc658456a",
+      "startLine": 365,
+      "endLine": 383,
+      "text": "\tit(\"hash-binds every closed ITF trace and rejects event-name-only state drift\", () => {\n\t\texpect(traceManifestIsExact()).toBe(true);\n\t\tconst events = allTraceEvents();\n\t\tfor (const descriptor of PRODUCT_CONTRACT.traces) {\n\t\t\texpect(sha256File(resolve(REPOSITORY_ROOT, descriptor.path))).toBe(descriptor.sha256);\n\t\t\tconst trace = readTrace(descriptor.path);\n\t\t\tassertClosedItfTrace(trace);\n\t\t\texpect(trace.states.every(({ n }) => n === descriptor.n)).toBe(true);\n\t\t\tfor (const event of descriptor.requiredEvents) expect(events.has(event), event).toBe(true);\n\t\t\tconst mutant = structuredClone(trace);\n\t\t\tconst terminal = mutant.states.at(-1);\n\t\t\tif (terminal === undefined) throw new Error(\"TRACE_TOO_SHORT\");\n\t\t\tmutant.states[mutant.states.length - 1] = {\n\t\t\t\t...terminal,\n\t\t\t\tdurableRevision: -1,\n\t\t\t};\n\t\t\texpect(() => assertClosedItfTrace(mutant)).toThrow(\"TRACE_STATE_MISMATCH\");\n\t\t\texpect(mutant.states.at(-1)?.durableRevision).not.toBe(trace.states.at(-1)?.durableRevision);\n\t\t\tconst temporary = mkdtempSync(resolve(REPOSITORY_ROOT, \".phase5d-trace-\"));"
+    },
+    {
+      "file": "tests/fixtures/phase-5d-v3/pacemaker-types.ts",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-5d-v3/pacemaker-types.ts",
+      "sha256": "a44637a56682c69d45ee1d319f6faa6ffa7bce913f6ffaff5a5d0e4d40234f97",
+      "startLine": 114,
+      "endLine": 133,
+      "text": "export interface ItfTraceState {\n\treadonly \"#meta\": Readonly<{ readonly index: number }>;\n\treadonly \"durableCommitQcCount\": number;\n\treadonly \"durablePrepareQcCount\": number;\n\treadonly \"durableRevision\": number;\n\treadonly \"futureBucketCount\": number;\n\treadonly \"lastEvent\": string;\n\treadonly \"n\": 4 | 5 | 6 | 7;\n\treadonly \"phase\": PacemakerPhase;\n\treadonly \"pendingRoundChangeCount\": number;\n\treadonly \"round\": number;\n\treadonly \"valueDigest\": string;\n}\n\nexport interface ItfTrace {\n\treadonly \"#meta\": Readonly<{ readonly format: \"ITF\"; readonly source: string }>;\n\treadonly \"states\": readonly ItfTraceState[];\n\treadonly \"vars\": readonly string[];\n}\n"
+    },
+    {
+      "file": "tests/fixtures/phase-5d-v3/pacemaker-fixture.ts",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-5d-v3/pacemaker-fixture.ts",
+      "sha256": "12add1a4d285ba0c66368d6c34fd5a5a20356873ec0bf8aff17463a17fd3e3bf",
+      "startLine": 116,
+      "endLine": 125,
+      "text": "\n/**\n * Reads one hash-bound closed ITF trace.\n * @param path - Repository-relative trace path.\n * @returns Parsed trace fixture.\n */\nexport function readTrace(path: string): ItfTrace {\n\treturn JSON.parse(readFileSync(resolve(REPOSITORY_ROOT, path), \"utf8\")) as ItfTrace;\n}\n"
+    },
+    {
+      "file": "node_modules/@noble/curves/abstract/edwards.d.ts",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.d.ts",
+      "sha256": "8b58881cb85ba02eaf002107bc0be0151414ba8ec082a4371830f09bfa75d9c2",
+      "startLine": 151,
+      "endLine": 163,
+      "text": "     * @param message - Message bytes.\n     * @param publicKey - Encoded public key.\n     * @param options - Optional verification tweaks:\n     *   - `context` (optional): Domain-separation context for Ed25519ctx/Ed448.\n     *   - `zip215` (optional): Whether to accept ZIP-215 encodings.\n     * @returns Whether the signature is valid.\n     */\n    verify: (sig: TArg<Uint8Array>, message: TArg<Uint8Array>, publicKey: TArg<Uint8Array>, options?: TArg<{\n        context?: Uint8Array;\n        zip215?: boolean;\n    }>) => boolean;\n    /** Point constructor used by this signature scheme. */\n    Point: EdwardsPointCons;"
+    },
+    {
+      "file": "node_modules/@noble/curves/abstract/edwards.js",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js",
+      "sha256": "4b58e733183b915d1b4c73c675e54f3d24e895f04ddff21bbb19dd848dae3c9e",
+      "startLine": 585,
+      "endLine": 600,
+      "text": "    function verify(sig, msg, publicKey, options = verifyOpts) {\n        // Preserve the wrapper-selected default for `{}` / `{ zip215: undefined }`, not just omitted opts.\n        const { context } = options;\n        const zip215 = options.zip215 === undefined ? !!verifyOpts.zip215 : options.zip215;\n        const len = lengths.signature;\n        sig = abytes(sig, len, 'signature');\n        msg = abytes(msg, undefined, 'message');\n        publicKey = abytes(publicKey, lengths.publicKey, 'publicKey');\n        if (zip215 !== undefined)\n            abool(zip215, 'zip215');\n        if (prehash)\n            msg = prehash(msg); // for ed25519ph, etc\n        const mid = len / 2;\n        const r = sig.subarray(0, mid);\n        const s = bytesToNumberLE(sig.subarray(mid, len));\n        let A, R, SB;"
+    },
+    {
+      "file": "node_modules/@noble/curves/utils.js",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/utils.js",
+      "sha256": "b4847e39fbb4a93e2a3e9f3945e41eabf6d58da5898cddaf45f7ed768f0e3758",
+      "startLine": 1,
+      "endLine": 22,
+      "text": "/**\n * Hex, bytes and number utilities.\n * @module\n */\n/*! noble-curves - MIT License (c) 2022 Paul Miller (paulmillr.com) */\nimport { abytes as abytes_, anumber as anumber_, bytesToHex as bytesToHex_, concatBytes as concatBytes_, hexToBytes as hexToBytes_, isBytes as isBytes_, randomBytes as randomBytes_, } from '@noble/hashes/utils.js';\n/**\n * Validates that a value is a byte array.\n * @param value - Value to validate.\n * @param length - Optional exact byte length.\n * @param title - Optional field name.\n * @returns Original byte array.\n * @example\n * Reject non-byte input before passing data into curve code.\n *\n * ```ts\n * abytes(new Uint8Array(1));\n * ```\n */\nexport const abytes = (value, length, title) => abytes_(value, length, title);\n/**\n * Validates that a value is a non-negative safe integer."
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+hashes@2.2.0/node_modules/@noble/hashes/utils.js",
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+hashes@2.2.0/node_modules/@noble/hashes/utils.js",
+      "sha256": "e2adfc13c846487feff0410bd5508a1d66f5ebadc3188f3a40a6b55449981e2f",
+      "text": "function abytes(value, length, title = '') {\n    const bytes = isBytes(value);\n    const len = value?.length;\n    const needsLen = length !== undefined;\n    if (!bytes || (needsLen && len !== length)) {\n        const prefix = title && `\"${title}\" `;\n        const ofLen = needsLen ? ` of length ${length}` : '';\n        const got = bytes ? `length=${len}` : `type=${typeof value}`;\n        const message = prefix + 'expected Uint8Array' + ofLen + ', got ' + got;\n        if (!bytes)\n            throw new TypeError(message);\n        throw new RangeError(message);\n    }\n    return value;\n}"
+    }
+  ],
+  "findings": [
+    {
+      "owner": "tests/genesis-profile.test.ts",
+      "cause": "Certificate row publicKey is a hex string; installed noble declaration and runtime abytes require 32-byte Uint8Array.",
+      "notTypeOnly": true,
+      "prospectiveMinimalRepair": "Decode that same row.publicKey hex to bytes at the one existing verify argument; preserve signature/message, strict zip215:false, and assertions.",
+      "boundary": "Outside frozen three type annotations. No cast-only disguise, dependency change or authentication weakening; root must freeze scope before edit.",
+      "runtimeFailureMeasured": false
+    },
+    {
+      "owner": "tests/phase-5d-pacemaker-red.test.ts",
+      "cause": "structuredClone preserves the declared ItfTrace type, including readonly states, although this detached clone is deliberately mutated.",
+      "notTypeOnly": false,
+      "prospectiveMinimalRepair": "Localized mutable array type view at the detached clone mutation, preserving all fields and durableRevision:-1.",
+      "boundary": "Do not change readTrace/shared ItfTrace, checked traces, hash manifest, parser, mutant value or TRACE_STATE_MISMATCH assertions."
+    }
+  ],
+  "initialDiagnosticCorrections": [
+    "Read-only custody-key node-e had an extra closing brace; corrected inspection succeeded before compiler execution.",
+    "Initial dependency resolver used the logical symlink importer path and reached a parent installation; corrected source-only resolver uses fs.realpathSync(curves utils) and the actual repository pnpm hashes2.2.0 path. No dependency function, test or compiler was rerun."
+  ],
+  "sourceEdits": 0,
+  "compilerReruns": 0,
+  "runtimeExecutions": 0
+}

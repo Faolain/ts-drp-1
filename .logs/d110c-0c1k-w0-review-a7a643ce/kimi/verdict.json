@@ -1,0 +1,39 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-1",
+      "finding": "Corrective RED and GREEN evidence directories omit the result.json file that the earlier W0 red/green evidence directories include; gate records exist only in results.md/commands.md.",
+      "evidence": ".logs/d110c-0c1k-w0-corrective-green-a7a643ce/results.md",
+      "owner": "hardening evidence recorder",
+      "disposition": "Accept as-is (results.md and commands.md carry the full gate record) or backfill result.json for format parity; no material impact."
+    },
+    {
+      "id": "P2-2",
+      "finding": "Three settlement-slice commits (9a9a2226, b926a606, 751b1df5) landed between corrective RED f511a18b and corrective GREEN a7a643ce; b926a606 modifies production in shared package files (packages/protocol-v3/src/index.ts, packages/control-plane/src/internal/creator-transition-advance.ts).",
+      "evidence": "packages/protocol-v3/src/index.ts:413",
+      "owner": "D.110c-0c1f5b0a settlement slice owner",
+      "disposition": "Tracked under the settlement slice's own RED/GREEN chain (6921ec65 -> b926a606 -> 751b1df5); verified it does not touch latched-acl.ts, the 8,192 ceiling, the member caps, or any W0 boundary."
+    },
+    {
+      "id": "P2-3",
+      "finding": "Broad Node package run retains 27 failures plus worker-host/WebRTC/compact-history typecheck diagnostics, all reproduced at the untouched parent commit.",
+      "evidence": ".logs/d110c-0c1k-w0-corrective-green-a7a643ce/results.md",
+      "owner": "pre-existing phase-3a1b transport and node fixture owners",
+      "disposition": "Explicitly outside W0 scope per the recorded GREEN evidence; unchanged by this chain; no action in this stage."
+    }
+  ],
+  "notes": [
+    "Full history confirmed commit-by-commit: plan correction 909f4f5c (byte ceiling stays 8,192; maxItems raised only so it never binds below the ceiling; fixtures 31/64/65 writer-only and 41 full-shape) -> causal RED 8860b432 (.logs/d110c-0c1k-w0-red-8860b432/: all 10 focused tests failed causally in 34.62s; pinned measurements 31=3,450B accept, 64=7,014B accept, 65=7,122B reject by member cap, 41 full-shape=8,261B reject by the 8,192B ceiling) -> initial GREEN 0d6e38c2 + evidence commit 9ad3d957 (legacy maxItems 512->2048 only; MAX_CANONICAL_BYTES untouched; settlement 65,536/8,192-items/256-members untouched) -> reviewer P1 (snapshotGroupsForVersion returned GROUPS_V2 for v1, admitting referee-bearing v1 snapshots including the exact [admin,finality,referee,writer] tuple, solely to support a faulty full-shape live fixture) -> corrective tests-only RED f511a18b (referee removed from the v1 fixture at tests/fixtures/phase-3a1b-p3/live-fixture.ts:317; exact four-group tuple pinned as snapshot-mismatch at tests/protocol-v3-latched-acl-referee-successor-red.test.ts:125; causal 1/7 failure vs initial GREEN confirmed by code path and .logs/d110c-0c1k-w0-corrective-red-f511a18b/) -> corrective GREEN a7a643ce (only packages/protocol-v3/src/latched-acl.ts, +2/-8).",
+    "P1 closure verified in current source: latched-acl.ts:120-122 groupsForVersion returns GROUPS_V1 for v1; latched-acl.ts:150 and :171 validate v1 member groups against GROUPS_V1, so any referee-bearing v1 member (including the exact four-group tuple) now fails includes() and open returns snapshot-mismatch; the v1-to-v2 vocabulary exception and its exact-tuple carve-out are deleted; freezeMembers sorting (latched-acl.ts:403) uses groupsForVersion, and since GROUPS_V1 is a prefix of GROUPS_V2's order, sort behavior for valid v1/v2 inputs is unchanged.",
+    "W0 cases 1-4 rechecked: case 1 stage/open parity and lifecycle pinned at tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts:16-46 and tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts:27-68 (65 rejects by the 64-member cap with 7,122 <= 8,192 bytes, 41 full-shape rejects by the byte ceiling at 8,261 > 8,192); case 2 loud per-kind rejection with SCANNABLE_BYTES absent from packages/node/src/creator-close.ts; case 3 single opened-snapshot O(1) membership index (latched-acl.ts:83-87,198-201,349-376) with identical accept/reject decisions; case 4 per-author default-4 share with ceil division at packages/node/src/v3-live.ts:1305,3778-3779 and builders pinning 4 at examples/grid/src/v3-zone.ts:29 and examples/v3-chat/src/index.ts:29, maxEpochVertices unchanged at 8,192.",
+    "Fail-closed legacy compatibility holds: version-1 carrier closed over its original three groups (tests/protocol-v3-latched-acl-referee-successor-red.test.ts:117-137, referee grant into v1 rejected as malformed-input), v2 referee semantics retained, settlement v3 remains 65,536 bytes / 8,192 items / 256 members (latched-acl.ts:19-22,145,225,491), and the member cap 64 for v1/v2 predates the GREEN (present at 8860b432).",
+    "No boundary, profile, fence, share, close, wire/schema/API/dependency/crypto behavior changed by the corrective pair: f511a18b is tests+fixture only and a7a643ce touches only latched-acl.ts; the registry optional-parameter mechanism (registry-v1.json authorShareMultiplier, the sole required:false field, and seal.ts's allowed-keys-plus-required validation) was introduced by the initial GREEN under plan-authorized W0 case 4 and is unchanged by the corrective commits.",
+    "Recorded gates in .logs/d110c-0c1k-w0-corrective-green-a7a643ce/ (W0 10/10, direct ACL 7/7 including referee-only and exact-four-group v1 refusal, retained five-file ACL/settlement/close/adoption 49/49, protocol-v3 and Node builds, protocol-v3 typecheck, exact lint/format/diff, commit signature and pushed-ref identity, fresh detached-worktree repetition) are consistent with the diffs; per the read-only mandate I re-verified by source and history inspection, not by re-executing the suites.",
+    "Working tree has no tracked modifications against HEAD == a7a643ceb70ce5c6551de9920c01d2bc96edd464; W1/W2 and future settlement integration were not demanded."
+  ]
+}

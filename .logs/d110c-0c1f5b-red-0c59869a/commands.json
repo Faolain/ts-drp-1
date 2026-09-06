@@ -1,0 +1,29 @@
+{
+  "startingHead": "0a09b1caea3f59cc5629905ca704167ba5cdcf20",
+  "redCommit": "0c59869a5199b880bb944aced8b7c82f5aaa59f0",
+  "branch": "codex/phase3a1b-p6-golden-path",
+  "focusedRuns": 1,
+  "focused": {
+    "command": "pnpm exec vitest run tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --reporter=json --outputFile=.logs/d110c-0c1f5b-red-0c59869a/focused.json",
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "exitCode": 1,
+    "stdout": "JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-0c59869a/focused.json\n",
+    "passedTests": 0,
+    "failedTests": 2,
+    "acceptedCausalMatrix": false
+  },
+  "finalStatic": [
+    { "command": "pnpm exec eslint tests/phase-6b-d110c-0c1f5b-integration-red.test.ts", "exitCode": 0 },
+    { "command": "pnpm exec prettier --check tests/phase-6b-d110c-0c1f5b-integration-red.test.ts", "exitCode": 0 },
+    { "command": "git diff --check", "exitCode": 0 },
+    { "command": "pnpm exec vitest list tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --json", "exitCode": 0, "listedTests": 2 },
+    { "command": "git verify-commit HEAD", "exitCode": 0, "signingKey": "55E22F154FBAF8C84F378304761B99CEA81C6289" }
+  ],
+  "testSourceSha256": "76a1d6dce08d885bf6b2b4c43a2fd8e5bc4e4029d2bdeda2f2792b3f41249b58",
+  "focusedJsonSha256": "08ddf0497a141a673624f4164edd3e8d6649427ea393ee26fceaad3c889c4862",
+  "trackedWorktreeCleanAtExecution": true,
+  "stashCountBeforeAndAfter": 27,
+  "productionEdits": false,
+  "reviewersInvoked": false,
+  "longWorkloadsRun": false
+}

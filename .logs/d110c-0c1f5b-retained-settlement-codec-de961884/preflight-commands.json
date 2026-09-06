@@ -1,0 +1,38 @@
+[
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "eslint",
+      "tests/d110c-0c1f5b0a-corrective-red.test.ts"
+    ],
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "prettier",
+      "--check",
+      "tests/d110c-0c1f5b0a-corrective-red.test.ts"
+    ],
+    "status": 0,
+    "stdout": "Checking formatting...\nAll matched files use Prettier code style!\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "list",
+      "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "--json"
+    ],
+    "status": 0,
+    "stdout": "[\n  {\n    \"name\": \"D.110c-0c1f5b0a final-review corrective RED > installs and reopens genuine settlement-profile trust without rewriting its profile, then settles with successor floor trust\",\n    \"file\": \"/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout/tests/d110c-0c1f5b0a-corrective-red.test.ts\"\n  },\n  {\n    \"name\": \"D.110c-0c1f5b0a final-review corrective RED > normalizes exactly one settlement checkpoint and no legacy carriers while retaining legacy cardinalities\",\n    \"file\": \"/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout/tests/d110c-0c1f5b0a-corrective-red.test.ts\"\n  },\n  {\n    \"name\": \"D.110c-0c1f5b0a final-review corrective RED > uses the settlement author-authorization ceiling for 256 authors while preserving legacy byte and author caps\",\n    \"file\": \"/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout/tests/d110c-0c1f5b0a-corrective-red.test.ts\"\n  },\n  {\n    \"name\": \"D.110c-0c1f5b0a final-review corrective RED > binds genesis advance to the exported settlement sentinel and retains settled-v1 digest adjacency\",\n    \"file\": \"/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout/tests/d110c-0c1f5b0a-corrective-red.test.ts\"\n  }\n]\n",
+    "stderr": ""
+  }
+]

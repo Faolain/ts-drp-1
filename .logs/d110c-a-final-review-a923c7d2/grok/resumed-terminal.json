@@ -1,0 +1,26 @@
+{
+  "verdict": "APPROVED",
+  "summary": "Signed GREEN a923c7d2 closes only D.110c-a. Causal RED 29012528 reached a real adopted epoch-1 close and failed solely at INVALID_ANCHOR because bind still supplied an empty previous-history snapshot; the private type contract independently rejected exact-number/1→2/later-epoch 3 against literal 0/1. GREEN restores a copied CompactMerkleAccumulator snapshot from the authenticated current projection in v3-live.ts, passes it to the unchanged history verifier, and widens only existing epoch/successorEpoch result fields with safe-integer overflow refusal and successorEpoch===epoch+1 before generation staging. Focused GREEN proves genuine 0→1, epoch-1 issue/publish, 1→2 close, independent RFC 9162 reconstruction, closure growth, concurrent/sequential/stale-predecessor refusal, and no epoch-2 adoption. Retained and browser gates are recorded. No wire/schema/D.110a/campaign/D.110c-b/0b1/Phase-7 work.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Hostile-carrier bind refusals are implemented but not fixture-distinguished",
+      "evidence": "The plan GREEN must-prove list names the mutations, while the original focused fixture exercised only the genuine carrier. Production refuses them through creatorClosePreviousHistorySnapshot returning undefined and CREATOR_CLOSE_UNAVAILABLE.",
+      "required_action": "Disposition: no product correction; later tests may distinguish the private bind refusals."
+    },
+    {
+      "severity": "P2",
+      "title": "Close-registration does not re-assert projection kind",
+      "evidence": "creatorClosePreviousHistorySnapshot checks epoch/object/anchor/history but prepareExistingCreatorGeneration already authenticates the epoch-dependent projection kind.",
+      "required_action": "Disposition: retain the existing authenticated prepare boundary."
+    },
+    {
+      "severity": "P2",
+      "title": "Source-shape counts are occurrence-based rather than semantic",
+      "evidence": "The source-shape artifact combines broad occurrence counts with exact removed-empty and installed-snapshot counts.",
+      "required_action": "Disposition: accept the exact owner predicates and do not add review ceremony."
+    }
+  ],
+  "counts": { "P0": 0, "P1": 0, "P2": 3 },
+  "next_slice": "D110C_A_GREEN_ACCEPTED"
+}

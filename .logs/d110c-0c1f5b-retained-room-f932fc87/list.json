@@ -1,0 +1,82 @@
+[
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > orders exact rebase and transform inputs while expire and held review perform no issue",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > closes one source exactly once after every child has a terminal outcome",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > preserves published source work and completes pending work only after target acceptance",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > batches sixteen compatible rebases behind one target signature",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > splits seventeen compatible rebases into sixteen plus one",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > refuses a foreign-author displaced intent before signing or issuing",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > sorts displaced pages before assigning fresh target logical times",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > suppresses an accepted exact identity before issue and rejects changed bytes",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > keeps the source pending and terminally exposes target issue or publication failure",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > keeps a failed source completion pending and retries it on reopen",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > fails unknown policy and unstable transform identity before target issuance",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > keeps a transformed source pending when the product projection rejects its replacement",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > keeps a recovered projection-rejected replacement and its source pending without reissue",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  },
+  {
+    "name": "Phase 3g room-owned rebase scheduling RED > keeps the reserved terminal activation outside the real chat and zone displacement policies",
+    "file": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/tests/phase-3g-v3-room-rebase-red.test.ts"
+  }
+]

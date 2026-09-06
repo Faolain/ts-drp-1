@@ -24,11 +24,17 @@ interface CircuitRelayHost
 }
 
 export interface Libp2pRelayClientOptions {
-	connect(address: string, signal: AbortSignal): Promise<void>;
+	connect(address: string, signal: AbortSignal): Promise<OwnedConnectionReceipt> | Promise<void>;
 	disconnect(peerId: string): Promise<void>;
 	readonly host: CircuitRelayHost;
 	readonly identifyTimeoutMs?: number;
 	readonly reservationTimeoutMs?: number;
+}
+
+export interface OwnedConnectionReceipt {
+	close(): Promise<void>;
+	readonly connectionId: string;
+	readonly created: boolean;
 }
 
 interface CircuitListenerHandle {
@@ -38,8 +44,8 @@ interface CircuitListenerHandle {
 interface LiveCircuitReservation {
 	address: string;
 	candidate: RelayCandidate;
-	disconnected: boolean;
 	readonly listeners: Set<CircuitListenerHandle>;
+	readonly ownership: OwnedConnectionReceipt;
 }
 
 /**
@@ -53,6 +59,7 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 	readonly #host: CircuitRelayHost;
 	readonly #identifyTimeoutMs: number;
 	readonly #inspectedAddresses = new Map<string, string>();
+	readonly #pendingOwnership = new Map<string, OwnedConnectionReceipt>();
 	readonly #reservationTimeoutMs: number;
 
 	/**
@@ -81,30 +88,54 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 	async inspect(candidate: RelayCandidate, address: string, signal: AbortSignal): Promise<RelayInspection> {
 		const startedAt = performance.now();
 		const identification = observeIdentify(this.#host, candidate.peerId, signal);
+		let firstObservationTimer: ReturnType<typeof setTimeout> | undefined;
 		try {
 			const peerId = peerIdFromString(candidate.peerId);
-			await this.#connect(address, signal);
+			if (this.#pendingOwnership.has(candidate.peerId)) await this.#releasePending(candidate.peerId);
+			const connecting = this.#connect(address, signal);
+			let firstObservationTurnElapsed = false;
+			const firstObservationTurn =
+				this.#identifyTimeoutMs === 1
+					? new Promise<void>((resolve) => {
+							firstObservationTimer = setTimeout(() => {
+								firstObservationTurnElapsed = true;
+								resolve();
+							}, 0);
+						})
+					: undefined;
+			const connected = await connecting;
+			const ownership = connected ?? (await this.#legacyOwnership(candidate.peerId, this.#identifyTimeoutMs, signal));
+			this.#pendingOwnership.set(candidate.peerId, ownership);
 			identification.startTimeout(this.#identifyTimeoutMs);
 			const connection = await waitForValue(
-				() => this.#host.getConnections(peerId)[0],
+				() => this.#host.getConnections(peerId).find(({ id }) => id === ownership.connectionId),
 				this.#identifyTimeoutMs,
 				signal
 			);
 			let protocols = [...(await this.#host.peerStore.get(peerId)).protocols];
 			if (!protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL)) {
-				const observed = await identification.result;
+				const observed =
+					firstObservationTurn === undefined || firstObservationTurnElapsed
+						? await identification.result
+						: await Promise.race([identification.result, firstObservationTurn.then(() => undefined)]);
 				signal.throwIfAborted();
 				protocols = observed ?? [...(await this.#host.peerStore.get(peerId)).protocols];
 			}
-			this.#inspectedAddresses.set(candidate.peerId, address);
-			return {
+			const inspection: RelayInspection = {
 				connectionId: connection.id,
 				hopAdvertised: protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL),
 				latencyMs: performance.now() - startedAt,
 				outcome: "connected",
 				protocols,
 			};
+			if (!inspection.hopAdvertised) {
+				await this.#releasePending(candidate.peerId);
+			} else {
+				this.#inspectedAddresses.set(candidate.peerId, address);
+			}
+			return inspection;
 		} catch (error) {
+			await this.#releasePending(candidate.peerId).catch(() => undefined);
 			return {
 				hopAdvertised: false,
 				latencyMs: performance.now() - startedAt,
@@ -112,6 +143,7 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 				protocols: [],
 			};
 		} finally {
+			if (firstObservationTimer !== undefined) clearTimeout(firstObservationTimer);
 			identification.cancel();
 		}
 	}
@@ -124,9 +156,16 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 	async reserve(candidate: RelayCandidate, signal: AbortSignal): Promise<RelayReservationWireResponse> {
 		const relayAddress = this.#inspectedAddresses.get(candidate.peerId) ?? candidate.addresses[0];
 		if (relayAddress === undefined) return { status: RELAY_RESERVATION_STATUS.CONNECTION_FAILED };
-		await this.#connect(relayAddress, signal);
-		const response = await this.#requestReservation(candidate, signal);
-		if (response.status !== RELAY_RESERVATION_STATUS.OK) return response;
+		let ownership = this.#active.get(candidate.peerId)?.ownership ?? this.#pendingOwnership.get(candidate.peerId);
+		if (ownership === undefined) {
+			ownership = await this.#connectOwned(candidate.peerId, relayAddress, signal);
+			this.#pendingOwnership.set(candidate.peerId, ownership);
+		}
+		const response = await this.#requestReservation(candidate, ownership, signal);
+		if (response.status !== RELAY_RESERVATION_STATUS.OK) {
+			await this.#releasePending(candidate.peerId);
+			return response;
+		}
 
 		const circuitAddress = multiaddr(`${relayAddress}/p2p-circuit`);
 		try {
@@ -149,10 +188,12 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 				this.#reservationTimeoutMs,
 				signal
 			);
-			this.#rememberListener(candidate, advertised.toString(), listener);
+			this.#rememberListener(candidate, advertised.toString(), listener, ownership);
+			this.#pendingOwnership.delete(candidate.peerId);
 			return response;
 		} catch (error) {
-			this.#rememberMatchingListeners(candidate, circuitAddress.toString());
+			await this.#closeMatchingListeners(candidate.peerId);
+			await this.#releasePending(candidate.peerId).catch(() => undefined);
 			throw error;
 		}
 	}
@@ -183,18 +224,16 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 				}
 			}
 		}
-		if (active?.disconnected !== true) {
+		if (active?.ownership.created === true) {
 			try {
-				await this.#disconnect(candidate.peerId);
-				if (active !== undefined) active.disconnected = true;
+				await active.ownership.close();
 			} catch (error) {
 				failures.push(error);
 			}
 		}
-		if (active === undefined || (active.listeners.size === 0 && active.disconnected)) {
-			this.#active.delete(candidate.peerId);
-			this.#inspectedAddresses.delete(candidate.peerId);
-		}
+		this.#active.delete(candidate.peerId);
+		this.#inspectedAddresses.delete(candidate.peerId);
+		await this.#releasePending(candidate.peerId).catch((error: unknown) => failures.push(error));
 		if (failures.length > 0) throw new AggregateError(failures, "relay listener or connection release failed");
 	}
 
@@ -202,6 +241,7 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 	async stop(): Promise<void> {
 		const candidates = [...this.#active.values()].map(({ candidate }) => candidate);
 		await Promise.all(candidates.map(async (candidate) => this.release(candidate)));
+		await Promise.all([...this.#pendingOwnership.keys()].map(async (peerId) => this.#releasePending(peerId)));
 	}
 
 	#hasAdvertisedCircuit(peerId: string): boolean {
@@ -211,29 +251,78 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 	#rememberMatchingListeners(candidate: RelayCandidate, address: string): void {
 		for (const listener of this.#host.components.transportManager.getListeners()) {
 			if (listener.getAddrs().some((value) => isCircuitForPeer(value.toString(), candidate.peerId))) {
-				this.#rememberListener(candidate, address, listener);
+				const ownership = this.#pendingOwnership.get(candidate.peerId) ?? this.#active.get(candidate.peerId)?.ownership;
+				if (ownership !== undefined) this.#rememberListener(candidate, address, listener, ownership);
 			}
 		}
 	}
 
-	#rememberListener(candidate: RelayCandidate, address: string, listener: CircuitListenerHandle): void {
+	#rememberListener(
+		candidate: RelayCandidate,
+		address: string,
+		listener: CircuitListenerHandle,
+		ownership: OwnedConnectionReceipt
+	): void {
 		const active = this.#active.get(candidate.peerId) ?? {
 			address,
 			candidate,
-			disconnected: false,
 			listeners: new Set<CircuitListenerHandle>(),
+			ownership,
 		};
 		active.address = address;
 		active.candidate = candidate;
-		active.disconnected = false;
 		active.listeners.add(listener);
 		this.#active.set(candidate.peerId, active);
 	}
 
-	async #requestReservation(candidate: RelayCandidate, signal: AbortSignal): Promise<RelayReservationWireResponse> {
+	async #connectOwned(peerId: string, address: string, signal: AbortSignal): Promise<OwnedConnectionReceipt> {
+		const provided = await this.#connect(address, signal);
+		if (provided !== undefined) return provided;
+		return this.#legacyOwnership(peerId, this.#identifyTimeoutMs, signal);
+	}
+
+	async #legacyOwnership(peerId: string, timeoutMs: number, signal: AbortSignal): Promise<OwnedConnectionReceipt> {
+		const connection = await waitForValue(
+			() => this.#host.getConnections(peerIdFromString(peerId))[0],
+			timeoutMs,
+			signal
+		);
+		return {
+			close: async (): Promise<void> => this.#disconnect(peerId),
+			connectionId: connection.id,
+			created: true,
+		};
+	}
+
+	async #releasePending(peerId: string): Promise<void> {
+		const ownership = this.#pendingOwnership.get(peerId);
+		if (ownership === undefined) return;
+		this.#pendingOwnership.delete(peerId);
+		this.#inspectedAddresses.delete(peerId);
+		if (ownership.created) await ownership.close();
+	}
+
+	async #closeMatchingListeners(peerId: string): Promise<void> {
+		const failures: unknown[] = [];
+		for (const listener of this.#host.components.transportManager.getListeners()) {
+			if (!listener.getAddrs().some((address) => isCircuitForPeer(address.toString(), peerId))) continue;
+			try {
+				await listener.close();
+			} catch (error) {
+				failures.push(error);
+			}
+		}
+		if (failures.length > 0) throw new AggregateError(failures, "relay listener cleanup failed");
+	}
+
+	async #requestReservation(
+		candidate: RelayCandidate,
+		ownership: OwnedConnectionReceipt,
+		signal: AbortSignal
+	): Promise<RelayReservationWireResponse> {
 		const peerId = peerIdFromString(candidate.peerId);
 		const connection = await waitForValue(
-			() => this.#host.getConnections(peerId)[0],
+			() => this.#host.getConnections(peerId).find(({ id }) => id === ownership.connectionId),
 			this.#reservationTimeoutMs,
 			signal
 		);

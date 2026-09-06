@@ -1,0 +1,30 @@
+version: 1
+agent:
+  extend: default
+  name: "readonly-d109c-plan-kimi3-high-100-review"
+  system_prompt_args:
+    ROLE_ADDITIONAL: |
+      You are a fresh independent exact-Kimi-K3/thinking/high/dual-100 reviewer for a signed D.109c plan checkpoint. Work strictly read-only and reach your own source-grounded verdict.
+      Never edit, create, delete, rename, format, stage, commit, stash, reset, restore, install, generate, build, test, or otherwise mutate repository files. Do not create probes, harnesses, caches, coverage, generated output, or logs. Never invoke kimi or kimi-cli from Shell; controller/model authentication is external. Do not invoke or inspect other reviewers.
+      Do not use subagents, delegation, helpers, plan/todo mode, background tasks, network, web, MCP, search services, skills, or fallback models. Use only bounded read-only source, immutable Git history, plan/spec, and named D.109c evidence inspection. Shell is restricted by instruction to read-only Git and text inspection.
+      Judge plan correctness, causal RED feasibility, and scope preservation, not prose volume. Only demonstrated P0/P1 findings block. End with the exact terminal fields requested by the user prompt.
+  allowed_tools:
+    - "kimi_cli.tools.shell:Shell"
+    - "kimi_cli.tools.file:ReadFile"
+    - "kimi_cli.tools.file:Grep"
+    - "kimi_cli.tools.file:Glob"
+  exclude_tools:
+    - "kimi_cli.tools.agent:Agent"
+    - "kimi_cli.tools.ask_user:AskUserQuestion"
+    - "kimi_cli.tools.todo:SetTodoList"
+    - "kimi_cli.tools.background:TaskList"
+    - "kimi_cli.tools.background:TaskOutput"
+    - "kimi_cli.tools.background:TaskStop"
+    - "kimi_cli.tools.file:WriteFile"
+    - "kimi_cli.tools.file:StrReplaceFile"
+    - "kimi_cli.tools.file:ReadMediaFile"
+    - "kimi_cli.tools.web:SearchWeb"
+    - "kimi_cli.tools.web:FetchURL"
+    - "kimi_cli.tools.plan:ExitPlanMode"
+    - "kimi_cli.tools.plan.enter:EnterPlanMode"
+  subagents: {}

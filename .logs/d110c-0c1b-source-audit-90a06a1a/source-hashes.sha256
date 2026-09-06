@@ -1,0 +1,6 @@
+69a8134fe8ad895f388dc93d02bdafc2b216b35f1cd5d06b597fab2d59487f19  packages/node/src/v3-live.ts
+4abdb8bf3dfcfa85e1b5320615928b19709fe9706bad8b509f12d59881225dcd  packages/node/src/creator-close.ts
+405ad160cf0bdb2ef6fb33dda81910f0435450fb7bb7ed85362ccd8605cdbf12  packages/issuance-store/src/types.ts
+c5f67bcc4415bd991954aa7a85ccea203cc67ca23df208681e064a6719e238d7  packages/live-journal/src/types.ts
+0f64058530c2462b043c6855eb2a4b1f18ece7dfa431a9d5f3c0e822a03201ec  tests/e5-01-v3-operation-admission-red.test.ts
+aa94101ea888c3f691d11be2d5ba869eaa715631b5276eaa1f800b4aa811c528  tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts

@@ -1,0 +1,17 @@
+dfde8831e21864c7c3f80725619dc9f9ab5df4a7ada6569d6c903d905b178822  .logs/d110c-0b1-plan-confirmation-627f98d1/confirmation-ledger.md
+5327de55d9f7f0143e0a3d493b040fe6beeff0ee4fa07b99810a172387fa231b  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/command.json
+adf2b6bf8cbaa75b5b627c3e52c69c6308616c6da47255d8bc0402212a3326e9  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/events.jsonl
+32a4dcdf34100ae5e9194abb1cd085c173ca313403532321df430a7d2148ce82  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/input-packet.md
+4b85ab2533bd9f32fa8f4684d861f1423f76bdca69b2dbe2b67bf21b466b8130  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/public.txt
+63b1cb3c8d156a41ef71c8f0b9ffec1d4d4f4700a24126e135d598909f675d2d  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/resume-events.jsonl
+84582f893bf451a9de5b53925d9a0aa1bcc5bbdae48fea70f2ad7bfcec0f36c8  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/resume-prompt.md
+fd669ea6c8e67fb6a135d03c48f8f1856099a212cc25b7d92eb00481e7032cc3  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/resume-public.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/resume-stderr.txt
+6969cfb8517a9a2635c1daced2e0bb969f5f6df325d9e3301b9fb4a0300cb086  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/review.diff
+bdace531f7e46138a74bf533e5145d2913c0a6513dfb9f3be2733175d28d8d35  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/status.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0b1-plan-confirmation-627f98d1/grok/stderr.log
+d706c8d7e11485fc37c89e3f063366d873cfb416fd6ce1a35fa41e5f146432f8  .logs/d110c-0b1-plan-confirmation-627f98d1/kimi/stderr.txt
+0a1f646588eb134dee629263ad146b09eb7ba0f6bb722cceeb8deb4f7fa1ff01  .logs/d110c-0b1-plan-confirmation-627f98d1/kimi/stream.jsonl
+68d50e305bdfa5da77392135ac68cc9c5ef2e642c34f539cc12ab2d848ceac74  .logs/d110c-0b1-plan-confirmation-627f98d1/opus/raw.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0b1-plan-confirmation-627f98d1/opus/stderr.txt
+c56d6d3397b218544776700b66bca585794417eb1d3a3fc467bd1f6bae938eca  .logs/d110c-0b1-plan-confirmation-627f98d1/prompt.md

@@ -1,0 +1,273 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 23,
+  "passed": 23,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED freezes exact workload, window and epsilon arithmetic",
+      "status": "passed",
+      "title": "freezes exact workload, window and epsilon arithmetic",
+      "duration": 0.9574999999999818,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED accepts the independent synthetic validator control",
+      "status": "passed",
+      "title": "accepts the independent synthetic validator control",
+      "duration": 1.3327089999999941,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the missing-gc false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the missing-gc false gate with its exact code",
+      "duration": 0.9197079999999858,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the endpoint-only-slope false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the endpoint-only-slope false gate with its exact code",
+      "duration": 0.3804580000000044,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the sorted-samples false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the sorted-samples false gate with its exact code",
+      "duration": 0.307124999999985,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the baseline-subtraction false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the baseline-subtraction false gate with its exact code",
+      "duration": 0.8540840000000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the wrong-ols-window false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the wrong-ols-window false gate with its exact code",
+      "duration": 0.37854200000001015,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the window-not-held false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the window-not-held false gate with its exact code",
+      "duration": 0.2777080000000183,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the retained-js-graph false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the retained-js-graph false gate with its exact code",
+      "duration": 0.4974589999999921,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the retained-array-buffers false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the retained-array-buffers false gate with its exact code",
+      "duration": 0.3349580000000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the absolute-budget-bypass false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the absolute-budget-bypass false gate with its exact code",
+      "duration": 0.4872919999999965,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the dropped-operations false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the dropped-operations false gate with its exact code",
+      "duration": 0.245207999999991,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the double-counted-operations false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the double-counted-operations false gate with its exact code",
+      "duration": 0.21516699999997968,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the substituted-digest false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the substituted-digest false gate with its exact code",
+      "duration": 0.24425000000002228,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the after-completion-only false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the after-completion-only false gate with its exact code",
+      "duration": 0.24408299999998917,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED rejects the false-repeated-same-object false gate with its exact code",
+      "status": "passed",
+      "title": "rejects the false-repeated-same-object false gate with its exact code",
+      "duration": 0.2073750000000132,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED audits the complete hard-gate infrastructure without readiness skips",
+      "status": "passed",
+      "title": "audits the complete hard-gate infrastructure without readiness skips",
+      "duration": 4.167875000000009,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED calibrates profile clocks without cross-clock absolute comparison",
+      "status": "passed",
+      "title": "calibrates profile clocks without cross-clock absolute comparison",
+      "duration": 1.2943750000000023,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED closes D110A_POST_GC_SLOPE_GATE_MISSING",
+      "status": "passed",
+      "title": "closes D110A_POST_GC_SLOPE_GATE_MISSING",
+      "duration": 0.30658299999998917,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED closes D110A_PAIRED_WORKLOAD_GATE_MISSING",
+      "status": "passed",
+      "title": "closes D110A_PAIRED_WORKLOAD_GATE_MISSING",
+      "duration": 0.23970900000000483,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED closes D110A_HARD_ENTRYPOINT_MISSING",
+      "status": "passed",
+      "title": "closes D110A_HARD_ENTRYPOINT_MISSING",
+      "duration": 0.23345800000004147,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED closes D110AW_TIMEOUT_FEASIBILITY_MISSING",
+      "status": "passed",
+      "title": "closes D110AW_TIMEOUT_FEASIBILITY_MISSING",
+      "duration": 0.2901249999999891,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a retained-heap hard-gate RED"
+      ],
+      "fullName": "D.110a retained-heap hard-gate RED closes D110AX_PREFLIGHT_VARIANCE_MISSING",
+      "status": "passed",
+      "title": "closes D110AX_PREFLIGHT_VARIANCE_MISSING",
+      "duration": 0.23224999999996498,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

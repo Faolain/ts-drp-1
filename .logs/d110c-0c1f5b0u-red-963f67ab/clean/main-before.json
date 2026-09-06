@@ -1,0 +1,15 @@
+{
+  "commit": "963f67ab997863a8acf3a47a8d978931e3411847",
+  "sourceHashes": {
+    "examples/v3-room/src/index.ts": "d872ebca21e0b637a258423650a3fa074556c4408a2f6057f7427fcdbd2f75fd",
+    "packages/issuance-store/src/conformance.ts": "00aa85f56e738686049099ded7ff4d1a12c34d54d7dadd9c6d47751df91a5c9a",
+    "packages/issuance-store/src/contract.ts": "5616617c29488208fe46c2fafd45e19af28129f7948b164424ea6275b621fab9",
+    "packages/issuance-store/src/types.ts": "2100ed2037bfb027d9f6090f843f04d9d448135498fa256e208afdd67ec65b8d",
+    "packages/node/src/v3-live.ts": "04057f76969a1286d511f629a3a0a84e60f1a811a0d7a7b0ba131d0a29db0177",
+    "packages/storage-browser/src/internal/browser-issuance-store.ts": "692e02f4381872f26b9d1801ef1d17cd760eb30ca6bfb9d8ffb09f4d27c024bd",
+    "packages/storage-node/src/internal/node-issuance-store.ts": "ab4fa2a5f81c5f674a799387d324e2f83db6dddbda6e22bc5611f0818f140110"
+  },
+  "patchHash": "1239cf2d5fbbc6e40eebdae4365ba7b8843af1d22586851548a1f995025684c9",
+  "stashHash": "382adffafb1bcaaff7def4d01213b0b0f70f7a446e60d9ac1225b8d6b81b5fc7",
+  "stashCount": 27
+}

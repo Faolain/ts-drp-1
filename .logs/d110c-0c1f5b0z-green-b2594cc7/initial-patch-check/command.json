@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout",
+  "command": "git",
+  "args": [
+    "apply",
+    "--check",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch"
+  ],
+  "start": "2026-09-05T19:59:44.166Z"
+}

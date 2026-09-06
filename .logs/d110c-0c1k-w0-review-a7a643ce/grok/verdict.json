@@ -1,0 +1,37 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "W0-P2-fence-restart",
+      "finding": "W0 proves in-session fence share/count/close, but not restart/replay of a locally issued fence.",
+      "evidence": "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts:146",
+      "owner": "f5b0b",
+      "disposition": "Deferred by W0; local fence issuance/restart remains f5b0b."
+    },
+    {
+      "id": "W0-P2-per-kind-oversize",
+      "finding": "Loud oversize rejection is centralized in creator-close rather than re-proven in each recognized codec.",
+      "evidence": "packages/node/src/creator-close.ts:696",
+      "owner": "existing per-kind codec tests",
+      "disposition": "Accepted residual; W0 closed the silent skip, not new codec suites."
+    },
+    {
+      "id": "W0-P2-runtime-41-v1-vocab",
+      "finding": "Runtime 41 full-shape still encodes the v2 four-group tuple on default v1; the 8,192-byte check rejects first.",
+      "evidence": "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts:69",
+      "owner": "W0 runtime fixture",
+      "disposition": "Non-blocking; v2 31/64/65/41 matrix and v1 referee snapshot-mismatch are independently pinned."
+    }
+  ],
+  "notes": [
+    "History confirmed: plan D.110c-0c1k + 909f4f5c (legacy ceiling stays 8192; 64 full-shape is impossible) -> causal RED 8860b432 (10/10) -> initial GREEN 0d6e38c2/9ad3d957 -> shared P1 v1 [admin,finality,referee,writer] accept -> tests-only RED f511a18b (W0 10/10, ACL 6/7, production ok:true) -> GREEN a7a643ce.",
+    "Corrective GREEN touched only packages/protocol-v3/src/latched-acl.ts: deleted snapshotGroupsForVersion and the v1 exact-four-group exception; validation/sorting use groupsForVersion (v1=GROUPS_V1).",
+    "W0 cases 1-4 hold: 31/64 writer-only 3450/7014 accept; 65 writer-only 7122 rejects by cap 64; 41 full-shape 8261 rejects by 8192 bytes; stage/open/close/adoption/recovery agree; SCANNABLE_BYTES gone from creator-close; O(1) membersByAuthor; default-4 authorShareMultiplier; maxEpochVertices unchanged.",
+    "Fail-closed legacy: v1 referee member and exact four-group tuple are snapshot-mismatch; v1 referee grant is malformed-input; v2 four-group remains valid.",
+    "Settlement v3 remains 65536/maxItems8192/cap256 and profile-gated; v1/v2 maxBytes 8192 / maxItems 2048 / cap 64. No W1/W2 demand."
+  ]
+}

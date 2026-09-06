@@ -1,0 +1,85 @@
+{
+  "checkedAt": "2026-09-06T12:05:52.945Z",
+  "ports": [
+    {
+      "port": 4174,
+      "pids": []
+    },
+    {
+      "port": 4175,
+      "pids": []
+    },
+    {
+      "port": 51000,
+      "pids": []
+    },
+    {
+      "port": 51002,
+      "pids": []
+    }
+  ],
+  "processes": [
+    {
+      "pid": 19195,
+      "numericStatus": "19195 86727 R",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 19543,
+      "numericStatus": "19543 38746 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 56881,
+      "numericStatus": "56881 56847 SN",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/marketing"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 56966,
+      "numericStatus": "56966 56850 SN",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/web"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 86724,
+      "numericStatus": "86724 86675 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 86727,
+      "numericStatus": "86727 86724 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    }
+  ],
+  "noArgvCommOrEnvironmentDump": true,
+  "noCompetingTaskProcesses": true,
+  "inheritedProfilingAbsent": true,
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "allFrozenInputsExact": true,
+  "inputCount": 1626,
+  "custodyExact": true,
+  "isolatedCustody": {
+    "root": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+    "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+    "overlaySha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+    "dependencyLinksExact": true
+  },
+  "releaseSha256": "e8a6287f4664cfaa7ed1a3c264980e96ea5dc0cfb7d87b6dede6a8515a6fbd83"
+}

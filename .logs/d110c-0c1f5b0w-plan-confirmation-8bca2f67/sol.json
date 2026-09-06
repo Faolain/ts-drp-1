@@ -1,0 +1,11 @@
+{
+	"verdict": "PASS",
+	"p0_count": 0,
+	"p1_count": 0,
+	"p2_count": 0,
+	"findings": [],
+	"blocking_union_empty": true,
+	"red_authorized": true,
+	"scope_preserved": true,
+	"assessment": "The corrected signed/pushed plan removes the parent-codec cycle through the closed f5b0u rebase-pair path, keeps successful close/adopt and re-admission in parent f5b, closes the retained-entry fall-through, and introduces no API or contract expansion."
+}

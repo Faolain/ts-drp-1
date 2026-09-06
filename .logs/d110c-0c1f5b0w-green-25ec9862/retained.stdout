@@ -1,0 +1,164 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > uses genuine trust, issuance and recovery, signs the record last, and reopens durable target state 534ms
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects a caller-selected target, a foreign creator, and hostile nonce views before target effects 113ms
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects duplicate source identity, unstable prepare, source substitution, and target-state divergence 338ms
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects oversized state and import descriptions before target reservation 211ms
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > linearizes the source snapshot before a concurrently queued source write 169ms
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects a genuine target import failure and a foreign registered-vertex signature without poisoning the source 286ms
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > contains a malformed signed remote migration record before projection and keeps recovery usable 437ms
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects noncreator and creator-signed malformed decisions before the exact creator activation 1098ms
+ ✓ tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > recovers irreversible activation commits without reopening source authority 4710ms
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > separates plane-local stores, authenticates both anchors and bootstraps the empty target once 861ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate 2ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis 4ms
+   → expected [Function] to throw error including 'issuance-rejected' but got 'truncated canonical value'
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > rejects wrong readiness scope and snapshot scope before bootstrap or recovery 1ms
+   → expected [Function] to throw error including 'readiness' but got 'truncated canonical value'
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase 12ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > orders exact rebase and transform inputs while expire and held review perform no issue 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > closes one source exactly once after every child has a terminal outcome 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > preserves published source work and completes pending work only after target acceptance 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > batches sixteen compatible rebases behind one target signature 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > splits seventeen compatible rebases into sixteen plus one 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > refuses a foreign-author displaced intent before signing or issuing 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > sorts displaced pages before assigning fresh target logical times 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > suppresses an accepted exact identity before issue and rejects changed bytes 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps the source pending and terminally exposes target issue or publication failure 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a failed source completion pending and retries it on reopen 5ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > fails unknown policy and unstable transform identity before target issuance 2ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a transformed source pending when the product projection rejects its replacement 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a recovered projection-rejected replacement and its source pending without reissue 1ms
+   → truncated canonical value
+ ✓ tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > rejects partial, extra and accessor-backed policy evidence before consuming a source row 2ms
+ ✓ tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps the reserved terminal activation outside the real chat and zone displacement policies 161ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c synchronous factory and exact SQLite admission > exports one runtime factory and returns the frozen eight-member capability synchronously 34ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c synchronous factory and exact SQLite admission > uses one-pass captured descriptors and rejects the complete closed-record misuse table before open 9ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c synchronous factory and exact SQLite admission > derives verbatim while never touching primary identity or creating parents 10ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c synchronous factory and exact SQLite admission > creates, byte-verifies and reopens exactly one authority at schema v3 in the stable v1-derived file 6ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c synchronous factory and exact SQLite admission > pins native constructor booleans, FULL/busy pragmas and explicit numeric statement reads 73ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c synchronous factory and exact SQLite admission > retries an interrupted empty catalog but rejects partial, AHE-shaped and extra-schema files without repair 39ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c real transaction, lifecycle and paging contract > commits one detached closure, returns fresh reads and preserves pending outbox 9ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c real transaction, lifecycle and paging contract > copies pooled Buffer input into plain private bytes and rejects SharedArrayBuffer without mutation 9ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c real transaction, lifecycle and paging contract > uses shared UTF-16 order rather than SQLite BINARY order, including the inversion pair 7ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c real transaction, lifecycle and paging contract > applies the shared default page bound, afterKey, scope filter and closed input grammar 14ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c real transaction, lifecycle and paging contract > makes one of eight same-scope candidates win and permits progress plus reentrancy during builders 115ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c real transaction, lifecycle and paging contract > uses one synchronous writer then one bounded readonly snapshot with no microtask in the writer 6ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c real transaction, lifecycle and paging contract > maps cross-process writer expiry as transient and latches child-key collision corruption 1160ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c real transaction, lifecycle and paging contract > close never awaits a suspended builder, validates malformed before closed, and MAX commits exactly once 10ms
+ ✓ packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts > Phase 2l-c terminal suppression through the real adapter > classifies all five bounded ambiguity outcomes without exposing candidate bytes 17ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a package and closed contract > publishes the exact closed error, retry and ten-case ambiguity registries 36ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a package and closed contract > has only canonical at runtime and keeps protocol-v3 out of source, runtime and declarations 2ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a package and closed contract > exposes exactly the store methods and creates only pending immutable rows 3ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > selects zero, calls the closure exactly once and does not rehash or verify arbitrary non-empty bytes 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects public misuse asynchronously with the exact TypeError code and no build 1ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects non-primitive, empty or over-bound scope fields without consuming 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects non-primitive, empty or over-bound scope fields without consuming 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects non-primitive, empty or over-bound scope fields without consuming 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > propagates a closure synchronous throw and rejection unchanged with old state 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects selected ordinal, scope, canonical-preimage and equal-envelope mismatches as commit-invalid 1ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects extra, inherited or accessor-backed commit records instead of normalizing a wider native shape 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects empty canonicalPreimageBytes and never persists it 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects empty digest and never persists it 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects empty signature and never persists it 2ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > rejects SharedArrayBuffer-backed views before persistence 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a validation, copying and promise behavior > copies before persistence and returns fresh detached graphs on every read and success 1ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a lineage and deterministic concurrency > issues MAX_SAFE_INTEGER exactly once, marks exhausted and never computes or builds +1 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a lineage and deterministic concurrency > leaves a failed final-slot build selectable for one later successful retry 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a lineage and deterministic concurrency > reports a final-slot CAS loser as retry-required even though the winner exhausted the lineage 1ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a lineage and deterministic concurrency > makes one synchronized same-scope winner and private retry-required CAS losers without rebuilding 1ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a lineage and deterministic concurrency > allows scope B to finish while scope A is suspended inside its one build 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a paging, terminal readback and poisoning > uses the exact default/bounds, optional scope and UTF-16 compound-key comparator 6ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a paging, terminal readback and poisoning > classifies exact pending or published candidate rows as durable success, even after later advance 3ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a paging, terminal readback and poisoning > classifies absent-old, foreign-pair, torn and unreadable observations by the exact five-case table 2ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a paging, terminal readback and poisoning > treats final MAX lineage as consumed only when exhausted 1ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a paging, terminal readback and poisoning > latches one recovery-corrupt error across every operation while close remains idempotent 0ms
+ ✓ tests/phase-2l-a-shared-issuance-contract.test.ts > Phase 2l-a paging, terminal readback and poisoning > rejects every post-close operation with one closed code and never returns partial data 0ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > freezes the ten migration cases and six genuine process-death boundaries 2ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > [RED readiness] requires the Node maintenance owner and v3 settlement schema 0ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > prunes and reopens the same derived authority without changing its facade 30ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant canonical-malformed with zero pruning writes 9ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant vertex-kind-wrong with zero pruning writes 7ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant protocol-major-wrong with zero pruning writes 7ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant scope-wrong with zero pruning writes 7ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant ordinal-wrong with zero pruning writes 10ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant epoch-wrong with zero pruning writes 8ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant issued-only with zero pruning writes 8ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant outbox-only with zero pruning writes 7ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant digest-mismatch with zero pruning writes 7ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant sequence-gap with zero pruning writes 8ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > refuses native mutant epoch-regression with zero pruning writes 12ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > rolls back the injected delete-count-mismatch owner-count mutant 5ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > rolls back the injected watermark-update-count-mismatch owner-count mutant 5ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > serializes two live handles and rejects a genuinely stale watermark extension 7ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > migrates the exact v1 authority in place and preserves every issuance row 8ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > rolls back a failed v1 migration and admits two racing v1 openers exactly once 110ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > rejects unknown versions and catalogs without repairing either authority 9ms
+ ✓ packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts > D.109b Node issuance-retention RED > recovers old XOR complete-new state at every frozen hard-kill edge 449ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > freezes the exact RED/GREEN owners, semantic matrix, page edges, native mutants, migration cases and crash edges 2ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > [RED readiness] requires the shared maintenance owner, resolver, watermark observation and pruned error 0ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > resolves only the exact genuine facade and returns detached frozen inspection state 7ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > atomically removes a published prefix and replays the same lost-receipt input as a no-op 7ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > keeps a valid pending prefix non-poisoning and a newer pending suffix outside the selected range 3ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > rejects accessor input before mutation and captures mutable input by value 1ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > refuses stale lineage and stale watermark without poisoning the store 2ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > supports a later closed epoch after a prior prefix was pruned 1ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > preserves null-watermark polarity across the complete absence matrix 1ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > walks the exact bounded-page edge 64 without retaining the selected prefix 6ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > walks the exact bounded-page edge 65 without retaining the selected prefix 5ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > walks the exact bounded-page edge 128 without retaining the selected prefix 7ms
+ ✓ tests/phase-6b-issuance-retention-red.test.ts > D.109b issuance-retention causal RED > walks the exact bounded-page edge 129 without retaining the selected prefix 7ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > uses one real issue/close/reopen lineage and publishes only the current target row 197ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > expands genuine two and sixteen child source batches in signed order 229ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > retires an authenticated stored structural source row without exposing an application policy intent 123ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > fails closed before exposing an 8,193rd authenticated displaced source row 16051ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > fails closed before quarantining an 8,193rd authenticated current row 15249ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > enumerates two genuine source rows in author-sequence order without re-deriving the first 96ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > rejects signed malformed, nested, mixed-control and over-limit prior batches 312ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > never treats missing or creator-signature-corrupt source authority as displacement 297ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > rejects mixed source authorization bytes and a target-capability substitution 538ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > rejects target authorization bytes and a source-capability substitution 145ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > reopens the target against the same lineage without issuing a duplicate target bootstrap 140ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > preserves source intent when a matching pending target replacement needs product acceptance 139ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > does not discard source intent behind a quarantined matching target row 105ms
+ ✓ tests/phase-3g-v3-rebase-outbox-red.test.ts > Phase 3g authenticated-plane rebase outbox RED > skips a directly quarantined current row without blocking rebase or publication 88ms
+ ✓ packages/storage-browser/tests/phase-2l-b-browser-issuance-registry-red.test.ts > Phase 2l-b literal browser issuance authorities > adds only the explicit issuance subpath and runtime shared owner while root stays byte-identical 2ms
+ ✓ packages/storage-browser/tests/phase-2l-b-browser-issuance-registry-red.test.ts > Phase 2l-b literal browser issuance authorities > freezes one exact v1 native schema and five browser ambiguity cases 0ms
+ ✓ packages/storage-browser/tests/phase-2l-b-browser-issuance-registry-red.test.ts > Phase 2l-b literal browser issuance authorities > freezes exactly eight semantic edges crossed with two scenarios 1ms
+ ✓ packages/storage-browser/tests/phase-2l-b-browser-issuance-registry-red.test.ts > Phase 2l-b literal browser issuance authorities > binds lineage-write to fresh add and existing exact-prior put 0ms
+ ✓ packages/storage-browser/tests/phase-2l-b-browser-issuance-registry-red.test.ts > Phase 2l-b literal browser issuance authorities > rejects the old self-labelled first-get arm and accepts the mutation reread trace 1ms
+ ✓ packages/storage-browser/tests/phase-2l-b-browser-issuance-registry-red.test.ts > Phase 2l-b literal browser issuance authorities > requires controlled abort old and complete exact-new without creating a ninth edge 0ms
+ ✓ tests/phase-3h-v3-migration-record-red.test.ts > Phase 3h creator-owned migration record RED > keeps the activation decision distinct from the migration record 1ms
+ ✓ tests/phase-3h-v3-migration-record-red.test.ts > Phase 3h creator-owned migration record RED > derives one exact nonce-bound target object identity without caller selection 2ms
+ ✓ tests/phase-3h-v3-migration-record-red.test.ts > Phase 3h creator-owned migration record RED > defines deterministic chat and zone application-state checkpoints 1ms
+ ✓ tests/phase-3h-v3-migration-record-red.test.ts > Phase 3h creator-owned migration record RED > rejects every duplicate chat or zone application identity before target creation 0ms
+ ✓ tests/phase-3h-v3-migration-record-red.test.ts > Phase 3h creator-owned migration record RED > defines the exact closed migration record whose digest is content identity only 1ms
+ ✓ tests/phase-3a1b-d9346-shared-v3-room-red.test.ts > D.93.46b shared room contract > keeps the current grid production entry independently bundleable 3ms
+ ✓ tests/phase-3a1b-d9346-shared-v3-room-red.test.ts > D.93.46b shared room contract > requires deterministic projection, a signed transport roster, and room-bound E1 1616ms
+ ✓ tests/phase-3a1b-d9346-shared-v3-room-red.test.ts > D.93.46b shared room contract > routes the grid production bundle through the public shared-room owner 15ms
+ ✓ tests/phase-3a1b-d9346-shared-v3-room-red.test.ts > D.93.46b shared room contract > retires the legacy durable-object composition from the grid product bundle 6ms
+ ✓ tests/phase-3h-v3-room-activation-red.test.ts > Phase 3h-b creator-signed activation RED > derives the exact signed decision from record and invite evidence without routing inputs 4ms
+ ✓ tests/phase-3f-c-v3-room-batching-red.test.ts > Phase 3f-c shared-room batch measurement > measures one, two, sixteen, and seventeen captured requests at the genuine signing boundary 249ms
+
+ Test Files  1 failed | 11 passed (12)
+      Tests  18 failed | 118 passed (136)
+   Start at  10:06:32
+   Duration  51.61s (transform 1.16s, setup 0ms, collect 2.11s, tests 47.38s, environment 1ms, prepare 509ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0w-green-25ec9862/retained.json

@@ -1,0 +1,8 @@
+{
+  "verdict": "PASS",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 0,
+  "findings": [],
+  "summary": "The correction fully closes the initial P1: every non-case-3 parent consumer of the shared append-only fixture now uses the deterministic 256-character transform with updated exact-effect expectations, and the full focused matrix must reject state-ceiling failures. Case 3 alone retains the genuine multi-chunk, committed-prefix crash/restart proof through a bounded-state transient-payload blueprint. The 64-writer proof remains a real four-epoch, three-transition composition with all writers issuing, exact settlement and lineage accounting, offline/rejoin behavior, restart and cold reopen; its independently verified final canonical state is 14,303 bytes and must also be asserted below 32,768 bytes."
+}

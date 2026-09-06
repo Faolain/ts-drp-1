@@ -1,0 +1,34 @@
+{
+  "scope": "Bounded acceptance data; not an executed campaign or replacement for the accepted design",
+  "functionalContinuation": {
+    "sameRoom": true,
+    "writers": 64,
+    "genuineCloseAdoptTransitions": 3,
+    "epochs": [0, 1, 2, 3],
+    "publicApplicationIssuesPerWriterPerEpoch": 1,
+    "totalPublicApplicationIssues": 256,
+    "membershipAloneDoesNotCount": true,
+    "creatorAndNoncreatorRestartAndColdReopenRequired": true,
+    "executed": false
+  },
+  "laterRetainedGate": {
+    "minimumGenuineSameRoomTransitions": 100,
+    "executed": false,
+    "campaignAuthorizedByThisEvidence": false,
+    "requiredControls": [
+      "bounded durable checkpoint and runtime structures",
+      "rollback-generation and availability custody",
+      "owner-custody accounting",
+      "fresh-process repeated same-room memory",
+      "exact application, ACL, authority, anchor, history, archive and operation accounting",
+      "Discord W2 remains separately gated before its larger-author golden path"
+    ]
+  },
+  "full27CaseParentAcceptanceClaimed": false,
+  "unimplementedDedicatedParentCases": [
+    "same-slot duplicate below fence",
+    "rollback after adoption",
+    "delayed fence and delayed replacement variants",
+    "full positive authenticated adoption, rollback and availability pruning gates"
+  ]
+}

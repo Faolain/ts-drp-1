@@ -1,0 +1,15 @@
+7eb12c818706875339b5fe5e78bef43a5dc24b0592486a1bacac35cd781d0885  .logs/d110c-0c1k-w0-review-a7a643ce/blocking-union.status
+77522fd5d561eca4f54d35bde5aba76e5280f191974c67a55708305d9c700172  .logs/d110c-0c1k-w0-review-a7a643ce/commands.md
+c27b197e9ede409d1c557364a8694613cbbaf7717eadb7fc54f800b2861e2560  .logs/d110c-0c1k-w0-review-a7a643ce/grok/events.jsonl
+c5bdd6c27d21826d6b881a008c353355dfbf797fd39fa9ac30d60b54b0e48c2d  .logs/d110c-0c1k-w0-review-a7a643ce/grok/public.txt
+e2590bd6b79e790af0cc73548acf90c9122a4adde3ebeec577fa7bd7608ef946  .logs/d110c-0c1k-w0-review-a7a643ce/grok/reemit.events.jsonl
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1k-w0-review-a7a643ce/grok/reemit.stderr.txt
+b26728dc0077bd9568e1b9bcdea8a522549221d545689aeae07af5c60cc36952  .logs/d110c-0c1k-w0-review-a7a643ce/grok/status.json
+fa077462e9863d0e0f8c4841c53d80e2d4872aab479795f494aa89d6d408a30e  .logs/d110c-0c1k-w0-review-a7a643ce/grok/verdict.json
+4f6a0570921e60fdcb0ffaac440773ac6d4c6a768272ce5660eb101a78386f4e  .logs/d110c-0c1k-w0-review-a7a643ce/kimi/stream.jsonl
+09e7a6139c0f1f03705b1e1fc70dcb9413a14509829bb4e8e7bb595c2bab6a72  .logs/d110c-0c1k-w0-review-a7a643ce/kimi/verdict.json
+382be846ce27c3710a774d79225fb89951e5b2c250c2e8ded4a92cbd29d44d68  .logs/d110c-0c1k-w0-review-a7a643ce/opus/raw.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1k-w0-review-a7a643ce/opus/stderr.txt
+5b6ccced7cd18850fe87db16661973da8ec8154164f6670d9c338bfeb182cf05  .logs/d110c-0c1k-w0-review-a7a643ce/opus/verdict.json
+d2c0859db80c89b0363aa0752cd81ab13b0e3d24c8df87d893d481ed1490424e  .logs/d110c-0c1k-w0-review-a7a643ce/prompt.md
+8e5f5267c572727ec67b663a0dc8e15b225dbb4f599aca4bacc992795076c74b  .logs/d110c-0c1k-w0-review-a7a643ce/review-ledger.md

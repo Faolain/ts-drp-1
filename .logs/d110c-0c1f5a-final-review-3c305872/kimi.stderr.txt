@@ -1,0 +1,163 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+.logs/d110c-0c1f5a-clean-52fe3b44-v2/:
+SHA256SUMS
+checkout.status
+checkout.stderr.txt
+checkout.stdout.txt
+f5a.json
+f5a.status
+f5a.stderr.txt
+f5a.stdout.txt
+final-worktree-status.txt
+fixture-boundary.json
+fixture-boundary.status
+fixture-boundary.stderr.txt
+fixture-boundary.stdout.txt
+install.status
+install.stderr.txt
+install.stdout.txt
+listing.status
+listing.stderr.txt
+listing.txt
+playwright.json
+playwright.status
+playwright.stderr.txt
+playwright.stdout.txt
+post-vitest-status.txt
+pre-browser-process-ports.txt
+pre-checkout-status.txt
+proof.md
+source-identity.txt
+validate.mjs
+validation.txt
+verify-commit.status
+verify-commit.stderr.txt
+verify-commit.stdout.txt
+
+.logs/d110c-0c1f5a-clean-52fe3b44/:
+SHA256SUMS
+checkout.status
+checkout.stderr.txt
+checkout.stdout.txt
+install.status
+install.stderr.txt
+install.stdout.txt
+pre-checkout-status.txt
+setup-failure.md
+source-identity.txt
+verify-commit.status
+verify-commit.stderr.txt
+verify-commit.stdout.txt
+
+.logs/d110c-0c1f5a-green-e379cfd2/:
+SHA256SUMS
+build-typecheck.status
+build-typecheck.stderr.txt
+build-typecheck.stdout.txt
+commands.md
+d109d-baseline-e379.json
+d109d-baseline-e379.status
+d109d-baseline-e379.stderr.txt
+d109d-baseline-e379.stdout.txt
+d109d-baseline-install.status
+d109d-baseline-install.stderr.txt
+d109d-baseline-install.stdout.txt
+d109d-baseline-worktree-path.txt
+d109d-targeted-diagnostic.json
+d109d-targeted-diagnostic.status
+d109d-targeted-diagnostic.stderr.txt
+d109d-targeted-diagnostic.stdout.txt
+d109d-targeted-green.json
+d109d-targeted-green.status
+d109d-targeted-green.stderr.txt
+d109d-targeted-green.stdout.txt
+f24-41.json
+f24-41.status
+f24-41.stderr.txt
+f24-41.stdout.txt
+f5a-retained-red-named.json
+f5a-retained-red-named.status
+f5a-retained-red-named.stderr.txt
+f5a-retained-red-named.stdout.txt
+final-static.status
+final-static.stderr.txt
+final-static.stdout.txt
+finished-at.txt
+fixture-restoration-targeted.json
+fixture-restoration-targeted.status
+fixture-restoration-targeted.stderr.txt
+fixture-restoration-targeted.stdout.txt
+focused-reconstructed-timestamps.json
+focused.json
+green.patch
+ledger-recorded-at.txt
+node-version.txt
+playwright-two-title.json
+playwright-two-title.status
+playwright-two-title.stderr.txt
+playwright-two-title.stdout.txt
+pnpm-version.txt
+pre-browser-process-ports.txt
+remaining-build-typecheck.status
+remaining-build-typecheck.stderr.txt
+remaining-build-typecheck.stdout.txt
+required-builds.status
+required-builds.stderr.txt
+required-builds.stdout.txt
+retained-195-corrected.json
+retained-195-corrected.status
+retained-195-corrected.stderr.txt
+retained-195-corrected.stdout.txt
+retained-195-final.json
+retained-195-final.status
+retained-195-final.stderr.txt
+retained-195-final.stdout.txt
+retained-195.json
+retained-195.status
+retained-195.stderr.txt
+retained-195.stdout.txt
+runner-status.txt
+source-identity-before-green.txt
+started-at.txt
+stderr.txt
+stdout.txt
+validate.mjs
+validation.txt
+
+.logs/d110c-0c1f5a-red-466169aa/:
+command.txt
+manifest.sha256
+red-ledger.md
+result.json
+status.txt
+stderr.txt
+stdout.txt
+validate.mjs
+validation.json
+1
+---
+1 1 0 True
+D.110c-0c1f5 foreign-author close liveness keeps foreign frontier anomalies author-local while creator corruption stays fail closed passed []
+---
+1 0 1 False
+D.110c-0c1f5 foreign-author close-liveness RED requires foreign frontier anomalies to remain author-local while creator corruption stays fail closed failed
+TypeError: D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED
+    at proveD110c0c1f5ForeignAuthorCloseLivenessRequired (/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts:340:8)
+    at /Users/aristotle/Documents/Projects/ts-drp-
+green-manifest-done
+d1456017748e33e7215118e2722465248a6e5481066780596a143775774abdfc  result.json
+clean-v2-manifest-done
+3c305872fbee759b1b6386c10a1d1ebbde3dd6e6 761B99CEA81C6289 3c305872fbee759b1b6386c10a1d1ebbde3dd6e6
+52fe3b44a40ab025102cad7637bbd10fae6edaac 761B99CEA81C6289
+e379cfd2854cbcb9db117960388e311251c9f086 761B99CEA81C6289
+466169aaf7c74b0c08b14e8c5f00b20f8710bfb8 761B99CEA81C6289
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/

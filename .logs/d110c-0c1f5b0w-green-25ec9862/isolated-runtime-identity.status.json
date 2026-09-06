@@ -1,0 +1,17 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "--dir",
+    "/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+    "exec",
+    "node",
+    "--input-type=module",
+    "-e",
+    "import {createRequire} from \"node:module\"; import {realpathSync} from \"node:fs\"; import {pathToFileURL} from \"node:url\"; const req=createRequire(pathToFileURL(process.cwd()+\"/packages/storage-browser/package.json\")); console.log(JSON.stringify({cwd:process.cwd(),contract:realpathSync(req.resolve(\"@ts-drp/issuance-store\")),browser:realpathSync(process.cwd()+\"/packages/storage-browser/dist/src/issuance.js\")}));"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:15:28.379Z",
+  "finished": "2026-09-05T14:15:28.753Z",
+  "status": 1,
+  "signal": null
+}

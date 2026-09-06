@@ -1,0 +1,26 @@
+I'll start by reading the review schema and the specified plan, evidence, and source files at the signed HEAD.I'll now read the plan sections, evidence ledgers, and the production seams the review must verify.I'll pull the D.110c-0c1f2/f4/f5 plan text and the related evidence ledgers next.I have the plan freeze; next I’ll inspect the production seams, tests, and RED/GREEN evidence against those claims.I have enough evidence for the two decisions. Composing the single schema-matching JSON now.{
+	"verdict": "APPROVED",
+	"summary": "Signed f2/f4 plan→causal RED→combined GREEN is an acceptable narrow implementation checkpoint at 9e1781e0966953d7adce8cf6b0a4d9e56d12299a / isolated proof da3e75514e3921b71d57d611d9e2b61785124b07, reviewed from f3617a8284af6d149441f0531ddec520370a34fe. It must not be read as general rebase safety, writer-gap recovery, close-liveness, ≥100-transition, D.110c-c/d, Phase-6 exit, or Phase-7 cold join. f5 is demonstrated in product source: rebase reissues at fresh sequences then marks sources published; the aggregate advances only an adjacent observed prefix; numeric holes stall S; null/absent/>1, regression, and duplicate slots throw and abort the whole close while the offending vertex remains; ingress does not require a per-author prefix. The covered-historical consumer only needs a creator-settled prefix of reissue candidates, not a Merkle log. The smallest safe gap-closing family is a creator-compacted per-source-to-replacement/disposition commitment, but inbound binding is absent from current vertex/aggregate grammar, so it is a new-authority/schema prerequisite. f5 tests-only RED is not authorized. No f5 production edit is authorized.",
+	"p0_count": 0,
+	"p1_count": 0,
+	"p2_count": 3,
+	"findings": [
+		{
+			"severity": "P2",
+			"title": "Cross-object displaced-source copies an unconsumed target-derived bootstrap policy",
+			"evidence": "packages/node/src/v3-live.ts around the crossSource displacedSource object assigns successorRecovery?.exactCanonicalPinnedGenesisBootstrapOperationBytes. Same-room transport handoff uses transportHandoff.displacedSource.* from the source registration. tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts asserts the same-room source path only. Plan 0c1f4 already records the field as unconsumed.",
+			"impact": "Not a verified same-room source-policy path. Silent cleanup or claiming it as f4 GREEN would invent authority.",
+			"required_action": "Leave the field untouched in this checkpoint. Source-derive or delete it only in a later change that already owns that cross-object branch."
+		},
+		{
+			"severity": "P2",
+			"title": "Null-boundary first-observed>1 emits the legacy-migration code",
+			"evidence": "packages/node/src/creator-close.ts: priorBoundary === null (author present with null frontier) plus firstObserved > 1 throws D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED. AUTHOR_REENTRY_PROOF_REQUIRED is used only when priorBoundary === undefined and a prior aggregate exists. No focused test asserts either token.",
+			"impact": "Diagnostics disagree with the earlier plan assignment. Not an f24 authority hole; f5 close-liveness GREEN must pin the exact code.",
+			"required_action": "Correct and test the token in the later supersession/close-liveness slice. Do not open a separate docs-only reslice now."
+		},
+		{
+			"severity": "P2",
+			"title": "Working GREEN narrative lists re-entry as passing without a token test",
+			"evidence": ".logs/d110c-0c1f24-green-working-fcd8735c/validation.md claims re-entry assertions pass. D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED exists only in packages/node/src/creator-close.ts. The focused 41/41 files never throw or expect it. Browser f2 GREEN proves Bob sequence 0 pending, sequence 1 admitted, and epoch-3 signerless reopen, not remove-then-readd.",
+			"impact": "Over-reads the checkpoint if treated as the

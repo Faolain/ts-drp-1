@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 360.277,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-workload-plan-review-f50a4637/grok/events.jsonl",
+  "exit_code": 0,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-workload-plan-review-f50a4637/grok/public.txt",
+  "stop_reason": "end_turn",
+  "timed_out": false
+}

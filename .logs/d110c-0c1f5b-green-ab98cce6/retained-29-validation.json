@@ -1,0 +1,64 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 4,
+  "passed": 4,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9346-shared-v3-room-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.93.46b shared room contract"
+      ],
+      "fullName": "D.93.46b shared room contract keeps the current grid production entry independently bundleable",
+      "status": "passed",
+      "title": "keeps the current grid production entry independently bundleable",
+      "duration": 3.021916000000033,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.93.46b shared room contract"
+      ],
+      "fullName": "D.93.46b shared room contract requires deterministic projection, a signed transport roster, and room-bound E1",
+      "status": "passed",
+      "title": "requires deterministic projection, a signed transport roster, and room-bound E1",
+      "duration": 2207.2160000000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.93.46b shared room contract"
+      ],
+      "fullName": "D.93.46b shared room contract routes the grid production bundle through the public shared-room owner",
+      "status": "passed",
+      "title": "routes the grid production bundle through the public shared-room owner",
+      "duration": 17.138625000000047,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.93.46b shared room contract"
+      ],
+      "fullName": "D.93.46b shared room contract retires the legacy durable-object composition from the grid product bundle",
+      "status": "passed",
+      "title": "retires the legacy durable-object composition from the grid product bundle",
+      "duration": 6.592000000000098,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

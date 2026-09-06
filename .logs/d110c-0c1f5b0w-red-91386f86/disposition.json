@@ -1,0 +1,75 @@
+{
+  "disposition": "REJECTED_UNEXPECTED_MATRIX_STOP_NO_FIX_NO_RERUN",
+  "acceptedRed": false,
+  "testCommit": "91386f8658e68d8a2ae76c4a1cfc8a8bee6fa982",
+  "parent": "8fdd048ce1f58e51aa15d14f87171e35c90fc3c0",
+  "changedTestsOnly": ["tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"],
+  "soleRun": {
+    "selectedFiles": 8,
+    "selectedTests": 219,
+    "expectedPassed": 156,
+    "expectedFailed": 63,
+    "actualPassed": 154,
+    "actualFailed": 65,
+    "skipped": 0,
+    "started": "2026-09-05T13:40:57.179Z",
+    "finished": "2026-09-05T13:41:09.741Z",
+    "exit": 1,
+    "signal": null
+  },
+  "causalFailures": {
+    "nativeStoreCases": 57,
+    "nativeStoreTokens": ["D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED", "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"],
+    "supersededF5b0cIssueCases": 1,
+    "runtimeCases": 5,
+    "runtimeTokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_REHEARSAL_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_ACTIVATION_HANG",
+      "D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG"
+    ]
+  },
+  "contradictions": [
+    {
+      "case": "same-epoch shutdown and reopen",
+      "observed": "The durable plan comparison passes. The cross-reopen effect check at test line 564 fails: accepted callback count was 1 at the first hold and is 2 at the reopen read. The displayed commits=1, issueTransactions=1 (normalized by this assertion), migrations=0, planWrites=1 and publications=1 agree. The later reopened holdCustody and explicit close assertions are not reached.",
+      "classification": "Unexpected retained-control failure; not classified as a product defect or accepted RED token."
+    },
+    {
+      "case": "changed retained held policy",
+      "observed": "Frozen application/dictionary reaches the existing exact source-diff issue rejection and terminal projection assertions. Subsequent durable plan readback uses the session's terminally closed store and throws DurableIssuanceError with code ISSUANCE_STORE_CLOSED. Durable post-terminal custody assertions are not discharged.",
+      "classification": "Unexpected retained-control failure after the intended error owner; no store reopen/fix/rerun performed."
+    }
+  ],
+  "redirect": {
+    "singleGenerationDurableHoldReached": true,
+    "activationPendingAfterBoundedProbe": true,
+    "publicCloseAttempted": true,
+    "publicClosePendingAfterBoundedProbe": true,
+    "specificSessionRemovedFromGenericHookAfterObservation": true,
+    "exactCausalErrorCount": 1,
+    "cleanupHookTimeout": false,
+    "unclassifiedTopLevelError": false,
+    "orderlyRedShutdownClaimed": false,
+    "futureGreenOrderlyCleanupAssertionsRetained": true
+  },
+  "gates": {
+    "preCommitLint": "PASS",
+    "preCommitEightGiBFormat": "PASS",
+    "preCommitCollection": "PASS exact 219/eight-file title matrix",
+    "preCommitSourceChecks": "PASS",
+    "preCommitDiffCheck": "PASS",
+    "sourceMappedTypecheckDelta": "PASS: three unchanged baseline/current diagnostics, zero added; no clean repository-wide typecheck claimed",
+    "signedPushedBeforeExecution": true,
+    "all27StashesUnchanged": true,
+    "protectedUntrackedInventoryUnchanged": true,
+    "allTrackedPackagesExamplesTestsHashesUnchangedAcrossRun": true,
+    "productionOrTimeoutEdits": false,
+    "postRunTestCorrections": false,
+    "reviewersOrSubagents": false,
+    "campaignOrLongRun": false
+  },
+  "immutableEvidence": "expected-matrix.json was frozen before execution and remains unchanged. complete-matrix.json and failed-titles.json retain every exact title, failure message, token and duration. initial.json/before.json/after.json retain source hashes, stash identities and untracked inventory. manifest.sha256 covers every evidence file except itself.",
+  "nextAuthority": "Further correction requires authorization; parent f5b and f5b0w production GREEN remain blocked."
+}

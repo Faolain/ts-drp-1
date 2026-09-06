@@ -1,0 +1,180 @@
+{
+  "frozenAt": "2026-09-05T14:59:40.880Z",
+  "base": "97ac13ca4202ee164c2d0274698643f6818dc2a5",
+  "filter": "D.110c-0c1f5b parent genuine settlement composition|parent f5b P2",
+  "files": [
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  ],
+  "fileHashes": {
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "507f70299a3004aac5a62b2d0741009b993752c1a82765b968dbe82ab4c4b2b6",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "f520224200e7bda6135ee605e546115bf699d483ee8efc7d9ed97ae4b06134d5"
+  },
+  "selected": 26,
+  "expectedFailed": 23,
+  "expectedPassed": 3,
+  "intentionallyFiltered": 17,
+  "allowedTopLevelErrors": 0,
+  "allowedTimeouts": 0,
+  "allowedAdditionalFailures": 0,
+  "executionCount": 1,
+  "entries": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition retains checkpoint-terminal open progress through cold recovery across three transitions",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 12 scans the largest valid fence without burning another author space",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 12 ignores a stale fence at or below the authenticated terminal boundary",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 23 freezes only the equivocating author below a fence",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve unpublished-fence custody",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-replacement custody",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-fence custody",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 17 closes an authenticated null-boundary member without a fence or slot zero",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 19-21 retain displaced control and sole plan completion ownership",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 24a rejects a stale local head without regressing the authenticated floor",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=false",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=true",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=false",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=true",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 13 prunes only beyond the fully retained authenticated rollback window",
+      "expectedStatus": "failed",
+      "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 17 retains the exact legacy v1 reentry guard source custody",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 non-hold same-message application failure retains generic activation mapping",
+      "expectedStatus": "failed",
+      "token": "F5B_P2_PRIVATE_HOLD_PROVENANCE_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for issue",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for rehearse",
+      "expectedStatus": "failed",
+      "token": "F5B_P2_CLOSED_PRECEDENCE_REHEARSE_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for activate",
+      "expectedStatus": "failed",
+      "token": "F5B_P2_CLOSED_PRECEDENCE_ACTIVATE_REQUIRED"
+    }
+  ],
+  "budgets": "Independent continuations; existing 60000ms wide-fixture watchdog unchanged and not a performance threshold. Routed ingress uses at most 256 real readonly IDB scheduling rounds; P2 prompt refusals use the accepted 256-microtask oracle. No wall-clock causal failure oracle. No complete GREEN duration claimed."
+}

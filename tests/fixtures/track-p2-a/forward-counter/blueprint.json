@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"kind": "ts-drp-blueprint-authoring-source",
+	"artifactId": "counter.v1",
+	"runtimeProfile": "ecmascript-2024-sync-v1",
+	"operationDiscriminator": "action",
+	"operations": [
+		{
+			"name": "add",
+			"reducerBinding": "addReducer",
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [{ "name": "value", "required": false, "type": "safe-integer" }]
+			}
+		},
+		{
+			"name": "read-value",
+			"reducerBinding": "readReducer",
+			"argumentSchema": { "kind": "closed-record", "fields": [] }
+		},
+		{
+			"name": "set",
+			"reducerBinding": "setReducer",
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [{ "name": "value", "required": true, "type": "safe-integer" }]
+			}
+		}
+	],
+	"conformance": {
+		"corpusVersion": "track-p2-a-v1",
+		"seed": "track-p2-a-seed-2026-08-12",
+		"initialState": 0,
+		"prCases": [
+			{ "id": "pr-add-negative-zero", "action": "add", "arguments": { "value": -0 } },
+			{ "id": "pr-read", "action": "read-value", "arguments": {} }
+		],
+		"nightlyAdditionalCases": [{ "id": "nightly-set", "action": "set", "arguments": { "value": 7 } }]
+	}
+}

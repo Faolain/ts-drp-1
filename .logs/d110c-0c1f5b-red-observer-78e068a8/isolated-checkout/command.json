@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "-C",
+    "/tmp/d110c-f5b-observer-red-zKIwWG/checkout",
+    "checkout",
+    "--detach",
+    "78e068a8992a6a4fa7402e24eeca50609aebff64"
+  ],
+  "start": "2026-09-05T18:22:55.276Z"
+}

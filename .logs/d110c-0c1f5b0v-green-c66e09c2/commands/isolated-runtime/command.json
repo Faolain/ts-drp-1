@@ -1,0 +1,9 @@
+{
+  "cwd": "/tmp/d110c-f5b0v-green-LLxy4p/checkout",
+  "command": "node",
+  "args": [
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-green-ea02487e/commands/custody.mjs",
+    "/tmp/d110c-f5b0v-green-LLxy4p/checkout"
+  ],
+  "start": "2026-09-05T07:56:15.786Z"
+}

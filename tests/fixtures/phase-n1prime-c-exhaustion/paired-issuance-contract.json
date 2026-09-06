@@ -1,0 +1,79 @@
+{
+	"schemaVersion": "phase-n1prime-c-exhaustion-paired-issuance-v1",
+	"redAuthorAttestation": {
+		"agentId": "codex-high-phase-n1prime-c-exhaustion-red-20260728",
+		"authoredCorrectedC2": false,
+		"authoredOriginalReference": false,
+		"authoredFirstVectorMint": false,
+		"willMintReplacementVectors": false,
+		"expectedBytesSource": "one invocation of the already-fixed original reference"
+	},
+	"immutableArtifacts": {
+		"historicalBlockedTest": {
+			"path": "tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts",
+			"sha256": "10f1f8b502cb599da6350cc13192e8fbe407710698c187e26ffe2e84d47374a2"
+		},
+		"historicalBlockedFixture": {
+			"path": "tests/fixtures/phase-n1prime-c/reference-vector-contract.json",
+			"sha256": "1f84788cad31a3fd737cf55d5da053748ea4e997bd4c5dbf4cf50fa568816840"
+		},
+		"correctedC2Test": {
+			"path": "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+			"sha256": "d1d4751ccdb8db0e8dbd11e7e353727cdd3a6ef3c739a4a6e1680c16bf1a9b12"
+		},
+		"correctedC2Fixture": {
+			"path": "tests/fixtures/phase-n1prime-c2/independent-reference-vector-contract.json",
+			"sha256": "17e22228adc677f9287ced3610211b21ec926e7647b1179574f2299359ccca62"
+		},
+		"originalReference": {
+			"path": "packages/protocol-v3/conformance/original-reference/reference.mjs",
+			"sha256": "abb01f2f061b20428e1c412793380a0baf468bf9397c7ec2952a902f2aaf7bdc"
+		},
+		"referenceProvenance": {
+			"path": "packages/protocol-v3/conformance/original-reference/provenance.json",
+			"sha256": "8b5e24c89dd32735ad95ca2a10a98e80dd2bb2623e0188b1355b51076bc90bc3"
+		}
+	},
+	"mutableTargets": {
+		"vectorDocument": {
+			"path": "packages/protocol-v3/conformance/vectors/registry-v1.json",
+			"historicalPreGreenSha256": "39b7c4e60fcb550c936be220660c8065b0bccc44ce1c288e0f685ced03b9dfa2"
+		}
+	},
+	"pair": {
+		"successId": "issuance-nonboundary-exhausted-false",
+		"exhaustedId": "issuance-nonboundary-exhausted-true",
+		"maximumPermittedLastIssued": 1000000,
+		"request": {
+			"before": {
+				"anchor": "abababababababababababababababababababababababababababababababab",
+				"epoch": 17,
+				"exhausted": false,
+				"lastIssued": 424242
+			},
+			"candidate": {
+				"anchor": "abababababababababababababababababababababababababababababababab",
+				"author": "phase-n1prime-c-exhaustion-red",
+				"authorSequence": 424243,
+				"dependencies": ["cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"],
+				"epoch": 17,
+				"kind": "drp-vertex",
+				"logicalTime": 23,
+				"objectId": "object:phase-n1prime-c-exhaustion",
+				"operation": {
+					"action": "set",
+					"key": "isolated-exhaustion",
+					"value": true
+				},
+				"protocolMajor": 3
+			},
+			"privateKeyHex": "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0efeeedecebeae9e8e7e6e5e4e3e2e1e0",
+			"publicKeyHex": "bafc71bead3ac5e4b63e9c8216ee71a34aaec65722eedbca728b4e9b3ccce396"
+		}
+	},
+	"referenceProtocol": {
+		"operation": "issue-next",
+		"timeoutMs": 10000,
+		"expectedInvocationCount": 1
+	}
+}

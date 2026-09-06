@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {DefaultReporter,JsonReporter} from '/tmp/d110c-f5b-red-room-guard-reporters-L8TTrA/checkout/node_modules/vitest/dist/reporters.js';
+import {parseCLI,resolveConfig} from '/tmp/d110c-f5b-red-room-guard-reporters-L8TTrA/checkout/node_modules/vitest/dist/node.js';
+const root=process.cwd(),out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),file='tests/phase-6a-creator-successor-product-red.test.ts';
+const argv=['vitest','run',file,'--no-file-parallelism','--coverage.enabled=false','--reporter=default','--reporter=json','--outputFile='+path.join(out,'focused.json')];
+const parsed=parseCLI(argv),resolved=await resolveConfig(parsed.options),config=resolved.vitestConfig;
+if(JSON.stringify(parsed.filter)!==JSON.stringify([file])||JSON.stringify(config.reporters.map(r=>r[0]))!==JSON.stringify(['default','json'])||config.silent!==false||config.onConsoleLog!==undefined||config.outputFile!==path.join(out,'focused.json')||config.fileParallelism!==false||config.coverage.enabled!==false)throw Error('Actual CLI/config reporter policy differs');
+let stdout='',stderr='';const reporter=new DefaultReporter();reporter.ctx={config,logger:{outputStream:{write:s=>stdout+=s},errorStream:{write:s=>stderr+=s}},state:{idMap:new Map()}};
+const marker=JSON.stringify({kind:'F5B_ROOM_GUARD_REPORTER_SINK_SMOKE',exact:'one bounded direct marker'});
+reporter.onUserConsoleLog({type:'stdout',content:marker+'\n'});
+if(typeof new JsonReporter({}).onUserConsoleLog!=='undefined'||stdout.split('\n').filter(line=>line===marker).length!==1||stderr!=='')throw Error('Locked reporter sink did not preserve exact standalone JSON');
+const reporterPath=fs.realpathSync(path.join(root,'node_modules/vitest/dist/reporters.js')),implementationPath=path.join(path.dirname(reporterPath),'chunks/index.CwHmn5H5.js'),configPath=path.join(root,'vite.config.mts');
+if(!reporterPath.startsWith(fs.realpathSync(root)+'/'))throw Error('Reporter outside own install');
+const data={root,argv,parsedFilter:parsed.filter,parsedOptions:parsed.options,reporters:config.reporters,silent:config.silent,onConsoleLogPresent:false,outputFile:config.outputFile,fileParallelism:config.fileParallelism,coverageEnabled:config.coverage.enabled,marker,stdout,stderr,standaloneExactMarkerCount:1,jsonReporterHasNoConsoleHandler:true,defaultReporterPreservesContent:true,reporterPath,implementationPath,reporterSha256:hash(fs.readFileSync(reporterPath)),implementationSha256:hash(fs.readFileSync(implementationPath)),configSha256:hash(fs.readFileSync(configPath)),lockedVersion:JSON.parse(fs.readFileSync(path.join(root,'node_modules/vitest/package.json'))).version,noRoomOrTestExecuted:true,noConfigOrDependencyChanges:true};
+fs.writeFileSync(path.join(out,'reporter-smoke.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({reporters:config.reporters.map(r=>r[0]),silent:false,onConsoleLogPresent:false,standaloneExactMarkerCount:1,noRoomOrTestExecuted:true}));

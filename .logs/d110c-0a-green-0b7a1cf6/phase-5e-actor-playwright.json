@@ -1,0 +1,521 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-5e-creator-actor.config.ts",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-5e-creator-actor.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 480000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5e-creator-actor.pw.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5e-creator-actor.pw.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5e-creator-actor.pw.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-5e-creator-actor.pw.ts",
+      "file": "phase-5e-creator-actor.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "migrates the exact v2 database to one additive nine-store v3 schema",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 164,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:29.661Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-612437e3ae5ef04ef32d",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 202,
+          "column": 1
+        },
+        {
+          "title": "commits evidence first and retains the exact four-store vote transaction",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 142,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:30.155Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-a476e4df148e05d4d1ec",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 244,
+          "column": 1
+        },
+        {
+          "title": "renderer termination at every durable boundary reopens old or the exact next state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2188,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:30.303Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-89308029e501ea07c940",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 283,
+          "column": 1
+        },
+        {
+          "title": "exact replay is idempotent, a conflicting close is durable failure, and stop fences late effects",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 209,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:32.496Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-4ee49becf67ec776dc8b",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 331,
+          "column": 1
+        },
+        {
+          "title": "migrates the exact v2 database to one additive nine-store v3 schema",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 973,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:33.099Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-bf83ab9ebdeae0e53ef5",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 202,
+          "column": 1
+        },
+        {
+          "title": "commits evidence first and retains the exact four-store vote transaction",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 350,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:34.812Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-ab086879717a9c496a76",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 244,
+          "column": 1
+        },
+        {
+          "title": "renderer termination at every durable boundary reopens old or the exact next state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5033,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:35.168Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-b35ba1f4d93fc1a205d7",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 283,
+          "column": 1
+        },
+        {
+          "title": "exact replay is idempotent, a conflicting close is durable failure, and stop fences late effects",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:40.205Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-174b5555555a934e95af",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 331,
+          "column": 1
+        },
+        {
+          "title": "migrates the exact v2 database to one additive nine-store v3 schema",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 744,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:41.200Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-3cc39177d80814d9fe90",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 202,
+          "column": 1
+        },
+        {
+          "title": "commits evidence first and retains the exact four-store vote transaction",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 449,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:42.388Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-817be9eadbfa0d07aa20",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 244,
+          "column": 1
+        },
+        {
+          "title": "renderer termination at every durable boundary reopens old or the exact next state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6188,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:42.845Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-3fd55069d38b559549ef",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 283,
+          "column": 1
+        },
+        {
+          "title": "exact replay is idempotent, a conflicting close is durable failure, and stop fences late effects",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 504,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:18:49.038Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "31b05574336c0f4df466-36aebf9209631410238f",
+          "file": "phase-5e-creator-actor.pw.ts",
+          "line": 331,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-02T05:18:29.227Z",
+    "duration": 20348.574,
+    "expected": 12,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

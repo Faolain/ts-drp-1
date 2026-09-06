@@ -1,0 +1,1061 @@
+{
+	"schemaVersion": "phase-n1prime-b-registry-spec-contract-v1",
+	"acceptedActionModel": {
+		"path": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+		"sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038",
+		"module": "authorLineageActions",
+		"signedVertexType": "SignedVertex"
+	},
+	"targetArtifacts": {
+		"registry": "packages/protocol-v3/registry/registry-v1.json",
+		"schema": "packages/protocol-v3/registry/registry-v1.schema.json",
+		"specification": "docs/protocol/attested-hard-epochs-v5.md",
+		"amendmentLog": "docs/protocol/amendments-v3.json",
+		"formalVariables": "packages/protocol-v3/formal/registry-signed-envelope-variables.qnt",
+		"registryModelSignoff": "packages/protocol-v3/formal/registry-model-signoff.json"
+	},
+	"requiredDecisionTypes": [
+		"protocol-identity",
+		"vertex-author-sequence",
+		"wire-format",
+		"canonical-map-order",
+		"round-change-anchor-resolution",
+		"signed-envelope-classification"
+	],
+	"illustrativeControls": {
+		"notice": "NONNORMATIVE: suite and domain literals below are test-only placeholders and do not select Phase -1 prime b GREEN identifiers.",
+		"registry": {
+			"protocolMajor": 3,
+			"registryVersion": 1,
+			"packageName": "protocol-v3",
+			"canonicalObjectKeyOrder": "encoded-key-bytes",
+			"wireFormat": {
+				"canonicalPreimage": "bytes",
+				"signature": "bytes",
+				"digestVerification": "received-bytes",
+				"reencodeBeforeDigest": false
+			},
+			"cryptoSuites": {
+				"active": [
+					{
+						"role": "identityAndVertex",
+						"suiteId": "illustrative-v3-identity-suite",
+						"domainKinds": ["vertex"]
+					},
+					{
+						"role": "sealVote",
+						"suiteId": "illustrative-v3-seal-suite",
+						"domainKinds": ["epochAnchor", "roundChange"]
+					}
+				],
+				"predecessorAudit": [
+					{
+						"role": "identityAndVertex",
+						"predecessorSuiteId": "illustrative-v2-identity-suite",
+						"successorSuiteId": "illustrative-v3-identity-suite",
+						"disposition": "replaced"
+					},
+					{
+						"role": "sealVote",
+						"predecessorSuiteId": "illustrative-v2-seal-suite",
+						"successorSuiteId": "illustrative-v3-seal-suite",
+						"disposition": "replaced"
+					}
+				]
+			},
+			"kinds": {
+				"vertex": {
+					"domain": "illustrative/vertex/v3",
+					"encoding": "canonical-object",
+					"signedEnvelope": {
+						"classification": "signed",
+						"suiteRole": "identityAndVertex"
+					},
+					"fields": [
+						{
+							"name": "kind",
+							"type": "string",
+							"const": "illustrative-vertex",
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "protocolMajor",
+							"type": "safe-integer",
+							"const": 3,
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "objectId",
+							"type": "string",
+							"const": null,
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "epoch",
+							"type": "safe-integer",
+							"const": null,
+							"constraints": {
+								"minimum": 0
+							},
+							"required": true
+						},
+						{
+							"name": "anchor",
+							"type": "digest-hex",
+							"const": null,
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "author",
+							"type": "string",
+							"const": null,
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "authorSequence",
+							"type": "safe-integer",
+							"const": null,
+							"constraints": {
+								"minimum": 0,
+								"maximum": 9007199254740991,
+								"initial": 0,
+								"reset": "never",
+								"overflow": "reject"
+							},
+							"required": true
+						},
+						{
+							"name": "logicalTime",
+							"type": "safe-integer",
+							"const": null,
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "dependencies",
+							"type": "array<digest-hex>",
+							"const": null,
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "operation",
+							"type": "canonical-object",
+							"const": null,
+							"constraints": {},
+							"required": true
+						}
+					]
+				},
+				"epochAnchor": {
+					"domain": "illustrative/epoch-anchor/v3",
+					"encoding": "canonical-object",
+					"signedEnvelope": {
+						"classification": "signed",
+						"suiteRole": "sealVote"
+					},
+					"fields": [
+						{
+							"name": "kind",
+							"type": "string",
+							"const": "illustrative-anchor",
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "anchor",
+							"type": "digest-hex",
+							"const": null,
+							"constraints": {},
+							"required": true
+						}
+					]
+				},
+				"roundChange": {
+					"domain": "illustrative/round-change/v3",
+					"encoding": "canonical-object",
+					"signedEnvelope": {
+						"classification": "signed",
+						"suiteRole": "sealVote"
+					},
+					"fields": [
+						{
+							"name": "kind",
+							"type": "string",
+							"const": "illustrative-round-change",
+							"constraints": {},
+							"required": true
+						},
+						{
+							"name": "anchor",
+							"type": "digest-hex",
+							"const": null,
+							"constraints": {},
+							"required": true
+						}
+					]
+				},
+				"diagnostic": {
+					"domain": "illustrative/diagnostic/v3",
+					"encoding": "canonical-object",
+					"signedEnvelope": {
+						"classification": "unsigned",
+						"suiteRole": null
+					},
+					"fields": [
+						{
+							"name": "message",
+							"type": "string",
+							"const": null,
+							"constraints": {},
+							"required": true
+						}
+					]
+				}
+			},
+			"decisionBindings": [
+				{
+					"decisionType": "protocol-identity",
+					"decisionId": "ILLUSTRATIVE-D01",
+					"registryPaths": ["protocolMajor", "registryVersion", "packageName", "cryptoSuites"]
+				},
+				{
+					"decisionType": "vertex-author-sequence",
+					"decisionId": "ILLUSTRATIVE-D02",
+					"registryPaths": ["kinds.vertex.fields"]
+				},
+				{
+					"decisionType": "wire-format",
+					"decisionId": "ILLUSTRATIVE-D03",
+					"registryPaths": ["wireFormat"]
+				},
+				{
+					"decisionType": "canonical-map-order",
+					"decisionId": "ILLUSTRATIVE-D04",
+					"registryPaths": ["canonicalObjectKeyOrder"]
+				},
+				{
+					"decisionType": "round-change-anchor-resolution",
+					"decisionId": "ILLUSTRATIVE-D05",
+					"registryPaths": ["kinds.roundChange.fields", "kinds.epochAnchor.fields"]
+				},
+				{
+					"decisionType": "signed-envelope-classification",
+					"decisionId": "ILLUSTRATIVE-D06",
+					"registryPaths": ["kinds"]
+				}
+			]
+		},
+		"schema": {
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"$id": "illustrative://protocol-v3/registry-v1.schema.json",
+			"$defs": {
+				"vertex": {
+					"type": "object",
+					"additionalProperties": false,
+					"x-canonical-key-order": "encoded-key-bytes",
+					"required": [
+						"kind",
+						"protocolMajor",
+						"objectId",
+						"epoch",
+						"anchor",
+						"author",
+						"authorSequence",
+						"logicalTime",
+						"dependencies",
+						"operation"
+					],
+					"properties": {
+						"kind": {
+							"type": "string",
+							"const": "illustrative-vertex",
+							"x-registry-type": "string",
+							"x-registry-constraints": {}
+						},
+						"protocolMajor": {
+							"type": "integer",
+							"const": 3,
+							"x-registry-type": "safe-integer",
+							"x-registry-constraints": {}
+						},
+						"objectId": {
+							"type": "string",
+							"x-registry-type": "string",
+							"x-registry-constraints": {}
+						},
+						"epoch": {
+							"type": "integer",
+							"minimum": 0,
+							"x-registry-type": "safe-integer",
+							"x-registry-constraints": {
+								"minimum": 0
+							}
+						},
+						"anchor": {
+							"type": "string",
+							"x-registry-type": "digest-hex",
+							"x-registry-constraints": {}
+						},
+						"author": {
+							"type": "string",
+							"x-registry-type": "string",
+							"x-registry-constraints": {}
+						},
+						"authorSequence": {
+							"type": "integer",
+							"minimum": 0,
+							"maximum": 9007199254740991,
+							"x-initial": 0,
+							"x-reset": "never",
+							"x-overflow": "reject",
+							"x-registry-type": "safe-integer",
+							"x-registry-constraints": {
+								"minimum": 0,
+								"maximum": 9007199254740991,
+								"initial": 0,
+								"reset": "never",
+								"overflow": "reject"
+							}
+						},
+						"logicalTime": {
+							"type": "integer",
+							"x-registry-type": "safe-integer",
+							"x-registry-constraints": {}
+						},
+						"dependencies": {
+							"type": "array",
+							"x-registry-type": "array<digest-hex>",
+							"x-registry-constraints": {}
+						},
+						"operation": {
+							"type": "object",
+							"x-registry-type": "canonical-object",
+							"x-registry-constraints": {}
+						}
+					}
+				},
+				"epochAnchor": {
+					"type": "object",
+					"additionalProperties": false,
+					"x-canonical-key-order": "encoded-key-bytes",
+					"required": ["kind", "anchor"],
+					"properties": {
+						"kind": {
+							"type": "string",
+							"const": "illustrative-anchor",
+							"x-registry-type": "string",
+							"x-registry-constraints": {}
+						},
+						"anchor": {
+							"type": "string",
+							"x-registry-type": "digest-hex",
+							"x-registry-constraints": {}
+						}
+					}
+				},
+				"roundChange": {
+					"type": "object",
+					"additionalProperties": false,
+					"x-canonical-key-order": "encoded-key-bytes",
+					"required": ["kind", "anchor"],
+					"properties": {
+						"kind": {
+							"type": "string",
+							"const": "illustrative-round-change",
+							"x-registry-type": "string",
+							"x-registry-constraints": {}
+						},
+						"anchor": {
+							"type": "string",
+							"x-registry-type": "digest-hex",
+							"x-registry-constraints": {}
+						}
+					}
+				},
+				"diagnostic": {
+					"type": "object",
+					"additionalProperties": false,
+					"x-canonical-key-order": "encoded-key-bytes",
+					"required": ["message"],
+					"properties": {
+						"message": {
+							"type": "string",
+							"x-registry-type": "string",
+							"x-registry-constraints": {}
+						}
+					}
+				}
+			}
+		},
+		"schemaTypeControls": [
+			{
+				"name": "safe-integer",
+				"field": {
+					"name": "value",
+					"type": "safe-integer",
+					"const": null,
+					"constraints": {
+						"minimum": 0,
+						"maximum": 9007199254740991
+					},
+					"required": true
+				},
+				"schema": {
+					"type": "integer",
+					"minimum": 0,
+					"maximum": 9007199254740991,
+					"x-registry-type": "safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0,
+						"maximum": 9007199254740991
+					}
+				}
+			},
+			{
+				"name": "canonical-safe-integer",
+				"field": {
+					"name": "value",
+					"type": "canonical-safe-integer",
+					"const": null,
+					"constraints": {
+						"minimum": 0
+					},
+					"required": true
+				},
+				"schema": {
+					"type": "integer",
+					"minimum": 0,
+					"x-registry-type": "canonical-safe-integer",
+					"x-registry-constraints": {
+						"minimum": 0
+					}
+				}
+			},
+			{
+				"name": "string",
+				"field": {
+					"name": "value",
+					"type": "string",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"type": "string",
+					"x-registry-type": "string",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "canonical-string",
+				"field": {
+					"name": "value",
+					"type": "canonical-string",
+					"const": null,
+					"constraints": {
+						"minimumUtf16Units": 1
+					},
+					"required": true
+				},
+				"schema": {
+					"type": "string",
+					"x-registry-type": "canonical-string",
+					"x-registry-constraints": {
+						"minimumUtf16Units": 1
+					}
+				}
+			},
+			{
+				"name": "digest-hex",
+				"field": {
+					"name": "value",
+					"type": "digest-hex",
+					"const": null,
+					"constraints": {
+						"bytes": 32,
+						"case": "lower"
+					},
+					"required": true
+				},
+				"schema": {
+					"type": "string",
+					"x-registry-type": "digest-hex",
+					"x-registry-constraints": {
+						"bytes": 32,
+						"case": "lower"
+					}
+				}
+			},
+			{
+				"name": "enum",
+				"field": {
+					"name": "value",
+					"type": "enum",
+					"const": null,
+					"constraints": {
+						"values": ["alpha", "beta"],
+						"reservedValues": ["future"]
+					},
+					"required": true
+				},
+				"schema": {
+					"type": "string",
+					"enum": ["alpha", "beta"],
+					"x-registry-type": "enum",
+					"x-registry-constraints": {
+						"values": ["alpha", "beta"],
+						"reservedValues": ["future"]
+					}
+				}
+			},
+			{
+				"name": "canonical-object",
+				"field": {
+					"name": "value",
+					"type": "canonical-object",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"type": "object",
+					"x-registry-type": "canonical-object",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "parameters",
+				"field": {
+					"name": "value",
+					"type": "parameters",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"type": "object",
+					"x-registry-type": "parameters",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "array<canonical-value>",
+				"field": {
+					"name": "value",
+					"type": "array<canonical-value>",
+					"const": null,
+					"constraints": {
+						"minimumItems": 1
+					},
+					"required": true
+				},
+				"schema": {
+					"type": "array",
+					"x-registry-type": "array<canonical-value>",
+					"x-registry-constraints": {
+						"minimumItems": 1
+					}
+				}
+			},
+			{
+				"name": "array<digest-hex>",
+				"field": {
+					"name": "value",
+					"type": "array<digest-hex>",
+					"const": null,
+					"constraints": {
+						"unique": true
+					},
+					"required": true
+				},
+				"schema": {
+					"type": "array",
+					"x-registry-type": "array<digest-hex>",
+					"x-registry-constraints": {
+						"unique": true
+					}
+				}
+			},
+			{
+				"name": "array<signed-seal-vote>",
+				"field": {
+					"name": "value",
+					"type": "array<signed-seal-vote>",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"type": "array",
+					"x-registry-type": "array<signed-seal-vote>",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "array<signer>",
+				"field": {
+					"name": "value",
+					"type": "array<signer>",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"type": "array",
+					"x-registry-type": "array<signer>",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "array<{index,digest,byteLength}>",
+				"field": {
+					"name": "value",
+					"type": "array<{index,digest,byteLength}>",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"type": "array",
+					"x-registry-type": "array<{index,digest,byteLength}>",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "array<{signerId:string,publicKey:string}>",
+				"field": {
+					"name": "value",
+					"type": "array<{signerId:string,publicKey:string}>",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"type": "array",
+					"x-registry-type": "array<{signerId:string,publicKey:string}>",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "seal-qc|null",
+				"field": {
+					"name": "value",
+					"type": "seal-qc|null",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"type": ["null", "object"],
+					"x-registry-type": "seal-qc|null",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "bytes",
+				"field": {
+					"name": "value",
+					"type": "bytes",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"x-registry-type": "bytes",
+					"x-registry-constraints": {}
+				}
+			},
+			{
+				"name": "canonical-value",
+				"field": {
+					"name": "value",
+					"type": "canonical-value",
+					"const": null,
+					"constraints": {},
+					"required": true
+				},
+				"schema": {
+					"x-registry-type": "canonical-value",
+					"x-registry-constraints": {}
+				}
+			}
+		],
+		"decisionRecords": [
+			{
+				"decision": 1,
+				"id": "ILLUSTRATIVE-D01",
+				"decisionType": "protocol-identity",
+				"registryPaths": ["protocolMajor", "registryVersion", "packageName", "cryptoSuites"],
+				"requirements": {
+					"protocolMajor": 3,
+					"registryVersion": 1,
+					"packageName": "protocol-v3",
+					"distinctSuccessorSuites": true
+				}
+			},
+			{
+				"decision": 2,
+				"id": "ILLUSTRATIVE-D02",
+				"decisionType": "vertex-author-sequence",
+				"registryPaths": ["kinds.vertex.fields"],
+				"requirements": {
+					"field": "authorSequence",
+					"reviewPosition": "immediately-after-author",
+					"type": "safe-integer",
+					"minimum": 0,
+					"maximum": 9007199254740991,
+					"initial": 0,
+					"reset": "never",
+					"overflow": "reject"
+				}
+			},
+			{
+				"decision": 3,
+				"id": "ILLUSTRATIVE-D03",
+				"decisionType": "wire-format",
+				"registryPaths": ["wireFormat"],
+				"requirements": {
+					"canonicalPreimage": "bytes",
+					"signature": "bytes",
+					"digestVerification": "received-bytes",
+					"reencodeBeforeDigest": false
+				}
+			},
+			{
+				"decision": 4,
+				"id": "ILLUSTRATIVE-D04",
+				"decisionType": "canonical-map-order",
+				"registryPaths": ["canonicalObjectKeyOrder"],
+				"requirements": {
+					"rule": "encoded-key-bytes",
+					"declarationOrderControlsEncoding": false
+				}
+			},
+			{
+				"decision": 5,
+				"id": "ILLUSTRATIVE-D05",
+				"decisionType": "round-change-anchor-resolution",
+				"registryPaths": ["kinds.roundChange.fields", "kinds.epochAnchor.fields"],
+				"requirements": {
+					"resolution": "illustrative-anchor-is-direct",
+					"roundChangeAnchorBinding": "direct",
+					"registryModelSpecConsequences": "consistent"
+				}
+			},
+			{
+				"decision": 6,
+				"id": "ILLUSTRATIVE-D06",
+				"decisionType": "signed-envelope-classification",
+				"registryPaths": ["kinds"],
+				"requirements": {
+					"classificationMode": "registry-metadata",
+					"allKindsAudited": true,
+					"signedEnvelopeKinds": ["vertex", "epochAnchor", "roundChange"],
+					"unsignedEnvelopeKinds": ["diagnostic"],
+					"omittedPredecessorRationales": {
+						"sealVote": "Illustrative control omits this predecessor kind only to exercise explicit scoped-registry evidence."
+					},
+					"unsignedPredecessorRationales": {}
+				}
+			}
+		],
+		"formalVariableNames": [
+			"vertexKind",
+			"vertexProtocolMajor",
+			"vertexObjectId",
+			"vertexEpoch",
+			"vertexAnchor",
+			"vertexAuthor",
+			"vertexAuthorSequence",
+			"vertexLogicalTime",
+			"vertexDependencies",
+			"vertexOperation",
+			"epochAnchorKind",
+			"epochAnchorAnchor",
+			"roundChangeKind",
+			"roundChangeAnchor"
+		],
+		"signoff": {
+			"schemaVersion": "phase-n1prime-b-registry-model-signoff-v1",
+			"protocolMajor": 3,
+			"status": "complete",
+			"acceptedActionModel": {
+				"path": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+				"sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038"
+			},
+			"classification": {
+				"mode": "registry-metadata",
+				"rationaleDecisionId": "ILLUSTRATIVE-D06",
+				"allRegistryKinds": ["vertex", "epochAnchor", "roundChange", "diagnostic"],
+				"signedEnvelopeKinds": ["vertex", "epochAnchor", "roundChange"],
+				"unsignedEnvelopeKinds": ["diagnostic"]
+			},
+			"fieldMappings": [
+				{
+					"envelopeKind": "vertex",
+					"field": "kind",
+					"modelVariable": "vertexKind",
+					"registryPath": "kinds.vertex.fields[0]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "protocolMajor",
+					"modelVariable": "vertexProtocolMajor",
+					"registryPath": "kinds.vertex.fields[1]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "objectId",
+					"modelVariable": "vertexObjectId",
+					"registryPath": "kinds.vertex.fields[2]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "epoch",
+					"modelVariable": "vertexEpoch",
+					"registryPath": "kinds.vertex.fields[3]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "anchor",
+					"modelVariable": "vertexAnchor",
+					"registryPath": "kinds.vertex.fields[4]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "author",
+					"modelVariable": "vertexAuthor",
+					"registryPath": "kinds.vertex.fields[5]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "authorSequence",
+					"modelVariable": "vertexAuthorSequence",
+					"registryPath": "kinds.vertex.fields[6]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "logicalTime",
+					"modelVariable": "vertexLogicalTime",
+					"registryPath": "kinds.vertex.fields[7]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "dependencies",
+					"modelVariable": "vertexDependencies",
+					"registryPath": "kinds.vertex.fields[8]"
+				},
+				{
+					"envelopeKind": "vertex",
+					"field": "operation",
+					"modelVariable": "vertexOperation",
+					"registryPath": "kinds.vertex.fields[9]"
+				},
+				{
+					"envelopeKind": "epochAnchor",
+					"field": "kind",
+					"modelVariable": "epochAnchorKind",
+					"registryPath": "kinds.epochAnchor.fields[0]"
+				},
+				{
+					"envelopeKind": "epochAnchor",
+					"field": "anchor",
+					"modelVariable": "epochAnchorAnchor",
+					"registryPath": "kinds.epochAnchor.fields[1]"
+				},
+				{
+					"envelopeKind": "roundChange",
+					"field": "kind",
+					"modelVariable": "roundChangeKind",
+					"registryPath": "kinds.roundChange.fields[0]"
+				},
+				{
+					"envelopeKind": "roundChange",
+					"field": "anchor",
+					"modelVariable": "roundChangeAnchor",
+					"registryPath": "kinds.roundChange.fields[1]"
+				}
+			],
+			"reviewedArtifacts": [
+				{
+					"path": "illustrative-registry.json",
+					"sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+				},
+				{
+					"path": "illustrative-schema.json",
+					"sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+				},
+				{
+					"path": "illustrative-spec.md",
+					"sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+				},
+				{
+					"path": "illustrative-amendments.json",
+					"sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+				},
+				{
+					"path": "illustrative-formal.qnt",
+					"sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+				}
+			]
+		},
+		"reviewedArtifactHashes": {
+			"illustrative-registry.json": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"illustrative-schema.json": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"illustrative-spec.md": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+			"illustrative-amendments.json": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+			"illustrative-formal.qnt": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+		},
+		"sequenceCases": [
+			{
+				"name": "initial-zero",
+				"value": 0,
+				"accepted": true
+			},
+			{
+				"name": "large-safe",
+				"value": 9007199254740990,
+				"accepted": true
+			},
+			{
+				"name": "maximum-safe",
+				"value": 9007199254740991,
+				"accepted": true
+			},
+			{
+				"name": "negative",
+				"value": -1,
+				"accepted": false
+			},
+			{
+				"name": "fractional",
+				"value": 1.5,
+				"accepted": false
+			},
+			{
+				"name": "unsafe",
+				"value": 9007199254740992,
+				"accepted": false
+			},
+			{
+				"name": "missing",
+				"accepted": false
+			}
+		],
+		"lineageTransitions": [
+			{
+				"name": "same-anchor-next",
+				"before": {
+					"epoch": 0,
+					"anchor": "anchor-a",
+					"next": 4
+				},
+				"candidate": 4,
+				"after": {
+					"epoch": 0,
+					"anchor": "anchor-a",
+					"next": 5
+				},
+				"accepted": true
+			},
+			{
+				"name": "new-anchor-does-not-reset",
+				"before": {
+					"epoch": 0,
+					"anchor": "anchor-a",
+					"next": 5
+				},
+				"candidate": 5,
+				"after": {
+					"epoch": 1,
+					"anchor": "anchor-b",
+					"next": 6
+				},
+				"accepted": true
+			},
+			{
+				"name": "maximum-does-not-wrap",
+				"before": {
+					"epoch": 8,
+					"anchor": "anchor-z",
+					"next": 9007199254740991
+				},
+				"candidate": 9007199254740991,
+				"after": {
+					"epoch": 8,
+					"anchor": "anchor-z",
+					"next": 9007199254740991
+				},
+				"accepted": false
+			}
+		],
+		"crossMajorCases": [
+			{
+				"name": "v3-valid",
+				"registryMajor": 3,
+				"candidateMajor": 3,
+				"expectedDomain": "illustrative/vertex/v3",
+				"candidateDomain": "illustrative/vertex/v3",
+				"expectedSuite": "illustrative-v3-identity-suite",
+				"candidateSuite": "illustrative-v3-identity-suite",
+				"accepted": true
+			},
+			{
+				"name": "v2-domain-on-v3",
+				"registryMajor": 3,
+				"candidateMajor": 3,
+				"expectedDomain": "illustrative/vertex/v3",
+				"candidateDomain": "illustrative/vertex/v2",
+				"expectedSuite": "illustrative-v3-identity-suite",
+				"candidateSuite": "illustrative-v3-identity-suite",
+				"accepted": false
+			},
+			{
+				"name": "v2-suite-on-v3",
+				"registryMajor": 3,
+				"candidateMajor": 3,
+				"expectedDomain": "illustrative/vertex/v3",
+				"candidateDomain": "illustrative/vertex/v3",
+				"expectedSuite": "illustrative-v3-identity-suite",
+				"candidateSuite": "illustrative-v2-identity-suite",
+				"accepted": false
+			},
+			{
+				"name": "v3-domain-on-v2",
+				"registryMajor": 2,
+				"candidateMajor": 2,
+				"expectedDomain": "illustrative/vertex/v2",
+				"candidateDomain": "illustrative/vertex/v3",
+				"expectedSuite": "illustrative-v2-identity-suite",
+				"candidateSuite": "illustrative-v2-identity-suite",
+				"accepted": false
+			},
+			{
+				"name": "v3-suite-on-v2",
+				"registryMajor": 2,
+				"candidateMajor": 2,
+				"expectedDomain": "illustrative/vertex/v2",
+				"candidateDomain": "illustrative/vertex/v2",
+				"expectedSuite": "illustrative-v2-identity-suite",
+				"candidateSuite": "illustrative-v3-identity-suite",
+				"accepted": false
+			},
+			{
+				"name": "major-mismatch",
+				"registryMajor": 3,
+				"candidateMajor": 2,
+				"expectedDomain": "illustrative/vertex/v3",
+				"candidateDomain": "illustrative/vertex/v3",
+				"expectedSuite": "illustrative-v3-identity-suite",
+				"candidateSuite": "illustrative-v3-identity-suite",
+				"accepted": false
+			}
+		]
+	}
+}

@@ -1,0 +1,12 @@
+Listing tests:
+  [chromium] › phase-6a-creator-successor-product.pw.ts:697:1 › pins the exact successor product browser inventory
+  [chromium] › phase-6a-creator-successor-product.pw.ts:715:1 › hot creator adoption exposes oracle authority and issues through the replacement handle
+  [chromium] › phase-6a-creator-successor-product.pw.ts:748:1 › established peer cold reopen accepts the genuine epoch-one live operation
+  [chromium] › phase-6a-creator-successor-product.pw.ts:776:1 › fresh late peer cold reopen accepts the targeted retained epoch-one operation
+  [chromium] › phase-6a-creator-successor-product.pw.ts:865:1 › D.110c-0b0 provider crash and classification matrix fails closed
+  [chromium] › phase-6a-creator-successor-product.pw.ts:971:1 › concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping
+  [chromium] › phase-6a-creator-successor-product.pw.ts:1115:1 › close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup
+  [chromium] › phase-6a-creator-successor-product.pw.ts:1257:1 › cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown
+  [chromium] › phase-6a-creator-successor-product.pw.ts:1968:1 › redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding
+  [chromium] › phase-6a-creator-successor-product.pw.ts:2071:1 › D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody
+Total: 10 tests in 1 file

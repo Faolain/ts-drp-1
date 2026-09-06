@@ -1,0 +1,1605 @@
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index d3d84f64773e90d2850d851e255f2df530676f70..ba75796111dc99b20b5628b8307f4099440ac19d 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -73,6 +73,7 @@ const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
+ const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
+ const UNSUPPORTED_LINEAGE_POLICY = "D110C_LINEAGE_POLICY_UNSUPPORTED";
+ const SETTLEMENT_MANUAL_REVIEW_MESSAGE = "v3 room settlement plan requires manual review";
++const settlementManualReviewErrors = new WeakSet<TypeError>();
+ // Object framing plus the nine encoded keys and the fixed kind, digest and version values.
+ // The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
+ const CREATOR_INVITE_FIXED_CANONICAL_BYTE_LENGTH = 346;
+@@ -1376,12 +1377,28 @@ function validateDisplacementPolicy(application: V3RoomApplication): void {
+ 	}
+ }
+ 
+-function migrationCreatorAuthor(material: V3RoomCreatorInviteMaterial): string {
++function migrationLatchedAcl(material: V3RoomCreatorInviteMaterial): unknown {
++	const profile = decodeCanonical(material.exactCanonicalProfileBytes);
++	const settlement =
++		profile !== null && typeof profile === "object" && settlementProfileFor(Reflect.get(profile, "profileId")) === "v1";
+ 	const decoded = decodeCanonical(material.exactCanonicalLatchedAclBytes, {
+ 		maxBytes: 65_536,
+-		maxDepth: 6,
+-		maxItems: 512,
++		maxDepth: settlement ? 4 : 6,
++		maxItems: settlement ? 8_192 : 512,
+ 	});
++	if (
++		settlement &&
++		decoded !== null &&
++		typeof decoded === "object" &&
++		Reflect.get(decoded, "version") === 3 &&
++		(exactDenseArray(Reflect.get(decoded, "members"))?.length ?? Infinity) <= 256
++	)
++		return decoded;
++	return decodeCanonical(material.exactCanonicalLatchedAclBytes, { maxBytes: 65_536, maxDepth: 6, maxItems: 512 });
++}
++
++function migrationCreatorAuthor(material: V3RoomCreatorInviteMaterial): string {
++	const decoded = migrationLatchedAcl(material);
+ 	const members = exactDenseArray(
+ 		decoded !== null && typeof decoded === "object" ? Reflect.get(decoded, "members") : undefined
+ 	);
+@@ -1418,7 +1435,7 @@ function migrationInviteAuthority(material: V3RoomCreatorInviteMaterial): Readon
+ 	const blueprintDigest =
+ 		preimage !== null && typeof preimage === "object" ? Reflect.get(preimage, "blueprintDigest") : undefined;
+ 	const objectId = preimage !== null && typeof preimage === "object" ? Reflect.get(preimage, "objectId") : undefined;
+-	const acl = decodeCanonical(material.exactCanonicalLatchedAclBytes, { maxBytes: 65_536, maxDepth: 6, maxItems: 512 });
++	const acl = migrationLatchedAcl(material);
+ 	const aclObjectId = acl !== null && typeof acl === "object" ? Reflect.get(acl, "objectId") : undefined;
+ 	if (
+ 		preimage === null ||
+@@ -1531,9 +1548,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
+ 	if (
+ 		input.successorSnapshotDeclaration !== undefined &&
+-		(input.createOperationAdmissionPolicy !== undefined ||
+-			input.rebaseSourceInvite !== undefined ||
+-			input.creatorFinalitySigner !== undefined)
++		(input.createOperationAdmissionPolicy !== undefined || input.rebaseSourceInvite !== undefined)
+ 	) {
+ 		throw new TypeError("v3 room successor authority composition is unsupported");
+ 	}
+@@ -1586,6 +1601,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			? Reflect.get(profileCarrier, "profileId")
+ 			: undefined;
+ 	const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
++	if (
++		input.successorSnapshotDeclaration !== undefined &&
++		input.creatorFinalitySigner !== undefined &&
++		settlementProfile !== "v1"
++	) {
++		throw new TypeError("v3 room successor authority composition is unsupported");
++	}
+ 	const sourceInvite = input.rebaseSourceInvite;
+ 	const sourceMaterial =
+ 		sourceInvite === undefined
+@@ -1914,6 +1936,53 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			});
+ 		}
+ 	};
++	const installSuccessorProjectionBase = (plane: RoomPlaneHandle, authority: V3RoomSuccessorAuthority): void => {
++		const projectionBaseResult = bindV3BlueprintLivePlane({ plane, purpose: "projection-base" });
++		if (!projectionBaseResult.ok) {
++			throw new TypeError(`v3 room successor projection base failed: ${projectionBaseResult.kind}`);
++		}
++		if (exactRecord(projectionBaseResult, PROJECTION_BASE_RESULT_KEYS) === undefined) {
++			throw new TypeError("v3 room successor projection base differs");
++		}
++		const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
++			projectionBaseResult.exactCanonicalApplicationStateBytes,
++			"migration"
++		);
++		if (
++			projectionBaseResult.objectId !== input.objectId ||
++			projectionBaseResult.epoch !== authority.epoch ||
++			projectionBaseResult.blueprintDigest !== roomDescriptor.blueprintDigest ||
++			projectionBaseResult.stateDigest !== digest("ts-drp/state/v3", exactCanonicalApplicationStateBytes)
++		) {
++			throw new TypeError("v3 room successor projection base differs");
++		}
++		const base = Object.freeze({
++			blueprintDigest: projectionBaseResult.blueprintDigest,
++			epoch: projectionBaseResult.epoch,
++			exactCanonicalApplicationStateBytes,
++			objectId: projectionBaseResult.objectId,
++			stateDigest: projectionBaseResult.stateDigest,
++		});
++		const baseProjection = input.application.projectAcceptedOperations(
++			Object.freeze({ authenticatedBase: base, currentEpochOperations: Object.freeze([]) })
++		);
++		const canonicalStateBytes = input.application.migration?.canonicalStateBytes;
++		if (typeof canonicalStateBytes !== "function") {
++			throw new TypeError("v3 room successor projection state is unavailable");
++		}
++		const projectedStateBytes = normalizeApplicationStateBytes(
++			Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
++			"migration"
++		);
++		if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
++			throw new TypeError("v3 room successor projection state differs");
++		}
++		authenticatedProjectionBase = base;
++		if (settlementProfile === "v1") {
++			acceptedVertices.clear();
++			acceptedOperationRows.clear();
++		}
++	};
+ 	const isSettlementFence = (vertex: V3RoomAcceptedVertex): boolean =>
+ 		settlementProfile === "v1" && Reflect.get(vertex.operation, "action") === "$drp.author-fence.v1";
+ 	const commit = async (vertices: readonly V3RoomAcceptedVertex[]): Promise<boolean> => {
+@@ -2004,7 +2073,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	let redirectPromise: Promise<V3RoomSession<Projection>> | undefined;
+ 	let settlementHeld = false;
+ 	const assertSettlementUnheld = (): void => {
+-		if (settlementHeld) throw new TypeError(SETTLEMENT_MANUAL_REVIEW_MESSAGE);
++		if (settlementHeld) {
++			const error = new TypeError(SETTLEMENT_MANUAL_REVIEW_MESSAGE);
++			settlementManualReviewErrors.add(error);
++			throw error;
++		}
+ 	};
+ 	let retainedBootstrapReady = !retainedBootstrapHeld;
+ 	let resolveRetainedBootstrap: (() => void) | undefined;
+@@ -2229,6 +2302,24 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		return true;
+ 	};
+ 	let startupReplay: V3RoomAcceptedVertex[] | undefined;
++	const commitSuccessorProjection = async (authority: V3RoomSuccessorAuthority): Promise<void> => {
++		if (startupReplay === undefined) throw new TypeError("v3 room successor replay is unavailable");
++		if (settlementProfile === "none") {
++			const replay = startupReplay;
++			startupReplay = undefined;
++			await commit(replay);
++		} else {
++			// Keep activation deliveries buffered while replayable application callbacks
++			// await. The authenticated base already contains every predecessor effect.
++			while (startupReplay.length !== 0) {
++				const replay = startupReplay.splice(0);
++				await commit(replay.filter((vertex) => vertex.epoch === authority.epoch));
++			}
++			startupReplay = undefined;
++		}
++		projection = stage(Object.freeze([])).projection;
++		input.onProjection(projection);
++	};
+ 	const admittedSink = async ({
+ 		vertex,
+ 	}: Parameters<V3AdmittedVertexSink>[0]): Promise<
+@@ -2364,54 +2455,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 				}
+ 				activeHandle = reopened.handle as RoomPlaneHandle;
+ 				successorProjectionAuthority = successorAuthority(reopened.trust, activeHandle);
+-				const projectionBaseResult = bindV3BlueprintLivePlane({ plane: activeHandle, purpose: "projection-base" });
+-				if (!projectionBaseResult.ok) {
+-					throw new TypeError(`v3 room successor projection base failed: ${projectionBaseResult.kind}`);
+-				}
+-				if (exactRecord(projectionBaseResult, PROJECTION_BASE_RESULT_KEYS) === undefined) {
+-					throw new TypeError("v3 room successor projection base differs");
+-				}
+-				const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
+-					projectionBaseResult.exactCanonicalApplicationStateBytes,
+-					"migration"
+-				);
+-				if (
+-					projectionBaseResult.objectId !== input.objectId ||
+-					projectionBaseResult.epoch !== successorProjectionAuthority.epoch ||
+-					projectionBaseResult.blueprintDigest !== roomDescriptor.blueprintDigest ||
+-					projectionBaseResult.stateDigest !== digest("ts-drp/state/v3", exactCanonicalApplicationStateBytes)
+-				) {
+-					throw new TypeError("v3 room successor projection base differs");
+-				}
+-				authenticatedProjectionBase = Object.freeze({
+-					blueprintDigest: projectionBaseResult.blueprintDigest,
+-					epoch: projectionBaseResult.epoch,
+-					exactCanonicalApplicationStateBytes,
+-					objectId: projectionBaseResult.objectId,
+-					stateDigest: projectionBaseResult.stateDigest,
+-				});
+-				const baseProjection = input.application.projectAcceptedOperations(
+-					Object.freeze({
+-						authenticatedBase: authenticatedProjectionBase,
+-						currentEpochOperations: Object.freeze([]),
+-					})
+-				);
+-				const canonicalStateBytes = input.application.migration?.canonicalStateBytes;
+-				if (typeof canonicalStateBytes !== "function") {
+-					throw new TypeError("v3 room successor projection state is unavailable");
+-				}
+-				const projectedStateBytes = normalizeApplicationStateBytes(
+-					Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
+-					"migration"
+-				);
+-				if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
+-					throw new TypeError("v3 room successor projection state differs");
+-				}
+-				const replay = startupReplay;
+-				startupReplay = undefined;
+-				await commit(replay);
+-				projection = stage(Object.freeze([])).projection;
+-				input.onProjection(projection);
++				installSuccessorProjectionBase(activeHandle, successorProjectionAuthority);
++				await commitSuccessorProjection(successorProjectionAuthority);
+ 			}
+ 			if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+ 				if (input.application.migration === undefined) {
+@@ -2451,7 +2496,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 					: await republishV3RetainedTo(activeHandle, targetPeerId);
+ 			if (!result.ok) throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
+ 		});
+-		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
++		if (
++			input.creatorFinalitySigner !== undefined &&
++			(input.successorSnapshotDeclaration === undefined || settlementProfile === "v1")
++		) {
+ 			const creatorFinalitySigner = input.creatorFinalitySigner;
+ 			const voteStore = await openBrowserSealVoteStore({ databaseName: input.databaseName });
+ 			creatorCloseStoreClosers.push(voteStore.close);
+@@ -2683,7 +2731,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	};
+ 	const issueOwned = async (owned: readonly PendingIssue[]): Promise<void> => {
+ 		if (owned.length === 0) return;
+-		if (activeHandle === undefined) {
++		if (activeHandle === undefined || (settlementProfile === "v1" && creatorSuccessorAdoptionTask !== undefined)) {
+ 			rejectOwned(owned, new TypeError("v3 room live plane is unavailable"));
+ 			return;
+ 		}
+@@ -2953,10 +3001,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			);
+ 		}
+ 		const displacedSequences = new Set(sources.map((source) => source.authorSequence));
++		const priorFence =
++			current?.fenceSequence == null
++				? undefined
++				: await issuanceStore.readIssued(settlementScope, current.fenceSequence);
++		const priorFenceEpoch =
++			priorFence == null
++				? undefined
++				: Reflect.get(decodeCanonical(priorFence.envelope.canonicalPreimageBytes) as object, "epoch");
+ 		const fenceSequence =
+ 			current?.fenceSequence !== null &&
+ 			current?.fenceSequence !== undefined &&
+-			displacedSequences.has(current.fenceSequence)
++			(displacedSequences.has(current.fenceSequence) || priorFenceEpoch !== activeHandle?.epoch)
+ 				? null
+ 				: (current?.fenceSequence ?? null);
+ 		const unchanged =
+@@ -3574,8 +3630,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		rehearsalInput: V3RoomMigrationRehearsalInput
+ 	): Promise<V3RoomMigrationRehearsalReceipt> => {
+ 		if (terminalFailure !== undefined) throw terminalFailure;
+-		assertSettlementUnheld();
+ 		if (closed) throw new TypeError("v3 room session is closed");
++		assertSettlementUnheld();
+ 		if (authenticatedProjectionBase !== undefined) {
+ 			throw new TypeError("D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE");
+ 		}
+@@ -3910,8 +3966,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		activationInput: V3RoomMigrationActivationInput
+ 	): Promise<V3RoomMigrationActivationReceipt> => {
+ 		if (terminalFailure !== undefined) throw terminalFailure;
+-		assertSettlementUnheld();
+ 		if (closed) throw new TypeError("v3 room session is closed");
++		assertSettlementUnheld();
+ 		if (migrationActivationAuthority === undefined || input.application.migration === undefined) {
+ 			throw new TypeError("v3 room migration activation is unavailable");
+ 		}
+@@ -4121,7 +4177,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		if (!published.ok) {
+ 			// The admission callback can record a target hold while publication awaits it.
+ 			const admissionFailure = terminalFailure as unknown;
+-			if (admissionFailure instanceof TypeError && admissionFailure.message === SETTLEMENT_MANUAL_REVIEW_MESSAGE) {
++			if (admissionFailure instanceof TypeError && settlementManualReviewErrors.has(admissionFailure)) {
+ 				throw admissionFailure;
+ 			}
+ 			const failure = new TypeError(`v3 room migration activation failed: ${published.kind}`);
+@@ -4233,6 +4289,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			return roomHeadFailure("D110C_FLOOR_MISMATCH");
+ 		}
+ 		assertSessionOpen();
++		if (settlementProfile === "v1") startupReplay = [];
+ 		const activated = await activateCreatorSuccessorAdoption({
+ 			capability: published.capability,
+ 			expectedRoomHead: openedRoomHeadState.stable,
+@@ -4242,6 +4299,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+ 		});
+ 		if (activated.ok !== true) {
++			startupReplay = undefined;
+ 			const failure = new TypeError("D110C_B_ACTIVATION_STALLED");
+ 			terminalFailure = failure;
+ 			creatorCloseHandle = undefined;
+@@ -4259,6 +4317,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			replacementOwned = false;
+ 		};
+ 		const throwAfterReplacementCleanup = async (primary: unknown): Promise<never> => {
++			startupReplay = undefined;
+ 			try {
+ 				await releaseReplacement();
+ 			} catch (cleanup) {
+@@ -4286,6 +4345,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+ 		}
+ 		const failCloseRebind = async (): Promise<never> => {
++			startupReplay = undefined;
+ 			activeHandle = replacement;
+ 			replacementOwned = false;
+ 			successorProjectionAuthority = authority;
+@@ -4303,6 +4363,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		successorProjectionAuthority = authority;
+ 		creatorCloseHandle = rebound.handle;
+ 		creatorCloseUnavailableContinuity = "continuous";
++		if (settlementProfile === "v1") {
++			try {
++				installSuccessorProjectionBase(replacement, authority);
++				await commitSuccessorProjection(authority);
++				await publishAccepted();
++				await drainRebaseOutbox();
++			} catch (error) {
++				startupReplay = undefined;
++				terminalFailure = error;
++				await shutdown().catch(() => undefined);
++				await predecessorClose.stop().catch(() => undefined);
++				throw error;
++			}
++		}
+ 		await predecessorClose.stop();
+ 	};
+ 	const adoptCreatorSuccessor = (): Promise<void> => {
+diff --git a/packages/node/src/creator-adoption.ts b/packages/node/src/creator-adoption.ts
+index 3281c37956c1e804dbcd0f9c2d374be7367b0816..ab67944ffdce333405cd149350cc0046f4ea1e95 100644
+--- a/packages/node/src/creator-adoption.ts
++++ b/packages/node/src/creator-adoption.ts
+@@ -8,6 +8,7 @@ import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protoco
+ import { openCreatorCheckpointTrust } from "@ts-drp/protocol-v3/creator-checkpoint";
+ import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";
+ import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
++import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
+ import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";
+ import {
+ 	type AheDurableStore,
+@@ -805,6 +806,22 @@ export async function verifyCreatorSuccessorAdoption(input: unknown): Promise<Ad
+ 		}
+ 		const snapshot = await verifySnapshot(facts, chain);
+ 		if (snapshot === undefined) return failure("snapshot-invalid", "creator close snapshot is invalid");
++		if (
++			settlementProfileFor(chain.successorTrust.profileId) === "v1" &&
++			!inspectCreatorTransitionAdvance({
++				current: { candidates: closure.currentCandidates, closure: facts.currentReferences },
++				currentTrust: facts.currentTrust,
++				mode: "verify",
++				proofRefs: [facts.closeResult.cutValueRef, facts.closeResult.commitQcRef],
++				proposed: { candidates: closure.proposedCandidates, closure: facts.proposedReferences },
++				successorTrust: chain.successorTrust,
++				settlementAcl: {
++					current: facts.exactCanonicalLatchedAclBytes,
++					successor: encodeCanonical(snapshot.payload.acl),
++				},
++			}).ok
++		)
++			return failure("chain-invalid", "creator settlement ACL advance is invalid");
+ 		const resolved = verifiedCatalog(captured.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
+ 		if (resolved === undefined) return failure("blueprint-invalid", "creator successor blueprint is invalid");
+ 		const projected = projection(facts, chain, snapshot, resolved);
+@@ -867,7 +884,8 @@ async function authenticatedSuccessorIssuanceScope(
+ 	objectId: StorageObjectId,
+ 	expectedAclDigest: string,
+ 	expectedEpoch: number,
+-	exactCanonicalLatchedAclBytes: Uint8Array
++	exactCanonicalLatchedAclBytes: Uint8Array,
++	expectedProfileId: string
+ ): Promise<AuthenticatedSuccessorIssuanceScopeResult> {
+ 	let writers: readonly string[];
+ 	try {
+@@ -876,6 +894,7 @@ async function authenticatedSuccessorIssuanceScope(
+ 			expectedAclDigest,
+ 			expectedEpoch,
+ 			expectedObjectId: objectId,
++			expectedProfileId,
+ 		});
+ 		if (!opened.ok) return Object.freeze({ ok: false as const, reason: "authority" as const });
+ 		writers = opened.snapshot.members.flatMap(({ author, groups }) =>
+@@ -1147,6 +1166,7 @@ async function reopenCreatorSuccessorMaterial(
+ 						expectedAclDigest: String(currentAnchor.aclDigest),
+ 						expectedEpoch: currentEpoch,
+ 						expectedObjectId: objectId,
++						expectedProfileId: predecessorTrust.profileId,
+ 					})
+ 				: undefined;
+ 		if (
+@@ -1156,12 +1176,26 @@ async function reopenCreatorSuccessorMaterial(
+ 		) {
+ 			return coldFailure("chain-invalid", "creator predecessor ACL cannot be reconstructed");
+ 		}
++		if (
++			settlementProfileFor(successorTrust.profileId) === "v1" &&
++			!inspectCreatorTransitionAdvance({
++				current: { candidates: currentCandidates, closure: currentGeneration.closure },
++				currentTrust: predecessorTrust,
++				mode: "verify",
++				proofRefs: [cutCandidate.ref, selectedQc.ref],
++				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
++				successorTrust,
++				settlementAcl: { current: predecessorExactCanonicalLatchedAclBytes, successor: exactCanonicalLatchedAclBytes },
++			}).ok
++		)
++			return coldFailure("chain-invalid", "creator settlement ACL advance is invalid");
+ 		const issuance = await authenticatedSuccessorIssuanceScope(
+ 			input,
+ 			objectId,
+ 			String(successorAnchor.aclDigest),
+ 			successorEpoch,
+-			exactCanonicalLatchedAclBytes
++			exactCanonicalLatchedAclBytes,
++			successorTrust.profileId
+ 		);
+ 		if (!issuance.ok) {
+ 			const detail =
+@@ -1480,8 +1514,22 @@ async function authenticatePendingCandidate(
+ 			expectedAclDigest: String(currentAnchor.aclDigest),
+ 			expectedEpoch: expectedPrevious.epoch,
+ 			expectedObjectId: objectId,
++			expectedProfileId: predecessorTrust.profileId,
+ 		});
+-		return openedPredecessorAcl.ok
++		return openedPredecessorAcl.ok &&
++			(settlementProfileFor(successorTrust.profileId) !== "v1" ||
++				inspectCreatorTransitionAdvance({
++					current: { candidates: currentCandidates, closure: currentGeneration.closure },
++					currentTrust: predecessorTrust,
++					mode: "verify",
++					proofRefs: [cutCandidate.ref, selectedQc.ref],
++					proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
++					successorTrust,
++					settlementAcl: {
++						current: predecessorAclCandidates[0]?.bytes as Uint8Array,
++						successor: encodeCanonical(snapshot.payload.acl),
++					},
++				}).ok)
+ 			? Object.freeze({ closureDigest: closureDigest.value, generation: candidate, head: candidateHead })
+ 			: undefined;
+ 	} catch {
+diff --git a/packages/node/src/creator-close.ts b/packages/node/src/creator-close.ts
+index f601f424694852dcfeb8608e9889b90c25d2b273..59f2642b1f6e45be198bc32a5554226d7c74dcb9 100644
+--- a/packages/node/src/creator-close.ts
++++ b/packages/node/src/creator-close.ts
+@@ -11,15 +11,22 @@ import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
+ import { ANCHOR_TRUST_STATE_MAX_RECORD_BYTES, type CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+ import {
+ 	completeCreatorAuthorIssuanceFrontiers,
++	completeCreatorAuthorSettlement,
+ 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_GENESIS_SENTINEL,
+ 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
+ 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES,
++	CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL,
+ 	CREATOR_AUTHOR_SETTLEMENT_KIND,
+ 	CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES,
+ 	type CreatorAuthorIssuanceFrontier,
++	type CreatorAuthorSettlementFrontier,
++	frontierFor,
+ 	openCreatorAuthorIssuanceFrontiers,
++	openCreatorAuthorSettlement,
+ 	prepareCreatorAuthorIssuanceFrontiers,
++	prepareCreatorAuthorSettlement,
+ 	resolveCreatorAuthorIssuanceFrontiers,
++	type VerifiedCreatorAuthorSettlement,
+ } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
+ import { openCreatorSuccessorTrust, prepareCreatorClose } from "@ts-drp/protocol-v3/creator-close";
+ import {
+@@ -598,6 +605,131 @@ async function authorIssuanceFrontiersCandidate(
+ 	});
+ }
+ 
++async function authorSettlementCandidate(
++	input: Omit<Parameters<typeof authorIssuanceFrontiersCandidate>[0], "legacy"> &
++		Readonly<{ historyRoot: string; historySize: number }>
++): Promise<Readonly<{ bytes: Uint8Array; priorRef?: GenerationRef; ref: GenerationRef }>> {
++	const currentAcl = openedLatchedAcl(input.currentExactAclBytes, input.currentTrust, input.currentAclDigest);
++	const successorAcl = openedLatchedAcl(input.successorExactAclBytes, input.successorTrust, input.successorAclDigest);
++	if (currentAcl === undefined || successorAcl === undefined) {
++		throw new TypeError("creator settlement ACL authority is unavailable");
++	}
++	const candidates = input.current.candidates.filter((candidate) => {
++		try {
++			return (decodeCanonical(candidate.bytes) as Record<string, unknown>).kind === CREATOR_AUTHOR_SETTLEMENT_KIND;
++		} catch {
++			return false;
++		}
++	});
++	if (candidates.length !== (input.currentTrust.currentEpoch === 0 ? 0 : 1)) {
++		throw new TypeError("creator settlement predecessor is unavailable");
++	}
++	const previous = candidates[0];
++	let prior: VerifiedCreatorAuthorSettlement | undefined;
++	if (previous !== undefined) {
++		const epoch = input.currentTrust.currentEpoch - 1;
++		const cut = uniqueRecordCandidate(input.current.candidates, "drp-hard-epoch-cut", epoch);
++		const qc = uniqueRecordCandidate(input.current.candidates, "drp-seal-qc", epoch, "commit");
++		const acl = uniqueRecordCandidate(input.current.candidates, "drp-v3-latched-acl", epoch);
++		const cutRecord = cut === undefined ? undefined : decodeCanonical(cut.bytes);
++		if (cut === undefined || qc === undefined || acl === undefined || !plainRecord(cutRecord)) {
++			throw new TypeError("creator settlement predecessor proof is unavailable");
++		}
++		const opened = openCreatorAuthorSettlement({
++			exactCanonicalRecordBytes: previous.bytes,
++			expectedCommitQcRef: qc.ref,
++			expectedCurrentAclDigest: candidateAclDigest(acl),
++			expectedCutValueDigest: hex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
++			expectedSnapshotManifestDigest: cutRecord.snapshotManifestDigest,
++			expectedSuccessorAclDigest: input.currentAclDigest,
++			floorTrust: input.currentTrust,
++		});
++		if (!opened.ok) throw new TypeError("creator settlement predecessor proof is invalid");
++		prior = opened.capability;
++	}
++	const currentMembers = new Set(currentAcl.members.map(({ author }) => author));
++	const byAuthor = new Map<string, Map<number, string>>();
++	const duplicates = new Set<string>();
++	for (const [digest, identity] of input.graph.authors) {
++		const slots = byAuthor.get(identity.author) ?? new Map<number, string>();
++		if (slots.has(identity.authorSequence)) duplicates.add(identity.author);
++		slots.set(identity.authorSequence, digest);
++		byAuthor.set(identity.author, slots);
++	}
++	const frontiers: CreatorAuthorSettlementFrontier[] = [];
++	for (const { author } of successorAcl.members) {
++		if (!currentMembers.has(author)) {
++			frontiers.push(Object.freeze([author, input.successorTrust.currentEpoch, null] as const));
++			continue;
++		}
++		const previousFrontier = prior === undefined ? undefined : frontierFor(prior, author);
++		if (prior !== undefined && previousFrontier === undefined) {
++			throw new TypeError("creator settlement predecessor member is unavailable");
++		}
++		const admissionEpoch = previousFrontier?.[1] ?? 0;
++		let boundary = previousFrontier?.[2] ?? null;
++		const slots = byAuthor.get(author) ?? new Map<number, string>();
++		const regressed = [...slots.keys()].some((sequence) => boundary !== null && sequence <= boundary);
++		if (duplicates.has(author) || regressed) {
++			if (author === input.issuanceScope.author) {
++				throw new TypeError(
++					duplicates.has(author)
++						? "creator issuance-frontier author slot is ambiguous"
++						: "creator issuance-frontier boundary regressed"
++				);
++			}
++		} else {
++			for (const [sequence, digest] of slots) {
++				const operation = input.graph.vertices.get(digest)?.operation;
++				const fence = operation?.fenceSequence;
++				if (
++					operation?.action === "$drp.author-fence.v1" &&
++					operation.version === 1 &&
++					typeof fence === "number" &&
++					Number.isSafeInteger(fence) &&
++					fence >= 0 &&
++					fence <= sequence &&
++					(boundary === null || fence > boundary)
++				) {
++					boundary = fence === 0 ? null : fence - 1;
++				}
++			}
++			let next = boundary === null ? 0 : boundary + 1;
++			while (slots.has(next)) {
++				boundary = next;
++				next += 1;
++			}
++		}
++		frontiers.push(Object.freeze([author, admissionEpoch, boundary] as const));
++	}
++	const prepared = prepareCreatorAuthorSettlement({
++		commitQcRef: input.qcRef,
++		currentAclDigest: input.currentAclDigest,
++		currentTrust: input.currentTrust,
++		cutValueDigest: input.cutValueDigest,
++		frontiers,
++		historyRoot: input.historyRoot,
++		historySize: input.historySize,
++		priorCheckpointDigest: previous?.ref.digest ?? CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL,
++		priorCheckpointKind: previous === undefined ? "genesis" : "settled-v1",
++		snapshotManifestDigest: input.snapshotManifestDigest,
++		successorAclDigest: input.successorAclDigest,
++		successorTrust: input.successorTrust,
++	});
++	if (!prepared.ok) throw new TypeError("creator settlement preparation failed");
++	const detachedSignature = await signCreatorIssuanceRetirementRequest({
++		request: prepared.signingRequest,
++		signer: input.signer,
++	});
++	const completed = completeCreatorAuthorSettlement({ detachedSignature, preparation: prepared.preparation });
++	if (!completed.ok) throw new TypeError("creator settlement completion failed");
++	return Object.freeze({
++		bytes: completed.exactCanonicalRecordBytes,
++		ref: refFor(completed.exactCanonicalRecordBytes),
++		...(previous === undefined ? {} : { priorRef: copiedRef(previous.ref) }),
++	});
++}
++
+ function sameHead(left: PresentHead, right: PresentHead): boolean {
+ 	return (
+ 		left.closureDigest === right.closureDigest &&
+@@ -1046,21 +1178,24 @@ export async function bindCreatorLiveClose(
+ 					const successorTrustRef = refFor(finalized.exactCanonicalTrustStateRecordBytes);
+ 					const cutValueRef = refFor(prepared.exactCanonicalCutValueBytes);
+ 					const commitQcRef = refFor(finalized.exactCanonicalCommitQcBytes);
+-					const retirement = await issuanceRetirementCandidate({
+-						current,
+-						currentTrust: registration.currentTrust,
+-						cutValueDigest: prepared.valueDigest,
+-						durableReplay,
+-						graph,
+-						issuanceScope: registration.issuanceScope,
+-						issuanceStore: registration.issuanceStore,
+-						maxEpochVertices: registration.maxEpochVertices,
+-						qcRef: commitQcRef,
+-						signer: input.signer,
+-						snapshotManifestDigest: persistedSnapshot.manifestDigest,
+-						successorTrust: successor.trust,
+-					});
+-					const aggregate = await authorIssuanceFrontiersCandidate({
++					const settlement = settlementProfileFor(registration.currentTrust.profileId) === "v1";
++					const retirement = settlement
++						? undefined
++						: await issuanceRetirementCandidate({
++								current,
++								currentTrust: registration.currentTrust,
++								cutValueDigest: prepared.valueDigest,
++								durableReplay,
++								graph,
++								issuanceScope: registration.issuanceScope,
++								issuanceStore: registration.issuanceStore,
++								maxEpochVertices: registration.maxEpochVertices,
++								qcRef: commitQcRef,
++								signer: input.signer,
++								snapshotManifestDigest: persistedSnapshot.manifestDigest,
++								successorTrust: successor.trust,
++							});
++					const frontierInput = {
+ 						current,
+ 						currentAclDigest: anchor.aclDigest,
+ 						currentExactAclBytes: registration.exactCanonicalLatchedAclBytes,
+@@ -1069,46 +1204,57 @@ export async function bindCreatorLiveClose(
+ 						graph,
+ 						issuanceScope: registration.issuanceScope,
+ 						issuanceStore: registration.issuanceStore,
+-						legacy: retirement,
+ 						qcRef: commitQcRef,
+ 						signer: input.signer,
+ 						snapshotManifestDigest: persistedSnapshot.manifestDigest,
+ 						successorAclDigest: aclDigest,
+ 						successorExactAclBytes: encodeCanonical(acl),
+ 						successorTrust: successor.trust,
+-					});
++					};
++					const aggregate =
++						retirement === undefined
++							? await authorSettlementCandidate({
++									...frontierInput,
++									historyRoot: commitment.historyRoot,
++									historySize: commitment.historySize,
++								})
++							: await authorIssuanceFrontiersCandidate({ ...frontierInput, legacy: retirement });
++					const controls = retirement === undefined ? [aggregate] : [retirement, aggregate];
+ 					const proposed = Object.freeze(
+ 						[
+ 							...current.references.filter(
+ 								({ digest }) =>
+-									digest !== current.trustRef.digest &&
+-									digest !== retirement.priorRef?.digest &&
+-									digest !== aggregate.priorRef?.digest
++									digest !== current.trustRef.digest && !controls.some((control) => digest === control.priorRef?.digest)
+ 							),
+ 							successorTrustRef,
+ 							cutValueRef,
+ 							commitQcRef,
+-							retirement.ref,
+-							aggregate.ref,
++							...controls.map(({ ref }) => ref),
+ 						].sort(compareRef)
+ 					);
+ 					const proposedCandidates = creatorCloseCandidates([
+ 						...current.candidates.filter(
+ 							({ ref }) =>
+ 								ref.digest !== current.trustRef.digest &&
+-								ref.digest !== retirement.priorRef?.digest &&
+-								ref.digest !== aggregate.priorRef?.digest
++								!controls.some((control) => ref.digest === control.priorRef?.digest)
+ 						),
+ 						{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
+ 						{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
+ 						{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
+-						{ bytes: retirement.bytes, ref: retirement.ref },
+-						{ bytes: aggregate.bytes, ref: aggregate.ref },
++						...controls.map(({ bytes, ref }) => ({ bytes, ref })),
+ 					]);
+ 					const advance = inspectCreatorTransitionAdvance({
+ 						current: { candidates: current.candidates, closure: current.references },
+ 						currentTrust: registration.currentTrust,
+ 						mode: "stage",
++						...(settlement
++							? {
++									settlementAcl: {
++										current: registration.exactCanonicalLatchedAclBytes,
++										successor: encodeCanonical(acl),
++									},
++								}
++							: {}),
+ 						proofRefs: [cutValueRef, commitQcRef],
+ 						proposed: { candidates: proposedCandidates, closure: proposed },
+ 						successorTrust: successor.trust,
+@@ -1122,8 +1268,7 @@ export async function bindCreatorLiveClose(
+ 							{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
+ 							{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
+ 							{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
+-							{ bytes: retirement.bytes, ref: retirement.ref },
+-							{ bytes: aggregate.bytes, ref: aggregate.ref },
++							...controls.map(({ bytes, ref }) => ({ bytes, ref })),
+ 						],
+ 						acceptedProposed
+ 					);
+diff --git a/packages/node/src/internal/closed-epoch-cleanup.ts b/packages/node/src/internal/closed-epoch-cleanup.ts
+index 2b9c20622b008e527c6b9465f4bed62a44cf81fa..b3fe8e88637377599931656bdf4e450a4e9704f1 100644
+--- a/packages/node/src/internal/closed-epoch-cleanup.ts
++++ b/packages/node/src/internal/closed-epoch-cleanup.ts
+@@ -59,6 +59,16 @@ export type ClosedEpochCleanupPlanningResult =
+ 	| Readonly<{ readonly ok: false; readonly reason: ClosedEpochCleanupRefusal }>
+ 	| Readonly<{ readonly ok: true; readonly plan: ClosedEpochCleanupPlan }>;
+ 
++type SettlementCleanupFrontier = Readonly<{ admissionEpoch: number; terminalThrough: number | null }>;
++type SettlementCleanupPlanningResult =
++	| Readonly<{ readonly ok: false; readonly reason: ClosedEpochCleanupRefusal }>
++	| Readonly<{
++			readonly ok: true;
++			readonly plan: Omit<ClosedEpochCleanupPlan, "issuance"> & {
++				readonly issuance: ClosedEpochCleanupPlan["issuance"] | null;
++			};
++	  }>;
++
+ type CapturedInput = Readonly<{
+ 	readonly adoption: Readonly<Record<string, unknown>>;
+ 	readonly availabilityPolicyDigest: unknown;
+@@ -67,6 +77,7 @@ type CapturedInput = Readonly<{
+ 	readonly generations: readonly unknown[];
+ 	readonly issuance: Readonly<Record<string, unknown>>;
+ 	readonly snapshot: Readonly<Record<string, unknown>>;
++	readonly settlement?: SettlementCleanupFrontier;
+ }>;
+ 
+ type CopiedGeneration = Readonly<{
+@@ -105,6 +116,7 @@ function captureInput(value: unknown): CapturedInput | undefined {
+ 			"generations",
+ 			"issuance",
+ 			"snapshot",
++			...(value.settlement === undefined ? [] : ["settlement"]),
+ 		]) ||
+ 		!record(value.adoption) ||
+ 		!record(value.close) ||
+@@ -114,6 +126,16 @@ function captureInput(value: unknown): CapturedInput | undefined {
+ 	) {
+ 		return undefined;
+ 	}
++	if (
++		value.settlement !== undefined &&
++		(!record(value.settlement) ||
++			!exactKeys(value.settlement, ["admissionEpoch", "terminalThrough"]) ||
++			!Number.isSafeInteger(value.settlement.admissionEpoch) ||
++			Number(value.settlement.admissionEpoch) < 0 ||
++			(value.settlement.terminalThrough !== null &&
++				(!Number.isSafeInteger(value.settlement.terminalThrough) || Number(value.settlement.terminalThrough) < 0)))
++	)
++		return undefined;
+ 	return Object.freeze({
+ 		adoption: value.adoption,
+ 		availabilityPolicyDigest: value.availabilityPolicyDigest,
+@@ -122,6 +144,7 @@ function captureInput(value: unknown): CapturedInput | undefined {
+ 		generations: value.generations,
+ 		issuance: value.issuance,
+ 		snapshot: value.snapshot,
++		...(value.settlement === undefined ? {} : { settlement: value.settlement as SettlementCleanupFrontier }),
+ 	});
+ }
+ 
+@@ -353,8 +376,9 @@ function validSnapshot(value: Readonly<Record<string, unknown>>): boolean {
+ function copiedIssuance(
+ 	value: Readonly<Record<string, unknown>>,
+ 	objectId: StorageObjectId,
+-	closedEpoch: number
+-): ClosedEpochCleanupPlan["issuance"] | undefined {
++	closedEpoch: number,
++	settlement?: SettlementCleanupFrontier
++): ClosedEpochCleanupPlan["issuance"] | null | undefined {
+ 	if (
+ 		!exactKeys(value, [
+ 			"complete",
+@@ -378,8 +402,8 @@ function copiedIssuance(
+ 		copiedObjectId(value.scope.objectId) !== objectId ||
+ 		typeof value.scope.author !== "string" ||
+ 		!HEX_DIGEST.test(value.scope.author) ||
+-		!Number.isSafeInteger(value.throughAuthorSequence) ||
+-		Number(value.throughAuthorSequence) < 0 ||
++		(!(settlement !== undefined && value.throughAuthorSequence === null) &&
++			(!Number.isSafeInteger(value.throughAuthorSequence) || Number(value.throughAuthorSequence) < 0)) ||
+ 		!Array.isArray(value.rows)
+ 	) {
+ 		return undefined;
+@@ -388,6 +412,14 @@ function copiedIssuance(
+ 	const lineage = Object.freeze({ exhausted: value.lineage.exhausted, next: Number(value.lineage.next) });
+ 	const prunedThroughAuthorSequence =
+ 		value.prunedThroughAuthorSequence === null ? null : Number(value.prunedThroughAuthorSequence);
++	if (settlement !== undefined && value.throughAuthorSequence === null) {
++		return value.rows.length === 0 &&
++			(prunedThroughAuthorSequence === null ||
++				lineage.next > prunedThroughAuthorSequence ||
++				(lineage.exhausted && lineage.next === prunedThroughAuthorSequence))
++			? null
++			: undefined;
++	}
+ 	const consumed =
+ 		lineage.next > throughAuthorSequence || (lineage.exhausted && lineage.next === throughAuthorSequence);
+ 	if (
+@@ -413,10 +445,19 @@ function copiedIssuance(
+ 			Number(candidate.authorSequence) < first ||
+ 			Number(candidate.authorSequence) > throughAuthorSequence ||
+ 			!Number.isSafeInteger(candidate.epoch) ||
+-			Number(candidate.epoch) !== closedEpoch ||
++			(settlement === undefined
++				? Number(candidate.epoch) !== closedEpoch
++				: Number(candidate.epoch) < 0 ||
++					Number(candidate.epoch) > closedEpoch - 2 ||
++					!(
++						Number(candidate.epoch) < settlement.admissionEpoch ||
++						(settlement.terminalThrough !== null && Number(candidate.authorSequence) <= settlement.terminalThrough)
++					)) ||
+ 			candidate.issued !== true ||
+ 			candidate.outbox !== true ||
+-			candidate.publishState !== "published" ||
++			(settlement === undefined
++				? candidate.publishState !== "published"
++				: candidate.publishState !== "published" && candidate.publishState !== "pending") ||
+ 			seen.has(Number(candidate.authorSequence))
+ 		) {
+ 			return undefined;
+@@ -437,9 +478,15 @@ function copiedIssuance(
+ /**
+  * Plans one closed-epoch cleanup without opening a store, mutating state, or scheduling work.
+  * @param input - Detached facts already authenticated by the owning Phase-5/6a components.
++ * @param input.settlement - Successor-authenticated incarnation and terminal boundary, for settlement only.
++ * @param input.settlement
+  * @returns One deep-frozen plan or the first exact refusal in the closed precedence.
+  */
+-export function planClosedEpochCleanup(input: unknown): ClosedEpochCleanupPlanningResult {
++export function planClosedEpochCleanup(input: {
++	readonly settlement: SettlementCleanupFrontier;
++}): SettlementCleanupPlanningResult;
++export function planClosedEpochCleanup(input: unknown): ClosedEpochCleanupPlanningResult;
++export function planClosedEpochCleanup(input: unknown): SettlementCleanupPlanningResult {
+ 	try {
+ 		const captured = captureInput(input);
+ 		if (captured === undefined) return refused("D109A_IDENTITY_INVALID");
+@@ -481,7 +528,9 @@ export function planClosedEpochCleanup(input: unknown): ClosedEpochCleanupPlanni
+ 		if (captured.availabilityPolicyDigest !== LOCAL_ONLY_POLICY_DIGEST) {
+ 			return refused("D109A_POLICY_UNSUPPORTED");
+ 		}
+-		const issuance = copiedIssuance(captured.issuance, objectId, closedEpoch);
++		if (captured.settlement !== undefined && captured.settlement.admissionEpoch > closedEpoch + 1)
++			return refused("D109A_OUTBOX_INCOMPLETE");
++		const issuance = copiedIssuance(captured.issuance, objectId, closedEpoch, captured.settlement);
+ 		if (issuance === undefined) return refused("D109A_OUTBOX_INCOMPLETE");
+ 
+ 		return Object.freeze({
+diff --git a/packages/node/src/internal/creator-transition-advance.ts b/packages/node/src/internal/creator-transition-advance.ts
+index 046c6f900e052214f58c8c859f8520662c1c827a..85accc35e95012f377d24fb1c1f8f439b3c8e7d6 100644
+--- a/packages/node/src/internal/creator-transition-advance.ts
++++ b/packages/node/src/internal/creator-transition-advance.ts
+@@ -10,10 +10,12 @@ import {
+ 	CREATOR_AUTHOR_SETTLEMENT_KIND,
+ 	type CreatorAuthorIssuanceFrontiersIdentity,
+ 	type CreatorAuthorSettlementIdentity,
++	frontierFor,
+ 	openCreatorAuthorIssuanceFrontiers,
+ 	openCreatorAuthorSettlement,
+ 	resolveCreatorAuthorIssuanceFrontiers,
+ 	resolveCreatorAuthorSettlement,
++	type VerifiedCreatorAuthorSettlement,
+ } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
+ import {
+ 	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
+@@ -22,6 +24,7 @@ import {
+ 	openCreatorIssuanceRetirement,
+ 	resolveCreatorIssuanceRetirement,
+ } from "@ts-drp/protocol-v3/creator-issuance-retirement";
++import { type LatchedAclSnapshot, openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
+ import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
+ import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+ 
+@@ -37,6 +40,8 @@ export interface InspectCreatorTransitionAdvanceInput {
+ 	readonly proofRefs: readonly GenerationRef[];
+ 	readonly proposed: CreatorTransitionClosure;
+ 	readonly successorTrust: CurrentAnchorTrust;
++	/** Final settlement validation requires the ACL bytes from the authenticated snapshot owner. */
++	readonly settlementAcl?: Readonly<{ current: Uint8Array; successor: Uint8Array }>;
+ }
+ 
+ export type InspectCreatorTransitionAdvanceResult =
+@@ -52,6 +57,7 @@ export interface VerifiedCreatorHistoricalIssuance {
+ }
+ 
+ export interface CreatorHistoricalIssuanceIdentity {
++	readonly admissionEpoch?: number;
+ 	readonly admittedAuthorSequence: number | null;
+ 	readonly author: string;
+ 	readonly closedAnchorDigest: string;
+@@ -518,6 +524,7 @@ function openedSettlement(
+ 	| Readonly<{
+ 			readonly candidate: DetachedClosureCandidate;
+ 			readonly identity: CreatorAuthorSettlementIdentity;
++			readonly capability: VerifiedCreatorAuthorSettlement;
+ 	  }>
+ 	| undefined {
+ 	const decodedCut = record(cut);
+@@ -547,10 +554,12 @@ function openedSettlement(
+ 		decodedCut.objectId !== identity.objectId ||
+ 		decodedCut.epoch !== identity.closedEpoch ||
+ 		decodedCut.previousAnchor !== identity.closedAnchorDigest ||
++		decodedCut.historyRoot !== identity.historyRoot ||
++		decodedCut.historySize !== identity.historySize ||
+ 		identity.successorAnchorDigest !== floorTrust.currentAnchorDigest ||
+ 		identity.successorEpoch !== floorTrust.currentEpoch
+ 		? undefined
+-		: Object.freeze({ candidate, identity });
++		: Object.freeze({ candidate, identity, capability: opened.capability });
+ }
+ 
+ /**
+@@ -575,6 +584,45 @@ export function openVerifiedCreatorHistoricalIssuance(
+ 		const cut = uniqueCandidate(input.closure.candidates, "drp-hard-epoch-cut", closedEpoch);
+ 		const qc = uniqueCandidate(input.closure.candidates, "drp-seal-qc", closedEpoch, "commit");
+ 		const acl = uniqueCandidate(input.closure.candidates, "drp-v3-latched-acl", closedEpoch);
++		if (settlementProfileFor(input.floorTrust.profileId) === "v1") {
++			const candidates = settlementCandidates(input.closure);
++			const candidate = candidates[0];
++			if (
++				retirement.length !== 0 ||
++				aggregate.length !== 0 ||
++				candidates.length !== 1 ||
++				candidate === undefined ||
++				cut === undefined ||
++				qc === undefined ||
++				acl === undefined ||
++				!exactClosureOccurrence(input.closure.closure, candidate)
++			)
++				return undefined;
++			const opened = openedSettlement(
++				candidate,
++				input.floorTrust,
++				cut,
++				qc,
++				hex(hashDomain("ts-drp/latched-acl/v3", acl.bytes))
++			);
++			const frontier = opened === undefined ? undefined : frontierFor(opened.capability, input.author);
++			if (opened === undefined || frontier === undefined) return undefined;
++			const capability = Object.freeze({}) as VerifiedCreatorHistoricalIssuance;
++			verifiedHistoricalIssuance.set(
++				capability,
++				Object.freeze({
++					admissionEpoch: frontier[1],
++					admittedAuthorSequence: frontier[2],
++					author: frontier[0],
++					closedAnchorDigest: opened.identity.closedAnchorDigest,
++					closedEpoch: opened.identity.closedEpoch,
++					objectId: opened.identity.objectId,
++					successorAnchorDigest: opened.identity.successorAnchorDigest,
++					successorEpoch: opened.identity.successorEpoch,
++				})
++			);
++			return capability;
++		}
+ 		if (
+ 			retirement.length !== 1 ||
+ 			cut === undefined ||
+@@ -827,9 +875,55 @@ function authenticatedSettlementPair(input: InspectCreatorTransitionAdvanceInput
+ 	) {
+ 		return undefined;
+ 	}
++	const openAcl = (bytes: Uint8Array, trust: CurrentAnchorTrust, digest: string): LatchedAclSnapshot | undefined => {
++		const opened = openCanonicalLatchedAclSnapshot({
++			exactCanonicalLatchedAclBytes: bytes,
++			expectedAclDigest: digest,
++			expectedEpoch: trust.currentEpoch,
++			expectedObjectId: trust.objectId,
++			expectedProfileId: trust.profileId,
++		});
++		return opened.ok ? opened.snapshot : undefined;
++	};
++	if (input.mode === "stage" && input.settlementAcl === undefined) return undefined;
++	const boundCurrentAcl =
++		input.settlementAcl === undefined
++			? undefined
++			: openAcl(input.settlementAcl.current, input.currentTrust, currentAclDigest);
++	const boundSuccessorAcl =
++		input.settlementAcl === undefined
++			? undefined
++			: openAcl(input.settlementAcl.successor, input.successorTrust, openedProposed.identity.successorAclDigest);
++	if (input.settlementAcl !== undefined && (boundCurrentAcl === undefined || boundSuccessorAcl === undefined))
++		return undefined;
++	const advance = (
++		predecessor: null | {
++			candidateDigest: string;
++			closedEpoch: number;
++			successorEpoch: number;
++			frontiers: CreatorAuthorSettlementIdentity["frontiers"];
++		}
++	): ReturnType<typeof inspectCreatorAuthorSettlementAdvance> => {
++		// The early verify pass authenticates the cryptographic closure before
++		// snapshot I/O. Its caller must repeat with snapshot ACLs before acceptance.
++		if (input.settlementAcl === undefined) return Object.freeze({ ok: true });
++		return inspectCreatorAuthorSettlementAdvance({
++			currentAcl: boundCurrentAcl,
++			successorAcl: boundSuccessorAcl,
++			predecessor,
++			proposed: {
++				closedEpoch: openedProposed.identity.closedEpoch,
++				successorEpoch: openedProposed.identity.successorEpoch,
++				frontiers: openedProposed.identity.frontiers,
++				priorCheckpointDigest: openedProposed.identity.priorCheckpointDigest,
++				priorCheckpointKind: openedProposed.identity.priorCheckpointKind,
++			},
++		});
++	};
+ 	if (input.currentTrust.currentEpoch === 0) {
+ 		return openedProposed.identity.priorCheckpointKind === "genesis" &&
+-			openedProposed.identity.priorCheckpointDigest === CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL
++			openedProposed.identity.priorCheckpointDigest === CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL &&
++			advance(null).ok
+ 			? Object.freeze({ proposed })
+ 			: undefined;
+ 	}
+@@ -851,7 +945,13 @@ function authenticatedSettlementPair(input: InspectCreatorTransitionAdvanceInput
+ 	);
+ 	return openedCurrent !== undefined &&
+ 		openedProposed.identity.priorCheckpointKind === "settled-v1" &&
+-		openedProposed.identity.priorCheckpointDigest === current.ref.digest
++		openedProposed.identity.priorCheckpointDigest === current.ref.digest &&
++		advance({
++			candidateDigest: current.ref.digest,
++			closedEpoch: openedCurrent.identity.closedEpoch,
++			successorEpoch: openedCurrent.identity.successorEpoch,
++			frontiers: openedCurrent.identity.frontiers,
++		}).ok
+ 		? Object.freeze({ current, proposed })
+ 		: undefined;
+ }
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index d6b3b994734dd7344a478cc7e7cb0aabeefdf441..0d17b6bc1172027ee90dacd674cc73c56e75a1e0 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -30,6 +30,7 @@ import {
+ 	durableIssuanceLineagesEqual,
+ 	durableIssuancePruningMaintenanceForStore,
+ 	type DurableIssuancePruningReceipt,
++	settlementPlanPermitsAuthenticatedPruning,
+ } from "@ts-drp/issuance-store/maintenance";
+ import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
+ import type { MessageQueueManager } from "@ts-drp/message-queue";
+@@ -52,6 +53,10 @@ import {
+ 	openCurrentEpochAuthorAuthorization,
+ 	resolveCurrentEpochAuthorizedAuthor,
+ } from "@ts-drp/protocol-v3/author-authorization";
++import {
++	openCreatorAuthorSettlement,
++	resolveCreatorAuthorSettlement,
++} from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
+ import { verifyReceivedVertex } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
+ import {
+ 	authorizeLatchedApplicationWrite,
+@@ -71,6 +76,7 @@ import {
+ 	digestClosure,
+ 	type ExpectedHead,
+ 	type GenerationId,
++	type GenerationRecord,
+ 	type GenerationRef,
+ 	parseGenerationId,
+ 	parseHeadRevision,
+@@ -80,12 +86,14 @@ import {
+ } from "@ts-drp/storage";
+ import {
+ 	AHE_RECLAMATION_LOCAL_ONLY_POLICY_DIGEST,
++	aheReclamationMaintenanceForStore,
+ 	type AheReclamationReceipt,
+ 	captureAheReclamationInput,
+ } from "@ts-drp/storage/maintenance";
+ import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
+ 
+ import { bindCreatorLiveClose } from "./creator-close.js";
++import { planClosedEpochCleanup } from "./internal/closed-epoch-cleanup.js";
+ import {
+ 	type CreatorSuccessorGenerationMaterial,
+ 	type CreatorSuccessorLiveMaterial,
+@@ -4489,6 +4497,19 @@ interface SettlementFrontierContext {
+ 	readonly terminalThrough: number | null;
+ }
+ 
++function settlementFrontierFromHistory(
++	context: HistoricalIssuanceContext | undefined
++): SettlementFrontierContext | undefined {
++	const identity = context === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(context.capability);
++	return identity?.admissionEpoch === undefined
++		? undefined
++		: ObjectFreeze({
++				admissionEpoch: identity.admissionEpoch,
++				currentEpoch: identity.successorEpoch,
++				terminalThrough: identity.admittedAuthorSequence,
++			});
++}
++
+ interface HistoricalIssuanceContext {
+ 	readonly capability: VerifiedCreatorHistoricalIssuance;
+ 	readonly countedSequences: Set<number>;
+@@ -4508,7 +4529,8 @@ function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefin
+ 	if (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;
+ 	context.count += 1;
+ 	ReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);
+-	const maxHistoricalIssuanceRows = context.maxEpochVertices;
++	const identity = resolveVerifiedCreatorHistoricalIssuance(context.capability);
++	const maxHistoricalIssuanceRows = context.maxEpochVertices * (identity?.admissionEpoch === undefined ? 1 : 3);
+ 	return context.count <= maxHistoricalIssuanceRows;
+ }
+ 
+@@ -4756,7 +4778,7 @@ function classifyPlaneVertex(
+ 	expectedDigest: Uint8Array,
+ 	expectedAuthor: string,
+ 	expectedAuthorSequence: number,
+-	settlementFrontier?: SettlementFrontierContext
++	settlementFrontier = settlementFrontierFromHistory(historicalIssuance)
+ ): ClassifiedPlaneVertex | undefined {
+ 	const matches = (
+ 		authenticated: AuthenticatedRecoveryVertex | undefined
+@@ -5140,6 +5162,33 @@ function creatorFilteredIssuanceStore(
+ 				if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
+ 					return page;
+ 				}
++				const settlementFrontier = settlementFrontierFromHistory(historicalIssuance);
++				if (settlementFrontier !== undefined) {
++					const source = authenticatedSettlementSourceRow(
++						filterPayload,
++						filterAuthorization,
++						row.canonicalPreimageBytes,
++						row.signature,
++						row.digest,
++						issuanceScope.author,
++						row.authorSequence,
++						settlementFrontier
++					);
++					if (
++						source !== undefined &&
++						(excludedAfterEpoch === undefined || source.admitted.epoch < excludedAfterEpoch)
++					) {
++						const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
++						const issuedRow = outboxRowSnapshot(
++							ObjectFreeze({ commit: issued, publishState: row.publishState }),
++							issuanceScope
++						);
++						if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
++						if (!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence)) return page;
++						afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence] as const);
++						continue;
++					}
++				}
+ 				const authenticated = authenticateRecoveryVertex(
+ 					filterPayload,
+ 					filterAuthorization,
+@@ -5333,7 +5382,22 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 		if (authorization === undefined) {
+ 			return recoveryFailure("authorization-rejected", "v3 recovery authorization does not match");
+ 		}
+-		if (resolveV3AuthorizedAuthor(authorization, selectedScope.author) === undefined) {
++		const historicalIdentity =
++			historicalIssuance === undefined
++				? undefined
++				: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
++		// This permits validation of a returning member's predecessor journal, not
++		// application admission under an ACL in which that member was absent.
++		const returningPredecessor =
++			historicalIdentity?.admissionEpoch === historicalIdentity?.successorEpoch &&
++			historicalIdentity !== undefined &&
++			historicalIdentity.author === selectedScope.author &&
++			historicalIdentity.objectId === selectedScope.objectId &&
++			historicalIdentity.closedEpoch === payload.provenance.epoch &&
++			historicalIdentity.closedAnchorDigest === payload.provenance.anchorDigest &&
++			historicalIdentity.successorEpoch === payload.provenance.epoch + 1 &&
++			settlementProfileFor(payload.trust.trust.profileId) === "v1";
++		if (resolveV3AuthorizedAuthor(authorization, selectedScope.author) === undefined && !returningPredecessor) {
+ 			return recoveryFailure("authorization-rejected", "v3 recovery author is not authorized");
+ 		}
+ 
+@@ -5376,7 +5440,20 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 			);
+ 			if (
+ 				sourceAuthorization === undefined ||
+-				resolveV3AuthorizedAuthor(sourceAuthorization, selectedScope.author) === undefined
++				(resolveV3AuthorizedAuthor(sourceAuthorization, selectedScope.author) === undefined &&
++					!(
++						successorRecovery !== undefined &&
++						source.capability === successorRecovery.sourceCapability &&
++						historicalIdentity !== undefined &&
++						historicalIdentity.author === selectedScope.author &&
++						historicalIdentity.objectId === selectedScope.objectId &&
++						historicalIdentity.admissionEpoch === payload.provenance.epoch &&
++						historicalIdentity.successorEpoch === payload.provenance.epoch &&
++						historicalIdentity.successorAnchorDigest === payload.provenance.anchorDigest &&
++						historicalIdentity.closedEpoch === sourcePayload.provenance.epoch &&
++						historicalIdentity.closedAnchorDigest === sourcePayload.provenance.anchorDigest &&
++						settlementProfileFor(payload.trust.trust.profileId) === "v1"
++					))
+ 			) {
+ 				return recoveryFailure("authorization-rejected", "v3 displaced source authorization does not match");
+ 			}
+@@ -5759,6 +5836,24 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 			} catch {
+ 				return recoveryFailure("admission-rejected", "v3 recovery admission failed");
+ 			}
++			const settlementFrontier = settlementFrontierFromHistory(historicalIssuance);
++			if (
++				classified !== undefined &&
++				settlementFrontier !== undefined &&
++				settlementFrontier.currentEpoch === payload.provenance.epoch
++			) {
++				const ownClass = settlementOwnRowClass(
++					classified.authenticated.admitted.epoch,
++					settlementFrontier.currentEpoch,
++					row.authorSequence,
++					settlementFrontier.admissionEpoch,
++					settlementFrontier.terminalThrough
++				);
++				if (ownClass === "terminal" || ownClass === "old-incarnation") {
++					afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
++					continue;
++				}
++			}
+ 			if (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {
+ 				if (
+ 					!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence) ||
+@@ -6040,6 +6135,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 		if (
+ 			successorRecovery === undefined &&
+ 			!retainedBootstrapHold &&
++			!returningPredecessor &&
+ 			currentRecordCount === 0 &&
+ 			(historicalIssuance?.count ?? 0) === 0 &&
+ 			(recoveredCount === 0 || (displacedSource !== undefined && displacedSource.activationVertexDigest === undefined))
+@@ -6049,7 +6145,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+ 		if (
+ 			successorRecovery === undefined &&
+ 			!retainedBootstrapHold &&
+-			((recoveredCount === 0 && (historicalIssuance?.count ?? 0) === 0) ||
++			((!returningPredecessor && recoveredCount === 0 && (historicalIssuance?.count ?? 0) === 0) ||
+ 				index.size !== preparedVertexCount + recoveredCount)
+ 		) {
+ 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
+@@ -8239,7 +8335,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
+ 						registration,
+ 						() => () =>
+ 							settlementProfileFor(registration.payload.trust.trust.profileId) === "v1"
+-								? readSettlementSources(registration)
++								? readSettlementSources(registration, settlementFrontierFromHistory(registration.historicalIssuance))
+ 								: readRebaseOutbox(registration)
+ 					),
+ 		completeRebaseSource: (
+@@ -8513,6 +8609,174 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
+ 	}
+ }
+ 
++async function cleanupCreatorSettlementSuccessor(
++	material: CreatorSuccessorLiveMaterial,
++	payload: PreparedV3LivePayload,
++	authorization: V3LiveAuthorization,
++	historical: HistoricalIssuanceContext
++): Promise<void> {
++	const frontier = settlementFrontierFromHistory(historical);
++	if (frontier === undefined) return;
++	const ahe = aheReclamationMaintenanceForStore(material.store);
++	const issuance = durableIssuancePruningMaintenanceForStore(material.issuanceStore);
++	if (ahe === undefined || issuance === undefined) return;
++	const candidate = (kind: string, epoch?: number): CreatorSuccessorGenerationMaterial["candidates"][number] => {
++		const matches = material.successor.candidates.filter(({ bytes }) => {
++			const value = decodeCanonical(bytes);
++			return (
++				isObject(value) &&
++				Reflect.get(value, "kind") === kind &&
++				(epoch === undefined || Reflect.get(value, "epoch") === epoch)
++			);
++		});
++		const match = matches[0];
++		if (matches.length !== 1 || match === undefined)
++			throw new TypeError("creator cleanup checkpoint proof is unavailable");
++		return match;
++	};
++	const closedEpoch = material.predecessor.trust.currentEpoch;
++	const cut = candidate("drp-hard-epoch-cut", closedEpoch);
++	const qc = candidate("drp-seal-qc", closedEpoch);
++	const cutRecord = decodeCanonical(cut.bytes) as Record<string, unknown>;
++	const opened = openCreatorAuthorSettlement({
++		exactCanonicalRecordBytes: candidate("drp-creator-author-settlement-state").bytes,
++		expectedCommitQcRef: qc.ref,
++		expectedCurrentAclDigest: bytesToLowerHex(
++			hashDomain("ts-drp/latched-acl/v3", material.predecessorExactCanonicalLatchedAclBytes)
++		),
++		expectedCutValueDigest: bytesToLowerHex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
++		expectedSnapshotManifestDigest: cutRecord.snapshotManifestDigest,
++		expectedSuccessorAclDigest: bytesToLowerHex(
++			hashDomain("ts-drp/latched-acl/v3", material.exactCanonicalLatchedAclBytes)
++		),
++		floorTrust: material.successor.trust,
++	});
++	const checkpoint = opened.ok ? resolveCreatorAuthorSettlement(opened.capability) : undefined;
++	if (
++		checkpoint === undefined ||
++		checkpoint.historyRoot !== cutRecord.historyRoot ||
++		checkpoint.historySize !== cutRecord.historySize
++	) {
++		throw new TypeError("creator cleanup checkpoint proof is invalid");
++	}
++	const generations: GenerationRecord[] = [];
++	let cursor: Parameters<AheDurableStore["readGenerationPage"]>[0]["cursor"];
++	do {
++		const page = await material.store.readGenerationPage({
++			objectId: material.successor.head.objectId,
++			limit: 64,
++			...(cursor === undefined ? {} : { cursor }),
++		});
++		if (!page.ok) throw new TypeError("creator cleanup generation enumeration failed");
++		generations.push(...page.value.generations);
++		cursor = page.value.nextCursor ?? undefined;
++	} while (cursor !== undefined);
++	const state = await issuance.inspectPruningState(material.issuanceScope);
++	const plan = await material.issuanceStore.readSettlementPlan(material.issuanceScope);
++	const rows: {
++		authorSequence: number;
++		epoch: number;
++		issued: true;
++		outbox: true;
++		publishState: "pending" | "published";
++	}[] = [];
++	let throughAuthorSequence: number | null = null;
++	if (closedEpoch >= 2 && settlementPlanPermitsAuthenticatedPruning(plan)) {
++		let afterKey: DurableOutboxPageInput["afterKey"] =
++			state.prunedThroughAuthorSequence === null
++				? null
++				: [material.issuanceScope.objectId, material.issuanceScope.author, state.prunedThroughAuthorSequence];
++		let done = false;
++		while (!done) {
++			const page = await material.issuanceStore.readOutboxPage({ scope: material.issuanceScope, afterKey, limit: 64 });
++			if (page.length === 0) break;
++			for (const raw of page) {
++				const row = outboxRowSnapshot(raw, material.issuanceScope);
++				if (row === undefined) throw new TypeError("creator cleanup issuance row is invalid");
++				const source = authenticatedSettlementSourceRow(
++					payload,
++					authorization,
++					row.canonicalPreimageBytes,
++					row.signature,
++					row.digest,
++					material.issuanceScope.author,
++					row.authorSequence,
++					frontier
++				);
++				if (
++					source === undefined ||
++					source.admitted.epoch > closedEpoch - 2 ||
++					!(
++						source.admitted.epoch < frontier.admissionEpoch ||
++						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
++					)
++				) {
++					done = true;
++					break;
++				}
++				const issued = await material.issuanceStore.readIssued(material.issuanceScope, row.authorSequence);
++				const issuedRow = outboxRowSnapshot({ commit: issued, publishState: row.publishState }, material.issuanceScope);
++				if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow))
++					throw new TypeError("creator cleanup issuance pair differs");
++				rows.push({
++					authorSequence: row.authorSequence,
++					epoch: source.admitted.epoch,
++					issued: true,
++					outbox: true,
++					publishState: row.publishState,
++				});
++				if (rows.length > payload.parameters.maxEpochVertices * 3)
++					throw new TypeError("creator cleanup issuance scan exceeded retained window");
++				throughAuthorSequence = row.authorSequence;
++				afterKey = [material.issuanceScope.objectId, material.issuanceScope.author, row.authorSequence];
++			}
++		}
++	}
++	const head = await material.store.readHead(material.successor.head.objectId);
++	if (!head.ok) throw new TypeError("creator cleanup head is unavailable");
++	const planned = planClosedEpochCleanup({
++		settlement: { admissionEpoch: frontier.admissionEpoch, terminalThrough: frontier.terminalThrough },
++		adoption: { adopted: true, activeHead: material.successor.head },
++		availabilityPolicyDigest: cutRecord.availabilityPolicyDigest,
++		close: {
++			closedEpoch,
++			commitQcRef: checkpoint.commitQcRef,
++			objectId: material.successor.head.objectId,
++			verified: true,
++		},
++		expectedHead: head.value,
++		generations,
++		issuance: {
++			complete: true,
++			lineage: state.lineage,
++			prunedThroughAuthorSequence: state.prunedThroughAuthorSequence,
++			rows,
++			scope: material.issuanceScope,
++			throughAuthorSequence,
++		},
++		snapshot: { adopted: true, manifestDigest: checkpoint.snapshotManifestDigest },
++	});
++	if (!planned.ok) {
++		if (planned.reason === "D109A_ROLLBACK_INSUFFICIENT" || planned.reason === "D109A_POLICY_UNSUPPORTED") return;
++		throw new TypeError(`creator cleanup refused: ${planned.reason}`);
++	}
++	const { issuance: prefix, ...reclamation } = planned.plan;
++	await ahe.reclaimClosedEpoch(reclamation);
++	if (prefix === null) return;
++	const expected = await material.store.readHead(material.successor.head.objectId);
++	if (!expected.ok || expected.value.kind !== "present" || !sameHead(expected.value, material.successor.head))
++		throw new TypeError("creator cleanup head changed");
++	await issuance.pruneAuthenticatedSettledPrefix({
++		closedEpoch,
++		commitQcRef: checkpoint.commitQcRef,
++		expectedLineage: prefix.lineage,
++		expectedPrunedThroughAuthorSequence: prefix.prunedThroughAuthorSequence,
++		scope: prefix.scope,
++		snapshotManifestDigest: checkpoint.snapshotManifestDigest,
++		throughAuthorSequence: prefix.throughAuthorSequence,
++	});
++}
++
+ async function activateCreatorSuccessorLive(
+ 	material: CreatorSuccessorLiveMaterial,
+ 	bindings: CreatorSuccessorRuntimeBindings
+@@ -8629,29 +8893,31 @@ async function activateCreatorSuccessorLive(
+ 			})
+ 		);
+ 		const successorIssuanceStore =
+-			transportHandoff?.displacedSource === undefined
+-				? material.predecessor.trust.currentEpoch > 0
+-					? creatorFilteredIssuanceStore(
++			settlementFrontierFromHistory(successorHistoricalIssuance) !== undefined
++				? material.issuanceStore
++				: transportHandoff?.displacedSource === undefined
++					? material.predecessor.trust.currentEpoch > 0
++						? creatorFilteredIssuanceStore(
++								material.issuanceStore,
++								material.issuanceScope,
++								successorPayload,
++								successorAuthorization,
++								Number.MAX_SAFE_INTEGER,
++								material.pinnedGenesisAnchorDigest,
++								material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
++								successorHistoricalIssuance
++							)
++						: material.issuanceStore
++					: creatorFilteredIssuanceStore(
+ 							material.issuanceStore,
+ 							material.issuanceScope,
+-							successorPayload,
+-							successorAuthorization,
+-							Number.MAX_SAFE_INTEGER,
+-							material.pinnedGenesisAnchorDigest,
+-							material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
++							transportHandoff.displacedSource.prepared,
++							transportHandoff.displacedSource.authorization,
++							undefined,
++							transportHandoff.displacedSource.pinnedGenesisAnchorDigest,
++							transportHandoff.displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+ 							successorHistoricalIssuance
+-						)
+-					: material.issuanceStore
+-				: creatorFilteredIssuanceStore(
+-						material.issuanceStore,
+-						material.issuanceScope,
+-						transportHandoff.displacedSource.prepared,
+-						transportHandoff.displacedSource.authorization,
+-						undefined,
+-						transportHandoff.displacedSource.pinnedGenesisAnchorDigest,
+-						transportHandoff.displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+-						successorHistoricalIssuance
+-					);
++						);
+ 		creatorHistoricalIssuanceHandoffs.set(successor, successorHistoricalIssuance);
+ 		const recovered = await recoverV3LiveReplica({
+ 			capability: successor,
+@@ -8707,6 +8973,17 @@ async function activateCreatorSuccessorLive(
+ 			activated.handle.deactivate();
+ 			return rejected("source-unavailable", "creator predecessor could not be terminalized");
+ 		}
++		try {
++			await cleanupCreatorSettlementSuccessor(
++				material,
++				successorPayload,
++				successorAuthorization,
++				successorHistoricalIssuance
++			);
++		} catch {
++			await Promise.resolve(activated.handle.deactivate());
++			return rejected("recovery-rejected", "creator authenticated cleanup failed");
++		}
+ 		return ObjectFreeze({ handle: activated.handle, ok: true as const });
+ 	} catch {
+ 		return rejected("internal-invariant", "creator successor activation failed unexpectedly");
+diff --git a/packages/protocol-v3/src/creator-checkpoint.ts b/packages/protocol-v3/src/creator-checkpoint.ts
+index 56b2d6dd3dcf7a6213fc137427e6818e6b443c82..fca16b354852a15358153f3cb9a0fd924292f7a5 100644
+--- a/packages/protocol-v3/src/creator-checkpoint.ts
++++ b/packages/protocol-v3/src/creator-checkpoint.ts
+@@ -8,6 +8,7 @@ import {
+ 	mintCreatorAnchorTrustCheckpointPredecessor,
+ 	resolveCreatorAnchorTrustMaterial,
+ } from "./internal/seal-authority-custody.js";
++import { settlementProfileFor } from "./settlement-profile.js";
+ 
+ const DIGEST_HEX = /^[0-9a-f]{64}$/u;
+ const INPUT_KEYS = Object.freeze([
+@@ -141,7 +142,8 @@ function trustRecord(
+ 		!exactKeys(decoded, TRUST_KEYS) ||
+ 		decoded.kind !== "drp-anchor-trust-state" ||
+ 		decoded.version !== 1 ||
+-		decoded.profileId !== "creator-trusted-v1" ||
++		typeof decoded.profileId !== "string" ||
++		(decoded.profileId !== "creator-trusted-v1" && settlementProfileFor(decoded.profileId) === "none") ||
+ 		decoded.quorum !== 1 ||
+ 		decoded.objectId !== expectedObjectId ||
+ 		decoded.genesisAnchorDigest !== pinnedGenesisAnchorDigest ||
+@@ -239,7 +241,7 @@ export function openCreatorCheckpointTrust(input: unknown): OpenCreatorCheckpoin
+ 			genesisAnchorDigest: pinnedGenesisAnchorDigest,
+ 			kind: "drp-anchor-trust-state",
+ 			objectId: expectedObjectId,
+-			profileId: "creator-trusted-v1",
++			profileId: predecessor.profileId,
+ 			quorum: 1,
+ 			version: 1,
+ 		});
+diff --git a/packages/protocol-v3/src/creator-close.ts b/packages/protocol-v3/src/creator-close.ts
+index 50b555ffbec1d2845ac2a676eb2f13d31c71f7cb..0bd05542de13c192a1ca63b1177a3f7bea4b77ce 100644
+--- a/packages/protocol-v3/src/creator-close.ts
++++ b/packages/protocol-v3/src/creator-close.ts
+@@ -11,6 +11,7 @@ import {
+ } from "./internal/seal-authority-custody.js";
+ import { resolveSealAuthorityIdentity } from "./internal/seal-authority-identity.js";
+ import { openSealAuthority, verifySealQC } from "./seal.js";
++import { settlementProfileFor } from "./settlement-profile.js";
+ import { decodeSnapshotManifest } from "./snapshot-transfer.js";
+ import registryJson from "../registry/registry-v1.json" with { type: "json" };
+ 
+@@ -273,7 +274,8 @@ export function prepareCreatorAnchorSigningRequest(
+ 			!plainRecord(profile) ||
+ 			!exactKeys(profile, ["cryptoSuiteId", "profileId", "quorum", "signers"]) ||
+ 			profile.cryptoSuiteId !== "ed25519-sha256-v3" ||
+-			profile.profileId !== "creator-trusted-v1" ||
++			typeof profile.profileId !== "string" ||
++			(profile.profileId !== "creator-trusted-v1" && settlementProfileFor(profile.profileId) === "none") ||
+ 			profile.quorum !== 1 ||
+ 			!Array.isArray(profile.signers) ||
+ 			!Array.isArray(signerSet) ||
+@@ -538,7 +540,7 @@ export function completeCreatorSuccessor(
+ 			genesisAnchorDigest: state.material.genesisAnchorDigest,
+ 			kind: "drp-anchor-trust-state",
+ 			objectId: state.material.objectId,
+-			profileId: "creator-trusted-v1",
++			profileId: (decodeCanonicalValue(state.material.exactCanonicalProfileBytes) as Record<string, unknown>).profileId,
+ 			quorum: 1,
+ 			version: 1,
+ 		});
+@@ -595,7 +597,7 @@ export function openCreatorSuccessorTrust(
+ 			decodedRecord.kind !== "drp-anchor-trust-state" ||
+ 			decodedRecord.objectId !== material.objectId ||
+ 			decodedRecord.genesisAnchorDigest !== material.genesisAnchorDigest ||
+-			decodedRecord.profileId !== "creator-trusted-v1" ||
++			decodedRecord.profileId !== currentTrust.profileId ||
+ 			decodedRecord.quorum !== 1 ||
+ 			compareBytes(profileBytes, material.exactCanonicalProfileBytes) !== 0 ||
+ 			compareBytes(signerSetBytes, material.exactCanonicalSignerSetBytes) !== 0

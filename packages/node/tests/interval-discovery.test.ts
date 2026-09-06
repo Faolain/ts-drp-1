@@ -1,6 +1,7 @@
 import { type MeshPeer } from "@libp2p/gossipsub";
 import { MapDRP } from "@ts-drp/blueprints";
 import { DRPNode } from "@ts-drp/node";
+import { createPermissionlessACL } from "@ts-drp/object";
 import { DRP_INTERVAL_DISCOVERY_TOPIC, type DRPNodeConfig, type LoggerOptions } from "@ts-drp/types";
 import { raceEvent } from "race-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -103,10 +104,12 @@ describe("DRP Interval Discovery integration test", () => {
 		const drpObject = await node1.createObject({
 			drp: drp,
 			id: "test_topic_discovery",
+			acl: createPermissionlessACL(),
 		});
 
 		await node3.connectObject({
 			id: drpObject.id,
+			acl: createPermissionlessACL(),
 		});
 
 		expect(node3.networkNode.getGroupPeers(drpObject.id).length).toBe(1);
@@ -136,6 +139,7 @@ describe("DRP Interval Discovery integration test", () => {
 		await node1.createObject({
 			drp: drp,
 			id,
+			acl: createPermissionlessACL(),
 		});
 
 		vi.advanceTimersByTime(1000);

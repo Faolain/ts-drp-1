@@ -1,0 +1,12 @@
+I'll inspect the signed correction at HEAD and the frozen D.110c-0c1a evidence, then answer only the material confirmation questions.I’ll pull the correction source, tests, plan claims, and the original Opus findings next.I’ll compare the extracted algorithm to initial GREEN, then inspect the plan’s D.110c-0c1b/P2 claims and `issueOneVertex`.The plan’s 0c1a/0c1b text is next; I’ll also check the original Opus P1s and the GREEN-to-correction diff.I’ll compare the original GREEN derivation to this extraction and check whether the matrix actually hits each fail-closed branch.The extraction matches initial GREEN, the named matrix is real, and D.110c-0c1b is the right block for the issuance hole. Closing 0c1a.
+
+```json
+{
+  "verdict": "APPROVED",
+  "summary": "Extraction is behavior-preserving; the named fail-closed matrix is directly executable; D.110c-0c1b blocks the reachable post-commit hole without a production repair or frontier weaken; Opus P2 is owned by D.110c-0c1. No P0/P1 remains against closing D.110c-0c1a.",
+  "findings": [],
+  "red_causal": true,
+  "green_closes_red": true,
+  "scope_preserved": true
+}
+```

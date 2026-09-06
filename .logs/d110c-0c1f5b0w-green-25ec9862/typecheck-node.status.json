@@ -1,0 +1,13 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "--filter",
+    "@ts-drp/storage-node",
+    "typecheck"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:05:18.988Z",
+  "finished": "2026-09-05T14:05:21.870Z",
+  "status": 2,
+  "signal": null
+}

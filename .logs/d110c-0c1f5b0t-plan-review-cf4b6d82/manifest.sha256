@@ -1,0 +1,14 @@
+258c6109fc7197317d36e31615e0679683b87d89d79a760246e3c7177efc79bf  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/command.json
+a91c530ea303332b61094e743b7b681eae177c14841b7cc66440ebf8c5da3b38  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/events.jsonl
+5165437e58c70699654d51f9bf2d1431d035a3ac61b42b16d9dc9c2932172efe  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/input-packet.md
+0b3ce9aabd3695bef307c51fa334dc812909b0f15917b8c35ee677855877948d  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/public.txt
+420a68d36f61c689008b0e21b6a7a310ce0ece301888bb2c395d42d4fbbfbd15  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/review.diff
+fb9739b138988378a1bfef9f38c8f29daaa9d5975f1edd6ef69189d243a343f2  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/status.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/stderr.log
+ced006b431add5603684ae762158b285161f97494b0b36c51e08b825c5c5b120  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw-standard.jsonl
+1202cd19f6cfd50687a1c3bccf8949a396223c3dfc8a212a36cc2a3da4f4ed02  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw.jsonl
+1eda0d9e6ff7acb22a4c86a0cc2618e63e429327c93f9f4f82bf5354a2608d82  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr-standard.txt
+352d8fb43f5414679bfd73f492d8c9c4185cb94ff1b80da4b8f92be763b0cf26  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr.txt
+9aabf1972aba2cc2ad4648c14333ec98b899ec734a50b016995194b606952ab2  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/result.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/stderr.txt
+a10acfb01efc2de0a5fcae63d5b22d68942f7c12cebe910cc6ad75c95903df84  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/review-prompt.md

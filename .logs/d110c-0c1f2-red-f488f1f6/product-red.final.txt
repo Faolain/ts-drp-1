@@ -1,0 +1,16 @@
+exit: 1 (expected causal RED)
+selected: 1 test in 1 file
+test: D.110c-0c1f2 non-creator writer requires an authenticated historical frontier
+terminal error: D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED
+causal path:
+- Alice and Bob join one genuine product room as distinct authorized writers.
+- Alice completes epoch 0 -> 1.
+- Bob cold reopens epoch 1 and genuinely issues/publishes authorSequence 1 in epoch 1.
+- Alice also issues in epoch 1 so creator-local predecessor issuance custody remains nonempty.
+- Alice completes epoch 1 -> 2, issues in epoch 2, and completes epoch 2 -> 3.
+- Bob's signerless cold reopen uses the authenticated epoch-3 carrier and his own retained issuance database.
+- The exact Bob epoch-1 digest is classified against current epoch 3 and refused by predecessor-validation against displaced epoch 2.
+- Product refusal: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected.
+unexpected errors: 0
+flaky tests: 0
+retries: 0

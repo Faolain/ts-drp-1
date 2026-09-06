@@ -1,0 +1,11 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "packages/node/src/v3-live.ts"
+  ],
+  "start": "2026-09-05T08:28:59.743Z"
+}

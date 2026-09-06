@@ -1,0 +1,53 @@
+{
+	"schemaVersion": "phase-4b-blueprint-snapshot-red-v1",
+	"lineage": {
+		"phase4aGreenCommit": "55d8eecfba7ea4e5850aaff5280bb0b4d058a254",
+		"phase4bPlanCommit": "4d11abe638fa7a2b5ae5326ce9e69511fe519a52"
+	},
+	"domains": {
+		"blueprint": "ts-drp/blueprint-admission/v3",
+		"payload": "ts-drp/snapshot-payload/v3",
+		"state": "ts-drp/state/v3"
+	},
+	"metadata": {
+		"kind": "drp-snapshot-payload",
+		"protocolMajor": 3,
+		"objectId": "object:phase-4b",
+		"epoch": 2,
+		"anchor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"schemaVersion": 1,
+		"archiveIndexRoot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	},
+	"limits": {
+		"maxSnapshotBytes": 1048576
+	},
+	"acl": {
+		"kind": "phase-4b-acl",
+		"writers": ["alice", "bob"],
+		"stale": "must-disappear-on-replacement"
+	},
+	"payloadFields": [
+		"acl",
+		"anchor",
+		"application",
+		"archiveIndexRoot",
+		"blueprintDigest",
+		"epoch",
+		"kind",
+		"objectId",
+		"protocolMajor",
+		"schemaVersion"
+	],
+	"causalMutants": [
+		"shallow-merge-import",
+		"omit-blueprint-binding",
+		"omit-anchor-binding",
+		"omit-archive-root-binding",
+		"omit-acl-byte-binding",
+		"hash-decoded-object",
+		"accept-noncanonical-reencoding",
+		"accept-shared-byte-carrier",
+		"mutate-live-instance",
+		"single-epoch-shortcut"
+	]
+}

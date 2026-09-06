@@ -1,0 +1,15 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-settlement-codec-de961884/focused.json"
+  ],
+  "executionCount": 1
+}

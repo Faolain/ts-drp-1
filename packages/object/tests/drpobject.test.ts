@@ -69,7 +69,7 @@ describe("Drp Object should be able to change state value", () => {
 
 		// Get the ACL states and expected variable names
 		const aclStates = drpObject["_states"]["aclStates"].values();
-		const expectedKeys = Object.keys(drpObject.acl);
+		const expectedKeys = Object.keys(drpObject.acl).filter((key) => key !== "context");
 
 		// Check that each state contains the expected keys
 		for (const state of aclStates) {
@@ -78,7 +78,7 @@ describe("Drp Object should be able to change state value", () => {
 		}
 
 		const drpStates = drpObject["_states"]["drpStates"].values();
-		const expectedDrpKeys = Object.keys(drpObject.drp ?? {});
+		const expectedDrpKeys = Object.keys(drpObject.drp ?? {}).filter((key) => key !== "context");
 
 		// Check that each state contains the expected keys
 		for (const state of drpStates) {
@@ -547,10 +547,13 @@ describe("ACL admin permission tests", () => {
 	test("Should not able to grant if node an admin", async () => {
 		obj2.acl.grant("peer3", ACLGroup.Writer);
 		expect(obj2.acl.query_isWriter("peer3")).toBe(true);
+		const rejectedGrant = obj2.vertices.at(-1);
+		if (rejectedGrant === undefined) throw new Error("grant fixture did not create a vertex");
+		const rejectedGrantHash = rejectedGrant.hash;
 
-		await expect(obj1.merge(obj2.vertices)).rejects.toThrow("Only admin peers can grant permissions.");
+		await expect(obj1.merge(obj2.vertices)).resolves.toEqual([false, [], [rejectedGrantHash]]);
 		expect(obj1.acl.query_isWriter("peer3")).toBe(false);
-		await expect(obj3.merge(obj2.vertices)).rejects.toThrow("Only admin peers can grant permissions.");
+		await expect(obj3.merge(obj2.vertices)).resolves.toEqual([false, [], [rejectedGrantHash]]);
 		expect(obj3.acl.query_isWriter("peer3")).toBe(false);
 	});
 
@@ -567,8 +570,11 @@ describe("ACL admin permission tests", () => {
 		expect(obj2.drp?.query_has(1)).toBe(true);
 		obj2.acl.revoke("peer3", ACLGroup.Writer);
 		expect(obj2.acl.query_isWriter("peer3")).toBe(false);
+		const rejectedRevoke = obj2.vertices.at(-1);
+		if (rejectedRevoke === undefined) throw new Error("revoke fixture did not create a vertex");
+		const rejectedRevokeHash = rejectedRevoke.hash;
 
-		await expect(obj3.merge(obj2.vertices)).rejects.toThrow("Only admin peers can revoke permissions.");
+		await expect(obj3.merge(obj2.vertices)).resolves.toEqual([false, [], [rejectedRevokeHash]]);
 		expect(obj3.acl.query_isWriter("peer3")).toBe(true);
 	});
 

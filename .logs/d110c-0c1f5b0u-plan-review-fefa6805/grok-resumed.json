@@ -1,0 +1,19 @@
+{
+  "verdict": "CHANGES_REQUIRED",
+  "reviewed_commit": "fefa6805e16066f55d15bb95701b3ced290553b3",
+  "session_id": "01a06f69-b8ac-7650-ac0b-6cb3f4d05459",
+  "stop_reason": "end_turn",
+  "summary": "The restart construction omits caller-side projection, close-owner rebind, and common lifecycle quiescence obligations.",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Restart omits projection-commit, close rebind, and shared lifetime quiescence",
+      "remediation": "Commit recovered vertices through the existing room commit path, rebind creator-close on genesis recovery, and serialize recovery on the same lifetime transition owner as close/adopt."
+    },
+    {
+      "severity": "P2",
+      "title": "Name admission-policy reconstruction on the extracted recover path",
+      "remediation": "Keep the existing fresh createOperationAdmissionPolicy reconstruction unchanged for each recovery."
+    }
+  ]
+}

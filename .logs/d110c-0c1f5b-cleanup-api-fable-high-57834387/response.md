@@ -1,0 +1,55 @@
+**Verdict: the gap is real, and it cannot be closed by wiring existing capabilities.** The smallest sound boundary is a backend-neutral AHE maintenance registry on the existing `@ts-drp/storage/maintenance` subpath, mirroring the issuance registry that Node already consumes. That is a new export, so it needs its own narrow prerequisite slice before parent GREEN resumes cleanup work. Nothing else in the parent's cleanup ownership needs a new API.
+
+## What the sources establish
+
+- **No production path exists today.** `planClosedEpochCleanup` (closed-epoch-cleanup.ts:442), `reclaimClosedEpoch` (storage/src/maintenance.ts:71) and `reclaimInstalledV3Runtime` (runtime-reclamation.ts:152) have zero production callers under `packages/` or `examples/`. The only reference is a comment in v3-live.ts:3211. The preserved seven-file diagnostic patch does not touch any of them.
+- **Node can already prune issuance backend-neutrally.** `durableIssuancePruningMaintenanceForStore` resolves through a `globalThis` registry keyed by `Symbol.for(...)` (issuance-store/src/maintenance.ts:46-103), and v3-live.ts:3201 consumes it. That registry's own JSDoc calls it a package-internal owner hook not re-exported on the facade.
+- **Node cannot reach AHE reclamation.** `AheDurableStore` has no maintenance member and `StoreCapabilities` carries only durability and signing eligibility (storage/src/types.ts:105-140). Browser and Node backends each keep a module-local WeakMap (storage-browser ahe-reclamation.ts:60, storage-node ahe-reclamation.ts:226) reachable only via their own package subpath resolvers. `@ts-drp/node` depends on neither backend (node/package.json:84-129). The memory store registers nothing.
+- **Node owns the authenticated facts, and both hot and cold paths converge on one private kernel.** `activateCreatorSuccessorAdoption` and `reopenCreatorSuccessorAdoption` both reach `activateMaterial`, then `consumeCreatorSuccessorLive`, then `activateCreatorSuccessorLive` (creator-adoption-activate.ts:378, :410, :492-504; v3-live.ts:8549-8748). The material carries the exact `store`, `issuanceStore`, `issuanceScope`, post-CAS successor head, snapshot digests and trust (creator-successor-live.ts:27-45; cold construction at creator-adoption.ts:1180-1215). The settlement boundary is already derivable inside that kernel from `openVerifiedCreatorHistoricalIssuance` and `settlementFrontierFromHistory` (v3-live.ts:8587-8612, :4492-4499).
+- **The RED pins the observable contract.** Case 13 requires a `planClosedEpochCleanup` event with `ok: true` for every peer at every transition, exactly two `Superseded` generations plus the active one after adopt or reopen, no issuance deletion at the first two transitions, and a first real deletion from sequence 0 at the third with a receipt bound to the current close's QC and manifest (test:882-906, :1676-1747). Per the plan clarification at 101039-101045, first adoption already has three physical ancestors, so real AHE generation deletion is required from the first generation while issuance deletion is not.
+
+## Recommendation and rejected alternatives
+
+**Adopt: backend-neutral AHE maintenance registry, resolved by Node from `material.store`.**
+
+- `packages/storage/src/maintenance.ts`: add `bindAheReclamationMaintenance(store, maintenance): boolean` and `aheReclamationMaintenanceForStore(store)` over a `globalThis[Symbol.for("@ts-drp/storage/ahe-reclamation-maintenance-v1")]` WeakMap registry, first-bind-wins, identical in shape to issuance-store/src/maintenance.ts:46-103. No change to `AheDurableStore`, `StoreCapabilities`, schemas or wire.
+- `packages/storage-browser/src/internal/ahe-reclamation.ts:293-299` and `packages/storage-node/src/internal/ahe-reclamation.ts:221-227`: the existing register functions additionally bind into the shared registry. The existing package resolvers stay untouched so retained D109c tests are byte-identical.
+- `packages/node/src/v3-live.ts`: inside `activateCreatorSuccessorLive`, after `material.terminalizeSource()` succeeds at :8740 and before the ok return, resolve both maintenances from `material.store` and `material.issuanceStore`, run the plan, then reclaim. Gate the whole invocation on `settlementProfileFor(...) === "v1"` so `creator-trusted-v1` rooms perform no cleanup call and no store mutation.
+- No room change, no new Node export, no new input key, no Node-to-backend dependency. The room example keeps passing `store: aheStores[0]` exactly as it does now (index.ts:2339, :2376).
+
+Why this is not a new authority carrier: the registry only makes the exact facade's capability discoverable by identity. Deletion authority is still established by Node's authenticated plan input and re-verified by the backend inside its own strict transaction, which rechecks head, lineage, closure digests, promotions and blobs and refuses on any drift (storage/src/maintenance.ts:390-532; browser ahe-reclamation.ts:216-263). The threat model equals the accepted issuance registry.
+
+Rejected:
+
+- **Existing-capability wiring.** Impossible for the reasons above. Any "wiring" would be a relative import from Node into a backend package or a room-side reconstruction of QC, manifest and adoption facts, which the assessment and clarification both forbid.
+- **Explicit DI from the room.** Requires new exact keys on both `HOT_KEYS` and `COLD_KEYS` of two public Node subpaths, threading the capability through stage, publish and activate custody, and makes every host application responsible for plumbing. Node could bind the passed capability to `material.store` only by post-read comparison. Larger public surface for the same trust outcome.
+- **Private room/Node bridge, global hook or relative source import.** Duplicates trust logic, is realm-fragile, and the test fixture already mixes `dist` and `src` realms for storage-browser (test:205-209). The global-symbol registry is the realm-safe form of the same idea, with a reviewed precedent.
+
+Who authenticates versus who deletes:
+
+- Node authenticates adoption, head, QC, snapshot manifest, rollback lineage and the exact settlement `terminalThrough`, and builds the plan input per local author scope.
+- The storage backend owns physical deletion, re-deriving the decision transactionally. Issuance pruning additionally enforces the linked plan and fence via `settlementPlanPermitsAuthenticatedPruning` and CAS on lineage and watermark.
+- Identity binding is the facade object: the same `material.store` whose head Node just CAS-adopted is the only store the registry can resolve. Node should also assert the receipt's `objectId`, `expectedHead` and `activeGenerationId` equal the plan, and the issuance receipt's `scope` equals `material.issuanceScope`.
+
+Ordering: hot adoption is stage, publish, room-head CAS, activate, predecessor and successor recovery, plane activation, delivery replay, terminalize, then cleanup, then return. Restart and cold reopen re-enter the same kernel and rerun cleanup idempotently: `lineagePlan` yields an empty prefix once the floor is normalized (closed-epoch-cleanup.ts:300-318), and AHE reclamation replays without deleting (storage/src/maintenance.ts:465-469, :519-520). Cleanup failures after a successful activation should be recorded as a typed non-fatal result and retried on the next activation, never un-adopting.
+
+No-eligible-prefix behavior: keep the legacy exact-key issuance section of `planClosedEpochCleanup` (closed-epoch-cleanup.ts:353-435) byte-identical, and select the settlement branch by a distinct exact key set inside the same private function so the RED's mock still observes it. That branch allows `throughAuthorSequence: null` with an empty row set, meaning AHE reclamation only, no prune call and no receipt. Before any prune on reopen, consult `inspectPruningState` (issuance-store/src/maintenance.ts:41) and skip when the watermark already covers the prefix, so no post-delete no-op receipt is ever minted. Eligible rows may be pending or published, must sit at or below the authenticated boundary, and the backend refuses any row held by an unlinked plan entry. The D109d runtime kernel needs a real receipt pair and therefore cannot run on generations with no issuance deletion. Do not fabricate one; predecessor runtime release for those generations stays with D.110c-c.
+
+Proof obligations for the prerequisite slice: RED asserts that the registry resolves the same object as the package resolver for browser and Node facades, returns undefined for memory and foreign shape-compatible objects, rejects a second bind, resolves identically across two module realms via the global symbol, adds no own property to the facade, and that a closed or poisoned store still refuses inside `reclaimClosedEpoch`. GREEN is the three files above with retained D109c/D109d and Chromium suites unchanged. Parent GREEN then satisfies case 13 and 24c through the kernel call without further API.
+
+Secondary finding: confirmed as a test-observation distinction. `projection()` rethrows `terminalFailure` by design (index.ts:4484-4488) and retained f5b0u tests pin it. `onProjection` fires on every committed accepted projection (index.ts:1940, :1979, :2430), the fixture currently passes a no-op (test:641), and `productState` goes through the getter (test:833-835). Capturing the last `onProjection` value per peer gives the last installed accepted projection for crash and restart comparison without any product getter bypass or state-limit change.
+
+Uncertainties: I inferred the four-generation count at first adoption from the plan text and the RED assertion, not from execution. The exact boundary the parent uses for the eligible prefix relative to the two-ancestor window is the parent's design detail and is not resolved here. I did not verify cross-realm behavior of the existing issuance registry under this fixture at runtime.
+
+```
+decision: new-prerequisite-slice
+mechanism: backend-neutral AHE maintenance registry (globalThis Symbol.for, WeakMap by facade identity)
+new_exports: @ts-drp/storage/maintenance: bindAheReclamationMaintenance, aheReclamationMaintenanceForStore
+files: packages/storage/src/maintenance.ts; packages/storage-browser/src/internal/ahe-reclamation.ts; packages/storage-node/src/internal/ahe-reclamation.ts; packages/node/src/v3-live.ts (activateCreatorSuccessorLive); packages/node/src/internal/closed-epoch-cleanup.ts (settlement branch, legacy byte-identical)
+unchanged: AheDurableStore interface, StoreCapabilities, room example, Node public subpaths, HOT_KEYS/COLD_KEYS, schemas, wire, thresholds, creator-trusted-v1 behavior
+authenticates: Node (adoption, head, QC, manifest, lineage, terminalThrough); deletes: storage backend transactionally
+call_site_order: terminalizeSource -> plan -> AHE reclaim -> issuance prune (only if eligible prefix above watermark) -> return ok
+no_eligible_prefix: AHE-only, no prune call, no receipt; D109d runtime kernel not invoked
+secondary: onProjection capture is test-only; keep terminal getter throw
+rejected: existing wiring (impossible), room DI (new public inputs), private bridge/global hook/relative import
+```

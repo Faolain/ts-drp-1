@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "examples/v3-room/package.json",
+    "examples/v3-room/src/index.ts",
+    "packages/issuance-store/src/conformance.ts",
+    "packages/issuance-store/src/contract.ts",
+    "packages/issuance-store/src/types.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/storage-browser/src/internal/browser-issuance-store.ts",
+    "packages/storage-node/src/internal/node-issuance-store.ts",
+    "pnpm-lock.yaml"
+  ],
+  "start": "2026-09-05T06:07:39.480Z"
+}

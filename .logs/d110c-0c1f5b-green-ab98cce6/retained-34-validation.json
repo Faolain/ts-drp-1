@@ -1,0 +1,108 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 8,
+  "passed": 8,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED freezes the exact five RED and exact nine GREEN owners",
+      "status": "passed",
+      "title": "freezes the exact five RED and exact nine GREEN owners",
+      "duration": 2.4952499999999986,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED pins separate honest trust, continuity and lifecycle projections",
+      "status": "passed",
+      "title": "pins separate honest trust, continuity and lifecycle projections",
+      "duration": 0.3193340000000262,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED independently classifies replay, equivocation, rollback, gap and the exact successor without writes",
+      "status": "passed",
+      "title": "independently classifies replay, equivocation, rollback, gap and the exact successor without writes",
+      "duration": 16.113875000000007,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED replaces exactly one trust ref while preserving every non-trust ref and adding proof refs",
+      "status": "passed",
+      "title": "replaces exactly one trust ref while preserving every non-trust ref and adding proof refs",
+      "duration": 0.7924170000000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED accepts ambiguous head success only by exact successor reopen",
+      "status": "passed",
+      "title": "accepts ambiguous head success only by exact successor reopen",
+      "duration": 0.12795900000003257,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED forbids activation, pruning and a second combined-head owner",
+      "status": "passed",
+      "title": "forbids activation, pruning and a second combined-head owner",
+      "duration": 0.8925830000000019,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED [RED readiness] requires the live close and successor-classifier owners",
+      "status": "passed",
+      "title": "[RED readiness] requires the live close and successor-classifier owners",
+      "duration": 0.09799999999995634,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED keeps both new runtime subpaths closed and binds every classifier verdict",
+      "status": "passed",
+      "title": "keeps both new runtime subpaths closed and binds every classifier verdict",
+      "duration": 318.47370900000004,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

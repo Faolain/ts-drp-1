@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b-green-replay-budget-zIt6Xr/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-06T06:00:45.714Z"
+}

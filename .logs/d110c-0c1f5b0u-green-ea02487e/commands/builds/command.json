@@ -1,0 +1,8 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-05T06:05:52.713Z"
+}

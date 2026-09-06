@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 280.164,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-plan-review-fefa6805/grok/events.jsonl",
+  "exit_code": 1,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-plan-review-fefa6805/grok/public.txt",
+  "stop_reason": "cancelled",
+  "timed_out": false
+}

@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=.logs/d110c-0c1f5b0u-green-working-747ce566/focused-final/result.json"
+  ],
+  "start": "2026-09-05T06:06:33.791Z"
+}

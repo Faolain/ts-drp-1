@@ -1,0 +1,53 @@
+{
+  "verdict": "APPROVED",
+  "summary": "The corrected D.110c-0c1f5a plan and tests-only RED are authorized for one focused execution. Every treatment and control is causally reachable to the intended current error, verified against product source rather than assertion: ingress admits both duplicate (author,sequence) vertices (CausalityIndex.append keys on digest only, linearize.ts:405) and admits an envelope-authorized but write-unauthorized foreign author (resolveV3AuthorizedAuthor uses membership-only authorizeLatchedEnvelopeAuthor, v3-live.ts:3436; the fold uses writer-group authorizeLatchedApplicationWrite, and stageSnapshot buckets every fold failure to not-active, v3-live.ts:7480). The duplicate scan at creator-close.ts:485-493 genuinely precedes successorAuthors filtering, and currentExactAclBytes (latched ACL, v3-live.ts:7462) is genuinely distinct from successorExactAclBytes (staged snapshot preview), so treatment 4 exercises the pre-filter path while the deauthorized control legitimately omits the removed writer. Treatment 1 is empirically confirmed by the diagnostic, which also proves priorIdentity resolves in the two-writer epoch-1 close; treatment 2's numeric prior 0 is corroborated by the passing f2 assertion at multi-author-frontier-contract.ts:129-132. The close-set/history versus issuance-frontier distinction is structurally enforced, not merely asserted: deriveCloseSetHistoryCommitment (creator-close.ts:857) consumes graph.vertices/charges/frontier and never graph.authors, so the narrow GREEN owner cannot move closeSetRoot or historyRoot. The removal of the absent-prior treatment is honest: the diagnostic evidence, manifest, recorded SHA-256 and failure label (D110C_0C1F5_ABSENT_PRIOR:NONCAUSAL_ERROR:creator snapshot export failed: not-active) all corroborate the plan's noncausal classification, the authorization refusal is retained as a control, and f5b is the correct owner for the reachability question. The test can terminate at the required token only after all nine fixtures complete. Verification limitation: no shell was available, so I could not run git diff eeaaaca8..052eaa21 or lint/format; I inspected the working-tree contents of every named file plus the governing product source instead. No P0/P1 findings; six P2s, of which the fixture-lineage coupling and the missing explicit testTimeout are worth applying before the single run.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Creator duplicate and no-gap controls silently depend on the shared fixture's creator issue count",
+      "evidence": "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts:240 routes a single creator vertex at authorSequence 1 and expects AUTHOR_SLOT_AMBIGUOUS; the duplicate partner is not routed by the test but is the fixture's own epoch-1 issueLocal row (tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts:596). Line 277-278 likewise hard-codes both exact boundaries as 1. Both hold only while openGenuineCreatorAdoptionFixture performs exactly one creator issueLocal at epoch 0 (creator-adoption-contract.ts:1175), making localIssued.authorSequence 0 and the epoch-1 sequence 1.",
+      "impact": "If the shared adoption/D.109d fixture ever adds a creator issue, the creator duplicate control flips to BOUNDARY_REGRESSED (creator-close.ts:527 fires before any duplicate) and the no-gap control throws D110C_0C1F5_NO_GAP_CONTROL_INVALID. Either outcome consumes the single authorized execution with a noncausal result that looks like a product signal.",
+      "required_action": "Owner: f5a RED author, before the single run. Derive the expected creator sequence from context.issuanceStore.readLineage(context.issuanceScope) (or route two explicit creator vertices) instead of hard-coding 1, so the control cannot silently change meaning. If left as written, record the coupling explicitly in the D.110c-0c1f5a plan section."
+    },
+    {
+      "severity": "P2",
+      "title": "RED test declares no testTimeout while opening nine full genuine fixtures under a 10s default",
+      "evidence": "vite.config.mts:127 sets testTimeout: 10000 and tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts contains no vi.setConfig override. The corrected contract opens openD110cARepeatCloseFixture nine times (four foreign treatments, two creator controls, no-gap, deauthorized, currently-unauthorized), each carrying a full epoch-0 close, verify, commit and activate plus an epoch-1 close. The diagnostic measured 1039ms for a run that opened two such fixtures.",
+      "impact": "Projected wall clock is roughly 5-7s against a 10s limit. On a loaded machine the single authorized execution can end in a vitest timeout rather than the required token, burning the authorization for a reason unrelated to close-frontier behavior.",
+      "required_action": "Owner: f5a RED author, before the single run. Add vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 }) to the RED test file. This is a mechanical guard that changes no assertion and preserves the one-file/one-title selection."
+    },
+    {
+      "severity": "P2",
+      "title": "not-active is a coarse bucket, so the currently-unauthorized control does not pin an authorization refusal",
+      "evidence": "packages/node/src/v3-live.ts:7480 maps every stageBlueprintEpoch failure to snapshotExportFailure(\"not-active\", staged.detail), including already-folded, operationAdmissionHalted and the fold-rejected authorization path (v3-live.ts:7052). creator-close.ts:824 formats only the kind, so the contract's exact-string comparison at foreign-author-close-liveness-contract.ts:323 cannot distinguish an ACL refusal from any other fold failure.",
+      "impact": "The plan sentence at docs/production-hardening/production-hardening-tdd-plan-v2.md:98110-98112 claims this control proves an already-unauthorized foreign application row is rejected by the snapshot fold. The assertion is weaker than the claim; a future unrelated fold regression would keep the control green.",
+      "required_action": "Owner: f5a plan and GREEN review. Narrow the plan wording to state the control pins a fail-closed refusal at snapshot export rather than a specific authorization reason, or have GREEN additionally assert the underlying fold detail once it is observable."
+    },
+    {
+      "severity": "P2",
+      "title": "f5b's own scope text never names the obligation transferred to it from f5a",
+      "evidence": "The transfer is stated only inside the f5a section (docs/production-hardening/production-hardening-tdd-plan-v2.md:98137-98140). The f5b section (98176-98242) enumerates the rebase and no-rebase delivery-ordering triggers and four candidate families, but never names D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED or the question of whether a genuine membership lifecycle can make a currently authorized writer absent from the prior authenticated aggregate.",
+      "impact": "When f5b is executed from its own section, the audit checklist does not contain the obligation f5a just handed it, so the reachability question that motivated removing the absent-prior treatment can be lost between sections.",
+      "required_action": "Owner: f5b plan section. Add the authorized-writer-absent-from-prior-aggregate reachability question, naming D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED, to f5b's enumerated audit obligations. Editorial only; does not affect f5a RED authorization."
+    },
+    {
+      "severity": "P2",
+      "title": "Divergent duplicate declarations of captureCloseGraph() across the close seam",
+      "evidence": "packages/node/src/v3-live.ts:402-408 declares captureCloseGraph() returning charges, frontier and vertices with no authors field, while packages/node/src/creator-close.ts:145-151 declares the same seam with authors. The implementation at v3-live.ts:7430-7440 returns authors and validates vertices.size === authors.size + 1, and authorIssuanceFrontiersCandidate consumes graph.authors.",
+      "impact": "Pre-existing, not introduced by this change, and currently harmless because structural typing tolerates the extra member. It is a latent trap for the exact GREEN owner: a future edit driven by the v3-live declaration would not see that authors is load-bearing for issuance-frontier classification.",
+      "required_action": "Owner: f5a GREEN, note only. Do not widen f5a to reconcile the declarations unless GREEN already edits that declaration; if untouched, record it as a follow-up so the divergence is not discovered during a later close-side change."
+    },
+    {
+      "severity": "P2",
+      "title": "Corrected case list has a dangling conjunction and omits the established-peer precondition",
+      "evidence": "docs/production-hardening/production-hardening-tdd-plan-v2.md:98096-98102: item 3 ends with \"and\" and item 4 also ends with \"and\" in a five-item list. Items 2 and 3 describe the foreign author's prior numeric boundary and duplicate slot without stating that the test establishes the numeric prior 0 via establishedPeerPrivateKeySeedHex (foreign-author-close-liveness-contract.ts:172, 191, 216), which is what makes the regression case reach creator-close.ts:527 rather than falling through.",
+      "impact": "A reader reconstructing the treatments from the plan alone would not know the prior-boundary precondition is fixture-supplied, which is exactly the detail that distinguishes the causal regression case from the removed noncausal one.",
+      "required_action": "Owner: f5a plan section. Fix the list conjunction and add the established-peer prior-boundary precondition to the case descriptions. Editorial only; does not block the corrected RED."
+    }
+  ],
+  "plan_sufficient": true,
+  "diagnostic_classification_honest": true,
+  "corrected_red_causal": true,
+  "corrected_red_authorized": true,
+  "scope_preserved": true
+}

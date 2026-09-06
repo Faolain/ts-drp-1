@@ -1,0 +1,7 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b-d110c-b/source-shape.mjs
+   5:21  error  Missing return type on function  @typescript-eslint/explicit-function-return-type
+  13:1   error  Missing return type on function  @typescript-eslint/explicit-function-return-type
+
+✖ 2 problems (2 errors, 0 warnings)
+

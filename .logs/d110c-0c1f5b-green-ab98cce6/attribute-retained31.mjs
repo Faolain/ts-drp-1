@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const git=(...a)=>execFileSync('git',['-C',root,...a],{encoding:'utf8',maxBuffer:16*1024*1024});
+const files=['tests/phase-5a-c-seal-safety-red.test.ts','tests/fixtures/phase-5-v3/seal-types.ts','tests/fixtures/phase-5-v3/seal-fixture.ts','packages/keychain/src/finality.ts'];
+const sources=Object.fromEntries(files.map(file=>{const source=fs.readFileSync(path.join(root,file));return [file,{sha256:hash(source),signedHeadSha256:hash(git('show','HEAD:'+file)),source:source.toString()}];}));
+const commit='d77ee315a7688cffb5fd55870c38231403ecc41f',report=JSON.parse(fs.readFileSync(path.join(out,'retained-31/result.json')));
+const result={head:git('rev-parse','HEAD').trim(),sources,origin:{commit,signature:git('log','-1','--format=%G?',commit).trim(),diff:git('show','--format=fuller',commit,'--','packages/keychain/src/finality.ts')},reporter:report,attribution:'Exact keychain export roster in seal-types expects three names; signed d77ee315 added signCreatorIssuanceRetirementRequest as the fourth export. No parent dirty owner participates. Raw failure is test298 before genuine signer behavior. All other six cases pass including bounded n=4 Quint witness. Existing export and governance fixture disposition requires root; no production/fixture edit or test/module rerun.'};
+fs.writeFileSync(path.join(out,'retained-31-attribution.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({total:report.numTotalTests,passed:report.numPassedTests,failed:report.numFailedTests,signedSourcesUnchanged:Object.values(sources).every(r=>r.sha256===r.signedHeadSha256)}));

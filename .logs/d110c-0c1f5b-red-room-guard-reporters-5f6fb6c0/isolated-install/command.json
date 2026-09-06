@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b-red-room-guard-reporters-L8TTrA/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-06T02:53:06.160Z"
+}

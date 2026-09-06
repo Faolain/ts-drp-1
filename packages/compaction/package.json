@@ -1,0 +1,58 @@
+{
+	"name": "@ts-drp/compaction",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		},
+		"./blueprint-fold": {
+			"types": "./dist/src/blueprint-fold.d.ts",
+			"import": "./dist/src/blueprint-fold.js"
+		},
+		"./blueprint-snapshot": {
+			"types": "./dist/src/blueprint-snapshot.d.ts",
+			"import": "./dist/src/blueprint-snapshot.js"
+		},
+		"./snapshot-stream": {
+			"types": "./dist/src/snapshot-stream.d.ts",
+			"import": "./dist/src/snapshot-stream.js"
+		},
+		"./snapshot-quarantine-receipt": {
+			"types": "./dist/src/snapshot-quarantine-receipt.d.ts",
+			"import": "./dist/src/snapshot-quarantine-receipt.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"test": "vitest run",
+		"test:nightly": "RUN_PHASE_0B_NIGHTLY=true vitest run tests/order-exhaustive.test.ts",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@noble/hashes": "^1.7.1",
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/errors": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0",
+		"@ts-drp/types": "0.11.0"
+	},
+	"devDependencies": {
+		"@ts-drp/object": "0.11.0"
+	}
+}

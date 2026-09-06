@@ -1,0 +1,153 @@
+{
+  "schema": "d110c-0a-green-ledger-v1",
+  "createdAt": "2026-09-02T05:30:55Z",
+  "acceptedPlanAnchor": "5388f64d",
+  "signedRedAnchor": "0b7a1cf6e01f3554363c4138b14eec779c05bc33",
+  "scope": "D.110c-0a epoch-relative creator seal custody",
+  "campaignInvocations": 0,
+  "d110aInvocations": 0,
+  "focused": {
+    "batch1": {
+      "command": "pnpm exec vitest run tests/phase-6b-d110c-0a-authority-red.test.ts --reporter=json --outputFile=.logs/d110c-0a-green-0b7a1cf6/batch1-corrected-vitest.json",
+      "report": ".logs/d110c-0a-green-0b7a1cf6/batch1-corrected-vitest.json",
+      "sha256": "3b073cd6332bba24b46fc1f4f3213dfceffd1b76af1d2375a9483e3c1f14cefc",
+      "selectedFiles": 1,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "success": true,
+      "proof": "The genuine adopted epoch-one creator trust opens the real creator seal authority while the certified/BFT authority remains epoch-zero-only."
+    },
+    "batch2": {
+      "command": "pnpm exec vitest run tests/phase-6b-d110c-0a-browser-custody-red.test.ts --reporter=json --outputFile=.logs/d110c-0a-green-0b7a1cf6/batch2-genuine-actor-matrix-vitest.json",
+      "report": ".logs/d110c-0a-green-0b7a1cf6/batch2-genuine-actor-matrix-vitest.json",
+      "sha256": "4639118d5c6b3e3f2b33e1834b5ab7448292a0063233d9b14572043c42ca2768",
+      "selectedFiles": 1,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "success": true,
+      "proof": "A real epoch-one creator actor derives prepare, commit, finality, and resumable evidence through the product path; exact epoch-keyed vote/evidence custody, selector validation, stale epoch-zero coexistence, cross-epoch replay refusal, restart, and dispatch isolation all pass."
+    }
+  },
+  "diagnosticAttempts": [
+    {
+      "report": "batch1-vitest.json",
+      "disposition": "Sequencing diagnostic only: the epoch-bearing vote intent reached the not-yet-generalized browser adapter and aborted setup with MALFORMED_INPUT; the accepted batch follows the completed related storage batch."
+    },
+    {
+      "report": "batch2-vitest.json",
+      "disposition": "Fixture correction only: the new selector rejection is asynchronous and the assertion initially observed the returned rejected promise incorrectly."
+    },
+    {
+      "report": "batch2-genuine-actor-vitest.json",
+      "disposition": "Fixture correction only: the test tried to read parameters from the successor anchor rather than the authenticated predecessor cut parameters."
+    },
+    {
+      "report": "batch2-genuine-actor-corrected-vitest.json",
+      "disposition": "Fixture correction only: a required test-only import was omitted after the real actor had already completed successfully."
+    },
+    {
+      "report": "batch2-corrected-vitest.json",
+      "disposition": "Passing intermediate mechanical matrix superseded by the genuine actor-derived accepted matrix."
+    },
+    {
+      "report": "batch2-genuine-actor-corrected2-vitest.json",
+      "disposition": "Passing genuine actor proof superseded by the expanded accepted adversarial matrix."
+    },
+    {
+      "report": "retained-vitest.json",
+      "disposition": "One stale Phase-5e expectation treated a foreign-epoch durable row as a current-scope conflict. The accepted plan requires foreign-scope rows to be ignored and current-scope ambiguity to remain fail closed; the expectation was corrected without a production change."
+    },
+    {
+      "report": "retained-creator-actor-corrected.json",
+      "disposition": "Focused retained confirmation of the corrected Phase-5e expectation: 12/12 passed."
+    }
+  ],
+  "retainedVitest": {
+    "command": "pnpm exec vitest run tests/phase-5a-c-seal-safety-red.test.ts tests/phase-5a-seal-digest-law-red.test.ts tests/phase-5d-pacemaker-law-red.test.ts tests/phase-5d-pacemaker-red.test.ts tests/phase-5e-creator-actor-red.test.ts tests/phase-5e-creator-close-red.test.ts tests/phase-5e-creator-live-close-red.test.ts tests/phase-5e-creator-relearn-red.test.ts tests/phase-6a-creator-adoption-commit-red.test.ts tests/phase-6a-creator-adoption-red.test.ts tests/phase-6a-creator-successor-activation-red.test.ts tests/phase-6a-creator-successor-epoch-red.test.ts tests/phase-6a-creator-successor-handle-identity-red.test.ts tests/phase-6a-creator-successor-infrastructure-red.test.ts tests/phase-6a-creator-successor-local-author-red.test.ts tests/phase-6a-creator-successor-product-red.test.ts tests/phase-6b-d110c-0a-authority-red.test.ts tests/phase-6b-d110c-0a-browser-custody-red.test.ts --reporter=json --outputFile=.logs/d110c-0a-green-0b7a1cf6/retained-corrected-vitest.json",
+    "report": ".logs/d110c-0a-green-0b7a1cf6/retained-corrected-vitest.json",
+    "sha256": "27296fbe5e781433e7f4010c395f84bebec1ec7955b1a2589a78677d7987d5e4",
+    "selectedFiles": 18,
+    "suites": 40,
+    "tests": 148,
+    "passed": 148,
+    "failed": 0,
+    "skipped": 0,
+    "success": true
+  },
+  "retainedPlaywright": {
+    "commandShape": "pnpm exec playwright test --config=<listed-config> --reporter=json",
+    "totals": {
+      "expected": 133,
+      "skipped": 2,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "runs": [
+      {"config": "packages/storage-browser/playwright.phase-5c-seal-vote.config.ts", "report": "phase-5c-playwright.json", "expected": 25, "skipped": 2, "unexpected": 0, "flaky": 0},
+      {"config": "packages/storage-browser/playwright.phase-5d-round-change.config.ts", "report": "phase-5d-playwright.json", "expected": 24, "skipped": 0, "unexpected": 0, "flaky": 0},
+      {"config": "packages/storage-browser/playwright.phase-5e-creator-actor.config.ts", "report": "phase-5e-actor-playwright.json", "expected": 12, "skipped": 0, "unexpected": 0, "flaky": 0},
+      {"config": "packages/storage-browser/playwright.phase-5e-creator-live-close.config.ts", "report": "phase-5e-live-close-playwright.json", "expected": 9, "skipped": 0, "unexpected": 0, "flaky": 0},
+      {"config": "packages/storage-browser/playwright.phase-5e-creator-relearn.config.ts", "report": "phase-5e-relearn-playwright.json", "expected": 6, "skipped": 0, "unexpected": 0, "flaky": 0},
+      {"config": "packages/storage-browser/playwright.phase-6a-creator-adoption-commit.config.ts", "report": "phase-6a-adoption-commit-playwright.json", "expected": 6, "skipped": 0, "unexpected": 0, "flaky": 0},
+      {"config": "packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts", "report": "phase-6a-activation-playwright.json", "expected": 24, "skipped": 0, "unexpected": 0, "flaky": 0},
+      {"config": "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts", "report": "phase-6a-product-playwright.json", "expected": 24, "skipped": 0, "unexpected": 0, "flaky": 0},
+      {"config": "packages/storage-browser/playwright.phase-6a-successor-epoch.config.ts", "report": "phase-6a-successor-epoch-playwright.json", "expected": 3, "skipped": 0, "unexpected": 0, "flaky": 0}
+    ]
+  },
+  "staticGates": [
+    {"command": "pnpm exec prettier --check <15 changed source/test paths>", "status": 0},
+    {"command": "pnpm exec eslint <15 changed source/test paths>", "status": 0},
+    {"command": "git diff --check", "status": 0},
+    {"command": "pnpm --filter @ts-drp/protocol-v3 build", "status": 0},
+    {"command": "pnpm --filter @ts-drp/seal build", "status": 0},
+    {"command": "pnpm --filter @ts-drp/storage-browser build", "status": 0},
+    {"command": "pnpm --filter @ts-drp/node build", "status": 0},
+    {"command": "pnpm --filter @ts-drp/protocol-v3 typecheck", "status": 0},
+    {"command": "pnpm --filter @ts-drp/seal typecheck", "status": 0},
+    {"command": "pnpm exec tsc -p packages/storage-browser/tsconfig.build.json --noEmit --composite false", "status": 0}
+  ],
+  "inheritedTypecheckDebt": [
+    "The full @ts-drp/node package typecheck remains red only in inherited test-root/config ownership; its affected production build passes and packages/node/src/creator-close.ts is unchanged.",
+    "The full @ts-drp/storage-browser package typecheck remains red only in future Phase-6b test assets with missing private maintenance aliases/branded fixture IDs; the exact production build tsconfig passes."
+  ],
+  "unchangedControlHashes": {
+    "packages/protocol-v3/registry/registry-v1.json": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9",
+    "packages/storage-browser/src/internal/schema-idb.ts": "166634277bc38dd4919300e2fa3f3509d10cfe51ab3cda22fd7dc52f1c42609e",
+    "packages/node/src/creator-close.ts": "dc509821d77523fda5afa71c6f6eea2de9a694ac8ad59c0bb56428fed18e1c90",
+    "pnpm-lock.yaml": "73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99"
+  },
+  "scopeAssertions": [
+    "No wire kind, canonical registry, browser schema version, dependency, lockfile, threshold, timing, workload, product activation authority, or D.110a evidence changed.",
+    "Creator current-epoch custody derives from opened authenticated trust; caller-supplied epoch does not mint authority.",
+    "Certified/BFT seal authority remains epoch-zero-only.",
+    "The Node creator-close result and its literal first-transition epoch values remain unchanged for D.110c-a.",
+    "Foreign epoch/anchor evidence is ignored for current actor resume; same-current-scope duplicates remain fail closed.",
+    "The legacy two-field evidence selector remains exact epoch zero; the explicit three-field selector requires a safe nonnegative integer and exact closed shape."
+  ],
+  "changedPaths": [
+    "packages/protocol-v3/src/internal/seal-authority-identity.ts",
+    "packages/protocol-v3/src/seal.ts",
+    "packages/seal/src/creator.ts",
+    "packages/seal/src/index.ts",
+    "packages/seal/src/internal/creator-close-intent.ts",
+    "packages/seal/src/internal/seal-vote-intent.ts",
+    "packages/seal/src/pacemaker.ts",
+    "packages/storage-browser/src/internal/seal-evidence-store.ts",
+    "packages/storage-browser/src/internal/seal-vote-dispatch.ts",
+    "packages/storage-browser/src/internal/seal-vote-store.ts",
+    "packages/storage-browser/src/internal/seal-vote-test-control.ts",
+    "packages/storage-browser/src/seal-evidence.ts",
+    "tests/phase-5e-creator-actor-red.test.ts",
+    "tests/phase-6b-d110c-0a-authority-red.test.ts",
+    "tests/phase-6b-d110c-0a-browser-custody-red.test.ts"
+  ],
+  "protectedState": {
+    "stashes": 26,
+    "protectedUntrackedPresent": [".agents", ".claude", ".pnpm-store"],
+    "status": "preserved"
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "verdict": "FAIL",
+  "findings": [
+    {
+      "severity": "P1",
+      "file": "specs/current-registry-governance/inventory.json",
+      "line": 2084,
+      "title": "Omitted live consumer: issuance-exhaustion suite hashes the editable c2 test and is classified preserved-input outside the affected roster",
+      "evidence": "tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts:338-339 asserts sha256(artifact.path) === artifact.sha256 for every contract.immutableArtifacts entry; tests/fixtures/phase-n1prime-c-exhaustion/paired-issuance-contract.json:20-23 pins correctedC2Test = tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts at d1d4751c…. The c2 test is classified editable-current-owner (inventory.json:2071-2081) and must be retitled per owner map §5, so its bytes change in GREEN. The exhaustion test is classified preserved-input (inventory.json:2084-2093), is absent from affectedCurrentTestFiles (:77-100) and from gate-plan.mjs greenMainAndIsolation, yet is selected by root-test-lifecycle-contract.json:50 and runs under `pnpm test` (test.yml:30). The inventory even records the dangling reference (historicalRecordsWhoseLiveTargetsChange :2292-2297) without propagating it to the consumer's classification. After GREEN this suite fails and no owner is authorized to change it.",
+      "violated_requirement": "Complete consumer coverage; historical test supersession without suppression; no opportunistic repinning after RED begins"
+    },
+    {
+      "severity": "P1",
+      "file": "specs/current-registry-governance/README.md",
+      "line": 151,
+      "title": "Contract does not state which inventory records are byte-compared to base; as derived it silently byte-freezes the root Vitest config, workspace, ordinary CI workflow and four never-pinned tests",
+      "evidence": "inventory.json classifies vite.config.mts (:2135), vitest.workspace.ts (:2147) and .github/workflows/test.yml (:271) as preserved-input, and limits[1] (:2571) defines preserved-input as byte preservation; README:54-56 says the root manifest protects the complete selected inventory and :99-100 says to freeze the required path inventory in the validator, while :151 compares 'protected inventory ... bytes to base'. The existing root checker governs these three files semantically only (check-protocol-v3-freeze.mjs:509-533 validateTestLifecycle; they are absent from freeze-policy-v3.json:64-112), and the v2 checker explicitly rejects byte-freezing CI/CODEOWNERS files (check-protocol-freeze.mjs:495-498). vite.config.mts:11-112 carries ~100 package aliases edited by ordinary development; byte-freezing it under registry governance makes every alias addition a signed baseline amendment. The same unstated widening applies to tests newly owned only by current-contract (anchor-trust :1832, live-journal parity :1794, author-auth p6 :1908, successor red :2047), contradicting README:101 that the policy is the canonical digest home consumers bind to. RED and GREEN cannot implement protectedPaths consistently from this text.",
+      "violated_requirement": "Scope custody: fixed required source roster vs byte-protected inventory must be explicit; no unauthorized widening beyond the registry-governance repair"
+    },
+    {
+      "severity": "P2",
+      "file": "specs/current-registry-governance/derive-inventory.mjs",
+      "line": 110,
+      "title": "Historical-record derivation misses the frozenTuple family whose live targets change",
+      "evidence": "walk() only matches keys that are inventory paths or {path, sha256} objects (:110-113) and only visits tests/fixtures/*.json preserved inputs (:106,116). It therefore omits records keyed freezePolicyPath/freezePolicySha256/protectedPathStatesSha256: docs/protocol/ed25519-acceptance-profile-v3.json, docs/protocol/blueprint-artifact-profile-v3.json, supplements/ed25519-acceptance-profile-v1/vectors.json, supplements/blueprint-artifact-profile-v1/profile.json:54-60, tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json:11-17 and tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json:69-75, all pinning root policy fa2a69d4… and the 47-path state digest 023e7b50…. README:96-98 presents inventory.json as the mechanically derived list of historical records whose live targets change; the owner map §3 covers them only in prose.",
+      "violated_requirement": "Complete inventory; exhaustive classification of historical records that must stop being dereferenced"
+    },
+    {
+      "severity": "P2",
+      "file": "specs/current-registry-governance/gate-plan.mjs",
+      "line": 20,
+      "title": "Frozen 240-second whole-file ceiling is unsupported for controlled-repository suites and cannot be retried once frozen",
+      "evidence": "test() fixes ceilingSeconds: 240 per file for all 28 roster entries. verification.md:54-68 requires each routing family to execute runner.sh (bash + extracted v2 + root Node processes) in fresh Git fixtures carrying the ~100-record inventory plus the 28-file v2 closure for ≥10 execution controls, and seal/pacemaker suites each spawn five controlled repositories (phase-5a:583-623, phase-5d:941-976). The retained successor suite in the same roster already needs 600 s per case (tests/protocol-v3-freeze-successor-v1-red.test.ts:670,679,696). verification.md:8 says ceilings stop a run and do not authorize retries, and README:283 requires limits frozen before execution, so an under-evidenced ceiling becomes an unrecoverable stop.",
+      "violated_requirement": "Actual readiness execution; implementable frozen gate roster"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/README.md",
+      "line": 50,
+      "title": "'Required-bump rule governs subsequent registry changes' implies a checker transition that does not exist",
+      "evidence": "Step 3 (README:151-152) rejects any protected-byte difference from base, and no in-band registryVersion transition is defined, unlike v2's validateVectorTransition (check-protocol-freeze.mjs:252-271). Any future registry change is therefore another out-of-band baseline amendment; the text should say so rather than attribute governance to registry-v1.json:1707-1710 changeControl.",
+      "violated_requirement": "Explain intentionally changed current acceptance predicates"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/README.md",
+      "line": 117,
+      "title": "Candidate fileEntries mode/type source is unspecified",
+      "evidence": "README:116-121 requires fileEntries {type, mode} for every present file but does not say whether the candidate's mode/type comes from the index (git ls-files --stage), from worktree lstat, or both, nor how untracked entries (no index mode) or index/worktree disagreement are treated. derive-inventory.mjs:92-98 asserts agreement, but that rule is not in the checker contract.",
+      "violated_requirement": "Mode/type/path custody"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/typecheck.mjs",
+      "line": 85,
+      "title": "Collector labels decoded-text digests as sha256 and performs a transient write into the selected root",
+      "evidence": "sources[].sha256 hashes TypeScript's decoded source.text (BOM-stripped), so it cannot be cross-checked against inventory/policy byte digests without a note. Line 33 loadConfigFromFile bundles vite.config.mts with esbuild, which writes and removes a vite.config.mts.timestamp-*.mjs file inside the checkout during collection; stage custody that snapshots the root concurrently may observe it.",
+      "violated_requirement": "Fresh strict compiler provenance; preserve main built outputs and custody"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/derive-inventory.mjs",
+      "line": 7,
+      "title": "Derivation script path handling and regeneration guards are brittle",
+      "evidence": "Line 7 uses new URL(import.meta.url).pathname (percent-encoded) instead of fileURLToPath. Line 145 permits --write only over the superseded inventory hash c4e0c69d…, so the frozen candidate cannot be regenerated in place; line 85 asserts proposed RED files are absent, so the script cannot be rerun after RED to detect classification drift.",
+      "violated_requirement": "Implementable inventory derivation evidence"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/README.md",
+      "line": 70,
+      "title": "Disposition of the pure child base/head evaluators is inconsistent between README and owner map",
+      "evidence": "README:70-71 says not to retain unused alternate transition evaluators; evaluateEd25519ProfileFreeze (check-ed25519-profile-freeze.mjs:109-128) and evaluateBlueprintArtifactProfileFreeze (check-blueprint-artifact-profile-freeze.mjs:88-109) become CLI-unused once child CLIs are integrity-only, yet owner map §3 retains their test callers (:418, :798). State whether they are kept as explicitly non-authoritative test seams or removed with assertions moved to the root seam.",
+      "violated_requirement": "No hidden alternate current transition owners"
+    }
+  ],
+  "checked_requirements": [
+    "One prospective transition owner: existing evaluateProtocolV3Freeze({base,current}) retained as sole callable API; child seal/pacemaker/Ed25519/blueprint/author CLIs become integrity-only and reject a base argument; verified current child transition code paths (seal :310-334, pacemaker :327-375, ed25519 :384-421, blueprint :338-379, author :173-182) are the ones being relinquished",
+    "Missing/obsolete/partial bases reject; no recursive historical projection, candidate checker fallback or accept-either registry; ordered attributable validation (structure, base semantics, base-vs-candidate custody, candidate semantics)",
+    "Hash-bound source/view validation on both snapshots for the fixed 20-path roster (root policy, registry, schema, two locks, eleven workflows, CODEOWNERS, three lifecycle files); derived views must match sources",
+    "Policy self-hash exclusion and acyclic hash direction: root policy pins checker and children; no child pins the new root policy; historical frozenTuple payloads (old fa2a69d4…, count 47, state digest) preserved unchanged, matching production validation at packages/protocol-v3/src/index.ts:2295-2359 and supplements/blueprint-artifact-profile-v1/profile.json:54-60",
+    "Closed-tree boundaries retained (formal, original, regenerated, registry, vectors) with added-sibling rejection; mode custody keeps pacemaker check-freeze.mjs at 100755, all others 100644",
+    "Base-semantic mutants distinguished from candidate-only custody mutants; no hardcoded whole-registry digest in checker code; policy remains canonical digest home",
+    "Eleven workflow consumers confirmed as the complete root/successor-routed roster; numeric-determinism, digest-identity, evidence-projection, blueprint-conformance and compaction workflows and checkers carry no registry/root-policy pins; existing job identities, subsystem commands, per-workflow install rules and pacemaker formal gate preserved",
+    "runner.sh: explicit BASE_SHA required, resolves to commit with --end-of-options, `git merge-base --all` with single 40-hex identity check, no HEAD fallback, no mapfile/cd, fresh mktemp under RUNNER_TEMP containing only extracted base checkers, v2 and root run with the same explicit base and bound workspace root; missing base checker fails via set -e",
+    "Unchanged v2 execution: verificationOnlyV2Closure covers v2 policy patterns plus CODEOWNERS and protocol-v2-registry.yml; v2 checker validateCurrentArtifacts inputs are all present in the closure",
+    "Author-authorization push-on-main uses event before as explicit base; empty/zero base rejected; PR retarget types to be made explicit",
+    "Lifecycle: current vite.config.mts has eight exclusions including **/.logs/** (:118-127); old checker/contract have seven; lifecycle contract is editable and retitling planned",
+    "Seal/pacemaker readiness: skipIf gates (phase-5a:537, phase-5d:902) and absent-base bootstrap positives (:583-586, :941-944) are the cases required to execute with fail-closed replacements; author-authorization bootstrap-positive (:295-297) and harness (:55-85) included",
+    "Historical supersession: c2/d/d2/b2b/registry-spec current-path hash loops in editable owners; locks, provenance, vectors, sign-off bytes preserved; old attestations not restamped",
+    "Schema change bounded to adding optional authorShareMultiplier (integer 1..1,000,000, no const/default) with seven required names and closed objects; registry-v1.json:52-66 already declares it optional first; runtime does not read the schema file",
+    "Independent oracle: tag octets 3/5/8, minimal varuint, zigzag 2n, full-encoded-byte key ordering and DRP\\0/U32BE/U64BE framing match docs/protocol/canonical-tag-codec-v1.json:35-67,133-138 and registry-v1.json:1676-1682; absent/present-four hex structure and byte lengths 153/178 reconciled by hand; absent digest faf2fab7… matches vectors parameters-basic (:66-92); construction script imports no project helper",
+    "Gate plan arithmetic (27 roots, 7 mjs, 5 child integrity, 28 GREEN entries) consistent with inventory classifications; typecheck.mjs assumptions (strict true, no types/typeRoots, allowJs, object vite aliases) hold against tsconfig.json and vite.config.mts",
+    "Baseline amendment honesty: old-base PR remains rejected; host protection and installation not claimed; checkpoint text must state the amendment",
+    "Eight dirty production owners (examples/v3-room, packages/node, protocol-v3 creator-* sources) are outside the inventory and untouched"
+  ],
+  "limitations": [
+    "Read-only review: no checker, test, compiler, build, derivation script, oracle construction or runner was executed; inventory sha256 values, oracle digests and gate-plan/typecheck behavior were checked by inspection only",
+    "Only plan sections around lines 104500-105200 were read; the prior review packet was read from public/ only",
+    "Line numbers in this review refer to the frozen candidate files and current HEAD sources; RED/GREEN runtime paths, log directories and test counts do not yet exist",
+    "Host branch-protection configuration, whether main carries the W0 registry bytes, and installation of the signed baseline on a protected branch cannot be established from repository evidence",
+    "Whether prettier/eslint currently pass on the editable .yml/.json/.mjs roster was not verified"
+  ]
+}

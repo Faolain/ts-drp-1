@@ -1,0 +1,1650 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+commit fc384d1fe3d503bb9e3706e97bf62bea39fe8a7c
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 20:07:30 2026 -0400
+
+    docs: freeze D110c issuance retirement checkpoint plan
+
+ .../audit.json                                     |  13 ++
+ .../d110c-0c1-architecture-audit-d6f5de26/audit.md | 120 +++++++++++
+ .../commands.txt                                   |   5 +
+ .../manifest.sha256                                |   4 +
+ .../source-hashes.sha256                           |   9 +
+ .../production-hardening-tdd-plan-v2.md            | 220 +++++++++++++++++++--
+ 6 files changed, 355 insertions(+), 16 deletions(-)
+fc384d1f docs: freeze D110c issuance retirement checkpoint plan
+d6f5de26 test: preserve D110c pending authenticator diagnostic
+907a0499 docs: reslice D110c pending reopen prerequisite
+total 56
+drwxr-xr-x     7 aristotle  staff     224 Sep  2 20:02 .
+drwxr-xr-x  7865 aristotle  staff  251680 Sep  2 20:10 ..
+-rw-r--r--     1 aristotle  staff     547 Sep  2 20:01 audit.json
+-rw-r--r--     1 aristotle  staff    9006 Sep  2 20:05 audit.md
+-rw-r--r--     1 aristotle  staff     802 Sep  2 20:01 commands.txt
+-rw-r--r--     1 aristotle  staff     318 Sep  2 20:06 manifest.sha256
+-rw-r--r--     1 aristotle  staff     955 Sep  2 20:01 source-hashes.sha256
+# D.110c-0c1 authenticated issuance-retirement architecture audit
+
+Anchor commit `d6f5de263c5d0bcabe4df25532a0a8d3dcf0ccbd`, tree
+`17ecf3edf922ca3b27e96a5c8b25ae7888f67146`.
+
+## Demonstrated seam
+
+`creatorFilteredIssuanceStore()` (`packages/node/src/v3-live.ts:4550-4624`)
+can authenticate current/successor-relative rows and the pinned genesis row.
+It cannot authenticate the genuine epoch-1 row during epoch-3 reopen.
+`recoverV3LiveReplica()` consequently rejects that row at
+`v3-live.ts:5097-5098`. Both predecessor and successor views are affected
+(`v3-live.ts:7377-7439`), as are later publication and rebase scans through the
+registered filtered view.
+
+## Existing proof inventory
+
+- `openCreatorCheckpointTrust()` authenticates pinned genesis plus exactly one
+  predecessor/current pair. The current anchor binds only its immediate
+  predecessor (`packages/protocol-v3/src/creator-checkpoint.ts:280-297`).
+- The hard-cut and epoch-anchor registries commit state, ACL, compact history,
+  snapshot, archive, signer, parameters, and the immediate previous anchor.
+  Neither schema carries a per-author resolved sequence frontier
+  (`packages/protocol-v3/src/creator-close.ts:64-80,387-410`).
+- `DurableIssuanceStore` exposes only six ordinary methods and `readLineage()`
+  omits the pruning watermark (`packages/issuance-store/src/types.ts:83-90`).
+- `prunedThroughAuthorSequence` is local maintenance state. Its receipt is
+  bound to a caller-supplied closed epoch, QC ref, snapshot digest, and lineage,
+  but it is not signed or authenticated from the pinned room genesis
+  (`packages/issuance-store/src/maintenance.ts:14-43`).
+- Physical pruning is implemented in Node/browser maintenance and tests, but no
+  product path under `packages/` or `examples/` invokes
+  `prunePublishedPrefix()`. Deletion alone also cannot authenticate a retained
+  or missing prefix after hostile storage rollback.
+- The compact RFC 9162 frontier authenticates history-root evolution, not the
+  proposition that a particular author's durable sequences through S are
+  completely represented and safe to retire.
+
+## Candidate decision
+
+| Family                                                    | Authentication                                                                                                                                 | Epoch growth                                          | Disposition                                                                                       |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Current/immediate-predecessor row filtering               | Authenticates only genesis and the bounded adjacent window                                                                                     | O(1)                                                  | Insufficient for arbitrary old retained rows.                                                     |
+| Decode/signature-check a claimed old epoch                | The row signs its own anchor claim but does not prove that anchor belongs to the accepted room lineage or that no unresolved address is hidden | O(1)                                                  | Rejected.                                                                                         |
+| Trust the database watermark or require physical deletion | Store-local state is not authenticated from genesis; failure may retain too much                                                               | O(1)                                                  | Rejected as sole authority; retained as an execution mechanism after authenticated authorization. |
+| Retain all old anchors/ACLs/cuts/QCs                      | Directly verifies every historical row                                                                                                         | O(N)                                                  | Rejected by the bounded control-state law.                                                        |
+| Add a cumulative creator-signed retirement checkpoint     | Stable creator authority signs the current cumulative resolved address frontier and binds it to the authenticated successor checkpoint         | One current candidate plus one transition predecessor | Selected, subject to a separate high-risk protocol-contract RED/GREEN.                            |
+
+## Selected control record
+
+D.110c-0c1a must define one canonical
+`drp-creator-issuance-retirement-state` record and a domain-separated
+`ts-drp/creator-issuance-retirement/v1` signature. The exact record binds:
+
+- protocol/version, object id, pinned genesis digest, creator issuance author;
+- closed/current epoch and anchor;
+- successor epoch and anchor;
+- exact cut-value, commit-QC, and snapshot-manifest digests;
+- the previous retirement-record digest (or the one frozen genesis sentinel);
+- previous inclusive resolved author sequence (nullable only for the initial
+  checkpoint), new inclusive resolved sequence, and observed lineage next.
+
+The record is signed by the existing stable `creator-trusted-v1` finality key,
+whose public key is authenticated by pinned genesis. It is stored as exactly one
+replaceable AHE closure candidate. It is not a database watermark and is not
+trusted because it is present in storage. Its opener reconstructs the creator
+authority from pinned genesis, verifies the detached signature, exact room and
+scope, exact current/successor heads, cut/QC/snapshot bindings, monotonic
+sequence relation, and previous-candidate digest during transition. Cold reopen
+requires the one current record bound to the independently authenticated room
+floor. Missing, duplicate, stale, future, cross-room, cross-author, forked, or
+malformed records fail closed.
+
+At close, the minting owner starts from the authenticated prior retirement
+checkpoint, reads the exact issuance lineage and the complete unretired prefix,
+requires issued/outbox byte equality, dense increasing addresses, canonical
+vertices, valid signatures, current room/anchor/epoch, `published` state, and
+membership of every newly covered digest in the captured close graph and
+durable replay. It sets `throughAuthorSequence = observedLineage.next - 1` and
+does not mint if any address is missing, pending, substituted, or outside the
+closed graph. The successor anchor and Cut/QC/snapshot identities are known
+before the deterministic Ed25519 signature is completed. The proposed AHE
+closure contains the new record and retires the previous record only through
+the shared bounded transition predicate.
+
+During recovery, an authenticated boundary authorizes classification only for
+addresses at or below `throughAuthorSequence`. The wrapper still requires an
+exact issued/outbox pair, canonical object/author/sequence, valid author
+signature and `published` state; it uses the creator certificate—not the row's
+claimed old anchor or database watermark—as the authority that the address is
+resolved. Rows above the boundary retain current/displaced admission and
+offline/rebase behavior. One per-scan combined hidden-row ceiling applies.
+
+Physical pruning remains D.109/D.110c-c execution after verified adoption,
+floor commit, snapshot availability, two rollback generations, outbox
+completion, and authenticated certificate match. Refusal or crash may retain
+certified rows. It may not advance the signed boundary, remove an uncertified
+address, or make partial progress look complete.
+
+## Compatibility boundary and required reslice
+
+This choice adds a protocol-v3 control-record/registry contract and a new
+protocol-owned finality signing request. It therefore requires the explicit
+high-risk D.110c-0c1a prerequisite before any filter implementation. It does
+not require a new product API, dependency, cryptographic primitive, epoch
+anchor/Cut wire field, or issuance database migration: the signed carrier is a
+bounded AHE closure blob and reuses Ed25519 plus the existing finality signer.
+
+Compatibility is limited deliberately. Fresh rooms create the initial
+checkpoint during 0→1 while the genuine epoch-0 close graph, durable replay,
+and pinned-genesis row are all present. Any inherited epoch≥1 closure without a
+retirement checkpoint fails closed and requires an explicit migration/recovery
+decision: bounded current trust can authenticate an old row's signature but
+does not prove its membership in the already-completed close. The repository
+has not shipped a genuine repeated-epoch producer, so it must not invent that
+proof silently.
+
+No production implementation is authorized by this audit. The next checkpoint
+is the signed plan and governing Grok/Kimi/Opus review of the exact 0c1a design,
+followed by a tests-only causal RED.
+{
+  "anchorCommit": "d6f5de263c5d0bcabe4df25532a0a8d3dcf0ccbd",
+  "anchorTree": "17ecf3edf922ca3b27e96a5c8b25ae7888f67146",
+  "currentAuthenticatedBoundarySufficient": false,
+  "decision": "creator-signed-cumulative-issuance-retirement-checkpoint",
+  "implementationAuthorized": false,
+  "newPublicProductApi": false,
+  "newProtocolControlCarrier": true,
+  "newWireOrRegistryContract": true,
+  "requiresHighRiskPrerequisite": true,
+  "selectedStorage": "one replaceable authenticated AHE closure candidate",
+  "storeSchemaChangeRequired": false
+}
+git rev-parse HEAD^{commit}
+git rev-parse HEAD^{tree}
+shasum -a 256 packages/node/src/v3-live.ts packages/node/src/creator-close.ts packages/node/src/internal/closed-epoch-cleanup.ts packages/issuance-store/src/types.ts packages/issuance-store/src/maintenance.ts packages/protocol-v3/src/creator-close.ts packages/protocol-v3/src/creator-checkpoint.ts packages/protocol-v3/registry/registry-v1.json examples/v3-room/src/index.ts
+rg -n "prunePublishedPrefix\\(" packages examples --glob '!**/tests/**' --glob '!**/test/**'
+rg -n "prunedThroughAuthorSequence|creatorFilteredIssuanceStore|readOutboxPage|readIssued|publishPending|readRebaseOutbox|previousAnchor|snapshotManifestDigest|historyRoot|authorSequence" packages/issuance-store/src packages/node/src packages/protocol-v3/src examples/v3-room/src
+ec57bb766bcafdc1c3c3a49bf2c8e498f36e173d02769bb1a4106c0722c265b0  audit.json
+3cb40fd36b74889c0101d2f388f6bc14df3547b4d54b1cab7896058a64f7d819  audit.md
+d0f16aa052e50c01ea756ccd48ff84dfa033065a32713984582752ae256387ac  commands.txt
+761f29d121ae63ad3ed2d5f25a9ba3d388c7f3d122ebde74c4bf7d3d1c30ac87  source-hashes.sha256
+69a8134fe8ad895f388dc93d02bdafc2b216b35f1cd5d06b597fab2d59487f19  packages/node/src/v3-live.ts
+911350d1739a0659d28950193f2a48d2ae3d53e230ffe31707ea506976e54fe8  packages/node/src/creator-close.ts
+72b78915f65ee60b4b1f38be4edcebf662731dcf24f8f9edd91db931912c39fe  packages/node/src/internal/closed-epoch-cleanup.ts
+405ad160cf0bdb2ef6fb33dda81910f0435450fb7bb7ed85362ccd8605cdbf12  packages/issuance-store/src/types.ts
+31d4443ea1ac3753f589fe8153602a62fdaeb39a7a5d67fb21cffcd0b2eaefae  packages/issuance-store/src/maintenance.ts
+abb54cdabda724888aabed2119df45c8678623e6d701f8366a9f7919f018c95b  packages/protocol-v3/src/creator-close.ts
+4a44cb2d12788bb3aec5b692e0ca2479b7ab7e4ca3a64c97f41915a8860e62f2  packages/protocol-v3/src/creator-checkpoint.ts
+2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9  packages/protocol-v3/registry/registry-v1.json
+3926bbd008fb6b5791d2b0df3fed11cc7110c1b682ead0d3b17ba5f3c1281292  examples/v3-room/src/index.ts
+27764:  `1a17a50c1a9bd03743a704d25fbab8cd8e2c7ee367823986de7528dd28e8838c`;
+49026:- `packages/types/src/network.ts` — `81654d65dcd5619b0c1ae08b0f88544a9e1337d1` /
+70716:`b0c1a6b305cda25adafc24b97159e51bed068f13c16b50b6b0fd97e5a2037e2e`,
+72570:`27789968d0b1f9071b133b6a91de163867f0f0ee78e7f3d0c1a6327c92b48eee`
+72656:`27789968d0b1f9071b133b6a91de163867f0f0ee78e7f3d0c1a6327c92b48eee`
+82721:`e8170b88a0c1a203ab3f9c7b8a95a2a878ec227ae78b132961b28b90aa2ee7f3`.
+83475:`e8170b88a0c1a203ab3f9c7b8a95a2a878ec227ae78b132961b28b90aa2ee7f3`;
+84740:`e8170b88a0c1a203ab3f9c7b8a95a2a878ec227ae78b132961b28b90aa2ee7f3`.
+85223:`e8170b88a0c1a203ab3f9c7b8a95a2a878ec227ae78b132961b28b90aa2ee7f3`.
+86256:`e8170b88a0c1a203ab3f9c7b8a95a2a878ec227ae78b132961b28b90aa2ee7f3`.
+87081:`02b9e2d84e9ac541c878c0d125c007540308b5f36839522cbd9d0c1a4b6b3aaa`.
+95503:remain blocked on D.110c-0c1a GREEN before any `v3-live.ts` or issuance-store
+95543:protocol-contract prerequisite as D.110c-0c1a before implementation. A signed
+95546:After D.110c-0c1a GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
+95775:###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
+95790:`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`. A second product-shaped row
+95837:Because 0c1a changes a signed protocol control carrier adjacent to authority,
+95847:than widening 0c1a. No Fable or collaboration subagent runs.
+95854:The prerequisite decisions, including 0b0 freshness-floor authority and 0c1a
+95858:D.110c-0a/0b0/0b/0b1/0c1a/0c1/0c/a/b/c jointly prove one genuine room completes
+neither classifiable by the epoch-2 predecessor nor hidden by an authenticated
+intermediate-epoch rule, so predecessor recovery fails closed at admission.
+The accepted 0b1 closure already assigned general intermediate-epoch issuance
+retirement/recovery to D.110c-c, while this plan simultaneously required 0c to
+cold reopen epoch 3 and prohibited an unreviewed `v3-live.ts` filter change.
+The result exposes that sequencing contradiction. Removing epoch-0/1/2 work,
+accepting the floor commit without cold reopen, passing a synthetic displaced
+authority, or deferring the same-process reopen would invalidate causal
+RED-to-GREEN closure and is prohibited.
+
+##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
+
+**Status: bounded architecture decision complete; implementation and causal RED
+remain blocked on D.110c-0c1a GREEN before any `v3-live.ts` or issuance-store
+production edit.** Owner: the predecessor and successor issuance
+views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
+`creatorFilteredIssuanceStore()`, their exact outbox classification inside
+`recoverV3LiveReplica()`, and the registered view's `publishPending` and
+`readRebaseOutbox` scans. The durable issuance/outbox contract and browser/Node
+store implementations join the owner set only if the reviewed design requires
+an authenticated retirement boundary or physical deletion; that outcome is an
+explicit high-risk compatibility/schema prerequisite, not an implicit 0c
+change. Deadline: GREEN before D.110c-0c may claim its same-process post-commit
+reopen, before D.110c-c RED, and before any D.110c-d/Phase-7 long-lived-room
+gate.
+
+The threat model remains untrusted durable store bytes under a trusted pinned
+genesis and current room floor. It is not sufficient to decode a claimed epoch
+and skip the row. A solution must prove that no current/unpublished row can be
+hidden or substituted; authenticate object, author, sequence, signature,
+anchor/epoch relation, and the exact retained authority needed for any row it
+discards; preserve pending publication and offline/rebase custody; never copy
+the current genesis filter's publish-state-blind treatment of an unpublished
+old row; fail closed or explicitly resolve every such pending row; fail closed
+on malformed, duplicate, reordered, forked, stale, cross-object, cross-author,
+or ambiguous rows; and keep hidden-row accounting per scan under one combined
+`maxEpochVertices` ceiling. It may not retain an O(N) authority/projection
+chain, manufacture displaced authority, mark an unpublished row published,
+trust the issuance database as an authority, weaken the two-generation rollback
+window, or hide growth outside the D.110c-c/d durable census.
+
+The bounded architecture audit compares exactly:
+
+1. authenticated discard-only classification of signed obsolete rows against
+   the retained current/immediate-predecessor trust and ACL material;
+2. an authenticated durable per-author retirement boundary advanced only after
+   verified adoption, floor commit, availability, rollback, and outbox gates;
+3. physical row retirement under the existing D.109/D.110c-c cleanup owner; and
+4. retaining older authority/projection material, which is rejected unless it
+   can meet the existing O(1) control-state law.
+
+The audit below rejects options 1, 3 as a sole authority, and 4; it selects a
+bounded signed-control form of option 2 and freezes its exact high-risk
+protocol-contract prerequisite as D.110c-0c1a before implementation. A signed
+claimed epoch alone remains insufficient.
+
+After D.110c-0c1a GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
+diagnostic invocation must retain
+both old-AHE and new-AHE orderings after `active-new`, proving exact floor/AHE
+effects and the identical post-commit reopen classification without aborting
+after the first ordering. Then a deterministic real-store prefix differential
+uses the same product path, room, and message inputs. Its control performs the
+genuine 0→1 transition with local issued/published rows r0 and r1, crashes in
+the pending 1→2 state, recovers, and reopens at epoch 2. Its treatment adds the
+next genuine transition, with r2, and attempts the same-process post-commit
+epoch-3 reopen. A test-owned read-only store-boundary trace records every
+`readOutboxPage` and `readIssued` call, returned row key and digest, and the
+pre-crash issue result for each epoch. It must prove byte-identical r1 is
+accepted as current in the control, the treatment reaches r1 through the real
+recovery scan, and the treatment fails there with exact predecessor
+`admission-rejected` without widening production error strings. Any control
+failure before epoch-2 reopen, treatment trace not ending at r1, different row,
+filter call, or failure class stops the slice. An empty-epoch/omitted-row control
+is prohibited unless a separate bounded tests-only probe first proves the
+product supports that lifecycle. The existing two process-death orderings
+remain retained consumption gates; no test may construct epoch-3 state, delete
+a row privately, or mutate store bytes to manufacture the differential.
+
+The one authorized corrected diagnostic ran from signed/pushed plan anchor
+`907a0499cfe03a858f682a2066faf3bbd210a59d`. Its read-only listing selected
+exactly the one D.110c-0c Chromium test in one file. Playwright exited `1` with
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors, and exactly
+two soft failures carrying `D110C_0C_EPOCH3_COLD_REOPEN_BLOCKED`. Both
+`old-ahe` and `new-ahe` completed pending recovery as `active-new`, advanced
+the room floor from stable epoch 2/pending epoch 3 to stable epoch 3/no pending,
+then failed immediate cold reopen with the identical exact detail
+`v3 room successor reopen failed: recovery-rejected: creator predecessor
+recovery failed: admission-rejected`. Old-AHE performed exactly one head swap
+with revision `7→8`, former active `Adopted→Superseded`, replacement
+`Complete→Adopted`, and every other generation unchanged. New-AHE performed
+zero swaps and retained its complete AHE value exactly. The aggregate inline
+attachment equals the two ordered per-case attachments.
+
+The deterministic validator first used an ANSI-sensitive regex. That faulty
+read-only diagnostic was corrected to strip terminal escape codes and is not a
+code or test failure; the corrected validator exits `0`. The complete evidence
+is `.logs/d110c-0c-green-two-order-diagnostic-907a0499/`; its validating
+nine-entry self-excluding manifest SHA-256 is
+`53c39e465c0c397602c0d0a2bf0336c6b13115d72bfb785fc8d480dfaf3d6270`.
+The two earlier non-GREEN executions remain preserved rather than overwritten:
+the masked floor-guard result manifest is
+`3b42a052723a3d01b12d78244a6c3d11050cf4c7e72be33a912f25ae1da340e0`,
+and the first one-order downstream diagnostic manifest is
+`4909002340b4d9c2316f262cabff8a8c1168e9e155d1066b07f56ba7ed30b128`.
+Node build, production-source no-emit typecheck, exact-owner ESLint/Prettier,
+and diff checks pass. These results prove the pending authenticator through
+durable commit and the separate post-commit seam; they are explicitly not a
+GREEN or permission to edit `v3-live.ts`.
+
+GREEN implements only the reviewed selected family. It must make the unchanged
+epoch-0/1/2 fixture complete its same-process post-commit epoch-3 reopen and
+issue/publish its fourth message in both crash orderings while preserving the
+exact first-transition pending matrix
+and the signed D.110c-0c RED. The N≥1 pending authenticator also applies the
+same commit-phase/current-epoch QC filtering used by the retained cold-reopen
+owner before its exactly-one opener. Adversarial gates cover a forged lower epoch,
+valid same-room old fork, duplicated author sequence, substituted issued/outbox
+pair, unpublished intermediate row, current row claiming an older sequence,
+stale retirement boundary, rollback, ambiguous write, and scan-counter reset.
+The retained gate includes 0b1 cold reopen/census, Phase-6a reopen,
+issuance/outbox, offline/rebase, D.109 reclamation, room-head, snapshot,
+availability, and rollback suites. Exact-owner build/typecheck/lint/format/diff,
+one-test/one-file selection, source-slice predicates, protected paths, 27
+stashes, process/ports, hashes, and self-excluding evidence manifests remain
+mandatory.
+
+Because this prerequisite changes or may change production recovery and durable
+issuance policy, it is high risk. Freeze the exact selected construction after
+the two-order diagnostic and bounded audit, sign/push the plan, and run the
+governing Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh plan review.
+Only P0/P1 blocks. No production edit follows until that union is empty and the
+causal RED is signed/pushed. The held D.110c-0c pending-authenticator candidate
+is signed only as a labeled non-GREEN checkpoint and receives the existing
+final GREEN review together with 0c1 after the unchanged full gate passes. No
+Fable or collaboration subagent is invoked without a new express user
+authorization.
+
+The expressly authorized one-off `claude-fable-5-1`/high course review ended
+normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
+and verdict `RESLICE_REQUIRED`. It independently confirmed that the held
+pending-authenticator change is minimal, the epoch-3 admission failure is a
+separate intermediate-row recovery seam, and weakening the existing fixture
+would invalidate closure. Its two P1s are accepted above: split the
+contradictory owner/gate sequence and retain both post-commit orderings before
+freezing 0c1 RED. Its P2 semantic-preservation audit, diagnostic-only source
+check, exact AHE delta, inner-detail custody, and static gates are retained
+obligations. The review root is
+`.logs/d110c-0c-fable51-high-course-review-20260902/`; its validating four-entry
+self-excluding manifest SHA-256 is
+`d90b114e2c7b318a722006a8f0a473e1ff3ce34fe58a1e2a3cf2975c44a696df`.
+This was the only authorized Fable invocation; no further Fable review is
+permitted without new express authorization.
+
+A later separately authorized one-off `claude-fable-5-1`/high current-course
+review completed normally in session
+`6aaf4f98-77ca-42ab-a71e-721c11f781d1`, spawned zero subagents, and returned
+`ON_TRACK_WITH_CORRECTIONS`, P0=0/P1=2. Its first P1 is corrected above by
+replacing the false literal epoch-0 byte-preservation claim with exact semantic
+delegation/binding obligations and the retained 0→1 behavioral gate. Its second
+P1 is corrected above by replacing the invalid omitted-row control, which could
+fail earlier on an empty issued chain, with the prefix-control differential and
+exact store-boundary trace. Its nonblocking guidance names both registered
+view scans, keeps unpublished old rows fail closed, limits 0c to same-process
+post-commit reopen, aligns N≥1 QC filtering at GREEN, and prohibits reuse of the
+file-global diagnostic check. The review did not select between carrier-free
+authenticated discard and a creator-signed retirement boundary; that remains
+the explicit 0c1 architecture decision. Evidence is under
+`.logs/d110c-current-course-fable51-high-20260902/`; its validating
+self-excluding manifest SHA-256 is
+`7acd605e4973999cfdf935d7a4c5e89c00be11bcc9ab45fab8bc7e182023ddb6`.
+This authorization is consumed; no further Fable review is permitted without
+new express authorization.
+
+The bounded post-diagnostic source audit is now pinned to signed/pushed
+non-GREEN checkpoint `d6f5de263c5d0bcabe4df25532a0a8d3dcf0ccbd`, tree
+`17ecf3edf922ca3b27e96a5c8b25ae7888f67146`. It confirms that current data is
+not sufficient for a general age-independent intermediate-row decision.
+`openCreatorCheckpointTrust()` authenticates pinned genesis and exactly one
+predecessor/current pair; the current anchor commits only its immediate
+predecessor. The cut/anchor schemas authenticate state, ACL, compact history,
+snapshot, archive, signer, parameters, and adjacent lineage, but no per-author
+resolved sequence. `DurableIssuanceStore.readLineage()` omits the maintenance
+watermark, while `prunedThroughAuthorSequence` and its pruning receipt are
+store-held unsigned facts. No product path invokes `prunePublishedPrefix()`.
+The RFC 9162 history frontier authenticates accumulated history, not the claim
+that every local issuance address through one ordinal is represented and safe
+to retire.
+
+The decision matrix therefore rejects four incomplete constructions:
+
+1. current/immediate-predecessor filtering cannot authenticate an arbitrary
+   retained epoch;
+2. decoding and signature-checking a row's self-claimed old epoch/anchor does
+   not establish accepted room lineage or prefix completeness;
+3. a database watermark or physical deletion alone is not an authority under
+   the untrusted-durable-bytes model and cannot cover fail-safe retained rows;
+   and
+4. retaining all prior anchors, ACLs, cuts, or QCs violates the O(1)-in-epoch
+   control-state law.
+
+The selected family is one **creator-signed cumulative issuance-retirement
+checkpoint**, stored as exactly one replaceable AHE closure candidate. It is
+authenticated by the stable `creator-trusted-v1` finality key already rooted in
+the pinned genesis, binds the current local creator issuance scope to the
+authenticated successor checkpoint, and directly attests the inclusive
+resolved author-sequence frontier. It neither trusts the database watermark nor
+requires replay of an old authority chain. This selection is creator-only: a
+future rotating signer or independently reopening non-creator writer requires
+its own reviewed authority design and is not silently claimed here.
+
+The exact canonical
+`drp-creator-issuance-retirement-state` v1 record is signed over domain
+`ts-drp/creator-issuance-retirement/v1` and binds all of:
+
+- protocol/version, object id, pinned genesis digest, and creator issuance
+  author;
+- closed/current epoch and anchor plus successor epoch and anchor;
+- the exact cut-value digest, commit-QC ref, and snapshot-manifest digest;
+- the prior retirement-candidate digest or the frozen genesis sentinel;
+- prior inclusive resolved author sequence, nullable only for initialization;
+  and
+- new inclusive resolved author sequence plus the exact observed issuance
+  lineage `{ exhausted, next }` from which it is derived.
+
+The initial and advancing rules are exact. A fresh room emits its first
+checkpoint during 0→1 close while its genuine epoch-0 close graph, durable
+replay, and pinned-genesis issuance row are present. Any inherited epoch≥1 room
+with no checkpoint fails closed and requires a separate migration/recovery
+decision: bounded current trust can authenticate an old row's signature but
+cannot prove its membership in an already-completed close. No genuine
+repeated-epoch producer has shipped, so the plan does not invent compatibility
+evidence. Thereafter each close requires exactly one authenticated previous
+checkpoint and replaces it with exactly one successor checkpoint. The
+successor record directly authenticates the cumulative fact under the stable
+genesis signer; the prior digest is used to enforce transition continuity while
+both adjacent closures exist, not to create an O(N) proof chain.
+
+Minting starts from the authenticated prior checkpoint and exact issuance
+scope. It reads the lineage and every address strictly above the prior boundary
+through `lineage.exhausted ? lineage.next : lineage.next - 1`. Every new address
+must be dense and increasing and have one byte-identical issued/outbox pair, a
+canonical vertex, valid author signature, exact current room/anchor/epoch,
+`published` state, and a digest present in both the captured close graph and
+sealed durable replay. Missing, duplicate, pending, malformed, substituted,
+cross-scope, non-current, or non-member rows refuse signing. The successor
+anchor, Cut/QC, and snapshot identities are fixed before completing the
+deterministic Ed25519 signature. A close with no newly issued address carries
+the prior sequence forward while rebinding it to the new successor checkpoint.
+
+Cold reopen never trusts this record merely because storage returned it. The
+opener consumes pinned-genesis-derived creator trust plus the independently
+authenticated room floor, verifies the exact signature and all scope/head/
+Cut/QC/snapshot fields, and requires the one candidate selected from the
+bounded active closure. Missing, duplicate, stale, future, cross-room,
+cross-author, forked, malformed, or nonmonotonic candidates fail closed. An
+authenticated boundary permits old-address classification only at or below its
+inclusive sequence. The wrapper still requires exact issued/outbox equality,
+canonical object/author/sequence, a valid author signature, and `published`
+state; the creator checkpoint, not the row's claimed old anchor or database
+watermark, supplies the authority that the address is resolved. Rows above the
+boundary retain existing current/displaced admission and offline/rebase
+custody. One combined per-scan `maxEpochVertices` counter bounds all hidden
+rows.
+
+Physical pruning remains an execution mechanism owned by D.109/D.110c-c. It may
+run only after verified adoption, authenticated floor commit, snapshot
+availability, two complete rollback generations, outbox completion, and exact
+retirement-checkpoint agreement. Refusal or crash may retain certified rows;
+neither can advance the certificate, remove an uncertified address, or report a
+partial deletion as complete.
+
+This design introduces a protocol-v3 control-record/registry contract and a new
+protocol-owned finality signing request. That is a material high-risk
+compatibility boundary. It does not require a new cryptographic primitive,
+dependency, epoch-anchor/Cut field, product API, or issuance database schema:
+the signed record is one bounded AHE closure blob and reuses existing Ed25519,
+the existing creator finality signer, exact AHE blob/ref storage, and current
+room-floor authority. Per the stop rule, no production implementation begins
+inside D.110c-0c1. The new prerequisite below owns that contract first. The
+audit evidence is
+`.logs/d110c-0c1-architecture-audit-d6f5de26/`; its validated nine-source hash
+inventory is inside the root and its four-entry self-excluding manifest
+SHA-256 is
+`814f98305ea36ee3a0a37bdf07055dd4fbae8ac053b7bf5c58148904754bb1cd`.
+
+###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
+
+**Status: plan review required; no production implementation authorized.**
+Owner: protocol-v3 creator retirement record/opener and one-use signing request,
+keychain finality signing dispatch, the creator-close row/graph/replay capture,
+the shared creator transition classifier's exact-one replacement law, and
+pending/reopen AHE closure preservation. Deadline: GREEN before D.110c-0c1 may
+change `creatorFilteredIssuanceStore()`, before D.110c-0c may claim its
+same-process epoch-3 reopen, and before D.110c-c/d or Phase 7 consumes repeated
+epochs.
+
+The tests-only RED uses a fresh genuine 0→1 creator close. It proves the current
+proposed closure contains zero authenticated
+`drp-creator-issuance-retirement-state` candidates even though the exact
+issuance lineage and published bootstrap row exist, and terminates only with
+`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`. A second product-shaped row
+extends the lineage before close and must leave the same exact causal failure;
+no fixture writes a carrier or mutates the AHE closure. The RED evidence records
+the exact row keys/digests, lineage, graph membership, durable-replay result,
+cut/QC/snapshot/successor identities, selected closure, one-test/one-file
+listing, reporter counts, and the complete token. Any earlier close failure,
+different missing candidate, or hidden source mutation stops the slice.
+
+GREEN implements only the reviewed carrier prerequisite:
+
+1. add the exact registry kind, canonical capture, prepare/complete/open APIs,
+   opaque verified capability, and one-use domain-separated signing request;
+2. extend finality-key custody only with the matching protocol-owned request;
+   arbitrary-digest signing remains impossible;
+3. derive the dense published boundary through genuine creator close graph,
+   issuance, and durable-replay owners before producing the successor-bound
+   record;
+4. stage exactly one signed record in the proposed AHE closure, preserve it
+   through pending process death, and replace the adjacent predecessor record
+   with no third live copy or uncounted sibling state;
+5. enforce fresh 0→1 initialization, ordinary monotonic advance,
+   same-boundary advance, and inherited epoch≥1 missing-record refusal pending
+   a separately reviewed migration;
+   and
+6. expose no filter/skip decision yet. D.110c-0c1 remains the sole consumer
+   that classifies old addresses from the verified capability.
+
+Adversarial GREEN rows cover wrong creator signer, altered signature/preimage,
+wrong object/genesis/author/current or successor head, wrong Cut/QC/snapshot,
+stale prior digest, decreased or jumped sequence, inconsistent exhausted/next,
+missing/duplicate record, duplicate/gapped issued address, issued/outbox
+substitution, pending row, valid same-room fork, graph/replay omission,
+post-capture mutation, ambiguous persistence, and replay after candidate
+replacement. The closure census proves exactly one active retirement candidate,
+at most one adjacent predecessor during atomic advance, and constant bytes with
+epoch count for fixed scope/field sizes.
+
+Focused protocol/keychain/control-plane/Node tests run once for RED and once for
+GREEN. GREEN then retains creator close/seal/QC, 0b0/0b1 checkpoint opening and
+bounded closure, 0c pending process-death, Phase-6a adoption/reopen,
+issuance/outbox/offline-rebase, AHE crash/CAS, snapshot, D.109 pruning/runtime
+reclamation, and current protocol-v3 canonical/registry suites. Exact affected
+package builds and production-source typechecks, exact-owner lint/format/diff,
+source/export shape, protected paths, 27 stashes, process/ports, signed commits,
+pushed refs, hashes, and self-excluding manifests remain mandatory. D.110a's
+consumed full/preflight identities and every retained campaign remain excluded.
+
+Because 0c1a changes a signed protocol control carrier adjacent to authority,
+restart, pruning, and compatibility, this plan-only checkpoint receives the
+governing Grok 4.6/high, standard direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review before RED. Only P0/P1
+blocks. Corrections that alter carrier fields, authority, compatibility, or
+executable acceptance receive at most one confirmation; P2/bookkeeping does not
+recurse. The signed GREEN later receives the single complete plan→RED→GREEN
+review. If the review cannot accept this exact local signed carrier without an
+epoch-anchor/Cut wire change, public product API, new dependency, or different
+authority assumption, stop and reslice that demonstrated requirement rather
+than widening 0c1a. No Fable or collaboration subagent runs.
+
+The complete confirmation evidence is retained under
+`.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+self-excluding manifest SHA-256 is
+`5f932353bbd41bffc697424adfbe2c9a2835ac79de6f2dc9e51e6c455ae6a9e7`.
+
+The prerequisite decisions, including 0b0 freshness-floor authority and 0c1a
+issuance-retirement authority, are reviewed before their production edits; each
+executable sub-slice receives its own bounded causal RED and GREEN. The
+umbrella's minimum functional GREEN is not satisfied until
+D.110c-0a/0b0/0b/0b1/0c1a/0c1/0c/a/b/c jointly prove one genuine room completes
+epoch 0→1, restart/reopen, epoch 1→2,
+continued issue/publish after epoch 2, and cold recovery with exact application
+state, ACL, writer authority, current anchor/trust, compact history,
+archive-index root, snapshots, journals, and operation accounting. A second
+close that only returns an epoch number is not acceptance.
+
+##### Retained long-horizon and golden-path acceptance
+
+D.110c-d must prove, in a fresh process where required, all of the following:
+
+- at least 100 genuine transitions on one production room, with strictly
+  increasing epochs and authenticated anchor/QC/cut lineage;
+- exact compact-history root and size extension at every step, with no skipped,
+  duplicated, reordered, or substituted epoch and no same-anchor double close;
+- real issue/admit/apply/publish work before and after selected transitions,
+  exact aggregate operation accounting, exact application state, and an
+  independently derived semantic digest;
+- restart/reopen at selected pre-close, post-close, pre-adoption,
+  post-adoption, and post-prune boundaries, including offline/rebase outbox and
+  first-successful-publication continuity;
+- pruning only after verified adoption, two complete rollback generations,
+  satisfied availability, complete outbox classification, and authenticated
+  archive/snapshot dependencies; refusal and crash may retain too much but may
+  not delete too much;
+- bounded active-owner, registration, close-handle, displaced-predecessor,
+  hot/control closure, snapshot/quarantine, issuance/outbox, AHE
+  generation/blob, rollback, and runtime structure census, without moving
+  unbounded control data into a journal or sibling owner. Intentionally archival
+  application/history bytes receive a separate exact segment/byte census and
+  are never counted as bounded hot state;
+- a fresh-process, during-execution, post-GC memory series over repeated
+  same-room rollovers, paired with exact work and digest assertions. Its exact
+  sample window, workload, watchdog, epsilon, and absolute ceiling require a
+  separately reviewed freeze before execution; D.110a's distinct-room values
+  are preserved as evidence but are not silently reused as this contract; and
+- two real semantic controls using the same production lifecycle: an
+  MMORPG-style world whose current state and authority continue across
+  rotations, and a Discord-shaped room whose messages span genuine epochs and
+  whose current work continues after safe pruning. D.110c must produce the
+  latter without synthetic archive rows; actual evolving archive roots and
+  cold paging remain a separately reviewed Phase-7 control because the current
+  creator-close wire requires the archive root to remain unchanged.
+fc384d1fe3d503bb9e3706e97bf62bea39fe8a7c
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+69a8134fe8ad895f388dc93d02bdafc2b216b35f1cd5d06b597fab2d59487f19  packages/node/src/v3-live.ts
+911350d1739a0659d28950193f2a48d2ae3d53e230ffe31707ea506976e54fe8  packages/node/src/creator-close.ts
+72b78915f65ee60b4b1f38be4edcebf662731dcf24f8f9edd91db931912c39fe  packages/node/src/internal/closed-epoch-cleanup.ts
+405ad160cf0bdb2ef6fb33dda81910f0435450fb7bb7ed85362ccd8605cdbf12  packages/issuance-store/src/types.ts
+31d4443ea1ac3753f589fe8153602a62fdaeb39a7a5d67fb21cffcd0b2eaefae  packages/issuance-store/src/maintenance.ts
+abb54cdabda724888aabed2119df45c8678623e6d701f8366a9f7919f018c95b  packages/protocol-v3/src/creator-close.ts
+4a44cb2d12788bb3aec5b692e0ca2479b7ab7e4ca3a64c97f41915a8860e62f2  packages/protocol-v3/src/creator-checkpoint.ts
+2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9  packages/protocol-v3/registry/registry-v1.json
+3926bbd008fb6b5791d2b0df3fed11cc7110c1b682ead0d3b17ba5f3c1281292  examples/v3-room/src/index.ts
+			extracted.vertex.objectId === issuanceScope.objectId &&
+			extracted.vertex.author === issuanceScope.author &&
+			extracted.vertex.authorSequence === row.authorSequence &&
+			lowerHexDigest(extracted.vertex.digest) === lowerHexDigest(row.digest)
+		);
+	} catch {
+		return false;
+	}
+}
+
+function creatorFilteredIssuanceStore(
+	issuanceStore: DurableIssuanceStore,
+	issuanceScope: DurableIssueScope,
+	filterPayload: PreparedV3LivePayload,
+	filterAuthorization: V3LiveAuthorization,
+	excludedAfterEpoch?: number,
+	pinnedGenesisAnchorDigest?: string
+): DurableIssuanceStore {
+	let skipped = 0;
+	let skippedGenesis = 0;
+	return ObjectFreeze({
+		close: () => issuanceStore.close(),
+		compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
+			issuanceStore.compareAndMarkOutboxPublished(input),
+		readIssued: (scope: DurableIssueScope, authorSequence: number) => issuanceStore.readIssued(scope, authorSequence),
+		readLineage: (scope: DurableIssueScope) => issuanceStore.readLineage(scope),
+		readOutboxPage: async (input?: DurableOutboxPageInput) => {
+			let afterKey = input?.afterKey;
+			for (;;) {
+				const page = await issuanceStore.readOutboxPage({
+					...(afterKey === undefined || afterKey === null ? {} : { afterKey }),
+					limit: 1,
+					scope: issuanceScope,
+				});
+				if (page.length !== 1) return page;
+				const row = outboxRowSnapshot(page[0], issuanceScope);
+				if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
+					return page;
+				}
+				const authenticated = authenticateRecoveryVertex(
+					filterPayload,
+					filterAuthorization,
+					row.canonicalPreimageBytes,
+					row.signature
+				);
+				const candidateEpoch = authenticated?.vertex.epoch;
+				const authenticatedFilterRow =
+					authenticated !== undefined &&
+					authenticated.digest === lowerHexDigest(row.digest) &&
+					authenticated.author === issuanceScope.author &&
+					authenticated.authorSequence === row.authorSequence &&
+					typeof candidateEpoch === "number" &&
+					(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch);
+				const authenticatedGenesisRow =
+					pinnedGenesisAnchorDigest !== undefined &&
+					authenticatedPinnedGenesisOutboxRow(row, issuanceScope, filterPayload, pinnedGenesisAnchorDigest);
+				if (authenticatedFilterRow || authenticatedGenesisRow) {
+					const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+					const issuedRow = outboxRowSnapshot(
+						ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+						issuanceScope
+					);
+					if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
+					if (authenticatedFilterRow) skipped += 1;
+					if (authenticatedGenesisRow) skippedGenesis += 1;
+					if (
+						skipped > filterPayload.parameters.maxEpochVertices ||
+						skippedGenesis > filterPayload.parameters.maxEpochVertices
+					) {
+						return page;
+					}
+					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
+						string,
+						string,
+						number,
+					];
+					continue;
+				}
+				return page;
+			}
+		},
+		transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
+			issuanceStore.transactIssue(scope, buildAndSign),
+	});
+}
+
+function openRecoveryAuthorization(
+	payload: PreparedV3LivePayload,
+	exactAuthorizationBytes: Uint8Array,
+	kind: "author-list" | "latched-acl"
+): V3LiveAuthorization | undefined {
+	if (kind === "author-list") {
+		const opened = openCurrentEpochAuthorAuthorization({
+			detachedAnchorSignature: payload.input.detachedSignature,
+			exactCanonicalAnchorPreimageBytes: payload.input.exactCanonicalAnchorPreimageBytes,
+			exactCanonicalAuthorAuthorizationBytes: exactAuthorizationBytes,
+			trust: payload.trust.trust,
+		});
+		return opened.ok ? ObjectFreeze({ kind: "author-list" as const, value: opened.authorization }) : undefined;
+	}
+	const anchor = decodeCanonical(payload.input.exactCanonicalAnchorPreimageBytes);
+			const page = onePage(rawPage);
+			if (page === undefined) return recoveryFailure("issuance-rejected", "v3 recovery outbox page is invalid");
+			if (page === null) break;
+			const row = outboxRowSnapshot(page, selectedScope);
+			if (row === undefined || (afterKey !== undefined && row.authorSequence <= afterKey[2])) {
+				return recoveryFailure("issuance-rejected", "v3 recovery outbox record is invalid");
+			}
+			// The predecessor view does not point-read a returned nonfuture row; this consumer owns its sole issued read and exact match.
+			let issuedCommit: unknown;
+			try {
+				issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
+			} catch {
+				return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
+			}
+			const issuedRow = outboxRowSnapshot(
+				ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+				selectedScope
+			);
+			if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) {
+				return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
+			}
+			let classified: ClassifiedPlaneVertex | undefined;
+			try {
+				classified = classifyPlaneVertex(
+					payload,
+					authorization,
+					displacedSource,
+					row.canonicalPreimageBytes,
+					row.signature,
+					lowerHexDigest(row.digest),
+					selectedScope.author,
+					row.authorSequence
+				);
+			} catch {
+				return recoveryFailure("admission-rejected", "v3 recovery admission failed");
+			}
+			if (classified?.kind === "displaced") {
+				displacedRecordCount += 1;
+				displacedIssuanceBoundary = row.authorSequence;
+				if (
+					displacedRecordCount > (displacedSource as V3DisplacedSourceAuthority).prepared.parameters.maxEpochVertices
+				) {
+					return recoveryFailure("graph-rejected", "v3 displaced recovery graph is at capacity");
+				}
+				if (
+					!acceptedApplicationOperation(
+						(displacedSource as V3DisplacedSourceAuthority).prepared,
+						classified.authenticated.vertex.operation,
+						classified.authenticated.admitted.logicalTime
+					) ||
+					!hasBoundedDependencies((displacedSource as V3DisplacedSourceAuthority).prepared, classified.authenticated)
+				) {
+					return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
+				}
+				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+				continue;
+			}
+			if (classified?.kind !== "current") {
+				return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
+			}
+			currentRecordCount += 1;
+			if (currentRecordCount > payload.parameters.maxEpochVertices) {
+				return recoveryFailure("graph-rejected", "v3 current recovery graph is at capacity");
+			}
+			const authenticated = classified.authenticated;
+			if (
+				!acceptedApplicationOperation(payload, authenticated.vertex.operation, authenticated.admitted.logicalTime) ||
+				authenticated.vertex.dependencies.some(
+					(dependency) => ReflectApply(SetPrototypeHas, quarantinedDigests, [dependency]) === true
+				)
+			) {
+				ReflectApply(SetPrototypeAdd, quarantinedDigests, [authenticated.digest]);
+				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+				continue;
+			}
+			if (!hasBoundedDependencies(payload, authenticated)) {
+				return recoveryFailure("admission-rejected", "v3 recovery vertex dependency bound is invalid");
+			}
+			const alreadyRecovered = index.has(authenticated.digest);
+			let terminalClassification: ReturnType<V3TerminalVertexClassifier> = "ordinary";
+			if (!alreadyRecovered && typeof terminalClassifier === "function") {
+				try {
+					terminalClassification = (terminalClassifier as V3TerminalVertexClassifier)(
+						ObjectFreeze({
+							author: authenticated.author,
+							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(issuedRow.canonicalPreimageBytes),
+							signature: new Uint8ArrayConstructor(issuedRow.signature),
+							vertex: authenticated.admitted,
+						})
+					);
+				} catch {
+					terminalClassification = "reject";
+				}
+				if (
+					terminalClassification === "reject" ||
+					(recoveredTerminal && terminalClassification !== "terminal-authorized")
+				) {
+					return recoveryFailure("authorization-rejected", "v3 recovery terminal sequence is invalid");
+				}
+			}
+			const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+			if (!alreadyRecovered && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
+				return recoveryFailure("authorization-rejected", "v3 recovery ACL operation is not authorized");
+			}
+			let updatedEpochBytes = epochBytes;
+			if (!alreadyRecovered) {
+				if (!hasInstalledDependencies(index, authenticated)) {
+					return recoveryFailure("graph-rejected", "v3 recovery graph dependency is unavailable");
+				}
+				const nextBytes = nextEpochBytes(epochBytes, authenticated.byteCharge, payload.parameters.maxEpochBytes);
+				if (nextBytes === undefined || index.size >= payload.parameters.maxEpochVertices) {
+					return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
+				}
+				updatedEpochBytes = nextBytes;
+			}
+			const reservation = alreadyRecovered
+				? undefined
+				: reserveOperation(
+						selectedOperationAdmissionPolicy,
+						authenticated.vertex.operation as Readonly<Record<string, unknown>>
+					);
+				queueId,
+				networkSubscriptionAttempted
+			);
+		}
+	} catch {
+		return activationFailure("internal-invariant", "v3 activation failed");
+	}
+}
+
+async function activateCreatorSuccessorLive(
+	material: CreatorSuccessorLiveMaterial,
+	bindings: CreatorSuccessorRuntimeBindings
+): Promise<
+	Readonly<
+		| { readonly handle: object; readonly ok: true }
+		| { readonly detail: string; readonly kind: string; readonly ok: false }
+	>
+> {
+	const rejected = (
+		kind: string,
+		detail: string
+	): Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }> =>
+		ObjectFreeze({ detail, kind, ok: false as const });
+	try {
+		const transportHandoff = creatorSuccessorTransportHandoff(material, bindings);
+		const [predecessorValidation, predecessorSource, successor, successorIssuanceAuthority] = await Promise.all([
+			prepareExistingCreatorGeneration(material.predecessor, material),
+			prepareExistingCreatorGeneration(material.predecessor, material),
+			prepareExistingCreatorGeneration(material.successor, material),
+			prepareExistingCreatorGeneration(material.successor, material),
+		]);
+		if (
+			predecessorValidation === undefined ||
+			predecessorSource === undefined ||
+			successor === undefined ||
+			successorIssuanceAuthority === undefined
+		) {
+			return rejected("preparation-rejected", "creator successor generation preparation failed");
+		}
+		const successorPayload = consumePreparedV3Live(successorIssuanceAuthority);
+		const successorAuthorization =
+			successorPayload === undefined
+				? undefined
+				: openRecoveryAuthorization(successorPayload, material.exactCanonicalLatchedAclBytes, "latched-acl");
+		if (successorPayload === undefined || successorAuthorization === undefined) {
+			return rejected("preparation-rejected", "creator successor issuance authority preparation failed");
+		}
+		const predecessorIssuanceStore = creatorFilteredIssuanceStore(
+			material.issuanceStore,
+			material.issuanceScope,
+			successorPayload,
+			successorAuthorization,
+			material.predecessor.trust.currentEpoch,
+			material.predecessor.trust.currentEpoch > 0 ? material.pinnedGenesisAnchorDigest : undefined
+		);
+		if (transportHandoff?.displacedSource !== undefined) {
+			creatorPredecessorRecoverySource.set(predecessorValidation, transportHandoff.displacedSource);
+		}
+		const validatedPredecessor = await recoverV3LiveReplica({
+			capability: predecessorValidation,
+			exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
+			issuanceScope: material.issuanceScope,
+			issuanceStore: predecessorIssuanceStore,
+			liveJournalStore: material.liveJournalStore,
+		});
+		if (!validatedPredecessor.ok) {
+			return rejected("recovery-rejected", `creator predecessor recovery failed: ${validatedPredecessor.kind}`);
+		}
+		if (consumeRecoveredV3Live(validatedPredecessor.capability) === undefined) {
+			return rejected("internal-invariant", "creator predecessor recovery custody failed");
+		}
+		creatorSuccessorRecovery.set(
+			successor,
+			ObjectFreeze({
+				issuanceScope: material.issuanceScope,
+				issuanceStore: material.issuanceStore,
+				liveJournalStore: material.liveJournalStore,
+				sourceCapability: predecessorSource,
+			})
+		);
+		const successorIssuanceStore =
+			transportHandoff?.displacedSource === undefined
+				? material.predecessor.trust.currentEpoch > 0
+					? creatorFilteredIssuanceStore(
+							material.issuanceStore,
+							material.issuanceScope,
+							successorPayload,
+							successorAuthorization,
+							Number.MAX_SAFE_INTEGER,
+							material.pinnedGenesisAnchorDigest
+						)
+					: material.issuanceStore
+				: creatorFilteredIssuanceStore(
+						material.issuanceStore,
+						material.issuanceScope,
+						transportHandoff.displacedSource.prepared,
+						transportHandoff.displacedSource.authorization
+					);
+		const recovered = await recoverV3LiveReplica({
+			capability: successor,
+			displacedSource: ObjectFreeze({
+				capability: predecessorSource,
+				exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
+			}),
+			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
+			issuanceScope: material.issuanceScope,
+			issuanceStore: successorIssuanceStore,
+			liveJournalStore: material.liveJournalStore,
+		});
+		if (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);
+		creatorSuccessorInitialState.set(
+			recovered.capability,
+			ObjectFreeze({
+				exactCanonicalPayloadBytes: new Uint8ArrayConstructor(material.exactCanonicalSnapshotPayloadBytes),
+				expectedApplicationStateDigest: material.stateDigest,
+				expectedPayloadDigest: material.snapshotPayloadDigest,
+			})
+		);
+		if (transportHandoff !== undefined) {
+			creatorSuccessorTransportHandoffs.set(recovered.capability, transportHandoff);
+		}
+		const activated = activateV3LivePlane({ capability: recovered.capability, ...bindings });
+		if (!activated.ok) return rejected("activation-rejected", `creator successor activation failed: ${activated.kind}`);
+		const activatedRegistration = v3HandleRegistrations.get(activated.handle);
+		if (activatedRegistration === undefined) {
+			activated.handle.deactivate();
+			return rejected("internal-invariant", "creator successor runtime registration is unavailable");
+		}
+		activatedRegistration.sourceRuntimeHandle = material.sourceRuntimeHandle;
+		if (!material.terminalizeSource()) {
+			activated.handle.deactivate();
+			return rejected("source-unavailable", "creator predecessor could not be terminalized");
+		}
+		return ObjectFreeze({ handle: activated.handle, ok: true as const });
+	} catch {
+		return rejected("internal-invariant", "creator successor activation failed unexpectedly");
+	}
+}
+
+if (!installCreatorSuccessorHandleAlias(aliasCreatorSuccessorHandle)) {
+	throw new TypeError("creator successor handle alias owner was already installed");
+     752 packages/node/src/creator-close.ts
+     508 packages/node/src/internal/closed-epoch-cleanup.ts
+    1260 total
+packages/node/src/vertex-egress.ts
+packages/node/src/v3-live.ts
+packages/node/src/handlers.ts
+packages/node/src/creator-close.ts
+packages/node/src/index.ts
+closed-epoch-cleanup.ts
+creator-adoption-intent.ts
+creator-adoption-recover.ts
+creator-adoption-stage.ts
+creator-room-head.ts
+creator-successor-live.ts
+creator-transition-advance.ts
+runtime-reclamation.ts
+v3-topic.ts
+finality.ts
+index.ts
+keychain.ts
+packages/keychain/src/finality.ts
+anchor-trust.ts
+creator-trust-advance.ts
+creator-trust-checkpoint-advance.ts
+index.ts
+signed-disable.ts
+     228 packages/control-plane/src/creator-trust-checkpoint-advance.ts
+     186 packages/control-plane/src/creator-trust-advance.ts
+     414 total
+['registryVersion', 'protocolMajor', 'packageName', 'documentation', 'domains', 'kinds', 'framing', 'endianness', 'codec', 'quorum', 'actions', 'trustProfiles', 'admissionOrder', 'wireFormat', 'changeControl', 'canonicalObjectKeyOrder', 'cryptoSuites', 'decisionBindings']
+signerSet ts-drp/signer-set/v3 1
+parameters ts-drp/parameters/v3 7
+vertex ts-drp/vertex/v3 10
+cutValue ts-drp/hard-epoch-cut/v3 22
+epochAnchor ts-drp/epoch-anchor/v3 16
+historyLeaf ts-drp/history-leaf/v3 6
+snapshotPayload ts-drp/snapshot-payload/v3 10
+snapshotChunk ts-drp/snapshot-chunk/v3 2
+snapshotManifest ts-drp/snapshot-manifest/v3 12
+archivePayload ts-drp/archive-payload/v3 7
+archiveChunk ts-drp/archive-chunk/v3 4
+archiveSegment ts-drp/archive-segment/v3 12
+sealProposal ts-drp/seal-proposal/v3 5
+sealVote ts-drp/seal-vote/v3 8
+sealQC ts-drp/seal-qc/v3 8
+roundChange ts-drp/round-change/v3 8
+profile ts-drp/profile/v3 4
+availabilityPolicy ts-drp/availability-policy/v3 4
+state ts-drp/state/v3 1
+packages/storage-browser/dist/src/internal/browser-issuance-store.d.ts:16:    prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-browser/src/internal/browser-issuance-store.ts:589:	async prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+packages/storage-browser/src/internal/browser-issuance-store.ts:1147:			prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-browser/src/internal/browser-issuance-store.ts:1154:		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+packages/storage-node/dist/src/internal/node-issuance-store.d.ts:16:    prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-node/src/internal/node-issuance-store.ts:631:	prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+packages/storage-node/src/internal/node-issuance-store.ts:1078:		prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-node/src/internal/node-issuance-store.ts:1118:				prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+packages/storage-node/src/internal/node-issuance-store.ts:1146:			prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/issuance-store/dist/src/maintenance.d.ts:36:    prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+---
+packages/node/src/v3-live.ts:4299:function authenticateRecoveryVertex(
+packages/node/src/v3-live.ts:4370:					authenticated = authenticateRecoveryVertex(
+packages/node/src/v3-live.ts:4384:						authenticated = authenticateRecoveryVertex(
+packages/node/src/v3-live.ts:4469:	const current = authenticateRecoveryVertex(payload, authorization, canonicalPreimageBytes, signature);
+packages/node/src/v3-live.ts:4472:	const displaced = authenticateRecoveryVertex(
+phase-6b-d110c-0a-authority-red.test.ts
+phase-6b-d110c-0a-browser-custody-red.test.ts
+phase-6b-d110c-0b0-floor-red.test.ts
+phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+phase-6b-d110c-0b1-boundaries.test.ts
+phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+phase-6b-d110c-a-repeat-close-red.test.ts
+phase-6b-d110c-b-hot-adoption.test.ts
+---
+phase-6b-d110c-0a-authority-red.test.ts
+phase-6b-d110c-0a-browser-custody-red.test.ts
+phase-6b-d110c-0b0-floor-red.test.ts
+phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+phase-6b-d110c-0b1-boundaries.test.ts
+phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+phase-6b-d110c-a-repeat-close-red.test.ts
+phase-6b-d110c-b-hot-adoption.test.ts
+---
+tests/e3-03-loss-and-hol-proof.pw.ts
+tests/e4-02-targeted-aoi.pw.ts
+tests/e4-03-zone-aoi-recovery.pw.ts
+tests/e4-04-zone-bandwidth-proof.pw.ts
+tests/e5-00-zone-trade-intent.pw.ts
+tests/e5-01-zone-prejournal-admission.pw.ts
+tests/e5-02-zone-referee-outcome.pw.ts
+tests/phase-3a1b-d9336-two-client-room.pw.ts
+tests/phase-3a1b-d9346-v3-zone.pw.ts
+tests/phase-3a1b-d9349-peer-selector-50-browser.pw.ts
+tests/phase-3a1b-p5-local-author-browser.pw.ts
+tests/phase-3a1b-p6-author-authorization-browser.pw.ts
+---
+function authenticateRecoveryVertex(
+	payload: PreparedV3LivePayload,
+	authorization: V3LiveAuthorization,
+	canonicalPreimageBytes: Uint8Array,
+	signature: Uint8Array
+): AuthenticatedRecoveryVertex | undefined {
+	const extracted = extractAuthorizedV3Vertex(payload, canonicalPreimageBytes, signature, (author) => {
+		return resolveV3AuthorizedAuthor(authorization, author);
+	});
+	if (extracted === undefined || !extracted.ok) return undefined;
+	return authenticatedRecoveryVertex(extracted.vertex, canonicalPreimageBytes.byteLength);
+}
+
+interface CreatorReplayRow {
+	readonly byteCharge: number;
+	readonly digest: string;
+	readonly exactCanonicalVertexBytes: Uint8Array;
+}
+
+async function readCreatorReplayRows(
+	registration: V3PlaneRegistration
+): Promise<readonly CreatorReplayRow[] | undefined> {
+	try {
+		const scope = liveJournalScope(registration.payload);
+		const readiness = await registration.liveJournalStore.readiness({ scope });
+		if (
+			!readiness.ok ||
+			!readiness.ready ||
+			!sameLiveJournalScope(readiness.scope, scope) ||
+			!NumberIsSafeInteger(readiness.rowCount) ||
+			readiness.rowCount < 0 ||
+			readiness.rowCount > registration.payload.parameters.maxEpochVertices
+		) {
+			return undefined;
+		}
+		if (readiness.rowCount === 0) {
+			const empty = await registration.liveJournalStore.readPage({
+				afterSequence: null,
+				limit: 1,
+				scope,
+				snapshot: readiness.snapshot,
+			});
+			return empty.ok &&
+				empty.rows.length === 0 &&
+				empty.nextSequence === null &&
+				registration.applicationVertices.size === 1 &&
+				registration.applicationCharges.size === 1
+				? ObjectFreeze([])
+				: undefined;
+		}
+		const rows: CreatorReplayRow[] = [];
+		let afterSequence: number | null = null;
+		while (rows.length < readiness.rowCount) {
+			const remaining = readiness.rowCount - rows.length;
+			const page = await registration.liveJournalStore.readPage({
+				afterSequence,
+				limit: Math.min(128, remaining),
+				scope,
+				snapshot: readiness.snapshot,
+			});
+			if (!page.ok || page.rows.length === 0 || page.rows.length > remaining || page.rows.length > 128) {
+				return undefined;
+			}
+			const pageStart = rows.length;
+			for (let pageIndex = 0; pageIndex < page.rows.length; pageIndex += 1) {
+				const expectedSequence = pageStart + pageIndex;
+				const row = journalRowSnapshot(page.rows[pageIndex], scope, expectedSequence);
+				if (row === undefined) return undefined;
+
+				let authenticated: AuthenticatedRecoveryVertex | undefined;
+				if (row.sourceKind === "received") {
+					authenticated = authenticateRecoveryVertex(
+						registration.payload,
+						registration.authorization,
+						row.exactCanonicalPreimageBytes,
+						row.detachedSignature
+					);
+				} else {
+					const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
+					const issued = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
+					const issuedRow = outboxRowSnapshot(
+						ObjectFreeze({ commit: issued, publishState: "published" as const }),
+						localScope
+					);
+					if (issuedRow !== undefined && lowerHexDigest(issuedRow.digest) === row.vertexDigest) {
+						authenticated = authenticateRecoveryVertex(
+							registration.payload,
+							registration.authorization,
+							issuedRow.canonicalPreimageBytes,
+							issuedRow.signature
+						);
+						if (authenticated?.author !== row.author || authenticated.authorSequence !== row.authorSequence) {
+							authenticated = undefined;
+						}
+					}
+				}
+				if (authenticated === undefined || authenticated.digest !== row.vertexDigest) return undefined;
+				const retainedVertex = registration.applicationVertices.get(authenticated.digest);
+				const retainedCharge = registration.applicationCharges.get(authenticated.digest);
+				const exactCanonicalVertexBytes = encodeCanonical(authenticated.vertex);
+				if (
+					retainedVertex === undefined ||
+					retainedCharge !== authenticated.byteCharge ||
+					!sameBytes(encodeCanonical(retainedVertex), exactCanonicalVertexBytes)
+				) {
+					return undefined;
+				}
+				rows.push(
+					ObjectFreeze({
+						byteCharge: authenticated.byteCharge,
+						digest: authenticated.digest,
+						exactCanonicalVertexBytes,
+					})
+				);
+			}
+			const expectedNext = rows.length < readiness.rowCount ? rows.length - 1 : null;
+			if (page.nextSequence !== expectedNext) return undefined;
+			afterSequence = page.nextSequence;
+		}
+		return registration.applicationVertices.size === rows.length + 1 &&
+			registration.applicationCharges.size === rows.length + 1
+			? ObjectFreeze(rows)
+---
+phase-6a-creator-adoption-commit-red.test.ts
+phase-6a-creator-adoption-red.test.ts
+phase-6a-creator-successor-activation-red.test.ts
+phase-6a-creator-successor-epoch-red.test.ts
+phase-6a-creator-successor-handle-identity-red.test.ts
+phase-6a-creator-successor-infrastructure-red.test.ts
+phase-6a-creator-successor-local-author-red.test.ts
+phase-6a-creator-successor-product-red.test.ts
+phase-6b-ahe-reclamation-red.test.ts
+phase-6b-cleanup-eligibility-red.test.ts
+phase-6b-d110c-0a-authority-red.test.ts
+phase-6b-d110c-0a-browser-custody-red.test.ts
+phase-6b-d110c-0b0-floor-red.test.ts
+phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+phase-6b-d110c-0b1-boundaries.test.ts
+phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+phase-6b-d110c-a-repeat-close-red.test.ts
+phase-6b-d110c-b-hot-adoption.test.ts
+phase-6b-differential-exit-red.test.ts
+phase-6b-issuance-retention-red.test.ts
+phase-6b-runtime-reclamation-red.test.ts
+phase-6c-creator-replay-pagination-red.test.ts
+phase-6c-retained-heap-forensics-red.test.ts
+phase-6c-retained-heap-red.test.ts
+---
+examples/v3-chat/dist/index.js
+examples/v3-room/src/index.ts
+---
+9:docs/production-hardening/production-hardening-tdd-plan-v2.md:95479:downstream result as `D110C_0C_FAILED_RECOVERY_FLOOR_MUTATED`; that test-only
+./docs/production-hardening/production-hardening-tdd-plan-v2.md
+./packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+./packages/storage-browser/test-results/phase-6a-creator-successor-2407e-oth-process-death-orderings-chromium/error-context.md
+./.logs/d110c-0c-green-two-order-diagnostic-907a0499/diagnostic-ledger.md
+./.logs/d110c-0c-green-two-order-diagnostic-907a0499/playwright.json
+./.logs/d110c-current-course-fable51-high-20260902/result.md
+53:	const creatorClose = resolve(REPOSITORY_ROOT, "packages/node/src/creator-close.ts");
+63:const closeHandlePlaneIdMapSymbol = Symbol.for("ts-drp/d108e3/close-handle-plane-ids");
+70:    closeBindCount: 0,
+71:    closeBindFailureCount: 0,
+80:    issueThrowCount: 0,
+128:    state.closeBindCount = 0;
+129:    state.closeBindFailureCount = 0;
+138:    state.issueThrowCount = 0;
+263:        closeBindCount: state.closeBindCount,
+264:        closeBindFailureCount: state.closeBindFailureCount,
+282:        issueThrowCount: state.issueThrowCount,
+301:const closeHandlePlaneIds = globalThis[closeHandlePlaneIdMapSymbol] ??
+302:  (globalThis[closeHandlePlaneIdMapSymbol] = new WeakMap());
+340:    } else if (key === "issueLocal") {
+349:            state.issueThrowCount += 1;
+350:            throw new TypeError("D.108e3 injected pending-issue drain failure");
+420:export const republishV3RetainedTo = (handle, targetPeerId) => actual.republishV3RetainedTo(unwrapPlane(handle), targetPeerId);`,
+423:					"@ts-drp/node/creator-close",
+429:    state.closeBindCount += 1;
+432:      state.closeBindFailureCount += 1;
+437:  if (planeId !== undefined && result.ok === true) closeHandlePlaneIds.set(result.handle, planeId);
+446:  const targeted = closeHandlePlaneIds.get(input.handle) === state.targetPlaneId;
+459:  if (closeHandlePlaneIds.get(input.handle) === state.targetPlaneId) state.commitCount += 1;
+468:  if (closeHandlePlaneIds.get(input.handle) === state.targetPlaneId) state.commitCount += 1;
+479:export const publishStagedCreatorSuccessorAdoption = async (input) => {
+484:  return actual.publishStagedCreatorSuccessorAdoption(input);
+514:export const reopenCreatorSuccessorAdoption = async (input) => {
+516:  return actual.reopenCreatorSuccessorAdoption(input);
+519:  const planeId = closeHandlePlaneIds.get(input.handle);
+555:	close(): Promise<void>;
+602:						"@ts-drp/node/creator-close",
+664:		close: async (): Promise<void> =>
+666:				server.close((error) => (error === undefined ? resolvePromise() : reject(error)))
+762:			page?.isClosed() === false ? page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()) : undefined
+765:	await context?.close();
+766:	await Promise.all(servers.map((server) => server.close()));
+771:		"hot creator adoption exposes oracle authority and issues through the replacement handle",
+772:		"established peer cold reopen accepts the genuine epoch-one live operation",
+773:		"fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+778:		"close joins a paused adoption before releasing lifetime ownership",
+782:		"close at the post-activation gate cleans the successor exactly once",
+783:		"close at the post-predecessor-deactivation gate preserves causal cleanup",
+824:	await established.evaluate(() => window.phase6aCreatorSuccessorProduct.close());
+841:	const reopened = await snapshot(established);
+842:	expect(reopened.authority).toEqual(carrier.authority);
+843:	expect(reopened.roomId).toBe(carrier.authority.anchorDigest);
+888:	await creator.evaluate(() => window.phase6aCreatorSuccessorProduct.close());
+937:test("D.110c-0b0 provider crash and classification matrix fails closed", async () => {
+981:	await creator.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+993:async function closeLifetimeCreator(page: Page): Promise<void> {
+995:	await page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+1021:	await selected.page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+1025:	await selected.page.close();
+1062:	await closeLifetimeCreator(successful);
+1068:	await closeLifetimeCreator(failing);
+1077:	const closeBeforeRelease = await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
+1079:	const [adoptionAfterRelease, closeAfterRelease] = await Promise.all([
+1083:	const closeCounts = await counts(closing);
+1084:	await closeLifetimeCreator(closing);
+1096:	await closeLifetimeCreator(deactivation);
+    2610 packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+482:    throw new TypeError("D110C controlled pre-publication process death");
+2327:		throw new TypeError("D110C_0C fixture record is invalid");
+2333:	if (!Array.isArray(value)) throw new TypeError("D110C_0C fixture array is invalid");
+2364:		readonly ordering: "new-ahe" | "old-ahe";
+2382:			reject(new Error(`D110C_0C stage timeout: ${stdout}\n${stderr}`));
+2390:				if (message.kind === "child-error") throw new TypeError(message.message ?? "D110C_0C child failed");
+2394:				if (owned.length < 2) throw new TypeError("D110C_0C browser process forest is empty");
+2411:						`D110C_0C expected staged browser SIGKILL, got ${String(code)}/${String(signal)}: ${stdout}\n${stderr}`
+2420:				else if (Date.now() >= deadline) reject(new Error("D110C_0C browser process forest survived SIGKILL"));
+2450:			reject(new Error(`D110C_0C recovery timeout: ${stdout}\n${stderr}`));
+2460:				reject(new TypeError(message.message ?? "D110C_0C child failed"));
+2467:				reject(new Error(`D110C_0C recovery child failed ${String(code)}/${String(signal)}: ${stdout}\n${stderr}`));
+2475:test("D.110c-0c resumes a genuine epoch-3 pending adoption after both process-death orderings", async ({
+2478:	const token = "D110C_0C_PENDING_EPOCH3_RESUME_MISSING";
+2479:	const postCommitToken = "D110C_0C_EPOCH3_COLD_REOPEN_BLOCKED";
+2487:		for (const ordering of ["old-ahe", "new-ahe"] as const) {
+2519:				...(ordering === "new-ahe" ? ["commit-fault"] : []),
+2554:					if (ordering === "old-ahe") {
+2589:				swapHeadCount: ordering === "old-ahe" ? 1 : 0,
+test("D.110c-0c resumes a genuine epoch-3 pending adoption after both process-death orderings", async ({
+	browserName: _browserName,
+}, testInfo) => {
+	const token = "D110C_0C_PENDING_EPOCH3_RESUME_MISSING";
+	const postCommitToken = "D110C_0C_EPOCH3_COLD_REOPEN_BLOCKED";
+	const server = await startProductBrowserServer(
+		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+	);
+	const child = await buildD110c0cChild();
+	const profiles: string[] = [];
+	const causalEvidence: Array<Readonly<Record<string, unknown>>> = [];
+	try {
+		for (const ordering of ["old-ahe", "new-ahe"] as const) {
+			const name = `d110c-0c-${ordering}`;
+			const profileDirectory = mkdtempSync(join(tmpdir(), `${name}-`));
+			profiles.push(profileDirectory);
+			const staged = await runD110c0cStage(child.path, {
+				name,
+				ordering,
+				profileDirectory,
+				url: server.origin,
+			});
+			const floor = d110c0cRecord(staged.floor);
+			const floorState = d110c0cRecord(floor.state);
+			const stableHead = d110c0cRecord(floorState.stable);
+			const pending = d110c0cRecord(floorState.pending);
+			const nextHead = d110c0cRecord(pending.next);
+			expect(stableHead.epoch).toBe(2);
+			expect(nextHead.epoch).toBe(3);
+			expect(pending.previous).toEqual(stableHead);
+			expect(floor.fault).toBe("none");
+			expect(d110c0cRecord(d110c0cRecord(staged.stable).authority).epoch).toBe(2);
+			expect(d110c0cRecord(d110c0cRecord(staged.after).authority).epoch).toBe(2);
+			expect(d110c0cRecord(staged.stable).projection).toEqual(d110c0cRecord(staged.after).projection);
+			expect(d110c0cRecord(staged.stable).acl).toEqual(d110c0cRecord(staged.after).acl);
+			expect(d110c0cRecord(staged.close)).toMatchObject({ epoch: 2, successorEpoch: 3 });
+			const operations = d110c0cArray(floor.events).map((event) => d110c0cRecord(event).operation);
+			expect(operations).toEqual([
+				"create",
+				"begin",
+				"commit",
+				"begin",
+				"commit",
+				"begin",
+				...(ordering === "new-ahe" ? ["commit-fault"] : []),
+			]);
+			const generations = d110c0cArray(d110c0cRecord(staged.ahe).generations).map(d110c0cRecord);
+			const closure = generations.flatMap((generation) => d110c0cArray(generation.closure).map(d110c0cRecord));
+			expect(closure).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ currentEpoch: 2, kind: "drp-anchor-trust-state" }),
+					expect.objectContaining({ currentEpoch: 3, kind: "drp-anchor-trust-state" }),
+					expect.objectContaining({ epoch: 2, kind: "drp-hard-epoch-cut" }),
+					expect.objectContaining({ epoch: 2, kind: "drp-seal-qc" }),
+					expect.objectContaining({ epoch: 3, kind: "v3-live-generation-2" }),
+				])
+			);
+
+			const recovered = await runD110c0cRecovery(child.path, {
+				name,
+				profileDirectory,
+				url: server.origin,
+			});
+			expect(recovered.floorBefore).toEqual(staged.floor);
+			expect(recovered.aheBefore).toEqual(staged.ahe);
+			expect(d110c0cRecord(recovered.snapshotScope).epoch).toBe(2);
+			const recovery = d110c0cRecord(recovered.recovery);
+			expect(recovery.callCount).toBe(1);
+			const evidenceRow = Object.freeze({ ordering, recovered, staged });
+			causalEvidence.push(evidenceRow);
+			await testInfo.attach(`d110c-0c-causal-evidence-${ordering}`, {
+				body: Buffer.from(JSON.stringify(evidenceRow)),
+				contentType: "application/json",
+			});
+			if (recovered.detail !== "fulfilled") {
+				if (recovery.resultKind === "active-new") {
+					const committed = d110c0cRecord(d110c0cRecord(recovered.floorAfter).state);
+					expect(committed.pending).toBeNull();
+					expect(d110c0cRecord(committed.stable).epoch).toBe(3);
+					if (ordering === "old-ahe") {
+						const beforeAhe = d110c0cRecord(recovered.aheBefore);
+						const afterAhe = d110c0cRecord(recovered.aheAfter);
+						const beforeHead = d110c0cRecord(beforeAhe.activeHead);
+						const afterHead = d110c0cRecord(afterAhe.activeHead);
+						expect(afterHead.revision).toBe(Number(beforeHead.revision) + 1);
+						const expectedGenerations = d110c0cArray(beforeAhe.generations).map((entry) => {
+							const generation = d110c0cRecord(entry);
+							return generation.generationId === beforeHead.generationId
+								? { ...generation, state: "Superseded" }
+								: generation.generationId === afterHead.generationId
+									? { ...generation, state: "Adopted" }
+									: generation;
+						});
+						expect(afterAhe).toEqual({ ...beforeAhe, activeHead: afterHead, generations: expectedGenerations });
+					} else {
+						expect(recovered.aheAfter).toEqual(recovered.aheBefore);
+					}
+					expect.soft(recovered.detail, postCommitToken).toBe("fulfilled");
+					continue;
+				}
+				expect(recovered.detail).toBe("D110C_FLOOR_RECOVERY_UNAVAILABLE");
+				expect(recovery).toEqual({ callCount: 1, resultKind: "pending-missing", swapHeadCount: 0 });
+				expect(recovered.floorAfter).toEqual(recovered.floorBefore);
+				expect(recovered.aheAfter).toEqual(recovered.aheBefore);
+				expect(recovered.reopened).toBeNull();
+				expect.soft(recovered.detail, token).toBe("fulfilled");
+				continue;
+			}
+			const committed = d110c0cRecord(d110c0cRecord(recovered.floorAfter).state);
+			expect(committed.pending).toBeNull();
+			expect(d110c0cRecord(committed.stable).epoch).toBe(3);
+			expect(recovery).toEqual({
+				callCount: 1,
+				resultKind: "active-new",
+				swapHeadCount: ordering === "old-ahe" ? 1 : 0,
+			});
+			const reopened = d110c0cRecord(recovered.reopened);
+			expect(d110c0cRecord(reopened.authority).epoch).toBe(3);
+			const accepted = d110c0cArray(d110c0cRecord(reopened.projection).accepted).map(d110c0cRecord);
+			expect(accepted.map(({ text }) => text)).toEqual([
+				"d110c-0c-epoch-zero",
+				"d110c-0c-epoch-one",
+				"d110c-0c-epoch-two",
+				"d110c-0c-post-restart",
+			]);
+		}
+		await testInfo.attach("d110c-0c-causal-evidence", {
+			body: Buffer.from(JSON.stringify(causalEvidence)),
+			contentType: "application/json",
+		});
+	} finally {
+		for (const profile of profiles) rmSync(profile, { force: true, recursive: true });
+		rmSync(child.directory, { force: true, recursive: true });
+		await server.close();
+	}
+});
+      70 packages/node/src/internal/creator-adoption-recover.ts
+      61 packages/node/src/internal/creator-adoption-stage.ts
+     242 packages/node/src/internal/creator-adoption-intent.ts
+     373 total
+4515:function authenticatedPinnedGenesisOutboxRow(
+4595:					authenticatedPinnedGenesisOutboxRow(row, issuanceScope, filterPayload, pinnedGenesisAnchorDigest);
+---
+function authenticatedPinnedGenesisOutboxRow(
+	row: SnapshottedOutboxRow,
+	issuanceScope: DurableIssueScope,
+	filterPayload: PreparedV3LivePayload,
+	pinnedGenesisAnchorDigest: string
+): boolean {
+	try {
+		if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") return false;
+		const suiteId = V3_VERTEX_SUITE_ID;
+		const extracted = extractAdmittedReceivedVertex({
+			domain: V3_VERTEX_DOMAIN,
+			expectedAnchor: pinnedGenesisAnchorDigest,
+			preparedBlueprintAdmission: filterPayload.admission,
+			receivedCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			resolveAuthorPublicKey: (author) => {
+				const bytes = author === issuanceScope.author ? publicKeyBytes(author) : undefined;
+				return bytes === undefined ? undefined : ObjectFreeze({ bytes, format: "raw" as const });
+			},
+			signature: row.signature,
+			suiteId,
+		});
+		return (
+			extracted.ok &&
+			extracted.vertex.anchor === pinnedGenesisAnchorDigest &&
+			extracted.vertex.epoch === 0 &&
+			extracted.vertex.objectId === issuanceScope.objectId &&
+			extracted.vertex.author === issuanceScope.author &&
+			extracted.vertex.authorSequence === row.authorSequence &&
+			lowerHexDigest(extracted.vertex.digest) === lowerHexDigest(row.digest)
+		);
+	} catch {
+		return false;
+	}
+}
+packages/node/src/internal/closed-epoch-cleanup.ts:442:export function planClosedEpochCleanup(input: unknown): ClosedEpochCleanupPlanningResult {
+packages/node/src/v3-live.ts:360:	readRebaseOutbox(): Promise<V3RebaseOutboxResult>;
+packages/node/src/v3-live.ts:364:	publishPending(): Promise<V3EgressResult>;
+packages/node/src/v3-live.ts:4550:function creatorFilteredIssuanceStore(
+packages/node/src/v3-live.ts:4566:		readOutboxPage: async (input?: DurableOutboxPageInput) => {
+packages/node/src/v3-live.ts:4569:				const page = await issuanceStore.readOutboxPage({
+packages/node/src/v3-live.ts:5034:				rawPage = await issuance.readOutboxPage(
+packages/node/src/v3-live.ts:6002:async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3RebaseOutboxResult> {
+packages/node/src/v3-live.ts:6025:				rawPage = await selectedStore.readOutboxPage(
+packages/node/src/v3-live.ts:6151:async function publishPending(
+packages/node/src/v3-live.ts:6176:			rawPage = await registration.issuanceStore.readOutboxPage(
+packages/node/src/v3-live.ts:6304:		return await publishPending(registration, row);
+packages/node/src/v3-live.ts:6315:				const result = await publishPending(registration);
+packages/node/src/v3-live.ts:6323:	return enqueueRegistrationTask(registration, () => () => publishPending(registration));
+packages/node/src/v3-live.ts:7081:		readRebaseOutbox: (): Promise<V3RebaseOutboxResult> =>
+packages/node/src/v3-live.ts:7086:				: enqueueRegistrationTask(registration, () => () => readRebaseOutbox(registration)),
+packages/node/src/v3-live.ts:7095:		publishPending: (): Promise<V3EgressResult> =>
+packages/node/src/v3-live.ts:7377:		const predecessorIssuanceStore = creatorFilteredIssuanceStore(
+packages/node/src/v3-live.ts:7413:					? creatorFilteredIssuanceStore(
+packages/node/src/v3-live.ts:7422:				: creatorFilteredIssuanceStore(
+ .../audit.json                                     |  13 ++
+ .../d110c-0c1-architecture-audit-d6f5de26/audit.md | 120 +++++++++++
+ .../commands.txt                                   |   5 +
+ .../manifest.sha256                                |   4 +
+ .../source-hashes.sha256                           |   9 +
+ .../production-hardening-tdd-plan-v2.md            | 220 +++++++++++++++++++--
+ 6 files changed, 355 insertions(+), 16 deletions(-)
+@@ -95499,8 +95499,9 @@ RED-to-GREEN closure and is prohibited.
+@@ -95527,7 +95528,7 @@ chain, manufacture displaced authority, mark an unpublished row published,
+@@ -95537,13 +95538,13 @@ Before production edits, the bounded architecture decision compares exactly:
+@@ -95596,8 +95597,9 @@ durable commit and the separate post-commit seam; they are explicitly not a
+@@ -95658,17 +95660,203 @@ self-excluding manifest SHA-256 is
+9:	reopenCreatorSuccessorAdoption,
+13:	publishStagedCreatorSuccessorAdoption,
+17:	bindCreatorLiveClose,
+28:	republishV3RetainedTo,
+134:						publishTerminal(
+268:	| Readonly<{ readonly kind: "reopen" }>;
+340:	close(): void;
+348:	setRetainedPublisher(publisher: (targetPeerId?: string) => Promise<void>): void;
+400:	close(): Promise<void>;
+872:	if (createOrReopen?.kind === "create" || createOrReopen?.kind === "reopen") {
+925:			initialization.kind === "reopen" ? "D110C_FLOOR_MIGRATION_REQUIRED" : "D110C_FLOOR_CONFLICT"
+980:	const reopened = await readRoomHeadAuthority(authority, scope);
+981:	if (!sameRoomHeadState(reopened, desired)) return roomHeadFailure("D110C_FLOOR_MISMATCH");
+982:	return reopened;
+1424:		publishMessage: (): Promise<true> => Promise.resolve(true),
+1441:		close(): void {
+1455:			// The genuine live plane still installs its local publisher.
+1723:			await Promise.allSettled([aheStore.close(), openedIssuanceStore?.close()]);
+1746:		await Promise.allSettled([issuanceStore.close(), journalStore.close(), ...aheStores.map((store) => store.close())]);
+1875:		await Promise.all([issuanceStore.close(), journalStore.close(), ...aheStores.map((store) => store.close())]);
+1884:	let bindCurrentCreatorClose: ((plane: RoomPlaneHandle) => ReturnType<typeof bindCreatorLiveClose>) | undefined;
+1950:				transport?.close();
+1956:				issuanceStore.close(),
+1957:				journalStore.close(),
+1958:				...aheStores.map((store) => store.close()),
+2054:					await session.close().catch(() => undefined);
+2065:					await session.close().catch(() => undefined);
+2211:			const reopened = await reopenCreatorSuccessorAdoption({
+2230:			if (reopened.ok !== true) {
+2231:				throw new TypeError(`v3 room successor reopen failed: ${String(reopened.kind)}: ${String(reopened.detail)}`);
+38:		if (path.endsWith("maintenance.ts")) return !source.includes("prunePublishedPrefix");
+135:				const receipt = await maintenance.prunePublishedPrefix(input);
+160:				const replay = await maintenance.prunePublishedPrefix(input);
+178:		"keeps a valid pending prefix non-poisoning and a newer pending suffix outside the selected range",
+185:				const pendingError = await capture(maintenance.prunePublishedPrefix(d109bPruningInput(stateBefore, 8, 1)));
+186:				expect(d109bErrorCode(pendingError)).toBe("ISSUANCE_RETRY_REQUIRED");
+188:				const wrongEpoch = await capture(maintenance.prunePublishedPrefix(d109bPruningInput(stateBefore, 7, 0)));
+211:			expect(d109bErrorCode(await capture(maintenance.prunePublishedPrefix(accessorInput)))).toBe(
+227:			const pruning = maintenance.prunePublishedPrefix(mutableInput);
+254:				d109bErrorCode(await capture(first.maintenance.prunePublishedPrefix(d109bPruningInput(staleLineage, 12, 0))))
+266:			await second.maintenance.prunePublishedPrefix(d109bPruningInput(staleWatermark, 13, 0));
+268:				d109bErrorCode(await capture(second.maintenance.prunePublishedPrefix(d109bPruningInput(staleWatermark, 13, 1))))
+282:			await maintenance.prunePublishedPrefix(d109bPruningInput(first, 14, 1));
+287:			const receipt = await maintenance.prunePublishedPrefix(d109bPruningInput(second, 15, 3));
+336:				const receipt = await maintenance.prunePublishedPrefix(d109bPruningInput(before, 11, count - 1));
+					"@ts-drp/node/creator-adoption-commit",
+					`${shared}
+import * as actual from ${JSON.stringify(creatorAdoptionCommit)};
+export const commitCreatorSuccessorAdoption = async (input) => {
+  if (closeHandlePlaneIds.get(input.handle) === state.targetPlaneId) state.commitCount += 1;
+  return actual.commitCreatorSuccessorAdoption(input);
+};`,
+				],
+				[
+					"@ts-drp/node/creator-adoption-stage",
+					`${shared}
+import * as actual from ${JSON.stringify(creatorAdoptionStage)};
+export const stageCreatorSuccessorAdoption = async (input) => {
+  if (closeHandlePlaneIds.get(input.handle) === state.targetPlaneId) state.commitCount += 1;
+  const result = await actual.stageCreatorSuccessorAdoption(input);
+  if (state.mutateStagedDescriptor && result.ok === true) {
+    state.mutateStagedDescriptor = false;
+    return Object.freeze({
+      ...result,
+      descriptor: Object.freeze({ ...result.descriptor, epoch: Number(result.descriptor.epoch) + 1 }),
+    });
+  }
+  return result;
+};
+export const publishStagedCreatorSuccessorAdoption = async (input) => {
+  if (state.failBeforePublication) {
+    state.failBeforePublication = false;
+    throw new TypeError("D110C controlled pre-publication process death");
+  }
+  return actual.publishStagedCreatorSuccessorAdoption(input);
+};`,
+				],
+				[
+					"@ts-drp/node/creator-adoption-recover",
+					`${shared}
+import * as actual from ${JSON.stringify(creatorAdoptionRecover)};
+export const recoverPendingCreatorSuccessorAdoption = async (input) => {
+  state.d110c0cRecoveryCallCount += 1;
+  const store = new Proxy(input.store, {
+    get(target, key) {
+      if (key === "swapHead") {
+        return (...args) => {
+          state.d110c0cRecoverySwapHeadCount += 1;
+          return Reflect.apply(target.swapHead, target, args);
+        };
+      }
+826:const creatorSuccessorRecovery = new WeakMap<
+4669:		const successorRecovery = creatorSuccessorRecovery.get(input.capability as object);
+4670:		if (successorRecovery !== undefined) creatorSuccessorRecovery.delete(input.capability as object);
+7401:		creatorSuccessorRecovery.set(
+377:	readonly issuanceStore: DurableIssuanceStore;
+660:			readonly issuanceStore: DurableIssuanceStore;
+667:			readonly issuanceStore: DurableIssuanceStore;
+678:			readonly issuanceStore: DurableIssuanceStore;
+686:			readonly issuanceStore: DurableIssuanceStore;
+697:				readonly issuanceStore: DurableIssuanceStore;
+702:			readonly issuanceStore: DurableIssuanceStore;
+713:				readonly issuanceStore: DurableIssuanceStore;
+718:			readonly issuanceStore: DurableIssuanceStore;
+830:		readonly issuanceStore: DurableIssuanceStore;
+2532:	readonly issuanceStore: DurableIssuanceStore;
+4128:	readonly issuanceStore: DurableIssuanceStore;
+4551:	issuanceStore: DurableIssuanceStore,
+4775:					issuanceStore: crossSource.issuanceStore as DurableIssuanceStore,
+4788:					issuanceStore: successorRecovery.issuanceStore,
+5337:				issuanceStore: issuance,
+5990:	issuanceStore: DurableIssuanceStore = registration.issuanceStore,
+7020:		issuanceStore: registration.issuanceStore,
+7283:				issuanceStore: boundIssuanceStore,
+7392:			issuanceStore: predecessorIssuanceStore,
+7405:				issuanceStore: material.issuanceStore,
+7436:			issuanceStore: successorIssuanceStore,

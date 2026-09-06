@@ -1,0 +1,28 @@
+{
+  "signedPlan": "5f6fb6c0e708dc31848931f06677e116659400e5",
+  "unchangedTestsCommit": "ba15bb894d324bb8d8a0d8a7da3f3e61042a0283",
+  "unchangedTestSha256": "66c26d38e25ed8bc3c765faab58a0167ca289efb4d97f438eac695c5af93e2a1",
+  "authorizedOnlyCommandDelta": {
+    "added": "--reporter=default",
+    "preserved": [
+      "--reporter=json",
+      "--outputFile=<fresh-root>/focused.json",
+      "unfiltered exact13",
+      "11pass/2fail",
+      "8observations/5forbidden/3controls"
+    ]
+  },
+  "sourceTestsConfigDependenciesUnchanged": true,
+  "stoppedRootsPreserved": [
+    ".logs/d110c-0c1f5b-red-room-guard-da874b52/",
+    ".logs/d110c-0c1f5b-red-room-guard-ba15bb89/"
+  ],
+  "typeDebt": {
+    "target": 0,
+    "external": 41,
+    "baseline": "61a793d38a9fa1eafd9639aa41de2335f9891695",
+    "owner": "Existing creator-adoption and successor-product fixture static-contract owners",
+    "deadline": "Parent static closure",
+    "notTypecheckPass": true
+  }
+}

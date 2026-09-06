@@ -1,0 +1,31 @@
+{
+	"evidence_form": "normalized_summary_from_terminal_result",
+	"verdict": "FAIL",
+	"p0_count": 0,
+	"p1_count": 2,
+	"p2_count": 1,
+	"findings": [
+		{
+			"severity": "P1",
+			"title": "The proposed store law incorrectly assumes linked and completed-progress entries are already immutable",
+			"evidence": "The plan states that retained linked or progress-bearing entries remain immutable under existing stricter laws. In contract.ts, only an entry with replacementProgress present and replacementSequence null is fully frozen. A legacy linked entry with no progress, or a completed progress entry with a non-null replacementSequence, falls through and can be retained while its disposition, replacementSequence, or completed progress changes.",
+			"required_action": "Extend the f5b0w transition matrix before RED: for retained legacy-linked and completed-progress entries, reject disposition, replacementSequence, sourceDigest, and replacementProgress mutation. Preserve removal only for normal authenticated plan re-derivation."
+		},
+		{
+			"severity": "P1",
+			"title": "The prerequisite's completion criteria are circular with the parent successor codec it gates",
+			"evidence": "The plan blocks parent f5b production GREEN until f5b0w is GREEN, but f5b0w required genuine settlement close/adopt and revoke/close/adopt/grant/close/adopt. The accepted parent RED establishes that genuine settlement close currently stops at F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED.",
+			"required_action": "Close f5b0w before parent GREEN by proving that a creator-held sealEpoch reaches the unchanged creator-close owner promptly, preserves the held plan, and then encounters the accepted parent codec terminus. Keep successful close/adopt and removal/re-admission as mandatory parent f5b retained tests."
+		},
+		{
+			"severity": "P2",
+			"title": "Migration hold refusal lacks an exact observable contract",
+			"evidence": "Public issue had an exact TypeError and side-effect contract, while migration named neither the rejecting public call nor exact durable cleanup state.",
+			"required_action": "Freeze exact migration rehearsal, activation, standalone rebase-target and internal redirect observations."
+		}
+	],
+	"red_reachable_before_parent_green": true,
+	"scope_preserved": true,
+	"golden_path_fit": "The hold-state and prompt-refusal slice is the right narrow prerequisite and can obtain causal RED from the existing genuine f5b0u rebase path without the missing successor codec. It needed the bounded sequencing and store-law corrections above.",
+	"assessment": "No new public room API, wire/schema/crypto/dependency, threshold, or authority carrier is authorized, and the future per-source resolver is honestly deferred."
+}

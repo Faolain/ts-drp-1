@@ -1,0 +1,8 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-0c1f5b-snapshot-fixture-red-03acb4ac/validate-runtime-corrected.mjs"
+  ],
+  "start": "2026-09-06T08:22:59.282Z"
+}

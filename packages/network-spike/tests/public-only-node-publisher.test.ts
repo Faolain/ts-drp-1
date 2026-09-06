@@ -1,6 +1,7 @@
 import type { DRPNetworkHostFactory } from "@ts-drp/network";
 import { DRPNetworkNode } from "@ts-drp/network";
 import { DRPNode } from "@ts-drp/node";
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
 	Libp2pRelayClient,
@@ -152,7 +153,11 @@ it("proves one real DRP identity owns local Amino publication, a real relay list
 			},
 			node: {
 				createGrid: async (objectId): Promise<void> => {
-					await drp.createObject({ drp: new PublisherGrid(), id: objectId });
+					await drp.createObject({
+						acl: createPermissionlessACL(),
+						drp: new PublisherGrid(),
+						id: objectId,
+					});
 				},
 				get peerId(): string {
 					return network.peerId;

@@ -1,0 +1,7 @@
+{
+  "numericOnly": true,
+  "noArgvOrComm": true,
+  "candidates": [],
+  "taskCompetitors": 0,
+  "unrelatedProcessesDoNotBlock": true
+}

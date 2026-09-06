@@ -1,0 +1,93 @@
+name: Compaction epoch byte capacity freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  compaction-epoch-byte-capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Freeze provenance
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node packages/compaction/conformance/epoch-capacity-v1/check-freeze.mjs "$BASE_SHA"
+          if git cat-file -e "$BASE_SHA:packages/compaction/conformance/epoch-byte-capacity-v1/check-freeze.mjs" 2>/dev/null; then
+            git show "$BASE_SHA:packages/compaction/conformance/epoch-byte-capacity-v1/check-freeze.mjs" > "$RUNNER_TEMP/compaction-epoch-byte-capacity-base-check-freeze.mjs"
+            COMPACTION_EPOCH_BYTE_CAPACITY_REPOSITORY_ROOT="$GITHUB_WORKSPACE" node "$RUNNER_TEMP/compaction-epoch-byte-capacity-base-check-freeze.mjs" "$BASE_SHA"
+          fi
+          node packages/compaction/conformance/epoch-byte-capacity-v1/check-freeze.mjs "$BASE_SHA"
+      - name: Controlled and production byte-capacity contract serially
+        run: |
+          PHASE_0P3_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p3-v3/controlled-epoch-byte-capacity.ts pnpm exec vitest run tests/compaction-epoch-byte-capacity-0p3.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/compaction-epoch-byte-capacity-0p3.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Kill every controlled surgical mutant
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from "node:child_process";
+          import { readFileSync } from "node:fs";
+
+          const contract = JSON.parse(
+            readFileSync("tests/fixtures/phase-0p3-v3/epoch-byte-capacity-contract.json", "utf8")
+          );
+          for (const mutant of contract.mutants) {
+            const expectedRow = contract.mutantRows[mutant];
+            const result = spawnSync(
+              "pnpm",
+              [
+                "exec",
+                "vitest",
+                "run",
+                "tests/compaction-epoch-byte-capacity-0p3.test.ts",
+                "--no-coverage",
+                "--maxWorkers=1",
+                "--minWorkers=1",
+              ],
+              {
+                encoding: "utf8",
+                env: {
+                  ...process.env,
+                  PHASE_0P3_IMPLEMENTATION_MODULE:
+                    "tests/fixtures/phase-0p3-v3/controlled-epoch-byte-capacity.ts",
+                  PHASE_0P3_MUTANT: mutant,
+                },
+                maxBuffer: 16 * 1024 * 1024,
+              }
+            );
+            const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+            process.stdout.write(output);
+            const failureLines = output.split(/\r?\n/u).filter((line) => line.startsWith(" FAIL  "));
+            if (
+              result.status !== 1 ||
+              !output.includes("Tests  1 failed | 17 passed (18)") ||
+              failureLines.length !== 1 ||
+              !failureLines[0].includes(`> ${expectedRow} `)
+            ) {
+              throw new Error(`mutant failure title mismatch: ${mutant} expected ${expectedRow}`);
+            }
+          }
+          NODE
+      - name: Preserve predecessor capacity contracts serially
+        run: |
+          pnpm exec vitest run tests/compaction-epoch-capacity-0p1.test.ts packages/compaction/tests/causality-append-0e.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Audit public types
+        run: |
+          pnpm --filter @ts-drp/compaction build
+          pnpm exec tsc -p tests/fixtures/phase-0p1-v3/tsconfig.public-entry-audit.json
+          pnpm exec tsc -p tests/fixtures/phase-0p1-v3/tsconfig.built-package-audit.json
+          pnpm exec tsc -p tests/fixtures/phase-0p3-v3/tsconfig.public-entry-audit.json
+          pnpm exec tsc -p tests/fixtures/phase-0p3-v3/tsconfig.built-package-audit.json

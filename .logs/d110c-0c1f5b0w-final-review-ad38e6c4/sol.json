@@ -1,0 +1,18 @@
+{
+	"verdict": "PASS",
+	"p0_count": 0,
+	"p1_count": 0,
+	"p2_count": 1,
+	"findings": [
+		{
+			"severity": "P2",
+			"title": "Manual-review redirect cause is identified only by error text",
+			"evidence": "examples/v3-room/src/index.ts permits the application onAcceptedVertex callback to throw, stores any such error in terminalFailure, and classifies any TypeError whose message equals the manual-review message as the target-hold cause. A non-hold callback throwing that same TypeError can therefore bypass the existing generic migration-activation failure mapping even though no durable target hold caused it.",
+			"required_action": "Parent f5b room-lifecycle owner: before parent closure, replace message-only provenance with a private non-exported brand or equivalent internal marker set only by the target-hold path, preserve the exact public TypeError message, and add a retained non-hold collision test. No public API is needed."
+		}
+	],
+	"blocking_union_empty": true,
+	"red_causal": true,
+	"scope_preserved": true,
+	"golden_path_fit": "The signed RED is causal and the rejected runs remain explicitly excluded. GREEN establishes a durable prompt fail-closed hold, preserves creator-close and orderly-reopen behavior, freezes retained store identity/link/progress, and leaves parent codec/frontier, close-adopt, 64-writer, and long-horizon work correctly unclaimed."
+}

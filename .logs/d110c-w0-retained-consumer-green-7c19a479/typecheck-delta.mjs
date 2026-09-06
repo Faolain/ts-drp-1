@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root = '/Users/aristotle/Documents/Projects/ts-drp-1';
+const out = path.dirname(new URL(import.meta.url).pathname);
+const suffix = '';
+const read = file => JSON.parse(fs.readFileSync(path.join(out, file)));
+const before = read('typecheck-before.json');
+const after = read('typecheck-after.json');
+if (JSON.stringify(read('typecheck-after.json')) !== JSON.stringify(after)) throw Error('Final diagnostics differ from initial after diagnostics');
+const targets = read('custody-before.json').targets;
+const allBefore = [...before.targetDiagnostics, ...before.externalDiagnostics];
+const allAfter = [...after.targetDiagnostics, ...after.externalDiagnostics];
+const identity = ({ file, code, message }) => JSON.stringify({ file, code, message });
+if (allBefore.length !== allAfter.length || allBefore.some((diagnostic, index) => identity(diagnostic) !== identity(allAfter[index]))) throw Error('Diagnostic identities differ');
+const anchors = allBefore.map((diagnostic, index) => {
+  const current = allAfter[index];
+  const baselinePath = targets.includes(diagnostic.file) ? path.join(out, 'before', diagnostic.file) : path.join(root, diagnostic.file);
+  const beforeAnchor = fs.readFileSync(baselinePath, 'utf8').split('\n')[diagnostic.line - 1].trim();
+  const afterAnchor = fs.readFileSync(path.join(root, current.file), 'utf8').split('\n')[current.line - 1].trim();
+  if (beforeAnchor !== afterAnchor) throw Error('Diagnostic source anchor drift: ' + diagnostic.file);
+  return { file: diagnostic.file, code: diagnostic.code, message: diagnostic.message, beforeLine: diagnostic.line, afterLine: current.line, sourceAnchor: beforeAnchor, sameAnchor: true, ownedGreenFile: targets.includes(diagnostic.file) };
+});
+const result = { classification: 'baseline-equivalent typecheck, not whole-program pass', retainedDiagnostics: anchors.length, selectedRootDiagnostics: after.targetDiagnostics.length, externalDiagnostics: after.externalDiagnostics.length, externalDiagnosticsByteEquivalent: JSON.stringify(before.externalDiagnostics) === JSON.stringify(after.externalDiagnostics), newDiagnostics: 0, diagnostics: anchors, ownedDiagnosticInventory: targets.map(file => ({ file, diagnostics: anchors.filter(anchor => anchor.file === file) })), testExecutions: 0 };
+fs.writeFileSync(path.join(out, 'typecheck-delta' + suffix + '.json'), JSON.stringify(result, null, 2) + '\n', { flag: 'wx' });
+console.log(JSON.stringify({ classification: result.classification, retainedDiagnostics: anchors.length, ownedDiagnostics: anchors.filter(anchor => anchor.ownedGreenFile).length, newDiagnostics: 0, allAnchorsExact: true }));

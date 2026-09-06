@@ -1,0 +1,20 @@
+diff --git a/tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts b/tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts
+index 8c08c23d..2554bc5a 100644
+--- a/tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts
++++ b/tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts
+@@ -308,14 +308,13 @@ describe("D.110c-0c1f5b0b Node settlement RED", () => {
+ 			ok: true,
+ 			source: {
+ 				authorSequence: 0,
+-				publishState: "published",
+ 				vertexDigest: result.sourceBootstrapDigest,
+ 			},
+ 		});
+ 		expect(result.rebaseOutboxes[1]).toMatchObject({
+ 			kind: "displaced",
+ 			ok: true,
+-			source: { authorSequence: 1, publishState: "published", vertexDigest: result.sourceDigest },
++			source: { authorSequence: 1, vertexDigest: result.sourceDigest },
+ 		});
+ 	});
+ 

@@ -1,0 +1,23 @@
+{
+  "numericOnly": true,
+  "noArgvOrComm": true,
+  "candidates": [
+    {
+      "pid": 7117,
+      "status": "7117  7074 S",
+      "taskRelevantCwd": false
+    },
+    {
+      "pid": 7120,
+      "status": "7120  7117 S",
+      "taskRelevantCwd": false
+    },
+    {
+      "pid": 19010,
+      "status": "19010  7120 S",
+      "taskRelevantCwd": false
+    }
+  ],
+  "taskCompetitors": 0,
+  "unrelatedProcessesDoNotBlock": true
+}

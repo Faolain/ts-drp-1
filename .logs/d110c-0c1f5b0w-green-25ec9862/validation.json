@@ -1,0 +1,162 @@
+{
+  "disposition": "GREEN_WITH_EXACT_RETAINED_BASELINE_DEBT",
+  "checks": {
+    "focused": true,
+    "frozenSelection": true,
+    "isolatedFocused": true,
+    "retainedMatrix": true,
+    "exactBaselineDebt": true,
+    "retainedCounts": true,
+    "v1": true,
+    "sourceIdentity": true,
+    "patchIdentity": true,
+    "unrelatedIsolation": true,
+    "cleanIsolationAnchor": true,
+    "custody": true,
+    "sourceShape": true,
+    "typeDeltas": true,
+    "noRuntimeErrors": true,
+    "finalGates": true
+  },
+  "sourceHashes": {
+    "examples/v3-room/src/index.ts": "e75a9edac9a8d13d4fdb9062003fde84b03d5120d3b18416af8fc9395b39e028",
+    "packages/issuance-store/src/contract.ts": "2e2d160f7e59d643d01fb4d10e321c573ace252bef43040156ff26d92e837042"
+  },
+  "counts": {
+    "focused": {
+      "total": 219,
+      "passed": 219,
+      "failed": 0,
+      "skipped": 0,
+      "runtimeErrors": 0
+    },
+    "isolatedFocused": {
+      "total": 219,
+      "passed": 219,
+      "failed": 0,
+      "skipped": 0,
+      "runtimeErrors": 0
+    },
+    "retained": {
+      "total": 136,
+      "passed": 118,
+      "failed": 18,
+      "skipped": 0,
+      "runtimeErrors": 0
+    },
+    "isolatedRetained": {
+      "total": 136,
+      "passed": 118,
+      "failed": 18,
+      "skipped": 0,
+      "runtimeErrors": 0
+    },
+    "retainedV1": {
+      "total": 2,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 1,
+      "runtimeErrors": 0
+    },
+    "isolatedV1": {
+      "total": 2,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 1,
+      "runtimeErrors": 0
+    }
+  },
+  "finalGates": [
+    "affected-builds",
+    "final-build",
+    "build-issuance",
+    "typecheck-issuance",
+    "typecheck-room-final",
+    "lint-final",
+    "format-final",
+    "diff",
+    "typecheck-deltas",
+    "isolated-install",
+    "isolated-complete-build",
+    "isolated-candidate-build",
+    "isolated-typechecks",
+    "isolated-lint",
+    "isolated-format",
+    "isolated-diff",
+    "isolated-runtime-identity-esm"
+  ],
+  "statuses": {
+    "affected-builds": 0,
+    "build-issuance": 0,
+    "diff": 0,
+    "final-build": 0,
+    "focused-final": 0,
+    "focused-verified": 0,
+    "format-final": 0,
+    "format": 0,
+    "isolated-baseline-build": 0,
+    "isolated-baseline-rebase-complete": 1,
+    "isolated-baseline-rebase": 1,
+    "isolated-candidate-build": 0,
+    "isolated-checkout": 0,
+    "isolated-complete-build": 0,
+    "isolated-diff": 0,
+    "isolated-focused": 0,
+    "isolated-format": 0,
+    "isolated-install": 0,
+    "isolated-lint": 0,
+    "isolated-retained": 1,
+    "isolated-runtime-identity-esm": 0,
+    "isolated-runtime-identity": 1,
+    "isolated-sparse": 0,
+    "isolated-typechecks": 0,
+    "isolated-v1": 0,
+    "isolated-worktree": 0,
+    "iteration-1": 1,
+    "iteration-2": 1,
+    "lint-final": 0,
+    "lint": 0,
+    "production-commit": 0,
+    "production-push": 0,
+    "retained-v1-exact": 0,
+    "retained-v1": 0,
+    "retained": 1,
+    "typecheck-browser": 2,
+    "typecheck-deltas": 0,
+    "typecheck-issuance": 0,
+    "typecheck-node": 2,
+    "typecheck-room-final": 0,
+    "typecheck-room": 2
+  },
+  "isolated": {
+    "path": "/private/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+    "method": "Sparse detached accepted-anchor checkout with exact two-file candidate patch; independent offline frozen-lockfile install and fresh builds. Tracked packages/examples/tests/configs/scripts/patches and root files present; historical .logs/docs/specs excluded. No protected untracked paths copied.",
+    "nodeResolution": {
+      "cwd": "/private/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+      "contract": "/private/tmp/d110c-f5b0w-green-m7UvLk/checkout/packages/issuance-store/dist/src/index.js",
+      "implementation": "/private/tmp/d110c-f5b0w-green-m7UvLk/checkout/packages/issuance-store/dist/src/contract.js",
+      "validator": "function",
+      "sha256": "08a1ae84c129ffe93ee5f67c2dfd7e5c3df5e18c7c4dfb9d0045c6ea60eee7a2"
+    }
+  },
+  "debt": {
+    "rebase": "18 unchanged Phase-3g mock-fixture failures before settlement startup: invalid/truncated canonical genesis parameters. Exact baseline title/status/error comparison passed. No rebaseline or test edits.",
+    "typechecks": {
+      "sourceMapped": 53,
+      "browserNative": 78,
+      "nodeNative": 111,
+      "added": 0
+    },
+    "parent": "Successful settlement close/adopt, successor codec/frontier, cross-close hold custody, authenticated removal/re-admission and long workloads remain unimplemented and unclaimed.",
+    "review": "Separate formal trio owned by root follows signed/pushed GREEN."
+  },
+  "diagnostics": [
+    "Iteration 1: 180 pass / 39 fail; 38 stale compiled browser/node store cases and one exact redirect error wrapper. Rebuilt issuance package.",
+    "Iteration 2: 218 pass / 1 fail; blanket terminal-error preservation changed the old no-hold terminal-rejected outcome. Narrowed preservation to exact manual-review TypeError.",
+    "Initial room typecheck saw callback flow-narrowing TS2358/TS2339. Explicit unknown snapshot of callback-mutated terminalFailure fixes typing without behavior change.",
+    "Initial custody comparator incorrectly treated authorized source edits and rebuilt contract.js as protected; only those three exact paths now excluded. No stash/untracked/unrelated-source change occurred.",
+    "Initial isolated baseline lacked built outcome-commit test dependency; complete fresh package build preceded accepted baseline and final runs.",
+    "Initial v1 name filter selected zero tests; exact title corrected before claiming v1 coverage.",
+    "Initial CommonJS runtime-resolution probe was incompatible with ESM-only exports; corrected ESM import proves isolated runtime identity."
+  ]
+}

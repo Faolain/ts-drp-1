@@ -1,0 +1,385 @@
+commit 7eb2a8dfcec8af9a533b3308b6d1f060f52a90b4
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Sat Sep 5 15:04:39 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Sat Sep 5 15:04:39 2026 -0400
+
+    docs: freeze authorized AHE maintenance discovery prerequisite
+
+diff --git a/.logs/d110c-0c1f5b0z-plan-609ee4ba/audit.json b/.logs/d110c-0c1f5b0z-plan-609ee4ba/audit.json
+new file mode 100644
+index 00000000..0c12df50
+--- /dev/null
++++ b/.logs/d110c-0c1f5b0z-plan-609ee4ba/audit.json
+@@ -0,0 +1,66 @@
++{
++  "head": "609ee4ba24652cc10becc1a07e198a81a01e61ba",
++  "signature": "609ee4ba G docs: accept isolated parent observer correction RED",
++  "branch": "codex/phase3a1b-p6-golden-path",
++  "productionPatchUnchanged": true,
++  "productionPaths": [
++    "examples/v3-room/src/index.ts",
++    "packages/node/src/creator-adoption.ts",
++    "packages/node/src/creator-close.ts",
++    "packages/node/src/internal/creator-transition-advance.ts",
++    "packages/node/src/v3-live.ts",
++    "packages/protocol-v3/src/creator-checkpoint.ts",
++    "packages/protocol-v3/src/creator-close.ts"
++  ],
++  "stashesUnchanged": true,
++  "stashCount": 27,
++  "untrackedNamesHash": "502430a01301382a897cd6d14727989401dac475204b103ef35b40fd323f6014",
++  "sourceHashes": {
++    "packages/storage/src/maintenance.ts": "a328bcec1b9d416614570db83a5c618a4f9e8a59f43cf938f64dae3cb8ca47e2",
++    "packages/storage-browser/src/internal/ahe-reclamation.ts": "fa73cf9dfe30891349b8e6830443bdbcad1679a6f2ae6bdb97d8333e271428d7",
++    "packages/storage-node/src/internal/ahe-reclamation.ts": "5c390dd68295eb6284876133612ce58564c4b6ce2e7a714e7d3a36d2a8dbefa5",
++    "packages/issuance-store/src/maintenance.ts": "636950d28fdb26a95d222ad8c744c5280f0011630f3649e0c1863e4c930c3b05",
++    "packages/storage/src/types.ts": "74590f4cab68a5fce21cca8804d41e77215b164362c67a2ade2036eecd80f6c6",
++    "packages/storage/package.json": "f7d47bd5aa959f98933ed87028d7d11f58f585e7da8b8052bd2a623d83ee0f93",
++    "packages/storage-browser/package.json": "778e423600035d673a89a7bdbe57f377466f0fcd9b3e63f6437a45c525dbdfca",
++    "packages/storage-node/package.json": "1f9622ff045cf8aaf00599f96c4bd751ca98e88a713e02f76cda0e13fa8c5c1f"
++  },
++  "planHash": "0e96f27bb80190c5ee7af48155a7984aab8991bb88d4be1cae301626f57ad5a0",
++  "commands": [
++    {
++      "command": "git",
++      "args": [
++        "-C",
++        "/Users/aristotle/Documents/Projects/ts-drp-1",
++        "diff",
++        "--check"
++      ],
++      "nodeOptions": null,
++      "start": "2026-09-05T19:04:10.658Z",
++      "finish": "2026-09-05T19:04:10.803Z",
++      "status": 0,
++      "signal": null,
++      "stdout": "",
++      "stderr": ""
++    },
++    {
++      "command": "pnpm",
++      "args": [
++        "exec",
++        "prettier",
++        "--check",
++        "docs/production-hardening/production-hardening-tdd-plan-v2.md",
++        ".logs/d110c-0c1f5b0z-plan-609ee4ba/design.md"
++      ],
++      "nodeOptions": "--max-old-space-size=12288",
++      "start": "2026-09-05T19:04:10.803Z",
++      "finish": "2026-09-05T19:04:27.505Z",
++      "status": 0,
++      "signal": null,
++      "stdout": "Checking formatting...\nAll matched files use Prettier code style!\n",
++      "stderr": ""
++    }
++  ],
++  "newProductionEdits": 0,
++  "newTestRuns": 0
++}
+diff --git a/.logs/d110c-0c1f5b0z-plan-609ee4ba/audit.mjs b/.logs/d110c-0c1f5b0z-plan-609ee4ba/audit.mjs
+new file mode 100644
+index 00000000..96da5892
+--- /dev/null
++++ b/.logs/d110c-0c1f5b0z-plan-609ee4ba/audit.mjs
+@@ -0,0 +1,29 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import crypto from 'node:crypto';
++import {execFileSync, spawnSync} from 'node:child_process';
++const root = '/Users/aristotle/Documents/Projects/ts-drp-1';
++const out = path.dirname(new URL(import.meta.url).pathname);
++const plan = 'docs/production-hardening/production-hardening-tdd-plan-v2.md';
++const git = (...args) => execFileSync('git',['-C',root,...args],{encoding:'utf8',maxBuffer:128*1024*1024}).trimEnd();
++const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
++const prior = JSON.parse(fs.readFileSync(path.join(root,'.logs/d110c-0c1f5b-green-57834387/custody-before.json'),'utf8'));
++const paths = git('diff','--name-only','--','packages','examples').split('\n').filter(Boolean);
++if (paths.length !== 7 || git('diff','--',...paths) !== prior.diff || git('stash','list','--format=%H %gd %gs') !== prior.stashes || git('diff','--cached')) throw Error('custody');
++const commands = [];
++for (const [command,args,env] of [
++  ['git',['-C',root,'diff','--check'],process.env],
++  ['pnpm',['exec','prettier','--check',plan,path.relative(root,path.join(out,'design.md'))],{...process.env,NODE_OPTIONS:'--max-old-space-size=12288'}],
++]) {
++  const start = new Date().toISOString();
++  const result = spawnSync(command,args,{cwd:root,env,encoding:'utf8',maxBuffer:16*1024*1024});
++  commands.push({command,args,nodeOptions:env.NODE_OPTIONS??null,start,finish:new Date().toISOString(),status:result.status,signal:result.signal,stdout:result.stdout,stderr:result.stderr});
++}
++const sourcePaths = ['packages/storage/src/maintenance.ts','packages/storage-browser/src/internal/ahe-reclamation.ts','packages/storage-node/src/internal/ahe-reclamation.ts','packages/issuance-store/src/maintenance.ts','packages/storage/src/types.ts','packages/storage/package.json','packages/storage-browser/package.json','packages/storage-node/package.json'];
++const sourceHashes = Object.fromEntries(sourcePaths.map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]));
++const audit = {head:git('rev-parse','HEAD'),signature:git('log','--format=%h %G? %s','-1'),branch:git('branch','--show-current'),productionPatchUnchanged:true,productionPaths:paths,stashesUnchanged:true,stashCount:prior.stashes.split('\n').length,untrackedNamesHash:hash(git('ls-files','--others','--exclude-standard','-z')),sourceHashes,planHash:hash(fs.readFileSync(path.join(root,plan))),commands,newProductionEdits:0,newTestRuns:0};
++fs.writeFileSync(path.join(out,'audit.json'),JSON.stringify(audit,null,2)+'\n',{flag:'wx'});
++if(commands.some(command=>command.status!==0))throw Error('static failure; evidence preserved');
++const entries=fs.readdirSync(out).filter(name=>name!=='manifest.sha256').sort().map(name=>hash(fs.readFileSync(path.join(out,name)))+'  '+name);
++fs.writeFileSync(path.join(out,'manifest.sha256'),entries.join('\n')+'\n',{flag:'wx'});
++console.log(JSON.stringify({head:audit.head,commands:commands.map(x=>({command:x.command,status:x.status})),entries:entries.length,manifest:hash(fs.readFileSync(path.join(out,'manifest.sha256')))},null,2));
+diff --git a/.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md b/.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md
+new file mode 100644
+index 00000000..d3148fcd
+--- /dev/null
++++ b/.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md
+@@ -0,0 +1,175 @@
++# f5b0z: backend-neutral AHE maintenance discovery
++
++Authorized by the user on 2026-09-05. Source anchor:
++`609ee4ba24652cc10becc1a07e198a81a01e61ba` on
++`codex/phase3a1b-p6-golden-path`. This is one prerequisite, not a reopening of
++f5b0d or an authorization for the parent cleanup caller. The seven uncommitted
++parent production files are preserved separately and are not this slice.
++
++## Contract and ownership
++
++Add exactly two exports to the existing `@ts-drp/storage/maintenance` subpath:
++
++```ts
++bindAheReclamationMaintenance(
++  store: AheDurableStore,
++  maintenance: AheReclamationMaintenance,
++): boolean;
++aheReclamationMaintenanceForStore(
++  store: AheDurableStore,
++): AheReclamationMaintenance | undefined;
++```
++
++The binder is trusted backend registration, not authentication of arbitrary
++JavaScript supplied by an adversary. Valid inputs are an ordinary facade and
++its owning existing maintenance object. Resolution is exact object identity;
++copies, proxies and an unregistered memory facade do not inherit a binding.
++The first bind returns true; every subsequent bind for that facade returns
++false, including the same capability. It never replaces the first entry or
++invokes a store/capability method. Do not widen the store interface or root
++exports. The public reclamation inputs, receipts and error-code set are unchanged.
++
++One process-global weak registry uses
++`Symbol.for("@ts-drp/storage/ahe-reclamation-maintenance-v1")`. Its value is a
++frozen ordinary object with exactly own data functions `bind` and `resolve`,
++closing over a WeakMap. Install it as a non-enumerable, non-configurable,
++non-writable own data property on `globalThis`. Inspect an existing property
++by descriptor, without invoking an accessor. Reuse only that compatible
++descriptor and frozen exact function-record shape; a present incompatible
++property throws `TypeError("AHE maintenance registry is incompatible")` at
++module initialization, without overwriting it or falling back to a second map.
++This detects accidental incompatible module/registry state, not hostile local
++code that can forge a compatible implementation. Separate module instances in
++the same global share bindings. Separate workers/globals do not share facade
++identity, and each registers its own stores. Do not change the issuance registry.
++
++The existing browser and SQLite registration functions create their existing
++maintenance object once, bind it neutrally, then install that same object in
++their existing backend-local WeakMap. Failed duplicate binding throws
++`TypeError("AHE maintenance facade is already registered")` before changing
++the local map. Existing backend resolvers remain backend-specific: browser
++must not resolve a SQLite facade and vice versa. These local maps are scoped
++discovery indexes, not additional mutation owners; both paths return the exact
++same backend object, never wrappers or duplicate capabilities.
++
++Only these three production owners may change:
++
++- `packages/storage/src/maintenance.ts`: registry, two exports, type import.
++- `packages/storage-browser/src/internal/ahe-reclamation.ts`: import and registration body.
++- `packages/storage-node/src/internal/ahe-reclamation.ts`: import and registration body.
++
++All existing maintenance implementations, transaction/reclamation predicates,
++schema, backend-specific resolver bodies, and lifecycle methods are untouched.
++No Node/room source, dependency/package manifest, wire, API input key, pruning
++policy, retry classification, threshold or timing contract changes. Importing,
++binding and resolving do not perform I/O or reclaim anything. A discovered
++capability remains subject to its existing closed/poisoned and transactional
++checks. Legacy facades and backend resolver outcomes are unchanged.
++
++## Causal RED and narrow GREEN
++
++One Astra-high agent writes tests only, commits/signs/pushes, then runs the
++single frozen focused RED in an independently installed/source-built checkout.
++A separate Astra-high agent implements GREEN only after RED acceptance. Tests
++live in `tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts` and,
++if required for native ESM/global isolation, bounded helper children under
++`tests/fixtures/phase-6b-d110c-0c1f5b0z/`. No existing retained fixture is changed.
++
++Freeze 16 selected tests in one file, no skips or campaigns:
++
++1. Real browser facade resolves the exact existing backend capability.
++2. Real SQLite facade resolves the exact existing backend capability.
++3. Memory, copied, proxy and foreign facade non-resolution after genuine discovery.
++4. First-bind-wins through both backends; same and different second capability refused.
++5. Duplicate backend registration cannot change either resolver's first capability.
++6. Two freshly built native ESM module instances in one global share exact bindings.
++7. Incompatible preoccupied registry value fails closed in a fresh child.
++8. Preoccupied accessor is not invoked and import fails closed in a fresh child.
++9. Mutable/configurable preoccupied registry descriptor fails closed in a fresh child.
++10. Discovered browser maintenance preserves `AHE_RECLAMATION_STORE_CLOSED`.
++11. Discovered browser maintenance preserves `AHE_RECLAMATION_STORE_POISONED`.
++12. Discovered SQLite maintenance preserves `AHE_RECLAMATION_STORE_CLOSED`.
++13. Discovered SQLite maintenance preserves `AHE_RECLAMATION_STORE_POISONED`.
++14. Registration/discovery preserve facade keys and perform no additional store I/O.
++15. Existing backend resolvers remain backend-specific and reject foreign identities.
++16. Compatibility source custody: store interface, roots, manifests, mutation bodies unchanged.
++
++For cases 1-6 and 10-14, first create a genuine facade, verify its existing
++backend resolver and an ordinary store read work, then compare neutral discovery
++to that existing capability. Import the existing maintenance namespace normally;
++a safe optional lookup may observe no discovery, but cannot substitute the
++backend resolver as GREEN behavior. Failure must be exactly
++`F5B0Z_NEUTRAL_MAINTENANCE_DISCOVERY_REQUIRED`, after those genuine premises,
++not an import/export error, `typeof` assertion, or undefined-function call.
++Cases 7-9 fail with `F5B0Z_INCOMPATIBLE_REGISTRY_REFUSAL_REQUIRED` because the
++existing module succeeds without refusing the incompatible slot. Their GREEN
++continuations require the exact TypeError above, unchanged descriptor and no
++accessor invocation. Cases 15-16 are retained compatibility controls and pass
++in RED. Expected RED: 16 total, 14 exact failures (11 discovery, 3 registry
++refusal), 2 passes, zero filtered/skipped/top-level errors. Stop on any other
++matrix. Do not rerun to obtain the expected result.
++
++The RED owner must substantiate case 14's no-I/O observation without counting
++ordinary facade creation/schema setup as discovery I/O. Capture the already
++open store and observe registration/resolution separately; preserve the exact
++existing construction/registration boundary by source custody. No mocked
++maintenance may replace the real backend in positive identity/lifecycle cases.
++Corruption/poison controls use existing deterministic substrate-fault patterns,
++not product instrumentation. Native module duplication and incompatible globals
++run only in fresh bounded children, never poison the parent test runner.
++
++GREEN changes only the three owners. All 16 tests must pass; post-discovery
++continuations, including duplicate bind/registration and lifecycle refusal,
++must actually execute. Read-only source-custody checks prove the existing
++mutation bodies and legacy facade exports are byte-identical. A regex mistake
++is a diagnostic error to correct and record, not a product failure.
++
++## Gates and review
++
++Plan: sign/push this bounded design and plan update, then Grok 4.6/high,
++Codex gpt-5.6-sol high, Fable 5.1 xhigh via claude-phel. A new capability export
++adjacent to destructive maintenance requires this plan gate: it checks exact
++identity, duplicate registration, module compatibility and no authority expansion.
++Only P0/P1 block; P2 receive owner/disposition, no recursive prose review.
++At most one material confirmation if executable scope/acceptance changes.
++Preserve and resume Grok's exact session if canceled; never replace NO_VERDICT
++with approval. The earlier Fable-high consultation is input, not this gate.
++
++RED: one isolated focused execution, exact matrix/error/status/hash validation,
++signed/pushed evidence. No separate three-model RED round. Final GREEN review
++must inspect signed causal RED and all GREEN evidence.
++
++GREEN focused command:
++`pnpm exec vitest run tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts --reporter=json`
++with complete raw stdout/stderr, reporter, statuses and selected-test listing.
++Use `pnpm build:packages` before children; typecheck each of `@ts-drp/storage`,
++`@ts-drp/storage-browser`, `@ts-drp/storage-node`, plus the new test/fixtures
++through the existing source-mapped harness. Record any inherited diagnostics
++exactly; no blanket typecheck pass if it fails. Run exact-owner ESLint,
++Prettier and `git diff --check`.
++
++Retained Vitest gates (complete files, no filtering):
++
++- `tests/phase-6b-ahe-reclamation-red.test.ts`
++- `packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts`
++- `tests/phase-6b-runtime-reclamation-red.test.ts`
++- `tests/phase-6b-cleanup-eligibility-red.test.ts`
++- `tests/phase-6b-issuance-retention-red.test.ts`
++- `packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts`
++- `tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts`
++
++Retained Chromium:
++`pnpm exec playwright test --config packages/storage-browser/playwright.phase-6b-ahe-reclamation.config.ts --fail-on-flaky-tests`.
++These are bounded deterministic retained suites, not campaign authorization.
++Retain the configured timeouts/retries. Separately repeat focused GREEN and
++fresh native import-identity proof in an isolated signed checkout with its own
++frozen install/source build and no parent partial patch or copied dist. Record
++all evidence under slice RED/GREEN/review roots with self-excluding manifests.
++
++After signed/pushed GREEN, one final Grok/Sol/Fable review covers plan, RED,
++GREEN, source custody, fresh-build identity, retained behavior and remaining
++parent authority. Empty P0/P1 union plus all gates closes only f5b0z. Parent f5b
++then resumes its previously authorized eight-owner implementation, including
++the newly accepted observer correction; no automatic cleanup is added here.
++Its genuine three-transition/64-writer and later >=100-transition obligations,
++Discord safety checkpoint f5b0y, and Phase 7 archive/cold-join gates remain open.
+diff --git a/.logs/d110c-0c1f5b0z-plan-609ee4ba/manifest.sha256 b/.logs/d110c-0c1f5b0z-plan-609ee4ba/manifest.sha256
+new file mode 100644
+index 00000000..7ef25225
+--- /dev/null
++++ b/.logs/d110c-0c1f5b0z-plan-609ee4ba/manifest.sha256
+@@ -0,0 +1,3 @@
++74aa70fc89624416f371ac11d884c8adcc3aa7693ef73a38e27303aeea736b2d  audit.json
++fcb27c9e87a8c9bb732c994a33c6d7ababa025480c11669156dc1d9250f021f1  audit.mjs
++c3769a30cb1d7a59411fa38ed287e909660dfffa9ac7059a9c075b528b3f2489  design.md
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 3657cb34..19838e31 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
+ 
+ ---
+ 
+-### Current frontier — author settlement and writer capacity (as of 2026-09-05, observer RED accepted; cleanup API decision pending)
++### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0z authorized for reviewed RED/GREEN)
+ 
+ This subsection is the entry point for an agent resuming the D.110c-0c1f /
+ D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
+@@ -18463,7 +18463,15 @@ Closed through the 2026-09-05 checkpoint:
+   before parent closure; prospective isolated evidence must record its patch-
+   application boundary explicitly.
+ 
+-Current work (observer RED accepted; parent production GREEN paused):
++Current work (f5b0z plan review, then separate RED/GREEN; parent GREEN paused):
++
++- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is expressly
++  authorized by the user on 2026-09-05, with review and separate RED/GREEN.
++  The exact design is `.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md`: two
++  maintenance-subpath exports and the existing browser/SQLite registration
++  functions only. Sign/push the plan, complete its Grok / Sol-high /
++  Fable-xhigh gate, then separate Astra-high causal RED and GREEN. No parent
++  cleanup call, new authority, dependency, policy or limit is in this slice.
+ 
+ - **f5b creator settlement and recovery integration** below. Accepted causal
+   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
+@@ -18522,14 +18530,13 @@ Current work (observer RED accepted; parent production GREEN paused):
+ 
+ Blocked, and on what:
+ 
+-- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** is a proposed
+-  narrow API prerequisite, awaiting explicit scope authorization and its
+-  governing review/TDD gates. It blocks parent f5b's genuine cleanup caller
++- **D.110c-0c1f5b0z backend-neutral AHE maintenance discovery** now has explicit
++  scope authorization and awaits its governing review/TDD gates. It blocks parent f5b's genuine cleanup caller
+   and therefore parent closure. The independent tests-only observer correction
+   is accepted and needs no further RED execution. The existing AHE backend
+   capability must become discoverable by
+-  Node without a Node-to-browser dependency or caller-invented authority. No
+-  production change or new review invocation is authorized by this proposal.
++  Node without a Node-to-browser dependency or caller-invented authority.
++  Production edits require the accepted plan gate and signed tests-only RED.
+ - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
+   high-risk design checkpoint, not a production implementation authorization.
+   The f5b fixture correction proves settlement under existing limits but does
+@@ -101361,10 +101368,11 @@ and has SHA-256
+ 
+ ###### D.110c-0c1f5b0z backend-neutral AHE maintenance discovery prerequisite
+ 
+-**Status: proposed API prerequisite; root audit and user-requested one-off
+-Fable-high consultation complete; explicit scope authorization and governing
+-plan review required before tests-only RED, followed by separate GREEN and
+-final implementation review. No implementation is authorized here.** Owner:
++**Status: expressly authorized by the user on 2026-09-05 for review and
++separate RED/GREEN; exact plan frozen at
++`.logs/d110c-0c1f5b0z-plan-609ee4ba/design.md`. Governing plan review precedes
++tests-only RED; production edits require signed RED, and final implementation
++review remains mandatory.** Owner:
+ the existing `@ts-drp/storage/maintenance` contract and browser/Node backend
+ registration functions; root owns the boundary decision. Deadline: before
+ parent f5b's first genuine cleanup invocation and parent closure, hence before
+@@ -101393,6 +101401,14 @@ the user's API-decision insight consultation, not a substituted formal GREEN
+ review. Root agrees with the discovery recommendation, subject to the exact
+ compatibility boundary and proof obligations below.
+ 
++The frozen design above prospectively resolves the proposal's remaining API
++and executable details: exact bind/resolve names, compatible global descriptor,
++first-bind-wins and duplicate-registration refusal, no-I/O ownership, 16-test
++RED matrix (14 named causal failures / 2 controls), focused/static/retained/
++isolated commands and final review. Its source anchor is signed `609ee4ba`;
++the inherited seven-file parent patch stays separate. The prior consultation
++and proposal below remain rationale, not a competing implementation contract.
++
+ Proposed minimal construction: add bind/resolve exports on the existing
+ `@ts-drp/storage/maintenance` subpath for the existing
+ `AheReclamationMaintenance` capability, keyed by the exact ordinary facade;

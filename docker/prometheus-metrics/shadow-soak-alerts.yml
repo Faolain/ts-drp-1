@@ -1,0 +1,21 @@
+groups:
+  - name: ts-drp-shadow-soak
+    rules:
+      - alert: ShadowSoakProcessStale
+        expr: absent(ts_drp_shadow_soak_process_heartbeat_unixtime_seconds) or time() - ts_drp_shadow_soak_process_heartbeat_unixtime_seconds > 120
+        for: 2m
+      - alert: ShadowSoakCycleOvertime
+        expr: (ts_drp_shadow_soak_cycle_in_progress == 1 and time() - ts_drp_shadow_soak_cycle_started_unixtime_seconds > 2700) or ts_drp_shadow_soak_cycle_overtime == 1
+        for: 2m
+      - alert: ShadowSoakFirstEvidenceMissing
+        expr: (ts_drp_shadow_soak_cycle_in_progress == 0 and time() - ts_drp_shadow_soak_cycle_started_unixtime_seconds > 2700) unless on(instance) ts_drp_shadow_soak_evidence_heartbeat_unixtime_seconds
+        for: 2m
+      - alert: ShadowSoakEvidenceStale
+        expr: time() - ts_drp_shadow_soak_evidence_heartbeat_unixtime_seconds > 93600
+        for: 2m
+      - alert: ShadowSoakReportIncomplete
+        expr: ts_drp_shadow_soak_evidence_heartbeat_unixtime_seconds and on(instance) ts_drp_shadow_soak_report_complete == 0
+        for: 2m
+      - alert: ShadowSoakMismatch
+        expr: ts_drp_shadow_soak_mismatches > 0
+        for: 2m

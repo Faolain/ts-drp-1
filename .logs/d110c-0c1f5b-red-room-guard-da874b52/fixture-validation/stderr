@@ -1,0 +1,32 @@
+10:31:01 PM [vite] (ssr) warning: 
+/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/packages/protocol-v3/src/index.ts
+1824|    }
+1825|    const exactByteUrl = `data:text/javascript;base64,${bytesToBase64(exactArtifactBytes)}`;
+1826|    const namespace = await import(exactByteUrl);
+   |                                   ^^^^^^^^^^^^
+1827|    const operationNames = [...preparedAdmission.operations.keys()];
+1828|    const reducers = prepareRuntimeExport(namespace, operationNames, compiled);
+The above dynamic import cannot be analyzed by Vite.
+See https://github.com/rollup/plugins/tree/master/packages/dynamic-import-vars#limitations for supported dynamic import formats. If this is intended to be left as-is, you can use the /* @vite-ignore */ comment inside the import() call to suppress this warning.
+
+  Plugin: vite:import-analysis
+  File: /private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/packages/protocol-v3/src/index.ts
+10:31:02 PM [vite] (ssr) Error when evaluating SSR module @ts-drp/canonical: Failed to load url @ts-drp/canonical (resolved id: @ts-drp/canonical). Does the file exist?
+      at loadAndTransform (file:///private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:35725:17)
+node:internal/modules/run_main:122
+    triggerUncaughtException(
+    ^
+
+Error: Failed to load url @ts-drp/canonical (resolved id: @ts-drp/canonical). Does the file exist?
+    at loadAndTransform (file:///private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:35725:17) {
+  code: 'ERR_LOAD_URL',
+  runnerError: Error: RunnerError
+      at reviveInvokeError (file:///private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/module-runner.js:552:18)
+      at Object.invoke (file:///private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/module-runner.js:635:15)
+      at async SSRCompatModuleRunner.getModuleInformation (file:///private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/module-runner.js:1205:73)
+      at async SSRCompatModuleRunner.import (file:///private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/module-runner.js:1116:27)
+      at async instantiateModule (file:///private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:25231:12)
+      at async file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-room-guard-da874b52/fixture-validation.mjs:12:18
+}
+
+Node.js v22.15.0

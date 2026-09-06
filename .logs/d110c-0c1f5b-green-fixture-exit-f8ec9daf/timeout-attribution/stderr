@@ -1,0 +1,17 @@
+/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/lib/typescript.js:30500
+  return node.kind === 11 /* StringLiteral */;
+              ^
+
+TypeError: Cannot read properties of undefined (reading 'kind')
+    at Object.isStringLiteral (/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/lib/typescript.js:30500:15)
+    at visit (file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-fixture-exit-f8ec9daf/timeout-attribution.mjs:9:156)
+    at visitNode2 (/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/lib/typescript.js:32308:18)
+    at forEachChildInVariableDeclaration (/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/lib/typescript.js:32370:123)
+    at Object.forEachChild (/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/lib/typescript.js:32829:35)
+    at visit (file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-fixture-exit-f8ec9daf/timeout-attribution.mjs:9:227)
+    at visitNodes (/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/lib/typescript.js:32316:22)
+    at forEachChildInVariableDeclarationList (/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/lib/typescript.js:32535:12)
+    at Object.forEachChild (/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/lib/typescript.js:32829:35)
+    at visit (file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-fixture-exit-f8ec9daf/timeout-attribution.mjs:9:227)
+
+Node.js v22.15.0

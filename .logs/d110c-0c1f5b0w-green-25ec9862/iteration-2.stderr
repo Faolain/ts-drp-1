@@ -1,0 +1,39 @@
+stderr | tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > single-generation internal redirect pins target hold refusal and orderly source cleanup
+::v3-ingress sink-rejected
+
+stderr | tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock
+::v3-ingress sink-rejected
+
+(node:27834) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27842) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27845) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27849) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock
+AssertionError: D110C_0C1F5B0U_MIGRATION_ACTIVATION_BOUNDARY_DIFFERS: expected { status: 'rejected', …(1) } to deeply equal { status: 'rejected', …(1) }
+
+- Expected
++ Received
+
+  {
+-   "message": "v3 room migration activation failed: terminal-rejected",
++   "message": "v3 room rebase outbox failed: record-rejected",
+    "status": "rejected",
+  }
+
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:786:97
+    784|   expect.soft(results[0]?.status, "D110C_0C1F5B0U_QUEUED_ISSUE_NOT_REC…
+    785|   expect.soft(results[1]?.status, "D110C_0C1F5B0U_MIGRATION_DID_NOT_RE…
+    786|   expect.soft(await observedActivation, "D110C_0C1F5B0U_MIGRATION_ACTI…
+       |                                                                                                 ^
+    787|    status: "rejected",
+    788|    message: "v3 room migration activation failed: terminal-rejected",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

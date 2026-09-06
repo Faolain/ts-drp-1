@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 360.187,
+  "events": "/private/tmp/d110c-w0-confirm-grok/events.jsonl",
+  "exit_code": 0,
+  "public": "/private/tmp/d110c-w0-confirm-grok/public.txt",
+  "stop_reason": "end_turn",
+  "timed_out": false
+}

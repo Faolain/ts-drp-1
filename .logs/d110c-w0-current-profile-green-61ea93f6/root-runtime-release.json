@@ -1,0 +1,12 @@
+{
+  "releasedBy": "root",
+  "frozenRosterSha256": "730b0fb9ba0f0cc3dedc429f67d069bd26f0d63473bfb1c1926a44a9f65e9f9b",
+  "independentlyVerifiedInputCount": 934,
+  "nodeAndVitestHashesVerified": true,
+  "exactFiles": 35,
+  "exactCases": 227,
+  "queue": ["whole W0 focused: 7 once", "retained: 34 files, 220 once, only after focused passes"],
+  "rootOwns": ["24 browser cases", "fresh-source acceptance", "final Grok/Sol/Fable reviews"],
+  "failureRule": "Preserve full result and diagnose before edits or reruns; no repins or budget increases.",
+  "peerRuntimeCompilerBuildReviewExcludedDuringQueue": true
+}

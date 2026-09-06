@@ -1,0 +1,18 @@
+{
+	"schemaVersion": "ts-drp-blueprint-numeric-determinism-successor-profile-v2",
+	"profileId": "blueprint-numeric-determinism-successor-v2",
+	"successorRedCommit": "15b559d44d3e6b5dab09f169e755e8e87a89e1fe",
+	"releasedV1CurrentPaths": [
+		".github/workflows/protocol-v3-blueprint-numeric-determinism.yml",
+		"packages/protocol-v3/package.json"
+	],
+	"replacementAuthorities": {
+		".github/workflows/protocol-v3-blueprint-numeric-determinism.yml": "canonical workflow bytes and structural same-job routing",
+		"packages/protocol-v3/package.json": "numeric-determinism semantic projection"
+	},
+	"nonClaims": [
+		"No deterministic-math runtime is authorized.",
+		"No unrelated package-manifest field is frozen.",
+		"No blueprint fold, snapshot or pruning capability is added."
+	]
+}

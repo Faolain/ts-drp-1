@@ -1,0 +1,15 @@
+tests_commit=6e542c3dd326f772893c30fef5f7b8a1fc1bcd96
+tests_signature=G
+remote=6e542c3dd326f772893c30fef5f7b8a1fc1bcd96
+stashes=27
+tracked_status_lines_before_evidence=0
+changed_test_paths=1
+production_changes=0
+red_exit=1
+red_counts=14/13/1/0
+red_top_level_errors=0
+red_reporter_sha256=762c3779b41983cb4952fcff9084093ba309bfb709d0b22cd1fa4901a3b063a8
+prior_green_reporter_sha256=9332fff25f5f432f7ff4f85a2555b166a2a26e1b05b45eb9a453fcd60be2b520
+prettier=0
+eslint=0
+diff_check=0

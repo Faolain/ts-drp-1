@@ -1,0 +1,18 @@
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-complete.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-corrected.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-final.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-green.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-isolated.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/batch2-chromium.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/green-ledger.md: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-activation-browser.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-live-close-browser.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-node.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-ordering-focused-corrected.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-ordering-focused.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-product-browser-corrected.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-product-browser-final.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-product-browser-green.json: No such file or directory
+shasum: .logs/d110c-b-green-90147e3c/retained-product-browser.json: No such file or directory
+shasum: WARNING: 17 listed files could not be read

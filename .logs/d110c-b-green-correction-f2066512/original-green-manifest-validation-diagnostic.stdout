@@ -1,0 +1,17 @@
+.logs/d110c-b-green-90147e3c/batch1-vitest-complete.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/batch1-vitest-corrected.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/batch1-vitest-final.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/batch1-vitest-green.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/batch1-vitest-isolated.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/batch1-vitest.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/batch2-chromium.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/green-ledger.md: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-activation-browser.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-live-close-browser.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-node.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-ordering-focused-corrected.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-ordering-focused.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-product-browser-corrected.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-product-browser-final.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-product-browser-green.json: FAILED open or read
+.logs/d110c-b-green-90147e3c/retained-product-browser.json: FAILED open or read

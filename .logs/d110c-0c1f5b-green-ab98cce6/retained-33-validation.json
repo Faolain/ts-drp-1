@@ -1,0 +1,108 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 8,
+  "passed": 8,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-relearn-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 5e persistent creator evidence and bounded re-learn RED"
+      ],
+      "fullName": "Phase 5e persistent creator evidence and bounded re-learn RED freezes the exact seven RED and exact nine GREEN owners",
+      "status": "passed",
+      "title": "freezes the exact seven RED and exact nine GREEN owners",
+      "duration": 3.3372080000000324,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e persistent creator evidence and bounded re-learn RED"
+      ],
+      "fullName": "Phase 5e persistent creator evidence and bounded re-learn RED pins one connected-only bounded protocol and a closed recovery state machine",
+      "status": "passed",
+      "title": "pins one connected-only bounded protocol and a closed recovery state machine",
+      "duration": 0.6560829999999669,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e persistent creator evidence and bounded re-learn RED"
+      ],
+      "fullName": "Phase 5e persistent creator evidence and bounded re-learn RED persists exact registered evidence before acknowledgement or relay",
+      "status": "passed",
+      "title": "persists exact registered evidence before acknowledgement or relay",
+      "duration": 223.29179200000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e persistent creator evidence and bounded re-learn RED"
+      ],
+      "fullName": "Phase 5e persistent creator evidence and bounded re-learn RED queries every snapshotted authenticated peer and ignores foreign, malformed, and digest-only replies",
+      "status": "passed",
+      "title": "queries every snapshotted authenticated peer and ignores foreign, malformed, and digest-only replies",
+      "duration": 53.84558400000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e persistent creator evidence and bounded re-learn RED"
+      ],
+      "fullName": "Phase 5e persistent creator evidence and bounded re-learn RED terminalizes conflicting own-signed evidence independently of arrival or lexical order",
+      "status": "passed",
+      "title": "terminalizes conflicting own-signed evidence independently of arrival or lexical order",
+      "duration": 99.40049999999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e persistent creator evidence and bounded re-learn RED"
+      ],
+      "fullName": "Phase 5e persistent creator evidence and bounded re-learn RED stalls with no evidence and releases only the exact old value and carrier after complete re-learn",
+      "status": "passed",
+      "title": "stalls with no evidence and releases only the exact old value and carrier after complete re-learn",
+      "duration": 49.07704100000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e persistent creator evidence and bounded re-learn RED"
+      ],
+      "fullName": "Phase 5e persistent creator evidence and bounded re-learn RED [RED readiness] requires the connected carrier and node recovery owner",
+      "status": "passed",
+      "title": "[RED readiness] requires the connected carrier and node recovery owner",
+      "duration": 0.18487499999991996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 5e persistent creator evidence and bounded re-learn RED"
+      ],
+      "fullName": "Phase 5e persistent creator evidence and bounded re-learn RED keeps the new runtime subpaths closed",
+      "status": "passed",
+      "title": "keeps the new runtime subpaths closed",
+      "duration": 8.520374999999945,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

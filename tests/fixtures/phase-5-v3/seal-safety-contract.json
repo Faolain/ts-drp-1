@@ -1,0 +1,49 @@
+{
+	"model": {
+		"module": "sealSafety",
+		"path": "packages/seal/formal/seal-safety.qnt",
+		"runs": ["testAgreement", "testSameValueRoundCarryover", "testDurableBeforeGossip", "testCrashPreservesLock"]
+	},
+	"schema": {
+		"currentVersion": 2,
+		"legacyStores": ["blobs", "generations", "objects", "promotions"],
+		"voteStores": ["signerState", "storageMeta", "voteOutbox", "voteSlots"],
+		"voteTransactionStores": ["signerState", "storageMeta", "voteOutbox", "voteSlots"]
+	},
+	"limits": {
+		"epoch": 0,
+		"phases": ["prepare", "commit"],
+		"signatureBytes": 64,
+		"dispatchConcurrency": 4
+	},
+	"requiredOwners": [
+		"packages/protocol-v3/src/seal.ts",
+		"packages/keychain/src/finality.ts",
+		"packages/seal/src/index.ts",
+		"packages/storage-browser/src/seal-vote.ts"
+	],
+	"mutants": [
+		"round-in-cut-value",
+		"proposal-hash-lock",
+		"mixed-qc",
+		"signature-length-only",
+		"duplicate-signer-count",
+		"validation-after-write",
+		"state-only-commit",
+		"vote-only-commit",
+		"outbox-only-commit",
+		"provisional-byte-release",
+		"put-overwrite",
+		"revision-ignore",
+		"incarnation-ignore",
+		"default-durability",
+		"async-signing-after-transaction-start",
+		"lock-as-authority",
+		"empty-takeover",
+		"raw-seeded-outbox-dispatch",
+		"queue-coalescing",
+		"prefix-only-outbox-recovery",
+		"late-upgrade-after-timeout",
+		"graceful-close-as-crash"
+	]
+}

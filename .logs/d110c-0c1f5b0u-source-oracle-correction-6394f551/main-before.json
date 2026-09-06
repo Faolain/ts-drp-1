@@ -1,0 +1,354 @@
+{
+  "head": "6abc3c3123d03854aa7c4b9a9c95c47e21b49268",
+  "paths": [
+    "examples/v3-room/package.json",
+    "examples/v3-room/src/index.ts",
+    "packages/issuance-store/src/conformance.ts",
+    "packages/issuance-store/src/contract.ts",
+    "packages/issuance-store/src/types.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/storage-browser/src/internal/browser-issuance-store.ts",
+    "packages/storage-node/src/internal/node-issuance-store.ts",
+    "pnpm-lock.yaml"
+  ],
+  "patchHash": "797511cab746df7ae44de600ae8eb110787b276f96973ef77863665c9cfa2675",
+  "files": {
+    "examples/v3-room/package.json": "b7024b1a092796ba921b1b7d04e4cb1034b0a7a383bb098a8dd4ffa4b985bd98",
+    "examples/v3-room/src/index.ts": "fd4907fd75cba96cc23c9e00e5c2e39de06b22a19a302788ea2da393c4fbfcf9",
+    "packages/issuance-store/src/conformance.ts": "00aa85f56e738686049099ded7ff4d1a12c34d54d7dadd9c6d47751df91a5c9a",
+    "packages/issuance-store/src/contract.ts": "028c188a03f5408c5893693f8afd7c41a6b369b619e18e056e8eaa658b8c8ca7",
+    "packages/issuance-store/src/types.ts": "2100ed2037bfb027d9f6090f843f04d9d448135498fa256e208afdd67ec65b8d",
+    "packages/node/src/v3-live.ts": "61ef1d5c79ffbe615dad6ca6fc207bae842f9b4cab1eeececafe36e33e70c210",
+    "packages/storage-browser/src/internal/browser-issuance-store.ts": "7ad0a58ea2de2ae33481187a257c3ec69c2c1013445b36ac3ad180538d79c862",
+    "packages/storage-node/src/internal/node-issuance-store.ts": "ae169091ee9f1e1c4265e4075dee1ab46ddadb0623e8ead2ede0f8250ef8c01a",
+    "pnpm-lock.yaml": "56e8b9b56d7e76d4651daec66b6ff8c0bc8150ce9fab588b97b1887f417d1251"
+  },
+  "stashCount": 27,
+  "stashHash": "382adffafb1bcaaff7def4d01213b0b0f70f7a446e60d9ac1225b8d6b81b5fc7",
+  "protectedEntries": {
+    ".agents/skills/claude/SKILL.md": {
+      "kind": "file",
+      "sha256": "37bc6e2d0e34c7cd7526908de7ec96ecb7a503c3204571fb69e14539e48ea257"
+    },
+    ".agents/skills/claude/agents/openai.yaml": {
+      "kind": "file",
+      "sha256": "cb19d1683a5c8dcd2b497ba5bd75e24a8d0f0b06d25653a5c3ed20725cc9a0b3"
+    },
+    ".agents/skills/claude/index.html": {
+      "kind": "file",
+      "sha256": "810c1e61aaf42e1c8afb7414581b630eba68e30bafa3b83a05b3967d8b79fcdf"
+    },
+    ".claude/skills/claude": {
+      "kind": "symlink",
+      "target": "../../.agents/skills/claude"
+    },
+    "CPU.20260901.090022.81530.0.001.cpuprofile": {
+      "kind": "file",
+      "sha256": "7cf8b4caadf5217e6dd98eb60193d7b67a268df003a152619d1b3471d1c1e7eb"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/MCviolation.out": {
+      "kind": "file",
+      "sha256": "d920effbde6bd29d2b4b6a77874e1f839abda17f01916fb9d0af814b5dcddc33"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/MCviolation1.out": {
+      "kind": "file",
+      "sha256": "d920effbde6bd29d2b4b6a77874e1f839abda17f01916fb9d0af814b5dcddc33"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/violation.itf.json": {
+      "kind": "file",
+      "sha256": "c65846ee313368729e301475944ae7fb0e25f7f67c6eccd924ed24412dc61f28"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/violation.json": {
+      "kind": "file",
+      "sha256": "d6280e216aacb9b4a4ce6ed236d344d17fe481351ac2aead7be9a7272339edef"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/violation.tla": {
+      "kind": "file",
+      "sha256": "0ae9e1ec4759d50f8b82341789c2192fcb53476513bc9dee598239b6abe260f2"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/violation1.itf.json": {
+      "kind": "file",
+      "sha256": "c65846ee313368729e301475944ae7fb0e25f7f67c6eccd924ed24412dc61f28"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/violation1.json": {
+      "kind": "file",
+      "sha256": "d6280e216aacb9b4a4ce6ed236d344d17fe481351ac2aead7be9a7272339edef"
+    },
+    "_apalache-out/server/2026-08-25T16-09-02_6509091193363332850/violation1.tla": {
+      "kind": "file",
+      "sha256": "0ae9e1ec4759d50f8b82341789c2192fcb53476513bc9dee598239b6abe260f2"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/MCviolation.out": {
+      "kind": "file",
+      "sha256": "527952a2e66c71f8261658bae193e62fd94308681171cdf95507c3b889b86274"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/MCviolation1.out": {
+      "kind": "file",
+      "sha256": "527952a2e66c71f8261658bae193e62fd94308681171cdf95507c3b889b86274"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/violation.itf.json": {
+      "kind": "file",
+      "sha256": "dabb1fb566a6354788b2850464865446daf04a466f2a46b88882545526c58c98"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/violation.json": {
+      "kind": "file",
+      "sha256": "09c6ab79ec9af76a7d6eaeddb004d2790816e638e0b8320c63dc3ea818ad4d7f"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/violation.tla": {
+      "kind": "file",
+      "sha256": "89ccc04878c43e2f17545aef5675d59e1a9c15839d2fbda2c5aeb91f7fd0af39"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/violation1.itf.json": {
+      "kind": "file",
+      "sha256": "dabb1fb566a6354788b2850464865446daf04a466f2a46b88882545526c58c98"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/violation1.json": {
+      "kind": "file",
+      "sha256": "09c6ab79ec9af76a7d6eaeddb004d2790816e638e0b8320c63dc3ea818ad4d7f"
+    },
+    "_apalache-out/server/2026-08-25T16-09-33_11182137541824545129/violation1.tla": {
+      "kind": "file",
+      "sha256": "89ccc04878c43e2f17545aef5675d59e1a9c15839d2fbda2c5aeb91f7fd0af39"
+    },
+    "_apalache-out/server/2026-08-25T16-10-10_8163239754134228023/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-10-10_8163239754134228023/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-16-15_718894437511951032/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-16-15_718894437511951032/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-17-36_4454253779654834830/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-17-36_4454253779654834830/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-25-01_11879039786187375717/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-25-01_11879039786187375717/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-25-36_16613834141427683242/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-25-36_16613834141427683242/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-26-36_8546616019729553196/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-26-36_8546616019729553196/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-35-34_1841905699355501361/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-35-34_1841905699355501361/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-36-52_342351099956900578/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-36-52_342351099956900578/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T16-39-51_6991402949610694831/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T16-39-51_6991402949610694831/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T17-08-10_7848105589586065750/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T17-08-10_7848105589586065750/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T17-12-50_2949531790162460700/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T17-12-50_2949531790162460700/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T17-34-38_10918522350219559635/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T17-34-38_10918522350219559635/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T17-37-48_299667496381694453/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T17-37-48_299667496381694453/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T17-44-08_10606763167608277025/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T17-44-08_10606763167608277025/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T17-49-17_84607505617482050/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T17-49-17_84607505617482050/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T18-13-12_10805765683355394652/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T18-13-12_10805765683355394652/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T18-16-41_13017142869406591305/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T18-16-41_13017142869406591305/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T19-16-20_9245808068892682508/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T19-16-20_9245808068892682508/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T19-20-51_10356514483693891287/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T19-20-51_10356514483693891287/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T21-10-36_18141112401804072083/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T21-10-36_18141112401804072083/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T23-36-59_3460098689260205317/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T23-36-59_3460098689260205317/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-25T23-45-20_4190197520832481206/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-25T23-45-20_4190197520832481206/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-26T00-10-17_7914145060350650689/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-26T00-10-17_7914145060350650689/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-08-26T02-01-12_17907863751148145829/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-08-26T02-01-12_17907863751148145829/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-09-02T01-10-47_13643944372310254119/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-09-02T01-10-47_13643944372310254119/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "_apalache-out/server/2026-09-02T01-15-06_7794885817731275429/log0.smt": {
+      "kind": "file",
+      "sha256": "c0a6e962b48d940e2c94211ebf831179df3ab27bac218e2147423717c09ea517"
+    },
+    "_apalache-out/server/2026-09-02T01-15-06_7794885817731275429/run.txt": {
+      "kind": "file",
+      "sha256": "dc66a8d0596c0da166d37bcf3f58aec90435fa37748a4a6c74225c198dbc8a80"
+    },
+    "examples/v3-room/tsconfig.build.tsbuildinfo": {
+      "kind": "file",
+      "sha256": "649f8b337f6da8c814e7e132a17bda8394a03b73aaa37026817232d7c8ededcf"
+    },
+    "packages/protocol-v2/tests/author-sequence-0g2.test.ts": {
+      "kind": "file",
+      "sha256": "d92cf2c515b40b9c04d2f0f1fb59926c0f2df082a30b3c2c806c8fd8b8698692"
+    },
+    "packages/protocol-v2/tests/local-author-sequence-issuance-0g2.test.ts": {
+      "kind": "file",
+      "sha256": "23af3b601d1576a5e4f6ad0f1cb584c68fc13b6074afe1e58fa4591847ec01a3"
+    },
+    "skills-lock.json": {
+      "kind": "file",
+      "sha256": "1ff0ab91a6f4e1db3670d59eb8c955a87066e77c77371ba5fb557322ca89baed"
+    }
+  }
+}
