@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (room-carrier attempt stopped; mock-target correction next):
+Current work (room-fixture gate repaired; issuance-roster correction next):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18585,12 +18585,17 @@ Blocked, and on what:
   The independent finality-roster correction is now accepted at signed/pushed
   tests `867d7f09` and isolated evidence `140a3053`: 19/19 pass in a clean
   source-built checkout, then 19/19 pass against the preserved parent patch
-  through the separate GREEN owner. This closes only gates 31/32's two stale
-  export-list failures; 29 other observed failures and blocked supplement
-  coverage remain open. Four inherited certificate-fixture type diagnostics
-  are separately owned, not waived or called a typecheck pass. The parent
-  record has exact evidence and dispositions. Registry-freeze repair remains
-  outside authorized implementation scope; no production edit occurred here.
+  through the separate GREEN owner, closing gates 31/32's two stale export
+  failures. The subsequent room-carrier/mock-target correction at signed/pushed
+  tests `e384a40c` and isolated evidence `4e669b70` passes 20/20 in both its
+  clean source-built checkout and the separate GREEN run against the same
+  patch. This closes gate 10's 18 runtime failures; 11 other observed runtime
+  failures and blocked supplement coverage remain open. The inherited
+  certificate, room-test and grid-wrapper type diagnostics retain their named
+  owners and deadlines; no blanket typecheck pass. The parent record owns
+  exact evidence and the next bounded issuance-roster correction. Registry-freeze
+  repair remains outside authorized implementation scope; no production
+  edit occurred in these retained fixture corrections.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -100836,6 +100841,11 @@ across 72 files; the diagnostic inventory below owns the unresolved causes.
 The bounded finality-roster correction subsequently passes 19/19 both in its
 isolated signed checkout and against the unchanged parent patch, closing two
 of those observed runtime failures without rerunning the full inventory.
+The room-carrier/mock-target correction then passes 20/20 in its fresh signed
+checkout and separate GREEN run against that same patch, closing gate 10's
+18 failures. Its earlier stopped carrier attempt stays immutable. Eleven
+other observed runtime failures, blocked supplement coverage and inherited
+static debts remain open; the issuance-roster correction below is next.
 The partial eight-owner production patch is preserved, not committed or
 accepted. Other retained repair, browser/static/isolated and final review gates
 remain open.** The
@@ -101973,6 +101983,93 @@ additional model/prose round is required; the parent final review remains
 open. No retained failure is closed by this stopped attempt, and the existing
 29-observed-failure inventory disposition, blocked supplement coverage and
 registry-governance scope remain unchanged.
+
+**Retained room-fixture acceptance (2026-09-05).** Tests-only
+`e384a40cc9f30d4cb5f65b459e2be65858ce05e5` and isolated evidence
+`4e669b7017a09cec8f11acdcb083876ab20f86ef` are signed (`G`) and pushed.
+Root independently reconstructed the whole test from its signed predecessor
+using exactly the two permitted mock-name replacements: every other byte,
+factory, canonical carrier, assertion, title and bound remains unchanged.
+The prior carrier attempt at `f932fc87` / `36784ba9` is not relabeled or rerun.
+
+The fresh `/private/tmp/d110c-f5b-retained-room-mocks-2C1IwR/checkout`
+independently installed frozen dependencies offline and completed its source
+build without the parent patch, copied dist or shared main node_modules.
+The bounded Vite resolver audit confirms all seven mock/import pairs match
+before runtime. Its sole run passes the exact original 20 cases with no
+skips, failure messages or suite errors, including the unchanged 8,192-row,
+16/17 batching, source completion and projection-rejection controls.
+Evidence is `.logs/d110c-0c1f5b-retained-room-mocks-e384a40c/`, with
+91-entry manifest
+`64a77efee1ff57be9ae880b68b30c922a09037251af5d839493e7930137d8cd6`
+and raw reporter
+`94abeb1ee3a5d28fc3470d37dbc5e2dc32fb40a4442b74b07f364d504bada7ed`.
+Build, exact-source lint/format/diff, syntax and collection pass. The same
+three unchanged-body TS2345 diagnostics and one external grid-wrapper TS2345
+are proven identical in the same compiler program with signed baseline input;
+they remain owned static debt, not a typecheck pass or waiver.
+
+After root accepted those signed results and complete manifest, the separate
+Astra-high GREEN owner ran only the same file once against the preserved
+parent patch: 20/20 pass, no skips or suite errors, exact same title multiset.
+No build, listing, other runtime gate or model review was repeated. Evidence
+is `.logs/d110c-0c1f5b-green-room-mocks-4e669b70/`, with 15-entry manifest
+`bdffd0b114dce025687de6540bcb9fb2d6326e70f4e0f72ae317adc19b53c670`
+and raw reporter
+`35563cdd2c2c6082f2658f07979c3f12738dd8a835b644b6e7c155c7c43add3e`.
+Root independently validated both complete inventories and exact results,
+all eight production and seven runtime hashes, unchanged other retained tests,
+27 stashes and 86,522 protected paths. The production patch remains
+`245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed`;
+GREEN references that existing immutable patch rather than duplicating it.
+
+This closes only gate 10's controlled room-composition fixture debt. Its fake
+trust/signature/anchor markers do not become authenticated-genesis or golden-path
+evidence. The earlier full 845-pass/31-failure inventory is unchanged;
+do not synthesize new full-suite totals from corrective executions. Eleven
+other observed runtime failures, blocked supplement coverage, all assigned
+static debt and parent browser/isolated/final-review gates remain open.
+
+**Prospective retained issuance-roster correction (2026-09-05).** Gate 67's
+already-owned test fails before later checks because its exact root-export
+list omits five exports implemented by the closed settlement prerequisites.
+The following whole-contract hash is also stale; it was not reached in that
+failed execution and is not counted as another observed runtime failure.
+Root's read-only source/history audit ties the changes to signed `ea02487e`
+and `9c1ec6c4`, not the pending parent patch. Compared with signed `9fef8d24`,
+the changed contract bodies concern settlement cloning, effects, progress
+and holds. The legacy scope/envelope/commit validators, error taxonomy,
+terminal classifier and index remain unchanged. The five later publication-claim
+source checks also retain their existing read-only no-match result.
+
+Owner: the retained issuance-contract fixture; deadline: before parent f5b
+retained acceptance. The separate Astra-high tests-only owner may change only
+the root-export array and its immediately following `contract.ts` hash literal
+in `tests/phase-3a1b-p2-outbox-publication-contract.test.ts`. Add exactly
+`SETTLEMENT_REPLACEMENT_DIGEST_LIMITS`, `SETTLEMENT_REPLACEMENT_MAX_INTENTS`,
+`assertSettlementPlanProgressTransition`, `settlementPlanHasExactEffectLink`
+and `settlementReplacementLastLogicalTime` in the existing sorted equality
+list, giving exactly 35 exports. Pin the current signed contract to
+`2e2d160f7e59d643d01fb4d10e321c573ace252bef43040156ff26d92e837042`.
+Preserve every other byte, the independent classifier/oracle cases, terminal
+and index pins, conformance roster, method/taxonomy checks and all 10 titles.
+This updates one current retained expectation for already-accepted code;
+it does not replace historical evidence hashes, modify a registry freeze,
+introduce an API or reopen completed settlement reviews.
+
+Sign/push that tests-only correction separately, then independently install
+and source-build a fresh checkout of its exact signed tree. Preserve the old
+gate-67 nine-pass/one-failure evidence; do not rerun that baseline. Freeze
+the exact existing 10 file-bound titles before one isolated run expecting
+10 passes with no skips or unexpected results. Stop on any newly reached
+failure; no assertion weakening, production edits or extra changes in the
+batch. Retain exact scope/source/runtime checks, lint/format/diff, bounded
+type diagnostics with explicit inherited attribution, complete raw results,
+statuses and a self-excluding manifest. After root acceptance, the separate
+existing GREEN owner runs the same file once against the unchanged parent
+patch. All other gates stay frozen. Use the existing final parent review;
+no additional model/prose round, campaign or registry-governance repair is
+authorized by this correction.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
