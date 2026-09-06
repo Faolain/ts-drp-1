@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts"
+  ],
+  "start": "2026-09-06T09:36:39.542Z"
+}
