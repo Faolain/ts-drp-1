@@ -1,0 +1,14 @@
+{
+  "command": [
+    "git",
+    "show",
+    "--check",
+    "623c415ed3ac2814d071bae59720456a92c804c0"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "status": 2,
+  "signal": null,
+  "stdout": "commit 623c415ed3ac2814d071bae59720456a92c804c0\nAuthor: Faolain <Faolain@users.noreply.github.com>\nDate:   Sat Sep 5 20:59:54 2026 -0400\n\n    test: record isolated retained issuance roster evidence\n\n.logs/d110c-0c1f5b-retained-issuance-roster-d9781349/assessment.md:32: new blank line at EOF.\n.logs/d110c-0c1f5b-retained-issuance-roster-d9781349/final-custody.mjs:14: new blank line at EOF.\n",
+  "stderr": "",
+  "disposition": "Accepted immutable evidence-only blank-EOF warnings in assessment.md:32 and final-custody.mjs:14; not a source failure or blanket diff pass."
+}
