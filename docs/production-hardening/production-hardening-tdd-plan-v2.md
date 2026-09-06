@@ -18568,6 +18568,11 @@ three transition groups completed, but final creator cold reopen began at
 costs and next boundary. No product defect, full functional pass or further
 run is implied.
 
+The user's subsequent “yes investigate” authorizes continuing function-level
+attribution. **Bounded session-reopen CPU attribution** below freezes one
+profiled diagnostic of the same exact wide case, without source or workload
+changes; the preceding diagnostic identity remains consumed and immutable.
+
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
   exactly one expected settlement-profile failure and one complete v1 pass.
@@ -103921,6 +103926,48 @@ silently raise the watchdog. The three fixture diagnostics, grid authority
 composition and four registry/W0 failures remain separately open. This closes
 the one-off investigation and diagnostic capture, not parent GREEN, final
 review, D.110c-c or the long-run freeze. No prose review round is added.
+
+**Bounded session-reopen CPU attribution (2026-09-06).** Root's bounded
+source audit follows room `activateStartupPlane` through
+`reopenCreatorSuccessorAdoption`, private `consumeCreatorSuccessorReopen`,
+`reopenCreatorSuccessorMaterial`, durable closure reconstruction, trust/QC
+validation, snapshot verification and live activation. The fixture also
+wraps activation through per-peer module realms and observers. Source alone
+does not weight those costs, so no product repair is selected.
+
+Under the user's instruction to investigate, perform one function-level CPU
+diagnostic with exactly the prior one-file, one-active/23-filtered selection,
+opt-in phase log and unchanged 70-second test watchdog. Use the current Node
+binary with `--cpu-prof`, its documented default 1,000-microsecond sampling
+interval and a fresh evidence-local `--cpu-prof-dir` to launch the installed
+Vitest entry point directly. Installed Vitest 3.1.1 explicitly forwards
+`--cpu-prof*` arguments to its worker pool, so capture both parent/Vite and
+test-worker profiles, retaining PID and source/runtime identity. Do not
+substitute a profile of only the launcher for the measured test worker.
+
+Reuse the prior captured launcher/selection/custody and 180-second owned-tree
+containment plus five-second termination grace. Preserve complete reporters,
+phase logs, status and process quiescence. Freeze the command before spawn;
+no miniature workload, calibration, repeated profiling attempt, full-45 run,
+clean acceptance run, fixture change, production change, dependency or larger
+test deadline is authorized. Source hashes and prior passing static checks
+remain credited at identical bytes; do not rerun static compilers merely for
+an execution-argument-only diagnostic. Missing or malformed worker profiles
+are unavailable attribution, not a pass or authority to retry.
+
+Analyze native profiler samples by self time and inclusive call paths, keeping
+parent and worker distinct and accounting for idle/GC/unattributed samples.
+Use actual `timeDeltas`, not just sample counts, and preserve raw profiles and
+source locations. Do not double-count inclusive callers or summed concurrent
+peer intervals. Relate sampled owners to existing coarse phase evidence only
+where clock/process identity supports that relation; do not infer exact phase
+alignment from unrelated clocks. Profiling overhead makes this diagnostic,
+never functional acceptance. Select the smallest justified next action from
+measured product, fixture/module, mixed or unavailable attribution. Any
+production optimization still requires its narrow RED/GREEN and review
+boundary; any timing-contract revision remains explicit. Do not weaken the
+64-writer repeated-transition golden path. No further Fable or model review
+is authorized or launched for this diagnostic.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
