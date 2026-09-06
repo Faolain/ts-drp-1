@@ -18507,6 +18507,11 @@ Next is the parent record's bounded authority-read-order correction: preserve
 the original room guard test, add one profile-aware RED probe, then restore
 early refusal without blocking settlement creator cold reopen. No production
 ordering change precedes the separate signed/accepted additive RED.
+Its first signed test preparation stopped before runtime on an invalid fixture
+identity label; evidence `edb238c6` preserves that stop. The one-label
+continuation below changes no acceptance predicate. Forty-one external
+baseline-identical fixture type diagnostics remain assigned to parent static
+closure, not silently classified as a passing typecheck.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -102635,6 +102640,50 @@ The focused GREEN must pass all thirteen cases and preserve all other parent
 owners. Existing affected static/retained/browser/isolated and final-review
 obligations remain required; an actual new authority/API/schema/dependency or
 threshold need stops and reslices, never widens this guard repair silently.
+
+**Stopped preparation and one-label continuation (2026-09-05).** Signed tests
+`da874b52` and signed/pushed evidence `edb238c6` preserve the first preparation
+under `.logs/d110c-0c1f5b-red-room-guard-da874b52/`. Its exact 84-entry
+self-excluding manifest is
+`cfe539a80fd93634885029080f1c5d2e20298ee41b621c205c5173de5b952aa7`.
+Independent install, native preparation, source build, Node root import,
+fixture signatures/carrier bindings, lint, format and thirteen-title listing
+passed. The first standalone fixture loader omitted the importer's resolution
+context; its status 1 is preserved alongside the corrected diagnostic-only
+recorder and passing result. That was not a product or fixture failure.
+The subsequent typecheck did expose a new fixture error:
+`createV3ChatApplication("guard")` violates the existing persona literal union
+(TS2345). No constructor/test invocation, result or execution sentinel exists;
+the prospective eleven-pass/two-failure RED remains unproved.
+
+One read-only same-program compiler comparison substituted only the original
+target test from signed `61a793d3` in memory. It proves zero baseline target
+diagnostics versus one new target diagnostic and exact equality of all 41
+external diagnostics, including file, code, complete message, location and
+token. These belong to the existing creator-adoption and successor-product
+fixture static-contract owners, with deadline parent static closure. Their
+baseline equality permits this bounded runtime diagnostic after the new target
+error is corrected; it does not discharge their repair or claim static GREEN.
+The sealed evidence's staged diff check returned 2 solely for trailing spaces
+in the first raw Vite warning line of each fixture-validation stderr stream.
+Root verified those exact two exceptions and preserved raw bytes; authored
+syntax/whitespace checks pass. No blanket clean-diff claim is made.
+
+The existing RED owner may now change only that added helper's `"guard"`
+argument to the supported `"alice"` literal, in a separate signed/pushed
+tests-only commit. This selects the same chat blueprint and never reaches its
+bootstrap operation in these probes. Preserve all twelve original tests,
+the new eight-row matrix, signed prior attempt, parent production patch and
+other retained files. Use a new independently installed/source-built checkout
+and fresh evidence root; do not mutate or reuse the stopped checkout. Before
+the sole unfiltered thirteen-test execution, require zero target diagnostics
+and an exact same-program match of the 41 external diagnostics against the
+original target text, with full source/runtime, signature, fixture, listing
+and custody checks. Any new diagnostic or different causal result stops.
+The original expected eleven-pass/two-failure result and five-forbidden/
+three-permitted observation matrix are unchanged. Only accepted causal RED
+authorizes the separate narrow GREEN already frozen above; no extra reviewer,
+design slice, production change or workload is authorized by this correction.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
