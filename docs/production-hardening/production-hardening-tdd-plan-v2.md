@@ -104898,6 +104898,52 @@ frozen fixture corrections, establishes fresh source/input custody, and requests
 root release before runtime. The 51-case consumer gate, original W0/retained
 gates, browser, source-built isolation and frozen reviews remain open.
 
+**W0 retained-consumer GREEN checkpoint (2026-09-06).** Separate GREEN source
+is signed at `3a65a546acd05d9f536d2b0f9132aa471b5e80cc`. Only the three frozen
+fixtures changed. The genuine public store supplies its untouched settlement
+methods before the existing six overrides. The checkpoint and unfiltered full
+transition authenticate before exact digest/byte-length auxiliary-reference
+projection; full durable evidence remains intact. Both cold-input sites receive
+detached bytes from the single validated original bootstrap, not a recovery-row
+substitute. RED observers and assertions remain unchanged.
+
+The sealed evidence owner is
+`.logs/d110c-w0-retained-consumer-green-7c19a479/`; `runtime-handoff.json` and
+`runtime-roster.json` own the exact results and identities. Root independently
+verified all 135 self-excluding manifest entries, SHA
+`32c97c2e3382b738c4a0697ce6bcd61ee36bcb5f08fc4d571c2bfa4995fce5d8`,
+and the exact file set, runtime identities and all 942 input hashes.
+Staged whitespace warnings occur only in preserved `green.patch` context;
+the second whitespace check excludes that raw patch alone, not its custody.
+
+The two separately released invocations passed: focused seven cases in
+6.345 seconds, then all 51 consumer cases in 113.947 seconds. These are 58 case
+executions covering 51 unique identities, not 58 independent controls. Neither
+run skipped, failed, timed out or needed process cleanup. The genuine cumulative
+skip-budget child ran once and retained its public-shape and behavioral
+assertions. Epoch-two cold recovery is active-new, followed by accepted issuance
+and published output with the actual original pin. The existing committed-
+issuance control also recovers the genuine current-successor handle and accepts
+its next issue. The full-closure hostile controls and original bounded predicate
+controls pass without dropping durable aggregates from evidence.
+
+Exact-owner lint, format, diff and normalized implementation equivalence pass.
+Compilation remains baseline-equivalent, **not a clean typecheck**: 26 retained
+diagnostics, three in the frozen fixture owners, zero new. Preserve the initial
+kind-spelling correction, failed equivalence selector and traversal-order
+comparison with their corrected checks in `static-corrections.json`; none caused
+a runtime retry. Root's initial read-only identity comparison used Vitest's
+separator-free `fullName`; the structured ancestor/title comparison then matched
+the frozen roster exactly. No result or roster was rewritten to obtain a match.
+
+Protected source, built artifacts, stashes, paths and prior sealed evidence
+retain custody. This signed checkpoint is not W0 acceptance or formal review.
+The original W0 seven cases and complete retained roster remain required: keep
+all historic 220 identities plus the two new closure controls, with the three
+bootstrap-policy cases separately identified as supplements. Browser, fresh
+source-built isolation and the frozen three-model reviews remain open. No
+campaign, production change, build or reviewer was released by this repair.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;

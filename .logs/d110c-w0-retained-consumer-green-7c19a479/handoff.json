@@ -1,0 +1,73 @@
+{
+  "status": "GREEN source and static freeze READY; zero runtime test executions; root release pending",
+  "baseline": "7c19a4792eb63eecb85e4ac7a1484df88c77c984",
+  "sourcePatch": "green.patch",
+  "sourcePatchSha256": "54baa695c170ae83431fee7b4478e1ced4227dc62fab7043b53fef95c594df8a",
+  "sourceHashes": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "3c80b45a20d41a8044406270ffcee5ed954271ce9debfac71b25df778ad120fc",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "67be57e7ad5f72335c8e89b770a031960bf48b636594ec52e3b6c3adbb2db717",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "2944cdce0fd0ab8a1e1c0318e1bdc49522ac8ff678696a6a0a118f247739e00b"
+  },
+  "sourceCommitted": false,
+  "static": {
+    "lintErrors": 0,
+    "lintWarnings": 0,
+    "formatPass": true,
+    "diffPass": true,
+    "equivalence": "equivalence.json",
+    "greenHunksOnlyAndRedObserversPreserved": true,
+    "typecheck": {
+      "classification": "baseline-equivalent typecheck, not whole-program pass",
+      "retainedDiagnostics": 26,
+      "newDiagnostics": 0,
+      "ownedDiagnostics": 3,
+      "inventory": "typecheck-delta.json",
+      "wholeProgramPass": false,
+      "selectedRoots": 16,
+      "sourceInputs": 909
+    }
+  },
+  "collection": {
+    "files": 14,
+    "cases": 51,
+    "inheritedCases": 46,
+    "addedCases": 2,
+    "supplementalCases": 3,
+    "result": "collection/stdout",
+    "authoritativeRoster": "runtime-roster.json",
+    "noDuplicateOrRelabeledIdentities": true,
+    "reverseImportGraph": "consumers-accepted.json"
+  },
+  "custody": {
+    "protectedSources": 11,
+    "builtIdentities": 7,
+    "stashes": 27,
+    "protectedPaths": 86522,
+    "manifests": 42,
+    "inheritedInputs": 942,
+    "currentInputs": 942,
+    "allPreserved": true
+  },
+  "behaviorClaims": "No GREEN runtime outcome claimed. Genuine skip-budget child and both cold-input lifecycle controls remain to be executed after explicit root release.",
+  "currentSuccessorControls": "Existing 0c1b successful recovered handle and accepted issuance assertions; no observer callback API expansion.",
+  "proposedRuntime": [
+    {
+      "label": "runtime-checkpoint",
+      "budgetMs": 120000,
+      "files": 2,
+      "cases": 7,
+      "released": false
+    },
+    {
+      "label": "runtime-consumers",
+      "budgetMs": 240000,
+      "files": 14,
+      "cases": 51,
+      "released": false
+    }
+  ],
+  "corrections": "static-corrections.json",
+  "reviewersLaunched": 0,
+  "buildsLaunched": 0,
+  "testsExecuted": 0
+}
