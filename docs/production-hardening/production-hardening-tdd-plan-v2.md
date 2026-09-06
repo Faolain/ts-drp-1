@@ -18600,6 +18600,10 @@ The user has now authorized the three-error tests-only snapshot-fixture
 repair and continued execution. **Authorized snapshot-fixture contract batch**
 below supersedes that pending authorization, retaining separate RED/GREEN
 ownership and the existing review gates without reopening completed work.
+Snapshot-fixture RED is now signed/pushed (`dc2f8dc2`, evidence `1fc3d039`):
+the one test fails at its intended outcome assertion after all 15 controls,
+including genuine epoch-zero recovery, pass. **Snapshot-fixture RED acceptance
+and retained scope** below releases the separate narrow GREEN owner.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104353,6 +104357,58 @@ No Kimi/Opus substitution or prose-review round is introduced. Only P0/P1
 block closure; every P2 needs owner/disposition. This batch closes only the
 three fixture-contract errors when all its gates pass; the other recorded
 parent acceptance boundaries remain intact.
+
+**Snapshot-fixture RED acceptance and retained scope (2026-09-06).** Tests-only
+RED `dc2f8dc2170936fc491701614ba938767445468b` and evidence
+`1fc3d0393e25a8cf9c57edbc4b4461b9c39a86be` are signed/pushed, origin-exact.
+Root independently verified the complete raw reporter and self-excluding
+115-entry manifest under
+`.logs/d110c-0c1f5b-snapshot-fixture-red-03acb4ac/`; manifest SHA is
+`94f6c450f4750041aacd90f7c4bda53879c00863092745eeaa3c22723fc17200` and
+reporter SHA is
+`d872372b11c080c720ccd6d967b582d570934b8d06ad7876a2a241be7d1feabe`.
+Exactly one test/file ran, with one intended assertion failure, zero passes
+and zero skips at the final token. All 15 preceding controls, including one
+genuine recovery call, completed; the observed outcome is
+`missing-required-rejection`, not an undefined-function error. Test SHA is
+`24b7a57addf2b77ca6987cee6ac5f4d10586b63a23e0ed6c79d4dbdc78d28181`.
+The selected compiler preserves exactly the three inherited helper errors
+and zero new-test errors; matrix validation passes. No helper or production
+edit occurred in RED. This releases the separate GREEN owner under the
+frozen narrow repair, not a runtime retry or another review-only checkpoint.
+
+Preparation diagnostics remain honest: initial authoring lint/format issues
+were corrected before runtime; an overbroad process scan incorrectly matched
+a repository service and was replaced by the accepted numeric-only task
+predicate. No reviewer was active, fixed ports were clear, and no invocation
+was consumed by that readiness failure. A process-supplied title was not used
+as executable identity or published as evidence. The first result validator
+incorrectly demanded expanded object text from Vitest's abbreviated JSON
+message; the corrected validator checks the JSON token/actual result/source
+location and complete expected text in raw stderr. No test was rerun.
+After sealing, ordinary staging omitted ignored raw logs; exact-root forced
+staging restored the complete whitelist without changing bytes. Raw whitespace
+exceptions are only `focused/stderr.log:23,30`, `lint/stdout.log:7` and
+`typecheck/stderr.log:22` within this root. Excluding those exact raw paths
+passes the staged diff check; authored checks pass and sealed bytes remain.
+
+The caller audit also found four bounded indirect recovery consumers through
+the unchanged Node-settlement fixture. Add these existing files to the same
+GREEN retained roster before execution: `phase-6b-d110c-0c1f5b0b-node-red`,
+`phase-6b-d110c-0c1f5b0b-node-corrective-red`,
+`phase-6b-d110c-0c1f5b0t-settlement-progress-red` and
+`phase-6b-d110c-0c1f5b0u-store-red` (under `tests/`, `.test.ts`). Freeze their
+actual selected titles/counts, not source-text guesses. This is relevant
+regression coverage for the authorized helper change, not scope expansion
+into another implementation. The shadow driver's live checkpoint also uses
+the genesis recovery helper, but its existing comparison file eagerly runs
+a synthetic 100-close setup. Do not launch that setup in this batch or claim
+a new runtime pass for it. Preserve the driver/intermediate fixture hashes
+and prove unchanged existing genesis execution, `fakeNetwork` and module
+initialization; the added unsupported method is unreachable on the inspected
+epoch-zero recovery branch. Thus the targeted direct/indirect retained
+roster is 11 files plus the new focused test, without a wide or long-run
+replay. Final review must inspect this coverage boundary explicitly.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
