@@ -18522,18 +18522,17 @@ diagnostics remain preserved; none required a product change. The parent
 record's **Consolidated remaining fixture/type acceptance batch** now has signed
 RED/amendment `f8ec9daf` and four-source GREEN `8336eb77`: all nine fixture
 diagnostics are removed, with only the unchanged grid error in both compilers.
-Main passes 49/49, but clean isolation stops at 48/49: the unchanged pacemaker
-trace-replay test exceeds its inherited 10-second runner limit (10.93 seconds;
-main 9.04 seconds). The complete-set audit finds no other isolated failure.
-The batch is not accepted; its **Consolidated fixture-exit isolated stop** below
-owns evidence. The user has now authorized exactly the test-local 20-second
-budget amendment below; separate GREEN and the same acceptance gates may resume.
-No unchanged retry, product-defect conclusion or new review-only slice follows.
+The original main 49/49 and isolated 48/49 timeout remain immutable. The user's
+test-local 20-second amendment is now signed at `967da628` and passes 49/49 in
+both main and a fresh source-built isolated checkout. The parent record's
+**Consolidated fixture-exit acceptance** owns the complete evidence and scope.
+Compatible fixture cleanup has passed its required repair gates; return to
+the existing combined parent acceptance, not another fixture/prose review slice.
 Grid `roomHeadAuthority` composition and four still-recorded original runtime
 failures remain separate; those four are not a newly executed whole-parent
 aggregate. Registry-freeze repair retains its explicit governance boundary.
-After the compatible batch's acceptance, return to the existing combined
-parent gates and inspect their complete failure set before further edits.
+Run the existing combined parent gates against the current production bytes
+and inspect their complete failure set before further edits.
 Do not extend fixture cleanup one diagnostic/checkpoint at a time.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
@@ -101057,8 +101056,10 @@ diagnostics are subsequently repaired by the two-fixture GREEN below, with
 The consolidated four-source fixture GREEN at `8336eb77` then removes nine
 more fixture diagnostics and passes 49/49 in main, but its clean-isolated
 acceptance stops at 48/49 on the unchanged pacemaker replay's 10-second runner
-limit. The detailed stop below preserves that result and owns the test-budget
-decision; no production performance defect is established and no retry occurs.
+limit. The detailed stop below preserves that result. The subsequently
+user-authorized one-test 20-second budget at `967da628` passes 49/49 in main
+and fresh isolation; the compatible fixture acceptance below closes this
+repair's runtime gap without a production performance claim or unchanged retry.
 Registry-freeze and W0 compatibility decisions retain their distinct boundaries.
 The partial eight-owner production patch is preserved, not committed or
 accepted. Other retained repair, browser/static/isolated and final review gates
@@ -103457,6 +103458,63 @@ boundary is not waived, nor is another review-only slice introduced. After
 acceptance, return directly to the already-required combined parent gates and
 complete-failure-set diagnosis. Grid authority composition and the four original
 recorded runtime failures retain their separate dispositions and boundaries.
+
+**Consolidated fixture-exit acceptance (2026-09-06).** The authorized
+one-file GREEN `967da628cc8522cf468c20488a2e071eb84e59ee` is signed and pushed.
+Main and fresh-isolated four-file runs each pass all 49 cases with exact
+file/title/ancestor/fullName multisets, no failures/skips or reported errors.
+The amended replay completes in 10,581.410750ms and 10,236.386167ms respectively
+under its explicit 20-second harness budget. These are observations, not a
+production timing contract. The earlier 10-second failure remains preserved.
+
+Evidence is `.logs/d110c-0c1f5b-green-replay-budget-1809157e/`, with 206
+self-excluding manifest entries and manifest SHA-256
+`68b94317a4062b7ead8100854109dca1df9924373715a7266c4c1a81ffe21e06`.
+Root independently verified every entry, the complete inventory and both raw
+reporters. Main reporter SHA-256 is
+`f9d42b869d34ea6e70cc3d2bb030e4157d45e1f080a01b3c41cbc30836eeb20f`;
+isolated is `94497028350e0d2f969a7ec59dd8d2bd65b4084b02e4d07e3941c32fde1b1b7b`.
+`final-assessment.md` owns the exact commands, statuses, identities and limits.
+
+Only the third registration argument is added. Removing it restores every
+previous source byte, including callback-body hash `f3c51b5f029dff7d496528157f04b1b5bc550b5a149dadd35aaba530675c0e41`.
+Readiness, assertions, traces, model commands, global 10-second timeout and
+product timers remain unchanged. Exact-owner lint/format/diff/equivalence pass.
+Both four-root strict compilers retain only the exact grid TS2345, with exit 1
+and matrix-validator exit 0; this does not claim a whole-program static pass.
+The nine repaired fixture diagnostics remain absent.
+
+Fresh checkout `/private/tmp/d110c-f5b-green-replay-budget-zIt6Xr/checkout`
+uses signed `967da628` plus the unchanged eight-owner `6d0fd99c` production
+overlay, its own frozen install and first-invocation official native setup.
+Native/Node imports and fresh source build pass; all 93 source identities and
+seven initially absent, freshly built artifacts match main. All 928 isolated
+compiler sources are inside the checkout, matching common main hashes; 381
+main-only ancestor ambient declarations explain the 1,309-versus-928 graph
+difference. No prior checkout or host runtime artifacts are reused.
+
+All 37 command statuses are preserved: two expected grid-only compiler failures
+and two pre-runtime recorder mistakes are the four nonzero results. The
+equivalence checker initially included the enclosing `describe` body, and the
+first readiness check preceded lint completion. Corrected checks pass without
+source correction or runtime repetition. Final custody retains the effective
+85-entry test/shared map, eight production/seven built owners, 27 stashes,
+86,522 protected paths and prior immutable evidence. The pending production
+patch remains uncommitted and unchanged.
+
+This completes the compatible fixture repair gates, not parent f5b or Phase-6
+acceptance. Resume the existing combined static/retained and current-byte
+integration gates, then browser/isolated/final-review obligations as permitted
+by their existing ordering. Inspect the complete failure set before any more
+edits; do not introduce another checkpoint for each diagnostic. Grid authority
+composition and four still-recorded original runtime failures are not waived
+or reported as a new aggregate. The required final Grok/Sol/Fable parent review
+still inspects the signed history, including this authorized timing amendment.
+
+The unfiltered staged whitespace check exits 2 solely for four context-prefix
+spaces before tabs in the sealed `fixture-only.patch` (lines 6, 7, 8 and 12).
+Root verified those exact raw lines; excluding only that artifact passes.
+Edited-source and plan checks pass, and the sealed patch remains unchanged.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
