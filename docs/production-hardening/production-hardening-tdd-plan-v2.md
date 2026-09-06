@@ -18592,6 +18592,10 @@ complete 64-writer pass in 69,154.209667ms, zero failures, 23 intentionally
 filtered cases. **90-second wide-fixture focused result** below owns the
 sealed evidence. This closes the focused timeout blocker only; combined,
 isolated and final parent acceptance remain open with the known other debt.
+**Remaining acceptance boundary readback** below identifies the next proposed
+snapshot-fixture contract batch and keeps registry, W0 compatibility and grid
+authority decisions separate; the 90-second authorization does not silently
+authorize those changes.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104232,6 +104236,44 @@ or the prior aggregate establish current combined acceptance. No combined,
 isolated, browser, campaign or additional profiling execution occurred here;
 no new review-only slice is required. D.110c-c and the long-run freeze remain
 pending parent acceptance, not released by this focused pass.
+
+**Remaining acceptance boundary readback (2026-09-06).** Read-only inspection
+after signed/pushed `a437d985` credits the completed timeout gate without
+reopening the accepted two-owner annotation batch. No new test, compiler,
+reviewer or runtime diagnostic was executed. The current selected compiler
+evidence remains the exact three external diagnostics captured in the
+90-second evidence root; retained failures remain the complete raw
+`retained-30`, `retained-40` and `retained-58` results under the `71bca5d5`
+evidence root, not newly reproduced failures.
+
+| Remaining requirement                                 | Current source/evidence                                                                                                                                               | Smallest disposition                                                                                                                                        |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Snapshot-fixture interface and settlement-plan typing | `tests/fixtures/phase-4b-v3/live-snapshot.ts`: missing `installEpochAnchor`, implicit plan-entry type, nullable write return; the current compiler confirms all three | Propose one tests-only contract batch with separate RED/GREEN owners; no production edit or fake successor support                                          |
+| Registry-governance assertions                        | Two seal-digest-law failures and one journal registry pin failure; signed `0d6e38c2` adds only optional `authorShareMultiplier` to the registry                       | Reconcile the accepted addition with the historical tuple/checker contract prospectively; do not blindly update pins or alter immutable seven-file evidence |
+| W0 fence/share compatibility                          | The existing aggregate fails `toMatchObject`; raw output does not identify the differing field                                                                        | Preserve failure; settle the legacy-profile versus settlement-only fence contract before changing its expectation or production ingress                     |
+| Grid room-head authority composition                  | `examples/grid/src/v3-zone.ts` calls `createV3RoomSession` without required `roomHeadAuthority`                                                                       | Explicit authority-composition decision, not a fixture cast, invented floor or weakening of the room API                                                    |
+
+The snapshot helper hardcodes an epoch-0 scope. Its missing epoch-install
+method cannot honestly claim generic successor adoption. A repair must
+retain its genuine supported recovery behavior, fail closed on unsupported
+epoch installation, and prove that refusal without substituting a fake
+successor. The settlement store contract independently requires a typed
+write input and a non-null `Promise<SettlementPlan>` result, unlike the
+nullable read. A locally constructed non-null committed plan can satisfy
+that distinction without altering CAS, entry copying or transaction effects.
+These are proposed fixture-contract obligations, not an already-authorized
+runtime implementation or permission to suppress the diagnostics.
+
+Root's next requested decision is authority for that bounded three-error
+tests-only batch, including its fail-closed unsupported-installation behavior,
+separate RED/GREEN and existing review gates. It is not another review-only
+slice and does not release any registry, W0, grid, API, threshold or product
+change. Existing immutable failures should supply RED where causal; any new
+refusal assertion must fail for its intended behavior, not a missing export.
+After this and the separately bounded governance/compatibility/authority
+obligations are resolved, run the existing complete combined and isolated
+acceptance gates. The focused 64-writer pass remains accepted at its actual
+scope; no new long workload is authorized by this inventory readback.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
