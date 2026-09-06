@@ -18475,7 +18475,32 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (settlement-codec gate repaired; transport fixtures next):
+Current work (f5b acceptance repair; D.110c-c is remaining-gap closure):
+
+The prospective **D.110c-c requirements-to-evidence reconciliation
+(2026-09-05)** below governs its remaining scope. Do not recreate cleanup,
+restart or repeated-adoption proofs assigned to older roadmap wording when
+later accepted work already supplies them. Pending f5b gate 71 passes 45/45,
+including one room with 64 contributing writers through three transitions;
+that is diagnostic GREEN awaiting parent acceptance, not a closed milestone.
+The positive issuance-deletion case uses two writers; room stop/reopen in that
+suite is same-process, not fresh-process crash recovery. D.110c-c retains only
+the uncovered owner retirement/census, crash and composition obligations in
+the table. The MMORPG path is f5b acceptance → actual D.110c-c gaps → reviewed
+D.110c-d workload/memory/evidence freeze → execution. Discord-specific f5b0y
+and archive/paging work do not gate that independently bounded control without
+a demonstrated shared dependency. This clarification creates no review round,
+new implementation authorization or long-run invocation.
+
+The current transport fixture correction is signed at `772e96bd`; its stopped
+isolated evidence is signed/pushed at `8e121d2d`, under
+`.logs/d110c-0c1f5b-retained-transport-772e96bd/`. All three corrected cases pass,
+but the sole complete selection is 23 pass / 1 fail / 0 skip: an untouched
+Node-root import case cannot load the existing `node-datachannel` native
+binary after an isolated install with scripts disabled. The gate is not
+accepted or retried; thirteen exactly baseline-attributed target type
+diagnostics remain open. This does not change the eight unresolved failures
+in the original retained inventory or interrupt the existing repair sequence.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -92295,6 +92320,11 @@ receipt, archive record, or active registration in test code.
    Existing first-transition APIs and epoch-1 governance controls remain valid;
    new epoch-N controls are additive. Deadline: before D.110c-c RED.
 7. **D.110c-c — bounded cold reopen, repeated cleanup, restart, and custody.**
+   **Prospective scope correction (2026-09-05):** the requirements-to-evidence
+   reconciliation immediately below this numbered sequence supersedes the
+   following original allocation wherever later work absorbs an obligation.
+   These historical descriptions are not instructions to manufacture another
+   RED for implemented behavior or to repeat accepted milestones.
    Owner: the existing D.109 cleanup/reclamation orchestrators and installed-v3
    registration custody, consuming approved 0b/0c designs. This slice also owns
    the currently missing close-capability composition after cold reopen: today
@@ -92342,6 +92372,121 @@ receipt, archive record, or active registration in test code.
    its final golden-path closure additionally require D.110c-0c1f5b0y GREEN;
    a smaller bounded fixture is not message-capacity safety evidence. Deadline:
    before Phase-6 exit or Phase-7a execution.
+
+##### D.110c-c requirements-to-evidence reconciliation (2026-09-05)
+
+**Status: bounded plan reconciliation complete; implementation has not begun.**
+Owner: the parent plan custodian for evidence credit, then the existing
+Node cleanup/installed-owner and storage maintenance owners for demonstrated
+gaps. Deadline: close applicable gaps before D.110c-d RED and its MMORPG
+execution freeze. This is prospective remaining-gap closure, not a new architecture or
+review-only slice. Preserve every completed checkpoint, immutable result and
+consumed identity. Required regression validation remains required; it does
+not reopen the milestone that originally established the regression.
+
+Evidence keys below identify scope, not interchangeable proofs:
+
+The read-only source audit is at signed `8e121d2d` plus the preserved parent
+patch SHA-256
+`245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed`.
+“Current” source references below mean this exact state, not an accepted
+production commit. No prior evidence is amended to describe this state.
+
+- **F**: `tests/phase-6b-d110c-0c1f5b-integration-red.test.ts`, signed test chain
+  through `f83764c5`, with source-bound diagnostic evidence committed at
+  `8ba7d208b29a644678802aa06e397d1afcd8c7fd`,
+  `.logs/d110c-0c1f5b-green-ab98cce6/retained-71/result.json` (45/45).
+  The enclosing 458-entry manifest is
+  `16888af6758fb12fa0cf4c55cf231babac0b468665e04b7a8e6f4976a4f41523`.
+  Its eight-owner production patch is still uncommitted/unaccepted; neither
+  this evidence commit nor this reconciliation is a production GREEN commit.
+- **R**: accepted D.109f correction `ca25ea23`,
+  `.logs/phase-6b-d109f-green-correction/`, and its confirmation recorded in
+  D.109f; `tests/phase-6b-differential-exit-red.test.ts`,
+  `tests/phase-6b-ahe-reclamation-red.test.ts` and
+  `tests/phase-6b-runtime-reclamation-red.test.ts`. Credit the existing
+  cleanup/receipt/census kernels, 128-step maintenance differential and fresh
+  single-handoff lifecycle, not 128 genuine same-room epochs.
+- **B**: accepted checkpoint GREEN `420fd240`,
+  `.logs/d110c-0b1-green-9457680d-final/focused-evidence.json` and
+  `.logs/d110c-0b1-final-review-420fd240/`;
+  `tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts` and its boundary
+  test. This proves bounded current control references and epoch-2 reopen,
+  not retirement of every sibling store.
+
+| Requirement                                                                                                       | Implementation owner                                                            | Exact existing commit/test/evidence                                                                                                                                                                                                                                 | Status             | Smallest remaining action                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| One room, 64 active writers, three genuine transitions; real plan → fence → replacement and continued publication | f5b room/Node settlement composition                                            | F, `sixtyFourWriterGoldenPath`: all 64 contribute in epochs 0–3, rotating offline cohorts, 256 ordinary contributions and six displaced sources                                                                                                                     | pending acceptance | Finish f5b's existing gates and review; credit this composition without a new D.110c-c RED. Extend horizon only in D.110c-d.                                                                                                                                                         |
+| Snapshot chunks/manifest, exact canonical state, ACL/authority and authenticated anchor/history accounting        | f5b creator-close/checkpoint and room projection owners                         | F, `sixtyFourWriterGoldenPath`, actual produced chunks and independent `snapshotStateOracle`; exact history root/size and final cold-state assertions                                                                                                               | pending acceptance | Accept f5b; retain these oracles. Unchanged archive root is not advancing archive/paging proof.                                                                                                                                                                                      |
+| Creator cold reopen remains close/issue-capable                                                                   | f5b `examples/v3-room/src/index.ts`, creator-adoption and live owner            | F, creator reopen after epoch-2 adoption, subsequent genuine close, epoch-3 issue and final cold reopen                                                                                                                                                             | pending acceptance | Credit after f5b acceptance. Its `reopen` calls room close/create in the same process and retained realm; add only missing process-death boundaries. Do not restore the obsolete blanket signer/declaration prohibition for settlement.                                              |
+| Active AHE generation plus two complete physical rollback ancestors                                               | existing AHE maintenance, f5b cleanup composition                               | F, `assertRetainedRollbackPair`: exact three generations, complete closures and linked digests; called for the 64-writer creator and both peers in case 13. Discovery accepted separately at `6f3d3049`, final review `.logs/d110c-0c1f5b0z-final-review-6f3d3049/` | pending acceptance | Accept parent composition; reuse closed discovery and reclamation. Count blobs/promotions and every other owner separately. Physical generations are not necessarily distinct prior logical epochs.                                                                                  |
+| Genuine eligible issuance-prefix deletion; premature deletion refusal                                             | issuance maintenance backends and f5b Node caller                               | Closed f5b0d `292fc14f`/`b384c7d9`, final confirmation `b15917ff`; F, case 13 `positiveAuthenticatedPruning`, real first deletion and durable absence after the third close                                                                                         | pending acceptance | Preserve accepted backend contract; accept parent caller. Case 13 has two writers, not 64. Add only uncovered intermediate-prefix/hold/outbox composition and census; D.110c-d must account for all 64 writers.                                                                      |
+| Age-independent authenticated current trust opening                                                               | protocol checkpoint and Node transition classifier                              | B: exact staged/active ref census and authenticated predecessor/current opening                                                                                                                                                                                     | accepted           | Reuse opener and authenticated floor contract; later repeated-room census must show no required chain hidden in journals or sibling storage.                                                                                                                                         |
+| Fresh-process pre-close, post-close, pre-adoption, post-adoption and post-prune recovery                          | existing durable pending-recovery and lifecycle harness/owners                  | R covers a fresh single handoff; D.110c-0c persistent Chromium child `packages/storage-browser/tests/process/phase-6b-durable-pending-recovery-child.ts` and its 0c record preserve pending-recovery diagnostics; F supplies same-process reopened composition      | partially covered  | Finish any still-open 0c acceptance in its existing lineage; map exact crash edges before adding only uncovered genuine-process cases. Neither a child file nor a diagnostic epoch-3 commit is acceptance, and neither is the 64-writer crash matrix.                                |
+| Skipped-prune catch-up, rollback/availability refusal, receipt replay/staleness                                   | D.109 planner and backend/runtime reclamation                                   | R; `packages/storage/src/maintenance.ts::classifyAheReclamation`, Node `closed-epoch-cleanup.ts::lineagePlan`; F case 13 proves sequential positive pruning                                                                                                         | partially covered  | Retain accepted kernel mutants. Prove only absent repeated-room skipped-prune and refusal compositions with exact no-deletion/catch-up receipts; a prefix-walking implementation alone is not that runtime proof.                                                                    |
+| Bounded `sealEvidence`, `voteSlots`, `signerState`, `voteOutbox`                                                  | storage-browser seal/vote owners; D.110c-c retirement composition               | `93fe946a`; `internal/seal-evidence-store.ts` and `internal/seal-vote-store.ts` retain epoch-keyed rows; `markDispatched` updates, does not delete. AHE reclamation transaction excludes these stores. No accepted retirement proof identified                      | uncovered          | Establish each applicable store's exact row/byte census and authenticated rollback/availability/outbox-safe retirement; demonstrate the gap causally before code. Preserve anti-equivocation and pending dispatch custody. Zero rows in an unused store is not exercised retirement. |
+| Bounded durable live journals and watermarks                                                                      | live-journal contract and browser/Node journal backends                         | Current `packages/live-journal/src/types.ts` and both `src/live-journal.ts` implementations; R credits runtime release, not durable journal deletion. No durable retirement operation found in these owners                                                         | uncovered          | Scope the missing authenticated durable-retirement seam and exact census. Do not infer disk deletion from volatile map release or silently widen the public contract.                                                                                                                |
+| Snapshot/quarantine and AHE blob/promotion retention                                                              | snapshot-transfer backends and existing AHE maintenance                         | Browser `src/snapshot-transfer.ts` already implements expiry sweep and cancellation; AHE backend deletes selected generations/promotions/unshared blobs; R and F cover their narrower paths                                                                         | partially covered  | Reuse existing mechanisms; prove exact bytes/scopes/blobs retained across repeated close/reopen and rollback/availability refusal. TTL or generation count alone does not establish safe epoch retirement. Change production only for a demonstrated missing composition.            |
+| Freshness floor is fixed-size and safely replaced                                                                 | existing application-held `V3RoomHeadAuthority` and Node `creator-room-head.ts` | Accepted 0b0 correction `43290dab`, `.logs/d110c-0b0-confirmation-43290dab/`; `tests/phase-6b-d110c-0b0-floor-red.test.ts`; B and F consume the floor, F asserts stable epoch/head after adoption/reopen                                                            | partially covered  | Count one stable and at most one pending tuple at the actual selected provider, including crash paths and terminal used-scope custody. Do not invent another floor owner or count only its room-side projection.                                                                     |
+| Active-owner, predecessor-registration and close-handle custody                                                   | D.109 runtime release; D.110c-b and f5b installed/room owners                   | R's exact 22-owner lifecycle census; accepted D.110c-b `5aa26cd4`; F exercises repeated real close/reopen and terminal/refusal controls                                                                                                                             | partially covered  | Credit those owners. Check deferred alias-cleanup, failure-path stop guard, raw/visible authority and head tuple against accepted tests; add only still-missing cases and repeated-room exact census, not a new ownership system.                                                    |
+
+The actual missing production mechanism found by this bounded inspection is
+safe durable retirement for the independently retained seal/vote and journal
+owners, not another implementation of repeat adoption, AHE discovery or
+issuance pruning. Each seal/vote store must be classified as exercised or
+inapplicable for the selected profile, with exact zero accounting where truly
+unused; none may disappear from the ledger. Snapshot retirement, skipped-prune
+catch-up, provider retention and crash/custody composition are presently proof
+gaps unless their bounded RED identifies a missing production seam. Existing
+deletion/cancellation APIs must not be replaced merely to give D.110c-c new
+work. No new API/authority/wire/schema/dependency/threshold choice is made here;
+any required change stops at its existing explicit review/authorization
+boundary, including the user's new-API consultation rule.
+
+Prospectively absorbed obligations are f5b's settlement-profile cold
+close rebinding, stable epoch-N room reopen, exact snapshot/application-state
+composition, three-transition adoption, numeric issuance-prefix reconciliation
+and first eligible deletion. Their older forward allocations in D.110c-b,
+0b1, 0c, 0c1g and f5b0d remain historical records, not parallel tasks. Transfer
+final credit only when f5b closes; pending acceptance is neither failure nor
+permission to recreate its RED. This does not grant settlement behavior to the
+unchanged legacy profile or turn two-writer cases into 64-writer evidence.
+
+The remaining MMORPG path is exact:
+
+1. Finish current f5b retained/static/browser/isolated acceptance, signed/pushed
+   production/evidence and the governing Grok/Sol/Fable final review. Preserve
+   all stopped attempts and assigned debts; no milestone is waived here.
+2. Close only the uncovered D.110c-c obligations above and any still-open
+   prerequisite acceptance. Use existing causal RED/separate GREEN and review
+   gates for actual changes. Maintain a per-owner row/item/byte ledger,
+   retirement condition and refusal result; archival application bytes are
+   separate and cannot conceal required ordinary-reopen control state.
+3. Freeze and review D.110c-d's exact ≥100 genuine same-room transitions,
+   64 contributions per epoch and offline/rejoin schedule, process/restart
+   matrix, durable/runtime census, independent state/history/accounting oracle,
+   fresh-process during-execution post-GC memory samples, ceilings, watchdog,
+   source/runtime identity and fail-closed evidence/invocation contract. This
+   amendment chooses no new values and authorizes no consuming invocation.
+4. Execute only after those gates pass under the separately reviewed execution
+   contract. Neither W0's ACL capacity nor D.110a's consumed distinct-room run
+   substitutes. The MMORPG-only bounded-state control does not wait for
+   f5b0y's Discord message-capacity design or Phase-7 archive/attachment work
+   absent a demonstrated shared dependency. Discord and combined golden-path
+   closure retain those separate dependencies.
+
+Validation for this plan-only reconciliation: read the named source seams and
+test assertions; parse existing gate 71 as 45/45 without execution; rehash all
+458 files of its manifest and all 95 files of the stopped transport manifest
+`6370ab611b6d247a323b0bda52c58fdd63be7a1fb6862b32de3c3c6a105bf090`.
+No production source, fixture, historical evidence, limit or workload changes;
+no new agent, reviewer or test invocation. Missing-path/glob search diagnostics
+were corrected to the actual owner paths and are not code failures.
+Bounded Prettier checks pass for the frontier addition and reconciliation;
+the table has exactly thirteen rows using only the four required statuses.
+Plan-only `git diff --check` passes. All eight pending production-owner hashes,
+86,522 protected paths and 27 stashes are unchanged; the index was empty before
+staging this plan-only checkpoint. No historical source/evidence hash is updated.
 
 ##### D.110c-0a bounded epoch-relative seal-custody plan
 
