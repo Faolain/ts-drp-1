@@ -104770,6 +104770,80 @@ prepared source-built acceptance and Grok high/Sol high/Fable xhigh review.
 Do not commit the pending W0 source as accepted, widen production owners,
 repin historical evidence or release any long workload from this checkpoint.
 
+**W0 retained-consumer repair freeze (2026-09-06).** The signed local checkpoint
+`8be3011b69ae4b1dd327c618d641f15f8830ca34` preserves the four causal failures;
+it does not accept W0. The read-only consumer audit bounds three fixture seams
+below. Implement observation/assertion RED first, then use a different GREEN
+owner. Neither owner may change production, the shared creator-adoption helper,
+pending W0 source, historic evidence, timers or workload sizes. Existing genuine
+stores and authentication owners remain authoritative; no parallel verifier,
+private maintenance binding or legacy compatibility path is introduced.
+
+The exact RED owners are
+`packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`,
+`packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`,
+`tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts`,
+`tests/phase-6b-d110c-0b1-boundaries.test.ts`,
+`tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts` and
+`tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts`. GREEN owns only the
+three fixtures in that set, in implementation hunks separate from RED. Freeze
+the exact resulting case identities, dependency inputs and command budgets
+before runtime; source-owner permission alone does not release a test run.
+
+1. **Public store shape.** RED observes ordered own keys/descriptors, settlement
+   method presence and identity, distinct identity of the six intentional
+   overrides, and absence of added keys/symbols through the existing genuine
+   cumulative-skip child. Keep all existing skip-budget, bounded materialization,
+   mismatch, reuse, publication and equality assertions. GREEN spreads the real
+   public store before its six existing overrides, preserving order and the two
+   untouched settlement functions. Do not register the facade in private
+   maintenance maps. The consumed retained failure is causal RED; do not rerun
+   the expensive child merely to attach new observations to old evidence.
+
+2. **Authenticated closure projection.** RED preserves full durable closures
+   and asserts current/proposed/active census 7/6/7, one aggregate at closed
+   epochs 0/1/1 and unchanged bounded census 5/4. These are current-contract
+   assertions, not edits to historic measurements. Add a genuine full-closure
+   positive and missing/duplicate aggregate, invalid signed bytes with a
+   recomputed reference, current-as-proposed substitution, and wrong Cut/QC or
+   predecessor-binding controls through `inspectCreatorTransitionAdvance` in
+   verify mode. Independently open aggregates through the existing protocol
+   opener with expected bindings derived from authenticated checkpoint/closure
+   authority, not the mutated aggregate. Assert exact durable occurrence and
+   proposed prior-aggregate reference to current. Preserve existing hostile
+   bounded-predicate controls. GREEN opens the existing checkpoint and verifies
+   the unfiltered full transition before projecting authenticated retirement
+   and aggregate references out for the trust-only predicate. Preserve the full
+   evidence; a kind-name filter alone is not authentication.
+
+3. **Cold bootstrap provenance.** RED derives one detached original bootstrap
+   operation from the uniquely matching original epoch-zero row in
+   `hot.base.evidence.journalRows`, using existing `bytesForRow`. Validate room,
+   original author, genesis anchor, sequence zero and decoded bootstrap identity,
+   dependencies and logical time. Observe actual supplied-pin presence/equality
+   at both cold-input constructions without adding the pin. GREEN supplies that
+   single validated value via the existing
+   `exactCanonicalPinnedGenesisBootstrapOperationBytes` field at both sites.
+   Never derive it from the mutable recovery row, hardcode it or add a shared
+   fixture API. Preserve epoch-two active-new recovery, accepted post-reopen
+   issuance, publication, genuine stores and authenticated floor checks. The
+   existing admission-rejected diagnostic is causal evidence; success remains
+   unproven until the repaired consumer runs.
+
+RED must preserve source/patch custody and prove observation-only equivalence
+outside its assertions. Static/type/lint/format and collection may proceed;
+send the exact runtime roster to root before execution. GREEN then requires
+each repaired genuine consumer, including the existing skip-budget child once.
+The eight direct affected files retain their existing 19 cases before added
+controls; their authoritative dependency-derived roster belongs in evidence.
+The three existing bootstrap-policy cases in
+`tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts` are explicitly authorized
+as supplemental controls, not relabeled members of the historic retained 220.
+After bounded repair passes, retain the original W0 7 and retained 220 gates
+without exclusions, followed by browser, source-built isolation and the frozen
+three reviews. Preserve all pending production/build/stash/path custody. On a
+new failure, diagnose and reslice before replaying; no campaign is released.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
