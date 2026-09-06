@@ -18552,6 +18552,10 @@ That amendment is signed/pushed at `5ea4a5ed`, but its sole main execution also
 stopped: 44 passed and the wide case timed out at 70,025.111834ms. No fresh
 isolated run followed. **Wide-fixture watchdog amendment stop** below owns this
 new evidence; bounded diagnosis is next, not another deadline increase or rerun.
+The subsequent read-only audit below finds that existing evidence cannot
+identify the timed-out lifecycle phase or distinguish CPU cost from waiting.
+It proposes one tests-only diagnostic execution, pending explicit authorization;
+no production repair or further timeout increase is justified yet.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -103686,6 +103690,61 @@ obtain a pass. The other four retained runtime failures, three snapshot type
 errors and grid authority composition retain their existing dispositions.
 The current-byte 64-writer proof, parent acceptance, fresh isolation and final
 review remain pending; no Phase-6 or long-run claim is released.
+
+**Wide-fixture read-only diagnosis (2026-09-06).** At signed `124e9a87`,
+root inspected the current integration fixture, both stopped raw reporters
+and stdout/stderr, the earlier accepted raw reporter, and the installed
+`@vitest/runner` 3.1.1 implementation. No test, profile, instrumentation,
+production edit or model review was run. The current fixture remains hash
+`a1bbf534aa93f5990a442c974035f5aa73c4982569886876a957b6b62da37a0d`.
+
+`sixtyFourWriterGoldenPath`, `openRoom`, `reopen`, `transferDatabase`, `send`
+and the fixture's cleanup hooks own the relevant source path. Successful
+execution entails 64 initial sessions, 256 ordinary issues over four epochs,
+three real close/adopt transitions, 189 noncreator successor reopens and 378
+corresponding AHE/quarantine database transfers, plus two creator reopens.
+The transfers read all keys/values and write detached copies, while reopen
+uses the genuine authenticated product path. The transport's admission wait
+is bounded by 256 readonly IDB turns, not an elapsed-time gate. These are
+planned source counts and possible cost owners, not observed completed work
+or evidence that any one owner dominates. The timeout reports contain no
+last-phase, epoch, writer or await-start/finish observation.
+
+Installed runner `dist/index.js::withTimeout` rejects its wrapper promise
+on deadline but does not cancel the callback promise. Fixture `afterEach`
+closes the then-known shared sessions and restores mocks; the next
+`beforeEach` resets shared observations. Therefore timeout alone does not
+prove callback termination before cleanup. No cross-test contamination has
+been demonstrated, and the captured 44 passing statuses remain honest raw
+results; do not infer independent post-timeout quiescence from them.
+The inspected installed runner has SHA-256
+`8f0c538ef8f4eb308f4d814bcc1deb14cf3d4afd06c37b4ff6eef02b10bbd9d5`.
+
+Read-only comparison of the three raw 45-case reporters finds an earlier
+wide pass at 56,860.0455ms under different production bytes, then the preserved
+60,033.888875ms and 70,025.111834ms timeouts. The other 44 reported durations
+sum to 28,651.033210ms, 37,123.074961ms and 34,437.058248ms respectively.
+Those non-controlled aggregates cannot distinguish product changes, fixture
+cost, host scheduling or surviving timed-out work. Neither a linear
+extrapolation nor a larger deadline is a defensible diagnosis.
+
+Smallest proposed next action, not yet execution authority: add bounded
+tests-only start/end lifecycle observations carrying monotonic elapsed time,
+process CPU deltas, epoch/writer identity and completed-operation counters,
+written incrementally outside product code. Cover initial open, per-epoch
+issue, close, adoption, database transfer, successor reopen, final checks and
+cleanup. Run only the exact wide case once with the unchanged 70-second
+watchdog in a fresh process; capture complete output and process termination,
+with no later selected test sharing that worker after timeout. Partial
+observations remain diagnostic, never substitute for the existing full proof.
+If CPU is dominant, identify a concrete measured owner before proposing an
+optimization; if a phase stalls with low CPU, inspect its actual outstanding
+await. Instrumentation overhead means this is diagnosis, not acceptance.
+No deadline, workload, assertion, production behavior or dependency change is
+proposed. The existing separate RED/GREEN and final review boundaries remain;
+obtain explicit authorization for instrumentation and the one execution before
+editing the fixture. Do not add a review-only slice or recursively review this
+audit prose. Other known failures retain their separate scope boundaries.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
