@@ -1,0 +1,17 @@
+tests/phase-3a1b-p3-live-transport-red.test.ts(356,20): error TS2345: Argument of type 'Expression | undefined' is not assignable to parameter of type 'Node'.
+  Type 'undefined' is not assignable to type 'Node'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(461,2): error TS2322: Type '{ transactIssue: DurableTransactIssue; compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) => Promise<void>; ... 5 more ...; close: () => Promise<void>; }' is not assignable to type 'DurableIssuanceStore'.
+  Types of property 'readSettlementPlan' are incompatible.
+    Type '((scope: DurableIssueScope) => Promise<SettlementPlan | null>) | undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'.
+      Type 'undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(564,2): error TS2741: Property 'installEpochAnchor' is missing in type 'Readonly<{ installGenesis: Mock<() => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>>; readiness: Mock<...>; readPage: Mock<...>; appendAccepted: Mock<...>; close: Mock<...>; }>' but required in type 'DurableLiveJournalStore'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(803,28): error TS2322: Type 'number' is not assignable to type 'void'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(804,24): error TS2322: Type 'number' is not assignable to type 'void'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(889,13): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(892,14): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(936,15): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(1180,12): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(1251,11): error TS2532: Object is possibly 'undefined'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(1252,11): error TS2532: Object is possibly 'undefined'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(1792,12): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+tests/phase-3a1b-p3-live-transport-red.test.ts(2238,5): error TS2307: Cannot find module '../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder' or its corresponding type declarations.

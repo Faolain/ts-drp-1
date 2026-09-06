@@ -18517,8 +18517,10 @@ diagnostics: signed RED `393eda67`, signed two-fixture GREEN `210fecb0`, and
 The parent record owns the evidence and precise environment attribution.
 Thirteen inherited transport diagnostics and the other named static debts
 remain separately open. The parent record's **Retained transport-fixture
-static contract repair** freezes the next one-file, separate RED/GREEN batch;
-it does not reopen accepted transport runtime behavior. No blanket typecheck or
+static contract repair** owns the next one-file, separate RED/GREEN batch.
+Its compiler RED is accepted at exactly thirteen complete diagnostics with
+zero external errors; separate GREEN remains pending. It does not reopen
+accepted transport runtime behavior. No blanket typecheck or
 parent GREEN acceptance is claimed; registry-freeze repair still requires its
 explicit prospective governance decision.
 
@@ -103057,6 +103059,46 @@ this repair. Other static debts and the four original retained runtime
 failures remain separately owned. Closure is due before parent static
 acceptance; the existing final parent Grok/Sol/Fable review covers the signed
 RED-to-GREEN history without a new bookkeeping/prose review round.
+
+**Transport-fixture compiler RED acceptance.** Under signed/pushed freeze
+`63e42eef`, the existing separate Astra-high RED owner ran exactly one
+TypeScript 5.8.2 program. Evidence is
+`.logs/d110c-0c1f5b-red-transport-static-63e42eef/`; its 41-entry
+self-excluding manifest is
+`c245961b238714159df0e1f77f347f43bb3b5d44ea7cea41a576083a092872c7`.
+Compiler status is 1; the independent matrix validator is 0. All thirteen
+complete diagnostic rows exactly match the accepted native-isolation report,
+including full messages, locations, owners and source lines; external
+diagnostics are zero. Effective options are identical after explicitly
+relocating the accepted isolated checkout root to this workspace, not by
+claiming those absolute paths are equal. The actual program captures 1,291
+source inputs, 1,755 read inputs, 3,054 module resolutions and 37 type
+resolutions. No source is replaced in memory and no emit, runtime, collection,
+build or installation occurs. Root independently verified the matrix, source
+and configuration identities, full manifest inventory and command statuses.
+
+The oracle inventory clarifies the preceding freeze without changing its
+acceptance: 123 is the exact previously accepted publication/FIFO two-body
+subset, not the full-file count. The full file contains 295 captured assertion
+statements and the same 24 reporter-bound titles. GREEN must preserve both
+the complete set and that subset. Compare semantic assertion trees after
+erasing only the explicitly frozen type-only annotations/non-null assertions;
+do not claim raw TypeScript trees are byte-identical when the planned two
+mock-argument assertions acquire `!`. All executable expressions, values,
+receivers, effect ordering and negative oracles remain exact except the three
+new rejecting defaults and explicitly frozen initializer guard. The query
+loader identity still requires the specified transform and genuine runtime
+proof, not merely compiler success.
+
+Before/after custody and authored checks pass. All eight production owners,
+seven built artifacts, effective 81-file test map, 27 stashes and 86,522
+protected paths remain unchanged. The test source and pending production
+patch are byte-identical to the freeze; the index is empty before root stages
+this evidence-only checkpoint. No failed diagnostic recorder, compiler rerun,
+runtime test or new reviewer was introduced. Root's plan-only formatting and
+diff checks pass. After this RED evidence is signed and pushed, release only
+the frozen separate one-file GREEN; parent acceptance and all other debts
+remain open.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
