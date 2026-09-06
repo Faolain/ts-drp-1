@@ -29,7 +29,8 @@ import type { DurableIssuancePruningReceipt } from "@ts-drp/issuance-store/maint
 import type { V3PlaneHandle } from "@ts-drp/node/v3-live";
 import { type GenerationRecord, parseStorageObjectId } from "@ts-drp/storage";
 import { Message, MessageType, V3Envelope } from "@ts-drp/types";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeSync } from "node:fs";
+import { performance } from "node:perf_hooks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
@@ -350,6 +351,68 @@ const record = (value: Uint8Array) => decodeCanonical(value) as Record<string, u
 const STALE_LOCAL_HEAD_FAILURE =
 	"v3 room successor reopen failed: D110C_FLOOR_MISMATCH: creator successor differs from the authenticated room-head floor";
 let ordinal = 0;
+
+const wideDiagnosticState = {
+	enabled: process.env.TS_DRP_F5B_WIDE_DIAGNOSTIC === "1",
+	records: 0,
+	completedOrdinaryIssues: 0,
+	epoch: null as number | null,
+	startNs: 0n,
+	previousUser: 0,
+	previousSystem: 0,
+	writeFailures: 0,
+};
+
+function wideDiagnostic(
+	phase: string,
+	edge: string,
+	epoch: number | null = null,
+	peer: string | null = null,
+	completed: boolean | null = null
+): void {
+	if (!wideDiagnosticState.enabled || wideDiagnosticState.records >= 4096) return;
+	try {
+		const now = process.hrtime.bigint();
+		const cpu = process.cpuUsage();
+		const eventLoop = performance.eventLoopUtilization();
+		if (wideDiagnosticState.records === 0) {
+			wideDiagnosticState.startNs = now;
+			wideDiagnosticState.previousUser = cpu.user;
+			wideDiagnosticState.previousSystem = cpu.system;
+		}
+		if (phase === "epoch" && edge === "begin") wideDiagnosticState.epoch = epoch;
+		if (phase === "ordinary-issue" && edge === "end") wideDiagnosticState.completedOrdinaryIssues += 1;
+		wideDiagnosticState.records += 1;
+		const overflow = wideDiagnosticState.records === 4096;
+		writeSync(
+			1,
+			`${JSON.stringify({
+				kind: "F5B_WIDE_DIAGNOSTIC",
+				sequence: wideDiagnosticState.records,
+				phase: overflow ? "diagnostic-overflow" : phase,
+				edge: overflow ? "limit" : edge,
+				epoch: epoch ?? wideDiagnosticState.epoch,
+				peer,
+				completed,
+				completedOrdinaryIssues: wideDiagnosticState.completedOrdinaryIssues,
+				elapsedMs: Number(now - wideDiagnosticState.startNs) / 1_000_000,
+				cpuScope: "process-aggregate-including-overlapping-work",
+				cpuUserMicros: cpu.user,
+				cpuSystemMicros: cpu.system,
+				eventLoopIdleMs: eventLoop.idle,
+				eventLoopActiveMs: eventLoop.active,
+				eventLoopUtilization: eventLoop.utilization,
+				deltaUserMicros: cpu.user - wideDiagnosticState.previousUser,
+				deltaSystemMicros: cpu.system - wideDiagnosticState.previousSystem,
+				writeFailures: wideDiagnosticState.writeFailures,
+			})}\n`
+		);
+		wideDiagnosticState.previousUser = cpu.user;
+		wideDiagnosticState.previousSystem = cpu.system;
+	} catch {
+		wideDiagnosticState.writeFailures += 1;
+	}
+}
 
 function required<T>(value: T | undefined | null): T {
 	if (value === undefined || value === null) throw new TypeError("F5B_PRODUCT_CUSTODY_MISSING");
@@ -678,7 +741,9 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
 			openTransport: transportFor(databaseName),
 		};
+		wideDiagnostic("initial-peer-open", "begin", 0, databaseName);
 		const room = await createV3RoomSession(input);
+		wideDiagnostic("initial-peer-open", "end", 0, databaseName);
 		sessions.add(room);
 		const peer = { ...identity, databaseName, floor, input, room };
 		peers.push(peer);
@@ -688,22 +753,32 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 		}
 	}
 	const stop = async (peer: Peer) => {
+		wideDiagnostic("peer-stop", "begin", null, peer.databaseName);
 		await peer.room.close();
 		sessions.delete(peer.room);
+		wideDiagnostic("peer-stop", "end", null, peer.databaseName);
 	};
 	const reopen = async (peer: Peer, closedEpoch: number, transfer = false, application = peer.input.application) => {
+		wideDiagnostic("reopen", "begin", closedEpoch + 1, peer.databaseName);
 		await stop(peer);
 		const origin = required(peers[0]);
 		if (transfer) {
+			wideDiagnostic("ahe-transfer", "begin", closedEpoch + 1, peer.databaseName);
 			await transferDatabase(`${origin.databaseName}--ahe`, `${peer.databaseName}--ahe`);
+			wideDiagnostic("ahe-transfer", "end", closedEpoch + 1, peer.databaseName);
+			wideDiagnostic("snapshot-transfer", "begin", closedEpoch + 1, peer.databaseName);
 			await transferDatabase(
 				`${origin.databaseName}--drp-snapshot-quarantine-v1`,
 				`${peer.databaseName}--drp-snapshot-quarantine-v1`
 			);
+			wideDiagnostic("snapshot-transfer", "end", closedEpoch + 1, peer.databaseName);
 			peer.floor.receive(origin.floor.read());
 		}
+		wideDiagnostic("snapshot-declaration", "begin", closedEpoch + 1, peer.databaseName);
 		const declaration = await producedDeclaration(peer.databaseName, closedEpoch);
+		wideDiagnostic("snapshot-declaration", "end", closedEpoch + 1, peer.databaseName);
 		const { creatorFinalitySigner, ...reopenInput } = peer.input;
+		wideDiagnostic("reopen-session", "begin", closedEpoch + 1, peer.databaseName);
 		peer.room = await createV3RoomSession({
 			...reopenInput,
 			// Legacy keeps its existing restriction. Settlement creator restart must
@@ -714,11 +789,13 @@ async function openRoom(writerCount: number, legacy = false, secondaryAdmin = fa
 			roomHeadAuthority: { ...peer.floor.authority, initialization: { kind: "reopen" } },
 			successorSnapshotDeclaration: declaration,
 		});
+		wideDiagnostic("reopen-session", "end", closedEpoch + 1, peer.databaseName);
 		sessions.add(peer.room);
 		if (transientPayload) {
 			required(emitted.get(peer.databaseName)).owner = peer.room;
 			emittedProjection(peer);
 		}
+		wideDiagnostic("reopen", "end", closedEpoch + 1, peer.databaseName);
 	};
 	const issue = (peer: Peer, clientOperationId: string) =>
 		peer.room.issue({ action: "message", clientOperationId, text: clientOperationId });
@@ -1323,391 +1400,430 @@ async function staleLocalHead() {
 }
 
 async function sixtyFourWriterGoldenPath() {
-	const fixture = await openRoom(64);
-	const creator = required(fixture.peers[0]);
-	const expected = new Map<string, string>();
-	const contributions: { peer: Peer; epoch: number; id: string; commit: DurableIssueCommit }[] = [];
-	const displaced: { peer: Peer; source: DurableIssueCommit; id: string; epoch: number }[] = [];
-	const adopted: { epoch: number; anchor: string; historyRoot: string; historySize: number; revision: number }[] = [];
-	const expectedMembers = fixture.peers
-		.map((peer, index) => ({
-			author: peer.author,
-			finalityKey: index === 0 ? peer.author : null,
-			groups: index === 0 ? ["admin", "finality", "writer"] : ["writer"],
-		}))
-		.sort((left, right) => (left.author < right.author ? -1 : 1));
-	let priorCheckpoint: ReturnType<typeof fixture.checkpoint> | undefined;
-	let sealedState = encodeCanonical([]);
-	const semanticState = (rows: { clientOperationId: string; text: string }[]) =>
-		encodeCanonical([...rows].sort((left, right) => left.clientOperationId.localeCompare(right.clientOperationId)));
-	const accountEpoch = (epoch: number) => {
-		for (const { peer, commit } of contributions.filter((row) => row.epoch === epoch)) {
-			const plan = required(observed.issuePlans.get(commit));
-			const fenceSequence = required(plan.fenceSequence);
-			const fences = ownCommits(peer).filter(
-				(row) => row.planEffect?.kind === "fence" && record(row.envelope.canonicalPreimageBytes).epoch === epoch
-			);
-			expect(fences, "F5B_64_EVERY_AUTHOR_EVERY_EPOCH_EXACT_ONE_FENCE").toHaveLength(1);
-			const fence = required(fences[0]);
-			expect(fence.authorSequence).toBe(fenceSequence);
-			expect(fenceSequence, "F5B_64_FENCE_BEFORE_FIRST_ORDINARY_ISSUE").toBeLessThan(commit.authorSequence);
-			const beforeFence = required(observed.issuePlans.get(fence));
-			expect(beforeFence.scope).toEqual({ author: peer.author, objectId: fixture.objectId });
-			expect(beforeFence.fenceSequence).toBeNull();
-			expect(beforeFence.entries.some((entry) => entry.disposition === "manual-review")).toBe(false);
-			const events = observed.timeline.filter((event) => event.database === peer.databaseName);
-			const planAt = events.findIndex((event) => event.kind === "plan" && event.revision === beforeFence.revision);
-			const fenceAt = events.findIndex((event) => event.kind === "commit" && event.sequence === fenceSequence);
-			const publishedAt = events.findIndex((event) => event.kind === "publication" && event.sequence === fenceSequence);
-			const ordinaryAt = events.findIndex(
-				(event) => event.kind === "commit" && event.sequence === commit.authorSequence
-			);
-			expect(planAt, "F5B_64_DURABLE_PLAN_WRITE_EXISTS_BEFORE_FENCE").toBeGreaterThanOrEqual(0);
-			expect(planAt).toBeLessThan(fenceAt);
-			expect(fenceAt).toBeLessThan(publishedAt);
-			expect(publishedAt).toBeLessThan(ordinaryAt);
-			const effects = ownCommits(peer).filter(
-				(row) =>
-					row.authorSequence >= fenceSequence &&
-					row.authorSequence < commit.authorSequence &&
-					row.planEffect !== undefined
-			);
-			expect(plan.revision, "F5B_64_EXACT_PLAN_REVISION_ADVANCES_ONLY_WITH_ATOMIC_EFFECTS").toBe(
-				beforeFence.revision + effects.length
-			);
-			expect(
-				observed.publications.filter((row) => row.database === peer.databaseName && row.sequence === fenceSequence),
-				"F5B_64_EXACT_ONE_FENCE_PUBLICATION"
-			).toEqual([
-				{
-					database: peer.databaseName,
-					sequence: fenceSequence,
-					digest: hex(fence.envelope.digest),
-					handle: observed.commitHandles.get(fence),
-				},
-			]);
-		}
-	};
-	for (let epoch = 0; epoch <= 3; epoch += 1) {
-		for (const [index, peer] of fixture.peers.entries()) {
-			const acl = peer.room.previewLatchedAcl().current;
-			expect(acl, "F5B_64_EXACT_PRODUCT_ACL_AFTER_RECOVERY").toEqual({
-				epoch,
-				kind: "drp-v3-latched-acl",
-				objectId: fixture.objectId,
-				permissionless: false,
-				version: 3,
-				members: expectedMembers,
-			});
-			const id = `wide-${epoch}-${index}`;
-			await fixture.issue(peer, id);
-			const matching = ownCommits(peer).filter((commit) =>
-				applicationOperations(commit).some((operation) => operation.clientOperationId === id)
-			);
-			expect(matching, `F5B_64_E${epoch}_AUTHOR_${index}_EXACT_ONE_ISSUED_OPERATION`).toHaveLength(1);
-			const commit = required(matching[0]);
-			expect(record(commit.envelope.canonicalPreimageBytes).epoch, "F5B_64_OPERATION_ISSUED_IN_CURRENT_EPOCH").toBe(
-				epoch
-			);
-			expect(
-				observed.publications.some(
-					(row) =>
-						row.database === peer.databaseName &&
-						row.sequence === commit.authorSequence &&
-						row.digest === hex(commit.envelope.digest)
-				),
-				"F5B_64_BACKEND_CONFIRMED_PUBLICATION"
-			).toBe(true);
-			expect(fixture.received.has(hex(commit.envelope.digest)), "F5B_64_CREATOR_AUTHENTICATED_ADMISSION_ACK").toBe(
-				true
-			);
-			expect(
-				messages(peer).filter((row) => row.clientOperationId === id),
-				"F5B_64_AUTHOR_PRODUCT_APPLIED_OWN_OPERATION"
-			).toEqual([{ clientOperationId: id, text: id }]);
-			contributions.push({ peer, epoch, id, commit });
-			expected.set(id, id);
-			if (epoch > 0) {
-				const current = required(peer.room.authority());
-				expect(current.epoch, "F5B_64_REJOIN_CONTRIBUTES_BEFORE_NEXT_CLOSE").toBe(epoch);
-				expect(current.anchorDigest).toBe(required(priorCheckpoint).identity.successorAnchorDigest);
-				expect(current.aclDigest).toBe(required(priorCheckpoint).identity.successorAclDigest);
-				expect(current.aclDigest, "F5B_64_AUTHORITY_BINDS_EXACT_RECOVERED_ACL").toBe(
-					hex(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(acl)))
+	let wideDiagnosticCompleted = false;
+	wideDiagnostic("callback", "begin");
+	try {
+		wideDiagnostic("initial-open", "begin", 0);
+		const fixture = await openRoom(64);
+		wideDiagnostic("initial-open", "end", 0);
+		const creator = required(fixture.peers[0]);
+		const expected = new Map<string, string>();
+		const contributions: { peer: Peer; epoch: number; id: string; commit: DurableIssueCommit }[] = [];
+		const displaced: { peer: Peer; source: DurableIssueCommit; id: string; epoch: number }[] = [];
+		const adopted: { epoch: number; anchor: string; historyRoot: string; historySize: number; revision: number }[] = [];
+		const expectedMembers = fixture.peers
+			.map((peer, index) => ({
+				author: peer.author,
+				finalityKey: index === 0 ? peer.author : null,
+				groups: index === 0 ? ["admin", "finality", "writer"] : ["writer"],
+			}))
+			.sort((left, right) => (left.author < right.author ? -1 : 1));
+		let priorCheckpoint: ReturnType<typeof fixture.checkpoint> | undefined;
+		let sealedState = encodeCanonical([]);
+		const semanticState = (rows: { clientOperationId: string; text: string }[]) =>
+			encodeCanonical([...rows].sort((left, right) => left.clientOperationId.localeCompare(right.clientOperationId)));
+		const accountEpoch = (epoch: number) => {
+			for (const { peer, commit } of contributions.filter((row) => row.epoch === epoch)) {
+				const plan = required(observed.issuePlans.get(commit));
+				const fenceSequence = required(plan.fenceSequence);
+				const fences = ownCommits(peer).filter(
+					(row) => row.planEffect?.kind === "fence" && record(row.envelope.canonicalPreimageBytes).epoch === epoch
 				);
-				expect(current.profileId, "F5B_64_SETTLEMENT_AUTHORITY_NO_DOWNGRADE").toBe("creator-trusted-settlement-v1");
-				const floor = peer.floor.read();
-				expect(floor.pending).toBeNull();
-				expect(floor.stable).toMatchObject({ epoch, currentAnchorDigest: current.anchorDigest });
-				const ownRecovered = displaced.filter((row) => row.peer === peer && row.epoch === epoch - 1);
-				const expectedLocal = [
-					...(decodeCanonical(required(sealedState)) as { clientOperationId: string; text: string }[]),
-					...ownRecovered.map((row) => ({ clientOperationId: row.id, text: "r".repeat(256) })),
-					{ clientOperationId: id, text: id },
-				];
-				// Creator also receives peers' automatically drained replacements; its
-				// complete shared projection is checked after all 64 admission acks.
-				if (peer !== creator)
-					expect(semanticState(messages(peer)), "F5B_64_EXACT_RECOVERED_PRODUCT_STATE_PER_AUTHOR").toEqual(
-						semanticState(expectedLocal)
-					);
-				for (const source of ownRecovered) {
-					const plan = required((await durable(peer)).plan);
-					const entry = required(plan.entries.find((row) => row.sourceSequence === source.source.authorSequence));
-					const replacement = required(entry.replacementSequence);
-					expect(entry.disposition, "F5B_64_REAL_TRANSFORM_DISPOSITION").toBe("transform");
-					expect(required(plan.fenceSequence), "F5B_64_PLAN_FENCE_REPLACEMENT_ORDER").toBeLessThan(replacement);
-					expect(
-						ownCommits(peer).filter(
-							(row) =>
-								row.planEffect?.kind === "replacement" && row.planEffect.sourceSequence === source.source.authorSequence
-						),
-						"F5B_64_EXACT_ONE_REPLACEMENT_LINK"
-					).toHaveLength(1);
-					expected.set(source.id, "r".repeat(256));
-				}
+				expect(fences, "F5B_64_EVERY_AUTHOR_EVERY_EPOCH_EXACT_ONE_FENCE").toHaveLength(1);
+				const fence = required(fences[0]);
+				expect(fence.authorSequence).toBe(fenceSequence);
+				expect(fenceSequence, "F5B_64_FENCE_BEFORE_FIRST_ORDINARY_ISSUE").toBeLessThan(commit.authorSequence);
+				const beforeFence = required(observed.issuePlans.get(fence));
+				expect(beforeFence.scope).toEqual({ author: peer.author, objectId: fixture.objectId });
+				expect(beforeFence.fenceSequence).toBeNull();
+				expect(beforeFence.entries.some((entry) => entry.disposition === "manual-review")).toBe(false);
+				const events = observed.timeline.filter((event) => event.database === peer.databaseName);
+				const planAt = events.findIndex((event) => event.kind === "plan" && event.revision === beforeFence.revision);
+				const fenceAt = events.findIndex((event) => event.kind === "commit" && event.sequence === fenceSequence);
+				const publishedAt = events.findIndex(
+					(event) => event.kind === "publication" && event.sequence === fenceSequence
+				);
+				const ordinaryAt = events.findIndex(
+					(event) => event.kind === "commit" && event.sequence === commit.authorSequence
+				);
+				expect(planAt, "F5B_64_DURABLE_PLAN_WRITE_EXISTS_BEFORE_FENCE").toBeGreaterThanOrEqual(0);
+				expect(planAt).toBeLessThan(fenceAt);
+				expect(fenceAt).toBeLessThan(publishedAt);
+				expect(publishedAt).toBeLessThan(ordinaryAt);
+				const effects = ownCommits(peer).filter(
+					(row) =>
+						row.authorSequence >= fenceSequence &&
+						row.authorSequence < commit.authorSequence &&
+						row.planEffect !== undefined
+				);
+				expect(plan.revision, "F5B_64_EXACT_PLAN_REVISION_ADVANCES_ONLY_WITH_ATOMIC_EFFECTS").toBe(
+					beforeFence.revision + effects.length
+				);
+				expect(
+					observed.publications.filter((row) => row.database === peer.databaseName && row.sequence === fenceSequence),
+					"F5B_64_EXACT_ONE_FENCE_PUBLICATION"
+				).toEqual([
+					{
+						database: peer.databaseName,
+						sequence: fenceSequence,
+						digest: hex(fence.envelope.digest),
+						handle: observed.commitHandles.get(fence),
+					},
+				]);
 			}
-		}
-		const expectedMessages = [...expected].map(([clientOperationId, text]) => ({ clientOperationId, text }));
-		expect(semanticState(messages(creator)), "F5B_64_EXACT_CREATOR_APPLICATION_STATE").toEqual(
-			semanticState(expectedMessages)
-		);
-		expect(
-			hex(hashDomain("ts-drp/state/v3", semanticState(messages(creator)))),
-			"F5B_64_EXACT_PRODUCT_SEMANTIC_DIGEST"
-		).toBe(hex(hashDomain("ts-drp/state/v3", semanticState(expectedMessages))));
-		if (epoch === 3) {
+		};
+		for (let epoch = 0; epoch <= 3; epoch += 1) {
+			wideDiagnostic("epoch", "begin", epoch);
+			for (const [index, peer] of fixture.peers.entries()) {
+				const acl = peer.room.previewLatchedAcl().current;
+				expect(acl, "F5B_64_EXACT_PRODUCT_ACL_AFTER_RECOVERY").toEqual({
+					epoch,
+					kind: "drp-v3-latched-acl",
+					objectId: fixture.objectId,
+					permissionless: false,
+					version: 3,
+					members: expectedMembers,
+				});
+				const id = `wide-${epoch}-${index}`;
+				wideDiagnostic("ordinary-issue", "begin", epoch, peer.databaseName);
+				await fixture.issue(peer, id);
+				wideDiagnostic("ordinary-issue", "end", epoch, peer.databaseName);
+				wideDiagnostic("ordinary-accounting", "begin", epoch, peer.databaseName);
+				const matching = ownCommits(peer).filter((commit) =>
+					applicationOperations(commit).some((operation) => operation.clientOperationId === id)
+				);
+				expect(matching, `F5B_64_E${epoch}_AUTHOR_${index}_EXACT_ONE_ISSUED_OPERATION`).toHaveLength(1);
+				const commit = required(matching[0]);
+				expect(record(commit.envelope.canonicalPreimageBytes).epoch, "F5B_64_OPERATION_ISSUED_IN_CURRENT_EPOCH").toBe(
+					epoch
+				);
+				expect(
+					observed.publications.some(
+						(row) =>
+							row.database === peer.databaseName &&
+							row.sequence === commit.authorSequence &&
+							row.digest === hex(commit.envelope.digest)
+					),
+					"F5B_64_BACKEND_CONFIRMED_PUBLICATION"
+				).toBe(true);
+				expect(fixture.received.has(hex(commit.envelope.digest)), "F5B_64_CREATOR_AUTHENTICATED_ADMISSION_ACK").toBe(
+					true
+				);
+				expect(
+					messages(peer).filter((row) => row.clientOperationId === id),
+					"F5B_64_AUTHOR_PRODUCT_APPLIED_OWN_OPERATION"
+				).toEqual([{ clientOperationId: id, text: id }]);
+				contributions.push({ peer, epoch, id, commit });
+				expected.set(id, id);
+				if (epoch > 0) {
+					const current = required(peer.room.authority());
+					expect(current.epoch, "F5B_64_REJOIN_CONTRIBUTES_BEFORE_NEXT_CLOSE").toBe(epoch);
+					expect(current.anchorDigest).toBe(required(priorCheckpoint).identity.successorAnchorDigest);
+					expect(current.aclDigest).toBe(required(priorCheckpoint).identity.successorAclDigest);
+					expect(current.aclDigest, "F5B_64_AUTHORITY_BINDS_EXACT_RECOVERED_ACL").toBe(
+						hex(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(acl)))
+					);
+					expect(current.profileId, "F5B_64_SETTLEMENT_AUTHORITY_NO_DOWNGRADE").toBe("creator-trusted-settlement-v1");
+					const floor = peer.floor.read();
+					expect(floor.pending).toBeNull();
+					expect(floor.stable).toMatchObject({ epoch, currentAnchorDigest: current.anchorDigest });
+					const ownRecovered = displaced.filter((row) => row.peer === peer && row.epoch === epoch - 1);
+					const expectedLocal = [
+						...(decodeCanonical(required(sealedState)) as { clientOperationId: string; text: string }[]),
+						...ownRecovered.map((row) => ({ clientOperationId: row.id, text: "r".repeat(256) })),
+						{ clientOperationId: id, text: id },
+					];
+					// Creator also receives peers' automatically drained replacements; its
+					// complete shared projection is checked after all 64 admission acks.
+					if (peer !== creator)
+						expect(semanticState(messages(peer)), "F5B_64_EXACT_RECOVERED_PRODUCT_STATE_PER_AUTHOR").toEqual(
+							semanticState(expectedLocal)
+						);
+					for (const source of ownRecovered) {
+						const plan = required((await durable(peer)).plan);
+						const entry = required(plan.entries.find((row) => row.sourceSequence === source.source.authorSequence));
+						const replacement = required(entry.replacementSequence);
+						expect(entry.disposition, "F5B_64_REAL_TRANSFORM_DISPOSITION").toBe("transform");
+						expect(required(plan.fenceSequence), "F5B_64_PLAN_FENCE_REPLACEMENT_ORDER").toBeLessThan(replacement);
+						expect(
+							ownCommits(peer).filter(
+								(row) =>
+									row.planEffect?.kind === "replacement" &&
+									row.planEffect.sourceSequence === source.source.authorSequence
+							),
+							"F5B_64_EXACT_ONE_REPLACEMENT_LINK"
+						).toHaveLength(1);
+						expected.set(source.id, "r".repeat(256));
+					}
+				}
+				wideDiagnostic("ordinary-accounting", "end", epoch, peer.databaseName);
+			}
+			const expectedMessages = [...expected].map(([clientOperationId, text]) => ({ clientOperationId, text }));
+			expect(semanticState(messages(creator)), "F5B_64_EXACT_CREATOR_APPLICATION_STATE").toEqual(
+				semanticState(expectedMessages)
+			);
+			expect(
+				hex(hashDomain("ts-drp/state/v3", semanticState(messages(creator)))),
+				"F5B_64_EXACT_PRODUCT_SEMANTIC_DIGEST"
+			).toBe(hex(hashDomain("ts-drp/state/v3", semanticState(expectedMessages))));
+			if (epoch === 3) {
+				accountEpoch(epoch);
+				wideDiagnostic("epoch", "end", epoch);
+				break;
+			}
+			// Rotating eight-author cohort has ALREADY issued/admitted/applied/published
+			// in this epoch. It remains genuinely stopped over close/adopt and the
+			// selected creator cold restart, then rejoins before the next epoch's issue.
+			const cohort = fixture.peers.slice(1 + epoch * 8, 9 + epoch * 8);
+			for (const [index, peer] of cohort.slice(0, 2).entries()) {
+				const id = `wide-displaced-${epoch}-${index}`;
+				if (index === 0) fixture.held.add(peer.databaseName);
+				else fixture.publicationFailures.add(peer.databaseName);
+				wideDiagnostic("displaced-issue", "begin", epoch, peer.databaseName);
+				if (index === 0) await fixture.issue(peer, id);
+				else await expect(fixture.issue(peer, id), "F5B_64_SELECTED_PENDING_PUBLICATION_FAILURE").rejects.toThrow();
+				wideDiagnostic("displaced-issue", "end", epoch, peer.databaseName);
+				const row = required(
+					(await durable(peer)).rows.find((candidate) =>
+						applicationOperations(candidate.commit).some((operation) => operation.clientOperationId === id)
+					)
+				);
+				expect(row.publishState, "F5B_64_PENDING_AND_PUBLISHED_DISPLACED_INPUTS").toBe(
+					index === 0 ? "published" : "pending"
+				);
+				displaced.push({ peer, source: row.commit, id, epoch });
+			}
+			wideDiagnostic("cohort-stop", "begin", epoch);
+			await Promise.all(cohort.map(fixture.stop));
+			wideDiagnostic("cohort-stop", "end", epoch);
+			// The live migration view has already passed its independent semantic check.
+			// Its order is not the authoritative snapshot's projected-graph Kahn order.
+			wideDiagnostic("close", "begin", epoch);
+			await fixture.close();
+			wideDiagnostic("close", "end", epoch);
+			wideDiagnostic("checkpoint-oracle", "begin", epoch);
+			const checkpoint = fixture.checkpoint();
 			accountEpoch(epoch);
-			break;
-		}
-		// Rotating eight-author cohort has ALREADY issued/admitted/applied/published
-		// in this epoch. It remains genuinely stopped over close/adopt and the
-		// selected creator cold restart, then rejoins before the next epoch's issue.
-		const cohort = fixture.peers.slice(1 + epoch * 8, 9 + epoch * 8);
-		for (const [index, peer] of cohort.slice(0, 2).entries()) {
-			const id = `wide-displaced-${epoch}-${index}`;
-			if (index === 0) fixture.held.add(peer.databaseName);
-			else fixture.publicationFailures.add(peer.databaseName);
-			if (index === 0) await fixture.issue(peer, id);
-			else await expect(fixture.issue(peer, id), "F5B_64_SELECTED_PENDING_PUBLICATION_FAILURE").rejects.toThrow();
-			const row = required(
-				(await durable(peer)).rows.find((candidate) =>
-					applicationOperations(candidate.commit).some((operation) => operation.clientOperationId === id)
-				)
+			const graph = required(observed.closeGraphs.at(-1));
+			const admitted = fixture.peers
+				.flatMap(ownCommits)
+				.filter(
+					(row) =>
+						record(row.envelope.canonicalPreimageBytes).epoch === epoch &&
+						!displaced.some((source) => hex(source.source.envelope.digest) === hex(row.envelope.digest))
+				);
+			const anchor = hex(hashDomain("ts-drp/epoch-anchor/v3", graph.input.exactCanonicalEpochAnchorPreimageBytes));
+			const signedGraph = new Map<string, SnapshotOracleVertex>([[anchor, { dependencies: [] }]]);
+			for (const row of admitted) {
+				const hash = hex(row.envelope.digest);
+				const signed = record(row.envelope.canonicalPreimageBytes);
+				expect(hex(hashDomain("ts-drp/vertex/v3", row.envelope.canonicalPreimageBytes))).toBe(hash);
+				expect(
+					ed25519.verify(row.envelope.signature, row.envelope.digest, Buffer.from(row.issuedRecord.scope.author, "hex"))
+				).toBe(true);
+				const vertex = required(graph.input.vertices.get(hash));
+				expect(vertex.dependencies, "F5B_64_CAPTURED_GRAPH_EXACT_SIGNED_DEPENDENCIES").toEqual(signed.dependencies);
+				expect(vertex.operation, "F5B_64_CAPTURED_GRAPH_EXACT_SIGNED_OPERATION").toEqual(signed.operation);
+				expect([vertex.hash, vertex.epoch, vertex.objectId, vertex.anchor, vertex.kind]).toEqual([
+					hash,
+					epoch,
+					fixture.objectId,
+					anchor,
+					"drp-vertex",
+				]);
+				signedGraph.set(hash, {
+					dependencies: signed.dependencies as string[],
+					operation: signed.operation as Record<string, unknown>,
+				});
+			}
+			expect([...signedGraph.keys()].sort(), "F5B_64_SIGNED_GRAPH_HAS_NO_MISSING_OR_EXTRA_VERTICES").toEqual(
+				[...graph.input.vertices.keys()].sort()
 			);
-			expect(row.publishState, "F5B_64_PENDING_AND_PUBLISHED_DISPLACED_INPUTS").toBe(
-				index === 0 ? "published" : "pending"
+			const oracle = snapshotStateOracle(signedGraph, anchor, graph.input.frontier, sealedState);
+			expect(oracle.ancestors, "F5B_64_FULL_FRONTIER_ANCESTRY_COVERS_COMPLETE_RAW_GRAPH").toEqual(
+				[...signedGraph.keys()].sort()
 			);
-			displaced.push({ peer, source: row.commit, id, epoch });
-		}
-		await Promise.all(cohort.map(fixture.stop));
-		// The live migration view has already passed its independent semantic check.
-		// Its order is not the authoritative snapshot's projected-graph Kahn order.
-		await fixture.close();
-		const checkpoint = fixture.checkpoint();
-		accountEpoch(epoch);
-		const graph = required(observed.closeGraphs.at(-1));
-		const admitted = fixture.peers
-			.flatMap(ownCommits)
-			.filter(
-				(row) =>
-					record(row.envelope.canonicalPreimageBytes).epoch === epoch &&
-					!displaced.some((source) => hex(source.source.envelope.digest) === hex(row.envelope.digest))
+			sealedState = oracle.state;
+			const snapshot = required(
+				observed.snapshots.findLast((row) => row.result.manifestDigest === checkpoint.identity.snapshotManifestDigest)
 			);
-		const anchor = hex(hashDomain("ts-drp/epoch-anchor/v3", graph.input.exactCanonicalEpochAnchorPreimageBytes));
-		const signedGraph = new Map<string, SnapshotOracleVertex>([[anchor, { dependencies: [] }]]);
-		for (const row of admitted) {
-			const hash = hex(row.envelope.digest);
-			const signed = record(row.envelope.canonicalPreimageBytes);
-			expect(hex(hashDomain("ts-drp/vertex/v3", row.envelope.canonicalPreimageBytes))).toBe(hash);
-			expect(
-				ed25519.verify(row.envelope.signature, row.envelope.digest, Buffer.from(row.issuedRecord.scope.author, "hex"))
-			).toBe(true);
-			const vertex = required(graph.input.vertices.get(hash));
-			expect(vertex.dependencies, "F5B_64_CAPTURED_GRAPH_EXACT_SIGNED_DEPENDENCIES").toEqual(signed.dependencies);
-			expect(vertex.operation, "F5B_64_CAPTURED_GRAPH_EXACT_SIGNED_OPERATION").toEqual(signed.operation);
-			expect([vertex.hash, vertex.epoch, vertex.objectId, vertex.anchor, vertex.kind]).toEqual([
-				hash,
-				epoch,
+			const payloadBytes = new Uint8Array(Buffer.concat(snapshot.result.chunks));
+			expect(payloadBytes, "F5B_64_ACTUAL_TRANSFER_CHUNKS_MATCH_PRODUCED_PAYLOAD").toEqual(
+				snapshot.input.exactCanonicalPayloadBytes
+			);
+			expect([snapshot.input.objectId, snapshot.input.epoch, snapshot.input.anchor]).toEqual([
 				fixture.objectId,
+				epoch,
 				anchor,
-				"drp-vertex",
 			]);
-			signedGraph.set(hash, {
-				dependencies: signed.dependencies as string[],
-				operation: signed.operation as Record<string, unknown>,
+			expect(
+				encodeCanonical(record(payloadBytes).application),
+				"F5B_64_SNAPSHOT_EXACT_INDEPENDENT_APPLICATION_BYTES"
+			).toEqual(sealedState);
+			expect(snapshot.input.stateDigest).toBe(hex(hashDomain("ts-drp/state/v3", sealedState)));
+			expect(
+				[...graph.result.closeSetOrder].sort(),
+				"F5B_64_EXACT_CLOSE_SET_COUNTS_APPLICATION_AND_CONTROL_VERTICES"
+			).toEqual(admitted.map((row) => hex(row.envelope.digest)).sort());
+			for (const row of admitted)
+				expect(
+					graph.input.authenticatedCanonicalPreimageByteLengths.get(hex(row.envelope.digest)),
+					"F5B_64_EXACT_SIGNED_BYTE_CHARGES_INCLUDE_FENCES"
+				).toBe(row.envelope.canonicalPreimageBytes.byteLength);
+			expect(checkpoint.identity.historySize, "F5B_64_EXACT_HISTORY_SIZE_NOT_ONLY_MONOTONICITY").toBe(
+				(priorCheckpoint?.identity.historySize ?? 0) + admitted.length
+			);
+			expect(checkpoint.identity.historyRoot, "F5B_64_HISTORY_ROOT_BINDS_COMPLETE_REAL_GRAPH").toBe(
+				graph.result.historyRoot
+			);
+			expect(checkpoint.cut.closeSetCount).toBe(admitted.length);
+			expect(checkpoint.cut.closeSetRoot).toBe(graph.result.closeSetRoot);
+			expect(checkpoint.identity.frontiers, "F5B_64_AUTHENTICATED_ACL_MEMBER_VECTOR").toHaveLength(64);
+			expect(checkpoint.cut.stateDigest, "F5B_64_SNAPSHOT_BINDS_EXACT_PRODUCT_STATE").toBe(
+				hex(hashDomain("ts-drp/state/v3", sealedState))
+			);
+			for (const contribution of contributions.filter((row) => row.epoch === epoch))
+				expect(
+					frontierFor(checkpoint.capability, contribution.peer.author)?.[2],
+					"F5B_64_CHECKPOINT_ACCOUNTS_EVERY_AUTHOR_APPLICATION"
+				).toBeGreaterThanOrEqual(contribution.commit.authorSequence);
+			if (priorCheckpoint !== undefined) {
+				expect(checkpoint.identity.closedAnchorDigest, "F5B_64_CONTIGUOUS_ANCHOR_LINEAGE").toBe(
+					priorCheckpoint.identity.successorAnchorDigest
+				);
+				expect(checkpoint.identity.priorCheckpointDigest, "F5B_64_ADJACENT_CHECKPOINT_LINK").toBe(
+					hex(hashDomain("ts-drp-storage/blob/v1", priorCheckpoint.bytes))
+				);
+				expect(checkpoint.identity.historySize, "F5B_64_MONOTONE_HISTORY_ACCOUNTING").toBeGreaterThan(
+					priorCheckpoint.identity.historySize
+				);
+				expect(checkpoint.identity.historyRoot, "F5B_64_HISTORY_ROOT_ADVANCES").not.toBe(
+					priorCheckpoint.identity.historyRoot
+				);
+			}
+			wideDiagnostic("checkpoint-oracle", "end", epoch);
+			wideDiagnostic("adopt", "begin", epoch);
+			await creator.room.adoptCreatorSuccessor();
+			wideDiagnostic("adopt", "end", epoch);
+			wideDiagnostic("adoption-accounting", "begin", epoch);
+			expect(productState(creator), "F5B_64_ADOPTION_EXACT_STATE_BYTES").toEqual(sealedState);
+			const authority = required(creator.room.authority());
+			const head = await assertRetainedRollbackPair(creator);
+			expect(authority.anchorDigest).toBe(checkpoint.identity.successorAnchorDigest);
+			expect(authority.aclDigest).toBe(checkpoint.identity.successorAclDigest);
+			expect(creator.floor.read().stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
+			const previous = adopted.at(-1);
+			if (previous !== undefined)
+				expect(head.head.revision, "F5B_C24C_MONOTONE_ACTIVE_HEAD_REVISION").toBeGreaterThan(previous.revision);
+			adopted.push({
+				epoch: authority.epoch,
+				anchor: authority.anchorDigest,
+				historyRoot: checkpoint.identity.historyRoot,
+				historySize: checkpoint.identity.historySize,
+				revision: head.head.revision,
 			});
+			wideDiagnostic("adoption-accounting", "end", epoch);
+			if (epoch === 1) {
+				await fixture.reopen(creator, epoch);
+				expect(productState(creator), "F5B_64_CREATOR_RESTART_EXACT_PRODUCT_STATE").toEqual(sealedState);
+				expect(creator.room.authority(), "F5B_64_CREATOR_RESTART_AUTHORITY_IDENTICAL").toEqual(authority);
+				expect((await aheFacts(creator)).head, "F5B_64_RESTART_PRESERVES_ACTIVE_HEAD").toEqual(head.head);
+			}
+			for (const peer of cohort) {
+				fixture.held.delete(peer.databaseName);
+				fixture.publicationFailures.delete(peer.databaseName);
+			}
+			// Reopen only: all publication remains explicitly awaited by next epoch's
+			// issue. Independent stores/transport receivers can authenticate in parallel.
+			wideDiagnostic("peer-reopen-group", "begin", epoch + 1);
+			await Promise.all(fixture.peers.slice(1).map((peer) => fixture.reopen(peer, epoch, true)));
+			wideDiagnostic("peer-reopen-group", "end", epoch + 1);
+			priorCheckpoint = checkpoint;
+			wideDiagnostic("epoch", "end", epoch);
 		}
-		expect([...signedGraph.keys()].sort(), "F5B_64_SIGNED_GRAPH_HAS_NO_MISSING_OR_EXTRA_VERTICES").toEqual(
-			[...graph.input.vertices.keys()].sort()
-		);
-		const oracle = snapshotStateOracle(signedGraph, anchor, graph.input.frontier, sealedState);
-		expect(oracle.ancestors, "F5B_64_FULL_FRONTIER_ANCESTRY_COVERS_COMPLETE_RAW_GRAPH").toEqual(
-			[...signedGraph.keys()].sort()
-		);
-		sealedState = oracle.state;
-		const snapshot = required(
-			observed.snapshots.findLast((row) => row.result.manifestDigest === checkpoint.identity.snapshotManifestDigest)
-		);
-		const payloadBytes = new Uint8Array(Buffer.concat(snapshot.result.chunks));
-		expect(payloadBytes, "F5B_64_ACTUAL_TRANSFER_CHUNKS_MATCH_PRODUCED_PAYLOAD").toEqual(
-			snapshot.input.exactCanonicalPayloadBytes
-		);
-		expect([snapshot.input.objectId, snapshot.input.epoch, snapshot.input.anchor]).toEqual([
-			fixture.objectId,
-			epoch,
-			anchor,
-		]);
+		wideDiagnostic("final-accounting", "begin", 3);
+		expect(contributions, "F5B_64_EXACT_256_CURRENT_EPOCH_APPLICATION_ISSUES").toHaveLength(256);
+		expect(displaced, "F5B_64_SIX_BOUNDED_PENDING_PUBLISHED_RECOVERY_SOURCES").toHaveLength(6);
 		expect(
-			encodeCanonical(record(payloadBytes).application),
-			"F5B_64_SNAPSHOT_EXACT_INDEPENDENT_APPLICATION_BYTES"
-		).toEqual(sealedState);
-		expect(snapshot.input.stateDigest).toBe(hex(hashDomain("ts-drp/state/v3", sealedState)));
-		expect(
-			[...graph.result.closeSetOrder].sort(),
-			"F5B_64_EXACT_CLOSE_SET_COUNTS_APPLICATION_AND_CONTROL_VERTICES"
-		).toEqual(admitted.map((row) => hex(row.envelope.digest)).sort());
-		for (const row of admitted)
+			adopted.map((row) => row.epoch),
+			"F5B_C24C_THREE_MONOTONE_TRANSITIONS"
+		).toEqual([1, 2, 3]);
+		for (const peer of fixture.peers) {
 			expect(
-				graph.input.authenticatedCanonicalPreimageByteLengths.get(hex(row.envelope.digest)),
-				"F5B_64_EXACT_SIGNED_BYTE_CHARGES_INCLUDE_FENCES"
-			).toBe(row.envelope.canonicalPreimageBytes.byteLength);
-		expect(checkpoint.identity.historySize, "F5B_64_EXACT_HISTORY_SIZE_NOT_ONLY_MONOTONICITY").toBe(
-			(priorCheckpoint?.identity.historySize ?? 0) + admitted.length
-		);
-		expect(checkpoint.identity.historyRoot, "F5B_64_HISTORY_ROOT_BINDS_COMPLETE_REAL_GRAPH").toBe(
-			graph.result.historyRoot
-		);
-		expect(checkpoint.cut.closeSetCount).toBe(admitted.length);
-		expect(checkpoint.cut.closeSetRoot).toBe(graph.result.closeSetRoot);
-		expect(checkpoint.identity.frontiers, "F5B_64_AUTHENTICATED_ACL_MEMBER_VECTOR").toHaveLength(64);
-		expect(checkpoint.cut.stateDigest, "F5B_64_SNAPSHOT_BINDS_EXACT_PRODUCT_STATE").toBe(
-			hex(hashDomain("ts-drp/state/v3", sealedState))
-		);
-		for (const contribution of contributions.filter((row) => row.epoch === epoch))
+				contributions.filter((row) => row.peer === peer).map((row) => row.epoch),
+				"F5B_64_PER_AUTHOR_FOUR_EPOCH_ACCOUNTING"
+			).toEqual([0, 1, 2, 3]);
+			const commits = ownCommits(peer);
+			const lineage = (await durable(peer)).lineage;
 			expect(
-				frontierFor(checkpoint.capability, contribution.peer.author)?.[2],
-				"F5B_64_CHECKPOINT_ACCOUNTS_EVERY_AUTHOR_APPLICATION"
-			).toBeGreaterThanOrEqual(contribution.commit.authorSequence);
-		if (priorCheckpoint !== undefined) {
-			expect(checkpoint.identity.closedAnchorDigest, "F5B_64_CONTIGUOUS_ANCHOR_LINEAGE").toBe(
-				priorCheckpoint.identity.successorAnchorDigest
+				commits.map((row) => row.authorSequence),
+				"F5B_64_NO_HOLE_OR_DUPLICATE_DEVICE_LINEAGE"
+			).toEqual(Array.from({ length: lineage.next }, (_, sequence) => sequence));
+			const publications = new Set(
+				observed.publications.filter((row) => row.database === peer.databaseName).map((row) => row.sequence)
 			);
-			expect(checkpoint.identity.priorCheckpointDigest, "F5B_64_ADJACENT_CHECKPOINT_LINK").toBe(
-				hex(hashDomain("ts-drp-storage/blob/v1", priorCheckpoint.bytes))
-			);
-			expect(checkpoint.identity.historySize, "F5B_64_MONOTONE_HISTORY_ACCOUNTING").toBeGreaterThan(
-				priorCheckpoint.identity.historySize
-			);
-			expect(checkpoint.identity.historyRoot, "F5B_64_HISTORY_ROOT_ADVANCES").not.toBe(
-				priorCheckpoint.identity.historyRoot
-			);
+			for (const commit of commits) {
+				const marks = observed.publications.filter(
+					(row) => row.database === peer.databaseName && row.sequence === commit.authorSequence
+				);
+				expect(marks, "F5B_64_NO_DUPLICATE_PUBLICATION_MARK").toHaveLength(
+					publications.has(commit.authorSequence) ? 1 : 0
+				);
+				for (const mark of marks) expect(mark.digest).toBe(hex(commit.envelope.digest));
+			}
+			const intentionallyNeverPublished = displaced
+				.filter((row) => row.peer === peer)
+				.filter((row) => !publications.has(row.source.authorSequence));
+			expect(
+				publications.size + intentionallyNeverPublished.length,
+				"F5B_64_PER_AUTHOR_OPERATION_PUBLICATION_CONSERVATION"
+			).toBe(commits.length);
 		}
-		await creator.room.adoptCreatorSuccessor();
-		expect(productState(creator), "F5B_64_ADOPTION_EXACT_STATE_BYTES").toEqual(sealedState);
-		const authority = required(creator.room.authority());
-		const head = await assertRetainedRollbackPair(creator);
-		expect(authority.anchorDigest).toBe(checkpoint.identity.successorAnchorDigest);
-		expect(authority.aclDigest).toBe(checkpoint.identity.successorAclDigest);
-		expect(creator.floor.read().stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
-		const previous = adopted.at(-1);
-		if (previous !== undefined)
-			expect(head.head.revision, "F5B_C24C_MONOTONE_ACTIVE_HEAD_REVISION").toBeGreaterThan(previous.revision);
-		adopted.push({
-			epoch: authority.epoch,
-			anchor: authority.anchorDigest,
-			historyRoot: checkpoint.identity.historyRoot,
-			historySize: checkpoint.identity.historySize,
-			revision: head.head.revision,
-		});
-		if (epoch === 1) {
-			await fixture.reopen(creator, epoch);
-			expect(productState(creator), "F5B_64_CREATOR_RESTART_EXACT_PRODUCT_STATE").toEqual(sealedState);
-			expect(creator.room.authority(), "F5B_64_CREATOR_RESTART_AUTHORITY_IDENTICAL").toEqual(authority);
-			expect((await aheFacts(creator)).head, "F5B_64_RESTART_PRESERVES_ACTIVE_HEAD").toEqual(head.head);
-		}
-		for (const peer of cohort) {
-			fixture.held.delete(peer.databaseName);
-			fixture.publicationFailures.delete(peer.databaseName);
-		}
-		// Reopen only: all publication remains explicitly awaited by next epoch's
-		// issue. Independent stores/transport receivers can authenticate in parallel.
-		await Promise.all(fixture.peers.slice(1).map((peer) => fixture.reopen(peer, epoch, true)));
-		priorCheckpoint = checkpoint;
-	}
-	expect(contributions, "F5B_64_EXACT_256_CURRENT_EPOCH_APPLICATION_ISSUES").toHaveLength(256);
-	expect(displaced, "F5B_64_SIX_BOUNDED_PENDING_PUBLISHED_RECOVERY_SOURCES").toHaveLength(6);
-	expect(
-		adopted.map((row) => row.epoch),
-		"F5B_C24C_THREE_MONOTONE_TRANSITIONS"
-	).toEqual([1, 2, 3]);
-	for (const peer of fixture.peers) {
+		const aggregate = fixture.peers.flatMap(ownCommits);
 		expect(
-			contributions.filter((row) => row.peer === peer).map((row) => row.epoch),
-			"F5B_64_PER_AUTHOR_FOUR_EPOCH_ACCOUNTING"
-		).toEqual([0, 1, 2, 3]);
-		const commits = ownCommits(peer);
-		const lineage = (await durable(peer)).lineage;
+			aggregate
+				.flatMap(applicationOperations)
+				.filter((operation) => String(operation.clientOperationId).startsWith("wide-")).length,
+			"F5B_64_AGGREGATE_ISSUES_INCLUDE_SOURCES_AND_REPLACEMENTS"
+		).toBe(268);
+		expect(messages(creator), "F5B_64_EXACT_262_UNIQUE_APPLICATION_EFFECTS").toHaveLength(262);
+		const finalCanonicalState = productState(creator).slice();
 		expect(
-			commits.map((row) => row.authorSequence),
-			"F5B_64_NO_HOLE_OR_DUPLICATE_DEVICE_LINEAGE"
-		).toEqual(Array.from({ length: lineage.next }, (_, sequence) => sequence));
-		const publications = new Set(
-			observed.publications.filter((row) => row.database === peer.databaseName).map((row) => row.sequence)
-		);
-		for (const commit of commits) {
-			const marks = observed.publications.filter(
-				(row) => row.database === peer.databaseName && row.sequence === commit.authorSequence
-			);
-			expect(marks, "F5B_64_NO_DUPLICATE_PUBLICATION_MARK").toHaveLength(
-				publications.has(commit.authorSequence) ? 1 : 0
-			);
-			for (const mark of marks) expect(mark.digest).toBe(hex(commit.envelope.digest));
-		}
-		const intentionallyNeverPublished = displaced
-			.filter((row) => row.peer === peer)
-			.filter((row) => !publications.has(row.source.authorSequence));
-		expect(
-			publications.size + intentionallyNeverPublished.length,
-			"F5B_64_PER_AUTHOR_OPERATION_PUBLICATION_CONSERVATION"
-		).toBe(commits.length);
-	}
-	const aggregate = fixture.peers.flatMap(ownCommits);
-	expect(
-		aggregate
-			.flatMap(applicationOperations)
-			.filter((operation) => String(operation.clientOperationId).startsWith("wide-")).length,
-		"F5B_64_AGGREGATE_ISSUES_INCLUDE_SOURCES_AND_REPLACEMENTS"
-	).toBe(268);
-	expect(messages(creator), "F5B_64_EXACT_262_UNIQUE_APPLICATION_EFFECTS").toHaveLength(262);
-	const finalCanonicalState = productState(creator).slice();
-	expect(
-		finalCanonicalState.byteLength,
-		"F5B_64_ACTUAL_FINAL_CANONICAL_STATE_WITHIN_UNCHANGED_CEILING"
-	).toBeLessThanOrEqual(32_768);
-	const finalAuthority = creator.room.authority();
-	const finalAccounting = {
-		commits: aggregate.length,
-		publications: observed.publications.filter((row) =>
-			fixture.peers.some((peer) => peer.databaseName === row.database)
-		).length,
-	};
-	await fixture.reopen(creator, 2);
-	expect(productState(creator), "F5B_64_FINAL_COLD_REOPEN_EXACT_CANONICAL_STATE_BYTES").toEqual(finalCanonicalState);
-	expect(creator.room.authority(), "F5B_64_FINAL_COLD_REOPEN_EXACT_AUTHORITY").toEqual(finalAuthority);
-	expect(
-		{
-			commits: fixture.peers.flatMap(ownCommits).length,
+			finalCanonicalState.byteLength,
+			"F5B_64_ACTUAL_FINAL_CANONICAL_STATE_WITHIN_UNCHANGED_CEILING"
+		).toBeLessThanOrEqual(32_768);
+		const finalAuthority = creator.room.authority();
+		const finalAccounting = {
+			commits: aggregate.length,
 			publications: observed.publications.filter((row) =>
 				fixture.peers.some((peer) => peer.databaseName === row.database)
 			).length,
-		},
-		"F5B_64_FINAL_COLD_REOPEN_NO_DUPLICATE_ISSUE_PUBLICATION"
-	).toEqual(finalAccounting);
-	expect(semanticState(messages(creator)), "F5B_64_FINAL_CREATOR_COLD_REOPEN_EXACT_STATE").toEqual(
-		semanticState([...expected].map(([clientOperationId, text]) => ({ clientOperationId, text })))
-	);
-	await Promise.all(fixture.peers.map(fixture.stop));
+		};
+		wideDiagnostic("final-accounting", "end", 3);
+		wideDiagnostic("final-reopen", "begin", 3, creator.databaseName);
+		await fixture.reopen(creator, 2);
+		expect(productState(creator), "F5B_64_FINAL_COLD_REOPEN_EXACT_CANONICAL_STATE_BYTES").toEqual(finalCanonicalState);
+		expect(creator.room.authority(), "F5B_64_FINAL_COLD_REOPEN_EXACT_AUTHORITY").toEqual(finalAuthority);
+		expect(
+			{
+				commits: fixture.peers.flatMap(ownCommits).length,
+				publications: observed.publications.filter((row) =>
+					fixture.peers.some((peer) => peer.databaseName === row.database)
+				).length,
+			},
+			"F5B_64_FINAL_COLD_REOPEN_NO_DUPLICATE_ISSUE_PUBLICATION"
+		).toEqual(finalAccounting);
+		expect(semanticState(messages(creator)), "F5B_64_FINAL_CREATOR_COLD_REOPEN_EXACT_STATE").toEqual(
+			semanticState([...expected].map(([clientOperationId, text]) => ({ clientOperationId, text })))
+		);
+		wideDiagnostic("final-reopen", "end", 3, creator.databaseName);
+		wideDiagnostic("final-stop", "begin", 3);
+		await Promise.all(fixture.peers.map(fixture.stop));
+		wideDiagnostic("final-stop", "end", 3);
+		wideDiagnosticCompleted = true;
+	} finally {
+		wideDiagnostic("callback", "settled", null, null, wideDiagnosticCompleted);
+	}
 }
 
 async function positiveAuthenticatedPruning() {
@@ -2122,6 +2238,7 @@ beforeEach(() => {
 	observed.snapshots = [];
 });
 afterEach(async () => {
+	wideDiagnostic("afterEach", "begin");
 	observed.failSuffixFor = "";
 	observed.ambiguous = undefined;
 	observed.failRecoveryReadFor = "";
@@ -2130,6 +2247,7 @@ afterEach(async () => {
 	vi.restoreAllMocks();
 	if (originalStorage === undefined) Reflect.deleteProperty(navigator, "storage");
 	else Object.defineProperty(navigator, "storage", originalStorage);
+	wideDiagnostic("afterEach", "end");
 });
 
 describe("D.110c-0c1f5b parent genuine settlement composition", () => {
