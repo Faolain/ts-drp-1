@@ -18507,11 +18507,14 @@ Next is the parent record's bounded authority-read-order correction: preserve
 the original room guard test, add one profile-aware RED probe, then restore
 early refusal without blocking settlement creator cold reopen. No production
 ordering change precedes the separate signed/accepted additive RED.
-Its first signed test preparation stopped before runtime on an invalid fixture
-identity label; evidence `edb238c6` preserves that stop. The one-label
-continuation below changes no acceptance predicate. Forty-one external
-baseline-identical fixture type diagnostics remain assigned to parent static
-closure, not silently classified as a passing typecheck.
+The fixture label is corrected in signed tests `ba15bb89`; evidence `edb238c6`
+preserves the pre-runtime stop. The first execution at `c25cb891` has the
+expected eleven passes/two failures but lacks the required eight observations
+because the JSON-only reporter suppresses console events. It is not accepted
+causal RED. The command-only dual-reporter continuation below preserves all
+test bytes and acceptance predicates. Forty-one external baseline-identical
+fixture type diagnostics remain assigned to parent static closure, not silently
+classified as a passing typecheck.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18641,6 +18644,7 @@ Blocked, and on what:
   authority-read-order, registry-freeze and W0 compatibility decisions. Registry-freeze
   repair remains outside authorized implementation scope; no production
   edit occurred in these retained fixture corrections.
+
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -102684,6 +102688,42 @@ The original expected eleven-pass/two-failure result and five-forbidden/
 three-permitted observation matrix are unchanged. Only accepted causal RED
 authorizes the separate narrow GREEN already frozen above; no extra reviewer,
 design slice, production change or workload is authorized by this correction.
+
+**Observation-capture continuation (2026-09-05).** Tests `ba15bb89` pass the
+one-label scope/static correction. Signed/pushed evidence `c25cb891`, under
+`.logs/d110c-0c1f5b-red-room-guard-ba15bb89/`, preserves one actual unfiltered
+thirteen-test execution: eleven passes, the two expected failing titles, no
+skips or top-level errors, test status 1 and evidence validator status 2.
+Its exact 93-entry manifest is
+`401e8137c7361066a2e92f3df992d380dc0f0ae738d8a0e820158f787dcbb8f0`;
+raw reporter SHA-256 is
+`715c1ef36bf299c17b38a13a154090e68870d66bf2a6e926fa84b8002dff0f7f`.
+The eight observed rows are absent, so neither the five forbidden outcomes nor
+the three permitted controls receives causal acceptance. Preserve the consumed
+attempt and its full raw results; do not reconstruct missing values from the
+expected matrix or abbreviated assertion stacks.
+
+Locked Vitest 3.1.1 source establishes the capture defect: console events use
+`onUserConsoleLog`, which `JsonReporter` does not implement or serialize.
+`DefaultReporter` inherits the handler that writes the original log content.
+A bounded direct reporter-sink smoke in the isolated installation preserved
+one exact JSON marker with no room or test execution. The evidence records the
+source excerpts and hashes. Its sole raw Vite stderr warning-space exception
+is preserved and dispositioned; authored checks pass, not a blanket diff pass.
+
+Authorize one command-only continuation with both built-in reporters:
+`--reporter=default --reporter=json`, retaining the existing JSON output file.
+No test, product, configuration file, dependency, threshold, selection or
+assertion changes. Use a fresh evidence root and independent exact-signed
+source-built checkout; preserve both prior roots/checkouts. Recheck the
+existing prerequisites and exact thirteen-title/source custody, zero target
+diagnostics and the same 41 inherited external diagnostics. Before runtime,
+record the direct locked reporter-sink smoke and resolved reporter selection;
+these are mechanical capture checks, not an extra workload or model review.
+Then execute once, retaining complete stdout/stderr and JSON, with the same
+eleven-pass/two-failure and eight-row/five-forbidden/three-permitted acceptance
+matrix. A missing or different observation still stops. No GREEN edit is
+authorized until root accepts the separately signed/pushed causal evidence.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
