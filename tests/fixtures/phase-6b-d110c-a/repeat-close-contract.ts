@@ -629,6 +629,7 @@ export async function openD110cARepeatCloseFixture(
 		await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
 	};
 	const recoverCurrentSuccessor = async (): Promise<Readonly<Record<string, unknown>>> => {
+		if (originalBootstrap === undefined) throw new TypeError("D110C_0B1_ORIGINAL_BOOTSTRAP_UNAVAILABLE");
 		const coldFacts = hot.predecessorColdFacts as unknown as D110c0b1ColdFacts;
 		const genesisTrustCandidate = hot.base.evidence.current.candidates.find((candidate) => {
 			const record = canonicalRecord(candidate.bytes);
@@ -656,6 +657,7 @@ export async function openD110cARepeatCloseFixture(
 						genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
 					),
 					exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
+					exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array.from(originalBootstrap.operationBytes),
 					expectedRoomHead: Object.freeze({
 						currentAnchorDigest: currentAuthority.anchorDigest,
 						epoch: currentAuthority.epoch,
@@ -1025,6 +1027,7 @@ export async function openD110cARepeatCloseFixture(
 					throw new TypeError(`D110C_B_PUBLISH_FAILED:${String(published.kind)}:${String(published.detail)}`);
 				}
 				d110c0b1ActiveInspection = await adoptionHandle.inspectDurableHead();
+				if (originalBootstrap === undefined) throw new TypeError("D110C_0B1_ORIGINAL_BOOTSTRAP_UNAVAILABLE");
 				d110c0b1ColdInput = observeColdInput(
 					Object.freeze({
 						authenticationProfile: "creator-only",
@@ -1035,6 +1038,7 @@ export async function openD110cARepeatCloseFixture(
 							genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
 						),
 						exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
+						exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array.from(originalBootstrap.operationBytes),
 						expectedRoomHead,
 						issuanceStore: hot.base.evidence.issuanceStore,
 						liveJournalStore: hot.base.journal,

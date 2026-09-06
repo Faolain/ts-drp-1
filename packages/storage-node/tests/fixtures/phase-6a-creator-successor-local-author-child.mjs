@@ -740,6 +740,7 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit, initialD
 			terminalEmpty: telemetry.terminalEmpty,
 		});
 	const store = Object.freeze({
+		...raw,
 		close: () => measureFacade("close", () => raw.close()),
 		compareAndMarkOutboxPublished: (...args) =>
 			measureFacade("compareAndMarkOutboxPublished", () => raw.compareAndMarkOutboxPublished(...args)),

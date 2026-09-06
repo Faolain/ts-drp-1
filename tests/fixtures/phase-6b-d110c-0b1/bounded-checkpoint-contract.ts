@@ -2,9 +2,15 @@ import { decodeCanonical } from "@ts-drp/canonical";
 
 import { inspectCreatorTrustAdvance } from "../../../packages/control-plane/src/creator-trust-advance.js";
 import type { InspectBoundedCreatorTrustAdvanceInput } from "../../../packages/control-plane/src/creator-trust-checkpoint-advance.js";
+import { inspectCreatorTransitionAdvance } from "../../../packages/node/src/internal/creator-transition-advance.js";
 import { openCurrentAnchorTrust } from "../../../packages/protocol-v3/src/anchor-trust-singleton.js";
-import type { OpenCreatorCheckpointTrustInput } from "../../../packages/protocol-v3/src/creator-checkpoint.js";
+import { CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND } from "../../../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
+import {
+	openCreatorCheckpointTrust,
+	type OpenCreatorCheckpointTrustInput,
+} from "../../../packages/protocol-v3/src/creator-checkpoint.js";
 import { openCreatorSuccessorTrust } from "../../../packages/protocol-v3/src/creator-close.js";
+import { CREATOR_ISSUANCE_RETIREMENT_KIND } from "../../../packages/protocol-v3/src/creator-issuance-retirement.js";
 import { type D110c0b1RedMaterial, openD110cARepeatCloseFixture } from "../phase-6b-d110c-a/repeat-close-contract.js";
 
 export const D110C_0B1_CHECKPOINT_OPENER_MISSING = "D110C_0B1_CHECKPOINT_OPENER_MISSING";
@@ -124,11 +130,39 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 		const newQc = candidate(material.proposed.candidates, "drp-seal-qc", 1, "commit");
 		const expectedObjectId = material.genesisTrust.objectId;
 		const pinnedGenesisAnchorDigest = material.genesisTrust.genesisAnchorDigest;
-		const retirementDigests = new Set(
-			[...material.current.candidates, ...material.proposed.candidates].flatMap((entry) =>
-				record(entry).kind === "drp-creator-issuance-retirement-state" ? [entry.ref.digest] : []
-			)
-		);
+		const checkpointInput: OpenCreatorCheckpointTrustInput = Object.freeze({
+			...material.checkpointGenesis,
+			exactCanonicalCommitQcBytes: Uint8Array.from(newQc.bytes),
+			exactCanonicalCurrentTrustStateRecordBytes: Uint8Array.from(epochTwoTrust.bytes),
+			exactCanonicalCutValueBytes: Uint8Array.from(newCut.bytes),
+			exactCanonicalPredecessorTrustStateRecordBytes: Uint8Array.from(epochOneTrust.bytes),
+			expectedCurrentHead: Object.freeze({
+				currentAnchorDigest: String(record(epochTwoTrust).currentAnchorDigest),
+				epoch: 2,
+				objectId: expectedObjectId,
+			}),
+		});
+		const checkpoint = openCreatorCheckpointTrust(checkpointInput);
+		if (!checkpoint.ok) throw new TypeError(`D110C_0B1_CHECKPOINT_INVALID:${checkpoint.reason}`);
+		const transition = inspectCreatorTransitionAdvance({
+			current: { candidates: material.current.candidates, closure: material.current.references },
+			currentTrust: checkpoint.predecessorTrust,
+			mode: "verify",
+			proofRefs: [newCut.ref, newQc.ref],
+			proposed: { candidates: material.proposed.candidates, closure: material.proposed.references },
+			successorTrust: checkpoint.currentTrust,
+		});
+		if (!transition.ok) throw new TypeError(`D110C_0B1_TRANSITION_INVALID:${transition.reason}`);
+		const authenticatedControlRefs = [...material.current.candidates, ...material.proposed.candidates]
+			.filter((entry) => {
+				const kind = record(entry).kind;
+				return kind === CREATOR_ISSUANCE_RETIREMENT_KIND || kind === CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND;
+			})
+			.map((entry) => entry.ref);
+		const isAuthenticatedControlRef = (ref: Candidate["ref"]): boolean =>
+			authenticatedControlRefs.some(
+				(control) => control.digest === ref.digest && control.byteLength === ref.byteLength
+			);
 		const openedEpochOne = openCurrentAnchorTrust({
 			exactCanonicalTrustStateRecordBytes: epochOneTrust.bytes,
 			expectedObjectId,
@@ -143,20 +177,20 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 		const retiredDigests = new Set([retiringCut.ref.digest, retiringQc.ref.digest, retiringAcl.ref.digest]);
 		const boundedReferences = Object.freeze(
 			material.proposed.references
-				.filter((ref) => !retiredDigests.has(ref.digest) && !retirementDigests.has(ref.digest))
+				.filter((ref) => !retiredDigests.has(ref.digest) && !isAuthenticatedControlRef(ref))
 				.map((ref) => Object.freeze({ ...ref }))
 				.sort((left, right) => left.digest.localeCompare(right.digest))
 		);
 		const boundedCandidates = Object.freeze(
 			material.proposed.candidates.filter(
-				(entry) => !retiredDigests.has(entry.ref.digest) && !retirementDigests.has(entry.ref.digest)
+				(entry) => !retiredDigests.has(entry.ref.digest) && !isAuthenticatedControlRef(entry.ref)
 			)
 		);
 		const boundedCurrentReferences = Object.freeze(
-			material.current.references.filter((ref) => !retirementDigests.has(ref.digest))
+			material.current.references.filter((ref) => !isAuthenticatedControlRef(ref))
 		);
 		const boundedCurrentCandidates = Object.freeze(
-			material.current.candidates.filter((entry) => !retirementDigests.has(entry.ref.digest))
+			material.current.candidates.filter((entry) => !isAuthenticatedControlRef(entry.ref))
 		);
 		return Object.freeze({
 			close: fixture.close,
@@ -169,18 +203,7 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 					retiringPredecessorAclRef: retiringAcl.ref,
 					retiringProofRefs: Object.freeze([retiringCut.ref, retiringQc.ref]),
 				}),
-				checkpointInput: Object.freeze({
-					...material.checkpointGenesis,
-					exactCanonicalCommitQcBytes: Uint8Array.from(newQc.bytes),
-					exactCanonicalCurrentTrustStateRecordBytes: Uint8Array.from(epochTwoTrust.bytes),
-					exactCanonicalCutValueBytes: Uint8Array.from(newCut.bytes),
-					exactCanonicalPredecessorTrustStateRecordBytes: Uint8Array.from(epochOneTrust.bytes),
-					expectedCurrentHead: Object.freeze({
-						currentAnchorDigest: String(record(epochTwoTrust).currentAnchorDigest),
-						epoch: 2,
-						objectId: expectedObjectId,
-					}),
-				}),
+				checkpointInput,
 				coldBootstrap: material.coldBootstrap,
 				coldIssued: material.coldIssued,
 				coldPublished: material.coldPublished,
