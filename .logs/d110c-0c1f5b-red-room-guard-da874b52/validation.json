@@ -1,0 +1,30 @@
+{
+  "classification": "STOPPED_NEW_TARGET_TYPE_DIAGNOSTIC_BEFORE_RUNTIME",
+  "testCommit": "da874b52ab99e7143911f1ce8c018c29f826db3c",
+  "signature": "G",
+  "pushed": true,
+  "runtimeExecutions": 0,
+  "constructorProbeExecutions": 0,
+  "expectedRuntimeUnproved": {
+    "total": 13,
+    "passed": 11,
+    "failed": 2,
+    "forbiddenViolations": 5,
+    "permittedControls": 3
+  },
+  "listCount": 13,
+  "originalBodiesByteIdentical": 12,
+  "fixtureSignaturesVerified": 2,
+  "initialDiagnosticLoaderFailurePreserved": true,
+  "correctedDiagnosticLoaderPassed": true,
+  "newTargetDiagnostics": 1,
+  "baselineTargetDiagnostics": 0,
+  "externalDiagnostics": 41,
+  "externalBaselineExactlyEqual": true,
+  "typecheckPassed": false,
+  "sourceBuildPassed": true,
+  "productionPreserved": true,
+  "protectedPaths": 86522,
+  "stashCount": 27,
+  "rootContinuationRequired": true
+}
