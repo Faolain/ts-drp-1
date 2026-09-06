@@ -1,0 +1,9 @@
+{
+  "initialGate": "freeze-runtime",
+  "testExecutions": 0,
+  "initialQuery": ["lsof", "-nP", "-i:51000", "-t"],
+  "numericObservation": {"pid": 90575, "ppid": 90292, "status": "S", "cwd": "/"},
+  "socketState": "ESTABLISHED outbound HTTPS using local ephemeral port 51000, not LISTEN",
+  "resolution": "Root authorized fixed-server-port checks to target TCP LISTEN, preserving this observation and all initial failure bytes. Unrelated process was not killed or modified.",
+  "bindFailureDisposition": "Any actual bind failure remains a real gate failure."
+}

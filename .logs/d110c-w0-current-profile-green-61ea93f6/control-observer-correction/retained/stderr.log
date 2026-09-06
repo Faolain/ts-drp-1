@@ -1,0 +1,168 @@
+(node:24939) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26459) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26478) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26583) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26604) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26692) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26713) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26828) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26830) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26849) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] rejects a genuine legacy-profile fence at ingress without journaling it
+::v3-ingress admission-rejected
+
+stderr | tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [control] admits a huge valid settlement fence, rejects m > f, and never calls the application sink
+::v3-ingress not-authenticated
+
+stderr | tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [control] uses the current anchor as admission authority for stale same-key ingress
+::v3-ingress not-authenticated
+
+(node:26871) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26955) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27096) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27141) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27191) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27235) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27435) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress
+::v3-ingress admission-rejected
+
+(node:27585) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27680) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27795) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27835) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27987) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28033) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28095) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28099) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28120) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28225) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28247) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6b-d110c-0b1-boundaries.test.ts > D.110c-0b1 bounded protocol and control boundaries > retires exactly the stale Cut QC and predecessor ACL from the genuine staged closure
+AssertionError: expected { ok: false, …(1) } to deeply equal { kind: 'successor', ok: true }
+
+- Expected
++ Received
+
+  {
+-   "kind": "successor",
+-   "ok": true,
++   "ok": false,
++   "reason": "TRUST_CLOSURE_INVALID",
+  }
+
+ ❯ tests/phase-6b-d110c-0b1-boundaries.test.ts:157:52
+    155|  it("retires exactly the stale Cut QC and predecessor ACL from the gen…
+    156|   const input = fixture.evidence.boundedInput;
+    157|   expect(inspectBoundedCreatorTrustAdvance(input)).toEqual({ kind: "su…
+       |                                                    ^
+    158|   expect(input.current.closure).toHaveLength(5);
+    159|   expect(input.proposed.closure).toHaveLength(4);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts > D.110c-0b1 bounded checkpoint and control-proof GREEN > retires the stale proof pair and predecessor ACL under the bounded advance
+AssertionError: expected { ok: false, …(1) } to deeply equal { kind: 'successor', ok: true }
+
+- Expected
++ Received
+
+  {
+-   "kind": "successor",
+-   "ok": true,
++   "ok": false,
++   "reason": "TRUST_CLOSURE_INVALID",
+  }
+
+ ❯ tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts:104:19
+    102|   const { activeCensus, currentCensus, existingAdvance, proposedCensus…
+    103|   expect(existingAdvance).toMatchObject({ ok: false, reason: "TRUST_CL…
+    104|   expect(bounded).toEqual({ kind: "successor", ok: true });
+       |                   ^
+    105|   expect(currentCensus).toHaveLength(6);
+    106|   expect(proposedCensus).toHaveLength(5);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts > D.110c-0b1 bounded checkpoint and control-proof GREEN > cold reopens the genuine active epoch-two room through the bounded checkpoint owner
+AssertionError: expected { …(3) } to match object { handle: { epoch: 2 }, …(3) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "handle": {
+-     "epoch": 2,
+-   },
+-   "lifecycle": "active",
+-   "ok": true,
+-   "recovery": "active-new",
++   "ok": false,
+  }
+
+ ❯ tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts:129:39
+    127|   expect(Number(proposed.revision)).toBe(Number(current.revision) + 1);
+    128|   expect(Number(active.revision)).toBe(Number(proposed.revision) + 1);
+    129|   expect(fixture.evidence.coldReopen).toMatchObject({
+       |                                       ^
+    130|    handle: { epoch: 2 },
+    131|    lifecycle: "active",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts > D.108d1b authenticated peer-local fresh-process issuance RED > fresh Node predecessor recovery enforces one cumulative authenticated future-row skip budget per recovery
+AssertionError: expected { boundedStoreShape: false, …(3) } to deeply equal { boundedStoreShape: true, …(3) }
+
+- Expected
++ Received
+
+  {
+-   "boundedStoreShape": true,
++   "boundedStoreShape": false,
+    "equalityMaterializedRows": 8193,
+    "maximumPageLimit": 128,
+    "overBudgetMaterializedRows": 8195,
+  }
+
+ ❯ packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts:1146:29
+    1144|    expect(proof?.maxEpochVertices).toBe(8_192);
+    1145|    expect(proof?.maxCanonicalPreimageBytes).toBeLessThan(1_024);
+    1146|    expect(proof?.realStore).toEqual({
+       |                             ^
+    1147|     boundedStoreShape: true,
+    1148|     equalityMaterializedRows: 8_193,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+

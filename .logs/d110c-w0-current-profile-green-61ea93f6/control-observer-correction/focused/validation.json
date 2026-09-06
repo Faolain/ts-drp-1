@@ -1,0 +1,57 @@
+{
+  "label": "focused",
+  "valid": true,
+  "expectedCases": 7,
+  "actualCases": 7,
+  "passed": 7,
+  "failed": 0,
+  "pending": 0,
+  "exactRoster": true,
+  "quiescent": true,
+  "failures": [],
+  "suiteFailures": [],
+  "actual": [
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED stages, opens, recovers, closes, and adopts a genuine 31-member writer-only ACL",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED stages, opens, recovers, closes, and adopts a genuine 64-member writer-only ACL",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED rejects 65 writer-only members consistently by legacy cardinality",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED rejects 41 full-shape members consistently by legacy byte ceiling",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED accepts a fitting recognized close record and rejects its oversized kind loudly at runtime",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED caps one legacy-profile writer, rejects the reserved fence, counts the causal join, preserves another writer and closes below global capacity",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED charges a settlement-profile offender's own signed fence to its share, refuses its next add, preserves another writer and genuinely closes",
+      "status": "passed",
+      "failureMessages": []
+    }
+  ]
+}

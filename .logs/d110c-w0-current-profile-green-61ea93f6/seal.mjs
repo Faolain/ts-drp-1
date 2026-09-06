@@ -1,0 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),files=[];
+const statuses={};function collect(dir,rel=''){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const r=path.join(rel,e.name),f=path.join(dir,e.name);if(e.isDirectory())collect(f,r);else if(e.name==='status.json')statuses[r]=JSON.parse(fs.readFileSync(f));}}collect(out);fs.writeFileSync(path.join(out,'final-command-status-inventory.json'),JSON.stringify(statuses,null,2)+'\n',{flag:'wx'});
+function walk(dir,rel=''){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const r=path.join(rel,e.name),f=path.join(dir,e.name);if(e.isDirectory())walk(f,r);else if(e.isFile()&&r!=='manifest.sha256')files.push(r);else if(!e.isFile())throw Error('Unexpected evidence entry '+r);}}walk(out);
+const manifest=files.sort().map(f=>hash(fs.readFileSync(path.join(out,f)))+'  '+f+'\n').join('');fs.writeFileSync(path.join(out,'manifest.sha256'),manifest,{flag:'wx'});for(const line of manifest.trim().split('\n')){const [digest,...tail]=line.split('  ');if(hash(fs.readFileSync(path.join(out,tail.join('  '))))!==digest)throw Error('Manifest verification failed');}console.log(JSON.stringify({entries:files.length,manifestSha256:hash(manifest),allEntriesVerified:true,sourceAndEvidenceUncommitted:true}));

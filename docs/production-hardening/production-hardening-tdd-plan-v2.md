@@ -104694,6 +104694,82 @@ implement the frozen tests-only profile reconciliation above. This handoff
 is neither GREEN acceptance nor release of any long workload; the combined
 Grok/Sol/Fable review and fresh-source acceptance remain required.
 
+**W0 local execution checkpoint; acceptance open (2026-09-06).** The separate
+GREEN owner implemented only the three frozen test/helper owners. The current
+patch is preserved under
+`.logs/d110c-w0-current-profile-green-61ea93f6/current-source/`, SHA
+`6c002d98eb4764ebe9b153c9e52dba4adac47e48ff31f5134f08b15fa7dddf0a`.
+Its source remains uncommitted pending the required retained gates; this
+evidence checkpoint is not GREEN acceptance. Root independently verified the
+290-entry self-excluding manifest, SHA
+`df446b69c7bd81b10714bd31439dcc2ba854288f6a61724c0aaff5fe9886411c`,
+and the current three source hashes. The local `handoff.json` records the
+complete disposition, source identities and still-pending gates.
+
+Evidence bytes are immutable: the staged whitespace check reports only patch
+context in the three preserved `.patch` files and terminal blank lines in six
+raw command outputs. Those nine exact paths are excluded only from a second
+whitespace check, not from custody, the manifest or acceptance gates. The
+remaining staged files and this authored checkpoint must pass that check.
+
+The first focused invocation passed six cases and failed the settlement
+companion's application-sink waiter. Production intentionally journals and
+counts control fences without application delivery. Root and GREEN verified
+that source branch; a read-only database inspection also found the exact
+signed fence matching the timeout digest, without a completed saturation or
+close. Preserve that failed source/patch, reporter and durable observation.
+The authorized correction submits the same fence through existing unchecked
+ingress and uses the already-planned dependent sequence-one add as its
+admission barrier. Both profiles require no fence application delivery;
+settlement still requires the offender's own durable fence and exact charges.
+No operation, dependency, timer, capacity, profile rule or production file was
+changed. Full-file reversal proves the correction's narrow observer scope.
+
+The corrected whole W0 file passes 7/7. Settlement matches the frozen 1,496
+journal/close rows and application state, with the offender's one fence plus
+1,491 adds charging its 1,492 share; overflow is absent and another writer
+progresses. Legacy matches 1,514 rows, state 1,652, one causal join and no
+fence. Original input preimages/signatures/digests and authenticated close-set
+charges match; byte totals are 595,313 and 603,525 respectively. Global graph
+occupancy includes the additional anchor. These are corrected-run observations,
+not retroactive values assigned to either earlier failed invocation.
+
+The complete affected retained run is 34 files, 220 cases: 216 pass, four fail,
+none pending. Preserve all four failures: the Node local-author child facade's
+exact store-shape check, two bounded-checkpoint retirement assertions and one
+epoch-two cold-reopen assertion. The child mirrors six methods while its real
+store has eight; the checkpoint fixture strips retirement but not aggregate
+control records before the trust-only predicate. These owners were not changed
+by W0. Cold-reopen diagnosis remains a separate required boundary, not permission
+to weaken its authenticated floor or bootstrap policy. No exclusion or changed
+expected outcome resolves these failures.
+
+Root's one bounded diagnostic reused the existing three-case checkpoint file
+with its existing detailed observer, under
+`.logs/d110c-w0-current-profile-acceptance-61ea93f6/`: one pass and two failures,
+2.79 seconds, unchanged source and clean process-group exit. It records current/
+proposed/active census sizes 7/6/7 and the exact cold failure
+`creator predecessor recovery failed: admission-rejected`. It is diagnostic
+evidence, not a new acceptance pass or a repeat of saturation, the skip-budget
+child, browser or campaign. A separate RED owner now bounds the consumer repair
+and its negative controls before a different GREEN owner changes those files.
+
+Selected 883-source compilation, source format/diff and equivalence pass;
+lint has one unchanged warning. Omitted shared-profile selection remains
+byte-equivalent. Custody retains all eight pending production owners, seven
+built identities, 27 stashes, 86,522 protected paths and prior evidence.
+The original roster validator incorrectly normalized a literal `m > f` inside
+a test title. Its failed result remains; corrected ancestry/title comparison
+proves all 220 identities with no missing or unexpected case. The four runtime
+failures remain failures. A preflight outbound connection on port 51000 was
+not a listener; listener-specific readiness was recorded without killing it.
+
+Next close the bounded consumer defects under separate RED/GREEN, then finish
+the 24-case three-engine browser companion, independently installed/native-
+prepared source-built acceptance and Grok high/Sol high/Fable xhigh review.
+Do not commit the pending W0 source as accepted, widen production owners,
+repin historical evidence or release any long workload from this checkpoint.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
