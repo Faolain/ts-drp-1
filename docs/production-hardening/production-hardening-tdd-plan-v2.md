@@ -18501,6 +18501,10 @@ binary after an isolated install with scripts disabled. The gate is not
 accepted or retried; thirteen exactly baseline-attributed target type
 diagnostics remain open. This does not change the eight unresolved failures
 in the original retained inventory or interrupt the existing repair sequence.
+The parent record now freezes a fresh isolated native-prerequisite
+continuation using the already-locked installer and unchanged transport tests;
+the consumed attempt is not reopened. This is dependency preparation under
+the existing repository policy, not a dependency or product change.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -102420,6 +102424,77 @@ API, dependency, threshold, campaign, registry-governance or W0 profile change
 is authorized. Existing final parent review covers this correction; no extra
 model/prose round. W0's legacy-fence/settlement-only compatibility mismatch and
 the registry freeze retain their separate owners and explicit scope boundaries.
+
+**Stopped transport isolation and native-prerequisite continuation
+(2026-09-05).** Signed tests `772e96bd` are unchanged. Signed/pushed stopped
+evidence `8e121d2d` preserves the sole 23-pass/one-failure result, original
+24-title matrix, thirteen inherited target type diagnostics and exact root
+disposition. Its 95-entry manifest is
+`6370ab611b6d247a323b0bda52c58fdd63be7a1fb6862b32de3c3c6a105bf090`;
+raw reporter is
+`5b564a839666ccdab855235c50cdbb29a4fb4524b6f851d7225120731ba622ab`.
+The new failure is the untouched Node-root import case loading
+`node-datachannel@0.32.3` without `build/Release/node_datachannel.node`.
+It does not invalidate the three corrected runtime cases or establish a
+transport authority defect; complete retained acceptance still fails closed.
+
+Root's source audit at `7b710cb4` identifies an existing preparation owner:
+`.npmrc` enables scripts, `package.json` approves `node-datachannel` in
+`pnpm.onlyBuiltDependencies`, and `scripts/ensure-native-deps.mjs` explicitly
+fetches the missing prebuild before root postinstall/build and pretest. The
+isolated `pnpm install --offline --frozen-lockfile --ignore-scripts` followed
+by direct Vitest bypassed that owner. Workspace source builds cannot supply a
+third-party native addon. The dependency's locked `prebuild-install@7.1.3` is
+already installed and package-locally resolvable; no new package is needed.
+
+Owner/deadline remain the retained transport environment and parent retained
+acceptance. After this plan-only checkpoint is signed/pushed, the existing
+separate Astra-high test owner may perform one fresh isolated continuation:
+
+1. Use a new temporary exact signed checkout and new write-once evidence root
+   `.logs/d110c-0c1f5b-retained-transport-native-<signed-plan-sha>/`. Do not
+   mutate or rerun the stopped checkout/root. Preserve the same frozen offline
+   lockfile install, no parent patch/overlay/main `node_modules` or copied
+   `dist`, and unchanged source/test/config/lockfile hashes.
+2. Before the full source build, resolve `prebuild-install/bin.js` from the
+   installed `node-datachannel` package using Node's package-local resolver.
+   Verify versions 0.32.3/7.1.3 against the lockfile and invoke that existing
+   installer with Node and `-r napi --nolocal --verbose` in the dependency
+   directory. Use a fresh checkout-specific `npm_config_cache`, not a host
+   prebuild cache. Inspect its resolved target/platform/architecture and
+   download URL first; require the package's normal upstream release URL and
+   host-compatible N-API target. Refuse an unexpected mirror, local override
+   or source-build setting without printing credential values.
+   This is the existing guard's prebuild operation through the locked binary,
+   avoiding `npx` package acquisition. Do not run the dependency's fallback
+   `npm install`/CMake path or change dependency/build policy. A failed fetch
+   or native load stops and seals this continuation, without retry.
+3. Record installer path/hash/version, package metadata, command/status and
+   raw streams; retain/hash the fetched archive and extracted `.node` binary.
+   Require a successful direct addon import, then source-build the workspace
+   and verify the fresh Node package root imports before the focused test.
+   Record runtime/build identities and confirm no tracked package, source,
+   lockfile or configuration change. Native evidence must come from this
+   preparation, not a copied working-tree artifact.
+4. Reuse the original exact 24 file-bound titles and unchanged test hash
+   `809c5b7858ac5d530179a35167b65bf2ec600b7adee78aa0d4ecb028f563056a`.
+   Run bounded static/source-shape/listing checks in the new checkout. Preserve
+   the existing thirteen target/zero external type diagnostics only with the
+   same exact baseline attribution; any changed diagnostic stops before
+   runtime. Do not add fixture methods, casts or a false typecheck pass.
+5. Run the same unfiltered 24-case Vitest command exactly once, changing only
+   its output path. Require 24 pass, zero failure/skip/top-level error, unchanged
+   assertion/owner custody, complete streams/statuses and a validating
+   self-excluding manifest. Stop/seal any unexpected result. Sign/push evidence
+   separately; only root's acceptance authorizes the existing separate GREEN
+   owner to run this file once against the preserved parent patch.
+
+This continuation changes preparation only, not tests, production, dependency
+versions, runtime policy, limits, workload or acceptance. No new reviewer or
+infrastructure slice is created; the existing final parent review consumes
+both the stopped evidence and this continuation. All protected paths, stashes,
+eight pending production owners, built owners and earlier evidence remain
+unchanged. Registry-freeze and W0 compatibility decisions stay out of scope.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
