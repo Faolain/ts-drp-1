@@ -1,0 +1,15 @@
+{
+  "startedAt": "2026-09-06T04:03:00.061Z",
+  "pid": 77160,
+  "root": "/private/tmp/d110c-f5b-green-adoption-static-Eqj4VS/checkout",
+  "files": [
+    "tests/phase-6a-creator-successor-product-red.test.ts"
+  ],
+  "compilerVersion": "5.8.2",
+  "nodeVersion": "v22.15.0",
+  "nodeExecutable": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "programExecutions": 1,
+  "effectiveOptionsExactlyAccepted": true,
+  "acceptedDiagnosticFile": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-adoption-static-393eda67/diagnostics.json",
+  "acceptedSha256": "79d1d139da85d18ac9ef4989340c3b304f55879277736241361a6724c47ab32d"
+}

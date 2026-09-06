@@ -18510,12 +18510,13 @@ registry-freeze and one W0 compatibility failure. Earlier stopped attempts
 remain immutable. The pending eight-owner patch has changed only in the room
 constructor; prior 45/45 integration evidence is not proof for these new bytes.
 Next is remaining parent acceptance/debt closure within existing authority
-boundaries, not another room-guard execution. The next bounded action is the
-parent record's **Retained adoption-fixture static contract repair**. Its sole
-compiler RED reproduced exactly the 41 external fixture diagnostics and its
-independent matrix validator passed; separate tests-only GREEN is next.
-Thirteen inherited transport diagnostics
-and the other named static debts remain separately open. No blanket typecheck or
+boundaries, not another room-guard execution. The subsequent **Retained
+adoption-fixture static contract repair** now clears all 41 external fixture
+diagnostics: signed RED `393eda67`, signed two-fixture GREEN `210fecb0`, and
+78/78 retained cases in both main and fresh source-built isolated environments.
+The parent record owns the evidence and precise environment attribution.
+Thirteen inherited transport diagnostics and the other named static debts
+remain separately open. No blanket typecheck or
 parent GREEN acceptance is claimed; registry-freeze repair still requires its
 explicit prospective governance decision.
 
@@ -101033,8 +101034,10 @@ remains immutable. The subsequent accepted additive room-guard RED at
 `db8a8615` is closed causally by the narrow room-only GREEN below: 13/13,
 bootstrap 3/3 and room-rebase 20/20. Four other original runtime failures,
 blocked supplement coverage and inherited static debts remain open, including
-thirteen transport and 41 external guard-program type diagnostics. Registry-
-freeze and W0 compatibility decisions retain their distinct boundaries.
+thirteen transport diagnostics. The 41 external guard-program fixture
+diagnostics are subsequently repaired by the two-fixture GREEN below, with
+78/78 main and isolated retained passes; this does not clear the other debts.
+Registry-freeze and W0 compatibility decisions retain their distinct boundaries.
 The partial eight-owner production patch is preserved, not committed or
 accepted. Other retained repair, browser/static/isolated and final review gates
 remain open.** The
@@ -102913,6 +102916,75 @@ must confirm execution selection; no static collection equivalence is claimed.
 No compiler or runtime was repeated. This accepted causal RED releases only
 the frozen separate two-fixture GREEN after this evidence is signed and pushed;
 it does not close the static debt or the parent checkpoint.
+
+**Retained adoption-fixture static GREEN acceptance (2026-09-06).** Signed
+RED `393eda67` established the exact compiler failure. The separate Astra-high
+GREEN changes only the two fixture owners, signed/pushed at `210fecb0`:
+contextual interface types, direct real settlement-plan forwarding, the
+unchanged malformed revision value and the two frozen AST narrowings. Both
+the main and isolated compiler programs now report zero diagnostics. Exact
+fixture lint, format and diff gates pass. The source/emitted-token comparison
+confirms unchanged behavior outside the two direct delegates and explicit
+oracle changes; the original declaration loop is accepted, assignment loop
+is rejected, and all four retained migration mutants remain rejected. No
+production/API/authority/threshold change is included in this repair.
+
+Evidence is `.logs/d110c-0c1f5b-green-adoption-static-393eda67/`, with the
+exact 181-entry self-excluding manifest
+`1e39cf8674633a5a8a98f74448fa48bbe346d18d9e17edaa766f9e314fe47fc3`.
+`final-assessment.md` is the completed handoff; the earlier main-stage
+assessment remains historical. The sole main run and sole isolated run each
+pass the exact twelve-file/78-title roster
+with zero failures, skips or top-level errors, and the exact eight raw guard
+observations. Reporter hashes are respectively
+`fd84d964ec7c79633e5836c5b35e28e3ac29dca23436738a6f49a888dea19b48`
+and `47c9faaae3baf8fe1d1075dfc048591ff64e2d4451fb43c6332c5e5b8a0b64f0`.
+The complete commands, streams, statuses, source identities and result sets
+are retained in that root; no result is inferred from shell status alone.
+
+The exact clean checkout is
+`/private/tmp/d110c-f5b-green-adoption-static-Eqj4VS/checkout`: signed
+`210fecb0` plus the unchanged, separately recorded eight-owner parent patch
+`6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`.
+It uses its own frozen offline install, independently fetched approved locked
+native addon, full `build:packages` and fresh Node-root import, all passing.
+All seven compiled owners were absent before building and match the tested
+main runtime afterward. Root independently verified all 525 compiler source
+files are physically inside this checkout and that the exact production,
+signed-fixture, runtime and consumer identities match the tested sources.
+
+The main program's additional 381 files are declarations from ancestor
+`/Users/aristotle/node_modules`; none is a missing project source. The fresh
+program retains the complete common graph and the same root-normalized
+options, with no isolated-only source. Do not claim identical ambient graphs
+or change dependencies/type discovery to manufacture matching counts. The
+main compiler's later comment relocation is reconstructed to its captured
+source hash and has identical non-comment tokens; the isolated compiler uses
+the final signed bytes directly. Initial comment-format and recorder span,
+regex, title-display and ESM-resolution mistakes are preserved as diagnostic
+errors, not product failures. No runtime or causal RED was repeated.
+
+The current eight-owner production patch remains uncommitted and unaccepted.
+This closes the named 41-diagnostic fixture obligation only. Four original
+runtime failures, other static debts, browser/current-parent/isolated parent
+acceptance and the final Grok/Sol/Fable review remain; no review union or
+long-lived-room closure is claimed. No campaign, parent 45-case integration
+or new model review ran for this repair. Earlier immutable evidence, protected
+paths and all stashes remain preserved.
+
+Root validated the complete manifest inventory and both raw result sets.
+All 33 recorded command statuses are retained, including five initial
+formatting/diagnostic failures followed by their successful final checks.
+The last custody correction permits exactly root's pending plan edit alongside
+the eight production paths; it is not a production drift exemption. The new
+`custody-final.json` supplies the effective 81-entry retained/shared/fixture
+hash map, with the two signed fixture hashes added to the earlier 79 entries,
+while preserving all eight production and seven built identities. Use that
+map for subsequent work, not the pre-repair fixture snapshots.
+The staged evidence diff check returns 2 solely for the original
+`fixture-lint/stdout.log` blank EOF line 8. Preserve that sealed raw stream;
+fixture-source and plan whitespace checks pass. No blanket staged-diff pass
+is claimed.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

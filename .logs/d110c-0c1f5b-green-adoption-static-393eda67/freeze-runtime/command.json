@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "node",
+    ".logs/d110c-0c1f5b-green-adoption-static-393eda67/runtime.mjs",
+    "freeze"
+  ],
+  "startedAt": "2026-09-06T03:55:05.684Z",
+  "recorderPid": 65668
+}
