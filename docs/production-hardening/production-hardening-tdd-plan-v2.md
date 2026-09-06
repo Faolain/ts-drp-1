@@ -18584,6 +18584,9 @@ snapshot copy is duplicated but has no demonstrated timeout-sized cost.
 Root proposes a separately explicit 90-second test-local budget amendment,
 pending user authorization, not an authentication optimization or another
 diagnostic. All golden-path assertions and existing failure evidence remain.
+The user subsequently authorized that exact amendment. **Authorized 90-second
+wide-fixture amendment** below governs the next separate-owner GREEN and sole
+focused execution; it supersedes only the pending authorization above.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104111,6 +104114,57 @@ freeze the exact focused selection and single execution before running it;
 only a complete semantic pass can release the subsequent combined gates.
 The audit closes now rather than recursively extending instrumentation.
 The separate snapshot, grid and registry/W0 blockers remain open.
+
+**Authorized 90-second wide-fixture amendment (2026-09-06).** The user's
+“yes authorized” accepts the preceding proposal. This remains the same parent
+acceptance work, not a new product or review-only slice. Root owns this
+prospective freeze; the existing separate RED owner independently validates
+the consumed 70-second failures without another RED run. The separate GREEN
+owner changes only the `sixtyFourWriterGoldenPath` registration argument from
+`70_000` to `90_000` and its adjacent “authorized 70s” comment to “authorized
+90s”. Reversing those exact replacements must restore full source SHA
+`c63f9cb4c8bfda07a631de56382180147af01e9c062b7099a39a4632d9f16f0e`.
+All callback bytes, instrumentation, 64 writers, operations, three genuine
+transitions, authority, accounting, restart/reopen, rollback and pruning
+assertions remain unchanged. No production source, global timeout,
+dependency, performance contract or workload change is authorized.
+
+Sign/push this freeze before GREEN edits and sign/push the exact two-change
+source commit before execution. Use a fresh write-once evidence root under
+`.logs/d110c-0c1f5b-green-wide90-<freeze-sha>/`. Record physical Node/Vitest
+identities, source and existing eight-owner overlay hashes, seven runtime
+artifact hashes, protected-path and stash custody, process and fixed-port
+predicates, commands, complete stdout/stderr/reporter and statuses. Preserve
+the existing owned-process-group 180-second containment, five-second grace
+and fail-closed quiescence checks; these are not the test's 90-second budget.
+No competing ts-drp test/profiler/reviewer may be active during execution.
+
+Run exact-owner lint, formatting, source diff and byte-reversal checks, plus
+the existing selected strict compiler and exact known-error matrix. The
+three external snapshot diagnostics remain disclosed, not a whole-program
+typecheck pass; do not repair them in this amendment. Freeze one focused
+runtime command using installed Node and Vitest, `run`, exactly
+`tests/phase-6b-d110c-0c1f5b-integration-red.test.ts`,
+`--testNamePattern=^D\.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions$`,
+`--no-file-parallelism`, `--coverage.enabled=false`, default and JSON reporters,
+and a fresh absolute output path. Unset `TS_DRP_F5B_WIDE_DIAGNOSTIC` for this
+acceptance run; do not pass CPU profiling arguments. The opt-in logger stays
+in source but this is not another instrumented diagnostic. Select exactly
+one active test in one file, with 23 filtered declarations. One pass, zero
+failures, no top-level errors, zero unexpected/skipped/flaky selected tests,
+successful runner status and process quiescence are required.
+
+Freeze the literal command and expected complete roster before spawn. Execute
+once, then inspect every result. Any failure stops for honest complete-set
+disposition, without retry or another deadline increase. A pass releases
+planning of the existing combined and fresh-isolated acceptance gates, not
+automatic parent closure or a long workload. Preserve all earlier consumed
+invocations. The existing final Grok/Sol/Fable acceptance review must inspect
+the inherited RED, amended timing scope, signed GREEN and complete evidence;
+do not invoke another Fable for diagnosis or add prose confirmation rounds.
+Seal a self-excluding manifest and sign/push results before any acceptance
+claim. Grid authority, snapshot fixtures and four registry/W0 failures remain
+separate blockers; no new repair authority follows from this amendment.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
