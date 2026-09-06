@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { digestBlob, type GenerationRef } from "@ts-drp/storage";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -9,6 +9,15 @@ import {
 	openD110c0b1RedFixture,
 } from "./fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.js";
 import { inspectBoundedCreatorTrustAdvance } from "../packages/control-plane/src/creator-trust-checkpoint-advance.js";
+import {
+	inspectCreatorTransitionAdvance,
+	type InspectCreatorTransitionAdvanceInput,
+} from "../packages/node/src/internal/creator-transition-advance.js";
+import {
+	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
+	openCreatorAuthorIssuanceFrontiers,
+	resolveCreatorAuthorIssuanceFrontiers,
+} from "../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
 import { openCreatorCheckpointTrust } from "../packages/protocol-v3/src/creator-checkpoint.js";
 
 type Candidate = Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>;
@@ -72,6 +81,42 @@ function findCandidate(candidates: readonly Candidate[], ref: GenerationRef): Ca
 	return candidate;
 }
 
+function aggregateCandidate(candidates: readonly Candidate[]): Candidate {
+	const matches = candidates.filter(
+		(candidate) => record(candidate.bytes).kind === CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND
+	);
+	if (matches.length !== 1) throw new TypeError("expected one genuine aggregate candidate");
+	return matches[0] as Candidate;
+}
+
+function checkpointAnchorAclDigest(trustStateRecordBytes: Uint8Array): string {
+	const anchorBytes = record(trustStateRecordBytes).exactCanonicalCurrentAnchorPreimageBytes;
+	if (!(anchorBytes instanceof Uint8Array)) throw new TypeError("checkpoint anchor bytes unavailable");
+	const aclDigest = record(anchorBytes).aclDigest;
+	if (typeof aclDigest !== "string") throw new TypeError("checkpoint ACL digest unavailable");
+	return aclDigest;
+}
+
+function fullTransition(fixture: D110c0b1RedFixture): InspectCreatorTransitionAdvanceInput {
+	const { boundedInput, checkpointInput, retirementTransition } = fixture.evidence;
+	const checkpoint = openCreatorCheckpointTrust(checkpointInput);
+	if (!checkpoint.ok) throw new TypeError("genuine checkpoint authority unavailable");
+	return Object.freeze({
+		current: Object.freeze({
+			candidates: retirementTransition.current.candidates,
+			closure: retirementTransition.current.references,
+		}),
+		currentTrust: checkpoint.predecessorTrust,
+		mode: "verify" as const,
+		proofRefs: boundedInput.proofRefs,
+		proposed: Object.freeze({
+			candidates: retirementTransition.proposed.candidates,
+			closure: retirementTransition.proposed.references,
+		}),
+		successorTrust: checkpoint.currentTrust,
+	});
+}
+
 describe("D.110c-0b1 bounded protocol and control boundaries", () => {
 	let fixture: D110c0b1RedFixture;
 
@@ -85,6 +130,147 @@ describe("D.110c-0b1 bounded protocol and control boundaries", () => {
 
 	afterAll(async () => {
 		await fixture?.close();
+	});
+
+	it("authenticates the full aggregate-bearing closure before trust-only projection", () => {
+		const transition = fullTransition(fixture);
+		const currentAggregate = aggregateCandidate(transition.current.candidates);
+		const proposedAggregate = aggregateCandidate(transition.proposed.candidates);
+		const inspected = inspectCreatorTransitionAdvance(transition);
+		expect(inspected).toMatchObject({ kind: "successor", ok: true });
+		if (!inspected.ok) throw new TypeError("genuine full transition rejected");
+		expect(inspected.proposed).toBe(transition.proposed);
+		expect(transition.current.closure).toHaveLength(7);
+		expect(transition.proposed.closure).toHaveLength(6);
+		const signature = Uint8Array.from(record(proposedAggregate.bytes).detachedCreatorSignature as Uint8Array);
+		signature[0] = (signature[0] as number) ^ 1;
+		const invalidSignature = mutatedCandidate(proposedAggregate, { detachedCreatorSignature: signature });
+		const wrongPredecessor = mutatedCandidate(proposedAggregate, { priorAggregateCandidateDigest: "f".repeat(64) });
+		const replaced = (replacement: Candidate): InspectCreatorTransitionAdvanceInput["proposed"] =>
+			Object.freeze({
+				candidates: replaceCandidate(transition.proposed.candidates, proposedAggregate, replacement),
+				closure: replaceRef(transition.proposed.closure, proposedAggregate.ref, replacement.ref),
+			});
+		const mutants = [
+			{
+				name: "missing aggregate",
+				input: {
+					...transition,
+					proposed: {
+						candidates: transition.proposed.candidates.filter(
+							(candidate) => candidate.ref.digest !== proposedAggregate.ref.digest
+						),
+						closure: transition.proposed.closure.filter((ref) => ref.digest !== proposedAggregate.ref.digest),
+					},
+				},
+			},
+			{
+				name: "duplicate aggregate",
+				input: {
+					...transition,
+					proposed: {
+						candidates: [...transition.proposed.candidates, proposedAggregate],
+						closure: [...transition.proposed.closure, proposedAggregate.ref].sort((left, right) =>
+							left.digest.localeCompare(right.digest)
+						),
+					},
+				},
+			},
+			{ name: "invalid signature with recomputed ref", input: { ...transition, proposed: replaced(invalidSignature) } },
+			{
+				name: "current aggregate substituted for proposed",
+				input: { ...transition, proposed: replaced(currentAggregate) },
+			},
+			{ name: "tampered signed predecessor bytes", input: { ...transition, proposed: replaced(wrongPredecessor) } },
+			{
+				name: "genuine wrong predecessor authority",
+				input: { ...transition, currentTrust: transition.successorTrust },
+			},
+			{
+				name: "wrong commit QC",
+				input: {
+					...transition,
+					proofRefs: [transition.proofRefs[0], fixture.evidence.boundedInput.retiringProofRefs[1]],
+				},
+			},
+		];
+		for (const { name, input } of mutants) {
+			expect(inspectCreatorTransitionAdvance(input), name).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+		}
+	});
+
+	it("opens both aggregates against independent authenticated checkpoint and closure bindings", () => {
+		const transition = fullTransition(fixture);
+		expect(inspectCreatorTransitionAdvance(transition)).toMatchObject({ kind: "successor", ok: true });
+		const { boundedInput, checkpointInput, durableReferences } = fixture.evidence;
+		const currentAggregate = aggregateCandidate(transition.current.candidates);
+		const proposedAggregate = aggregateCandidate(transition.proposed.candidates);
+		const currentCut = findCandidate(transition.current.candidates, boundedInput.retiringProofRefs[0]);
+		const currentQc = findCandidate(transition.current.candidates, boundedInput.retiringProofRefs[1]);
+		const currentAcl = findCandidate(transition.current.candidates, boundedInput.retiringPredecessorAclRef);
+		const proposedCut = findCandidate(transition.proposed.candidates, boundedInput.proofRefs[0]);
+		const proposedQc = findCandidate(transition.proposed.candidates, boundedInput.proofRefs[1]);
+		// The checkpoint opener above authenticates these exact trust-record bytes before their ACLs are decoded.
+		const epochOneAclDigest = checkpointAnchorAclDigest(checkpointInput.exactCanonicalPredecessorTrustStateRecordBytes);
+		const epochTwoAclDigest = checkpointAnchorAclDigest(checkpointInput.exactCanonicalCurrentTrustStateRecordBytes);
+		const currentInput = Object.freeze({
+			exactCanonicalRecordBytes: currentAggregate.bytes,
+			expectedCommitQcRef: currentQc.ref,
+			expectedCurrentAclDigest: Buffer.from(hashDomain("ts-drp/latched-acl/v3", currentAcl.bytes)).toString("hex"),
+			expectedCutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", currentCut.bytes)).toString("hex"),
+			expectedSnapshotManifestDigest: record(currentCut.bytes).snapshotManifestDigest,
+			expectedSuccessorAclDigest: epochOneAclDigest,
+			floorTrust: transition.currentTrust,
+		});
+		const proposedInput = Object.freeze({
+			currentTrust: transition.currentTrust,
+			exactCanonicalRecordBytes: proposedAggregate.bytes,
+			expectedCommitQcRef: proposedQc.ref,
+			expectedCurrentAclDigest: epochOneAclDigest,
+			expectedCutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
+			expectedSnapshotManifestDigest: record(proposedCut.bytes).snapshotManifestDigest,
+			expectedSuccessorAclDigest: epochTwoAclDigest,
+			floorTrust: transition.successorTrust,
+		});
+		const openedCurrent = openCreatorAuthorIssuanceFrontiers(currentInput);
+		const openedProposed = openCreatorAuthorIssuanceFrontiers(proposedInput);
+		expect(openedCurrent).toMatchObject({ ok: true });
+		expect(openedProposed).toMatchObject({ ok: true });
+		if (!openedCurrent.ok || !openedProposed.ok) throw new TypeError("independent aggregate opening failed");
+		expect(resolveCreatorAuthorIssuanceFrontiers(openedCurrent.capability)).toMatchObject({
+			closedAnchorDigest: checkpointInput.pinnedGenesisAnchorDigest,
+			closedEpoch: 0,
+			successorAnchorDigest: transition.currentTrust.currentAnchorDigest,
+			successorEpoch: 1,
+		});
+		expect(resolveCreatorAuthorIssuanceFrontiers(openedProposed.capability)).toMatchObject({
+			closedAnchorDigest: transition.currentTrust.currentAnchorDigest,
+			closedEpoch: 1,
+			priorAggregateCandidateDigest: currentAggregate.ref.digest,
+			successorAnchorDigest: transition.successorTrust.currentAnchorDigest,
+			successorEpoch: 2,
+		});
+		for (const [candidate, references] of [
+			[currentAggregate, durableReferences.current],
+			[proposedAggregate, durableReferences.proposed],
+			[proposedAggregate, durableReferences.active],
+		] as const) {
+			expect(references.filter((ref) => ref.digest === candidate.ref.digest)).toEqual([candidate.ref]);
+			expect(digestBlob(candidate.bytes)).toEqual({ ok: true, value: candidate.ref.digest });
+			expect(candidate.ref.byteLength).toBe(candidate.bytes.byteLength);
+		}
+		expect(durableReferences.proposed).not.toContainEqual(currentAggregate.ref);
+		expect(durableReferences.active).not.toContainEqual(currentAggregate.ref);
+		for (const input of [currentInput, proposedInput]) {
+			expect(openCreatorAuthorIssuanceFrontiers({ ...input, expectedCurrentAclDigest: "f".repeat(64) })).toEqual({
+				ok: false,
+				reason: "IDENTITY_INVALID",
+			});
+			expect(openCreatorAuthorIssuanceFrontiers({ ...input, expectedCutValueDigest: "f".repeat(64) })).toEqual({
+				ok: false,
+				reason: "IDENTITY_INVALID",
+			});
+		}
 	});
 
 	it("opens the genuine immediate predecessor and current checkpoint from pinned genesis", () => {

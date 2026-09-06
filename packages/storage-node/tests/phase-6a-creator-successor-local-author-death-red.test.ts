@@ -1136,6 +1136,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 						mismatch?: Readonly<Record<string, unknown>>;
 						overBudget?: Readonly<Record<string, unknown>>;
 						pid?: number;
+						publicStoreContract?: Readonly<Record<string, unknown>>;
 						realStore?: Readonly<Record<string, unknown>>;
 				  }>
 				| undefined;
@@ -1143,6 +1144,37 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			expect(proof?.pid).not.toBe(process.pid);
 			expect(proof?.maxEpochVertices).toBe(8_192);
 			expect(proof?.maxCanonicalPreimageBytes).toBeLessThan(1_024);
+			const publicKeys = [
+				"close",
+				"compareAndMarkOutboxPublished",
+				"readIssued",
+				"readLineage",
+				"readOutboxPage",
+				"readSettlementPlan",
+				"transactIssue",
+				"transactWriteSettlementPlan",
+			];
+			const publicSurface = {
+				descriptors: publicKeys.map((key) => ({
+					configurable: false,
+					enumerable: true,
+					key,
+					valueKind: "function",
+					writable: false,
+				})),
+				keys: publicKeys,
+				symbolCount: 0,
+			};
+			expect.soft(proof?.publicStoreContract).toEqual({
+				facade: publicSurface,
+				intentionalOverridesDistinct: true,
+				raw: publicSurface,
+				settlementMethods: ["readSettlementPlan", "transactWriteSettlementPlan"].map((key) => ({
+					identicalToRaw: true,
+					key,
+					present: true,
+				})),
+			});
 			expect(proof?.realStore).toEqual({
 				boundedStoreShape: true,
 				equalityMaterializedRows: 8_193,

@@ -1,4 +1,4 @@
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { type AccumulatorSnapshot, CompactMerkleAccumulator } from "@ts-drp/compaction";
 // eslint-disable-next-line import/no-unresolved -- Workspace subpath resolves after the required package build.
 import { createRecoverableFinalitySigner } from "@ts-drp/keychain/finality";
@@ -164,6 +164,23 @@ export interface D110cARepeatCloseOptions {
 
 export interface D110c0b1RedMaterial {
 	readonly active: DetachedHeadEvidence;
+	readonly coldBootstrap: Readonly<{
+		readonly inputs: readonly Readonly<{
+			readonly pinMatchesOriginal: boolean;
+			readonly pinPresent: boolean;
+			readonly site: "current-successor" | "epoch-two";
+		}>[];
+		readonly original: Readonly<{
+			readonly anchorDigest: string;
+			readonly author: string;
+			readonly authorSequence: 0;
+			readonly epoch: 0;
+			readonly logicalTime: 1;
+			readonly objectId: string;
+			readonly operationBytes: Uint8Array;
+			readonly vertexDigest: string;
+		}>;
+	}>;
 	readonly checkpointGenesis: Readonly<{
 		readonly detachedGenesisSignature: Uint8Array;
 		readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
@@ -421,6 +438,51 @@ async function bytesForRow(hot: D109dHotFixture, row: LiveJournalAcceptedRow): P
 	return Uint8Array.from(issued.envelope.canonicalPreimageBytes);
 }
 
+async function originalBootstrapOperation(
+	hot: D109dHotFixture
+): Promise<D110c0b1RedMaterial["coldBootstrap"]["original"]> {
+	const { author, objectId } = hot.base.evidence.issuanceScope;
+	const anchorDigest = hot.base.evidence.currentTrust.genesisAnchorDigest;
+	const matches: D110c0b1RedMaterial["coldBootstrap"]["original"][] = [];
+	for (const row of hot.base.evidence.journalRows) {
+		if (row.scope.objectId !== objectId || row.scope.epoch !== 0 || row.scope.anchorDigest !== anchorDigest) continue;
+		if (row.sourceKind === "local-issued" && (row.author !== author || row.authorSequence !== 0)) continue;
+		const bytes = await bytesForRow(hot, row);
+		const vertex = canonicalRecord(bytes);
+		if (vertex.author !== author || vertex.authorSequence !== 0) continue;
+		if (
+			compareBytes(encodeCanonical(vertex), bytes) !== 0 ||
+			lowerHex(hashDomain("ts-drp/vertex/v3", bytes)) !== row.vertexDigest ||
+			vertex.objectId !== objectId ||
+			vertex.anchor !== anchorDigest ||
+			vertex.epoch !== 0 ||
+			vertex.logicalTime !== 1 ||
+			!Array.isArray(vertex.dependencies) ||
+			vertex.dependencies.length !== 1 ||
+			vertex.dependencies[0] !== anchorDigest ||
+			vertex.operation === null ||
+			typeof vertex.operation !== "object" ||
+			Array.isArray(vertex.operation)
+		) {
+			throw new TypeError("D110C_0B1_ORIGINAL_BOOTSTRAP_INVALID");
+		}
+		matches.push(
+			Object.freeze({
+				anchorDigest,
+				author,
+				authorSequence: 0,
+				epoch: 0,
+				logicalTime: 1,
+				objectId,
+				operationBytes: encodeCanonical(vertex.operation),
+				vertexDigest: row.vertexDigest,
+			})
+		);
+	}
+	if (matches.length !== 1) throw new TypeError("D110C_0B1_ORIGINAL_BOOTSTRAP_NOT_UNIQUE");
+	return matches[0] as D110c0b1RedMaterial["coldBootstrap"]["original"];
+}
+
 async function epochOneRows(hot: D109dHotFixture): Promise<readonly LiveJournalAcceptedRow[]> {
 	const scope = Object.freeze({ anchorDigest: hot.oracle.anchorDigest, epoch: 1, objectId: hot.oracle.objectId });
 	const readiness = await hot.base.journal.readiness({ scope });
@@ -537,6 +599,24 @@ export async function openD110cARepeatCloseFixture(
 	let latestSuccessor: D109dHotFixture["successor"] | undefined;
 	let d110c0b1ColdInput: Readonly<Record<string, unknown>> | undefined;
 	let d110c0b1ActiveInspection: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>> | undefined;
+	let originalBootstrap: D110c0b1RedMaterial["coldBootstrap"]["original"] | undefined;
+	const coldBootstrapInputs: D110c0b1RedMaterial["coldBootstrap"]["inputs"][number][] = [];
+	const observeColdInput = (
+		input: Readonly<Record<string, unknown>>,
+		site: D110c0b1RedMaterial["coldBootstrap"]["inputs"][number]["site"]
+	): Readonly<Record<string, unknown>> => {
+		if (originalBootstrap === undefined) throw new TypeError("D110C_0B1_ORIGINAL_BOOTSTRAP_UNAVAILABLE");
+		const suppliedPin = input.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		coldBootstrapInputs.push(
+			Object.freeze({
+				pinMatchesOriginal:
+					suppliedPin instanceof Uint8Array && compareBytes(suppliedPin, originalBootstrap.operationBytes) === 0,
+				pinPresent: Object.hasOwn(input, "exactCanonicalPinnedGenesisBootstrapOperationBytes"),
+				site,
+			})
+		);
+		return input;
+	};
 	let closed = false;
 	let successorVerificationConsumed = false;
 	const cleanup = async (): Promise<void> => {
@@ -565,33 +645,41 @@ export async function openD110cARepeatCloseFixture(
 			throw new TypeError("D110C_A_CURRENT_COLD_INPUT_INVALID");
 		}
 		await Promise.resolve(hot.successor.deactivate());
-		const reopened = await reopenCreatorSuccessorAdoption({
-			authenticationProfile: "creator-only",
-			author: hot.base.evidence.issuanceScope.author,
-			catalog: hot.base.catalog,
-			detachedSignature: Uint8Array.from(genesisTrustRecord.detachedCurrentAnchorSignature),
-			exactCanonicalAnchorPreimageBytes: Uint8Array.from(genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
-			exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
-			expectedRoomHead: Object.freeze({
-				currentAnchorDigest: currentAuthority.anchorDigest,
-				epoch: currentAuthority.epoch,
-				objectId: currentAuthority.objectId,
-			}),
-			issuanceStore: hot.base.evidence.issuanceStore,
-			liveJournalStore: hot.base.journal,
-			pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
-			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
-			snapshotDeclaration: coldFacts.snapshotDeclaration,
-			snapshotStore: coldFacts.snapshotStore,
-			store: coldFacts.store,
-			...hot.runtimeBindings,
-		});
+		const reopened = await reopenCreatorSuccessorAdoption(
+			observeColdInput(
+				{
+					authenticationProfile: "creator-only",
+					author: hot.base.evidence.issuanceScope.author,
+					catalog: hot.base.catalog,
+					detachedSignature: Uint8Array.from(genesisTrustRecord.detachedCurrentAnchorSignature),
+					exactCanonicalAnchorPreimageBytes: Uint8Array.from(
+						genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+					),
+					exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
+					expectedRoomHead: Object.freeze({
+						currentAnchorDigest: currentAuthority.anchorDigest,
+						epoch: currentAuthority.epoch,
+						objectId: currentAuthority.objectId,
+					}),
+					issuanceStore: hot.base.evidence.issuanceStore,
+					liveJournalStore: hot.base.journal,
+					pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
+					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+					snapshotDeclaration: coldFacts.snapshotDeclaration,
+					snapshotStore: coldFacts.snapshotStore,
+					store: coldFacts.store,
+					...hot.runtimeBindings,
+				},
+				"current-successor"
+			)
+		);
 		if (reopened.ok === true && reopened.handle !== null && typeof reopened.handle === "object") {
 			latestSuccessor = reopened.handle as D109dHotFixture["successor"];
 		}
 		return reopened;
 	};
 	try {
+		originalBootstrap = await originalBootstrapOperation(hot);
 		const plane = hot.successor as V3PlaneHandle;
 		const issued = await hot.successor.issueLocal({
 			operations: Object.freeze([
@@ -937,25 +1025,28 @@ export async function openD110cARepeatCloseFixture(
 					throw new TypeError(`D110C_B_PUBLISH_FAILED:${String(published.kind)}:${String(published.detail)}`);
 				}
 				d110c0b1ActiveInspection = await adoptionHandle.inspectDurableHead();
-				d110c0b1ColdInput = Object.freeze({
-					authenticationProfile: "creator-only",
-					author: hot.base.evidence.issuanceScope.author,
-					catalog: hot.base.catalog,
-					detachedSignature: Uint8Array.from(genesisTrustRecord.detachedCurrentAnchorSignature),
-					exactCanonicalAnchorPreimageBytes: Uint8Array.from(
-						genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
-					),
-					exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
-					expectedRoomHead,
-					issuanceStore: hot.base.evidence.issuanceStore,
-					liveJournalStore: hot.base.journal,
-					pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
-					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
-					snapshotDeclaration: coldFacts.snapshotDeclaration,
-					snapshotStore: coldFacts.snapshotStore,
-					store: coldFacts.store,
-					...hot.runtimeBindings,
-				});
+				d110c0b1ColdInput = observeColdInput(
+					Object.freeze({
+						authenticationProfile: "creator-only",
+						author: hot.base.evidence.issuanceScope.author,
+						catalog: hot.base.catalog,
+						detachedSignature: Uint8Array.from(genesisTrustRecord.detachedCurrentAnchorSignature),
+						exactCanonicalAnchorPreimageBytes: Uint8Array.from(
+							genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+						),
+						exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
+						expectedRoomHead,
+						issuanceStore: hot.base.evidence.issuanceStore,
+						liveJournalStore: hot.base.journal,
+						pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
+						signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+						snapshotDeclaration: coldFacts.snapshotDeclaration,
+						snapshotStore: coldFacts.snapshotStore,
+						store: coldFacts.store,
+						...hot.runtimeBindings,
+					}),
+					"epoch-two"
+				);
 				return Object.freeze({
 					afterHead: d110c0b1ActiveInspection,
 					activation,
@@ -1017,7 +1108,11 @@ export async function openD110cARepeatCloseFixture(
 				}
 			},
 			captureD110c0b1RedMaterial: async () => {
-				if (d110c0b1ColdInput === undefined || d110c0b1ActiveInspection === undefined) {
+				if (
+					d110c0b1ColdInput === undefined ||
+					d110c0b1ActiveInspection === undefined ||
+					originalBootstrap === undefined
+				) {
 					throw new TypeError("D110C_0B1_HOT_ADOPTION_REQUIRED");
 				}
 				await Promise.resolve(latestSuccessor?.deactivate());
@@ -1046,6 +1141,13 @@ export async function openD110cARepeatCloseFixture(
 				}
 				return Object.freeze({
 					active: await detachedHeadForInspection(hot, d110c0b1ActiveInspection),
+					coldBootstrap: Object.freeze({
+						inputs: Object.freeze([...coldBootstrapInputs]),
+						original: Object.freeze({
+							...originalBootstrap,
+							operationBytes: Uint8Array.from(originalBootstrap.operationBytes),
+						}),
+					}),
 					checkpointGenesis: Object.freeze({
 						detachedGenesisSignature: Uint8Array.from(detachedGenesisSignature),
 						exactCanonicalGenesisAnchorPreimageBytes: Uint8Array.from(exactCanonicalGenesisAnchorPreimageBytes),

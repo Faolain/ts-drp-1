@@ -69,6 +69,7 @@ describe("D.110c-0b1 bounded checkpoint and control-proof GREEN", () => {
 						},
 						coldIssued: fixture.evidence.coldIssued,
 						coldPublished: fixture.evidence.coldPublished,
+						coldBootstrap: fixture.evidence.coldBootstrap,
 						census: {
 							active: fixture.evidence.activeCensus,
 							current: fixture.evidence.currentCensus,
@@ -102,9 +103,12 @@ describe("D.110c-0b1 bounded checkpoint and control-proof GREEN", () => {
 		const { activeCensus, currentCensus, existingAdvance, proposedCensus } = fixture.evidence;
 		expect(existingAdvance).toMatchObject({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
 		expect(bounded).toEqual({ kind: "successor", ok: true });
-		expect(currentCensus).toHaveLength(6);
-		expect(proposedCensus).toHaveLength(5);
-		expect(activeCensus).toHaveLength(6);
+		expect(currentCensus).toHaveLength(7);
+		expect(proposedCensus).toHaveLength(6);
+		expect(activeCensus).toHaveLength(7);
+		expect(entries(currentCensus, "drp-creator-author-issuance-frontiers-state", 0)).toHaveLength(1);
+		expect(entries(proposedCensus, "drp-creator-author-issuance-frontiers-state", 1)).toHaveLength(1);
+		expect(entries(activeCensus, "drp-creator-author-issuance-frontiers-state", 1)).toHaveLength(1);
 		expect(entries(currentCensus, "drp-creator-issuance-retirement-state", 0)).toHaveLength(1);
 		expect(entries(proposedCensus, "drp-creator-issuance-retirement-state", 1)).toHaveLength(1);
 		expect(entries(activeCensus, "drp-creator-issuance-retirement-state", 1)).toHaveLength(1);
@@ -126,6 +130,20 @@ describe("D.110c-0b1 bounded checkpoint and control-proof GREEN", () => {
 		const { active, current, proposed } = fixture.evidence.durableHeads;
 		expect(Number(proposed.revision)).toBe(Number(current.revision) + 1);
 		expect(Number(active.revision)).toBe(Number(proposed.revision) + 1);
+		const bootstrap = fixture.evidence.coldBootstrap;
+		expect(bootstrap.original).toMatchObject({
+			anchorDigest: fixture.evidence.checkpointInput.pinnedGenesisAnchorDigest,
+			authorSequence: 0,
+			epoch: 0,
+			logicalTime: 1,
+			objectId: fixture.evidence.checkpointInput.expectedObjectId,
+		});
+		expect(bootstrap.original.author).toEqual(expect.any(String));
+		expect(bootstrap.original.vertexDigest).toMatch(/^[a-f0-9]{64}$/u);
+		expect(bootstrap.original.operationBytes).toBeInstanceOf(Uint8Array);
+		expect(bootstrap.original.operationBytes.byteLength).toBeGreaterThan(0);
+		// This lifecycle constructs only epoch-two input; current-successor wiring is a separate retained consumer.
+		expect.soft(bootstrap.inputs).toEqual([{ pinMatchesOriginal: true, pinPresent: true, site: "epoch-two" }]);
 		expect(fixture.evidence.coldReopen).toMatchObject({
 			handle: { epoch: 2 },
 			lifecycle: "active",

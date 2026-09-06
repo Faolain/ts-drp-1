@@ -23,6 +23,7 @@ export interface D110c0b1RedEvidence {
 	readonly activeCensus: readonly D110c0b1ClosureEntry[];
 	readonly boundedInput: InspectBoundedCreatorTrustAdvanceInput;
 	readonly checkpointInput: OpenCreatorCheckpointTrustInput;
+	readonly coldBootstrap: D110c0b1RedMaterial["coldBootstrap"];
 	readonly coldIssued: Readonly<Record<string, unknown>> | undefined;
 	readonly coldPublished: Readonly<Record<string, unknown>> | undefined;
 	readonly coldReopen: Readonly<Record<string, unknown>>;
@@ -180,6 +181,7 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 						objectId: expectedObjectId,
 					}),
 				}),
+				coldBootstrap: material.coldBootstrap,
 				coldIssued: material.coldIssued,
 				coldPublished: material.coldPublished,
 				coldReopen: material.coldReopen,

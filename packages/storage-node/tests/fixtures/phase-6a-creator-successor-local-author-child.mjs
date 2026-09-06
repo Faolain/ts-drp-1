@@ -656,6 +656,25 @@ function sameStoreShape(actual, expected) {
 	);
 }
 
+function observePublicStore(store) {
+	return Object.freeze({
+		descriptors: Object.freeze(
+			Reflect.ownKeys(store).map((key) => {
+				const descriptor = Object.getOwnPropertyDescriptor(store, key);
+				return Object.freeze({
+					configurable: descriptor.configurable,
+					enumerable: descriptor.enumerable,
+					key: String(key),
+					valueKind: "value" in descriptor ? typeof descriptor.value : "accessor",
+					writable: descriptor.writable,
+				});
+			})
+		),
+		keys: Object.freeze(Reflect.ownKeys(store).map(String)),
+		symbolCount: Object.getOwnPropertySymbols(store).length,
+	});
+}
+
 function newD108e4mFacadeTiming(name) {
 	return {
 		methods: Object.fromEntries(D108E4M_FACADE_METHODS.map((method) => [method, { callCount: 0, syncBodyMs: 0 }])),
@@ -1514,6 +1533,27 @@ async function skipBudgetProof(material) {
 		const equalityRows = await materializeVerifiedClosure(raw, scope, 8_193, bob);
 		const equalityBounded = boundedRecoveryStore(raw, equalityRows, scope, undefined, "equality");
 		const boundedStoreShape = sameStoreShape(equalityBounded.store, raw);
+		const publicStoreContract = Object.freeze({
+			facade: observePublicStore(equalityBounded.store),
+			intentionalOverridesDistinct: [
+				"close",
+				"compareAndMarkOutboxPublished",
+				"readIssued",
+				"readLineage",
+				"readOutboxPage",
+				"transactIssue",
+			].every((key) => equalityBounded.store[key] !== raw[key]),
+			raw: observePublicStore(raw),
+			settlementMethods: Object.freeze(
+				["readSettlementPlan", "transactWriteSettlementPlan"].map((key) =>
+					Object.freeze({
+						identicalToRaw: equalityBounded.store[key] === raw[key],
+						key,
+						present: typeof equalityBounded.store[key] === "function",
+					})
+				)
+			),
+		});
 		const reuseRows = Object.freeze(equalityRows.slice(0, 8_191));
 		const reuseBounded = boundedRecoveryStore(raw, reuseRows, scope, undefined, "reuse-0");
 		const reuseFacade = reuseBounded.store;
@@ -1729,6 +1769,7 @@ async function skipBudgetProof(material) {
 			mismatch: Object.freeze({ ...mismatch, telemetry: mismatchTelemetry }),
 			overBudget: Object.freeze({ ...overBudget, telemetry: overBudgetTelemetry }),
 			pid: process.pid,
+			publicStoreContract,
 			realStore: Object.freeze({
 				boundedStoreShape,
 				equalityMaterializedRows: equalityRows.length,
