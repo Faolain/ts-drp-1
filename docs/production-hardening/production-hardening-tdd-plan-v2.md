@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (finality rosters repaired; remaining parent retained debt stays open):
+Current work (bounded room-fixture correction next; parent retained debt stays open):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -101842,6 +101842,59 @@ tests-only correction/GREEN ownership; registry-freeze repair still requires
 the explicit prospective scope requested from the user. The existing final
 parent Grok/Sol-high/Fable-xhigh review must inspect this correction alongside
 the full history after the remaining gates pass, without another prose round.
+
+**Prospective retained room-carrier correction (2026-09-05).** The Phase-3
+room harness owner now takes gate 10's already-assigned fixture debt, before
+parent f5b retained acceptance. The signed diagnostic inventory at `8ba7d208`
+preserves 18 failures and two passes in
+`tests/phase-3g-v3-room-rebase-red.test.ts`; all 20 outcomes and first failure
+lines agree with signed baseline `60548549`. Root revalidated the retained
+reporter and baseline comparison against their manifest. Do not rerun this
+uncorrected baseline or the accepted parent causal RED.
+
+The bounded source audit traces `decodeCreatorInvite`,
+`assertSupportedGenesisLineagePolicy`, `migrationLatchedAcl`,
+`migrationCreatorAuthor` and `migrationInviteAuthority` in the room owner.
+The one-byte parameters placeholder fails before rebase behavior. Merely
+replacing it would expose malformed profile, genesis and ACL carriers: the
+room reads these even without application migration. The fixture must carry
+complete canonical legacy parameters, creator-trusted-v1 profile, signer set,
+version-1 ACL and genesis records, with consistent object/blueprint and
+inner-carrier digest bindings. Do not substitute an empty or scalar parameters
+value, change production decoding, or add a mock for those checks.
+
+This remains a controlled room-composition suite. Its existing trust-store,
+issuer, recovery and live-plane mocks, a/b anchor markers, fake detached
+signatures and local-author markers remain unchanged. The correction does
+not turn them into authenticated genesis or golden-path evidence. A valid
+hex creator in the decoded ACL supplies the already-required carrier shape;
+it does not replace the mocked application's local-author identity.
+
+The separate Astra-high RED owner may edit only the `invite` helper, its
+existing canonical import if needed for inner-carrier hashing, and the single
+forwarded-ACL expected value in the first test. That expectation must still
+compare exact source-invite bytes. Preserve every byte outside those spans,
+all 20 titles, every other assertion and mock, batching and 8,192-row bounds,
+timeouts, and the eight-owner production patch. Sign/push the tests-only
+correction separately. In a fresh checkout of that exact signed tree,
+independently install frozen dependencies and build from source without the
+pending patch, copied dist or shared main-workspace node_modules. Freeze the
+existing exact file-bound title multiset, then execute only this one retained
+file once, expecting 20 passes and no skips, suite errors or changed names.
+Any newly reached failure stops this correction for diagnosis; do not expand
+its fixtures, assertions or production scope to conceal it.
+
+Record exact commands, complete reporter/stdout/stderr/statuses, source and
+runtime identities, source-shape custody, focused lint/format/diff, bounded
+target type diagnostics with honest inherited-debt attribution, protected
+paths/stashes and a self-excluding evidence manifest. After root acceptance,
+the separate existing Astra-high GREEN owner executes the same file once
+against the unchanged pending patch. Preserve all other retained test hashes.
+Use the existing parent final Grok/Sol-high/Fable-xhigh review after its full
+gates; this fixture correction adds no model/prose review round. Other retained
+debts, registry-governance authorization, static/browser/isolated parent gates
+and the long-horizon golden paths remain open. No campaign, new API,
+authority, dependency, workload or threshold change is authorized here.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
