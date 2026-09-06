@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- controlled module factories expose exact probes. */
-import { encodeCanonical } from "@ts-drp/canonical";
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
@@ -253,13 +253,63 @@ vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 const roomModule = import("../examples/v3-room/src/index.js");
 
 function invite(anchor: string): V3RoomCreatorInviteMaterial {
+	// These canonical records exercise room composition under the existing mocked trust boundary.
+	// The a/b pins and detached signatures remain markers, not authenticated genesis proof.
+	const objectId = `creator:${"d".repeat(32)}`;
+	const creator = "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664";
+	const digest = (domain: string, bytes: Uint8Array): string =>
+		Array.from(hashDomain(domain, bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+	const signerSet = [{ publicKey: creator, signerId: "creator" }];
+	const exactCanonicalSignerSetBytes = encodeCanonical(signerSet);
+	const exactCanonicalProfileBytes = encodeCanonical({
+		cryptoSuiteId: "ed25519-sha256-v3",
+		profileId: "creator-trusted-v1",
+		quorum: 1,
+		signers: signerSet,
+	});
+	const exactCanonicalLatchedAclBytes = encodeCanonical({
+		epoch: 0,
+		kind: "drp-v3-latched-acl",
+		members: [{ author: creator, finalityKey: creator, groups: ["admin", "finality", "writer"] }],
+		objectId,
+		permissionless: false,
+		version: 1,
+	});
+	const exactCanonicalParametersCarrierBytes = encodeCanonical({
+		maxEpochVertices: 8192,
+		maxEpochBytes: 8_388_608,
+		maxDependencies: 16,
+		snapshotChunkBytes: 131_072,
+		maxSnapshotBytes: 268_435_456,
+		maxPendingEntries: 4096,
+		maxPendingBytes: 16_777_216,
+	});
+	const emptyRoot = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+	const exactCanonicalGenesisAnchorPreimageBytes = encodeCanonical({
+		aclDigest: digest("ts-drp/latched-acl/v3", exactCanonicalLatchedAclBytes),
+		archiveIndexRoot: emptyRoot,
+		blueprintDigest: "b".repeat(64),
+		cryptoSuiteId: "ed25519-sha256-v3",
+		cutDigest: "0".repeat(64),
+		epoch: 0,
+		historyRoot: emptyRoot,
+		historySize: 0,
+		kind: "drp-epoch-anchor",
+		objectId,
+		parametersDigest: digest("ts-drp/parameters/v3", exactCanonicalParametersCarrierBytes),
+		previousAnchor: "0".repeat(64),
+		profileDigest: digest("ts-drp/profile/v3", exactCanonicalProfileBytes),
+		protocolMajor: 3,
+		signerSetDigest: digest("ts-drp/signer-set/v3", exactCanonicalSignerSetBytes),
+		stateDigest: digest("ts-drp/state/v3", encodeCanonical({ anchor })),
+	});
 	return Object.freeze({
 		detachedGenesisSignature: new Uint8Array(64).fill(anchor === "a".repeat(64) ? 1 : 2),
-		exactCanonicalGenesisAnchorPreimageBytes: Uint8Array.of(anchor === "a".repeat(64) ? 1 : 2),
-		exactCanonicalLatchedAclBytes: Uint8Array.of(3),
-		exactCanonicalParametersCarrierBytes: Uint8Array.of(4),
-		exactCanonicalProfileBytes: Uint8Array.of(5),
-		exactCanonicalSignerSetBytes: Uint8Array.of(6),
+		exactCanonicalGenesisAnchorPreimageBytes,
+		exactCanonicalLatchedAclBytes,
+		exactCanonicalParametersCarrierBytes,
+		exactCanonicalProfileBytes,
+		exactCanonicalSignerSetBytes,
 		pinnedGenesisAnchorDigest: anchor,
 	});
 }
@@ -461,7 +511,20 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 		expect(probe.recoveryInputs[1]).toMatchObject({
 			displacedSource: {
 				capability: { anchor: "a".repeat(64) },
-				exactCanonicalLatchedAclBytes: Uint8Array.of(3),
+				exactCanonicalLatchedAclBytes: encodeCanonical({
+					epoch: 0,
+					kind: "drp-v3-latched-acl",
+					members: [
+						{
+							author: "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+							finalityKey: "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+							groups: ["admin", "finality", "writer"],
+						},
+					],
+					objectId: `creator:${"d".repeat(32)}`,
+					permissionless: false,
+					version: 1,
+				}),
 			},
 		});
 		await first.close();
