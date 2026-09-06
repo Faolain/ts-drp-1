@@ -371,7 +371,7 @@ async function roomAuthorityReadOrderFixtures(): Promise<
 	const publicKey = ed25519.getPublicKey(seed);
 	const author = Buffer.from(publicKey).toString("hex");
 	const objectId = "creator:0000000000000000000000000000d108";
-	const blueprintDigest = createV3ChatApplication("guard").catalog.blueprintDigests[0];
+	const blueprintDigest = createV3ChatApplication("alice").catalog.blueprintDigests[0];
 	if (blueprintDigest === undefined) throw new TypeError("F5B_ROOM_GUARD_FIXTURE_BLUEPRINT");
 	const signers = Object.freeze([Object.freeze({ publicKey: author, signerId: "creator" })]);
 	const fixtures = [];
