@@ -104542,6 +104542,19 @@ backward-compatibility machinery. Root owns the contract reconciliation and
 evidence; independent Astra-high owners retain separate RED/GREEN roles.
 No new permission request is needed for these three authorized boundaries.
 
+The completed bounded source/API audit is preserved under
+`.logs/d110c-0c1f5b-authority-resolution-audit-601fbb52/`, ten-entry
+self-excluding manifest SHA
+`093dcdda59df4dafff3a4d50080ac067200e5790d01e698c8f97d1a5f7313017`.
+Its `audit-readback.md` distinguishes source facts, proposed owners and
+unsettled executable details. The sole Fable-high consultation returned
+normally in session `e8edce4f-a127-4dec-bd0b-224c8f8e3ded`; it supports
+example-level injection of the existing room-head capability, not a new
+Node/protocol API. Root has not accepted its proposed demo initialization
+default as a production freshness guarantee. This advisory result and the
+two read-only Astra audits are not formal plan acceptance or runtime gates.
+No checker, compiler, test, build or campaign was run during this audit.
+
 Historical signed commits, consumed invocation identities, review findings,
 manifests and evidence remain immutable. Their preservation is not a demand
 that current CI execute old checkers against an evolved registry or keep

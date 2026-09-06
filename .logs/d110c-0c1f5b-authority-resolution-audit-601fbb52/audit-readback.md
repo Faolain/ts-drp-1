@@ -1,0 +1,37 @@
+# Authorized current-contract resolution: bounded audit
+
+User authority: resolve registry governance, W0 fence compatibility and grid authority composition with separate RED/GREEN ownership and existing reviews. Subsequent clarification: no deployed rooms or external consumers; greenfield development. The previous proposal to build a legacy checker projection/compatibility mechanism is withdrawn. Signed/pushed plan correction 0994db2904c942b1b744f5e46b8a8a98a0f7c35f records that decision. This audit is not a frozen executable plan or production acceptance.
+
+## Registry
+
+Read-only registry audit by the existing Astra-high RED owner identifies three consumed failures: retained-30 (two failures and three readiness-blocked seal cases) and retained-40 (one failure, twelve passes), under .logs/d110c-0c1f5b-green-71bca5d5. Reporter hashes are ec0d8309c6eb9fd1ba0f6105daebe822ae431e9ddb3835ffb9b2917ea346b1fd and 44a3606fd52cbb23bb627eefb99b2d4727e45819c10574cb069775acf7678886. Do not call the three skipped seal cases passing or invent new runtime observations.
+
+The current registry is exactly the signed W0 0d6e38c2 registry: SHA663281a11da08d99e4a751ed3f439c1562a49d3b70ab21b34de50959bf47c190. Its only delta from the old registry is the eleven-line optional authorShareMultiplier descriptor (safe integer1–1,000,000, requiredfalse, null const/sortRule). The registry itself does not need another edit.
+
+Current-owner candidate: replace the active contracts at packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs and conformance/freeze-policy-v3.json, plus supplements/seal-digest-identity-v1/check-freeze.mjs and freeze-policy.json. Move current seal contract/test, journal governance and the direct anchor-trust test pin together. Preserve actual domain/signature/seal/QC/vote semantics and negative schema tests; do not merely substitute an expected hash.
+
+Active CI routing candidate: protocol-v3-registry and protocol-v3-seal-digest-identity, plus the five freeze-successor consumers (blueprint-operation-budget, blueprint-work-budget, equivocation-author-projection, equivocation-gossip-budget, equivocation-acl-reputation). Author-authorization already calls the root checker. Preserve subsystem commands and the v2 checks. Supersede obsolete current routing assertions explicitly, not by leaving them enabled against an intentionally retired contract. Do not extend freeze-successor-v1 with another bootstrap exception or construct synthetic historical trees.
+
+The old independent references understand seven required parameters and reject the optional eighth. Their frozen provenance cannot be represented as current present-field coverage. The exact implementation plan must decide current independent conformance coverage explicitly; a bounded independent canonical byte/digest oracle for present4 can complement retained historical vectors without pretending the old references handle that field. Existing absent-field bytes remain a useful current default-parameter invariant, not a promise to support deployed old rooms. No API, wire or production change is proposed by this governance repair.
+
+## W0
+
+Read-only W0 audit by the existing Astra-high GREEN owner finds that the helper opens genuine legacy material but asserts an admitted settlement-only fence. The complete retained58 JSON proves an aggregate mismatch only; it does not report the differing numeric field. Signed93585bf3 and accepted f5b0r intentionally reject legacy fences at local issue, ingress and recovery. Preserve that current rule rather than widening admission.
+
+Proposed repair owners are the W0 runtime test and its w0-runtime-contract.ts helper only. Keep the legacy22-writer/default4/max8192 share, causalJoin, other-writer progress and successful close controls, explicitly requiring attempted fence refusal without durable/application effects. Add a genuine settlement companion with identical supported parameters and the offender's own fence inside its1492-slot allowance (ceil8192/22 times4): one fence plus1491 application vertices, next valid vertex refused, another writer progresses, exact row/byte accounting, no application fold effect from the control. The old fence is author20 while the offender is author1, so flipping fenceCount1 to0 is insufficient coverage. Use real signatures, prepared profile, public recovery/ingress and genuine plan CAS where local issuance needs it; no synthetic counter/authority shortcut or shared-fixture API widening.
+
+## Grid consultation and root boundary
+
+The authorized Fable-high consultation through claude-phel completed successfully in session e8edce4f-a127-4dec-bd0b-224c8f8e3ded. Raw result is preserved in fable/events.jsonl. It was launched before the greenfield clarification and is advisory; no second consultation is needed solely to repeat that fact.
+
+It recommends a required per-open authority factory at the example-level createV3ZoneApi boundary, passed through by identity to the existing V3RoomHeadAuthority input. It identifies the two positional test consumers and browser entrypoint. Runtime shape validation is necessary because the room currently tolerates a missing provider in a non-closing genesis-only configuration. It rejects a cast, optional room authority, floor derived from AHE, and any assertion that same-origin storage supplies anti-rollback trust.
+
+Root accepts the injection direction for exact-plan consideration, not all proposed defaults. In particular, a page-local model that chooses create on every unseen join must not be mistaken for safe ordinary reopen. The executable plan still needs an exact account/bootstrap versus reopen boundary and a clearly bounded demo-provider lifetime, without duplicating chat's model gratuitously. No model provider can satisfy production freshness by labeling alone. The new API has not been implemented or accepted yet.
+
+Grid application projectAcceptedOperations still rejects any authenticatedBase with D110C_0C1G_GRID_AUTHORITY_BASE_UNAVAILABLE because snapshot state omits authenticated transportPeerAuthors. D.110c-0c1h owns that remaining genuine successor capability. The existing shared room lifecycle can be exercised with a real grid application; a new grid-specific close API is not automatically required merely because the demo wrapper lacks one. Removing the grid type error is not proof of100-epoch game-world continuity. Keep that separate actual dependency visible before the long-run freeze.
+
+## Execution and next action
+
+Only read-only source inspection and the one API consultation occurred. No checker, compiler, test, profile or workload ran; no production or fixture changed. Root corrected a few guessed nonexistent read paths by locating the actual owners with rg; these were diagnostic lookup errors, not code failures. The eight pending production sources, seven built outputs,27 stashes and86,522 protected paths were checked unchanged before the plan-only commit.
+
+Next: freeze one exact coherent implementation contract per authorized boundary, including current governance references/routing and grid initialization semantics, then the required bounded risk review and separate RED/GREEN owners. Do not relaunch audits or create a review-only slice for this prose. The user has already supplied authority; no repeat permission request is needed. No100-epoch workload before functional, remaining-gap, retained and reviewed workload/evidence gates.
