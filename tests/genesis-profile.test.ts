@@ -121,9 +121,14 @@ describe("Phase 3b certified genesis", () => {
 			);
 			for (const row of certificate.signatures) {
 				expect(
-					ed25519.verify(row.signature, Uint8Array.from(Buffer.from(material.anchorDigest, "hex")), row.publicKey, {
-						zip215: false,
-					})
+					ed25519.verify(
+						row.signature,
+						Uint8Array.from(Buffer.from(material.anchorDigest, "hex")),
+						Uint8Array.from(Buffer.from(row.publicKey, "hex")),
+						{
+							zip215: false,
+						}
+					)
 				).toBe(true);
 			}
 			expect(encodeCanonical(decodeCanonical(material.anchorBytes))).toEqual(material.anchorBytes);

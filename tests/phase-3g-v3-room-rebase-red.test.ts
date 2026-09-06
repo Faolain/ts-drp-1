@@ -1191,7 +1191,7 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 			...base,
 			projectAcceptedOperations: (input: {
 				readonly authenticatedBase: undefined;
-				readonly currentEpochOperations: readonly Readonly<Record<string, unknown>>[];
+				readonly currentEpochOperations: readonly Readonly<{ readonly operation: Readonly<Record<string, unknown>> }>[];
 			}) => {
 				if (
 					input.currentEpochOperations.some(
@@ -1253,7 +1253,7 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 			...base,
 			projectAcceptedOperations: (input: {
 				readonly authenticatedBase: undefined;
-				readonly currentEpochOperations: readonly Readonly<Record<string, unknown>>[];
+				readonly currentEpochOperations: readonly Readonly<{ readonly operation: Readonly<Record<string, unknown>> }>[];
 			}) => {
 				if (input.currentEpochOperations.some(({ operation }) => Reflect.get(operation, "value") === 2)) {
 					projectionRejections += 1;

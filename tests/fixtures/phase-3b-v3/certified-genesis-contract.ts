@@ -179,7 +179,13 @@ export function makeCertifiedGenesis(options: CertifiedGenesisOptions = {}): Cer
  * @param material - Valid certified genesis material.
  * @returns Detached public installation input.
  */
-export function installInput(material = makeCertifiedGenesis()): Readonly<Record<string, unknown>> {
+export function installInput(material = makeCertifiedGenesis()): Readonly<{
+	exactCanonicalCertifiedGenesisCertificateBytes: Uint8Array;
+	exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+	exactCanonicalProfileBytes: Uint8Array;
+	exactCanonicalSignerSetBytes: Uint8Array;
+	pinnedGenesisAnchorDigest: string;
+}> {
 	return Object.freeze({
 		exactCanonicalCertifiedGenesisCertificateBytes: new Uint8Array(material.certificateBytes),
 		exactCanonicalGenesisAnchorPreimageBytes: new Uint8Array(material.anchorBytes),

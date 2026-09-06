@@ -371,7 +371,9 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 			assertClosedItfTrace(trace);
 			expect(trace.states.every(({ n }) => n === descriptor.n)).toBe(true);
 			for (const event of descriptor.requiredEvents) expect(events.has(event), event).toBe(true);
-			const mutant = structuredClone(trace);
+			const mutant = structuredClone(trace) as Omit<ItfTrace, "states"> & {
+				readonly states: ItfTrace["states"][number][];
+			};
 			const terminal = mutant.states.at(-1);
 			if (terminal === undefined) throw new Error("TRACE_TOO_SHORT");
 			mutant.states[mutant.states.length - 1] = {
