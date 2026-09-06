@@ -18503,18 +18503,18 @@ needed after that stop. The parent record owns full evidence and custody.
 This closes three original runtime failures, leaving five from the original
 retained inventory. Thirteen baseline-identical transport type diagnostics
 remain open; no blanket typecheck or parent GREEN acceptance is claimed.
-Next is the parent record's bounded authority-read-order correction: preserve
-the original room guard test, add one profile-aware RED probe, then restore
-early refusal without blocking settlement creator cold reopen. No production
-ordering change precedes the separate signed/accepted additive RED.
-The fixture label is corrected in signed tests `ba15bb89`; evidence `edb238c6`
-preserves the pre-runtime stop. The first execution at `c25cb891` has the
-expected eleven passes/two failures but lacks the required eight observations
-because the JSON-only reporter suppresses console events. It is not accepted
-causal RED. The command-only dual-reporter continuation below preserves all
-test bytes and acceptance predicates. Forty-one external baseline-identical
-fixture type diagnostics remain assigned to parent static closure, not silently
-classified as a passing typecheck.
+Next is the parent record's bounded authority-read-order GREEN: restore early
+refusal without blocking settlement creator cold reopen. Its separate additive
+RED is now signed and accepted; preserve all original and added test assertions.
+The additive authority-ordering RED is accepted at signed/pushed `db8a8615`:
+the clean dual-reporter run has eleven passes/two intended failures and all
+eight observations, proving five forbidden early reads and three permitted
+controls. Separate room-only GREEN is next under the frozen scope below;
+the original retained failure remains open until that GREEN passes. The
+pre-runtime fixture stop `edb238c6` and observation-incomplete run `c25cb891`
+remain immutable. Forty-one external baseline-identical fixture type
+diagnostics remain assigned to parent static closure, not classified as a
+passing typecheck.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -102724,6 +102724,39 @@ Then execute once, retaining complete stdout/stderr and JSON, with the same
 eleven-pass/two-failure and eight-row/five-forbidden/three-permitted acceptance
 matrix. A missing or different observation still stops. No GREEN edit is
 authorized until root accepts the separately signed/pushed causal evidence.
+
+**Additive room-guard RED acceptance (2026-09-05).** Root accepts signed/pushed
+`db8a8615` and `.logs/d110c-0c1f5b-red-room-guard-reporters-5f6fb6c0/`:
+exact 98-entry manifest
+`3e968b850bfcac36c2eca4f91ca7b4e43f2869591af8da42224217a4c279c8ad`,
+raw reporter
+`5e280246cb25932ff0ee2ecda8f73f33bd2e99934f16a4bf440619da555fb46d`
+and raw stdout
+`360662808f051e663790252c9e60436261f3a60288d2abd18cddbc2ea70888d0`.
+One clean source-built execution matches thirteen tests, eleven passes, the
+two intended failures, no skips or unhandled anomalies, and exactly one full
+eight-row observation. All actual rows read only application once: the five
+forbidden rows violate early refusal, while the three permitted controls hold.
+This is input-classification causality, not authenticated activation proof.
+All prechecks and custody pass with zero target diagnostics; the 41 inherited
+external diagnostics remain open. Root rehashed the complete inventory,
+checked raw outcomes and verified signed/pushed identity. A faulty seal check
+was corrected to account only for the locked parser's exact `node,/index.js`
+prefix rewrite; no execution was repeated. Three raw-only whitespace warnings
+are explicitly retained: the Vite warning, a rendered source excerpt's trailing
+space and the default reporter's final blank line. Authored checks pass.
+
+The separate existing GREEN owner may now implement only the frozen room
+ordering repair. First require the unchanged thirteen cases and exact eight
+observations to pass; then retain bootstrap-policy gate 52 (three cases) and
+room-rebase gate 10 (twenty cases), without changing their tests. These are
+regressions for the actual room edit, not reopened milestones. Preserve the
+other seven pending production owners and record the room-only delta/new
+parent patch identity. Parent-wide/static/browser/isolated acceptance and the
+final Grok/Sol/Fable review remain open; the earlier 45/45 integration result
+is not reattributed to the new production bytes. No long workload or additional
+model round is authorized here. The eventual signed parent GREEN production
+commit remains separate from the accepted tests-only RED chain.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
