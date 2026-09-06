@@ -80,7 +80,7 @@ describe("D.110c-0c1k W0 real lifecycle and capacity RED", () => {
 
 	it("caps one authenticated writer, counts fence/join vertices, preserves another writer and closes below global capacity", async () => {
 		const measured = await exerciseAuthorShareRuntime();
-		expect(measured).toMatchObject({
+		expect(measured, JSON.stringify(measured)).toMatchObject({
 			causalJoinCount: 1,
 			closeCount: measured.journalCount,
 			fenceCount: 1,

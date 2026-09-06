@@ -118,17 +118,29 @@ function decodedRow(bytes: Uint8Array): Readonly<Record<string, unknown>> {
  */
 export async function exerciseAuthorShareRuntime(): Promise<
 	Readonly<{
+		readonly attemptedFenceCanonicalBytes: number;
+		readonly attemptedFenceDeliveredToApplication: boolean;
+		readonly attemptedFenceJournaled: boolean;
 		readonly causalJoinCount: number;
+		readonly closeCanonicalBytes: number;
 		readonly closeCount: number;
+		readonly closedApplicationState: unknown;
 		readonly fenceCount: number;
 		readonly globalCapacityRemaining: number;
+		readonly journalCanonicalBytes: number;
 		readonly journalCount: number;
+		readonly offenderApplicationCount: number;
 		readonly offenderCount: number;
+		readonly offenderFenceCount: number;
 		readonly offenderOverflowAdmitted: boolean;
 		readonly otherWriterProgressed: boolean;
+		readonly profileId: string;
 	}>
 > {
 	const seeds = deterministicAuthorSeeds(W0_WRITER_COUNT);
+	let attemptedFenceCanonicalBytes = 0;
+	let attemptedFenceDeliveredToApplication = false;
+	let attemptedFenceDigest = "";
 	let offenderAuthor = "";
 	let offenderOverflowAdmitted = false;
 	let markerDigest = "";
@@ -151,6 +163,8 @@ export async function exerciseAuthorShareRuntime(): Promise<
 				operation: Object.freeze({ action: W0_FENCE_ACTION, fenceSequence: 0, version: 1 }),
 				privateKeySeedHex: seeds[20] as string,
 			});
+			attemptedFenceCanonicalBytes = fence.canonicalPreimageBytes.byteLength;
+			attemptedFenceDigest = Buffer.from(fence.digest).toString("hex");
 			if (!routeRegisteredVertexUnchecked(fence, "d110c-w0-fence")) {
 				throw new TypeError("D110C_0C1K_FENCE_NOT_CLAIMED");
 			}
@@ -162,6 +176,7 @@ export async function exerciseAuthorShareRuntime(): Promise<
 				privateKeySeedHex: seeds[19] as string,
 			});
 			await routeRegisteredVertex(drainMarker, "d110c-w0-fence-drain");
+			attemptedFenceDeliveredToApplication = wasRegisteredVertexAdmitted(fence);
 			const offenderFirst = createRegisteredVertex({
 				authorSequence: 0,
 				dependencies: [initialDependency],
@@ -239,35 +254,64 @@ export async function exerciseAuthorShareRuntime(): Promise<
 		},
 	});
 	try {
+		const canonicalByteLengths: number[] = [];
 		const decodedRows = await Promise.all(
 			fixture.evidence.journalRows.map(async (row) => {
-				if (row.sourceKind === "received") return decodedRow(row.exactCanonicalPreimageBytes);
+				if (row.sourceKind === "received") {
+					canonicalByteLengths.push(row.exactCanonicalPreimageBytes.byteLength);
+					return decodedRow(row.exactCanonicalPreimageBytes);
+				}
 				const issued = await fixture.evidence.issuanceStore.readIssued(
 					Object.freeze({ author: row.author, objectId: fixture.evidence.issuanceScope.objectId }),
 					row.authorSequence
 				);
 				if (issued === null) throw new TypeError("D110C_0C1K_LOCAL_ROW_UNAVAILABLE");
+				canonicalByteLengths.push(issued.envelope.canonicalPreimageBytes.byteLength);
 				return decodedRow(issued.envelope.canonicalPreimageBytes);
 			})
 		);
 		const rowDigests = new Set(fixture.evidence.journalRows.map(({ vertexDigest }) => vertexDigest));
 		return Object.freeze({
+			attemptedFenceCanonicalBytes,
+			attemptedFenceDeliveredToApplication,
+			attemptedFenceJournaled: rowDigests.has(attemptedFenceDigest),
 			causalJoinCount: decodedRows.filter(({ operation }) =>
 				operation !== null && typeof operation === "object"
 					? (operation as Readonly<Record<string, unknown>>).action === "causalJoin"
 					: false
 			).length,
+			closeCanonicalBytes: fixture.evidence.history.closeSetEntries.reduce(
+				(total, entry) => total + entry.authenticatedCanonicalPreimageByteLength,
+				0
+			),
 			closeCount: fixture.evidence.closeResult.closedVertexCount,
+			closedApplicationState: decodedRow(fixture.evidence.exactCanonicalPayloadBytes).application,
 			fenceCount: decodedRows.filter(({ operation }) =>
 				operation !== null && typeof operation === "object"
 					? (operation as Readonly<Record<string, unknown>>).action === W0_FENCE_ACTION
 					: false
 			).length,
 			globalCapacityRemaining: W0_MAX_EPOCH_VERTICES - decodedRows.length,
+			journalCanonicalBytes: canonicalByteLengths.reduce((total, byteLength) => total + byteLength, 0),
 			journalCount: decodedRows.length,
+			offenderApplicationCount: decodedRows.filter(
+				({ author, operation }) =>
+					author === offenderAuthor &&
+					operation !== null &&
+					typeof operation === "object" &&
+					(operation as Readonly<Record<string, unknown>>).action === "add"
+			).length,
 			offenderCount: decodedRows.filter(({ author }) => author === offenderAuthor).length,
+			offenderFenceCount: decodedRows.filter(
+				({ author, operation }) =>
+					author === offenderAuthor &&
+					operation !== null &&
+					typeof operation === "object" &&
+					(operation as Readonly<Record<string, unknown>>).action === W0_FENCE_ACTION
+			).length,
 			offenderOverflowAdmitted,
 			otherWriterProgressed: rowDigests.has(markerDigest),
+			profileId: fixture.evidence.currentTrust.profileId,
 		});
 	} finally {
 		await fixture.close();
