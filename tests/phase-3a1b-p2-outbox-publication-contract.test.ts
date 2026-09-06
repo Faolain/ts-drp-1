@@ -580,8 +580,11 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"DurableIssuanceUnknownOutcomeError",
 			"MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT",
 			"MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS",
+			"SETTLEMENT_REPLACEMENT_DIGEST_LIMITS",
+			"SETTLEMENT_REPLACEMENT_MAX_INTENTS",
 			"applySettlementPlanEffect",
 			"assertDurableIssueScope",
+			"assertSettlementPlanProgressTransition",
 			"captureSettlementPlanWriteInput",
 			"classifyDurableIssuanceTerminalSuppression",
 			"cloneDurableIssueCommit",
@@ -602,9 +605,11 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"isClosedDurableIssuanceRecord",
 			"isValidDurableAuthorSequence",
 			"isValidDurableScopeField",
+			"settlementPlanHasExactEffectLink",
+			"settlementReplacementLastLogicalTime",
 		]);
 		expect(sha256(source("packages/issuance-store/src/contract.ts"))).toBe(
-			"49ac5a1d2b44f69a6becc3f3bcd4e44c2d4e178512a0d8489ae28766fa636cf7"
+			"2e2d160f7e59d643d01fb4d10e321c573ace252bef43040156ff26d92e837042"
 		);
 		expect(sha256(source("packages/issuance-store/src/terminal.ts"))).toBe(
 			"a71b32967ca152c12b10adad4f3303696fb42d4379892cc27c4937af19d42a4a"
