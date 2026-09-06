@@ -112,6 +112,9 @@ function journalStore(fixture: GenuinePreparedV3Fixture, trace?: string[]): Dura
 			);
 		}),
 		close: vi.fn(() => Promise.resolve()),
+		installEpochAnchor: vi.fn(() =>
+			Promise.reject(new Error("unexpected installEpochAnchor in live snapshot fixture"))
+		),
 		installGenesis: vi.fn(() => {
 			const idempotent = genesisInstalled;
 			genesisInstalled = true;
@@ -265,20 +268,21 @@ async function recoveryStore(
 			nextAuthorSequence += 1;
 			return issued;
 		}),
-		transactWriteSettlementPlan: vi.fn((input) => {
+		transactWriteSettlementPlan: vi.fn((input: Parameters<DurableIssuanceStore["transactWriteSettlementPlan"]>[0]) => {
 			if (input.scope.author !== scope.author || input.scope.objectId !== scope.objectId) {
 				return Promise.reject(new TypeError("settlement plan scope mismatch"));
 			}
 			if ((settlementPlan?.revision ?? null) !== input.expectedRevision) {
 				return Promise.reject(new TypeError("settlement plan revision mismatch"));
 			}
-			settlementPlan = Object.freeze({
+			const nextPlan: SettlementPlan = Object.freeze({
 				...input.plan,
 				entries: Object.freeze(input.plan.entries.map((entry) => Object.freeze({ ...entry }))),
 				revision: (settlementPlan?.revision ?? -1) + 1,
 				scope,
 			});
-			return Promise.resolve(settlementPlan);
+			settlementPlan = nextPlan;
+			return Promise.resolve(nextPlan);
 		}),
 	});
 	return Object.freeze({ store, vertexDigest: lowerHex(carrier.digest) });
