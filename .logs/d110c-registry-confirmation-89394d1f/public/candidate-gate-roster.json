@@ -1,0 +1,827 @@
+{
+  "status": "candidate-requires-design-acceptance-and-stage-custody",
+  "cwd": "explicit absolute current-source validation checkout A, then independently prepared checkout B; main static/custody and final transition checks are separate",
+  "serial": true,
+  "retries": 0,
+  "budgetMeaning": "One-shot admission ceilings inferred from declared child/case bounds, not measured runtime guarantees. First readiness invocations count toward the roster and are not automatically repeated.",
+  "red": [
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-current-registry-contract-d110c-red.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 900,
+      "expectedExit": 1,
+      "acceptance": "Named assertion through existing evaluator; no import, missing export, timeout or readiness skip as causal RED"
+    }
+  ],
+  "greenValidationAAndB": [
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-current-registry-contract-d110c-red.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 900,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-freeze-successor-v1-red.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 900,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/phase-5a-seal-digest-law-red.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 480,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/phase-5d-pacemaker-law-red.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 480,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-anchor-trust-3a0.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 600,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-blueprint-runtime-0j-b.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 600,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 360,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-freeze-governance-n1prime-e.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-freeze-governance-n1prime-e2.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-freeze-governance-n1prime-e3.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-freeze-governance-n1prime-e4.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-current-epoch-author-authorization-p6-red.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {},
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {
+        "PHASE_0P0_IMPLEMENTATION_MODULE": "tests/fixtures/phase-0p0-v3/controlled-blueprint-work-budget.ts"
+      },
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {
+        "PHASE_0P2_IMPLEMENTATION_MODULE": "tests/fixtures/phase-0p2-v3/controlled-blueprint-operation-budget.ts"
+      },
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {
+        "PHASE_0O_B1B_IMPLEMENTATION_MODULE": "tests/fixtures/phase-0o-b1b-v3/controlled-author-projection.ts"
+      },
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {
+        "PHASE_0O_B2_IMPLEMENTATION_MODULE": "tests/fixtures/phase-0o-b2-v3/controlled-gossip-budget.ts"
+      },
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+        "--no-coverage",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "env": {
+        "PHASE_0O_B3_IMPLEMENTATION_MODULE": "tests/fixtures/phase-0o-b3-v3/controlled-acl-reputation.ts"
+      },
+      "unsetEnv": [
+        "PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION"
+      ],
+      "ceilingSeconds": 240,
+      "expectedExit": 0
+    }
+  ],
+  "readinessPrefix": [
+    "tests/protocol-v3-current-registry-contract-d110c-red.test.ts",
+    "tests/protocol-v3-freeze-successor-v1-red.test.ts",
+    "tests/phase-5a-seal-digest-law-red.test.ts",
+    "tests/phase-5d-pacemaker-law-red.test.ts",
+    "tests/protocol-v3-anchor-trust-3a0.test.ts",
+    "tests/protocol-v3-blueprint-runtime-0j-b.test.ts"
+  ],
+  "strictCompiler": {
+    "roots": [
+      "tests/fixtures/phase-3a1b-p6/author-authorization-freeze-harness.ts",
+      "tests/fixtures/phase-3a1b-p6/author-authorization-governance-analyzer.ts",
+      "tests/fixtures/phase-6b-d110c-registry-current/current-routing.ts",
+      "tests/fixtures/phase-6b-d110c-registry-current/current-snapshot.ts",
+      "tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts",
+      "tests/phase-5a-seal-digest-law-red.test.ts",
+      "tests/phase-5d-pacemaker-law-red.test.ts",
+      "tests/protocol-v3-anchor-trust-3a0.test.ts",
+      "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+      "tests/protocol-v3-blueprint-runtime-0j-b.test.ts",
+      "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+      "tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+      "tests/protocol-v3-current-epoch-author-authorization-p6-red.test.ts",
+      "tests/protocol-v3-current-registry-contract-d110c-red.test.ts",
+      "tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+      "tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+      "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+      "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e2.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e3.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e4.test.ts",
+      "tests/protocol-v3-freeze-successor-v1-red.test.ts",
+      "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts",
+      "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+      "tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+      "tests/protocol-v3-registry-spec-n1prime-b.test.ts"
+    ],
+    "ceilingSeconds": 120,
+    "profile": "Actual tsconfig, package export type entries and Vite aliases; ES2022, noEmit, composite=false, declaration=false, declarationMap=false, incremental=false; no types/typeRoots injection",
+    "acceptance": "Capture new post-RED/pre-GREEN baseline for these exact roots; no new diagnostic identities or anchors; retain baseline errors as non-clean evidence; repeat with fresh isolation and resolution provenance"
+  },
+  "syntax": [
+    {
+      "command": "node",
+      "args": [
+        "--check",
+        "packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0
+    },
+    {
+      "command": "node",
+      "args": [
+        "--check",
+        "packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0
+    },
+    {
+      "command": "node",
+      "args": [
+        "--check",
+        "packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0
+    },
+    {
+      "command": "node",
+      "args": [
+        "--check",
+        "packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0
+    },
+    {
+      "command": "node",
+      "args": [
+        "--check",
+        "packages/protocol-v3/supplements/pacemaker-profile-v1/check-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0
+    },
+    {
+      "command": "node",
+      "args": [
+        "--check",
+        "packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0
+    },
+    {
+      "command": "node",
+      "args": [
+        "--check",
+        "tests/fixtures/phase-6b-d110c-registry-current/parameters-oracle.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0
+    }
+  ],
+  "lint": {
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "eslint",
+      "tests/fixtures/phase-3a1b-p6/author-authorization-freeze-harness.ts",
+      "tests/fixtures/phase-3a1b-p6/author-authorization-governance-analyzer.ts",
+      "tests/fixtures/phase-6b-d110c-registry-current/current-routing.ts",
+      "tests/fixtures/phase-6b-d110c-registry-current/current-snapshot.ts",
+      "tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts",
+      "tests/phase-5a-seal-digest-law-red.test.ts",
+      "tests/phase-5d-pacemaker-law-red.test.ts",
+      "tests/protocol-v3-anchor-trust-3a0.test.ts",
+      "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+      "tests/protocol-v3-blueprint-runtime-0j-b.test.ts",
+      "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+      "tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+      "tests/protocol-v3-current-epoch-author-authorization-p6-red.test.ts",
+      "tests/protocol-v3-current-registry-contract-d110c-red.test.ts",
+      "tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+      "tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+      "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+      "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e2.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e3.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e4.test.ts",
+      "tests/protocol-v3-freeze-successor-v1-red.test.ts",
+      "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts",
+      "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+      "tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+      "tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+      "packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs",
+      "packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs",
+      "packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+      "packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs",
+      "packages/protocol-v3/supplements/pacemaker-profile-v1/check-freeze.mjs",
+      "packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs",
+      "tests/fixtures/phase-6b-d110c-registry-current/parameters-oracle.mjs"
+    ],
+    "ceilingSeconds": 120,
+    "expectedExit": 0
+  },
+  "format": {
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "prettier",
+      "--check",
+      ".github/workflows/protocol-v3-author-authorization.yml",
+      ".github/workflows/protocol-v3-blueprint-artifact-profile.yml",
+      ".github/workflows/protocol-v3-blueprint-operation-budget.yml",
+      ".github/workflows/protocol-v3-blueprint-work-budget.yml",
+      ".github/workflows/protocol-v3-ed25519-profile.yml",
+      ".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+      ".github/workflows/protocol-v3-equivocation-author-projection.yml",
+      ".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+      ".github/workflows/protocol-v3-pacemaker-profile.yml",
+      ".github/workflows/protocol-v3-registry.yml",
+      ".github/workflows/protocol-v3-seal-digest-identity.yml",
+      "packages/protocol-v3/conformance/freeze-policy-blueprint-artifact-profile-v1.json",
+      "packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json",
+      "packages/protocol-v3/conformance/freeze-policy-v3.json",
+      "packages/protocol-v3/registry/registry-v1.schema.json",
+      "packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs",
+      "packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs",
+      "packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+      "packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs",
+      "packages/protocol-v3/supplements/author-authorization-v1/freeze-policy.json",
+      "packages/protocol-v3/supplements/pacemaker-profile-v1/check-freeze.mjs",
+      "packages/protocol-v3/supplements/pacemaker-profile-v1/freeze-policy.json",
+      "packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs",
+      "packages/protocol-v3/supplements/seal-digest-identity-v1/freeze-policy.json",
+      "tests/fixtures/phase-3a1b-p6/author-authorization-freeze-harness.ts",
+      "tests/fixtures/phase-3a1b-p6/author-authorization-governance-analyzer.ts",
+      "tests/fixtures/phase-6b-d110c-registry-current/current-registry-contract.json",
+      "tests/fixtures/phase-6b-d110c-registry-current/current-routing.ts",
+      "tests/fixtures/phase-6b-d110c-registry-current/current-snapshot.ts",
+      "tests/fixtures/phase-6b-d110c-registry-current/parameters-oracle.mjs",
+      "tests/fixtures/phase-n1prime-e4/root-test-lifecycle-contract.json",
+      "tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts",
+      "tests/phase-5a-seal-digest-law-red.test.ts",
+      "tests/phase-5d-pacemaker-law-red.test.ts",
+      "tests/protocol-v3-anchor-trust-3a0.test.ts",
+      "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+      "tests/protocol-v3-blueprint-runtime-0j-b.test.ts",
+      "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+      "tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+      "tests/protocol-v3-current-epoch-author-authorization-p6-red.test.ts",
+      "tests/protocol-v3-current-registry-contract-d110c-red.test.ts",
+      "tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+      "tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+      "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+      "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e2.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e3.test.ts",
+      "tests/protocol-v3-freeze-governance-n1prime-e4.test.ts",
+      "tests/protocol-v3-freeze-successor-v1-red.test.ts",
+      "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts",
+      "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+      "tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+      "tests/protocol-v3-registry-spec-n1prime-b.test.ts"
+    ],
+    "ceilingSeconds": 120,
+    "expectedExit": 0
+  },
+  "childIntegrity": [
+    {
+      "command": "node",
+      "args": [
+        "packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0,
+      "requiredScope": "integrity-only"
+    },
+    {
+      "command": "node",
+      "args": [
+        "packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0,
+      "requiredScope": "integrity-only"
+    },
+    {
+      "command": "node",
+      "args": [
+        "packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0,
+      "requiredScope": "integrity-only"
+    },
+    {
+      "command": "node",
+      "args": [
+        "packages/protocol-v3/supplements/pacemaker-profile-v1/check-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0,
+      "requiredScope": "integrity-only"
+    },
+    {
+      "command": "node",
+      "args": [
+        "packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs"
+      ],
+      "ceilingSeconds": 30,
+      "expectedExit": 0,
+      "requiredScope": "integrity-only"
+    }
+  ],
+  "transitionEvidence": "Actual extracted v2/root execution in new routing suite controlled repositories; signed-checkpoint-to-working-tree invocations recorded separately once checkpoint exists"
+}

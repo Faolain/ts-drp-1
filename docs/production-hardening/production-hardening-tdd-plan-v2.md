@@ -105138,6 +105138,50 @@ greenfield authorization, immutable historical evidence, unchanged registry and
 runtime profiles, one prospective transition owner and parent campaign gates
 remain in force.
 
+The bounded corrected-contract confirmation now accepts RED authoring. Sol
+5.6 high and Grok 4.6 high each return PASS with no findings; Fable 5.1 xhigh
+returns PASS with four P3 clarifications and no P0/P1/P2. Sol and Fable resumed
+their exact prior sessions; Grok used a fresh bounded file-only confirmation.
+No broad audit, implementation or project gate was replayed. The accepted
+ten-file candidate and the exact emitted roster are preserved under
+`.logs/d110c-registry-confirmation-89394d1f/public/`: 24 self-excluding entries,
+manifest SHA `ee564ea6c427eac4d89dda2429362dde06cbd3b8ca84f3640782c8ffb59f4516`.
+Root revalidated 3,064 frozen inputs, 5,251 entries in 48 inherited sealed roots,
+all 86,522 protected paths, stashes and the unchanged eight-owner production
+overlay. All three processes terminated normally and quiescent, without timeout
+or cleanup. Grok's wrapper NO_VERDICT/status 2 is retained alongside its normal
+model exit/end_turn and explicit schema-valid PASS; no verdict is inferred from
+process status. Private reasoning streams remain private.
+
+The accepted contract separates semantic-only lifecycle/CODEOWNERS sources
+from prospective byte protection, preserves the complete historical successor
+fixture closure, includes the exhaustion consumer and retires alternate child
+transition evaluators. It requires the same 29 whole-file/controlled-variant
+invocations in two independently prepared current-source checkouts, not runtime
+execution in main where nested builds would overwrite protected outputs.
+Historical native successor/predecessor checker replays are explicitly replaced
+by object/mode/parent authentication with original signed execution evidence
+preserved; this does not claim those obsolete checkers were rerun.
+
+Fable's four P3s are dispositioned in the packet: historical-labelled contracts
+may also supply active current semantic assertions, which must remain; the
+actual const-config/default-export, workspaceAliases and tsconfigPaths shape is
+the positive lifecycle grammar baseline; RED runs in its own prepared checkout
+R while main/A/B compiler stages receive distinct bound reports; and newly
+byte-protected paths without explicit v3 CODEOWNERS patterns rely on the default
+owner rule, independently of mandatory root-status byte preservation. These
+clarifications change no custody boundary and require no new prose-review loop.
+
+The next authorized action is separate Astra-high RED authoring of the five
+proposed evidence files only. Existing tests, checkers, policies, workflows,
+registry, runtime and built outputs remain unchanged. Concrete preparation
+capsules, exact case/child cardinalities, post-authoring static baseline and the
+single attributable RED invocation remain execution/acceptance gates before
+GREEN. The old native preparation helper performs a download and cannot be
+silently reused under the accepted offline contract. W0's acceptance is not a
+substitute for fresh current-source validation. All parent grid, production,
+checkpoint, final-review and campaign obligations remain active.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
