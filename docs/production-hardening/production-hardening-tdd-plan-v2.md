@@ -18510,9 +18510,11 @@ registry-freeze and one W0 compatibility failure. Earlier stopped attempts
 remain immutable. The pending eight-owner patch has changed only in the room
 constructor; prior 45/45 integration evidence is not proof for these new bytes.
 Next is remaining parent acceptance/debt closure within existing authority
-boundaries, not another room-guard execution. Thirteen inherited transport
-type diagnostics and the guard program's 41 external fixture diagnostics
-remain open, alongside the other named static debts. No blanket typecheck or
+boundaries, not another room-guard execution. The next bounded action is the
+parent record's **Retained adoption-fixture static contract repair**: causal
+compiler RED followed by a separate tests-only GREEN for the guard program's
+41 external fixture diagnostics. Thirteen inherited transport diagnostics
+and the other named static debts remain separately open. No blanket typecheck or
 parent GREEN acceptance is claimed; registry-freeze repair still requires its
 explicit prospective governance decision.
 
@@ -102816,6 +102818,67 @@ authored-recorder whitespace error. The full warning count includes space-
 before-tab diagnostics, not just trailing whitespace. These bytes and the
 sealed manifest are preserved; source/plan diff checks and bounded plan
 formatting pass. No blanket staged-diff pass is claimed.
+
+**Retained adoption-fixture static contract repair (2026-09-05, frozen).**
+This is remaining parent static acceptance work, not a new production slice
+or a reopening of the accepted room-guard runtime gate. The baseline is signed
+`67813c5f` and the preceding GREEN root's `typecheck-final.json` and
+`custody-after.json`. Its exact current program reports 34 TS7006, one TS2322
+and one TS2739 in `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts`,
+and five TS2339 in sibling `creator-successor-product-contract.ts`; target
+and production diagnostics are zero. All eight pending production owners,
+seven built artifacts and other retained tests remain fixed. Root revalidated
+the 100-entry manifest, current patch identity, 27 stashes and 86,522 protected
+paths before freezing this correction.
+
+The existing separate Astra-high RED owner records one compiler execution
+against the same root, compiler options and actual workspace resolutions.
+The typecheck must fail with exactly those 41 complete diagnostics, not a
+loader, missing-import or collection error. A separate matrix validator must
+pass; retain both statuses, full diagnostics, source identities and a
+self-excluding manifest under a fresh parent RED root. Sign and push that
+tests-only RED evidence before the separate Astra-high GREEN owner edits the
+two fixture files. Existing runtime REDs are not rerun for compiler failures.
+
+GREEN may restore contextual typing at the frozen store/snapshot wrappers,
+using existing interface types; forward `readSettlementPlan` and
+`transactWriteSettlementPlan` directly to the real underlying issuance store;
+and narrow the two AST seams using a captured unwrapped expression and a real
+variable-declaration-list guard. The omitted methods are a fixture facade
+defect, not a missing product API. Do not fabricate results, suppress compiler
+errors or introduce broad casts. The one intentional malformed predecessor
+revision may use a localized, documented test-only brand assertion: its
+existing `Math.max(0, base.revision - 1)` value must remain exact, including
+zero. Parsing, clamping or repairing that negative vector is forbidden.
+Existing durable-read hooks and all other facade effects remain unchanged;
+this correction makes no new census or settlement-plan read-accounting claim.
+
+The AST guard deliberately converts an assignment-initializer `for-of` from
+a thrown inspection error into a fail-closed non-match. Record that boundary
+with bounded source-oracle controls: the original declaration loop is accepted,
+the assignment loop is not, and existing migration mutants remain rejected.
+Do not claim blanket executable equivalence. Apart from these oracle narrowings
+and the two direct forwarders, emitted fixture behavior must be unchanged;
+validate the intentional malformed revision and forwarding arguments/results
+mechanically. Existing test titles, assertions, limits and fault values stay
+fixed. Any additional production, authority, API or workload need stops this
+batch rather than widening it.
+
+GREEN requires zero diagnostics in the exact formerly failing program,
+exact-owner lint/format/diff and source-shape checks, and the eight presently
+retained direct-consumer selections corresponding to original inventory gates
+17, 20, 22, 35, 36, 42, 49 and 50: 72 tests with the current thirteen-title
+gate 22. Freeze their exact title/file roster from retained evidence before
+execution; run each once, with complete reporters and no exclusions. The four
+other direct imports in superseded historical RED files are not automatically
+new acceptance gates. Validate fresh source-built isolated execution under
+the existing native/workspace recipe, without reusing host dist. Record all
+statuses and anomalies; stop on unexpected failures instead of broadening the
+matrix. No browser, parent 45-case integration or long workload is authorized
+by this static batch. Preserve the known four original runtime failures and
+all other static debts separately. Closure remains due before parent static
+acceptance; the existing final parent Grok/Sol/Fable review covers this repair,
+with no separate prose or bookkeeping confirmation round.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
