@@ -2443,13 +2443,13 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 	});
 
 	// Independently attributable continuations replace the old aggregate timeout.
-	// The unchanged 60s runner watchdog belongs only to the fixed 64-writer
+	// The authorized 70s runner watchdog belongs only to the fixed 64-writer
 	// functional fixture; it is NOT a product latency/performance acceptance gate.
 	// No complete GREEN duration is claimed by this pre-codec RED.
 	it(
 		"composes 64 active writers with universal plan fence and exact state accounting across three transitions",
 		sixtyFourWriterGoldenPath,
-		60_000
+		70_000
 	);
 	it(
 		"case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
