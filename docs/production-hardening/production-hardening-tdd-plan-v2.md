@@ -105086,6 +105086,58 @@ incorporate these accepted corrections into the contract, and obtain the
 required plan acceptance before separate RED/GREEN implementation. No new user
 authorization is needed for the already-authorized greenfield resolution.
 
+**Corrected registry design review — remaining closure and scope corrections
+(2026-09-06).** The nine-file current-registry specification was reviewed
+read-only against signed/pushed `343473f96243885d379da28a0f62c53bc03984ac`.
+Sol high and Fable 5.1 xhigh return terminal FAIL. Grok 4.6 high returns a
+schema-valid terminal PASS with two findings; that result does not waive the
+other required failures. Root accepts all fourteen raw findings (three P1,
+five P2 and six P3), grouped in the packet's `root-dispositions.md`. The phase
+remains FAIL; no RED/GREEN implementation or campaign is released.
+
+The remaining material gaps are the successor test's omitted historical fixture
+closure, the issuance-exhaustion suite's live hash of the editable c2 test, and
+an ambiguous distinction between byte-frozen artifacts and semantically governed
+lifecycle/CODEOWNERS inputs. The revised inventory must distinguish those roles,
+explicitly justify new byte-owned evidence, and account for historical compound
+tuple/currentBlob/currentSha256 records without restamping them. Ordinary
+Vitest alias changes must not silently require registry baseline amendments.
+The compiler baseline follows RED authoring and gates RED acceptance/GREEN
+handoff; it cannot gate creation of its own proposed source roots. Whole-file
+ceilings need evidence-based differentiation, rather than a uniform 240 seconds
+despite existing 600-second successor cases. Additional clarifications cover
+schema property order, future amendment versus in-band version-bump semantics,
+Git-tree/index/worktree mode capture, compiler decoded-text versus byte hashes
+and transient Vite config bundles, inventory reproduction, and removal of the
+child transition evaluators in favor of the sole root seam.
+
+The immutable corrected-review packet is
+`.logs/d110c-registry-corrected-design-review-343473f9/public/`: 22
+self-excluding entries, manifest SHA
+`12edcfbfa1dee142f2e3d974d1fef7ccd751654ac521366f56f6deee4e0a3be7`.
+It includes exact copies of all nine reviewed spec files, the owner map,
+terminal results and execution/custody evidence. Root revalidates all 3,029
+frozen inputs, 5,229 entries in 47 inherited sealed roots, stashes, all 86,522
+protected paths and the unchanged eight-owner production overlay. All three
+owned groups are quiescent without timeout or cleanup. Grok's unchanged wrapper
+still labels its structured JSON NO_VERDICT/status 2 despite normal zero-exit
+`end_turn`; both that wrapper result and the parsed substantive PASS-with-findings
+are preserved. Sol needed no access continuation this time. Private reasoning
+streams remain private. Design-time inventory/oracle construction and script
+syntax checks are not project test, checker or compiler passes; none of those
+project gates ran in this review phase.
+
+The full staged whitespace check reports only a new blank line at EOF in the
+packet's exact `run.mjs` and `seal-review.mjs` copies. Those immutable evidence
+bytes are retained; the plan-only whitespace check passes. This is a recorded
+formatting warning, not a clean full staged-whitespace result.
+
+Next incorporate these corrections and obtain bounded corrected-contract
+confirmation before separate RED/GREEN authoring and acceptance. The explicit
+greenfield authorization, immutable historical evidence, unchanged registry and
+runtime profiles, one prospective transition owner and parent campaign gates
+remain in force.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
