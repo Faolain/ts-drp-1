@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "commit",
+    "-S",
+    "--only",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "-m",
+    "test: authorize 90-second wide fixture watchdog"
+  ],
+  "start": "2026-09-06T07:53:10.365Z"
+}

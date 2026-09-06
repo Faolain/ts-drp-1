@@ -18587,6 +18587,11 @@ diagnostic. All golden-path assertions and existing failure evidence remain.
 The user subsequently authorized that exact amendment. **Authorized 90-second
 wide-fixture amendment** below governs the next separate-owner GREEN and sole
 focused execution; it supersedes only the pending authorization above.
+The amendment's focused run is now green: signed source `09aa2209`, one
+complete 64-writer pass in 69,154.209667ms, zero failures, 23 intentionally
+filtered cases. **90-second wide-fixture focused result** below owns the
+sealed evidence. This closes the focused timeout blocker only; combined,
+isolated and final parent acceptance remain open with the known other debt.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104165,6 +104170,68 @@ do not invoke another Fable for diagnosis or add prose confirmation rounds.
 Seal a self-excluding manifest and sign/push results before any acceptance
 claim. Grid authority, snapshot fixtures and four registry/W0 failures remain
 separate blockers; no new repair authority follows from this amendment.
+
+**90-second wide-fixture focused result (2026-09-06).** Independent RED reuse
+accepted the consumed 70-second failures without another RED workload.
+Separate GREEN source commit `09aa220919babdf4d869effcfee6ccdacb49c4a1` is
+signed/pushed, changes only the authorized watchdog literal and adjacent
+comment, and was origin-exact before execution. Full byte reversal restores
+the prior source; current source SHA is
+`1bbc6ea643867d0ed890d1cef4ca2cf9edb3e9b2bbc7f5cc9462ba99e13c450e` and
+unchanged callback-body SHA is
+`0003ed91240734eafb114c9aa160bc8c4f66f5153084ea7fab480b53974c17f9`.
+The complete unchanged callback therefore retains every 64-writer,
+four-contributing-epoch, three-transition, settlement, continued-publication,
+exact-state/lineage/accounting, reopen, rollback and pruning assertion.
+
+The sole authorized focused run passed in 69,154.209667ms. Complete reporter
+matrix: one file, 24 declarations, one selected pass, zero failures, 23
+intentionally filtered cases, no selected skips, suite errors or snapshot
+changes. Reporter SHA is
+`240e70ef87f1dc827494483dce9f4e9b904ed0de4f59984ecfa3223277732988`.
+Runner status is 0, signal null; the owned process group was quiescent after
+72,746.883334ms including collection/teardown, without containment actions.
+Profiling was absent and the diagnostic variable explicitly removed; no
+diagnostic records were emitted. This is a semantic focused pass under the
+authorized 90-second test budget, not a product performance guarantee or
+proof that host variance caused every earlier timeout. All failures remain
+immutable and no consumed name was retried.
+
+Evidence root `.logs/d110c-0c1f5b-green-wide90-fd4140d5/` has 109 entries,
+self-excluding manifest SHA
+`0c3a95d596fa74ddf38b8b538b7341944c42539498c12fe152dc82c885404439`.
+Root independently checked the raw reporter/status, every manifest hash and
+complete inventory. `root-red-readback.md` records separate RED ownership;
+`assessment.md`, `runtime-roster.json`, source equivalence, strict-program
+identity, command-status inventory and final custody own the detailed gates.
+Eighteen captured statuses contain one nonzero: the selected strict compiler
+retains exactly three known external snapshot-fixture diagnostics and zero
+target/production diagnostics across 912 inputs. Its exact matrix, lint,
+format, diff, reversal, syntax, runtime validation and custody checks pass;
+the whole strict program is not called green.
+
+Before launch, root caught double-escaped regular expressions in the new
+evidence-only PID/profiling guard. They were corrected before the first
+freeze/execution, and actual numeric PID/profiling/marker controls passed.
+This was a launcher-preparation diagnostic, not a product failure or a
+workload retry. Fixed ports 4174, 4175, 51000 and 51002 were clear; no
+competing task runtime was active. Final custody preserves all eight pending
+production sources, seven built artifacts, 85 effective test/shared
+identities with only the authorized target change, 27 stashes and 86,522
+protected paths. Production overlay SHA remains
+`6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`.
+
+The narrow timeout blocker and its focused execution are complete. No model
+review union is claimed: the existing final Grok/Sol/Fable parent acceptance
+review must still inspect this amendment and evidence with the full history.
+The next acceptance work is the existing combined static/retained and
+fresh-source isolated validation, after disposition of the three snapshot
+fixture diagnostics, separate grid authority-composition diagnostic and
+four known registry/W0 runtime failures. Do not infer that 23 filtered cases
+or the prior aggregate establish current combined acceptance. No combined,
+isolated, browser, campaign or additional profiling execution occurred here;
+no new review-only slice is required. D.110c-c and the long-run freeze remain
+pending parent acceptance, not released by this focused pass.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

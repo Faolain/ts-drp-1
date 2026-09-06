@@ -1,0 +1,325 @@
+{
+  "valid": true,
+  "status": {
+    "code": 0,
+    "signal": null,
+    "elapsedMs": 72746.883334,
+    "endedAt": "2026-09-06T07:56:22.975Z",
+    "watchdogActions": [],
+    "ownedProcessGroup": 64803,
+    "quiescent": true
+  },
+  "exactNames": true,
+  "exactFiles": true,
+  "success": true,
+  "total": 24,
+  "passed": 1,
+  "failed": 0,
+  "filtered": 23,
+  "todo": 0,
+  "noTopErrors": true,
+  "suiteErrors": [],
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "snapshotUnchanged": true,
+  "noDiagnosticRecords": true,
+  "selected": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+      "status": "passed",
+      "title": "composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+      "duration": 69154.209667,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "assertions": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect",
+      "status": "skipped",
+      "title": "snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition snapshot oracle preserves prior state atomic batch entry order and duplicate effects",
+      "status": "skipped",
+      "title": "snapshot oracle preserves prior state atomic batch entry order and duplicate effects",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition retains checkpoint-terminal open progress through cold recovery across three transitions",
+      "status": "skipped",
+      "title": "retains checkpoint-terminal open progress through cold recovery across three transitions",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+      "status": "passed",
+      "title": "composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+      "duration": 69154.209667,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+      "status": "skipped",
+      "title": "case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+      "status": "skipped",
+      "title": "cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+      "status": "skipped",
+      "title": "case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 12 scans the largest valid fence without burning another author space",
+      "status": "skipped",
+      "title": "case 12 scans the largest valid fence without burning another author space",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 12 ignores a stale fence at or below the authenticated terminal boundary",
+      "status": "skipped",
+      "title": "case 12 ignores a stale fence at or below the authenticated terminal boundary",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 23 freezes only the equivocating author below a fence",
+      "status": "skipped",
+      "title": "case 23 freezes only the equivocating author below a fence",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve unpublished-fence custody",
+      "status": "skipped",
+      "title": "cases 4 15 16 preserve unpublished-fence custody",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-replacement custody",
+      "status": "skipped",
+      "title": "cases 4 15 16 preserve delayed-replacement custody",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-fence custody",
+      "status": "skipped",
+      "title": "cases 4 15 16 preserve delayed-fence custody",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 17 closes an authenticated null-boundary member without a fence or slot zero",
+      "status": "skipped",
+      "title": "case 17 closes an authenticated null-boundary member without a fence or slot zero",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 19-21 retain displaced control and sole plan completion ownership",
+      "status": "skipped",
+      "title": "cases 19-21 retain displaced control and sole plan completion ownership",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 24a rejects a stale local head without regressing the authenticated floor",
+      "status": "skipped",
+      "title": "case 24a rejects a stale local head without regressing the authenticated floor",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=false",
+      "status": "skipped",
+      "title": "case 25 accounts exact surviving fence publication with committed=false",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=true",
+      "status": "skipped",
+      "title": "case 25 accounts exact surviving fence publication with committed=true",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=false",
+      "status": "skipped",
+      "title": "case 25 accounts exact surviving replacement publication with committed=false",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=true",
+      "status": "skipped",
+      "title": "case 25 accounts exact surviving replacement publication with committed=true",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+      "status": "skipped",
+      "title": "case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 13 prunes only beyond the fully retained authenticated rollback window",
+      "status": "skipped",
+      "title": "case 13 prunes only beyond the fully retained authenticated rollback window",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition case 17 retains the exact legacy v1 reentry guard source custody",
+      "status": "skipped",
+      "title": "case 17 retains the exact legacy v1 reentry guard source custody",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b parent genuine settlement composition"
+      ],
+      "fullName": "D.110c-0c1f5b parent genuine settlement composition keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+      "status": "skipped",
+      "title": "keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "240e70ef87f1dc827494483dce9f4e9b904ed0de4f59984ecfa3223277732988",
+  "stdoutSha256": "65ac2ae28e492428d444847550cd7fe193fbc6f8458b95f1066551a2925b9dc1",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "parentClosed": false
+}
