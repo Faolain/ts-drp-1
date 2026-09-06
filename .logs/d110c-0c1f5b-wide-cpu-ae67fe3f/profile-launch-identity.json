@@ -1,0 +1,15 @@
+{
+  "node": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "nodeVersion": "v22.15.0",
+  "nodeSha256": "6a1137a572bc6648411bfe51032173a535e010576cad6da87547f414daa11fdb",
+  "vitest": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+  "vitestSha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6",
+  "forwarder": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/coverage.SfnlalVs.js",
+  "forwarderSha256": "fc11622cdfc3994424135045f784fd88f9f707e17e15635f83700ab9ca6b5d31",
+  "samplingIntervalMicros": 1000,
+  "explicitSamplingInterval": false,
+  "profileNameOverride": false,
+  "profileDirectory": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-wide-cpu-ae67fe3f/profiles",
+  "creditedStaticRoot": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-wide-diagnostic-32968861",
+  "noSourceChanges": true
+}

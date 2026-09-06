@@ -18572,6 +18572,12 @@ The user's subsequent “yes investigate” authorizes continuing function-level
 attribution. **Bounded session-reopen CPU attribution** below freezes one
 profiled diagnostic of the same exact wide case, without source or workload
 changes; the preceding diagnostic identity remains consumed and immutable.
+That profile is now consumed and sealed under signed source `ae67fe3f`: one
+70,040.1905ms timeout, 23 filtered cases, and complete parent/worker profiles.
+Verification and canonical encoding are substantial sampled costs, not a
+demonstrated redundant-work defect. **Session-reopen CPU attribution result**
+below owns the evidence and the remaining bounded caller-audit boundary. No
+additional run, deadline increase or production optimization follows from it.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -103968,6 +103974,84 @@ production optimization still requires its narrow RED/GREEN and review
 boundary; any timing-contract revision remains explicit. Do not weaken the
 64-writer repeated-transition golden path. No further Fable or model review
 is authorized or launched for this diagnostic.
+
+**Session-reopen CPU attribution result (2026-09-06).** The single frozen
+diagnostic ran under signed/pushed `ae67fe3f483751bc26461767661b8fab5210d4d8`.
+Evidence root `.logs/d110c-0c1f5b-wide-cpu-ae67fe3f/` has 51 entries and a
+self-excluding manifest SHA
+`e0299cf4a4076f9aebc98d77f5412446f881690898ab751a063691f13423de10`;
+root independently verified every hash and the complete file inventory.
+`profile-launch-identity.json`, `runtime-roster.json` and `runtime.mjs` preserve
+the exact command, environment additions, binary identities and containment.
+`assessment.md`, `root-profile-analysis.json`, `profile-inventory.json`, the
+complete reporter and journal, and `command-status-inventory.json` retain
+the results without replacing the raw evidence.
+
+The complete reporter is 24 declarations, zero passes, one active timeout and
+23 filtered cases, with no top-level/suite errors. The timeout duration is
+70,040.1905ms; reporter SHA is
+`21dbeac1b5495ca0ce33e8fa3323d640efcc9720ce67dd09c934dc66b2d9ecda`.
+The journal has 3,151 valid records and 192 fulfilled ordinary issues. Cleanup
+completed but the callback did not settle; 129 intervals remain unmatched,
+including the successor-epoch-3 peer-reopen group and its 63 session opens.
+This does not prove completion of the final epoch or creator cold reopen.
+The process group became quiescent without a containment signal. Seven
+captured command statuses contain only the expected runtime/wrapper exits
+of 1; validation, profile inventory and custody checks passed. No retry,
+calibration, full retained or isolated acceptance run occurred.
+
+Both profiles are complete and distinguish the launcher from the test worker:
+parent PID 40665 has 52,866 samples and 74,423.666ms of weighted intervals;
+worker PID 40795 has 51,864 samples and 73,091.667ms. The worker was observed
+in the owned process group and contains the integration source. The parent
+is predominantly idle (70,012.923ms). Worker sampled self time includes Noble
+modular arithmetic `mod` at 13,875.085ms and canonical `encodeInternal` at
+5,831.007ms, with idle 5,620.630ms and GC 4,803.540ms separately accounted.
+Overlapping inclusive costs include Ed25519 `verify` at 20,404.935ms and
+`encodeCanonical` at 13,344.966ms. These are actual time-delta-weighted
+samples, not exact CPU accounting; inclusive rows must not be added, and
+unrelated profiler/phase clock origins do not establish exact phase timing.
+Profiling and logging overhead also preclude treating this timeout as an
+uninstrumented performance benchmark.
+
+Root's additional read-only stack inspection identifies received-vertex
+authentication and settlement-source authentication among verification
+callers, and durable-journal validation/row commitments among encoding
+callers. These are genuine validation paths, not automatically removable
+fixture overhead. Source inspection confirms `deriveToken` checks rows and
+commits their order, while `deriveLiveJournalSnapshot` validates the complete
+snapshot before deriving a requested prefix. This establishes meaningful
+computation, not unnecessary duplication, a memory leak, a deadlock, or a
+specific production regression. The first supplemental reader incorrectly
+used CommonJS `require` on a `.cpuprofile` extension; explicit JSON parsing
+corrected that diagnostic-only error without modifying or regenerating any
+profile. Profiler locations for transformed TypeScript are not assumed to
+be original source line numbers.
+
+Root owns the smallest remaining action: a bounded source-only audit of the
+identified callers for repeated validation of the same immutable input and
+the authority/lifetime boundary that would make any reuse safe. Do not
+remove verification, add an arbitrary cache, change crypto/dependencies, or
+alter workload/deadlines on this evidence. If a specific redundant-work
+owner is demonstrated, propose its narrow reviewed RED/GREEN optimization;
+otherwise disposition this as a test-budget reliability question rather
+than inventing a product defect. No further runtime diagnostic is released.
+
+Final custody preserves all eight pending production sources, seven built
+artifacts, 85 effective test/shared identities, 27 stashes and 86,522
+protected paths; parent patch SHA remains
+`6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`.
+Prior exact-byte static gates remain credited, including their three known
+external snapshot diagnostics; grid authority composition and four retained
+registry/W0 failures remain open. The bounded profiling/capture and
+function-level attribution steps are complete. Parent GREEN, its final
+review, D.110c-c and the long-run freeze remain unclosed. No new reviewer or
+review-only slice is introduced.
+Both affected plan ranges pass bounded Markdown formatting and plan diff
+checks. Evidence diff checking reports only the raw child's trailing blank
+line at `.logs/d110c-0c1f5b-wide-cpu-ae67fe3f/wide-only/stderr.log:8`;
+excluding that exact preserved artifact passes. Do not rewrite raw stderr
+to satisfy a source whitespace check.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
