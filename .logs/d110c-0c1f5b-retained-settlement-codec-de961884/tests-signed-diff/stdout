@@ -1,0 +1,38 @@
+commit de961884d9d3204f2c67561e96434995c6f0fafe
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Sat Sep 5 21:11:04 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Sat Sep 5 21:11:04 2026 -0400
+
+    test: restore retained settlement codec fixture shapes
+
+diff --git a/tests/d110c-0c1f5b0a-corrective-red.test.ts b/tests/d110c-0c1f5b0a-corrective-red.test.ts
+index ca1039ef..165b81ab 100644
+--- a/tests/d110c-0c1f5b0a-corrective-red.test.ts
++++ b/tests/d110c-0c1f5b0a-corrective-red.test.ts
+@@ -179,0 +180,2 @@ function proofCandidates(pair: EpochPair): Readonly<{ cut: Candidate; qc: Candid
++			historyRoot: "7".repeat(64),
++			historySize: 1,
+@@ -391,2 +393,20 @@ describe("D.110c-0c1f5b0a final-review corrective RED", () => {
+-		const currentAcl = Object.freeze({ epoch: 0, members: Object.freeze([{ author: AUTHOR }]) });
+-		const successorAcl = Object.freeze({ epoch: 1, members: Object.freeze([{ author: AUTHOR }]) });
++		const currentAcl = Object.freeze({
++			epoch: 0,
++			kind: "drp-v3-latched-acl",
++			members: Object.freeze([
++				Object.freeze({ author: AUTHOR, finalityKey: AUTHOR, groups: Object.freeze(["admin", "finality", "writer"]) }),
++			]),
++			objectId: anchorContract.objectId,
++			permissionless: false,
++			version: 3,
++		});
++		const successorAcl = Object.freeze({
++			epoch: 1,
++			kind: "drp-v3-latched-acl",
++			members: Object.freeze([
++				Object.freeze({ author: AUTHOR, finalityKey: AUTHOR, groups: Object.freeze(["admin", "finality", "writer"]) }),
++			]),
++			objectId: anchorContract.objectId,
++			permissionless: false,
++			version: 3,
++		});
