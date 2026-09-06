@@ -406,6 +406,7 @@ export interface GenuineCreatorAdoptionFixtureOptions {
 	readonly applicationBatch?: boolean;
 	readonly authorizedPrivateKeySeedHexes?: readonly string[];
 	readonly causalJoinOperation?: boolean;
+	readonly creatorTrustProfileId?: "creator-trusted-settlement-v1" | "creator-trusted-v1";
 	beforeCreatorClose?(
 		input: Readonly<{
 			readonly createRegisteredVertex: GenuinePreparedV3Fixture["createRegisteredVertex"];
@@ -1128,6 +1129,8 @@ export async function openGenuineCreatorAdoptionFixture(
 		historyRoot: emptyHistoryRoot,
 		historySize: 0,
 		...(options.causalJoinOperation === undefined ? {} : { causalJoinOperation: options.causalJoinOperation }),
+		...(options.creatorTrustProfileId === undefined ? {} : { creatorTrustProfileId: options.creatorTrustProfileId }),
+		...(options.creatorTrustProfileId === "creator-trusted-settlement-v1" ? { latchedAclVersion: 3 as const } : {}),
 		...(options.latchedAclGroups === undefined ? {} : { latchedAclGroups: options.latchedAclGroups }),
 		...(options.latchedAclWriterOnlyRoster === undefined
 			? {}

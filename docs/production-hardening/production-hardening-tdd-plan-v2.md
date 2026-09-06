@@ -104997,6 +104997,45 @@ check and source-diff whitespace check pass, without a whole-file format claim.
 Raw patch context and captured stderr whitespace remain immutable; only those
 four exact evidence paths are excluded from the authored staged-whitespace check.
 
+**W0 final acceptance (2026-09-06).** The frozen review HEAD is signed/pushed
+`0181584496cb213fc8872b57f473f911589fd4d8`. Grok 4.6 high, Sol high and Fable
+5.1 xhigh each return schema-valid PASS; the P0/P1 union is empty. Root verifies
+normal termination, quiescent groups and exact post-review custody of all
+2,736 frozen inputs and 46 sealed roots. No test, build or reviewer was repeated.
+The three W0 GREEN owners are accepted at exact patch SHA
+`6c002d98eb4764ebe9b153c9e52dba4adac47e48ff31f5134f08b15fa7dddf0a`;
+the eight pending production owners remain outside this acceptance.
+
+Public review evidence and root dispositions live in
+`.logs/d110c-w0-final-review-7efe33dd/public/`, with 22 self-excluding manifest
+entries, SHA `f8a6a9c9e7804e058a717c0972edfdb4d9b754edef884e39ecf3f048cc4cf4b6`.
+Complete original streams remain locally retained and hashed; published
+evidence contains terminal verdicts and custody/execution metadata, not private
+reasoning streams. Grok's unchanged wrapper reports `NO_VERDICT`/status 2
+because its prose-marker parser misses the requested JSON. The model itself
+exits zero with `end_turn`; root's full-schema validator accepts that explicit
+terminal PASS without relaunching or rewriting either classification.
+The staged whitespace warnings are confined to preserved `public/w0-green.patch`
+context; excluding only that exact raw path passes the authored-file check.
+
+Fable's three P3 notes are accepted as evidence limits, not contract failures.
+Graph occupancy is derived from journal rows plus the anchor, not observed
+through a private counter. The current seven-case W0 roster comprises five
+unchanged historical titles, the explicitly retitled legacy saturation control,
+and the new settlement companion; it is not seven literal identities in the
+older six-case reporter. Both cold-input sites supply the original detached
+pin, but the current-successor control proves compatible recovery/issuance,
+not that the pin alone causes its success. No new runtime is required by these
+notes. The wider 92-diagnostic comparison establishes current main/isolation
+equivalence, not an unperformed pre-GREEN run of that wider scope or a clean
+whole-program result.
+
+This finite W0/consumer batch is complete. Next freeze the authorized current
+registry-governance contract, then finish grid authority composition under the
+existing separate RED/GREEN and review discipline. Full parent acceptance and
+remaining D.110c obligations still precede the reviewed 64-active-writer,
+at-least-100-genuine-transition workload; no campaign is released here.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;

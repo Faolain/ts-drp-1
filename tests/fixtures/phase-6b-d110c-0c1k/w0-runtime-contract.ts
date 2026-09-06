@@ -1,4 +1,5 @@
-import { decodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+import type { DurableIssuanceStore, DurableSignedEnvelope } from "@ts-drp/issuance-store";
 
 import {
 	commitGenuineCreatorAdoptionFixture,
@@ -114,9 +115,12 @@ function decodedRow(bytes: Uint8Array): Readonly<Record<string, unknown>> {
 
 /**
  * Runs the fixed-profile multi-writer share boundary through real ingress, issue, journal, and close paths.
+ * @param profileId - Current supported profile; omission retains the legacy workload.
  * @returns Runtime admission, accounting, progress, and close observations.
  */
-export async function exerciseAuthorShareRuntime(): Promise<
+export async function exerciseAuthorShareRuntime(
+	profileId: "creator-trusted-settlement-v1" | "creator-trusted-v1" = "creator-trusted-v1"
+): Promise<
 	Readonly<{
 		readonly attemptedFenceCanonicalBytes: number;
 		readonly attemptedFenceDeliveredToApplication: boolean;
@@ -127,6 +131,13 @@ export async function exerciseAuthorShareRuntime(): Promise<
 		readonly closedApplicationState: unknown;
 		readonly fenceCount: number;
 		readonly globalCapacityRemaining: number;
+		readonly globalGraphOccupancy: number;
+		readonly expectedApplicationState: number;
+		readonly expectedJournalCount: number;
+		readonly exactInputRowsMatch: boolean;
+		readonly exactCloseSetChargesMatch: boolean;
+		readonly offenderSequences: readonly number[];
+		readonly offenderOverflowJournaled: boolean;
 		readonly journalCanonicalBytes: number;
 		readonly journalCount: number;
 		readonly offenderApplicationCount: number;
@@ -138,75 +149,109 @@ export async function exerciseAuthorShareRuntime(): Promise<
 	}>
 > {
 	const seeds = deterministicAuthorSeeds(W0_WRITER_COUNT);
+	const settlement = profileId === "creator-trusted-settlement-v1";
+	const admittedInputs = new Map<string, DurableSignedEnvelope>();
+	let expectedApplicationState = 0;
+	const recordAdmittedInput = (envelope: DurableSignedEnvelope): void => {
+		const digest = Buffer.from(envelope.digest).toString("hex");
+		if (admittedInputs.has(digest)) throw new TypeError("D110C_0C1K_DUPLICATE_EXPECTED_INPUT");
+		admittedInputs.set(digest, {
+			canonicalPreimageBytes: Uint8Array.from(envelope.canonicalPreimageBytes),
+			digest: Uint8Array.from(envelope.digest),
+			signature: Uint8Array.from(envelope.signature),
+		});
+		const operation = decodedRow(envelope.canonicalPreimageBytes).operation as Readonly<Record<string, unknown>>;
+		if (operation.action === "add") expectedApplicationState += Number(operation.value);
+	};
 	let attemptedFenceCanonicalBytes = 0;
 	let attemptedFenceDeliveredToApplication = false;
 	let attemptedFenceDigest = "";
 	let offenderAuthor = "";
 	let offenderOverflowAdmitted = false;
+	let overflowDigest = "";
 	let markerDigest = "";
 	const fixture = await openGenuineCreatorAdoptionFixture({
 		authorizedPrivateKeySeedHexes: seeds,
-		causalJoinOperation: true,
+		causalJoinOperation: !settlement,
+		creatorTrustProfileId: profileId,
+		decorateIssuanceStore: (store): DurableIssuanceStore => ({
+			...store,
+			transactIssue: (scope, buildAndSign) =>
+				store.transactIssue(scope, async (sequence) => {
+					const commit = await buildAndSign(sequence);
+					recordAdmittedInput(commit.envelope);
+					return commit;
+				}),
+		}),
 		beforeCreatorClose: async ({
 			createRegisteredVertex,
 			initialDependency,
 			plane,
-			routeRegisteredVertex,
+			routeRegisteredVertex: routeInput,
 			routeRegisteredVertexUnchecked,
 			signRegisteredVertexDigest,
 			wasRegisteredVertexAdmitted,
 		}) => {
+			const routeRegisteredVertex: typeof routeInput = async (vertex, sender) => {
+				recordAdmittedInput(vertex);
+				await routeInput(vertex, sender);
+			};
 			const fence = createRegisteredVertex({
 				authorSequence: 0,
 				dependencies: [initialDependency],
 				logicalTime: 3,
 				operation: Object.freeze({ action: W0_FENCE_ACTION, fenceSequence: 0, version: 1 }),
-				privateKeySeedHex: seeds[20] as string,
+				privateKeySeedHex: seeds[settlement ? 1 : 20] as string,
 			});
 			attemptedFenceCanonicalBytes = fence.canonicalPreimageBytes.byteLength;
 			attemptedFenceDigest = Buffer.from(fence.digest).toString("hex");
+			let offenderDependency = attemptedFenceDigest;
+			offenderAuthor = fence.author;
+			// Control fences bypass the application sink. Sequence one below is the existing causal admission barrier.
+			if (settlement) recordAdmittedInput(fence);
 			if (!routeRegisteredVertexUnchecked(fence, "d110c-w0-fence")) {
 				throw new TypeError("D110C_0C1K_FENCE_NOT_CLAIMED");
 			}
-			const drainMarker = createRegisteredVertex({
-				authorSequence: 0,
-				dependencies: [initialDependency],
-				logicalTime: 3,
-				operation: Object.freeze({ action: "add", value: 19 }),
-				privateKeySeedHex: seeds[19] as string,
-			});
-			await routeRegisteredVertex(drainMarker, "d110c-w0-fence-drain");
-			attemptedFenceDeliveredToApplication = wasRegisteredVertexAdmitted(fence);
-			const offenderFirst = createRegisteredVertex({
-				authorSequence: 0,
-				dependencies: [initialDependency],
-				logicalTime: 3,
-				operation: Object.freeze({ action: "add", value: 1 }),
-				privateKeySeedHex: seeds[1] as string,
-			});
-			offenderAuthor = offenderFirst.author;
-			await routeRegisteredVertex(offenderFirst, "d110c-w0-offender");
-			for (let writer = 2; writer < 17; writer += 1) {
-				await routeRegisteredVertex(
-					createRegisteredVertex({
-						authorSequence: 0,
-						dependencies: [initialDependency],
-						logicalTime: 3,
-						operation: Object.freeze({ action: "add", value: writer }),
-						privateKeySeedHex: seeds[writer] as string,
-					}),
-					`d110c-w0-tip-${writer}`
-				);
+			if (!settlement) {
+				const drainMarker = createRegisteredVertex({
+					authorSequence: 0,
+					dependencies: [initialDependency],
+					logicalTime: 3,
+					operation: Object.freeze({ action: "add", value: 19 }),
+					privateKeySeedHex: seeds[19] as string,
+				});
+				await routeRegisteredVertex(drainMarker, "d110c-w0-fence-drain");
+				attemptedFenceDeliveredToApplication = wasRegisteredVertexAdmitted(fence);
+				const offenderFirst = createRegisteredVertex({
+					authorSequence: 0,
+					dependencies: [initialDependency],
+					logicalTime: 3,
+					operation: Object.freeze({ action: "add", value: 1 }),
+					privateKeySeedHex: seeds[1] as string,
+				});
+				offenderAuthor = offenderFirst.author;
+				offenderDependency = Buffer.from(offenderFirst.digest).toString("hex");
+				await routeRegisteredVertex(offenderFirst, "d110c-w0-offender");
+				for (let writer = 2; writer < 17; writer += 1) {
+					await routeRegisteredVertex(
+						createRegisteredVertex({
+							authorSequence: 0,
+							dependencies: [initialDependency],
+							logicalTime: 3,
+							operation: Object.freeze({ action: "add", value: writer }),
+							privateKeySeedHex: seeds[writer] as string,
+						}),
+						`d110c-w0-tip-${writer}`
+					);
+				}
+				const joined = await plane.issueLocal({
+					operations: Object.freeze([
+						Object.freeze({ logicalTime: 4, operation: Object.freeze({ action: "add", value: 1 }) }),
+					]),
+					signRegisteredVertexDigest,
+				});
+				if (!joined.ok) throw new TypeError(`D110C_0C1K_JOIN_ISSUE_FAILED:${joined.kind}:${joined.detail}`);
 			}
-			const joined = await plane.issueLocal({
-				operations: Object.freeze([
-					Object.freeze({ logicalTime: 4, operation: Object.freeze({ action: "add", value: 1 }) }),
-				]),
-				signRegisteredVertexDigest,
-			});
-			if (!joined.ok) throw new TypeError(`D110C_0C1K_JOIN_ISSUE_FAILED:${joined.kind}:${joined.detail}`);
-
-			let offenderDependency = Buffer.from(offenderFirst.digest).toString("hex");
 			for (let authorSequence = 1; authorSequence < W0_AUTHOR_SHARE; authorSequence += 1) {
 				const vertex = createRegisteredVertex({
 					authorSequence,
@@ -218,6 +263,7 @@ export async function exerciseAuthorShareRuntime(): Promise<
 				await routeRegisteredVertex(vertex, "d110c-w0-offender");
 				offenderDependency = Buffer.from(vertex.digest).toString("hex");
 			}
+			attemptedFenceDeliveredToApplication = wasRegisteredVertexAdmitted(fence);
 			const overflow = createRegisteredVertex({
 				authorSequence: W0_AUTHOR_SHARE,
 				dependencies: [offenderDependency],
@@ -225,6 +271,7 @@ export async function exerciseAuthorShareRuntime(): Promise<
 				operation: Object.freeze({ action: "add", value: 1 }),
 				privateKeySeedHex: seeds[1] as string,
 			});
+			overflowDigest = Buffer.from(overflow.digest).toString("hex");
 			if (!routeRegisteredVertexUnchecked(overflow, "d110c-w0-overflow")) {
 				throw new TypeError("D110C_0C1K_OVERFLOW_NOT_CLAIMED");
 			}
@@ -255,9 +302,19 @@ export async function exerciseAuthorShareRuntime(): Promise<
 	});
 	try {
 		const canonicalByteLengths: number[] = [];
+		let exactInputRowsMatch = fixture.evidence.journalRows.length === admittedInputs.size;
+		const compareInput = (digest: string, bytes: Uint8Array, signature: Uint8Array): void => {
+			const input = admittedInputs.get(digest);
+			exactInputRowsMatch &&=
+				input !== undefined &&
+				Buffer.from(input.canonicalPreimageBytes).equals(bytes) &&
+				Buffer.from(input.signature).equals(signature) &&
+				Buffer.from(hashDomain("ts-drp/vertex/v3", bytes)).toString("hex") === digest;
+		};
 		const decodedRows = await Promise.all(
 			fixture.evidence.journalRows.map(async (row) => {
 				if (row.sourceKind === "received") {
+					compareInput(row.vertexDigest, row.exactCanonicalPreimageBytes, row.detachedSignature);
 					canonicalByteLengths.push(row.exactCanonicalPreimageBytes.byteLength);
 					return decodedRow(row.exactCanonicalPreimageBytes);
 				}
@@ -266,11 +323,15 @@ export async function exerciseAuthorShareRuntime(): Promise<
 					row.authorSequence
 				);
 				if (issued === null) throw new TypeError("D110C_0C1K_LOCAL_ROW_UNAVAILABLE");
+				compareInput(row.vertexDigest, issued.envelope.canonicalPreimageBytes, issued.envelope.signature);
+				exactInputRowsMatch &&= Buffer.from(issued.envelope.digest).toString("hex") === row.vertexDigest;
 				canonicalByteLengths.push(issued.envelope.canonicalPreimageBytes.byteLength);
 				return decodedRow(issued.envelope.canonicalPreimageBytes);
 			})
 		);
 		const rowDigests = new Set(fixture.evidence.journalRows.map(({ vertexDigest }) => vertexDigest));
+		exactInputRowsMatch &&=
+			rowDigests.size === admittedInputs.size && [...admittedInputs.keys()].every((digest) => rowDigests.has(digest));
 		return Object.freeze({
 			attemptedFenceCanonicalBytes,
 			attemptedFenceDeliveredToApplication,
@@ -291,7 +352,19 @@ export async function exerciseAuthorShareRuntime(): Promise<
 					? (operation as Readonly<Record<string, unknown>>).action === W0_FENCE_ACTION
 					: false
 			).length,
-			globalCapacityRemaining: W0_MAX_EPOCH_VERTICES - decodedRows.length,
+			expectedApplicationState,
+			expectedJournalCount: admittedInputs.size,
+			exactInputRowsMatch,
+			exactCloseSetChargesMatch:
+				fixture.evidence.history.closeSetEntries.length === admittedInputs.size &&
+				fixture.evidence.history.closeSetEntries.every(
+					(entry) =>
+						admittedInputs.get(entry.vertexHash)?.canonicalPreimageBytes.byteLength ===
+						entry.authenticatedCanonicalPreimageByteLength
+				),
+			// The anchor occupies one global graph vertex but is not an accepted journal row.
+			globalGraphOccupancy: decodedRows.length + 1,
+			globalCapacityRemaining: W0_MAX_EPOCH_VERTICES - decodedRows.length - 1,
 			journalCanonicalBytes: canonicalByteLengths.reduce((total, byteLength) => total + byteLength, 0),
 			journalCount: decodedRows.length,
 			offenderApplicationCount: decodedRows.filter(
@@ -310,6 +383,11 @@ export async function exerciseAuthorShareRuntime(): Promise<
 					(operation as Readonly<Record<string, unknown>>).action === W0_FENCE_ACTION
 			).length,
 			offenderOverflowAdmitted,
+			offenderOverflowJournaled: rowDigests.has(overflowDigest),
+			offenderSequences: decodedRows
+				.filter(({ author }) => author === offenderAuthor)
+				.map(({ authorSequence }) => Number(authorSequence))
+				.sort((a, b) => a - b),
 			otherWriterProgressed: rowDigests.has(markerDigest),
 			profileId: fixture.evidence.currentTrust.profileId,
 		});

@@ -1,0 +1,11 @@
+{
+  "status": 0,
+  "signal": null,
+  "timedOut": false,
+  "cleanup": [],
+  "remaining": [],
+  "quiescent": true,
+  "start": "2026-09-06T12:21:58.458Z",
+  "finish": "2026-09-06T12:34:29.109Z",
+  "verdictNotInferredFromExitCode": true
+}
