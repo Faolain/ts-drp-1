@@ -18535,6 +18535,20 @@ Run the existing combined parent gates against the current production bytes
 and inspect their complete failure set before further edits.
 Do not extend fixture cleanup one diagnostic/checkpoint at a time.
 
+The combined parent run has now stopped with complete current evidence at
+`.logs/d110c-0c1f5b-green-71bca5d5/`: 872 passed, five failed and five
+explicit conditional skips across 72 files. Four failures reproduce the
+recorded registry/W0 debt; the new failure is the 64-writer three-transition
+case exceeding its unchanged 60-second fixture watchdog. The other 44 parent
+integration cases pass. The selected strict program also retains three known
+`live-snapshot.ts` fixture diagnostics; grid authority composition remains
+separately open. **Combined parent acceptance stop** in the parent record owns
+the disposition. No retry, timeout increase, production defect claim, browser
+acceptance, final review or long-run release follows from this stopped result.
+The user subsequently authorized a test-local watchdog increase to 65 or 70
+seconds. The same-parent **Authorized wide-fixture watchdog amendment** below
+selects 70 seconds, preserves this failure, and owns the bounded next execution.
+
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
   exactly one expected settlement-profile failure and one complete v1 pass.
@@ -103515,6 +103529,110 @@ The unfiltered staged whitespace check exits 2 solely for four context-prefix
 spaces before tabs in the sealed `fixture-only.patch` (lines 6, 7, 8 and 12).
 Root verified those exact raw lines; excluding only that artifact passes.
 Edited-source and plan checks pass, and the sealed patch remains unchanged.
+
+**Combined parent acceptance stop (2026-09-06).** After signed/pushed fixture
+acceptance `71bca5d580ef0bab9bd17aaf7b51df99810b61c1`, the existing retained
+roster ran once against the unchanged eight-owner production overlay. The
+accepted room-guard addition accounts for the sole historical roster delta:
+876 to 877 active cases. No new collection, historical runtime pass credit or
+duplicate sibling-file execution was used. The 71 commands select 72 files
+and 882 raw cases: 872 passed, five failed and five conditional skips.
+
+Evidence is `.logs/d110c-0c1f5b-green-71bca5d5/`; its complete reporters,
+command/status records, exact selection validators and final assessment own
+the executable inventory. Root validated all 483 self-excluding manifest
+entries and the complete inventory; manifest SHA-256 is
+`93a9dec116d7061d341f9d6e3e205a28f609b64122d11a96549019c6a9551b32`.
+All 80 command statuses remain recorded, with only the compiler and runtime
+gates 30, 40, 58 and 71 exiting 1. Final custody preserves eight production
+owners, seven built artifacts, 85 test/shared identities, all 27 stashes and
+86,522 protected paths. Gates 30 and 40 reproduce the three registry-freeze
+failures; gate 58 reproduces the W0 compatibility assertion. Their existing
+governance and compatibility boundaries remain unchanged. Three supplement
+readiness skips and two deliberately disabled long crash tests are separately
+accounted, never passes. The W0 failure's raw error still does not expose the
+actual differing count; no numeric fence-count observation is inferred.
+
+The unfiltered staged whitespace check reports only a final blank line in
+sealed `source-lint/stdout:9`. Excluding that exact raw artifact passes;
+the captured output remains unchanged and the edited plan passes.
+
+The final command, retained-71, runs the full unfiltered parent integration:
+45 selected, 44 passed, one failed, zero skipped. Its sole new failure is
+`composes 64 active writers with universal plan fence and exact state accounting across three transitions`:
+`Test timed out in 60000ms`, observed duration 60,033.888875ms. No
+assertion-specific error, completed internal phase or CPU attribution is
+reported. The source explicitly distinguishes this fixed fixture watchdog
+from a product performance gate. Neither three completed transitions on the
+current bytes nor a product defect, harmless variance or suitable larger
+deadline has been established. The prior replay test's separately authorized
+20-second budget does not authorize changing this different test's budget.
+Execution stops without retry, profiling, instrumentation or source changes.
+
+The existing selected-two-test strict compiler exits 1 with zero target or
+production diagnostics and the exact three earlier `live-snapshot.ts`
+diagnostics: missing `installEpochAnchor`, an implicitly typed plan-entry
+callback and a nullable settlement-plan write return. Their complete diagnostic
+objects equal the signed checkpoint-link RED baseline, not the now-repaired
+adoption/transport inventories. The separate four-root grid authority error
+remains open; this narrower program does not import grid and cannot close it.
+Eight-owner lint, formatting and diff checks pass, with the same four JSDoc
+warnings. Matching source/build identities reuse the accepted fresh isolated
+build evidence without claiming final signed-production isolation.
+
+Owner: parent f5b integration and its existing separate RED/GREEN owners.
+Deadline: before parent acceptance, D.110c-c handoff or any D.110c-d long-run
+freeze. The smallest next action is bounded diagnosis from the complete
+failure inventory and existing source/evidence, then one explicit disposition
+of compatible fixture repairs versus registry, authority, compatibility and
+timing boundaries. Do not manufacture a separate slice per diagnostic or
+change a frozen expectation without validating its contract. A timing or
+product amendment requires its existing explicit authorization/review boundary;
+this record authorizes neither another execution nor an increased deadline.
+Browser, final signed isolation and final Grok/Sol/Fable review remain pending,
+not failed or waived. Completed fixture checkpoints remain closed. No model
+round is added for this evidence prose, and no long workload is released.
+
+**Authorized wide-fixture watchdog amendment (2026-09-06).** After the
+complete retained stop, the user explicitly permits 65 or 70 seconds for this
+test-local watchdog. Select `70_000` as the sole changed registration argument
+for `sixtyFourWriterGoldenPath` in
+`tests/phase-6b-d110c-0c1f5b-integration-red.test.ts`. This is a same-parent
+fixture-budget amendment, not a production timing contract or a new slice.
+The observed 60,033.888875ms is timeout delivery, not completion 34ms beyond
+the deadline; success inside the new budget must still be demonstrated.
+
+Preserve the complete failed aggregate as causal RED evidence. The separate
+existing RED owner verifies its exact matrix and source seam read-only, with
+no repeated RED workload. That independent readback confirms reporter SHA-256
+`fc9065fa0125c4405801512f38d0d6d17b60006d9f28cd863995ac927a815151`,
+owner SHA-256 `3eaf77c0438df09af30509c839531e78576a5fe6e88c70ea2983ee997807c885`
+and callback-body SHA-256
+`5772c9807c1d9152f7f89e0f7fe0ad38ede650793c7a571dd63a364862c82ee5`.
+No loader or missing-export failure substitutes for the timeout. Update the
+adjacent comment from “unchanged 60s” to “authorized 70s” so it describes the
+amended watchdog accurately; this is the sole non-executable source delta.
+Sign/push this amendment and evidence before the
+separate existing GREEN owner changes the one literal. Removing that delta
+and restoring the adjacent comment
+must restore the full test file byte-for-byte, with the callback, all 64
+writers, three transitions, operation/fence/state accounting, restart/reopen,
+pruning controls and every assertion unchanged. No global timeout, protocol
+timer, dependency, source behavior or other test budget changes.
+
+Run exact-owner static/equivalence gates and the full unfiltered 45-case
+integration file once under the new budget. Capture the complete reporter,
+stdout/stderr, process status, exact selection, source/runtime identities and
+self-excluding manifest. Any unexpected result stops for complete-set
+diagnosis, not another timeout increase or retry. On success, perform the
+existing required fresh source-built isolated validation once with the same
+exact selection and identity checks; no host artifacts or earlier runtime
+passes substitute for it. Keep the four known registry/W0 runtime failures,
+three snapshot-fixture diagnostics and separate grid authority error open;
+this amendment does not authorize repairing those boundaries or rerunning the
+whole 72-file roster. The existing final Grok/Sol/Fable parent review must
+inspect the signed RED, this explicit timing amendment and GREEN evidence.
+No additional review-only slice or prose confirmation is introduced.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

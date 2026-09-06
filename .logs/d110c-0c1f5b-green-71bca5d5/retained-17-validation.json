@@ -1,0 +1,235 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 17,
+  "passed": 17,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-17/result.json",
+  "baselineSha256": "126fcb03f8b4a87e0e0a7ae405d33c5e5ef0f594872d2ed2d9c49865c13e6d89",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED freezes the D.108e2a activation boundary and its single topic owner",
+      "status": "passed",
+      "title": "freezes the D.108e2a activation boundary and its single topic owner",
+      "duration": 234.6535839999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED rejects a hostile cold authentication profile before every downstream effect",
+      "status": "passed",
+      "title": "rejects a hostile cold authentication profile before every downstream effect",
+      "duration": 54.99687500000027,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED freezes exactly seven RED and eight GREEN owners",
+      "status": "passed",
+      "title": "freezes exactly seven RED and eight GREEN owners",
+      "duration": 1.6520829999999478,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster",
+      "status": "passed",
+      "title": "retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster",
+      "duration": 0.3669159999999465,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED derives the exact epoch-one identity and pending epoch-zero lineage independently",
+      "status": "passed",
+      "title": "derives the exact epoch-one identity and pending epoch-zero lineage independently",
+      "duration": 426.862208,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED keeps the root and products outside D.108d1",
+      "status": "passed",
+      "title": "keeps the root and products outside D.108d1",
+      "duration": 2.4173749999999927,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED pins the complete zero-skip GREEN inventory",
+      "status": "passed",
+      "title": "pins the complete zero-skip GREEN inventory",
+      "duration": 1.3954589999998461,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED imports the shipped successor activation owner without a source-pattern readiness gate",
+      "status": "passed",
+      "title": "imports the shipped successor activation owner without a source-pattern readiness gate",
+      "duration": 0.7234579999999369,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED genuine successor imports its verified snapshot before epoch-one activation",
+      "status": "passed",
+      "title": "genuine successor imports its verified snapshot before epoch-one activation",
+      "duration": 306.91491700000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED private custody alone selects installEpochAnchor",
+      "status": "passed",
+      "title": "private custody alone selects installEpochAnchor",
+      "duration": 2372.774208,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED divergent genesis identity fails before every live effect",
+      "status": "passed",
+      "title": "divergent genesis identity fails before every live effect",
+      "duration": 1638.3301250000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED pending epoch-zero outbox is classified and never published as epoch one",
+      "status": "passed",
+      "title": "pending epoch-zero outbox is classified and never published as epoch one",
+      "duration": 349.1184170000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED old handle registration author and prepared capability are terminal",
+      "status": "passed",
+      "title": "old handle registration author and prepared capability are terminal",
+      "duration": 1075.2915840000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED hot duplicate returns the same handle before a second source claim",
+      "status": "passed",
+      "title": "hot duplicate returns the same handle before a second source claim",
+      "duration": 329.0100000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED conflicting hot duplicate bindings fail closed",
+      "status": "passed",
+      "title": "conflicting hot duplicate bindings fail closed",
+      "duration": 357.1993330000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED post-adoption activation failure cleans up and fresh reverify performs no second swapHead",
+      "status": "passed",
+      "title": "post-adoption activation failure cleans up and fresh reverify performs no second swapHead",
+      "duration": 341.4018329999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED TTL expiry performs one bounded full reverify attempt",
+      "status": "passed",
+      "title": "TTL expiry performs one bounded full reverify attempt",
+      "duration": 950.3654580000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "99989fa6a24bd549dfea0449694460aa3dfd27a1d29e1713d4bf835205dd7925",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

@@ -1,0 +1,43 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-51/result.json",
+  "baselineSha256": "98bfa405f62aeae0b4da1e1bf6c5a1470b60509da6c55ea6e2c01325d4c1bf73",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f2 bounded multi-author issuance frontier"
+      ],
+      "fullName": "D.110c-0c1f2 bounded multi-author issuance frontier authenticates the exact creator-signed frontiers from a genuine two-writer close",
+      "status": "passed",
+      "title": "authenticates the exact creator-signed frontiers from a genuine two-writer close",
+      "duration": 595.1775419999999,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "2d8f26549c8ecc94370314c883a5c90f6e4e5fb310e8bfb58a923ab869d5492a",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

@@ -1,0 +1,163 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 11,
+  "passed": 11,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-19/result.json",
+  "baselineSha256": "35792e3cc49e44cf70a3b4bffdd8a211ab7db7267a1a356d1450b31b4dc6cc0c",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact six-RED/two-GREEN oracle corrective ownership",
+      "status": "passed",
+      "title": "freezes the exact six-RED/two-GREEN oracle corrective ownership",
+      "duration": 3.4536249999998745,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership",
+      "status": "passed",
+      "title": "freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership",
+      "duration": 1.9748329999999896,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes exact nine-RED/three-GREEN ownership and the closed cold input",
+      "status": "passed",
+      "title": "freezes exact nine-RED/three-GREEN ownership and the closed cold input",
+      "duration": 0.6679169999999885,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2d four-RED/one-GREEN performance ownership",
+      "status": "passed",
+      "title": "freezes the exact D.108e2d four-RED/one-GREEN performance ownership",
+      "duration": 0.6910420000001523,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership",
+      "status": "passed",
+      "title": "freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership",
+      "duration": 0.6475829999999405,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e4 thirteen-path tests-only ownership",
+      "status": "passed",
+      "title": "freezes the exact D.108e4 thirteen-path tests-only ownership",
+      "duration": 3.768542000000025,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED requires every root canonical consumer to use the D.108e4 export-file boundary",
+      "status": "passed",
+      "title": "requires every root canonical consumer to use the D.108e4 export-file boundary",
+      "duration": 0.7107499999999618,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED waits for reciprocal raw unreliable links before one measured movement in each direction",
+      "status": "passed",
+      "title": "waits for reciprocal raw unreliable links before one measured movement in each direction",
+      "duration": 1.3963329999999132,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED derives the shipped eight-member chat identities and exact writer split",
+      "status": "passed",
+      "title": "derives the shipped eight-member chat identities and exact writer split",
+      "duration": 44.12875000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED admits Bob's genuine epoch-zero vertex before the multi-writer successor close",
+      "status": "passed",
+      "title": "admits Bob's genuine epoch-zero vertex before the multi-writer successor close",
+      "duration": 880.7340839999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED pins the complete zero-skip GREEN child inventory to direct execution",
+      "status": "passed",
+      "title": "pins the complete zero-skip GREEN child inventory to direct execution",
+      "duration": 0.5459160000000338,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "a4d3784a381faf9e852a6a26abf1a7dbdc2a941afb8fb71f09fa589521b193a2",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

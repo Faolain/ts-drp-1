@@ -1,0 +1,127 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 8,
+  "passed": 8,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-34/result.json",
+  "baselineSha256": "764097e32d1e5509d081b2a241623d95093913fffe2df981969eb9546c4f371c",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED freezes the exact five RED and exact nine GREEN owners",
+      "status": "passed",
+      "title": "freezes the exact five RED and exact nine GREEN owners",
+      "duration": 3.043542000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED pins separate honest trust, continuity and lifecycle projections",
+      "status": "passed",
+      "title": "pins separate honest trust, continuity and lifecycle projections",
+      "duration": 0.44162500000004457,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED independently classifies replay, equivocation, rollback, gap and the exact successor without writes",
+      "status": "passed",
+      "title": "independently classifies replay, equivocation, rollback, gap and the exact successor without writes",
+      "duration": 17.85374999999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED replaces exactly one trust ref while preserving every non-trust ref and adding proof refs",
+      "status": "passed",
+      "title": "replaces exactly one trust ref while preserving every non-trust ref and adding proof refs",
+      "duration": 1.0911670000000413,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED accepts ambiguous head success only by exact successor reopen",
+      "status": "passed",
+      "title": "accepts ambiguous head success only by exact successor reopen",
+      "duration": 0.14541700000006585,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED forbids activation, pruning and a second combined-head owner",
+      "status": "passed",
+      "title": "forbids activation, pruning and a second combined-head owner",
+      "duration": 1.0692920000000186,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED [RED readiness] requires the live close and successor-classifier owners",
+      "status": "passed",
+      "title": "[RED readiness] requires the live close and successor-classifier owners",
+      "duration": 0.08575000000007549,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e genuine creator live close RED"
+      ],
+      "fullName": "Phase 5e genuine creator live close RED keeps both new runtime subpaths closed and binds every classifier verdict",
+      "status": "passed",
+      "title": "keeps both new runtime subpaths closed and binds every classifier verdict",
+      "duration": 329.14795800000013,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "1b2863fa04df9ac1958dca7314dca7db3ae568b0f154607410bd2d277fa0c539",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

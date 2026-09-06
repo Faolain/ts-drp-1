@@ -1,0 +1,43 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-53/result.json",
+  "baselineSha256": "f696d2d14d96328551c2166fc4f502dfeea6150e855f36e3597a0510a8bfce8d",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5 foreign-author close liveness"
+      ],
+      "fullName": "D.110c-0c1f5 foreign-author close liveness keeps foreign frontier anomalies author-local while creator corruption stays fail closed",
+      "status": "passed",
+      "title": "keeps foreign frontier anomalies author-local while creator corruption stays fail closed",
+      "duration": 8464.154542,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "ebd5d9aa041982410945f5e2a23371938a6726bf5314601d8bd3861c73ab4599",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}
