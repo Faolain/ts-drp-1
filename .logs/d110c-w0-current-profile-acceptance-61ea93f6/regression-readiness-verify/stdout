@@ -1,0 +1,28 @@
+{
+  "exactHistoricalAndAddedRoster": true,
+  "collected": 232,
+  "inputsVerified": 988,
+  "artifactsVerified": 13,
+  "runtimeBinariesExact": true,
+  "sourcePatchSha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+  "gates": [
+    {
+      "label": "runtime-w0",
+      "files": 1,
+      "cases": 7,
+      "budgetMs": 300000
+    },
+    {
+      "label": "runtime-retained",
+      "files": 34,
+      "cases": 222,
+      "budgetMs": 360000
+    },
+    {
+      "label": "runtime-bootstrap-supplement",
+      "files": 1,
+      "cases": 3,
+      "budgetMs": 60000
+    }
+  ]
+}

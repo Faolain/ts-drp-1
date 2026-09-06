@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import fs from \"node:fs\";import assert from \"node:assert/strict\";const d=\".logs/d110c-w0-isolated-7efe33dd/\",read=n=>JSON.parse(fs.readFileSync(d+n));const a=read(\"typecheck-main.json\"),b=read(\"typecheck-isolated.json\");assert.deepEqual(a.diagnostics,b.diagnostics);assert.deepEqual(a.targetDiagnostics,b.targetDiagnostics);assert.equal(a.diagnostics.length,92);assert.equal(a.targetDiagnostics.length,3);assert.equal(b.wholeProgramPass,false);for(const x of a.diagnostics){const line=fs.readFileSync(x.file,\"utf8\").split(\"\\n\")[x.line-1].trim();assert.equal(line,x.sourceAnchor)}const mp=read(\"program-identity-main.json\"),ip=read(\"program-identity-isolated.json\");const set=new Set(ip.sources.map(s=>s.physical.replace(ip.root,mp.root)));const omitted=mp.sources.filter(s=>!set.has(s.physical));for(const x of omitted){assert.ok(x.physical.startsWith(\"/Users/aristotle/node_modules/\"));assert.ok(x.physical.endsWith(\".d.ts\"))}assert.deepEqual(omitted,read(\"graph-comparison.json\").mainOnlySources);console.log(JSON.stringify({exactDiagnosticMessagesAndAnchors:92,targeted:3,derivedAncestorDeclarations:omitted.length,wholeProgramPass:false}));"
+  ],
+  "start": "2026-09-06T12:07:52.607Z"
+}

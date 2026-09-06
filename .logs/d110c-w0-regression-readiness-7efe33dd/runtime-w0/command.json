@@ -1,0 +1,61 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "label": "runtime-w0",
+  "files": [
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts"
+  ],
+  "entries": [
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED > stages, opens, recovers, closes, and adopts a genuine 31-member writer-only ACL"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED > stages, opens, recovers, closes, and adopts a genuine 64-member writer-only ACL"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED > rejects 65 writer-only members consistently by legacy cardinality"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED > rejects 41 full-shape members consistently by legacy byte ceiling"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED > accepts a fitting recognized close record and rejects its oversized kind loudly at runtime"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED > caps one legacy-profile writer, rejects the reserved fence, counts the causal join, preserves another writer and closes below global capacity"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED > charges a settlement-profile offender's own signed fence to its share, refuses its next add, preserves another writer and genuinely closes"
+    }
+  ],
+  "budgetMs": 300000,
+  "budgetRationale": "Historical corrected W0 elapsed 29681ms; unchanged two 120000ms explicit case ceilings plus 60000ms process/setup allowance. No test timer widened.",
+  "maxInvocations": 1,
+  "released": false,
+  "command": [
+    "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+    "run",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-regression-readiness-7efe33dd/runtime-w0/result.json"
+  ],
+  "environmentUnset": [
+    "TS_DRP_D108E4M_PROFILE",
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "D110C_0B1_EVIDENCE_PATH"
+  ],
+  "environmentSet": {},
+  "unchangedTestAndChildTimers": true,
+  "stopOnFailureNoRetryOrNextGate": true,
+  "runtimeRosterSha256": "e7eddba484ad9aa2a659d2e3fafa2f8f4e0da7429351d14d6b292cdb91a114c4"
+}

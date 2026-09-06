@@ -1,0 +1,4 @@
+{
+  releaseExact: true,
+  preLaunchCorrection: 'Root corrected a typed baseline typo before any invocation or delegation; no runtime consumed.'
+}

@@ -104944,6 +104944,59 @@ bootstrap-policy cases separately identified as supplements. Browser, fresh
 source-built isolation and the frozen three-model reviews remain open. No
 campaign, production change, build or reviewer was released by this repair.
 
+**W0 combined acceptance checkpoint; formal review open (2026-09-06).** The
+unchanged source overlay at signed/pushed `7efe33dd` now passes the required
+main and independently source-built gates. The three W0 GREEN owners remain
+uncommitted pending the frozen Grok high, Sol high and Fable xhigh review. This
+checkpoint records verification, not final W0 or parent-production acceptance.
+
+Main regression evidence lives in
+`.logs/d110c-w0-regression-readiness-7efe33dd/regression-handoff.json`: all seven
+W0 cases, all 220 historical retained identities plus two closure controls,
+and the three separately categorized bootstrap supplements pass. Root verified
+the exact reporters and 988 frozen inputs. The existing browser companion
+passes all 24 cases across Chromium, Firefox and WebKit; its final disposition
+is `.logs/d110c-w0-browser-7efe33dd/runtime-handoff.json`. The browser shim is
+absent before and after, and all 1,081 frozen inputs retain identity. Neither
+acceptance changes workloads, deadlines or historical evidence.
+
+Independent acceptance lives in
+`.logs/d110c-w0-isolated-7efe33dd/isolated-handoff.json`. A fresh checkout uses
+the exact eleven-owner overlay, an independent locked installation, fresh
+native preparation and one source build, without borrowing main dependencies
+or build output. Its separately released gates pass 7/7, 222/222 and 3/3 in
+27.259, 291.766 and 2.575 seconds. Root independently verifies every case,
+all 1,626 frozen inputs, dependency links, source hashes and normalized graph.
+No runtime failed, skipped, timed out, retried or required cleanup signals.
+The prelaunch bootstrap-release typing correction is recorded explicitly;
+it did not consume a runtime invocation.
+
+The fresh forty-root compiler comparison is baseline-equivalent, **not a clean
+typecheck**: both programs have the same 92 diagnostics, three in targeted
+fixtures, with exact messages and source-line anchors. This wider graph is not
+the earlier 26-diagnostic consumer scope. The actual main-only ancestor
+declarations are derived from the source sets, not injected into isolation or
+accepted by a historical count. Options match after checkout relocation, all
+common source hashes and import edges match, and no type debt was repaired.
+Lint has zero errors and one inherited warning; format and source diff pass.
+
+Root verifies exact self-excluding seals: regression 51 entries, manifest SHA
+`7c50bb00d2160a7f0d4bf48d0713e9ba3cbec81d1c349e544095d6cae01afe10`;
+browser 26 entries,
+`97fad32967e5756fa26c4395804d4def75f8a5ec262a3cc70963cb483e533926`;
+isolation 164 entries,
+`18e88cd975bf18553a71850d6da012a99f2f1d2389ff54274bcb76ed5d2c9258`.
+Main source/build/stash/path custody and all prior sealed evidence remain
+intact. The next action is the frozen three-model review of the whole bounded
+W0/consumer RED-to-GREEN chain. No production edit, registry/grid acceptance,
+long workload or 64-writer/100-transition campaign is released here.
+
+The whole-plan formatter exhausted Node's default heap; its failed log is
+preserved in root acceptance evidence. The established authored-section format
+check and source-diff whitespace check pass, without a whole-file format claim.
+Raw patch context and captured stderr whitespace remain immutable; only those
+four exact evidence paths are excluded from the authored staged-whitespace check.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;

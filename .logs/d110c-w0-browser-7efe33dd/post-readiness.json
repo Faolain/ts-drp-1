@@ -1,0 +1,114 @@
+{
+  "checkedAt": "2026-09-06T11:43:06.217Z",
+  "ports": [
+    {
+      "port": 4174,
+      "pids": []
+    },
+    {
+      "port": 4175,
+      "pids": []
+    },
+    {
+      "port": 51000,
+      "pids": []
+    },
+    {
+      "port": 51002,
+      "pids": []
+    }
+  ],
+  "processes": [
+    {
+      "pid": 19543,
+      "numericStatus": "19543 38746 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 54439,
+      "numericStatus": "54439 54413 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 54442,
+      "numericStatus": "54442 54439 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 54951,
+      "numericStatus": "54951 54442 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 56881,
+      "numericStatus": "56881 56847 SN",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/marketing"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 56966,
+      "numericStatus": "56966 56850 SN",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/web"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 63788,
+      "numericStatus": "63788 63758 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 63823,
+      "numericStatus": "63823 63788 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 63872,
+      "numericStatus": "63872 63823 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 63875,
+      "numericStatus": "63875 63872 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 69026,
+      "numericStatus": "69026 63875 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    }
+  ],
+  "noArgvCommOrEnvironmentDump": true,
+  "noCompetingTaskProcesses": true,
+  "inheritedProfilingAbsent": true
+}

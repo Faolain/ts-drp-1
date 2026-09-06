@@ -1,0 +1,11 @@
+
+ RUN  v3.1.1 /private/tmp/d110c-w0-isolated-qA7HqL/checkout
+
+ ✓ tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts (3 tests) 233ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  08:14:01
+   Duration  1.20s (transform 506ms, setup 0ms, collect 773ms, tests 233ms, environment 0ms, prepare 51ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/runtime-bootstrap-supplement/result.json

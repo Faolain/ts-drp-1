@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "-e",
+    "const fs=require(\"fs\"),a=require(\"node:assert/strict\"),d=\".logs/d110c-w0-isolated-7efe33dd/\",r=JSON.parse(fs.readFileSync(d+\"runtime-roster.json\")),x=JSON.parse(fs.readFileSync(d+\"root-runtime-bootstrap-supplement-release.json\"));a.equal(x.baseline,r.baseline);a.equal(x.sourcePatchSha256,r.sourcePatchSha256);console.log({releaseExact:true,preLaunchCorrection:\"Root corrected a typed baseline typo before any invocation or delegation; no runtime consumed.\"});"
+  ],
+  "start": "2026-09-06T12:13:41.690Z"
+}
