@@ -18556,6 +18556,10 @@ The subsequent read-only audit below finds that existing evidence cannot
 identify the timed-out lifecycle phase or distinguish CPU cost from waiting.
 It proposes one tests-only diagnostic execution, pending explicit authorization;
 no production repair or further timeout increase is justified yet.
+The user has now expressly authorized the phase/CPU logging and one diagnostic
+run, plus one Fable-high parallel timeout investigation through `claude-phel`.
+**Authorized wide-fixture diagnostic execution** below supersedes only that
+pending authorization. It does not release another acceptance or long run.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -103745,6 +103749,54 @@ proposed. The existing separate RED/GREEN and final review boundaries remain;
 obtain explicit authorization for instrumentation and the one execution before
 editing the fixture. Do not add a review-only slice or recursively review this
 audit prose. Other known failures retain their separate scope boundaries.
+
+**Authorized wide-fixture diagnostic execution (2026-09-06).** The user
+explicitly authorizes the preceding bounded diagnostic proposal and one
+Fable-high investigation. Root launched exactly one `claude-phel` session
+`657e119f-ea2b-4bfd-8f67-1dba20336d2f`, requested
+`claude-fable-5-1[1m]`/high, reported initialization model `claude-fable-5-1`.
+Its streamed evidence is `.logs/d110c-0c1f5b-timeout-fable-high-8001c18e/`.
+The alias is available through interactive shell configuration; the first
+noninteractive lookup failed before any model launch. The tracked launcher
+uses the verified alias expansion with a clean shell. This does not authorize
+any further Fable or model invocation.
+
+The existing separate RED owner verifies the preserved timeout and diagnostic
+scope read-only; no repeated RED execution is needed. After this authorization
+is signed/pushed, the existing separate GREEN owner adds only opt-in test-local
+phase/CPU observations to the exact wide fixture and its local helpers. Use
+monotonic elapsed time, process CPU readings, phase/epoch/writer identities,
+completed operation counters and paired begin/end observations. Capture
+incrementally, with an explicit bounded record count and no large retained
+diagnostic arrays, application payloads or product-source instrumentation.
+Include open, issue, close, adoption, database transfer, reopen, final accounting
+and cleanup so the last incomplete await can be identified. Measurement is
+diagnostic and includes its own overhead; process CPU is not per-operation
+causal attribution, especially during overlapping peer reopens.
+
+Preserve all existing assertions, sequencing/concurrency, 64 writers, three
+transitions, four contributing epochs, real storage/recovery and the 70-second
+test watchdog. Exact-owner lint/format/diff/type checks and a reversible
+source/semantic audit precede execution. Sign/push the diagnostic test change
+separately. Freeze one exact wide-case title selection with all other collected
+cases explicitly filtered; do not silently include the imported room-runtime
+suite. Run once in a fresh process, with no later selected case sharing its
+worker, complete JSON/stdout/stderr/exit status and incremental observations.
+Do not run the full 45-case suite, isolated acceptance, profiling campaign,
+second diagnostic attempt or larger deadline under this authority. Preserve
+the existing launcher hard process-lifetime bound and record quiescence/exit;
+the test timeout must not be treated as callback cancellation.
+
+Fable may inspect source/evidence and perform small diagnostic probes, but
+must not duplicate the wide execution, change the shared workspace, run a
+campaign or compete with the measured worker. Its local diagnostic work must
+finish before the sole wide invocation starts. Findings inform diagnosis, not
+automatic production edits or acceptance. Stop after the one result and
+interpret CPU/wall time, completed phases and outstanding operations
+conservatively; missing observations or reporter anomalies fail closed.
+Preserve exact source/runtime custody, protected paths, stashes and immutable
+evidence. The existing final Grok/Sol/Fable review remains separate and pending;
+no new prose review or production capability is introduced by this amendment.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
