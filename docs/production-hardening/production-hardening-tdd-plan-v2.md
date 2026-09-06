@@ -18560,6 +18560,13 @@ The user has now expressly authorized the phase/CPU logging and one diagnostic
 run, plus one Fable-high parallel timeout investigation through `claude-phel`.
 **Authorized wide-fixture diagnostic execution** below supersedes only that
 pending authorization. It does not release another acceptance or long run.
+That sole diagnostic is now consumed and sealed: one wide timeout, 23 filtered
+cases, and a valid 3,546-record partial journal. All 256 ordinary issues and
+three transition groups completed, but final creator cold reopen began at
+68.775 seconds and remained outstanding when the 70-second watchdog fired.
+**Wide-fixture diagnostic result and Fable disposition** below owns the measured
+costs and next boundary. No product defect, full functional pass or further
+run is implied.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -103804,6 +103811,116 @@ conservatively; missing observations or reporter anomalies fail closed.
 Preserve exact source/runtime custody, protected paths, stashes and immutable
 evidence. The existing final Grok/Sol/Fable review remains separate and pending;
 no new prose review or production capability is introduced by this amendment.
+
+**Wide-fixture diagnostic result and Fable disposition (2026-09-06).** The
+separate GREEN owner signed/pushed tests-only source
+`e68c6223bb7a93e79d3fd21e9c12c8eaa575272a`, hash
+`c63f9cb4c8bfda07a631de56382180147af01e9c062b7099a39a4632d9f16f0e`.
+Only opt-in boundary observations and diagnostic callback settlement were
+added. The independently checked reversal removes those nodes/imports and
+unwraps the diagnostic-only `try/finally`, restoring the original entire file
+after formatting and original callback hash `5772c9807c1d9152f7f89e0f7fe0ad38ede650793c7a571dd63a364862c82ee5`.
+All 289 original awaits, 15 `Promise.all` expressions and 271 assertions are
+preserved. Raw instrumented bytes are not claimed equal to the original.
+
+The sole fresh-process run selected exactly one integration file: 24 reported
+cases, one active wide timeout and 23 filtered. Reported duration was
+70,059.322208ms. Complete reporter SHA-256 is
+`b0250ff85969f1392fa2097df33e52439c17fe38c7d60907e184c5d0ee71ec06`.
+The owned process group exited 1 and was quiescent after about 74.771 seconds
+including collection/teardown; no outer containment signal was required.
+No second diagnostic, full-45 run, isolated validation or larger test deadline
+was used. The result remains a failure, not acceptance.
+
+Evidence is `.logs/d110c-0c1f5b-wide-diagnostic-32968861/`. Root verified
+all 126 self-excluding manifest entries and complete inventory; manifest
+SHA-256 is `8651cc2ff0883b24ecfdf709d99aa29a54ed14d2770d1c6dbd7bee4a75040846`.
+`assessment.md` and `wide-only/validation.json` own complete command/status,
+source, phase-pair and diagnostic-counter evidence. All 3,546 records have
+continuous sequences and no malformed record, overflow or write failure.
+All 256 ordinary issue awaits fulfilled and all three close/adopt/63-peer
+reopen groups ended; final accounting ended at 68,773.412917ms. The final
+creator `createV3RoomSession` began at 68,774.601084ms but has no end record.
+There are 190 completed session reopens out of 191 planned. Final cold-reopen
+assertions and callback completion remain unproved. Cleanup began at
+70,010.375042ms and ended at 70,057.990209ms without a callback-settled record;
+cleanup completion is not callback cancellation or completion.
+
+Root's independent journal analysis gives these coarse, non-overlapping
+reopen-group observations. CPU readings are process-wide and include
+overlapping work; individual peer intervals must not be summed as exclusive
+owners.
+
+| Successor epoch | 63-writer reopen group | All 126 database transfers finished by | All snapshot declarations finished by |
+| --------------- | ---------------------- | -------------------------------------- | ------------------------------------- |
+| 1               | 8,775.689ms            | 63.702ms after group start             | 247.490ms after group start           |
+| 2               | 9,427.611ms            | 77.631ms after group start             | 223.380ms after group start           |
+| 3               | 10,755.992ms           | 78.876ms after group start             | 248.667ms after group start           |
+
+Callback-to-cleanup elapsed time was 70,057.990209ms; process CPU increased
+62,476.484ms and event-loop idle time 309.828289ms. Initial open took
+8,572.594ms; three creator adoptions took 7,120.102ms, 2,360.064ms and
+2,975.973ms. This establishes substantial CPU/active-loop work in this run,
+not pure idle waiting. Whole-database copying is not the dominant measured
+reopen-group delay. Most remaining group time lies in the session-reopen
+pipeline, but these boundaries do not separate authenticated product work
+from fixture observers, module realms/Vite activity or diagnostic overhead.
+Nor do they prove the cause of earlier runs or a defect in the final reopen,
+which had only about 1.2 seconds before the test deadline.
+
+The one-off Fable-high session completed once with exit 0, `is_error=false`
+and `end_turn`, reported model `claude-fable-5-1`. Its nine-entry evidence root
+`.logs/d110c-0c1f5b-timeout-fable-high-8001c18e/` has verified manifest
+`e5e5ee588994539003891c772eb09b41e5627065a073c0c1f89cfc1df880e783`.
+Its original findings remain intact. Root's dispositions are:
+
+- Keep host/process slowdown as an unproven hypothesis, not a conclusion.
+  The claim that every other test slowed is false: seven were faster in the
+  first stopped run and four in the second, compared with the historical
+  pass. Aggregate slowdown and extrapolating a small control cannot establish
+  the wide case's cause. The new measured CPU work further prevents a simple
+  scheduling-only attribution.
+- Accept the distinctions between timeout, callback settlement and cleanup,
+  and the need to separate session work from database-copy work. Add only
+  lightweight event-loop-utilization reads to the already-authorized boundary
+  records. Do not adopt a compute-calibration workload, histogram timer,
+  extra IDB-turn instrumentation or further invocation.
+- Preserve source-based no-stall reasoning as hypotheses only. Absence of an
+  obvious unbounded loop does not prove every await completes, and a passing
+  future run would not retroactively prove earlier host contention.
+- Record the tool-use exception honestly: Fable ran an unverified
+  `rm -rf /tmp/f5b-room-recon` before a failed temporary reconstruction. Root
+  cannot establish whether that path held pre-existing data. The resulting
+  `/private/tmp/f5b-room-recon` directory remains untouched; this was disclosed
+  to the user. No repository production changes were made by Fable, and root
+  independently rehashed all eight production owners and seven built artifacts.
+  No further Fable session is authorized by this one-off investigation.
+
+Final exact-owner lint/format/diff/reversal/type-matrix checks pass. Two
+compiler runs (before/after the approved event-loop fields) retain exactly
+the known three external snapshot diagnostics, not a whole-program pass.
+The initial raw-scanner reversal failure was a parser/template diagnostic;
+its preserved readback and corrected parser-aware check prove full restored
+bytes without a source repair for that mistake. All 22 command statuses are
+retained, including both runtime wrapper/child failures, that checker failure
+and the two expected compiler failures. Final custody preserves eight pending
+production owners, seven built artifacts, 85 test/shared identities, all 27
+stashes and 86,522 protected paths. Existing immutable failures are unchanged.
+The staged whitespace check reports only the final blank line in sealed
+`wide-only/stderr.log:8`; excluding that exact raw artifact passes. The plan's
+bounded formatting/diff checks pass, and raw stderr remains unchanged.
+
+The diagnostic authorization is exhausted. The smallest justified next
+technical action is function-level CPU attribution within the measured
+session-reopen path before choosing an optimization or a revised test-budget
+contract. That needs an explicitly bounded next diagnostic proposal; no new
+profile or workload is launched by this record. Mixed product/fixture/module
+ownership is not a demonstrated production bug. Do not redesign snapshot
+transfer, weaken the 64-writer golden path, remove recovery assertions or
+silently raise the watchdog. The three fixture diagnostics, grid authority
+composition and four registry/W0 failures remain separately open. This closes
+the one-off investigation and diagnostic capture, not parent GREEN, final
+review, D.110c-c or the long-run freeze. No prose review round is added.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

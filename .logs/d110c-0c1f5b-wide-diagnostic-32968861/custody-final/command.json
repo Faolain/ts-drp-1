@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-0c1f5b-wide-diagnostic-32968861/custody-final.mjs",
+    "final"
+  ],
+  "start": "2026-09-06T07:15:29.267Z"
+}

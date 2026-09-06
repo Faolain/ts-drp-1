@@ -1,0 +1,31 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import ts from '/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/typescript/lib/typescript.js';
+import prettier from '/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/prettier/index.mjs';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),file='tests/phase-6b-d110c-0c1f5b-integration-red.test.ts',before=fs.readFileSync(path.join(out,'source-before.ts'),'utf8'),after=fs.readFileSync(path.join(root,file),'utf8'),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),unit=ts.createSourceFile(file,after,ts.ScriptTarget.Latest,true),old=ts.createSourceFile(file,before,ts.ScriptTarget.Latest,true),ranges=[],removed=[];
+function remove(start,end,kind){const lineStart=after.lastIndexOf('\n',start-1)+1,lineEnd=after.indexOf('\n',end);if(/^\s*$/u.test(after.slice(lineStart,start))&&lineEnd!==-1&&/^\s*$/u.test(after.slice(end,lineEnd))){start=lineStart;end=lineEnd+1;}ranges.push([start,end]);removed.push({kind,start,end,text:after.slice(start,end)});}
+const wide=unit.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='sixtyFourWriterGoldenPath'),priorWide=old.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='sixtyFourWriterGoldenPath');if(!wide||!priorWide||hash(priorWide.body.getText(old))!=='5772c9807c1d9152f7f89e0f7fe0ad38ede650793c7a571dd63a364862c82ee5')throw Error('Original callback custody');
+const wrapper=wide.body.statements.find(ts.isTryStatement);if(!wrapper||wrapper.catchClause||wrapper.finallyBlock.statements.length!==1||wrapper.finallyBlock.statements[0].getText(unit)!=='wideDiagnostic("callback", "settled", null, null, wideDiagnosticCompleted);')throw Error('Exact diagnostic finally');
+remove(wrapper.getStart(unit),wrapper.tryBlock.getStart(unit)+1,'try-open');remove(wrapper.tryBlock.end-1,wrapper.end,'finally-tail');
+function scan(n){
+ if(n===wrapper){ts.forEachChild(n.tryBlock,scan);return;}
+ if(ts.isFunctionDeclaration(n)&&n.name?.text==='wideDiagnostic'){remove(n.getStart(unit),n.end,'logger');return;}
+ if(ts.isVariableStatement(n)&&n.declarationList.declarations.length===1&&['wideDiagnosticState','wideDiagnosticCompleted'].includes(n.declarationList.declarations[0].name.getText(unit))){remove(n.getStart(unit),n.end,'diagnostic-state');return;}
+ if(ts.isExpressionStatement(n)&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(unit)==='wideDiagnostic'){remove(n.getStart(unit),n.end,'observation');return;}
+ if(ts.isExpressionStatement(n)&&n.getText(unit)==='wideDiagnosticCompleted = true;'){remove(n.getStart(unit),n.end,'completion-flag');return;}
+ if(ts.isImportDeclaration(n)&&n.moduleSpecifier.getText(unit)==='"node:fs"'){const names=n.importClause.namedBindings.elements;if(names.length!==2||names[0].name.text!=='readFileSync'||names[1].name.text!=='writeSync')throw Error('Exact import delta');remove(names[0].end,names[1].end,'writeSync-import');return;}
+ ts.forEachChild(n,scan);
+}
+scan(unit);ranges.sort((a,b)=>a[0]-b[0]);for(let i=1;i<ranges.length;i++)if(ranges[i][0]<ranges[i-1][1])throw Error('Overlapping diagnostic ranges');
+let restored=after;for(const[start,end]of ranges.toReversed())restored=restored.slice(0,start)+restored.slice(end);
+const tokens=text=>{const s=ts.createScanner(ts.ScriptTarget.Latest,true,ts.LanguageVariant.Standard,text),result=[];for(let kind=s.scan();kind!==ts.SyntaxKind.EndOfFileToken;kind=s.scan())result.push([kind,s.getTokenText()]);return result;};
+if(JSON.stringify(tokens(restored))!==JSON.stringify(tokens(before)))throw Error('Restored AST token sequence differs');
+const config=await prettier.resolveConfig(path.join(root,file)),formatted=await prettier.format(restored,{...config,filepath:path.join(root,file)});if(formatted!==before)throw Error('Formatter-normalized reverse is not original full bytes');
+const restoredUnit=ts.createSourceFile(file,formatted,ts.ScriptTarget.Latest,true),restoredWide=restoredUnit.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='sixtyFourWriterGoldenPath');
+const nodes=(u,predicate)=>{const found=[];function visit(n){if(predicate(n))found.push(n.getText(u));ts.forEachChild(n,visit)}visit(u);return found};
+const awaitBefore=nodes(old,ts.isAwaitExpression),awaitAfter=nodes(unit,ts.isAwaitExpression),normalize=list=>list.map(tokens);if(JSON.stringify(normalize(awaitBefore))!==JSON.stringify(normalize(awaitAfter)))throw Error('Original await expressions changed');
+const allBefore=nodes(old,n=>ts.isCallExpression(n)&&n.expression.getText(old)==='Promise.all'),allAfter=nodes(unit,n=>ts.isCallExpression(n)&&n.expression.getText(unit)==='Promise.all');if(JSON.stringify(normalize(allBefore))!==JSON.stringify(normalize(allAfter)))throw Error('Promise.all changed');
+const assertions=nodes(old,n=>ts.isCallExpression(n)&&n.expression.getText(old)==='expect');
+const data={valid:true,files:[{file,beforeSha256:hash(before),afterSha256:hash(after)}],callbackOriginalBodySha256:hash(priorWide.body.getText(old)),callbackRestoredBodySha256:hash(restoredWide.body.getText(restoredUnit)),rawInstrumentedBodyNotByteEqual:true,formatterNormalizedReverseEntireFileByteEqual:true,restoredFileSha256:hash(formatted),originalAwaitExpressions:awaitBefore.length,originalPromiseAllExpressions:allBefore.length,originalExpectCalls:assertions.length,allOriginalTokensAssertionsAndControlFlowRestored:true,removedDiagnosticSpans:removed,recordCap:4096,plannedSuccessfulRecordsUpperBound:3800,recordCountReason:'64 initial peer opens;256 issue/accounting pairs;191 reopen and stop/declaration/session pairs;378 transfer pairs;24 cohort stops+64 final stops;bounded epoch/close/oracle/adopt/group/final/callback/cleanup pairs',processCpuIsAggregateDuringConcurrentReopens:true,noRuntimeExecuted:true};
+fs.writeFileSync(path.join(out,'equivalence.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({valid:true,sourceSha256:hash(after),restoredFileSha256:hash(formatted),callbackRestoredBodySha256:data.callbackRestoredBodySha256,awaitExpressions:awaitBefore.length,promiseAllExpressions:allBefore.length,expectCalls:assertions.length,recordCap:4096}));
