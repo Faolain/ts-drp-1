@@ -105036,6 +105036,56 @@ existing separate RED/GREEN and review discipline. Full parent acceptance and
 remaining D.110c obligations still precede the reviewed 64-active-writer,
 at-least-100-genuine-transition workload; no campaign is released here.
 
+**Current registry design review — corrections required (2026-09-06).** The
+first prospective-current design was reviewed read-only against signed/pushed
+`8d81c8f47b9f5df0ff4e67caa01ae6f4008db707`. Grok 4.6 high, Sol high and Fable
+5.1 xhigh each return terminal FAIL. They accept the explicit trust-reset
+principle: future candidates are governed by the unique merge-base checker,
+policy and protected inventory; missing or obsolete bases fail closed, without
+candidate fallback. The reviewed baseline amendment is not represented as an
+old-policy-approved transition, and current/current checks do not prove an
+old-base PR passes or that host protection is installed.
+
+The design is not released for RED/GREEN. The reviews identify omitted live
+consumers and supersession obligations: author-authorization's candidate-root
+route and workflow pin; Ed25519/blueprint profile owners that hash the old root
+policy and its entire protected state; c2/d/d2/b2b historical suites that hash
+live registry/schema paths; and pacemaker's readiness-blocked bootstrap cases.
+The exact semantic-source validation seam, current eight-entry test lifecycle,
+registry-version baseline statement, checkpoint claims and dormant budget
+checker disposition also require a concrete freeze. Preserve each semantic
+obligation while replacing obsolete current authority; do not merely repin
+every child back to the new root and create a circular hash dependency.
+
+The subsequent bounded source check confirms that the blueprint artifact's
+historical five-field tuple and count 47 are also checked by production profile
+validation. Preserve those profile bytes and runtime behavior. Their historical
+root-policy identity must cease to mean a live-root dereference in governance
+checks; current root custody can protect the unchanged historical payload
+without claiming its old attestation describes the current policy. The exact
+consumer map must also cover author-authorization's bootstrap-positive test.
+
+The first review packet is preserved under
+`.logs/d110c-registry-current-contract-design-review-8d81c8f4/public/`, with
+15 self-excluding manifest entries, SHA
+`e309e567d4fd7487dd883794e091d8644c45515bd7503f0f54c6875013ab0765`.
+Its `root-dispositions.md` accepts the corrections and distinguishes design
+findings from newly executed runtime failures. Root verifies all 3,020 frozen
+inputs, 5,214 entries in 46 inherited sealed roots, all protected paths and
+stashes, and the unchanged eight-owner production overlay after the reviews.
+All owned groups terminate normally without timeout or cleanup. Sol's initial
+access-mismatch NO_VERDICT is retained; its same-session read-only continuation
+returns FAIL. Grok's unchanged wrapper reports NO_VERDICT/status 2, while its
+normal zero-exit `end_turn` contains the schema-valid terminal FAIL. No model
+failure is reclassified as approval. Public evidence omits private reasoning
+streams. No checker, test, compiler, build or campaign was run during this
+design phase.
+
+Next finish the exact acyclic current-owner map and source-validation seam,
+incorporate these accepted corrections into the contract, and obtain the
+required plan acceptance before separate RED/GREEN implementation. No new user
+authorization is needed for the already-authorized greenfield resolution.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
