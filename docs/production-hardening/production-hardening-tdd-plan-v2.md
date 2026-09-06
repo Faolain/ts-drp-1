@@ -18613,6 +18613,12 @@ already-disclosed P2 dispositioned. **Snapshot-fixture final acceptance**
 below closes the three-error fixture batch. Parent f5b remains open; the
 next boundary is the separately owned registry/W0/grid decisions, followed
 by combined, browser, signed-production isolated and final parent gates.
+The user has now fully authorized resolving those three decisions with
+separate RED/GREEN ownership and existing reviews, and confirmed there are
+no deployed rooms or external consumers. **Authorized greenfield contract
+resolution** below supersedes the pending authorization and legacy-support
+assumption. Audits are underway; no new workload or 100-transition run has
+been released.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104524,6 +104530,60 @@ isolation and complete final parent review. D.110c-c remains remaining-gap
 closure after f5b acceptance; the reviewed workload/evidence freeze precedes
 D.110c-d's genuine 100-transition, 64-active-writer control. No long-run
 prerequisite is waived by this fixture acceptance.
+
+**Authorized greenfield contract resolution (2026-09-06).** The user fully
+authorizes registry-governance, W0 fence-compatibility and grid-authority
+composition resolution under separate RED/GREEN ownership and the current
+Grok high, Sol high and Fable xhigh reviews. The application is greenfield:
+there are no deployed rooms or external consumers whose old data or APIs
+must remain supported. This explicitly supersedes the pending release above
+and the assumption that obsolete development contracts require runtime
+backward-compatibility machinery. Root owns the contract reconciliation and
+evidence; independent Astra-high owners retain separate RED/GREEN roles.
+No new permission request is needed for these three authorized boundaries.
+
+Historical signed commits, consumed invocation identities, review findings,
+manifests and evidence remain immutable. Their preservation is not a demand
+that current CI execute old checkers against an evolved registry or keep
+obsolete development behavior alive. The registry repair must establish one
+reviewed current contract and update its active references, tests and CI
+consumers coherently. Do not add a historical-tree projection, dual-registry
+runtime, accept-either-hash exception or recursive custody-chain mechanism
+solely to preserve obsolete live-tree pins. Independently retain semantic
+digest/domain, schema-validation, authority and accounting invariants;
+explain any intentionally changed current acceptance predicate. Existing
+historical results are not reinterpreted as having reviewed current bytes.
+
+W0 must follow the current supported profile rules. A legacy-profile fixture
+expecting settlement-only fence admission is not a production requirement
+merely because it once passed. Preserve deliberate profile rejection and
+prove admitted fences actually charge their own author's share in genuine
+settlement material; membership or a fence by a different author is not that
+proof. Whether an older profile remains a useful current control is separate
+from backward compatibility for nonexistent deployments. Do not remove
+unrelated profile code or weaken admission simply to close this diagnostic.
+
+Grid must compose an honest application-held room-head authority rather than
+inventing a floor or casting away the existing requirement. A potentially
+new API boundary receives the user's standing Fable-high consultation through
+`claude-phel` alongside root's source audit before choosing the exact design.
+This is advisory input, not a replacement for formal acceptance. Keep the
+freshness-provider trust assumption and the separately owned authenticated
+successor peer-to-author projection requirement explicit; eliminating a
+missing-argument diagnostic alone cannot establish a long-lived grid world.
+No silent new crypto, wire format, dependency, threshold, or workload change
+is included. Freeze the exact causal RED/repair owners and acceptance matrix
+before implementation, using existing failures where they are genuinely
+causal rather than manufacturing failures for behavior already proved.
+
+The next path remains these three coherent repairs, combined/static/browser
+and fresh-source parent acceptance, then genuinely uncovered D.110c-c work
+and the reviewed D.110c-d workload/memory/evidence freeze. Preserve the
+64-active-writer, at-least-100-genuine-transition objective. No long workload
+is released before its prerequisites pass; no consumed D.110a or campaign
+identity is retried. Protected paths, 27 stashes, eight pending production
+owners and seven built artifacts retain their existing custody until an
+explicitly frozen implementation owner is authorized to change a named file.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
