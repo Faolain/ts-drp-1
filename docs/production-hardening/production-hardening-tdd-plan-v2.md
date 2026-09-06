@@ -18516,7 +18516,9 @@ diagnostics: signed RED `393eda67`, signed two-fixture GREEN `210fecb0`, and
 78/78 retained cases in both main and fresh source-built isolated environments.
 The parent record owns the evidence and precise environment attribution.
 Thirteen inherited transport diagnostics and the other named static debts
-remain separately open. No blanket typecheck or
+remain separately open. The parent record's **Retained transport-fixture
+static contract repair** freezes the next one-file, separate RED/GREEN batch;
+it does not reopen accepted transport runtime behavior. No blanket typecheck or
 parent GREEN acceptance is claimed; registry-freeze repair still requires its
 explicit prospective governance decision.
 
@@ -102985,6 +102987,76 @@ The staged evidence diff check returns 2 solely for the original
 `fixture-lint/stdout.log` blank EOF line 8. Preserve that sealed raw stream;
 fixture-source and plan whitespace checks pass. No blanket staged-diff pass
 is claimed.
+
+**Retained transport-fixture static contract repair (2026-09-06, frozen).**
+This is remaining parent static acceptance, not a production slice or a new
+review checkpoint. Baseline is signed/pushed `8671e3d5`; the sole editable
+test owner is `tests/phase-3a1b-p3-live-transport-red.test.ts`, SHA-256
+`809c5b7858ac5d530179a35167b65bf2ec600b7adee78aa0d4ecb028f563056a`.
+The accepted native-isolation evidence root
+`.logs/d110c-0c1f5b-retained-transport-native-a430272a/` owns the complete
+`typecheck-current-full.json` diagnostic matrix and effective options in
+`typecheck-baseline-comparison.json`. Its thirteen inherited rows are one
+TS2345, three TS2322, one TS2741, five TS2722, two TS2532 and one TS2307.
+The last is the test loader's deliberate query-bearing module identity, not
+a missing production module: the genuine hostile cached-encoder assertion
+already passes in both accepted 24-test runtime reports. Preserve that
+distinction and the full query identity; an erased cast alone is not proof
+that Vite still evaluates the intended separate module.
+
+The existing Astra-high RED owner must execute one actual strict compiler
+program using the accepted root/options and real workspace resolutions.
+Require exactly those thirteen complete diagnostic rows and zero external
+diagnostics. Preserve compiler failure independently from successful matrix
+validation, with complete streams, statuses, compiler/configuration/source
+identities and a self-excluding evidence manifest. Do not replay the old
+two-program baseline comparison. Freeze the complete 24-title reporter roster
+and 123 existing assertion oracles without runtime execution. Sign and push
+the RED evidence before the separate Astra-high GREEN owner edits the test.
+
+The authorized GREEN delta is confined to the diagnosed seams:
+
+- Guard an absent variable initializer before `ts.isIdentifier`; an
+  uninitialized declaration becomes a fail-closed non-match, not an exception.
+- Supply rejecting `vi.fn` defaults for `readSettlementPlan`,
+  `transactWriteSettlementPlan` and `installEpochAnchor`, each rejecting with
+  `Error("unexpected <method> in transport fixture")` using its exact method
+  name. Preserve issuance `...overrides` last. Never return a fabricated plan,
+  alias successor installation to genesis, or manufacture successful authority.
+- Correct the two `effects.push` callbacks' explicit return annotations to
+  `number`, preserving their expression bodies and actual returned values.
+- Add only erased localized non-null assertions at the five already-guarded
+  optional calls and two mock-call arguments; retain receivers, prior guards,
+  optional-chain behavior and the exact preceding call/count assertions.
+- Widen only the existing query-bearing import literal with `as string`,
+  retaining its result type assertion, literal suffix, hostile-global interval
+  and `finally` restoration. No suppression, ambient wildcard, query removal,
+  module-cache reset or production/configuration change is permitted.
+
+GREEN must clear the same compiler program, pass exact-owner lint, format,
+diff and source-shape checks, and mechanically preserve all title/assertion
+trees. Compare emitted behavior allowing only the three new rejecting mocks
+and the initializer guard. Exercise those rejectors and override precedence
+without the workload; validate valid/invalid initializer controls. Verify
+the Vite transform retains the exact queried module identity and evaluation
+ordering, then execute the unfiltered 24-test file once in main and once in a
+fresh source-built isolated checkout using the accepted native/workspace
+recipe. Each reporter must contain the exact frozen roster, 24 passes and no
+skips, failures or top-level errors, including the genuine hostile-encoder
+assertion. No host dist reuse, new dependency or loader policy is authorized.
+
+Custody uses the preceding adoption-static GREEN root's `custody-final.json`
+effective 81-file test map, eight pending production owners, seven built
+artifacts, 27 stashes and 86,522 protected paths. Only the test owner and root's
+plan/evidence may change; preserve patch
+`6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`.
+Any additional diagnostic, unsupported mock invocation, lost query identity,
+changed oracle, runtime failure or production need stops the batch for
+diagnosis. No browser, parent integration or long workload is authorized by
+this repair. Other static debts and the four original retained runtime
+failures remain separately owned. Closure is due before parent static
+acceptance; the existing final parent Grok/Sol/Fable review covers the signed
+RED-to-GREEN history without a new bookkeeping/prose review round.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
