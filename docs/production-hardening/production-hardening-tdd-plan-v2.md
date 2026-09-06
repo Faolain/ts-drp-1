@@ -104598,6 +104598,77 @@ identity is retried. Protected paths, 27 stashes, eight pending production
 owners and seven built artifacts retain their existing custody until an
 explicitly frozen implementation owner is authorized to change a named file.
 
+**W0 current-profile fixture reconciliation freeze (2026-09-06).** This
+tests-only batch implements the accepted settlement-profile admission rules,
+not another production compatibility decision. Root owns acceptance; the
+separate Astra-high RED and GREEN owners must not exchange implementation
+roles. Existing signed W0/settlement decisions supply the design; the current
+Grok high, Sol high and Fable xhigh final review covers the complete frozen
+plan, historical causal failure, RED observation patch and GREEN evidence.
+No new profile, authority, threshold or production behavior is authorized.
+
+RED owns only `tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts` and
+`tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts`. Preserve the
+original saturation title, assertion, routing, writers, parameters and work.
+Add only typed observations derived from existing genuine evidence and a
+complete JSON assertion diagnostic. The consumed `retained-58` under
+`.logs/d110c-0c1f5b-green-71bca5d5/` supplies the original causal mismatch:
+reporter SHA `4926a150b2355c8f908c89085ed6fd89070c03faf66498c8cc32de9b0914fc2b`,
+command SHA `dfe6d69cc74a86b2d62eada4d1ab69144e667a39569285c2994bcf344e2737cc`.
+Do not rerun saturation simply to repeat that RED. Explicitly distinguish
+that historical execution from the new static-only observation patch; new
+observation values have not been measured. Run exact-owner type/lint/format,
+diff and semantic-equivalence checks, sign/push the RED patch and manifested
+evidence before GREEN. No missing export or manufactured product failure.
+
+GREEN keeps the legacy-profile capacity, causal-join, other-writer progress
+and successful close proof, but explicitly requires the attempted reserved
+fence to be absent from admission/application delivery and durable rows.
+Add a genuine settlement-profile companion proving the saturated writer's
+own fence consumes its share. The shared tests-only
+`tests/fixtures/phase-6a-v3/creator-adoption-contract.ts` may gain one optional
+`creatorTrustProfileId` selector forwarded to genuine preparation, deriving
+ACL version 3 only for the settlement profile. Omission keeps every existing
+default unchanged. This bounded shared-fixture seam replaces duplicating
+real-store/bootstrap/close orchestration; it is not a production API change.
+No other shared behavior or private authority construction is allowed.
+
+Use 22 authenticated writers, existing maxEpochVertices 8,192 and multiplier
+4. The share is 1,492. The new remote offender issues a real signed fence at
+sequence 0 and 1,491 ordinary adds at sequences 1..1,491; the next valid add
+is refused, another writer progresses, and the real creator closes. With
+the existing harness's bootstrap/initial/final creator operations and marker,
+the source-derived planned oracle is 1,496 journal/close rows and application
+state 1,496. Offender rows are exactly 1,492, with one fence and 1,491 adds.
+Verify this by independent work accumulation, not by copying observed totals.
+The legacy workload's planned oracle is 1,514 rows and application state
+1,652, causalJoin one and fence zero. These are acceptance expectations, not
+claims about the abbreviated historical reporter. If runtime contradicts
+them, stop and diagnose the complete result rather than adjusting literals.
+
+Compare exact persisted preimage bytes/digests against original admitted
+signed inputs and local issued rows, their total bytes against authenticated
+close-set leaf byte charges, exact closed application state, and close count.
+Rejected fence/overflow contribute no durable or application work. Distinguish
+journal rows from global graph occupancy including the anchor; do not read or
+invent private capacity counters. The existing Node settlement gates retain
+local real-plan CAS, malformed/stale-anchor and recovery controls; the remote
+companion does not counterfeit a local plan to obtain a fence.
+
+Before GREEN runtime, freeze actual selected titles/files and source/runtime
+identities. Run the whole W0 runtime file once (planned seven cases, including
+two saturation cases under the existing 120-second per-case budget), then
+the W0 capacity/static file and existing Node settlement/corrective retained
+files. Enumerate every shared-fixture consumer and run the bounded affected
+retained roster; do not silently omit a consumer or launch long campaigns.
+Repeat the affected focused/retained/static gates in fresh source-built
+isolation with independent installation and native preparation. Keep full
+reporters, stdout/stderr, statuses, complete failure sets and exact hash
+manifests. All expected cases must pass with no new exclusion. A production
+defect or additional authority seam requires diagnosis and explicit reslicing,
+not widening this tests-only batch. Preserve protected paths, stashes, eight
+pending production owners, seven built identities and all consumed evidence.
+
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
 contains ordinary `AheDurableStore`, but no backend-neutral reclamation resolver;
