@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (issuance-roster gate repaired; settlement-codec fixtures next):
+Current work (settlement-codec gate repaired; transport fixtures next):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18592,11 +18592,14 @@ Blocked, and on what:
   patch. This closes gate 10's 18 runtime failures. The issuance-roster
   correction at signed/pushed tests `d9781349` and isolated evidence `623c415e`
   then passes 10/10 in both its clean source-built checkout and the separate
-  GREEN run, closing gate 67's stale export expectation. Ten other observed
+  GREEN run, closing gate 67's stale export expectation. The settlement-codec
+  correction at signed/pushed tests `de961884` / isolated evidence `0240e9ea`
+  then passes 4/4 in both its clean source-built checkout and separate GREEN
+  run, closing gate 56's two incomplete-fixture failures. Eight other observed
   runtime failures and blocked supplement coverage remain open. The inherited
   certificate, room-test and grid-wrapper type diagnostics retain their named
   owners and deadlines; no blanket typecheck pass. The parent record owns
-  exact evidence and the next bounded settlement-codec fixture correction. Registry-freeze
+  exact evidence and the next bounded transport fixture correction. Registry-freeze
   repair remains outside authorized implementation scope; no production
   edit occurred in these retained fixture corrections.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
@@ -100849,9 +100852,12 @@ checkout and separate GREEN run against that same patch, closing gate 10's
 18 failures. Its earlier stopped carrier attempt stays immutable. The issuance-
 roster correction at signed/pushed tests `d9781349` / isolated evidence
 `623c415e` then passes 10/10 in the clean source-built checkout and separate
-GREEN run, closing gate 67's one observed failure. Ten other observed runtime
+GREEN run, closing gate 67's one observed failure. The settlement-codec
+correction at signed/pushed tests `de961884` / isolated evidence `0240e9ea`
+then passes 4/4 in the clean source-built checkout and separate GREEN run,
+closing gate 56's two incomplete-fixture failures. Eight other observed runtime
 failures, blocked supplement coverage and inherited static debts remain open;
-the settlement-codec fixture correction below is next.
+the transport fixture correction below is next.
 The partial eight-owner production patch is preserved, not committed or
 accepted. Other retained repair, browser/static/isolated and final review gates
 remain open.** The
@@ -102172,6 +102178,103 @@ unchanged parent patch, thereby exercising its history binding. Stop and seal
 any newly reached failure; no second edit or retry in the batch. No production,
 API, authority, threshold, registry-freeze, campaign or additional review scope
 is authorized. The existing final parent review covers this correction.
+
+**Retained settlement-codec acceptance (2026-09-05).** Signed/pushed tests
+`de961884d9d3204f2c67561e96434995c6f0fafe` change exactly the three frozen
+fixture spans, with every outside byte unchanged. Signed/pushed isolated
+evidence `0240e9eadce6c19d5ea870f25235043682e996d3` records one 4/4 pass,
+without skips or reporter errors, from the exact signed checkout
+`/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout`. Its own
+frozen offline install and complete source build precede collection/runtime;
+no parent patch, copied dist or shared main dependencies. Lint, formatting,
+source/evidence diff checks and bounded target TypeScript pass, with zero
+target or external diagnostics. This is not a package-wide typecheck claim.
+The isolated root
+`.logs/d110c-0c1f5b-retained-settlement-codec-de961884/` has 74 self-excluding
+manifest entries, SHA-256
+`ec67479759fef1f394da6b877527b403091df24eff3b7a00af1c2c35a2b8bca7`.
+
+The separate Astra-high GREEN owner runs the same unfiltered four cases once
+against the unchanged parent patch, exercising its cut/checkpoint history
+binding: 4/4 pass, status 0, no skips or reporter errors. No source edit, build
+or other runtime gate. The root
+`.logs/d110c-0c1f5b-green-settlement-codec-0240e9ea/` has 16 self-excluding
+manifest entries, SHA-256
+`18290425c9384b9acb2f8021efa314662f0e5b651f6f7a5880d96f039bdd202b`.
+The raw isolated and GREEN reporters respectively hash to
+`34a3d93dcb3dc10d3d49200adf9b320bc1d34f8a537c70164a1073111df901ba`
+and `7b143ca12038d3d7804de54984be817a96759b48784e971e56cad73b422d5f11`.
+Root independently verifies complete inventories/hashes, all original
+file-bound titles and raw outcomes, source/runtime identity and custody.
+Eight production owners and their patch, seven built owners, unrelated
+retained tests, 27 stashes and 86,522 protected paths remain unchanged.
+The original two-pass/two-failure gate-56 evidence remains immutable. This
+closes only those two fixture failures, not a production rollover or final
+snapshot ACL acceptance gate. Eight other observed runtime failures, blocked
+supplement coverage, assigned static debt and parent browser/isolated/final
+review gates remain open. No new aggregate full-suite result is inferred.
+
+**Prospective retained transport fixture correction (2026-09-05).** Gate 70
+has 24 original cases, 21 passes and three failures. Root's read-only audit
+confirms that its positive publication fixtures use three-field preimages,
+two-byte signatures and a store whose `readIssued` returns null. The current
+publication path authenticates the exact issued row before classifying and
+publishing it; that owner was introduced at signed `efe7cee7` and is unchanged
+by the parent patch. The FIFO assertion therefore never reaches its intended
+blocked publication. This is fixture restoration, not authority to bypass
+issued-row matching, signature verification, publication ordering or races.
+The third failure is a whole-file extractor count of one: signed `420fd240`
+and `5bf872b6` added the pinned-genesis and covered-history recovery owners.
+Source AST inspection finds exactly one call in each of those two owners and
+`extractAuthorizedV3Vertex`; all three bodies are unchanged by the parent.
+
+Owner: the retained Phase-3 transport fixture; deadline: before parent f5b
+retained acceptance. The next separate tests-only correction is confined to
+`tests/phase-3a1b-p3-live-transport-red.test.ts`: the two existing helpers
+`fakeIssuanceStore` and `outboxRecord`, and the three already-failing case
+bodies named by the immutable gate-70 reporter. No other bytes may change.
+
+- Let `outboxRecord` optionally consume the existing `SignedScopeCarrier`
+  type, copying its complete canonical preimage, digest and genuine signature.
+  Supply genuine fixture-signed carriers for the four positive rows with
+  sequences 1, 2, 3 and 4. Keep their existing scopes, publish states and
+  sequence expectations. Bind them to the fixture's active anchor/epoch and
+  valid dependencies; the published sequence-1 row must match the existing
+  admitted sequence-1 ingress carrier, not introduce a conflicting identity.
+  Preserve the existing malformed/default carrier for the foreign-scope
+  negative control. Do not change the shared live fixture or fabricate a
+  production-issued history claim from this controlled store.
+- Let `fakeIssuanceStore` optionally receive a fixed readonly issued-row
+  roster. Its `readIssued` resolves only an exact object/author/sequence match
+  in that roster, otherwise null; explicit overrides keep their existing
+  precedence and unrelated callers keep the null default. Wire the positive
+  activation/publication and FIFO/race cases to their independently fixed
+  rows. Never infer an issued row from whatever the mutable outbox page returns.
+  Preserve all existing runtime assertions, rejection codes, FIFO trace,
+  deferred scheduling, page/mark counts, publication bytes and deactivation
+  outcomes, including inconsistent-row and foreign-scope refusal.
+- Replace the stale whole-file extractor assertion with exact source ownership:
+  `extractAuthorizedV3Vertex`, `authenticatedPinnedGenesisOutboxRow` and
+  `authenticatedCoveredHistoricalOutboxRow` each own one call, and no other
+  owner calls the extractor. Keep the ingress helper's exact seven input keys
+  and constrain that assertion to its body. Preserve the remaining envelope,
+  routing and identity-source predicates; do not merely increase a loose count.
+
+Freeze the complete original 24 file-bound titles before execution; all titles,
+timeouts and unrelated cases stay unchanged. Preserve the 21-pass/three-failure
+baseline without rerunning it. Sign/push tests separately, then independently
+install and source-build a fresh exact signed checkout without the parent
+patch. One unfiltered 24-case run must pass without skips/errors, with exact
+helper/case ownership and unchanged runtime assertions, source/runtime custody,
+lint/format/diff, bounded type diagnostics with exact inherited attribution if
+needed, raw reporter/streams/statuses and a self-excluding manifest. Stop/seal
+any newly reached failure; no additional edit or retry within the batch.
+After root accepts signed/pushed isolated evidence, the separate GREEN owner
+runs the same file once against the unchanged parent patch. No production,
+API, dependency, threshold, campaign, registry-governance or W0 profile change
+is authorized. Existing final parent review covers this correction; no extra
+model/prose round. W0's legacy-fence/settlement-only compatibility mismatch and
+the registry freeze retain their separate owners and explicit scope boundaries.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

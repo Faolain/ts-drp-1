@@ -1,0 +1,46 @@
+{
+  "frozenAt": "2026-09-06T01:14:19.802Z",
+  "base": "de961884d9d3204f2c67561e96434995c6f0fafe",
+  "files": [
+    "tests/d110c-0c1f5b0a-corrective-red.test.ts"
+  ],
+  "selected": 4,
+  "expectedPassed": 4,
+  "expectedFailed": 0,
+  "intentionallyFiltered": 0,
+  "executionCount": 1,
+  "classification": "PARENT_GREEN_RETAINED_SETTLEMENT_CODEC_CORRECTION_ONLY",
+  "fileHashes": {
+    "tests/d110c-0c1f5b0a-corrective-red.test.ts": "dedb2315efa4d4a9886c6582518cad7bf517fe2a7028f096f89da7ee38ec43a4",
+    "tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts": "2ddc3e89762c81ffb25dd7b9cb4d36133495d7f8bd08f0399cc62bcd56e38ebf"
+  },
+  "entries": [
+    {
+      "file": "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0a final-review corrective RED > installs and reopens genuine settlement-profile trust without rewriting its profile, then settles with successor floor trust",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0a final-review corrective RED > normalizes exactly one settlement checkpoint and no legacy carriers while retaining legacy cardinalities",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0a final-review corrective RED > uses the settlement author-authorization ceiling for 256 authors while preserving legacy byte and author caps",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0a final-review corrective RED > binds genesis advance to the exported settlement sentinel and retains settled-v1 digest adjacency",
+      "expectedStatus": "passed",
+      "token": null
+    }
+  ],
+  "head": "0240e9eadce6c19d5ea870f25235043682e996d3",
+  "priorTitleMultisetMatches": true,
+  "collectionRepeated": false
+}
