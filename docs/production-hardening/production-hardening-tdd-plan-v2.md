@@ -103778,9 +103778,11 @@ Preserve all existing assertions, sequencing/concurrency, 64 writers, three
 transitions, four contributing epochs, real storage/recovery and the 70-second
 test watchdog. Exact-owner lint/format/diff/type checks and a reversible
 source/semantic audit precede execution. Sign/push the diagnostic test change
-separately. Freeze one exact wide-case title selection with all other collected
-cases explicitly filtered; do not silently include the imported room-runtime
-suite. Run once in a fresh process, with no later selected case sharing its
+separately. Freeze only the integration test file and exact wide-case full
+title: one active plus 23 filtered cases. The independent RED readback found
+the earlier launcher explicitly named the room-runtime file separately; it
+was not imported by this fixture. Do not include its 21 cases in this run.
+Run once in a fresh process, with no later selected case sharing its
 worker, complete JSON/stdout/stderr/exit status and incremental observations.
 Do not run the full 45-case suite, isolated acceptance, profiling campaign,
 second diagnostic attempt or larger test deadline under this authority. A
