@@ -18503,6 +18503,10 @@ needed after that stop. The parent record owns full evidence and custody.
 This closes three original runtime failures, leaving five from the original
 retained inventory. Thirteen baseline-identical transport type diagnostics
 remain open; no blanket typecheck or parent GREEN acceptance is claimed.
+Next is the parent record's bounded authority-read-order correction: preserve
+the original room guard test, add one profile-aware RED probe, then restore
+early refusal without blocking settlement creator cold reopen. No production
+ordering change precedes the separate signed/accepted additive RED.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -102554,6 +102558,83 @@ boundaries, blocked supplement coverage, other static debts, parent browser/
 isolated gates and final Grok/Sol/Fable review remain open. No new full-suite
 aggregate, parent production acceptance, review verdict or long-run claim is
 manufactured, and the eight-owner production patch remains uncommitted.
+
+**Prospective retained room authority-read-order correction (2026-09-05).**
+Gate 22's original 12-test result has eleven passes and one failure. The
+existing zero-authority-read assertion is a product contract, not a stale
+fixture expectation. Source audit at signed `f4efa4c0` plus the preserved
+eight-owner parent patch shows bootstrap encoding reads
+`input.application.bootstrapOperation` before the unsupported-composition
+guard; signed `9e1781e0` introduced that order. The parent legitimately allows
+settlement-profile creator signer plus successor declaration, but its legacy
+refusal currently occurs only after application/database reads and profile
+decoding. Restoring a blanket signer/declaration refusal would break f5b's
+genuine creator restart and subsequent close. Moving all invite parsing before
+application validation would also change the retained non-pair controls.
+
+Owner: existing room lifecycle owner, inside parent f5b; deadline: parent
+retained closure. This repairs the already-owned guard contract and preserves
+the accepted f5b profile boundary; it selects no new API or authority and does
+not restart the waived f5b0r design review. The existing final parent
+Grok/Sol/Fable review must inspect the additive RED and narrow ordering GREEN,
+particularly the legitimate settlement exception and unchanged later
+authentication. No separate bookkeeping/model-review slice is created.
+
+The existing Astra-high RED owner may change only imports and append a helper
+and one test in `tests/phase-6a-creator-successor-product-red.test.ts`. Preserve
+all twelve original titles, bodies, assertions and timeouts byte-identically,
+including the original incomplete-input guard control. Construct small genuine
+genesis invite material through the existing product builder, with complete
+canonical single-writer ACL/profile/signer/parameter carriers and real Ed25519
+genesis signing for both `creator-trusted-v1` and
+`creator-trusted-settlement-v1`. No room/epoch/adoption state is fabricated and
+no real close, browser, network or long workload is needed for input ordering.
+Each probe calls the real room constructor with the existing throwing getters
+for application, database, transport and registered signer, plus a successor
+declaration shape deliberately not reached before the getter/refusal boundary.
+
+Freeze eight new observations: factory-plus-declaration and rebase-plus-
+declaration are unsupported under both profiles (four); legacy signer-plus-
+declaration is unsupported (one); settlement signer-plus-declaration and each
+profile's declaration-only input reach the application getter (three). Every
+unsupported row requires exact `v3 room successor authority composition is
+unsupported` and zero of all four authority reads. Each permitted row requires
+the existing `D.108e2b application authority was read` detail, one application
+read and zero other reads. Reaching that getter proves only composition
+classification, not trusted signer acceptance or activation; the genuine f5b
+integration remains the latter's owner. Capture all eight actual rows as one
+bounded test-only JSON observation in retained stdout before assertions, so
+RED attribution does not depend on an abbreviated aggregate diff.
+
+Sign/push tests before execution. In a new exact signed, independently
+installed/source-built checkout without the parent patch, verify complete
+13-title selection, source identity, fixture signatures, static/source-shape
+and unchanged twelve-body custody before one unfiltered focused execution.
+Reuse the established locked native-preparation method if needed; missing
+imports or native artifacts are not causal RED. Expected RED is exactly
+eleven passes and two failures: the original guard assertion and the new
+profile-aware probe. All eight new actual observations must show only the
+application getter read once, which contradicts exactly the five forbidden
+rows and preserves the three permitted controls. Any different cause stops
+and is diagnosed; do not fold more changes into this batch. Record complete
+results/statuses/commands and a self-excluding manifest under the existing
+parent evidence naming convention; no repeated baseline or wide workload.
+
+Only after root accepts that separately signed/pushed RED may the separate
+GREEN owner change the existing room constructor's early input preparation.
+Reject the universally unsupported combinations before application access.
+For signer/declaration pairs only, capture and classify the existing invite
+material before authority access, retaining the original absent-invite
+unsupported refusal, rejecting non-settlement profiles, and reusing the
+captured bytes/material in the normal path. Do not create parallel profile or
+trust validation; do not treat a profile string as authentication. Preserve
+existing codec limits, later genesis/floor/signer validation and non-pair
+validation order. The narrowly amended room owner remains inside the pending
+parent GREEN patch, whose separate production commit/acceptance is still gated.
+The focused GREEN must pass all thirteen cases and preserve all other parent
+owners. Existing affected static/retained/browser/isolated and final-review
+obligations remain required; an actual new authority/API/schema/dependency or
+threshold need stops and reslices, never widens this guard repair silently.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
