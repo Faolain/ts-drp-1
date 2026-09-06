@@ -1,3 +1,5 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -20,7 +22,12 @@ import {
 	d108e5SourceOwnership,
 	isD108d2Authority,
 } from "./fixtures/phase-6a-v3/creator-successor-product-contract.js";
-import { createV3RoomSession } from "../examples/v3-room/src/index.js";
+import { createV3ChatApplication } from "../examples/v3-chat/src/index.js";
+import {
+	createV3RoomCreatorInviteMaterial,
+	createV3RoomSession,
+	type V3RoomCreatorInviteMaterial,
+} from "../examples/v3-room/src/index.js";
 
 function replaceExactlyOnce(source: string, before: string, after: string): string {
 	const index = source.indexOf(before);
@@ -352,4 +359,143 @@ describe("D.108e5 bounded redirected lifetime RED", () => {
 		);
 		expect(d108e5SourceOwnership(deadMetadataOwners).migrationInviteBoundOwnsEveryEncode).toBe(false);
 	});
+});
+
+async function roomAuthorityReadOrderFixtures(): Promise<
+	readonly Readonly<{
+		profileId: "creator-trusted-v1" | "creator-trusted-settlement-v1";
+		invite: V3RoomCreatorInviteMaterial;
+	}>[]
+> {
+	const seed = new Uint8Array(32).fill(153);
+	const publicKey = ed25519.getPublicKey(seed);
+	const author = Buffer.from(publicKey).toString("hex");
+	const objectId = "creator:0000000000000000000000000000d108";
+	const blueprintDigest = createV3ChatApplication("guard").catalog.blueprintDigests[0];
+	if (blueprintDigest === undefined) throw new TypeError("F5B_ROOM_GUARD_FIXTURE_BLUEPRINT");
+	const signers = Object.freeze([Object.freeze({ publicKey: author, signerId: "creator" })]);
+	const fixtures = [];
+	for (const profileId of ["creator-trusted-v1", "creator-trusted-settlement-v1"] as const) {
+		const invite = await createV3RoomCreatorInviteMaterial({
+			blueprintDigest,
+			exactCanonicalApplicationStateBytes: encodeCanonical([]),
+			exactCanonicalLatchedAclBytes: encodeCanonical({
+				epoch: 0,
+				kind: "drp-v3-latched-acl",
+				members: Object.freeze([
+					Object.freeze({
+						author,
+						finalityKey: author,
+						groups: Object.freeze(["admin", "finality", "writer"]),
+					}),
+				]),
+				objectId,
+				permissionless: false,
+				version: profileId === "creator-trusted-v1" ? 1 : 3,
+			}),
+			exactCanonicalParametersCarrierBytes: encodeCanonical({
+				maxDependencies: 16,
+				maxEpochBytes: 8_388_608,
+				maxEpochVertices: 8192,
+				maxPendingBytes: 16_777_216,
+				maxPendingEntries: 4096,
+				maxSnapshotBytes: 268_435_456,
+				snapshotChunkBytes: 131_072,
+			}),
+			exactCanonicalProfileBytes: encodeCanonical({
+				cryptoSuiteId: "ed25519-sha256-v3",
+				profileId,
+				quorum: 1,
+				signers,
+			}),
+			exactCanonicalSignerSetBytes: encodeCanonical(signers),
+			objectId,
+			signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, seed)),
+		});
+		const anchorDigest = hashDomain("ts-drp/epoch-anchor/v3", invite.exactCanonicalGenesisAnchorPreimageBytes);
+		const anchor = decodeCanonical(invite.exactCanonicalGenesisAnchorPreimageBytes) as Record<string, unknown>;
+		if (
+			Buffer.from(anchorDigest).toString("hex") !== invite.pinnedGenesisAnchorDigest ||
+			!ed25519.verify(invite.detachedGenesisSignature, anchorDigest, publicKey) ||
+			anchor.objectId !== objectId ||
+			anchor.epoch !== 0
+		) {
+			throw new TypeError("F5B_ROOM_GUARD_FIXTURE_GENESIS");
+		}
+		for (const [key, domain, bytes] of [
+			["aclDigest", "ts-drp/latched-acl/v3", invite.exactCanonicalLatchedAclBytes],
+			["parametersDigest", "ts-drp/parameters/v3", invite.exactCanonicalParametersCarrierBytes],
+			["profileDigest", "ts-drp/profile/v3", invite.exactCanonicalProfileBytes],
+			["signerSetDigest", "ts-drp/signer-set/v3", invite.exactCanonicalSignerSetBytes],
+		] as const) {
+			if (
+				!Buffer.from(encodeCanonical(decodeCanonical(bytes))).equals(Buffer.from(bytes)) ||
+				anchor[key] !== Buffer.from(hashDomain(domain, bytes)).toString("hex")
+			) {
+				throw new TypeError("F5B_ROOM_GUARD_FIXTURE_CARRIER");
+			}
+		}
+		fixtures.push(Object.freeze({ profileId, invite }));
+	}
+	return Object.freeze(fixtures);
+}
+
+it("classifies complete legacy and settlement successor compositions before reading room authorities", async () => {
+	const fixtures = await roomAuthorityReadOrderFixtures();
+	const observations = [];
+	const expected = [];
+	for (const { profileId, invite } of fixtures) {
+		for (const composition of ["factory", "rebase", "signer", "declaration-only"] as const) {
+			const reads = { application: 0, signer: 0, store: 0, transport: 0 };
+			// The declaration is deliberately never consumed at this ordering boundary.
+			// Reaching application proves classification only, not signer trust or activation.
+			const input = {
+				creatorInvite: invite,
+				successorSnapshotDeclaration: Object.freeze({}),
+				...(composition === "factory"
+					? { createOperationAdmissionPolicy: (): Readonly<Record<string, never>> => Object.freeze({}) }
+					: {}),
+				...(composition === "rebase" ? { rebaseSourceInvite: invite } : {}),
+				...(composition === "signer"
+					? { creatorFinalitySigner: Object.freeze({ sign: () => Promise.resolve(new Uint8Array(64)) }) }
+					: {}),
+				get application(): never {
+					reads.application += 1;
+					throw new TypeError("D.108e2b application authority was read");
+				},
+				get databaseName(): never {
+					reads.store += 1;
+					throw new TypeError("D.108e2b store authority was read");
+				},
+				get openTransport(): never {
+					reads.transport += 1;
+					throw new TypeError("D.108e2b transport authority was read");
+				},
+				get signRegisteredVertexDigest(): never {
+					reads.signer += 1;
+					throw new TypeError("D.108e2b signer authority was read");
+				},
+			};
+			let detail = "fulfilled";
+			try {
+				await createV3RoomSession(input as never);
+			} catch (error) {
+				detail = error instanceof Error ? error.message : String(error);
+			}
+			observations.push(Object.freeze({ profileId, composition, detail, reads: Object.freeze({ ...reads }) }));
+			const permitted =
+				composition === "declaration-only" ||
+				(composition === "signer" && profileId === "creator-trusted-settlement-v1");
+			expected.push({
+				profileId,
+				composition,
+				detail: permitted
+					? "D.108e2b application authority was read"
+					: "v3 room successor authority composition is unsupported",
+				reads: { application: permitted ? 1 : 0, signer: 0, store: 0, transport: 0 },
+			});
+		}
+	}
+	console.log(JSON.stringify({ kind: "F5B_ROOM_GUARD_OBSERVATIONS", observations }));
+	expect(observations, "F5B_ROOM_GUARD_PROFILE_AUTHORITY_READ_ORDER").toEqual(expected);
 });
