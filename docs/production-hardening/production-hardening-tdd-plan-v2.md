@@ -18596,6 +18596,10 @@ isolated and final parent acceptance remain open with the known other debt.
 snapshot-fixture contract batch and keeps registry, W0 compatibility and grid
 authority decisions separate; the 90-second authorization does not silently
 authorize those changes.
+The user has now authorized the three-error tests-only snapshot-fixture
+repair and continued execution. **Authorized snapshot-fixture contract batch**
+below supersedes that pending authorization, retaining separate RED/GREEN
+ownership and the existing review gates without reopening completed work.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -104274,6 +104278,81 @@ After this and the separately bounded governance/compatibility/authority
 obligations are resolved, run the existing complete combined and isolated
 acceptance gates. The focused 64-writer pass remains accepted at its actual
 scope; no new long workload is authorized by this inventory readback.
+
+**Authorized snapshot-fixture contract batch (2026-09-06).** The user's
+“you are authorized do not stop” releases the proposed three-error fixture
+repair through its RED/GREEN, static, retained, isolated and review gates.
+This is one bounded batch within parent f5b, not a new architecture or
+review-only slice. Root owns plan/evidence custody and final disposition;
+the existing Astra-high RED and distinct Astra-high GREEN owners implement
+their respective phases. No production, registry, W0 compatibility, grid
+authority, API, threshold, workload or dependency change is authorized.
+
+RED adds only
+`tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts`. Use the
+existing public `createRecoveryInput` with genuine epoch-0 fixture material;
+it already exposes both stores, so no new export or private seam is needed.
+Capture an attempted `installEpochAnchor` call through a guarded observation:
+absence produces an explicit `missing-required-rejection` observation, never
+an undefined-function exception, fallback install, missing import or loader
+failure. The intended final assertion token is
+`F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION`, expecting
+an asynchronous rejection with exactly
+`Error("unexpected installEpochAnchor in live snapshot fixture")`.
+The fixture explicitly does not implement successor installation, even if
+given valid genesis-shaped input; do not forge authenticated epoch-1 state.
+Before that final RED assertion, verify input bytes, journal state and
+issuance lineage/issued row/outbox/plan remain unchanged, and first/second
+genesis installations remain non-idempotent/idempotent respectively.
+Preserve genuine epoch-0 recovery as a control. Select this one test/file
+once for RED, expecting exactly one assertion failure at that token and no
+unexpected or skipped cases; preserve complete raw output and status.
+The already sealed three-diagnostic compiler evidence supplies the inherited
+static RED, without manufacturing missing-export failures. Sign/push RED
+and validated evidence before GREEN edits.
+
+GREEN changes only `tests/fixtures/phase-4b-v3/live-snapshot.ts`: add the
+unused epoch-install method as an asynchronous explicit rejection without
+mutating state, annotate the existing settlement-write input using its
+published contract, and construct a non-null local `SettlementPlan` before
+assigning and returning it. Preserve CAS, scope checks, revision arithmetic,
+entry copies, existing transaction effects, signatures and runtime recovery
+behavior. No blanket cast, nullable-return suppression, fake successor
+success, new dictionary or new authority is permitted. The new RED test
+and all original assertions remain unchanged in GREEN.
+
+Run exact-owner lint/format/diff, source-shape/equivalence checks and the
+existing selected strict program plus the new focused test: all three
+inherited diagnostics must disappear with zero new diagnostics. Freeze
+exact commands, selected-file/title rosters and source/runtime identities
+before execution. Run the focused test once, then the seven direct recovery
+consumers: `e5-01-v3-operation-admission-red`,
+`phase-4a-v3-live-blueprint-fold`, `phase-4b-v3-live-snapshot-composition-red`,
+`phase-4c-snapshot-pull-red`, `phase-4c-v3-snapshot-transfer-composition-red`,
+`protocol-v3-latched-acl-referee-successor-red` and
+`phase-6b-d110c-0c1f4-bootstrap-policy` (all under `tests/`, with `.test.ts`).
+Inspect the complete result set; stop to diagnose any unexpected failure
+without folding in other repairs. Validate the same narrow fixture change
+in the existing fresh-source isolated workflow with fixed install/build
+identities; no host artifacts substitute for isolated runtime dependencies.
+The five importers using only `fakeNetwork`, including the 64-writer parent,
+are protected by exact unchanged function/body and module-side-effect checks;
+this batch does not rerun the consumed wide test or claim a new full-parent
+aggregate. No campaign or long workload is released.
+
+Evidence uses fresh write-once roots
+`.logs/d110c-0c1f5b-snapshot-fixture-red-<freeze-sha>/`,
+`.logs/d110c-0c1f5b-snapshot-fixture-green-<red-sha>/` and
+`.logs/d110c-0c1f5b-snapshot-fixture-review-<green-sha>/`, with complete
+commands, results, hashes and self-excluding manifests. Preserve the eight
+pending production owners, seven built artifacts, stashes, protected paths,
+all prior evidence and signed/pushed workflow. Use the existing Grok high,
+Sol high and Fable xhigh implementation review over the signed RED/GREEN
+and evidence; Fable uses `claude-phel`, not an additional diagnostic agent.
+No Kimi/Opus substitution or prose-review round is introduced. Only P0/P1
+block closure; every P2 needs owner/disposition. This batch closes only the
+three fixture-contract errors when all its gates pass; the other recorded
+parent acceptance boundaries remain intact.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
