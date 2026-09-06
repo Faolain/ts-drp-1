@@ -18520,10 +18520,13 @@ signed one-file GREEN `c5b5f36a`, corrected strict compilers and 24/24 in both
 main and fresh source-built isolation. The initial lint-syntax and launcher
 diagnostics remain preserved; none required a product change. The parent
 record's **Consolidated remaining fixture/type acceptance batch** is next:
-the seven known compatible fixture errors are one batch, not seven new slices.
-Its two source owners and four retained consumers remain separate from the
+its sole combined compiler found the seven known fixture errors, the separate
+grid error, and two additional fixture diagnostics. The original eight-row
+matrix failed and is preserved; the complete-set audit below folds only the
+hex-key verification argument and detached-clone typing corrections into this
+same batch. Its four source owners and four retained consumers remain separate from the
 grid `roomHeadAuthority` composition diagnostic and four recorded runtime
-failures. Those counts describe the audited existing inventory, not a newly
+failures. Those runtime counts describe the audited existing inventory, not a newly
 executed whole-parent pass. No blanket typecheck or parent GREEN acceptance is
 claimed; registry-freeze repair still requires its explicit prospective
 governance decision. After the batch, run the existing combined acceptance
@@ -103292,6 +103295,52 @@ more edits; do not default to a new checkpoint per diagnostic. The intended
 exit is final f5b acceptance, then the already-reconciled D.110c-c gaps and
 reviewed D.110c-d execution freeze, not expanding fixture certification.
 No completed milestone is reopened and no long workload is authorized here.
+
+**Complete-set RED disposition and same-batch amendment (2026-09-06).**
+The sole combined strict compiler captured ten diagnostics: all seven known
+fixture rows and the separate grid row, plus genesis TS2345 at line 124 and
+pacemaker TS2542 at line 377. Compiler exit 1 and original matrix-validator
+exit 1 remain honest stopped evidence; missing known rows are zero. Evidence
+is `.logs/d110c-0c1f5b-red-fixture-exit-5aa22117/`, with 52 self-excluding
+manifest entries and manifest SHA-256
+`d76cc65d165eda9f115e724e25a6ea490d5d4c4bf1f6a9d91e81722076300c99`.
+Its complete messages, 1,309 actual source files, 1,771 reads, 3,083 module
+resolutions, 37 type references, six source snapshots and historical 49-case
+roster are retained. No source edit, runtime execution or compiler rerun
+occurred. The corrected read-only syntax and physical dependency-resolution
+diagnostics are disclosed in `assessment.md`, not classified as code failures.
+
+Root inspected the entire matrix and both added causes before amending scope.
+The nine fixture diagnostics share test representation/type-contract drift;
+the grid diagnostic remains a distinct production authority-composition issue.
+This paragraph prospectively supersedes only the three-type-edit/two-owner
+restriction above. In the same batch, the separate GREEN owner may also:
+
+- In `tests/genesis-profile.test.ts`, decode the existing canonical hex
+  `row.publicKey` to `Uint8Array.from(Buffer.from(row.publicKey, "hex"))`
+  at the one existing `ed25519.verify` argument. The installed noble 2.2.0
+  declaration and runtime require bytes, so a cast would conceal the defect.
+  Preserve the same key, signature, message, `zip215: false`, certificate bytes
+  and true-verification assertion. This is an explicit test-runtime correction,
+  not a type-only claim, dependency change or authentication-policy change.
+- In `tests/phase-5d-pacemaker-red.test.ts`, give only the detached
+  `structuredClone(trace)` a mutable `states` array type with the existing
+  complete element type. Preserve the exact terminal replacement,
+  `durableRevision: -1`, `TRACE_STATE_MISMATCH`, clone isolation and all trace
+  hashes. Do not relax the shared `ItfTrace` type or change the parser.
+
+The three original type spans remain unchanged in scope. GREEN must show
+identical emitted JavaScript outside the single genesis key-decoding argument;
+all assertion predicates, titles, frozen values and negative outcomes remain.
+The current ten-row capture supplies causal RED for this amended batch; do not
+rerun it or rewrite its failed eight-row validator as a pass. After signing
+and pushing this evidence/amendment, execute one corrected combined compiler
+and the existing four-file retained gate, inspecting their complete results.
+Expected static disposition is nine fixture rows removed and the same one grid
+error retained, with compiler failure reported explicitly. Additional failures
+stop edits for complete-set/shared-cause diagnosis, not new per-diagnostic
+slices. The existing static, retained, isolated and final parent review gates
+still apply; no extra review round, production edit or long run is introduced.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

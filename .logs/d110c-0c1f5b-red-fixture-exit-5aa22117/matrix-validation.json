@@ -1,0 +1,202 @@
+{
+  "classification": "STOP_ADDITIONAL_OR_CHANGED_DIAGNOSTICS",
+  "matrixValid": false,
+  "compilerTerminalExit": 1,
+  "matrixValidatorExit": 1,
+  "typecheckPassed": false,
+  "programExecutions": 1,
+  "diagnosticCount": 10,
+  "knownFixtureCount": 7,
+  "knownGridCount": 1,
+  "additionalCount": 2,
+  "missingCount": 0,
+  "knownMatches": [
+    {
+      "expected": {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 300,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      "actualIndex": 5
+    },
+    {
+      "expected": {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 355,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      "actualIndex": 6
+    },
+    {
+      "expected": {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 488,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      "actualIndex": 7
+    },
+    {
+      "expected": {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 532,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      "actualIndex": 8
+    },
+    {
+      "expected": {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1199,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      "actualIndex": 2
+    },
+    {
+      "expected": {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1199,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      "actualIndex": 3
+    },
+    {
+      "expected": {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1258,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      "actualIndex": 4
+    },
+    {
+      "expected": {
+        "file": "examples/grid/src/v3-zone.ts",
+        "code": 2345,
+        "line": 638,
+        "message": "Argument of type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' is not assignable to parameter of type 'CreateV3RoomSessionInput<ZoneProjection>'.\n  Property 'roomHeadAuthority' is missing in type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' but required in type 'CreateV3RoomSessionInput<ZoneProjection>'."
+      },
+      "actualIndex": 0
+    }
+  ],
+  "additionalDiagnostics": [
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "code": 2345,
+      "line": 124,
+      "character": 96,
+      "start": 4444,
+      "length": 13,
+      "message": "Argument of type 'string' is not assignable to parameter of type 'TArg<Uint8Array<ArrayBufferLike>>'.",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 105
+      },
+      "sourceLine": "\t\t\t\t\ted25519.verify(row.signature, Uint8Array.from(Buffer.from(material.anchorDigest, \"hex\")), row.publicKey, {",
+      "token": "row.publicKey"
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "code": 2542,
+      "line": 377,
+      "character": 4,
+      "start": 14366,
+      "length": 39,
+      "message": "Index signature in type 'readonly ItfTraceState[]' only permits reading.",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 365
+      },
+      "sourceLine": "\t\t\tmutant.states[mutant.states.length - 1] = {",
+      "token": "mutant.states[mutant.states.length - 1]"
+    }
+  ],
+  "missingKnownDiagnostics": [],
+  "groups": {
+    "examples/grid/src/v3-zone.ts TS2345": 1,
+    "tests/genesis-profile.test.ts TS2345": 1,
+    "tests/phase-3g-v3-room-rebase-red.test.ts TS2345": 3,
+    "tests/phase-5a-c-seal-safety-red.test.ts TS2345": 4,
+    "tests/phase-5d-pacemaker-red.test.ts TS2542": 1
+  },
+  "priorEvidence": [
+    {
+      "file": ".logs/d110c-0c1f5b-retained-finality-867d7f09/typecheck.json",
+      "sha256": "0bdb3e325abac947576a05e6d0902448b4483e916c62d6efdff7c4c9026ed834",
+      "value": {
+        "targetDiagnostics": [
+          {
+            "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+            "code": 2345,
+            "line": 300,
+            "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+          },
+          {
+            "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+            "code": 2345,
+            "line": 355,
+            "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+          },
+          {
+            "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+            "code": 2345,
+            "line": 488,
+            "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+          },
+          {
+            "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+            "code": 2345,
+            "line": 532,
+            "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+          }
+        ],
+        "externalDiagnostics": []
+      }
+    },
+    {
+      "file": ".logs/d110c-0c1f5b-retained-room-mocks-e384a40c/typecheck.json",
+      "sha256": "fa2bfd843d4e2c2c3d762218293496a0f0a3ea53a3a33babb19bd5b68f321f34",
+      "value": {
+        "targetDiagnostics": [
+          {
+            "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+            "code": 2345,
+            "line": 1199,
+            "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+          },
+          {
+            "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+            "code": 2345,
+            "line": 1199,
+            "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+          },
+          {
+            "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+            "code": 2345,
+            "line": 1258,
+            "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+          }
+        ],
+        "externalDiagnostics": [
+          {
+            "file": "examples/grid/src/v3-zone.ts",
+            "code": 2345,
+            "line": 638,
+            "message": "Argument of type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' is not assignable to parameter of type 'CreateV3RoomSessionInput<ZoneProjection>'.\n  Property 'roomHeadAuthority' is missing in type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' but required in type 'CreateV3RoomSessionInput<ZoneProjection>'."
+          }
+        ]
+      }
+    }
+  ],
+  "comparison": "Exact file/code/line/full-message multiset against all recorded fields; new full positions/owners/tokens captured in diagnostics.json",
+  "sourceInputs": 1309,
+  "readInputs": 1771,
+  "resolvedModules": 3083,
+  "resolvedTypeReferences": 37,
+  "runtimeExecutions": 0
+}
