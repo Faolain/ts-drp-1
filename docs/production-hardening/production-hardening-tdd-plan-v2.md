@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (bounded room-fixture correction next; parent retained debt stays open):
+Current work (room-carrier attempt stopped; mock-target correction next):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -101895,6 +101895,84 @@ gates; this fixture correction adds no model/prose review round. Other retained
 debts, registry-governance authorization, static/browser/isolated parent gates
 and the long-horizon golden paths remain open. No campaign, new API,
 authority, dependency, workload or threshold change is authorized here.
+
+**Retained room-carrier stop and mock-target continuation (2026-09-05).**
+Tests `f932fc87cab77e22b2d3994b8af288e9e491547a` and stopped evidence
+`36784ba9f3c7a19a323e4f73b575d32cc8e423f9` are signed (`G`) and pushed.
+Exactly the three frozen spans changed; root independently verified every
+outside byte unchanged. The one fresh source-built checkout at
+`/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout` independently installed
+frozen dependencies offline and built the signed tests tree without the
+pending patch, copied dist or shared main node_modules. Full source build,
+focused lint/format/diff and exact 20-title collection pass.
+
+The sole runtime does **not** meet the frozen 20-pass acceptance: one exact
+file, 20 outcomes, two passes, 18 failures and no skips or top-level errors.
+Sixteen failures contain the complete `trust-open-failed` token. The two
+unchanged issuance/readiness expected-error assertions instead report a
+truncated `v3 room preparation failed: trust-ope…` received value. They are
+not evidence of two independently captured complete tokens. Vitest status is
+1; the one-shot validator returns 2 with `UNEXPECTED_MATRIX_STOP_NO_RERUN`.
+No runtime retry, main-workspace GREEN, test/mock edit after the run or
+production change occurred. The earlier malformed-carrier evidence remains
+immutable: identical aggregate counts here have a different reached cause.
+
+Evidence is `.logs/d110c-0c1f5b-retained-room-f932fc87/`; its self-excluding
+100-entry manifest is
+`95d340e63e3ddec8d5c84d296aaac16fdcf041aee2d5c93064e3527af07b01c6`.
+Raw reporter SHA-256 is
+`ec73333a06bc187ca4fe452ec8f623eb817982c3ac40ee0e7fdc1b48f089d76d`.
+Root independently validated the complete manifest/inventory and exact title
+multiset, all eight production and seven runtime hashes, and the unchanged
+`245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed`
+patch. All 27 stashes and 86,522 protected paths remain. Root's first
+read-only token check incorrectly required untruncated text in all 18
+messages; the corrected check distinguishes the 16 complete tokens from the
+two truncated assertion messages. This diagnostic correction did not rerun
+tests or alter evidence.
+
+Bounded typecheck is not green. Three TS2345 diagnostics in unchanged test
+bodies and one external grid-wrapper TS2345 match the signed pre-correction
+test supplied in memory to the same compiler program/options. Exact source
+line mapping and full diagnostics are retained, with zero edited-span
+diagnostics. The original failed preflight is preserved. Owners are the
+Phase-3g projection fixture and grid composition-authority wrapper; deadline
+is applicable parent static closure. No typecast, source fix or blanket
+typecheck waiver is included.
+
+The initial audit covered carrier shapes but missed mock module identity;
+the three-span scope was insufficient. The recorded read-only Vite SSR
+resolver audit checks all seven existing mock/import pairs: five match,
+while the Node and protocol mocks target dist modules and the room's bare
+contracts resolve to source modules. Real Node preparation consequently
+receives the deliberately incomplete controlled trust snapshot and refuses
+it before anchor authentication. The protocol mismatch is also established,
+but its issuer path was not reached. This does not demonstrate a production
+authentication defect, and no rebase scheduling acceptance is claimed.
+
+The next tests-only continuation stays with the same room harness owner and
+deadline. It may change only the two existing `vi.mock` module-name literals:
+`../packages/node/dist/src/v3-live.js` to `@ts-drp/node/v3-live`, and
+`../packages/protocol-v3/dist/src/public.js` to `@ts-drp/protocol-v3`.
+Preserve both factories, all other mocks, the signed canonical carriers and
+every other byte, assertion, title and limit. Do not add mocks, modify Vite
+configuration, fabricate authenticated trust or weaken production validation.
+Before any runtime, repeat the bounded resolver audit and require all seven
+pairs to identify the intended same modules. Preserve this stopped run as
+the failure evidence; do not rerun its signed tree.
+
+Use the existing separate Astra-high tests-only owner, a separate signed/pushed
+two-literal correction, fresh independent source-built checkout, exact 20-name
+freeze and one isolated execution expecting 20 passes with no skipped or
+unexpected cases. Preserve the same static/custody/evidence gates and stop on
+any newly reached failure. Only after root accepts that result may the
+separate existing Astra-high GREEN owner execute the same file once against
+the unchanged parent patch. This is a prospective bounded disposition of the
+same retained fixture debt, not a new product API or review-only slice. No
+additional model/prose round is required; the parent final review remains
+open. No retained failure is closed by this stopped attempt, and the existing
+29-observed-failure inventory disposition, blocked supplement coverage and
+registry-governance scope remain unchanged.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
