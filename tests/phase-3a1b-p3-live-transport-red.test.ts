@@ -453,11 +453,24 @@ function fakeNetwork(
 	return network;
 }
 
-function fakeIssuanceStore(overrides: Partial<DurableIssuanceStore> = {}): DurableIssuanceStore {
+function fakeIssuanceStore(
+	overrides: Partial<DurableIssuanceStore> = {},
+	issuedRows: readonly DurableIssuanceOutboxRecord[] = Object.freeze([])
+): DurableIssuanceStore {
+	const issuedRoster = Object.freeze([...issuedRows]);
 	return {
 		transactIssue: vi.fn(() => Promise.reject(new Error("unused"))),
 		compareAndMarkOutboxPublished: vi.fn(() => Promise.resolve()),
-		readIssued: vi.fn(() => Promise.resolve(null)),
+		readIssued: vi.fn((scope, authorSequence) =>
+			Promise.resolve(
+				issuedRoster.find(
+					({ commit }) =>
+						commit.issuedRecord.scope.objectId === scope.objectId &&
+						commit.issuedRecord.scope.author === scope.author &&
+						commit.authorSequence === authorSequence
+				)?.commit ?? null
+			)
+		),
 		readOutboxPage: vi.fn(() => Promise.resolve([])),
 		readLineage: vi.fn(() => Promise.resolve({ exhausted: false, next: 0 })),
 		close: vi.fn(() => Promise.resolve()),
@@ -664,17 +677,18 @@ async function recoverActivationCapability(
 function outboxRecord(
 	scope: DurableIssueScope,
 	authorSequence: number,
-	publishState: "pending" | "published"
+	publishState: "pending" | "published",
+	carrier?: SignedScopeCarrier
 ): DurableIssuanceOutboxRecord {
-	const canonicalPreimageBytes = encodeCanonical({
-		author: scope.author,
-		authorSequence,
-		objectId: scope.objectId,
-	});
+	const canonicalPreimageBytes =
+		carrier === undefined
+			? encodeCanonical({ author: scope.author, authorSequence, objectId: scope.objectId })
+			: new Uint8Array(carrier.canonicalPreimageBytes);
 	const envelope = Object.freeze({
 		canonicalPreimageBytes,
-		digest: hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes),
-		signature: Uint8Array.of(authorSequence, 3),
+		digest:
+			carrier === undefined ? hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes) : new Uint8Array(carrier.digest),
+		signature: carrier === undefined ? Uint8Array.of(authorSequence, 3) : new Uint8Array(carrier.signature),
 	});
 	const issuedRecord = Object.freeze({ authorSequence, envelope, scope: Object.freeze({ ...scope }) });
 	const outboxEntry = Object.freeze({ authorSequence, envelope, scope: Object.freeze({ ...scope }) });
@@ -1030,13 +1044,19 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				throw new TypeError("missing Seam3 private surface");
 			}
 			const scope = Object.freeze({ author: fixture.author, objectId: fixture.descriptor.objectId });
-			const rows = Object.freeze([outboxRecord(scope, 1, "published"), outboxRecord(scope, 2, "pending")]);
+			const recoveryCarrier = fixture.createRecoveryVertex(0, [fixture.descriptor.anchorDigest]);
+			const publishedCarrier = fixture.createRecoveryVertex(1, [lowerHex(recoveryCarrier.digest)]);
+			const pendingCarrier = fixture.createRecoveryVertex(2, [lowerHex(publishedCarrier.digest)]);
+			const rows = Object.freeze([
+				outboxRecord(scope, 1, "published", publishedCarrier),
+				outboxRecord(scope, 2, "pending", pendingCarrier),
+			]);
 			let pageOrdinal = 0;
 			const readOutboxPage = vi.fn((_input: Parameters<DurableIssuanceStore["readOutboxPage"]>[0]) =>
 				Promise.resolve(pageOrdinal < rows.length ? [rows[pageOrdinal++]] : [])
 			);
 			const compareAndMarkOutboxPublished = vi.fn(() => Promise.resolve());
-			const issuanceStore = fakeIssuanceStore({ readOutboxPage, compareAndMarkOutboxPublished });
+			const issuanceStore = fakeIssuanceStore({ readOutboxPage, compareAndMarkOutboxPublished }, rows);
 			const published: [string, MessageShape][] = [];
 			const network = fakeNetwork(true, (topic, message) => {
 				published.push([topic, message]);
@@ -1134,7 +1154,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				};
 			};
 			if (generated.V3Envelope === undefined) throw new TypeError("missing generated V3Envelope");
-			const ingressCarrier = fixture.createRecoveryVertex(1, [recovered.recoveryDigest]);
+			const ingressCarrier = publishedCarrier;
 			const canonicalEnvelopeBytes = generated.V3Envelope.encode({
 				canonicalPreimage: ingressCarrier.canonicalPreimageBytes,
 				signature: ingressCarrier.signature,
@@ -1760,7 +1780,9 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const surface = await privateSurface();
 			if (surface.activateV3LivePlane === undefined) throw new TypeError("missing activateV3LivePlane");
 			const scope = Object.freeze({ author: fixture.author, objectId: fixture.descriptor.objectId });
-			const pending = outboxRecord(scope, 3, "pending");
+			const recoveryCarrier = fixture.createRecoveryVertex(0, [fixture.descriptor.anchorDigest]);
+			const pendingCarrier = fixture.createRecoveryVertex(3, [lowerHex(recoveryCarrier.digest)]);
+			const pending = outboxRecord(scope, 3, "pending", pendingCarrier);
 			const activate = async (
 				capability: object,
 				issuanceStore: DurableIssuanceStore,
@@ -1775,7 +1797,12 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				});
 			};
 
-			const secondPending = outboxRecord(scope, 4, "pending");
+			const secondPending = outboxRecord(
+				scope,
+				4,
+				"pending",
+				fixture.createRecoveryVertex(4, [lowerHex(pendingCarrier.digest)])
+			);
 			const fifoRows = [pending, secondPending] as const;
 			const fifoPublishes = [deferred<unknown>(), deferred<unknown>()] as const;
 			const fifoTrace: string[] = [];
@@ -1800,7 +1827,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			});
 			const fifoActivation = await activate(
 				fixture.capability,
-				fakeIssuanceStore({ compareAndMarkOutboxPublished: fifoMark, readOutboxPage: fifoRead }),
+				fakeIssuanceStore({ compareAndMarkOutboxPublished: fifoMark, readOutboxPage: fifoRead }, fifoRows),
 				fakeNetwork(true, fifoPublish)
 			);
 			if (!fifoActivation.ok) throw new TypeError(`FIFO activation failed: ${fifoActivation.kind}`);
@@ -1845,7 +1872,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const pageToken = await fixture.prepareAgain();
 			const pageActivation = await activate(
 				pageToken.capability,
-				fakeIssuanceStore({ compareAndMarkOutboxPublished: pageMark, readOutboxPage: pageRead }),
+				fakeIssuanceStore({ compareAndMarkOutboxPublished: pageMark, readOutboxPage: pageRead }, fifoRows),
 				pageNetwork
 			);
 			if (!pageActivation.ok) throw new TypeError(`page activation failed: ${pageActivation.kind}`);
@@ -1866,10 +1893,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const publishToken = await fixture.prepareAgain();
 			const publishActivation = await activate(
 				publishToken.capability,
-				fakeIssuanceStore({
-					compareAndMarkOutboxPublished: publishMark,
-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
-				}),
+				fakeIssuanceStore(
+					{
+						compareAndMarkOutboxPublished: publishMark,
+						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+					},
+					fifoRows
+				),
 				fakeNetwork(true, publishCalls)
 			);
 			if (!publishActivation.ok) throw new TypeError(`publish activation failed: ${publishActivation.kind}`);
@@ -1893,10 +1923,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const rejectedPublishToken = await fixture.prepareAgain();
 			const rejectedPublishActivation = await activate(
 				rejectedPublishToken.capability,
-				fakeIssuanceStore({
-					compareAndMarkOutboxPublished: rejectedPublishMark,
-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
-				}),
+				fakeIssuanceStore(
+					{
+						compareAndMarkOutboxPublished: rejectedPublishMark,
+						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+					},
+					fifoRows
+				),
 				fakeNetwork(true, rejectedPublishCalls)
 			);
 			if (!rejectedPublishActivation.ok) {
@@ -1921,10 +1954,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const markToken = await fixture.prepareAgain();
 			const markActivation = await activate(
 				markToken.capability,
-				fakeIssuanceStore({
-					compareAndMarkOutboxPublished: markCalls,
-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
-				}),
+				fakeIssuanceStore(
+					{
+						compareAndMarkOutboxPublished: markCalls,
+						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+					},
+					fifoRows
+				),
 				fakeNetwork()
 			);
 			if (!markActivation.ok) throw new TypeError(`mark activation failed: ${markActivation.kind}`);
@@ -1985,10 +2021,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const truthyMark = vi.fn(() => Promise.resolve());
 			const truthyActivation = await activate(
 				truthyToken.capability,
-				fakeIssuanceStore({
-					compareAndMarkOutboxPublished: truthyMark,
-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
-				}),
+				fakeIssuanceStore(
+					{
+						compareAndMarkOutboxPublished: truthyMark,
+						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+					},
+					fifoRows
+				),
 				fakeNetwork(true, () => Promise.resolve({ truthy: true }))
 			);
 			if (!truthyActivation.ok) throw new TypeError(`truthy activation failed: ${truthyActivation.kind}`);
@@ -2004,10 +2043,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const rejectedMark = vi.fn(() => Promise.resolve());
 			const rejectedActivation = await activate(
 				rejectedToken.capability,
-				fakeIssuanceStore({
-					compareAndMarkOutboxPublished: rejectedMark,
-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
-				}),
+				fakeIssuanceStore(
+					{
+						compareAndMarkOutboxPublished: rejectedMark,
+						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+					},
+					fifoRows
+				),
 				fakeNetwork(true, () => Promise.reject(new Error("synthetic publish rejection")))
 			);
 			if (!rejectedActivation.ok) throw new TypeError(`rejected activation failed: ${rejectedActivation.kind}`);
@@ -2023,10 +2065,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const rejectedMarkCall = vi.fn(() => Promise.reject(new Error("synthetic mark rejection")));
 			const rejectedMarkActivation = await activate(
 				rejectedMarkToken.capability,
-				fakeIssuanceStore({
-					compareAndMarkOutboxPublished: rejectedMarkCall,
-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
-				}),
+				fakeIssuanceStore(
+					{
+						compareAndMarkOutboxPublished: rejectedMarkCall,
+						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+					},
+					fifoRows
+				),
 				fakeNetwork()
 			);
 			if (!rejectedMarkActivation.ok) {
@@ -2253,8 +2298,28 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		expect(INGRESS_ORDER).toHaveLength(14);
 		expect(count(liveSource, /V3Envelope\.decode\(/gu)).toBe(1);
 		expect(count(liveSource, /V3Envelope\.encode\(/gu)).toBe(3);
-		expect(count(liveSource, /extractAdmittedReceivedVertex\(/gu)).toBe(1);
-		expect(liveSource).toMatch(
+		const unit = ts.createSourceFile("v3-live.ts", liveSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+		const extractorOwners: string[] = [];
+		const visit = (node: ts.Node): void => {
+			if (
+				ts.isCallExpression(node) &&
+				ts.isIdentifier(node.expression) &&
+				node.expression.text === "extractAdmittedReceivedVertex"
+			) {
+				let owner: ts.Node | undefined = node.parent;
+				while (owner !== undefined && !ts.isFunctionDeclaration(owner)) owner = owner.parent;
+				extractorOwners.push(owner?.name?.text ?? "<unowned>");
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(unit);
+		expect(extractorOwners.sort()).toEqual([
+			"authenticatedCoveredHistoricalOutboxRow",
+			"authenticatedPinnedGenesisOutboxRow",
+			"extractAuthorizedV3Vertex",
+		]);
+		const ingressExtractor = functionText(liveSource, "extractAuthorizedV3Vertex");
+		expect(ingressExtractor).toMatch(
 			/extractAdmittedReceivedVertex\(\{\s*domain,\s*expectedAnchor,\s*preparedBlueprintAdmission,\s*receivedCanonicalPreimageBytes,\s*resolveAuthorPublicKey,\s*signature,\s*suiteId,?\s*\}\)/u
 		);
 		expect(liveSource).not.toMatch(
