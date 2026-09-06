@@ -1,0 +1,11 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "tests/phase-3a1b-p2-outbox-publication-contract.test.ts"
+  ],
+  "start": "2026-09-06T00:53:58.559Z"
+}
