@@ -1,0 +1,11 @@
+{
+  "authoredWhitespacePassed": true,
+  "rawOutputPreserved": true,
+  "exceptions": [
+    {
+      "file": "focused/stderr.log",
+      "line": 23,
+      "rawOutput": true
+    }
+  ]
+}

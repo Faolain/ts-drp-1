@@ -1,0 +1,7 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts
+  67:66  error  Replace `originalInput.exactCanonicalParametersCarrierBytes` with `⏎↹↹↹↹↹originalInput.exactCanonicalParametersCarrierBytes⏎↹↹↹↹`  prettier/prettier
+
+✖ 1 problem (1 error, 0 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+
