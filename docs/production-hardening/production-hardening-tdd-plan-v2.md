@@ -18475,7 +18475,7 @@ Closed through the 2026-09-05 checkpoint:
   baseline-identical and explicitly unclaimed as passing. Final evidence is
   `.logs/d110c-0c1f5b0z-final-review-6f3d3049/`. Do not restart this slice.
 
-Current work (bounded finality-roster correction; parent retained debt remains open):
+Current work (finality rosters repaired; remaining parent retained debt stays open):
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18582,8 +18582,15 @@ Blocked, and on what:
   remains uncommitted and unaccepted. Resolve those bounded causes before
   claiming retained GREEN, without a Node-to-browser dependency, invented
   authority, blanket hash update or reopened immutable evidence.
-  The independent finality-roster correction below may proceed tests-only;
-  it does not authorize registry-freeze repair or any production edit.
+  The independent finality-roster correction is now accepted at signed/pushed
+  tests `867d7f09` and isolated evidence `140a3053`: 19/19 pass in a clean
+  source-built checkout, then 19/19 pass against the preserved parent patch
+  through the separate GREEN owner. This closes only gates 31/32's two stale
+  export-list failures; 29 other observed failures and blocked supplement
+  coverage remain open. Four inherited certificate-fixture type diagnostics
+  are separately owned, not waived or called a typecheck pass. The parent
+  record has exact evidence and dispositions. Registry-freeze repair remains
+  outside authorized implementation scope; no production edit occurred here.
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
   The f5b fixture correction proves settlement under existing limits but does
@@ -100826,9 +100833,12 @@ evidence `9c9e66b3`, with one isolated 19/19 baseline pass. Its separate GREEN
 continuation passes the affected gate 19/19 and final unfiltered parent gate
 45/45. Complete retained runtime is 845 pass / 31 fail / 5 conditional skips
 across 72 files; the diagnostic inventory below owns the unresolved causes.
+The bounded finality-roster correction subsequently passes 19/19 both in its
+isolated signed checkout and against the unchanged parent patch, closing two
+of those observed runtime failures without rerunning the full inventory.
 The partial eight-owner production patch is preserved, not committed or
-accepted. Retained repair, browser/static/isolated and final review gates remain
-open.** The
+accepted. Other retained repair, browser/static/isolated and final review gates
+remain open.** The
 f5b0t/f5b0u/f5b0v prerequisite chain is
 GREEN and its final P0/P1 union is empty. The first
 causal RED stopped before any edit when the accepted split-required case
@@ -101762,6 +101772,76 @@ only the two finality-roster failures; all other retained debts and the final
 parent Grok/Sol-high/Fable-xhigh implementation review remain open. In
 particular, registry-freeze reconciliation still awaits its explicit
 prospective governance scope and must not be hidden in this correction.
+
+**Retained finality-roster acceptance (2026-09-05).** Tests-only
+`867d7f09a78bb106cae10419b636bfa3638b11d6` and isolated evidence
+`140a305304dcd7b74f9ab7bdae85aba5e18d99a6` are signed (`G`) and pushed.
+Exactly three array spans now include the already-signed retirement signer;
+root independently verified every byte outside those spans unchanged, the
+seal-safety test byte-identical, and finality production byte-identical to
+`d77ee315`. No new API, production edit or contract relaxation occurred.
+
+The fresh checkout
+`/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout` independently
+installed its frozen dependencies and built exact signed `867d7f09`, without
+the pending production overlay or copied artifacts. Its sole two-file run
+passes all 19 assertions, including the previously blocked genuine certified
+signer binding, exact signature, consumed-request and raw-digest refusal
+checks; no skips, suite errors or matrix deviations. The existing bounded
+n=4 formal witness remains selected and passes. Evidence is
+`.logs/d110c-0c1f5b-retained-finality-867d7f09/`; root verified its complete
+89-entry self-excluding manifest with SHA-256
+`2ef800b9201a882c3c0c1cf1910bdf3cd470cb01f5420640e1cd9cbfeca7ed76`.
+Raw reporter SHA-256 is
+`94e77d17b3cbcfe7d7b30bd39a578cca7f68ae4ad81bf4cdae7c336c44bd6f6c`;
+its file-bound title multiset exactly matches the signed failing gates 31/32.
+
+Exact changed-source lint/format/diff, clean build, script syntax and listing
+pass. The bounded type program honestly retains four TS2345 diagnostics in
+the unchanged seal-safety test: its shared certificate helper returns generic
+`Readonly<Record<string, unknown>>` instead of the named certified-install
+input shape. Supplying only the three pre-correction files from signed
+`15c66947` in memory reproduces those exact four diagnostics, with zero
+external or edited-owner diagnostics. This is proven inherited typing debt,
+not a full typecheck pass. Owner: the Phase-3b certificate fixture and retained
+static gates; deadline: before the applicable parent static closure. No type
+cast, helper edit or runtime rerun was folded into the export correction.
+The evidence-only diff check preserves the raw signed-diff stdout's literal
+context-prefix whitespace; all other staged evidence files and actual changed
+test-source diff checks pass. No immutable capture is reformatted.
+
+The separate existing Astra-high GREEN owner then runs only the same two
+files once against the preserved eight-owner patch at signed/pushed
+`140a3053`: 19/19 pass, no skipped assertions, errors or name deviations.
+Evidence is `.logs/d110c-0c1f5b-green-finality-140a3053/`; its complete
+15-entry self-excluding manifest SHA-256 is
+`64919377b2fabf9fda671d2bc3554a11f2c095069f400ad821494bd2539ab4a3`.
+Root independently verified every entry, complete inventory, runner status,
+all 19 raw assertion results and the exact isolated-run title multiset.
+The raw GREEN reporter SHA-256 is
+`b3c275a193bd622c40828676e415e39772beb7b0ccb844a689bcd0464d04ed4d`.
+Main finality runtime
+matches the freshly built isolated runtime exactly; all other frozen test,
+source and affected runtime identities remain unchanged except the accepted
+three array owners. Before/after checks preserve all 27 stashes, 86,522
+protected paths and prior immutable manifests. No rebuild, wide workload,
+full retained inventory, campaign, production edit or model round is repeated.
+Root's unfiltered GREEN evidence diff check reports only the preserved raw
+patch's 445 context-space-before-tab and 17 blank-context whitespace findings
+(status 2). Excluding only that immutable `partial-production.patch` capture
+passes; actual production and edited-plan diffs independently pass. No source
+or test gate is excluded.
+
+This closes only the two finality export-roster failures. The original
+845-pass / 31-failure / five-skip inventory remains immutable; these later
+two-file controls do not pretend it was a green full run. The other 29
+observed runtime failures, three blocked supplement cases, two intentionally
+disabled long cases and separately owned typing debt remain accounted for.
+Parent f5b is not closed. Continue bounded retained repairs under separate
+tests-only correction/GREEN ownership; registry-freeze repair still requires
+the explicit prospective scope requested from the user. The existing final
+parent Grok/Sol-high/Fable-xhigh review must inspect this correction alongside
+the full history after the remaining gates pass, without another prose round.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
