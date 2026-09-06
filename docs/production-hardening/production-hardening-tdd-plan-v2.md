@@ -18526,8 +18526,9 @@ Main passes 49/49, but clean isolation stops at 48/49: the unchanged pacemaker
 trace-replay test exceeds its inherited 10-second runner limit (10.93 seconds;
 main 9.04 seconds). The complete-set audit finds no other isolated failure.
 The batch is not accepted; its **Consolidated fixture-exit isolated stop** below
-owns evidence and the pending test-budget decision. No retry, threshold edit,
-product-defect conclusion or new review-only slice follows automatically.
+owns evidence. The user has now authorized exactly the test-local 20-second
+budget amendment below; separate GREEN and the same acceptance gates may resume.
+No unchanged retry, product-defect conclusion or new review-only slice follows.
 Grid `roomHeadAuthority` composition and four still-recorded original runtime
 failures remain separate; those four are not a newly executed whole-parent
 aggregate. Registry-freeze repair retains its explicit governance boundary.
@@ -103414,6 +103415,48 @@ final blank line in raw `isolated/runtime-49/stderr.log`. Root verified each
 against its retained raw line. Excluding only these two exact artifacts passes;
 source and edited-plan checks pass independently. No sealed bytes are changed
 and no blanket staged-whitespace pass is claimed.
+
+**Authorized same-batch test-budget amendment (2026-09-06).** The user explicitly
+authorized the proposed 20-second limit after signed stopped evidence `ef2e056c`.
+This supersedes only the pending-authorization restriction above. It neither
+accepts the failed isolated run nor reopens completed work. The preserved
+48-pass/one-timeout report is the causal RED; the existing separate RED owner
+verifies that evidence and the unchanged failing registration read-only. Do not
+manufacture a new RED or rerun the old 10-second registration.
+
+The separate RED owner's read-only verification at signed `ef2e056c` confirms
+all 223 manifest entries, the complete 49-case result matrices, the unique
+two-argument registration and callback-body SHA-256
+`f3c51b5f029dff7d496528157f04b1b5bc550b5a149dadd35aaba530675c0e41`.
+Live eight-owner/seven-build/effective-85 custody, 27 stashes and 86,522
+protected paths match. No new test execution or fixture was used as RED.
+
+The separate existing Astra-high GREEN owner may add only a third argument,
+`20_000`, to the existing `it.skipIf(!readiness.ready)` registration titled
+"replays every checked trace through the genuine voter, pacemaker, and fake-IDB
+store" in `tests/phase-5d-pacemaker-red.test.ts`. Preserve its entire callback,
+readiness predicate, title, assertions, all three trace files, model invocations,
+global `testTimeout: 10000` and product round timers. This changes one test
+harness budget, not a production latency claim or a relaxation of model checks.
+No retries, adaptive deadlines, profiling, product edits or dependency changes.
+
+Use a fresh evidence root and prove that the registration's added scalar is
+the sole executable difference and that every test body remains byte-identical.
+Run the existing four-file/49-case main gate once, exact-owner static checks
+and the unchanged grid-only compiler matrix; sign/push the one-file GREEN,
+then run the same 49 cases and required source/static gates once in a fresh
+source-built signed checkout with the unchanged production overlay. Inspect
+complete results and stop on any unexpected outcome without another edit/run.
+The earlier main 49/49 and isolated 48/49 remain immutable historical evidence.
+No extra single-test run, per-diagnostic slice or prose-review round is needed.
+
+The existing final Grok/Sol-high/Fable-xhigh parent review must inspect this
+explicit timing amendment, its signed causal RED and GREEN, unchanged protocol
+timers/workload/assertions and the new isolated verdict. This acceptance-budget
+boundary is not waived, nor is another review-only slice introduced. After
+acceptance, return directly to the already-required combined parent gates and
+complete-failure-set diagnosis. Grid authority composition and the four original
+recorded runtime failures retain their separate dispositions and boundaries.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
