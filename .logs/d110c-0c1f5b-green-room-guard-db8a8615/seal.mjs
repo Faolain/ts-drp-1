@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),read=f=>JSON.parse(fs.readFileSync(path.join(out,f))),before=read('custody-before.json'),after=read('custody-after.json'),source=read('source-check-final.json');
+if(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim()!==after.head)throw Error('HEAD drift');
+for(const records of [after.ownerHashes,after.built,after.testHashes])for(const[f,h]of Object.entries(records))if(hash(fs.readFileSync(path.join(root,f)))!==h)throw Error('Custody drift '+f);
+for(const field of ['built','testHashes'])if(JSON.stringify(before[field])!==JSON.stringify(after[field]))throw Error('Before/after drift '+field);
+if(JSON.stringify(source.ownerHashes)!==JSON.stringify(after.ownerHashes)||source.parentPatchSha256!==after.patchSha256)throw Error('Final source binding drift');
+if(hash(fs.readFileSync(path.join(out,'room-after.ts')))!==after.ownerHashes['examples/v3-room/src/index.ts'])throw Error('Reconstructible room snapshot mismatch');
+const gates=['focused-13','bootstrap-3','rebase-20'].map(label=>({label,...read(label+'/validation.json')}));if(gates.some(g=>!g.valid)||!read('focused-13/observations.json').valid)throw Error('Runtime not green');
+if(!read('typecheck-final.json').valid)throw Error('Compiler attribution');
+const commands=fs.readdirSync(out,{withFileTypes:true}).filter(e=>e.isDirectory()&&fs.existsSync(path.join(out,e.name,'status.json'))).map(e=>({label:e.name,command:read(e.name+'/command.json'),status:read(e.name+'/status.json')}));
+fs.writeFileSync(path.join(out,'seal-summary.json'),JSON.stringify({head:after.head,roomSourceSha256:after.ownerHashes['examples/v3-room/src/index.ts'],beforePatchSha256:before.patchSha256,parentPatchSha256:after.patchSha256,gates:gates.map(g=>({label:g.label,total:g.total,passed:g.passed,failed:g.failed,skipped:g.skipped,reporterSha256:g.reporterSha256})),exactEightObservations:true,otherSevenSourcesUnchanged:true,sevenRuntimesUnchanged:true,tests:Object.keys(after.testHashes).length,stashes:after.stashCount,protectedPaths:after.protectedPaths,typecheckPassed:false,productionDiagnostics:0,targetDiagnostics:0,inheritedExternalDiagnostics:41,commands,productionCommitted:false,parentClosed:false},null,2)+'\n',{flag:'wx'});
+const collect=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?collect(path.join(dir,e.name)):[path.join(dir,e.name)]),files=collect(out).filter(f=>path.basename(f)!=='manifest.sha256').sort();fs.writeFileSync(path.join(out,'manifest.sha256'),files.map(f=>hash(fs.readFileSync(f))+'  '+path.relative(out,f)).join('\n')+'\n',{flag:'wx'});console.log(JSON.stringify({entries:files.length,manifestSha256:hash(fs.readFileSync(path.join(out,'manifest.sha256'))),gates:gates.map(g=>({label:g.label,passed:g.passed,total:g.total})),parentPatchSha256:after.patchSha256}));

@@ -18500,21 +18500,21 @@ The stopped 23-pass/one-native-loader-failure attempt at `8e121d2d` remains
 immutable. Fresh continuation used the already-locked native installer under
 existing repository policy; no dependency, production or test change was
 needed after that stop. The parent record owns full evidence and custody.
-This closes three original runtime failures, leaving five from the original
-retained inventory. Thirteen baseline-identical transport type diagnostics
-remain open; no blanket typecheck or parent GREEN acceptance is claimed.
-Next is the parent record's bounded authority-read-order GREEN: restore early
-refusal without blocking settlement creator cold reopen. Its separate additive
-RED is now signed and accepted; preserve all original and added test assertions.
-The additive authority-ordering RED is accepted at signed/pushed `db8a8615`:
-the clean dual-reporter run has eleven passes/two intended failures and all
-eight observations, proving five forbidden early reads and three permitted
-controls. Separate room-only GREEN is next under the frozen scope below;
-the original retained failure remains open until that GREEN passes. The
-pre-runtime fixture stop `edb238c6` and observation-incomplete run `c25cb891`
-remain immutable. Forty-one external baseline-identical fixture type
-diagnostics remain assigned to parent static closure, not classified as a
-passing typecheck.
+The subsequent room authority-read-order repair now passes all thirteen
+unchanged focused cases, including the exact eight-row matrix, followed by
+bootstrap-policy 3/3 and room-rebase 20/20. Its accepted causal RED is signed
+`db8a8615`; the parent record's **Retained room-guard GREEN acceptance** owns
+the complete evidence and room-only production delta. This closes gate 22's
+original failure, leaving four original retained runtime failures: three
+registry-freeze and one W0 compatibility failure. Earlier stopped attempts
+remain immutable. The pending eight-owner patch has changed only in the room
+constructor; prior 45/45 integration evidence is not proof for these new bytes.
+Next is remaining parent acceptance/debt closure within existing authority
+boundaries, not another room-guard execution. Thirteen inherited transport
+type diagnostics and the guard program's 41 external fixture diagnostics
+remain open, alongside the other named static debts. No blanket typecheck or
+parent GREEN acceptance is claimed; registry-freeze repair still requires its
+explicit prospective governance decision.
 
 - **f5b creator settlement and recovery integration** below. Accepted causal
   RED is tests-only `cecde972` with evidence `b7751f72`; its focused run has
@@ -18617,7 +18617,7 @@ Blocked, and on what:
   case-25, checkpoint-link and retained counter-harness corrections are also
   accepted. The completed retained inventory exposes fixture/export-roster,
   authority-read-order, registry-freeze, codec and W0 compatibility debts;
-  their owners and deadlines are in the parent record. The unchanged patch
+  their owners and deadlines are in the parent record. The pending patch
   remains uncommitted and unaccepted. Resolve those bounded causes before
   claiming retained GREEN, without a Node-to-browser dependency, invented
   authority, blanket hash update or reopened immutable evidence.
@@ -18637,13 +18637,17 @@ Blocked, and on what:
   run, closing gate 56's two incomplete-fixture failures. Transport tests
   `772e96bd` then pass 24/24 in fresh source-built isolation at evidence
   `e122e280` and the separate GREEN run, closing gate 70's three failures.
-  Five other observed runtime failures and blocked supplement coverage remain open. The inherited
+  The subsequent room-only authority guard repair passes 13/13 plus the
+  bootstrap 3/3 and room-rebase 20/20 regressions, closing gate 22's original
+  failure. Four other observed runtime failures and blocked supplement coverage remain open. The inherited
   certificate, room-test and grid-wrapper type diagnostics retain their named
   owners and deadlines; no blanket typecheck pass. The parent record owns
-  exact evidence, transport's thirteen inherited type diagnostics and remaining
-  authority-read-order, registry-freeze and W0 compatibility decisions. Registry-freeze
-  repair remains outside authorized implementation scope; no production
-  edit occurred in these retained fixture corrections.
+  exact evidence, transport's thirteen and the guard program's 41 inherited
+  external type diagnostics, and remaining registry-freeze/W0 compatibility
+  decisions. Registry-freeze repair remains outside authorized implementation
+  scope. The earlier fixture corrections made no production edits; the later
+  causal guard repair changes only the room constructor. Its complete parent
+  production acceptance and final review remain required.
 
 - **D.110c-0c1f5b0y chat admission and bounded-state continuity** is a named
   high-risk design checkpoint, not a production implementation authorization.
@@ -101022,10 +101026,12 @@ closing gate 56's two incomplete-fixture failures. Transport tests `772e96bd`
 then pass 24/24 in fresh source-built isolation at signed/pushed evidence
 `e122e280` and in the separate GREEN run against the preserved patch, closing
 gate 70's three original runtime failures. The stopped native-loader attempt
-remains immutable. Five other observed runtime failures, blocked supplement
-coverage and inherited static debts remain open, including thirteen transport
-type diagnostics; the authority-read-order, registry-freeze and W0 compatibility
-decisions retain their distinct boundaries.
+remains immutable. The subsequent accepted additive room-guard RED at
+`db8a8615` is closed causally by the narrow room-only GREEN below: 13/13,
+bootstrap 3/3 and room-rebase 20/20. Four other original runtime failures,
+blocked supplement coverage and inherited static debts remain open, including
+thirteen transport and 41 external guard-program type diagnostics. Registry-
+freeze and W0 compatibility decisions retain their distinct boundaries.
 The partial eight-owner production patch is preserved, not committed or
 accepted. Other retained repair, browser/static/isolated and final review gates
 remain open.** The
@@ -102757,6 +102763,59 @@ final Grok/Sol/Fable review remain open; the earlier 45/45 integration result
 is not reattributed to the new production bytes. No long workload or additional
 model round is authorized here. The eventual signed parent GREEN production
 commit remains separate from the accepted tests-only RED chain.
+
+**Retained room-guard GREEN acceptance (2026-09-05).** The accepted causal
+RED `db8a8615` is closed by the separate Astra-high GREEN owner under signed
+plan `b75e75ed`. Evidence is
+`.logs/d110c-0c1f5b-green-room-guard-db8a8615/`, with exact 100-entry
+self-excluding manifest
+`cfc91398e68b90ed48dc388f31675717fa96a662f6d1ad7aebf8257a42ce562d`.
+The complete commands and source-bound selection are in
+`runtime-roster-final.json` and each gate's command/status artifacts: one
+unfiltered focused run passes 13/13 with exactly eight observations, followed
+by one bootstrap-policy 3/3 and one room-rebase 20/20. No skip, unexpected
+failure or reporter anomaly occurs. All five forbidden combinations now return
+the exact unsupported token with zero authority reads; the three permitted
+controls read application exactly once and no other authority. The existing
+incomplete-input test remains unchanged and passes. This is the guard contract,
+not a new authenticated activation or repeated-rollover proof.
+
+Only `createV3RoomSessionOwned`'s preparation prefix changes. One private
+capture owner reuses the existing invite codec, limits and profile predicate;
+pair-only early capture preserves settlement cold reopen, while non-pair
+validation order and all downstream trust/floor/signer checks are byte-identical.
+Final room SHA-256 is
+`391177c10e5e20568bec216f18b3d26db6345a3bc2f8399409dbca52c5135252`;
+the full pending parent patch is now
+`6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`.
+Exact pre/post room sources and patches are retained; the former signed patch
+identified in `patch-reference.json` and all earlier results remain immutable.
+
+Final room lint, format, source-shape and source diff checks pass. The actual
+focused-test TypeScript program has zero target/production diagnostics and
+exactly 41 inherited external diagnostics, identical with the saved pre-edit
+room substituted in memory and with accepted RED. Those remain assigned to
+parent fixture static closure; this is not a whole-program typecheck pass.
+Initial missing-return-annotation and subsequent annotation-format failures
+are retained alongside the corrected checks; no runtime was repeated. The
+other seven production owners, seven built artifacts, all 79 retained/shared
+hashes, 27 stashes and 86,522 protected paths are unchanged. Root independently
+validated the exact manifest inventory, raw outcomes/observations and source
+custody. This closes one original retained runtime failure, not parent f5b:
+four original failures and the named static/browser/isolated/final-review
+gates remain. No new full inventory, 45-case integration, browser or long
+workload ran, and old integration evidence is not rebound to new source bytes.
+The eventual signed eight-owner production GREEN remains separate from RED
+and subject to the existing complete parent acceptance and Grok/Sol/Fable gate.
+
+Commit validation preserves a precise raw-evidence exception: staged diff
+status 2 reports 500 diff-context marker warnings across the three stored patch
+files and two blank EOF warnings in the original lint stdout streams. Root
+checked every warning against its raw line; none is a room-source, plan or
+authored-recorder whitespace error. The full warning count includes space-
+before-tab diagnostics, not just trailing whitespace. These bytes and the
+sealed manifest are preserved; source/plan diff checks and bounded plan
+formatting pass. No blanket staged-diff pass is claimed.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material
