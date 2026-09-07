@@ -1,0 +1,783 @@
+{
+  "status": "GREEN30 complete: exit0, no timeout, source custody exact, no remaining child processes; capture-complete and profiler finished=true. This is profiled30 diagnostic evidence, not full100 acceptance.",
+  "statusEvidence": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/capture30-assertion-released/status.json; worker/telemetry.jsonl",
+  "analyzer": {
+    "name": "@memlab/heap-analysis",
+    "version": "2.0.5",
+    "dependencyLockHash": "49182cc863293accfeebf4235c303a58c42fcbcaac551d2a1de80e3aa799f949"
+  },
+  "method": "Default Node heap. SHA verified before graph analysis. Each snapshot independently rediscovers global.indexedDB factory, observer object and sessions Set in startup-waiter lexical context. Current raw stores use factory-map membership and rawDatabase backlink. Old-room root BFS excludes weak and ALL ephemeron-pair edges; current registration association requires independently rooted handle and table before conditional key-to-value mapping.",
+  "paired": [
+    {
+      "transition": 10,
+      "baselineSha256": "04559ceadae20eac4b7c99d6df6f12af647c51b6286d201fadf1063acf60f5f2",
+      "greenSha256": "44164052ef1076aa72251b2b54c544a7c0a23e56fd9826fca069d97850c624cd",
+      "greenRoots": {
+        "factoryId": 153811,
+        "globalId": 6949,
+        "observerId": 273231,
+        "sessionsSetId": 273235,
+        "currentTestId": 185325,
+        "onFinished": null
+      },
+      "graph": {
+        "baselineBytes": 165733257,
+        "greenBytes": 162248497,
+        "pairedDeltaBytes": -3484760
+      },
+      "alternativeDisjointPartitions": {
+        "recordsAndIndexes": {
+          "baselineBytes": 24595715,
+          "greenBytes": 24595715
+        },
+        "rawStores": {
+          "baselineBytes": 26260411,
+          "greenBytes": 26260411
+        },
+        "rawDatabases": {
+          "baselineBytes": 26416411,
+          "greenBytes": 26416411
+        }
+      },
+      "graphOutsideDatabasePartition": {
+        "baselineBytes": 139316846,
+        "greenBytes": 135832086
+      },
+      "ownerCounts": {
+        "currentRooms": 64,
+        "currentRegistrations": 64,
+        "baselineRooms": 137,
+        "greenRooms": 128,
+        "baselineHistoricalRooms": 73,
+        "greenHistoricalRooms": 64,
+        "baselineOnFinishedCallbacks": 10,
+        "greenOnFinishedCallbacks": 0
+      },
+      "physicalOwnership": {
+        "databases": 257,
+        "rawStores": 1097,
+        "recordsAndIndexAnchors": 2194,
+        "partitionGaps": 0,
+        "unmatchedRawOwners": 0
+      },
+      "differingAnchors": [],
+      "constructors": [
+        {
+          "key": "string:(string)",
+          "baselineCount": 174092,
+          "greenCount": 165504,
+          "countDelta": -8588,
+          "baselineShallowBytes": 53600608,
+          "greenShallowBytes": 53027704,
+          "shallowBytesDelta": -572904
+        },
+        {
+          "key": "native:system / JSArrayBufferData",
+          "baselineCount": 16285,
+          "greenCount": 15885,
+          "countDelta": -400,
+          "baselineShallowBytes": 52007976,
+          "greenShallowBytes": 50577960,
+          "shallowBytesDelta": -1430016
+        },
+        {
+          "key": "code:(code)",
+          "baselineCount": 118240,
+          "greenCount": 118910,
+          "countDelta": 670,
+          "baselineShallowBytes": 20578024,
+          "greenShallowBytes": 20289360,
+          "shallowBytesDelta": -288664
+        },
+        {
+          "key": "object:Uint8Array",
+          "baselineCount": 17094,
+          "greenCount": 16621,
+          "countDelta": -473,
+          "baselineShallowBytes": 1640912,
+          "greenShallowBytes": 1595504,
+          "shallowBytesDelta": -45408
+        },
+        {
+          "key": "object:ArrayBuffer",
+          "baselineCount": 17652,
+          "greenCount": 17143,
+          "countDelta": -509,
+          "baselineShallowBytes": 1553344,
+          "greenShallowBytes": 1508552,
+          "shallowBytesDelta": -44792
+        },
+        {
+          "key": "object:Promise",
+          "baselineCount": 3282,
+          "greenCount": 3120,
+          "countDelta": -162,
+          "baselineShallowBytes": 157520,
+          "greenShallowBytes": 149744,
+          "shallowBytesDelta": -7776
+        },
+        {
+          "key": "object:ObjectStore",
+          "baselineCount": 1097,
+          "greenCount": 1097,
+          "countDelta": 0,
+          "baselineShallowBytes": 96536,
+          "greenShallowBytes": 96536,
+          "shallowBytesDelta": 0
+        },
+        {
+          "key": "object:FDBDatabase",
+          "baselineCount": 417,
+          "greenCount": 390,
+          "countDelta": -27,
+          "baselineShallowBytes": 43368,
+          "greenShallowBytes": 40560,
+          "shallowBytesDelta": -2808
+        },
+        {
+          "key": "object:Database",
+          "baselineCount": 257,
+          "greenCount": 257,
+          "countDelta": 0,
+          "baselineShallowBytes": 18504,
+          "greenShallowBytes": 18504,
+          "shallowBytesDelta": 0
+        },
+        {
+          "key": "object:CausalityIndex",
+          "baselineCount": 137,
+          "greenCount": 128,
+          "countDelta": -9,
+          "baselineShallowBytes": 13152,
+          "greenShallowBytes": 12288,
+          "shallowBytesDelta": -864
+        },
+        {
+          "key": "object:MessageQueueManager",
+          "baselineCount": 137,
+          "greenCount": 128,
+          "countDelta": -9,
+          "baselineShallowBytes": 6576,
+          "greenShallowBytes": 6144,
+          "shallowBytesDelta": -432
+        }
+      ],
+      "observerContainers": [
+        {
+          "property": "stores",
+          "retainedBytes": 1864,
+          "elementCount": null
+        },
+        {
+          "property": "planes",
+          "retainedBytes": 1864,
+          "elementCount": null
+        },
+        {
+          "property": "commits",
+          "retainedBytes": 704,
+          "elementCount": 66
+        },
+        {
+          "property": "advances",
+          "retainedBytes": 1379419,
+          "elementCount": 126
+        },
+        {
+          "property": "issueAttempts",
+          "retainedBytes": 704,
+          "elementCount": 65
+        },
+        {
+          "property": "commitHandles",
+          "retainedBytes": 3656,
+          "elementCount": null
+        },
+        {
+          "property": "issuePlans",
+          "retainedBytes": 23656,
+          "elementCount": null
+        },
+        {
+          "property": "timeline",
+          "retainedBytes": 11128,
+          "elementCount": 193
+        },
+        {
+          "property": "ambiguities",
+          "retainedBytes": 32,
+          "elementCount": 0
+        },
+        {
+          "property": "publications",
+          "retainedBytes": 9680,
+          "elementCount": 66
+        },
+        {
+          "property": "planWrites",
+          "retainedBytes": 21504,
+          "elementCount": 63
+        },
+        {
+          "property": "prunes",
+          "retainedBytes": 136240,
+          "elementCount": 63
+        },
+        {
+          "property": "cleanup",
+          "retainedBytes": 391488,
+          "elementCount": 63
+        },
+        {
+          "property": "snapshots",
+          "retainedBytes": 32,
+          "elementCount": 0
+        },
+        {
+          "property": "closeGraphs",
+          "retainedBytes": 32,
+          "elementCount": 0
+        }
+      ]
+    },
+    {
+      "transition": 20,
+      "baselineSha256": "b90970cef4bada1d78d28ffe012a1d70b5482470baf45c6be0152b49c6537bec",
+      "greenSha256": "39e3142448d6f1faa11dbd8d187b3ef1bcca5283d3a9249dfc7ce390c5fd8082",
+      "greenRoots": {
+        "factoryId": 153811,
+        "globalId": 6949,
+        "observerId": 273231,
+        "sessionsSetId": 273235,
+        "currentTestId": 185325,
+        "onFinished": null
+      },
+      "graph": {
+        "baselineBytes": 189779623,
+        "greenBytes": 181849374,
+        "pairedDeltaBytes": -7930249
+      },
+      "alternativeDisjointPartitions": {
+        "recordsAndIndexes": {
+          "baselineBytes": 41664988,
+          "greenBytes": 41664988
+        },
+        "rawStores": {
+          "baselineBytes": 44750484,
+          "greenBytes": 44750484
+        },
+        "rawDatabases": {
+          "baselineBytes": 44906484,
+          "greenBytes": 44906484
+        }
+      },
+      "graphOutsideDatabasePartition": {
+        "baselineBytes": 144873139,
+        "greenBytes": 136942890
+      },
+      "ownerCounts": {
+        "currentRooms": 64,
+        "currentRegistrations": 64,
+        "baselineRooms": 147,
+        "greenRooms": 128,
+        "baselineHistoricalRooms": 83,
+        "greenHistoricalRooms": 64,
+        "baselineOnFinishedCallbacks": 20,
+        "greenOnFinishedCallbacks": 0
+      },
+      "physicalOwnership": {
+        "databases": 257,
+        "rawStores": 1097,
+        "recordsAndIndexAnchors": 2194,
+        "partitionGaps": 0,
+        "unmatchedRawOwners": 0
+      },
+      "differingAnchors": [],
+      "constructors": [
+        {
+          "key": "native:system / JSArrayBufferData",
+          "baselineCount": 22266,
+          "greenCount": 21416,
+          "countDelta": -850,
+          "baselineShallowBytes": 66725150,
+          "greenShallowBytes": 63687701,
+          "shallowBytesDelta": -3037449
+        },
+        {
+          "key": "string:(string)",
+          "baselineCount": 202664,
+          "greenCount": 184532,
+          "countDelta": -18132,
+          "baselineShallowBytes": 55476568,
+          "greenShallowBytes": 54259240,
+          "shallowBytesDelta": -1217328
+        },
+        {
+          "key": "code:(code)",
+          "baselineCount": 125015,
+          "greenCount": 124240,
+          "countDelta": -775,
+          "baselineShallowBytes": 22264128,
+          "greenShallowBytes": 21242024,
+          "shallowBytesDelta": -1022104
+        },
+        {
+          "key": "object:Uint8Array",
+          "baselineCount": 23155,
+          "greenCount": 22152,
+          "countDelta": -1003,
+          "baselineShallowBytes": 2222768,
+          "greenShallowBytes": 2126480,
+          "shallowBytesDelta": -96288
+        },
+        {
+          "key": "object:ArrayBuffer",
+          "baselineCount": 23753,
+          "greenCount": 22674,
+          "countDelta": -1079,
+          "baselineShallowBytes": 2090232,
+          "greenShallowBytes": 1995280,
+          "shallowBytesDelta": -94952
+        },
+        {
+          "key": "object:Promise",
+          "baselineCount": 3462,
+          "greenCount": 3120,
+          "countDelta": -342,
+          "baselineShallowBytes": 166160,
+          "greenShallowBytes": 149744,
+          "shallowBytesDelta": -16416
+        },
+        {
+          "key": "object:ObjectStore",
+          "baselineCount": 1097,
+          "greenCount": 1097,
+          "countDelta": 0,
+          "baselineShallowBytes": 96536,
+          "greenShallowBytes": 96536,
+          "shallowBytesDelta": 0
+        },
+        {
+          "key": "object:FDBDatabase",
+          "baselineCount": 447,
+          "greenCount": 390,
+          "countDelta": -57,
+          "baselineShallowBytes": 46488,
+          "greenShallowBytes": 40560,
+          "shallowBytesDelta": -5928
+        },
+        {
+          "key": "object:Database",
+          "baselineCount": 257,
+          "greenCount": 257,
+          "countDelta": 0,
+          "baselineShallowBytes": 18504,
+          "greenShallowBytes": 18504,
+          "shallowBytesDelta": 0
+        },
+        {
+          "key": "object:CausalityIndex",
+          "baselineCount": 147,
+          "greenCount": 128,
+          "countDelta": -19,
+          "baselineShallowBytes": 14112,
+          "greenShallowBytes": 12288,
+          "shallowBytesDelta": -1824
+        },
+        {
+          "key": "object:MessageQueueManager",
+          "baselineCount": 147,
+          "greenCount": 128,
+          "countDelta": -19,
+          "baselineShallowBytes": 7056,
+          "greenShallowBytes": 6144,
+          "shallowBytesDelta": -912
+        }
+      ],
+      "observerContainers": [
+        {
+          "property": "stores",
+          "retainedBytes": 1864,
+          "elementCount": null
+        },
+        {
+          "property": "planes",
+          "retainedBytes": 1864,
+          "elementCount": null
+        },
+        {
+          "property": "commits",
+          "retainedBytes": 704,
+          "elementCount": 66
+        },
+        {
+          "property": "advances",
+          "retainedBytes": 1375387,
+          "elementCount": 126
+        },
+        {
+          "property": "issueAttempts",
+          "retainedBytes": 704,
+          "elementCount": 65
+        },
+        {
+          "property": "commitHandles",
+          "retainedBytes": 3656,
+          "elementCount": null
+        },
+        {
+          "property": "issuePlans",
+          "retainedBytes": 23416,
+          "elementCount": null
+        },
+        {
+          "property": "timeline",
+          "retainedBytes": 11128,
+          "elementCount": 193
+        },
+        {
+          "property": "ambiguities",
+          "retainedBytes": 32,
+          "elementCount": 0
+        },
+        {
+          "property": "publications",
+          "retainedBytes": 9680,
+          "elementCount": 66
+        },
+        {
+          "property": "planWrites",
+          "retainedBytes": 21504,
+          "elementCount": 63
+        },
+        {
+          "property": "prunes",
+          "retainedBytes": 136240,
+          "elementCount": 63
+        },
+        {
+          "property": "cleanup",
+          "retainedBytes": 391488,
+          "elementCount": 63
+        },
+        {
+          "property": "snapshots",
+          "retainedBytes": 32,
+          "elementCount": 0
+        },
+        {
+          "property": "closeGraphs",
+          "retainedBytes": 32,
+          "elementCount": 0
+        }
+      ]
+    },
+    {
+      "transition": 30,
+      "baselineSha256": "58b51c026b674a08090112c67dc7cc4681ae482c0053a54923fb8fba747d8249",
+      "greenSha256": "d30729abdb10c90858f3b97fa28f7337ea1d4f55abef4319bd8da880fdb08479",
+      "greenRoots": {
+        "factoryId": 153811,
+        "globalId": 6949,
+        "observerId": 273231,
+        "sessionsSetId": 273235,
+        "currentTestId": 185325,
+        "onFinished": null
+      },
+      "graph": {
+        "baselineBytes": 213075275,
+        "greenBytes": 201271692,
+        "pairedDeltaBytes": -11803583
+      },
+      "alternativeDisjointPartitions": {
+        "recordsAndIndexes": {
+          "baselineBytes": 59026074,
+          "greenBytes": 59026602
+        },
+        "rawStores": {
+          "baselineBytes": 63532370,
+          "greenBytes": 63532898
+        },
+        "rawDatabases": {
+          "baselineBytes": 63688370,
+          "greenBytes": 63688898
+        }
+      },
+      "graphOutsideDatabasePartition": {
+        "baselineBytes": 149386905,
+        "greenBytes": 137582794
+      },
+      "ownerCounts": {
+        "currentRooms": 64,
+        "currentRegistrations": 64,
+        "baselineRooms": 157,
+        "greenRooms": 128,
+        "baselineHistoricalRooms": 93,
+        "greenHistoricalRooms": 64,
+        "baselineOnFinishedCallbacks": 30,
+        "greenOnFinishedCallbacks": 0
+      },
+      "physicalOwnership": {
+        "databases": 257,
+        "rawStores": 1097,
+        "recordsAndIndexAnchors": 2194,
+        "partitionGaps": 0,
+        "unmatchedRawOwners": 0
+      },
+      "differingAnchors": [
+        {
+          "database": "d110c-f5b-parent-1-peer-0--drp-snapshot-quarantine-v1",
+          "store": "scopes",
+          "kind": "rawIndexes",
+          "baselineAnchorId": 1276579,
+          "greenAnchorId": 1522049,
+          "baselineRetainedBytes": 19024,
+          "greenRetainedBytes": 19552,
+          "delta": 528
+        }
+      ],
+      "constructors": [
+        {
+          "key": "native:system / JSArrayBufferData",
+          "baselineCount": 28500,
+          "greenCount": 27200,
+          "countDelta": -1300,
+          "baselineShallowBytes": 81666026,
+          "greenShallowBytes": 77019139,
+          "shallowBytesDelta": -4646887
+        },
+        {
+          "key": "string:(string)",
+          "baselineCount": 231150,
+          "greenCount": 203677,
+          "countDelta": -27473,
+          "baselineShallowBytes": 57354768,
+          "greenShallowBytes": 55502640,
+          "shallowBytesDelta": -1852128
+        },
+        {
+          "key": "code:(code)",
+          "baselineCount": 124207,
+          "greenCount": 125641,
+          "countDelta": 1434,
+          "baselineShallowBytes": 23062768,
+          "greenShallowBytes": 21788640,
+          "shallowBytesDelta": -1274128
+        },
+        {
+          "key": "object:Uint8Array",
+          "baselineCount": 29471,
+          "greenCount": 27938,
+          "countDelta": -1533,
+          "baselineShallowBytes": 2829104,
+          "greenShallowBytes": 2681936,
+          "shallowBytesDelta": -147168
+        },
+        {
+          "key": "object:ArrayBuffer",
+          "baselineCount": 30109,
+          "greenCount": 28460,
+          "countDelta": -1649,
+          "baselineShallowBytes": 2649560,
+          "greenShallowBytes": 2504448,
+          "shallowBytesDelta": -145112
+        },
+        {
+          "key": "object:Promise",
+          "baselineCount": 3642,
+          "greenCount": 3120,
+          "countDelta": -522,
+          "baselineShallowBytes": 174800,
+          "greenShallowBytes": 149744,
+          "shallowBytesDelta": -25056
+        },
+        {
+          "key": "object:ObjectStore",
+          "baselineCount": 1097,
+          "greenCount": 1097,
+          "countDelta": 0,
+          "baselineShallowBytes": 96536,
+          "greenShallowBytes": 96536,
+          "shallowBytesDelta": 0
+        },
+        {
+          "key": "object:FDBDatabase",
+          "baselineCount": 477,
+          "greenCount": 390,
+          "countDelta": -87,
+          "baselineShallowBytes": 49608,
+          "greenShallowBytes": 40560,
+          "shallowBytesDelta": -9048
+        },
+        {
+          "key": "object:Database",
+          "baselineCount": 257,
+          "greenCount": 257,
+          "countDelta": 0,
+          "baselineShallowBytes": 18504,
+          "greenShallowBytes": 18504,
+          "shallowBytesDelta": 0
+        },
+        {
+          "key": "object:CausalityIndex",
+          "baselineCount": 157,
+          "greenCount": 128,
+          "countDelta": -29,
+          "baselineShallowBytes": 15072,
+          "greenShallowBytes": 12288,
+          "shallowBytesDelta": -2784
+        },
+        {
+          "key": "object:MessageQueueManager",
+          "baselineCount": 157,
+          "greenCount": 128,
+          "countDelta": -29,
+          "baselineShallowBytes": 7536,
+          "greenShallowBytes": 6144,
+          "shallowBytesDelta": -1392
+        }
+      ],
+      "observerContainers": [
+        {
+          "property": "stores",
+          "retainedBytes": 1864,
+          "elementCount": null
+        },
+        {
+          "property": "planes",
+          "retainedBytes": 1864,
+          "elementCount": null
+        },
+        {
+          "property": "commits",
+          "retainedBytes": 704,
+          "elementCount": 66
+        },
+        {
+          "property": "advances",
+          "retainedBytes": 1385026,
+          "elementCount": 126
+        },
+        {
+          "property": "issueAttempts",
+          "retainedBytes": 704,
+          "elementCount": 65
+        },
+        {
+          "property": "commitHandles",
+          "retainedBytes": 3656,
+          "elementCount": null
+        },
+        {
+          "property": "issuePlans",
+          "retainedBytes": 23416,
+          "elementCount": null
+        },
+        {
+          "property": "timeline",
+          "retainedBytes": 11128,
+          "elementCount": 193
+        },
+        {
+          "property": "ambiguities",
+          "retainedBytes": 32,
+          "elementCount": 0
+        },
+        {
+          "property": "publications",
+          "retainedBytes": 9680,
+          "elementCount": 66
+        },
+        {
+          "property": "planWrites",
+          "retainedBytes": 21504,
+          "elementCount": 63
+        },
+        {
+          "property": "prunes",
+          "retainedBytes": 136240,
+          "elementCount": 63
+        },
+        {
+          "property": "cleanup",
+          "retainedBytes": 391488,
+          "elementCount": 63
+        },
+        {
+          "property": "snapshots",
+          "retainedBytes": 32,
+          "elementCount": 0
+        },
+        {
+          "property": "closeGraphs",
+          "retainedBytes": 32,
+          "elementCount": 0
+        }
+      ]
+    }
+  ],
+  "spans": [
+    {
+      "fromTransition": 10,
+      "toTransition": 20,
+      "baselineGraphGrowth": 24046366,
+      "greenGraphGrowth": 19600877,
+      "baselineDatabasePartitionGrowth": 18490073,
+      "greenDatabasePartitionGrowth": 18490073,
+      "baselineRemainingGraphGrowth": 5556293,
+      "greenRemainingGraphGrowth": 1110804
+    },
+    {
+      "fromTransition": 20,
+      "toTransition": 30,
+      "baselineGraphGrowth": 23295652,
+      "greenGraphGrowth": 19422318,
+      "baselineDatabasePartitionGrowth": 18781886,
+      "greenDatabasePartitionGrowth": 18782414,
+      "baselineRemainingGraphGrowth": 4513766,
+      "greenRemainingGraphGrowth": 639904
+    },
+    {
+      "fromTransition": 10,
+      "toTransition": 30,
+      "baselineGraphGrowth": 47342018,
+      "greenGraphGrowth": 39023195,
+      "baselineDatabasePartitionGrowth": 37271959,
+      "greenDatabasePartitionGrowth": 37272487,
+      "baselineRemainingGraphGrowth": 10070059,
+      "greenRemainingGraphGrowth": 1750708
+    }
+  ],
+  "conclusion": {
+    "confirmed": "Growing Vitest onFinished assertion-owner chain is absent in all GREEN snapshots. Real rooms and registrations stay128=64current+64bounded original owners instead of137/147/157. FDBDatabase/CausalityIndex/MessageQueueManager constructor counts stay390/128/128.",
+    "preserved": "257 physical databases,1097 current raw stores,2194 disjoint records/index anchors; all membership and overlap checks pass. Storage graph partitions exactly match baseline10/20; GREEN30 differs by528 retained bytes in creator quarantine scopes.rawIndexes only.",
+    "remaining": "GREEN10→30 retains39023195 additional graph bytes;37272487 are in current-database dominator partition growth, leaving1750708 graph bytes of growth outside that partition. This residual is NOT causally attributed. The fixed64 initial-room callback roots remain intentionally out of scope."
+  },
+  "limitations": [
+    "Graph self/retained sizes include represented native backing and are not process heapUsed, external, arrayBuffers or RSS. No subtraction from process memory is valid.",
+    "Records/index, raw-store and raw-database partitions are ALTERNATIVES; never sum overlapping nested partitions.",
+    "Paired whole-graph differences are observations across runs, not exact bytes freed solely by the assertion fix; JIT/runtime and measurement differences remain possible.",
+    "Constructor counts do not themselves prove current ownership or lifetime violations; current membership and explicit strong paths are in transition*-owners.json. Allocation-site boilerplates are excluded from room/registration instance counts.",
+    "Stable observer-array sizes do not numerically explain the entire unclassified graph.",
+    "Baseline capture later failed final accounting guard; its completed snapshots remain analyzable. GREEN30 passed final assertions, but the separate unprofiled100 acceptance run is outside this artifact."
+  ],
+  "artifacts": {
+    "reproduce": "analyze.mjs <snapshot> <expected SHA256> <exclusive output prefix>; compare.mjs produces this summary from completed paired artifacts",
+    "fullPairedConstructorDeltas": "constructor-deltas.json",
+    "owners": [
+      "transition10-owners.json",
+      "transition20-owners.json",
+      "transition30-owners.json"
+    ],
+    "stores": [
+      "transition10-stores.json",
+      "transition20-stores.json",
+      "transition30-stores.json"
+    ],
+    "top": [
+      "top10.json",
+      "top20.json",
+      "top30.json"
+    ]
+  }
+}

@@ -8,6 +8,7 @@ import {
 	mintCreatorAnchorTrustCheckpointPredecessor,
 	resolveCreatorAnchorTrustMaterial,
 } from "./internal/seal-authority-custody.js";
+import { settlementProfileFor } from "./settlement-profile.js";
 
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 const INPUT_KEYS = Object.freeze([
@@ -141,7 +142,8 @@ function trustRecord(
 		!exactKeys(decoded, TRUST_KEYS) ||
 		decoded.kind !== "drp-anchor-trust-state" ||
 		decoded.version !== 1 ||
-		decoded.profileId !== "creator-trusted-v1" ||
+		typeof decoded.profileId !== "string" ||
+		(decoded.profileId !== "creator-trusted-v1" && settlementProfileFor(decoded.profileId) === "none") ||
 		decoded.quorum !== 1 ||
 		decoded.objectId !== expectedObjectId ||
 		decoded.genesisAnchorDigest !== pinnedGenesisAnchorDigest ||
@@ -239,7 +241,7 @@ export function openCreatorCheckpointTrust(input: unknown): OpenCreatorCheckpoin
 			genesisAnchorDigest: pinnedGenesisAnchorDigest,
 			kind: "drp-anchor-trust-state",
 			objectId: expectedObjectId,
-			profileId: "creator-trusted-v1",
+			profileId: predecessor.profileId,
 			quorum: 1,
 			version: 1,
 		});

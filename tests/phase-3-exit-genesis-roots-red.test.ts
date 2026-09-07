@@ -8,6 +8,7 @@ import type {
 	createV3RoomCreatorInviteMaterial as exportedCreateV3RoomCreatorInviteMaterial,
 	V3RoomCreatorInviteMaterial,
 	V3RoomCreatorInviteMaterialInput,
+	V3RoomHeadAuthority,
 } from "../examples/v3-room/src/index.js";
 
 type GenesisAnchorSigner = (digest: Uint8Array) => Promise<Uint8Array>;
@@ -39,6 +40,7 @@ const builderProbe = vi.hoisted(() => ({
 	inputs: [] as unknown[],
 	materials: [] as unknown[],
 	roomCreatorInvites: [] as unknown[],
+	roomHeadAuthorities: [] as unknown[],
 }));
 
 vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) => ({
@@ -57,26 +59,37 @@ vi.mock("../examples/v3-room/src/index.js", async (importOriginal) => {
 			builderProbe.materials.push(material);
 			return material;
 		}),
-		createV3RoomSession: vi.fn((input: Readonly<{ readonly creatorInvite: unknown; readonly objectId: string }>) => {
-			builderProbe.roomCreatorInvites.push(input.creatorInvite);
-			return Promise.resolve(
-				Object.freeze({
-					close: () => Promise.resolve(),
-					invite: "00",
-					issue: () => Promise.resolve(),
-					openEphemeral: () =>
-						Object.freeze({
-							close: () => undefined,
-							publish: () => Promise.resolve(true),
-							subscribe: (): (() => void) => () => undefined,
-						}),
-					previewLatchedAcl: () => Object.freeze({}),
-					projection: () => Object.freeze({}),
-					roomId: input.objectId,
-					trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
-				})
-			);
-		}),
+		createV3RoomSession: vi.fn(
+			(
+				input: Readonly<{
+					readonly creatorInvite: unknown;
+					readonly objectId: string;
+					readonly roomHeadAuthority?: unknown;
+				}>
+			) => {
+				builderProbe.roomCreatorInvites.push(input.creatorInvite);
+				builderProbe.roomHeadAuthorities.push(input.roomHeadAuthority);
+				return Promise.resolve(
+					Object.freeze({
+						close: () => Promise.resolve(),
+						invite: "00",
+						objectId: input.objectId,
+						issue: () => Promise.resolve(),
+						openEphemeral: () =>
+							Object.freeze({
+								close: () => undefined,
+								publish: () => Promise.resolve(true),
+								stats: () => Object.freeze({ overLimit: 0 }),
+								subscribe: (): (() => void) => () => undefined,
+							}),
+						previewLatchedAcl: () => Object.freeze({ current: Object.freeze({ epoch: 0 }) }),
+						projection: () => Object.freeze({}),
+						roomId: input.objectId,
+						trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
+					})
+				);
+			}
+		),
 	};
 });
 
@@ -250,7 +263,9 @@ function expectProductInput(
 	expect(Reflect.has(input, "stateDigest")).toBe(false);
 	expect(Reflect.get(input, "exactCanonicalApplicationStateBytes")).toEqual(expected.stateBytes);
 	expect(input.exactCanonicalLatchedAclBytes).toEqual(expected.acl);
-	expect(input.exactCanonicalParametersCarrierBytes).toEqual(encodeCanonical(EXPECTED_PARAMETERS));
+	expect(input.exactCanonicalParametersCarrierBytes).toEqual(
+		encodeCanonical({ ...EXPECTED_PARAMETERS, authorShareMultiplier: 4 })
+	);
 	const signerSet = encodeCanonical([{ publicKey: expected.signerAuthor, signerId: "creator" }]);
 	expect(input.exactCanonicalSignerSetBytes).toEqual(signerSet);
 	expect(input.exactCanonicalProfileBytes).toEqual(
@@ -521,6 +536,7 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 		builderProbe.inputs.length = 0;
 		builderProbe.materials.length = 0;
 		builderProbe.roomCreatorInvites.length = 0;
+		builderProbe.roomHeadAuthorities.length = 0;
 		const chatModule = await import("../examples/v3-chat/src/index.js");
 		const chatApi = Reflect.get(globalThis, "d9336V3Chat") as Readonly<{
 			close(): Promise<void>;
@@ -533,11 +549,23 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 		const zoneCreator = new Keychain({ private_key_seed: "phase-3-exit-a-zone-creator" });
 		await zoneCreator.start();
 		const zoneCreatorAuthor = zoneCreator.localAuthorId;
+		const unavailable = (): ReturnType<V3RoomHeadAuthority["read"]> =>
+			Promise.resolve({ ok: false, reason: "unavailable" } as const);
+		const zoneAuthority: V3RoomHeadAuthority = Object.freeze({
+			initialization: Object.freeze({ kind: "create" }),
+			begin: unavailable,
+			commit: unavailable,
+			create: unavailable,
+			migrate: unavailable,
+			read: unavailable,
+		});
+		const authorityForOpen = vi.fn(() => zoneAuthority);
 		const zoneApi = Reflect.apply(
 			Reflect.get(zone, "createV3ZoneApi") as (...arguments_: unknown[]) => unknown,
 			undefined,
 			[
 				Object.freeze({
+					ephemeralUnreliableWebRtcSnapshot: (): undefined => undefined,
 					keychain: Object.freeze({
 						localAuthorId: zoneCreatorAuthor,
 						signWithLocalAuthor: (digestBytes: Uint8Array) => zoneCreator.signWithLocalAuthor(digestBytes),
@@ -548,10 +576,13 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 					},
 				}),
 				(): void => undefined,
+				authorityForOpen,
 			]
 		) as Readonly<{ close(): Promise<void>; create(enrollment: string): Promise<void> }>;
 		await zoneApi.create(enrollmentHex());
 		await zoneApi.close();
+		expect(authorityForOpen).toHaveBeenCalledTimes(1);
+		expect(builderProbe.roomHeadAuthorities[1]).toBe(zoneAuthority);
 
 		expect(builderProbe.inputs).toHaveLength(2);
 		const chatInput = builderProbe.inputs[0] as V3RoomCreatorInviteMaterialInput;
@@ -559,6 +590,9 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 		const chatObjectId = `creator:${"d".repeat(32)}`;
 		const alice = new Keychain({ private_key_seed: "d9336-v3-chat-alice" });
 		await alice.start();
+		const creatorFinality = new Keychain({ private_key_seed: "d107d-v3-chat-creator-finality" });
+		await creatorFinality.start();
+		expect(creatorFinality.localAuthorId).not.toBe(alice.localAuthorId);
 		const chatApplication = chatModule.createV3ChatApplication("alice");
 		const chatBlueprintDigest = String(chatApplication.catalog.blueprintDigests[0] ?? "");
 		const chatMigration = chatApplication.migration;
@@ -573,10 +607,10 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 			acl: await expectedChatAcl(chatObjectId),
 			blueprintDigest: chatBlueprintDigest,
 			objectId: chatObjectId,
-			signerAuthor: alice.localAuthorId,
+			signerAuthor: creatorFinality.localAuthorId,
 			stateBytes: chatStateBytes,
 		});
-		await expectProductSigner(chatInput, alice);
+		await expectProductSigner(chatInput, creatorFinality);
 		expect(zoneInput.objectId).toMatch(/^peer-creator:[0-9a-f]{32}$/u);
 		const zoneMembers = Object.freeze([
 			Object.freeze({ author: zoneCreatorAuthor, order: 0, peerId: "peer-creator" }),

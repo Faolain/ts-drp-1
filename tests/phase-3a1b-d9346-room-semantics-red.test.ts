@@ -75,6 +75,10 @@ interface LocalIssueInput {
 }
 
 const probe = vi.hoisted(() => ({
+	projectionHandles: new WeakMap<object, { vertices: unknown[]; anchorDigest: string; controlDigests: Set<string> }>(),
+	projectionAnchor: "a".repeat(64),
+	projectionOrderOverride: undefined as readonly string[] | undefined,
+	projectionOrderFault: undefined as "objectId" | "epoch" | "anchorDigest" | "missing" | undefined,
 	activatedSink: undefined as ((input: { readonly vertex: unknown }) => unknown) | undefined,
 	closeCounts: { ahe: 0, issuance: 0, journal: 0, queue: 0, transport: 0 },
 	deactivations: 0,
@@ -97,6 +101,38 @@ const probe = vi.hoisted(() => ({
 	splitPrefixLength: undefined as number | undefined,
 }));
 
+// Declared controlled-node rows, not a replacement DAG algorithm.
+function controlledProjectionOrder(
+	vertices: readonly unknown[],
+	anchorDigest = probe.projectionAnchor,
+	controlDigests: ReadonlySet<string> = new Set()
+) {
+	const digests: string[] = [];
+	for (const vertex of vertices) {
+		if (typeof vertex !== "object" || vertex === null) throw new TypeError("controlled order vertex is invalid");
+		if (Reflect.get(vertex, "kind") === "drp-epoch-anchor") continue;
+		const bytes = Reflect.get(vertex, "digest");
+		if (!(bytes instanceof Uint8Array)) throw new TypeError("controlled order digest is invalid");
+		const digest = Buffer.from(bytes).toString("hex");
+		if (!controlDigests.has(digest) && !digests.includes(digest)) digests.push(digest);
+	}
+	const declared = probe.projectionOrderOverride;
+	const selected =
+		declared === undefined
+			? digests
+			: [
+					...declared.filter((digest) => digests.includes(digest)),
+					...digests.filter((digest) => !declared.includes(digest)),
+				];
+	return Object.freeze({
+		controlDigests: Object.freeze([...controlDigests].sort()),
+		objectId: probe.projectionOrderFault === "objectId" ? "wrong-room" : "controlled-v3-room",
+		epoch: probe.projectionOrderFault === "epoch" ? 1 : 0,
+		anchorDigest: probe.projectionOrderFault === "anchorDigest" ? "f".repeat(64) : anchorDigest,
+		digests: Object.freeze(probe.projectionOrderFault === "missing" ? selected.slice(0, -1) : selected),
+	});
+}
+
 vi.mock("@ts-drp/control-plane", async (importOriginal) => ({
 	...(await importOriginal()),
 	createCurrentAnchorTrustStore: () => ({
@@ -116,9 +152,22 @@ vi.mock("../packages/message-queue/dist/src/index.js", async (importOriginal) =>
 
 vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 	...(await importOriginal()),
+	readV3ApplicationProjectionOrder: (input: { plane?: unknown }) => {
+		const plane = input?.plane;
+		const state = typeof plane === "object" && plane !== null ? probe.projectionHandles.get(plane) : undefined;
+		return state === undefined
+			? { ok: false, kind: "not-active", detail: "controlled projection plane is inactive" }
+			: { ok: true, order: controlledProjectionOrder(state.vertices, state.anchorDigest, state.controlDigests) };
+	},
 	activateV3LivePlane: (input: { onAdmittedVertex(value: { readonly vertex: unknown }): unknown }) => {
-		probe.activatedSink = input.onAdmittedVertex;
-		return {
+		const vertices: unknown[] = [...probe.recovered];
+		// This legacy-profile fixture declares no authenticated protocol controls.
+		const controlDigests = new Set<string>();
+		probe.activatedSink = (delivery) => {
+			vertices.push(delivery.vertex);
+			return input.onAdmittedVertex(delivery);
+		};
+		const result = {
 			handle: {
 				currentEphemeralAuthority: () =>
 					Object.freeze({
@@ -130,6 +179,7 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 					}),
 				deactivate: (): void => {
 					probe.deactivations += 1;
+					probe.projectionHandles.delete(result.handle);
 				},
 				issueLocal: async (input: LocalIssueInput) => {
 					probe.issueInputs.push(input);
@@ -184,17 +234,27 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 			},
 			ok: true,
 		};
+		probe.projectionHandles.set(result.handle, { vertices, anchorDigest: probe.projectionAnchor, controlDigests });
+		return result;
 	},
 	prepareV3LiveGeneration: () =>
 		Promise.resolve({
 			capability: {},
-			descriptor: { anchorDigest: "a".repeat(64), blueprintDigest: "b".repeat(64) },
+			descriptor: {
+				anchorDigest: "a".repeat(64),
+				blueprintDigest: "b".repeat(64),
+				objectId: "controlled-v3-room",
+				epoch: 0,
+			},
 			ok: true,
 		}),
 	recoverV3LiveReplica: () =>
 		Promise.resolve({
 			capability: {},
-			descriptor: { recoveredVertices: [...probe.recovered] },
+			descriptor: {
+				recoveredVertices: [...probe.recovered],
+				applicationProjectionOrder: controlledProjectionOrder(probe.recovered),
+			},
 			ok: true,
 		}),
 	routeV3Ingress: () => undefined,
@@ -263,7 +323,8 @@ function accepted(
 ): V3RoomAcceptedVertex {
 	return {
 		...input,
-		digest: typeof digestBytes === "number" ? Uint8Array.of(digestBytes) : new Uint8Array(digestBytes),
+		digest: typeof digestBytes === "number" ? new Uint8Array(32).fill(digestBytes) : new Uint8Array(digestBytes),
+		objectId: "controlled-v3-room",
 		operation: input.operation ?? Object.freeze({ action: "message" }),
 	} as unknown as V3RoomAcceptedVertex;
 }
@@ -313,9 +374,14 @@ function creatorInvite(): V3RoomCreatorInviteMaterial {
 			]),
 			objectId,
 		}),
-		exactCanonicalParametersCarrierBytes: Uint8Array.of(3),
-		exactCanonicalProfileBytes: Uint8Array.of(4),
-		exactCanonicalSignerSetBytes: Uint8Array.of(5),
+		exactCanonicalParametersCarrierBytes: encodeCanonical({}),
+		exactCanonicalProfileBytes: encodeCanonical({
+			cryptoSuiteId: "ed25519-sha256-v3",
+			profileId: "creator-trusted-v1",
+			quorum: 1,
+			signers: [{ publicKey: creatorAuthor, signerId: "creator" }],
+		}),
+		exactCanonicalSignerSetBytes: encodeCanonical([{ publicKey: creatorAuthor, signerId: "creator" }]),
 		pinnedGenesisAnchorDigest: "a".repeat(64),
 	});
 }
@@ -325,6 +391,9 @@ function channel(): EphemeralChannel {
 		authorizedPeers: () => [],
 		close: () => undefined,
 		publish: () => Promise.resolve(true),
+		publishTo: () => Promise.resolve(true),
+		resetReliable: () => Promise.resolve(),
+		restartUnreliable: () => Promise.resolve(),
 		stats: () => ({
 			authorityMismatch: 0,
 			delivered: 0,
@@ -393,6 +462,10 @@ function application(projector: ExpectedApplication["projectAcceptedOperations"]
 }
 
 beforeEach(() => {
+	probe.projectionHandles = new WeakMap();
+	probe.projectionAnchor = "a".repeat(64);
+	probe.projectionOrderOverride = undefined;
+	probe.projectionOrderFault = undefined;
 	probe.activatedSink = undefined;
 	probe.closeCounts = { ahe: 0, issuance: 0, journal: 0, queue: 0, transport: 0 };
 	probe.deactivations = 0;
@@ -420,6 +493,86 @@ afterEach(() => {
 });
 
 describe("D.93.46b real shared-room semantics", () => {
+	it("rejects recovered node projection order with a wrong object epoch or anchor", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		probe.recovered = [accepted(0x11, { author: "author-a", authorSequence: 1, epoch: 0, logicalTime: 1 })];
+		for (const fault of ["objectId", "epoch", "anchorDigest"] as const) {
+			probe.projectionOrderFault = fault;
+			const result = await createV3RoomSession(input(application(), () => undefined)).then(
+				async (session) => {
+					await session.close();
+					return "unexpected-success";
+				},
+				(error: unknown) => error
+			);
+			expect(result, `ROOM_BINDS_RECOVERED_NODE_ORDER_${fault}`).toBeInstanceOf(Error);
+			expect(result instanceof Error ? result.message : result).toMatch(/projection order/u);
+		}
+	});
+
+	it("rejects a recovered selected row outside the node projection order epoch", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		probe.recovered = [accepted(0x14, { author: "author-a", authorSequence: 1, epoch: 1, logicalTime: 1 })];
+		const result = await createV3RoomSession(input(application(), () => undefined)).then(
+			async (session) => {
+				await session.close();
+				return "unexpected-success";
+			},
+			(error: unknown) => error
+		);
+		expect(result, "ROOM_REJECTS_CROSS_EPOCH_SELECTED_ROW").toBeInstanceOf(Error);
+		expect(result instanceof Error ? result.message : result).toMatch(/projection order/u);
+	});
+
+	it("rejects recovered node projection order omitting a selected digest", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		probe.recovered = [accepted(0x12, { author: "author-a", authorSequence: 1, epoch: 0, logicalTime: 1 })];
+		probe.projectionOrderFault = "missing";
+		const result = await createV3RoomSession(input(application(), () => undefined)).then(
+			async (session) => {
+				await session.close();
+				return "unexpected-success";
+			},
+			(error: unknown) => error
+		);
+		expect(result).toBeInstanceOf(Error);
+		expect(result instanceof Error ? result.message : result).toMatch(/projection order/u);
+	});
+
+	it("rejects live node projection order omitting the newly selected digest", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(input(application(), () => undefined));
+		probe.projectionOrderFault = "missing";
+		try {
+			await expect(
+				Promise.resolve().then(() =>
+					probe.activatedSink?.({
+						vertex: accepted(0x13, {
+							author: "author-a",
+							authorSequence: 1,
+							epoch: 0,
+							logicalTime: 1,
+						}),
+					})
+				)
+			).rejects.toThrow(/projection order/u);
+		} finally {
+			await session.close();
+		}
+	});
+
 	it("accepts the exact Phase 3g application policy and split durable database input", async () => {
 		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
 		const candidateApplication = Object.freeze({
@@ -835,11 +988,11 @@ describe("D.93.46b real shared-room semantics", () => {
 			epoch: 0,
 			logicalTime: 1,
 		});
-		const epochLater = accepted(0x25, {
+		const logicalTimeLater = accepted(0x25, {
 			author: "author-a",
 			authorSequence: 1,
-			epoch: 1,
-			logicalTime: 0,
+			epoch: 0,
+			logicalTime: 2,
 		});
 		const projectionHidden = accepted(0x30, {
 			author: "author-hidden",
@@ -848,8 +1001,19 @@ describe("D.93.46b real shared-room semantics", () => {
 			logicalTime: 19,
 			operation: Object.freeze({ action: "projection-hidden" }),
 		});
-		const live = [epochLater, authorLater, sequenceLater, digestLater, digestEarlier];
-		const expected = [recovered, digestEarlier, digestLater, sequenceLater, authorLater, epochLater].map(digest);
+		const live = [logicalTimeLater, authorLater, sequenceLater, digestLater, digestEarlier];
+		const expected = [recovered, digestEarlier, digestLater, sequenceLater, authorLater, logicalTimeLater].map(digest);
+		// This scenario consumes declared node-owned order under reversed delivery;
+		// it no longer asks the room to reconstruct an ordering comparator.
+		probe.projectionOrderOverride = [
+			recovered,
+			digestEarlier,
+			digestLater,
+			sequenceLater,
+			authorLater,
+			projectionHidden,
+			logicalTimeLater,
+		].map(digest);
 		const visibleApplication = application(project);
 		const observed: Projection[] = [];
 		probe.recovered = [projectionHidden, recovered];

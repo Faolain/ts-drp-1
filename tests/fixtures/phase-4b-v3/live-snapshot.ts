@@ -29,39 +29,46 @@ export interface OperationAdmissionPolicyFixture {
 /**
  * Builds the same in-memory network used by the Phase 4a live-fold owner.
  * @param peerId - Distinct peer identity for this recovered replica.
+ * @param recordCalls - Keep mock-call recording by default; long-running workloads can opt out.
  * @returns A network node with recorded topic membership.
  */
-export function fakeNetwork(peerId: string): DRPNetworkNode {
+export function fakeNetwork(peerId: string, recordCalls = true): DRPNetworkNode {
 	const topics = new Set<string>();
-	return {
+	const network = {
 		peerId,
 		membershipVerifier: undefined,
-		start: vi.fn(() => Promise.resolve()),
-		stop: vi.fn(() => Promise.resolve()),
-		restart: vi.fn(() => Promise.resolve()),
-		isDialable: vi.fn(() => Promise.resolve(true)),
-		changeTopicScoreParams: vi.fn(),
-		removeTopicScoreParams: vi.fn(),
-		subscribe: vi.fn((topic: string) => topics.add(topic)),
-		unsubscribe: vi.fn((topic: string) => topics.delete(topic)),
-		connectToBootstraps: vi.fn(() => Promise.resolve()),
-		connect: vi.fn(() => Promise.resolve()),
-		disconnect: vi.fn(() => Promise.resolve()),
-		getPeerMultiaddrs: vi.fn(() => Promise.resolve([])),
-		getBootstrapNodes: vi.fn(() => []),
-		getSubscribedTopics: vi.fn(() => [...topics]),
-		getMultiaddrs: vi.fn(() => ["/ip4/127.0.0.1/tcp/1"]),
-		getAllPeers: vi.fn(() => []),
-		getGroupPeers: vi.fn(() => []),
-		broadcastMessage: vi.fn(() => Promise.resolve()),
-		publishMessage: vi.fn(() => Promise.resolve(true)),
-		sendMessage: vi.fn(() => Promise.resolve()),
-		sendMessageToRandomPeer: vi.fn(() => Promise.resolve()),
-		sendGroupMessage: vi.fn(() => Promise.resolve()),
-		subscribeToMessageQueue: vi.fn(),
-		onGroupPeerChange: vi.fn((): (() => void) => () => undefined),
-		gossipTopicFor: vi.fn(() => undefined),
-	} as unknown as DRPNetworkNode;
+		start: (): Promise<void> => Promise.resolve(),
+		stop: (): Promise<void> => Promise.resolve(),
+		restart: (): Promise<void> => Promise.resolve(),
+		isDialable: (): Promise<boolean> => Promise.resolve(true),
+		changeTopicScoreParams: (): undefined => undefined,
+		removeTopicScoreParams: (): undefined => undefined,
+		subscribe: (topic: string): Set<string> => topics.add(topic),
+		unsubscribe: (topic: string): boolean => topics.delete(topic),
+		connectToBootstraps: (): Promise<void> => Promise.resolve(),
+		connect: (): Promise<void> => Promise.resolve(),
+		disconnect: (): Promise<void> => Promise.resolve(),
+		getPeerMultiaddrs: (): Promise<never[]> => Promise.resolve([]),
+		getBootstrapNodes: (): never[] => [],
+		getSubscribedTopics: (): string[] => [...topics],
+		getMultiaddrs: (): string[] => ["/ip4/127.0.0.1/tcp/1"],
+		getAllPeers: (): never[] => [],
+		getGroupPeers: (): never[] => [],
+		broadcastMessage: (): Promise<void> => Promise.resolve(),
+		publishMessage: (): Promise<boolean> => Promise.resolve(true),
+		sendMessage: (): Promise<void> => Promise.resolve(),
+		sendMessageToRandomPeer: (): Promise<void> => Promise.resolve(),
+		sendGroupMessage: (): Promise<void> => Promise.resolve(),
+		subscribeToMessageQueue: (): undefined => undefined,
+		onGroupPeerChange: (): (() => void) => () => undefined,
+		gossipTopicFor: (): undefined => undefined,
+	};
+	if (recordCalls) {
+		for (const [name, method] of Object.entries(network)) {
+			if (typeof method === "function") Reflect.set(network, name, vi.fn(method));
+		}
+	}
+	return network as unknown as DRPNetworkNode;
 }
 
 function journalStore(fixture: GenuinePreparedV3Fixture, trace?: string[]): DurableLiveJournalStore {

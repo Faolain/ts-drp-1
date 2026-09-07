@@ -3,6 +3,8 @@ import { prepareBlueprintAdmission, prepareBlueprintRuntime } from "@ts-drp/prot
 import { describe, expect, it, vi } from "vitest";
 
 import { runFrontierScenario } from "./fixtures/phase-3f-b/frontier-reduction-fixture.js";
+import type { V3ZoneApi } from "../examples/grid/src/v3-zone.js";
+import type { V3RoomHeadAuthority } from "../examples/v3-room/src/index.js";
 import type { TrustedBlueprintCatalog } from "../packages/blueprint-catalog/src/index.js";
 
 vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) => ({
@@ -11,6 +13,8 @@ vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) 
 
 const roomEntryProbe = vi.hoisted(() => ({
 	applications: [] as unknown[],
+	inputs: [] as Array<Readonly<{ objectId: string; creatorInvite?: unknown; roomHeadAuthority?: unknown }>>,
+	failure: undefined as Error | undefined,
 	sessions: [] as Array<{
 		readonly channel: unknown;
 		committedProjection: boolean;
@@ -32,6 +36,8 @@ vi.mock("../examples/v3-room/src/index.js", async (importOriginal) => {
 					onProjection(value: unknown): void;
 				}>
 			) => {
+				roomEntryProbe.inputs.push(input);
+				if (roomEntryProbe.failure !== undefined) return Promise.reject(roomEntryProbe.failure);
 				roomEntryProbe.applications.push(input.application);
 				const channel = Object.freeze({
 					close: () => undefined,
@@ -101,6 +107,149 @@ interface ProductApplication {
 	}): Readonly<Record<string, unknown>>;
 }
 
+describe("grid per-open room-head authority wiring", () => {
+	it("passes a frozen open context and the exact provider, then reacquires reopen authority after close", async () => {
+		const created = entryAuthority();
+		const reopened = entryAuthority("reopen");
+		const factory = vi.fn().mockReturnValueOnce(created).mockResolvedValueOnce(reopened);
+		const api = await authorityZone(factory);
+		const before = roomEntryProbe.inputs.length;
+		try {
+			await api.create(authorityEnrollment());
+			const input = roomEntryProbe.inputs[before];
+			if (input === undefined) throw new Error("grid room open absent");
+			expect(factory).toHaveBeenCalledTimes(1);
+			expect(factory.mock.calls[0]).toEqual([
+				{
+					author: "c".repeat(64),
+					creatorInvite: input.creatorInvite,
+					objectId: input.objectId,
+					operation: "create",
+				},
+			]);
+			expect(Object.isFrozen(factory.mock.calls[0]?.[0])).toBe(true);
+			expect(input.roomHeadAuthority).toBe(created);
+			expect(api.snapshot().ready).toBe(true);
+			await api.close();
+			const invite = authorityJoinInvite(input);
+			await api.join(invite);
+			const next = roomEntryProbe.inputs[before + 1];
+			if (next === undefined) throw new Error("grid room reopen absent");
+			expect(factory).toHaveBeenCalledTimes(2);
+			expect(factory.mock.calls[1]).toEqual([
+				{
+					author: "c".repeat(64),
+					creatorInvite: next.creatorInvite,
+					objectId: input.objectId,
+					operation: "join",
+				},
+			]);
+			expect(Object.isFrozen(factory.mock.calls[1]?.[0])).toBe(true);
+			expect(next.roomHeadAuthority).toBe(reopened);
+			expect(reopened.initialization).toEqual({ kind: "reopen" });
+		} finally {
+			await api.close();
+		}
+	});
+
+	it("refuses absent or noncallable factories before opening the shared room", async () => {
+		for (const factory of [undefined, null, {}]) {
+			const before = roomEntryProbe.inputs.length;
+			const selected: { api?: V3ZoneApi } = {};
+			try {
+				await expect(
+					(async (): Promise<void> => {
+						selected.api = await authorityZone(factory);
+						await selected.api.create(authorityEnrollment());
+					})()
+				).rejects.toBeInstanceOf(TypeError);
+				expect(roomEntryProbe.inputs).toHaveLength(before);
+				if (selected.api !== undefined) expect(selected.api.snapshot().ready).toBe(false);
+			} finally {
+				await selected.api?.close();
+			}
+		}
+	});
+
+	it("rejects malformed providers, including every missing method and initialization kind", async () => {
+		const valid = entryAuthority();
+		const invalid = [
+			undefined,
+			null,
+			{},
+			{ ...valid, initialization: undefined },
+			{ ...valid, initialization: { kind: "unknown" } },
+			...["begin", "commit", "create", "migrate", "read"].map((method) => ({ ...valid, [method]: undefined })),
+		];
+		for (const provider of invalid) {
+			const factory = vi.fn(() => provider);
+			const api = await authorityZone(factory);
+			const before = roomEntryProbe.inputs.length;
+			try {
+				await expect(api.create(authorityEnrollment())).rejects.toBeInstanceOf(TypeError);
+				expect(factory).toHaveBeenCalledTimes(1);
+				expect(roomEntryProbe.inputs).toHaveLength(before);
+				expect(api.snapshot()).toMatchObject({ ready: false, zoneId: "", invite: "" });
+			} finally {
+				await api.close();
+			}
+		}
+	});
+
+	it("propagates factory failure without fallback and permits a fresh successful attempt", async () => {
+		const failure = new Error("authority service unavailable");
+		const provider = entryAuthority();
+		const factory = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(provider);
+		const api = await authorityZone(factory);
+		const before = roomEntryProbe.inputs.length;
+		try {
+			await expect(api.create(authorityEnrollment())).rejects.toBe(failure);
+			expect(roomEntryProbe.inputs).toHaveLength(before);
+			expect(factory).toHaveBeenCalledTimes(1);
+			expect(api.snapshot()).toMatchObject({ ready: false, zoneId: "", invite: "" });
+			await api.create(authorityEnrollment());
+			expect(factory).toHaveBeenCalledTimes(2);
+			expect(roomEntryProbe.inputs[before]?.roomHeadAuthority).toBe(provider);
+		} finally {
+			await api.close();
+		}
+	});
+
+	it("propagates shared-room authority refusal without substituting initialization", async () => {
+		const failure = new Error("D110C_FLOOR_MIGRATION_REQUIRED");
+		const provider = entryAuthority("reopen");
+		const factory = vi.fn(() => provider);
+		const api = await authorityZone(factory);
+		const before = roomEntryProbe.inputs.length;
+		roomEntryProbe.failure = failure;
+		try {
+			await expect(api.create(authorityEnrollment())).rejects.toBe(failure);
+			expect(factory).toHaveBeenCalledTimes(1);
+			expect(roomEntryProbe.inputs).toHaveLength(before + 1);
+			expect(roomEntryProbe.inputs[before]?.roomHeadAuthority).toBe(provider);
+			expect(provider.initialization).toEqual({ kind: "reopen" });
+			expect(api.snapshot()).toMatchObject({ ready: false, zoneId: "", invite: "" });
+		} finally {
+			roomEntryProbe.failure = undefined;
+			await api.close();
+		}
+	});
+
+	it("does not acquire authority for an invalid invite identity", async () => {
+		const factory = vi.fn(() => entryAuthority("reopen"));
+		const api = await authorityZone(factory);
+		const before = roomEntryProbe.inputs.length;
+		try {
+			await expect(api.join("00")).rejects.toBeInstanceOf(TypeError);
+			expect(factory).not.toHaveBeenCalled();
+			expect(roomEntryProbe.inputs).toHaveLength(before);
+			expect(api.snapshot().ready).toBe(false);
+		} finally {
+			await api.close();
+		}
+	});
+});
+
 function operations(application: ProductApplication): readonly unknown[] {
 	const decoded = decodeCanonical(application.canonicalBlueprintPackageBytes);
 	if (decoded === null || typeof decoded !== "object") throw new TypeError("invalid product package");
@@ -140,7 +289,67 @@ function hex(bytes: Uint8Array): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function expectNeutralReducer(application: ProductApplication): Promise<void> {
+// Shape-only capability for the existing mocked room; no freshness claim is made here.
+function entryAuthority(kind: "create" | "reopen" = "create"): V3RoomHeadAuthority {
+	const unavailable = (): ReturnType<V3RoomHeadAuthority["read"]> =>
+		Promise.resolve({ ok: false, reason: "unavailable" } as const);
+	return Object.freeze({
+		initialization: Object.freeze({ kind }),
+		begin: unavailable,
+		commit: unavailable,
+		create: unavailable,
+		migrate: unavailable,
+		read: unavailable,
+	});
+}
+
+async function authorityZone(factory: unknown): Promise<V3ZoneApi> {
+	const zone = await import("../examples/grid/src/v3-zone.js");
+	return Reflect.apply(zone.createV3ZoneApi, undefined, [
+		Object.freeze({
+			ephemeralUnreliableWebRtcSnapshot: () => undefined,
+			keychain: Object.freeze({
+				localAuthorId: "c".repeat(64),
+				signWithLocalAuthor: () => Promise.resolve(new Uint8Array(64).fill(0x41)),
+			}),
+			networkNode: Object.freeze({ peerId: "zone-creator-peer" }),
+			openRoomNetwork: () => {
+				throw new Error("mocked room must not open a transport");
+			},
+		}),
+		(): void => undefined,
+		factory,
+	]);
+}
+
+function authorityEnrollment(): string {
+	return hex(
+		encodeCanonical({
+			author: "d".repeat(64),
+			kind: "ts-drp-v3-zone-enrollment",
+			peerId: "peer:zone-member",
+			version: 1,
+		})
+	);
+}
+
+function authorityJoinInvite(input: Readonly<{ objectId: string; creatorInvite?: unknown }>): string {
+	const material = input.creatorInvite;
+	if (material === null || typeof material !== "object") throw new TypeError("creator material absent");
+	const roomInvite = hex(
+		encodeCanonical({
+			...material,
+			kind: "ts-drp-example-v3-room-creator-invite",
+			version: 1,
+		})
+	);
+	return hex(encodeCanonical({ kind: "ts-drp-v3-zone-invite", roomInvite, version: 1, zoneId: input.objectId }));
+}
+
+async function expectNeutralReducer(
+	application: ProductApplication,
+	state: unknown = Object.freeze({ durable: "unchanged" })
+): Promise<void> {
 	const decoded = decodeCanonical(application.canonicalBlueprintPackageBytes);
 	if (decoded === null || typeof decoded !== "object") throw new TypeError("invalid product package");
 	const blueprintDigest = application.catalog.resolve(
@@ -157,7 +366,6 @@ async function expectNeutralReducer(application: ProductApplication): Promise<vo
 		expectedBlueprintDigest: blueprintDigest,
 		preparedBlueprintAdmission: admission,
 	});
-	const state = Object.freeze({ durable: "unchanged" });
 	const reducer = runtime.reducers.causalJoin;
 	if (reducer === undefined) throw new TypeError("missing causalJoin reducer");
 	expect(reducer({ operation: Object.freeze({ action: "causalJoin" }), state })).toEqual({ output: null, state });
@@ -256,12 +464,20 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			"applicationBatch",
 			"causalJoin",
 			"commit-outcome-v1",
-			"join",
+			"installRoster",
 			"migrationActivation",
 			"migrationRecord",
 			"placeBlock",
 		]);
-		await expectNeutralReducer(application);
+		await expectNeutralReducer(
+			application,
+			Object.freeze({
+				version: 1,
+				blocks: [{ id: "retained", kind: "stone", x: 3, y: 4 }],
+				outcomes: [],
+				roster: [{ author: creatorAuthor, order: 0, peerId: "peer:creator" }],
+			})
+		);
 		const beforeEntry = roomEntryProbe.applications.length;
 		const localAuthor = "c".repeat(64);
 		const localPeerId = "zone-creator-peer";
@@ -278,6 +494,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 				},
 			}),
 			(): void => undefined,
+			(): V3RoomHeadAuthority => entryAuthority(),
 		]) as Readonly<{ close(): Promise<void>; create(enrollment: string): Promise<void> }>;
 		await zoneApi.create(
 			hex(
@@ -305,7 +522,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			]) as ProductApplication;
 			expectSameApplication(entryApplication, expectedEntryApplication, [
 				accepted(
-					Object.freeze({ action: "join", roster: Object.freeze({ entries: entryMembers }) }),
+					Object.freeze({ action: "installRoster", roster: Object.freeze({ entries: entryMembers }) }),
 					0x31,
 					localAuthor
 				),
@@ -321,7 +538,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 					authenticatedBase: undefined,
 					currentEpochOperations: [
 						accepted(
-							Object.freeze({ action: "join", roster: Object.freeze({ entries: entryMembers }) }),
+							Object.freeze({ action: "installRoster", roster: Object.freeze({ entries: entryMembers }) }),
 							0x41,
 							localAuthor
 						),
@@ -354,7 +571,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 		const zoneVertices = [
 			accepted(
 				Object.freeze({
-					action: "join",
+					action: "installRoster",
 					roster: Object.freeze({
 						entries: Object.freeze([Object.freeze({ author: creatorAuthor, order: 0, peerId: "peer:creator" })]),
 					}),

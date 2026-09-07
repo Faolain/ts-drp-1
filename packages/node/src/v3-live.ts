@@ -5,6 +5,7 @@ import {
 	CausalityIndex,
 	CompactMerkleAccumulator,
 	type EpochVertex,
+	topologicalOrder,
 } from "@ts-drp/compaction";
 import {
 	BlueprintStateMachine,
@@ -30,6 +31,7 @@ import {
 	durableIssuanceLineagesEqual,
 	durableIssuancePruningMaintenanceForStore,
 	type DurableIssuancePruningReceipt,
+	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
 import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
@@ -52,6 +54,10 @@ import {
 	openCurrentEpochAuthorAuthorization,
 	resolveCurrentEpochAuthorizedAuthor,
 } from "@ts-drp/protocol-v3/author-authorization";
+import {
+	openCreatorAuthorSettlement,
+	resolveCreatorAuthorSettlement,
+} from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import { verifyReceivedVertex } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import {
 	authorizeLatchedApplicationWrite,
@@ -71,6 +77,7 @@ import {
 	digestClosure,
 	type ExpectedHead,
 	type GenerationId,
+	type GenerationRecord,
 	type GenerationRef,
 	parseGenerationId,
 	parseHeadRevision,
@@ -80,12 +87,14 @@ import {
 } from "@ts-drp/storage";
 import {
 	AHE_RECLAMATION_LOCAL_ONLY_POLICY_DIGEST,
+	aheReclamationMaintenanceForStore,
 	type AheReclamationReceipt,
 	captureAheReclamationInput,
 } from "@ts-drp/storage/maintenance";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
 import { bindCreatorLiveClose } from "./creator-close.js";
+import { planClosedEpochCleanup } from "./internal/closed-epoch-cleanup.js";
 import {
 	type CreatorSuccessorGenerationMaterial,
 	type CreatorSuccessorLiveMaterial,
@@ -814,6 +823,7 @@ export type RecoverV3LiveReplicaResult =
 			readonly ok: true;
 			readonly capability: RecoveredV3Live;
 			readonly descriptor: Readonly<{
+				readonly applicationProjectionOrder: V3ApplicationProjectionOrder;
 				readonly objectId: string;
 				readonly recoveredVertices: readonly AdmittedReceivedVertexView[];
 				readonly recoveredVertexCount: number;
@@ -821,6 +831,22 @@ export type RecoverV3LiveReplicaResult =
 			}>;
 	  }>
 	| Readonly<{ readonly ok: false; readonly kind: RecoverV3LiveReplicaFailureKind; readonly detail: string }>;
+
+export interface V3ApplicationProjectionOrder {
+	readonly objectId: string;
+	readonly epoch: number;
+	readonly anchorDigest: string;
+	readonly digests: readonly string[];
+	readonly controlDigests: readonly string[];
+}
+
+export type V3ApplicationProjectionOrderResult =
+	| Readonly<{ readonly ok: true; readonly order: V3ApplicationProjectionOrder }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "malformed-input" | "not-active" | "graph-rejected";
+			readonly detail: string;
+	  }>;
 
 interface CapturedInput {
 	readonly authenticationProfile: "creator-only";
@@ -2748,6 +2774,38 @@ interface VerifiedV3IngressEvidence {
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
+
+/**
+ * Reads scalar diagnostics from an already-owned handle without retaining owners.
+ * Gate presence is not queue depth: a settled completion promise can remain installed.
+ * @param plane Existing live-plane handle.
+ * @returns Current registration census, or undefined for a foreign handle.
+ */
+export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<string, number>> | undefined {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined) return undefined;
+	return ObjectFreeze({
+		networkRegistrations: v3PlaneRegistrations.get(registration.networkNode)?.size ?? 0,
+		authorVertexCounts: registration.authorVertexCounts.size,
+		closeAuthors: registration.closeAuthors.size,
+		closeCharges: registration.closeCharges.size,
+		closeVertices: registration.closeVertices.size,
+		controlVertices: registration.controlVertices.size,
+		latchedOperations: registration.latchedOperations.size,
+		pendingIngress: registration.pendingIngress.size,
+		pendingIngressBytes: registration.pendingIngressBytes,
+		quarantinedDigests: registration.quarantinedDigests.size,
+		rebaseSnapshotRows: registration.rebaseSnapshot?.length ?? 0,
+		causalityIndex: registration.index.size,
+		gatePresent: Number(registration.gate !== undefined),
+		drainingPendingIngress: Number(registration.drainingPendingIngress),
+		terminalBarrierPresent: Number(registration.terminalBarrier !== undefined),
+		releaseTerminalBarrierPresent: Number(registration.releaseTerminalBarrier !== undefined),
+		active: Number(registration.active),
+		terminal: Number(registration.terminalState === "terminal"),
+	});
+}
+
 const creatorSuccessorTransportHandoffs = new WeakMap<object, V3PlaneRegistration>();
 const aliasedCreatorSuccessorHandles = new WeakSet<V3PlaneHandle>();
 const claimedCreatorCloseHandles = new WeakSet<V3PlaneHandle>();
@@ -4489,6 +4547,19 @@ interface SettlementFrontierContext {
 	readonly terminalThrough: number | null;
 }
 
+function settlementFrontierFromHistory(
+	context: HistoricalIssuanceContext | undefined
+): SettlementFrontierContext | undefined {
+	const identity = context === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(context.capability);
+	return identity?.admissionEpoch === undefined
+		? undefined
+		: ObjectFreeze({
+				admissionEpoch: identity.admissionEpoch,
+				currentEpoch: identity.successorEpoch,
+				terminalThrough: identity.admittedAuthorSequence,
+			});
+}
+
 interface HistoricalIssuanceContext {
 	readonly capability: VerifiedCreatorHistoricalIssuance;
 	readonly countedSequences: Set<number>;
@@ -4508,7 +4579,8 @@ function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefin
 	if (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;
 	context.count += 1;
 	ReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);
-	const maxHistoricalIssuanceRows = context.maxEpochVertices;
+	const identity = resolveVerifiedCreatorHistoricalIssuance(context.capability);
+	const maxHistoricalIssuanceRows = context.maxEpochVertices * (identity?.admissionEpoch === undefined ? 1 : 3);
 	return context.count <= maxHistoricalIssuanceRows;
 }
 
@@ -4756,7 +4828,7 @@ function classifyPlaneVertex(
 	expectedDigest: Uint8Array,
 	expectedAuthor: string,
 	expectedAuthorSequence: number,
-	settlementFrontier?: SettlementFrontierContext
+	settlementFrontier = settlementFrontierFromHistory(historicalIssuance)
 ): ClassifiedPlaneVertex | undefined {
 	const matches = (
 		authenticated: AuthenticatedRecoveryVertex | undefined
@@ -5140,6 +5212,33 @@ function creatorFilteredIssuanceStore(
 				if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
 					return page;
 				}
+				const settlementFrontier = settlementFrontierFromHistory(historicalIssuance);
+				if (settlementFrontier !== undefined) {
+					const source = authenticatedSettlementSourceRow(
+						filterPayload,
+						filterAuthorization,
+						row.canonicalPreimageBytes,
+						row.signature,
+						row.digest,
+						issuanceScope.author,
+						row.authorSequence,
+						settlementFrontier
+					);
+					if (
+						source !== undefined &&
+						(excludedAfterEpoch === undefined || source.admitted.epoch < excludedAfterEpoch)
+					) {
+						const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+						const issuedRow = outboxRowSnapshot(
+							ObjectFreeze({ commit: issued, publishState: row.publishState }),
+							issuanceScope
+						);
+						if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
+						if (!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence)) return page;
+						afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence] as const);
+						continue;
+					}
+				}
 				const authenticated = authenticateRecoveryVertex(
 					filterPayload,
 					filterAuthorization,
@@ -5333,7 +5432,22 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (authorization === undefined) {
 			return recoveryFailure("authorization-rejected", "v3 recovery authorization does not match");
 		}
-		if (resolveV3AuthorizedAuthor(authorization, selectedScope.author) === undefined) {
+		const historicalIdentity =
+			historicalIssuance === undefined
+				? undefined
+				: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+		// This permits validation of a returning member's predecessor journal, not
+		// application admission under an ACL in which that member was absent.
+		const returningPredecessor =
+			historicalIdentity?.admissionEpoch === historicalIdentity?.successorEpoch &&
+			historicalIdentity !== undefined &&
+			historicalIdentity.author === selectedScope.author &&
+			historicalIdentity.objectId === selectedScope.objectId &&
+			historicalIdentity.closedEpoch === payload.provenance.epoch &&
+			historicalIdentity.closedAnchorDigest === payload.provenance.anchorDigest &&
+			historicalIdentity.successorEpoch === payload.provenance.epoch + 1 &&
+			settlementProfileFor(payload.trust.trust.profileId) === "v1";
+		if (resolveV3AuthorizedAuthor(authorization, selectedScope.author) === undefined && !returningPredecessor) {
 			return recoveryFailure("authorization-rejected", "v3 recovery author is not authorized");
 		}
 
@@ -5376,7 +5490,20 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			);
 			if (
 				sourceAuthorization === undefined ||
-				resolveV3AuthorizedAuthor(sourceAuthorization, selectedScope.author) === undefined
+				(resolveV3AuthorizedAuthor(sourceAuthorization, selectedScope.author) === undefined &&
+					!(
+						successorRecovery !== undefined &&
+						source.capability === successorRecovery.sourceCapability &&
+						historicalIdentity !== undefined &&
+						historicalIdentity.author === selectedScope.author &&
+						historicalIdentity.objectId === selectedScope.objectId &&
+						historicalIdentity.admissionEpoch === payload.provenance.epoch &&
+						historicalIdentity.successorEpoch === payload.provenance.epoch &&
+						historicalIdentity.successorAnchorDigest === payload.provenance.anchorDigest &&
+						historicalIdentity.closedEpoch === sourcePayload.provenance.epoch &&
+						historicalIdentity.closedAnchorDigest === sourcePayload.provenance.anchorDigest &&
+						settlementProfileFor(payload.trust.trust.profileId) === "v1"
+					))
 			) {
 				return recoveryFailure("authorization-rejected", "v3 displaced source authorization does not match");
 			}
@@ -5759,6 +5886,24 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			} catch {
 				return recoveryFailure("admission-rejected", "v3 recovery admission failed");
 			}
+			const settlementFrontier = settlementFrontierFromHistory(historicalIssuance);
+			if (
+				classified !== undefined &&
+				settlementFrontier !== undefined &&
+				settlementFrontier.currentEpoch === payload.provenance.epoch
+			) {
+				const ownClass = settlementOwnRowClass(
+					classified.authenticated.admitted.epoch,
+					settlementFrontier.currentEpoch,
+					row.authorSequence,
+					settlementFrontier.admissionEpoch,
+					settlementFrontier.terminalThrough
+				);
+				if (ownClass === "terminal" || ownClass === "old-incarnation") {
+					afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+					continue;
+				}
+			}
 			if (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {
 				if (
 					!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence) ||
@@ -6040,6 +6185,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (
 			successorRecovery === undefined &&
 			!retainedBootstrapHold &&
+			!returningPredecessor &&
 			currentRecordCount === 0 &&
 			(historicalIssuance?.count ?? 0) === 0 &&
 			(recoveredCount === 0 || (displacedSource !== undefined && displacedSource.activationVertexDigest === undefined))
@@ -6049,10 +6195,14 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (
 			successorRecovery === undefined &&
 			!retainedBootstrapHold &&
-			((recoveredCount === 0 && (historicalIssuance?.count ?? 0) === 0) ||
+			((!returningPredecessor && recoveredCount === 0 && (historicalIssuance?.count ?? 0) === 0) ||
 				index.size !== preparedVertexCount + recoveredCount)
 		) {
 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
+		}
+		const applicationProjection = deriveApplicationProjectionOrder(payload, closeVertices, controlVertices, index);
+		if (applicationProjection === undefined) {
+			return recoveryFailure("graph-rejected", "v3 recovery application order is unavailable");
 		}
 		const capability = ObjectFreeze({}) as RecoveredV3Live;
 		if (successorRecovery !== undefined)
@@ -6088,6 +6238,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		return ObjectFreeze({
 			capability,
 			descriptor: ObjectFreeze({
+				applicationProjectionOrder: applicationProjection.order,
 				objectId: payload.provenance.objectId,
 				recoveredVertices: ObjectFreeze([...recoveredVertices]),
 				recoveredVertexCount: index.size,
@@ -7720,6 +7871,72 @@ function applicationProjectionVertices(
 	return projected;
 }
 
+function deriveApplicationProjectionOrder(
+	payload: PreparedV3LivePayload,
+	source: Map<string, EpochVertex>,
+	controlVertices: ReadonlySet<string>,
+	causality: CausalityIndex
+): Readonly<{ readonly order: V3ApplicationProjectionOrder; readonly vertices: Map<string, EpochVertex> }> | undefined {
+	try {
+		const vertices = applicationProjectionVertices(source, controlVertices, causality);
+		if (vertices === undefined) return undefined;
+		const anchorDigest = payload.provenance.anchorDigest;
+		const digests = topologicalOrder(vertices, anchorDigest).filter((digest) => digest !== anchorDigest);
+		const controlDigests = [...controlVertices].sort();
+		if (controlDigests.some((digest) => digest === anchorDigest || !source.has(digest) || vertices.has(digest))) {
+			return undefined;
+		}
+		return ObjectFreeze({
+			order: ObjectFreeze({
+				objectId: payload.provenance.objectId,
+				epoch: payload.provenance.epoch,
+				anchorDigest,
+				digests: ObjectFreeze(digests),
+				controlDigests: ObjectFreeze(controlDigests),
+			}),
+			vertices,
+		});
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Reads the canonical application order from one authenticated active plane.
+ * @param input - Exact capability-bearing request; copied handles have no provenance.
+ * @returns Detached scoped application order and authenticated protocol-control digests, excluding anchors.
+ */
+export function readV3ApplicationProjectionOrder(
+	input: Readonly<{ readonly plane: V3PlaneHandle }>
+): V3ApplicationProjectionOrderResult {
+	try {
+		const captured = snapshotClosedRecord(input, BLUEPRINT_RETRIEVAL_INPUT_KEYS);
+		const registration =
+			captured === undefined ? undefined : v3HandleRegistrations.get(captured.plane as V3PlaneHandle);
+		if (registration === undefined) {
+			return ObjectFreeze({
+				ok: false,
+				kind: "malformed-input",
+				detail: "v3 application order plane has no provenance",
+			});
+		}
+		if (!currentRegistration(registration)) {
+			return ObjectFreeze({ ok: false, kind: "not-active", detail: "v3 application order plane is not active" });
+		}
+		const projection = deriveApplicationProjectionOrder(
+			registration.payload,
+			registration.closeVertices,
+			registration.controlVertices,
+			registration.index
+		);
+		return projection === undefined
+			? ObjectFreeze({ ok: false, kind: "graph-rejected", detail: "v3 application order graph is unavailable" })
+			: ObjectFreeze({ ok: true, order: projection.order });
+	} catch {
+		return ObjectFreeze({ ok: false, kind: "malformed-input", detail: "v3 application order input is invalid" });
+	}
+}
+
 function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3BlueprintFoldResult {
 	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
 		return blueprintFoldFailure("not-active", "v3 blueprint fold is not active");
@@ -7733,12 +7950,13 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 	const graphVersion = registration.graphVersion;
 	let staged;
 	try {
-		const vertices = applicationProjectionVertices(
+		const projection = deriveApplicationProjectionOrder(
+			registration.payload,
 			registration.closeVertices,
 			registration.controlVertices,
 			registration.index
 		);
-		if (vertices === undefined) return blueprintFoldFailure("fold-rejected", "v3 blueprint graph is unavailable");
+		if (projection === undefined) return blueprintFoldFailure("fold-rejected", "v3 blueprint graph is unavailable");
 		staged = foldBlueprintEpoch({
 			anchorHash: registration.payload.provenance.anchorDigest,
 			authorize: ({ hash }) => {
@@ -7747,8 +7965,15 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 					| undefined;
 				return identity !== undefined && isV3ApplicationAuthorAuthorized(registration.authorization, identity.author);
 			},
+			executionContext: ({ hash }) => {
+				const identity = ReflectApply(MapPrototypeGet, registration.closeAuthors, [hash]) as
+					| CloseVertexIdentity
+					| undefined;
+				if (identity === undefined) throw new TypeError("v3 blueprint execution context author is unavailable");
+				return ObjectFreeze({ author: identity.author });
+			},
 			machine: registration.blueprintMachine,
-			vertices,
+			vertices: projection.vertices,
 		});
 	} catch {
 		return blueprintFoldFailure("fold-rejected", "v3 blueprint epoch fold was rejected");
@@ -8239,7 +8464,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 						registration,
 						() => () =>
 							settlementProfileFor(registration.payload.trust.trust.profileId) === "v1"
-								? readSettlementSources(registration)
+								? readSettlementSources(registration, settlementFrontierFromHistory(registration.historicalIssuance))
 								: readRebaseOutbox(registration)
 					),
 		completeRebaseSource: (
@@ -8513,6 +8738,174 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 	}
 }
 
+async function cleanupCreatorSettlementSuccessor(
+	material: CreatorSuccessorLiveMaterial,
+	payload: PreparedV3LivePayload,
+	authorization: V3LiveAuthorization,
+	historical: HistoricalIssuanceContext
+): Promise<void> {
+	const frontier = settlementFrontierFromHistory(historical);
+	if (frontier === undefined) return;
+	const ahe = aheReclamationMaintenanceForStore(material.store);
+	const issuance = durableIssuancePruningMaintenanceForStore(material.issuanceStore);
+	if (ahe === undefined || issuance === undefined) return;
+	const candidate = (kind: string, epoch?: number): CreatorSuccessorGenerationMaterial["candidates"][number] => {
+		const matches = material.successor.candidates.filter(({ bytes }) => {
+			const value = decodeCanonical(bytes);
+			return (
+				isObject(value) &&
+				Reflect.get(value, "kind") === kind &&
+				(epoch === undefined || Reflect.get(value, "epoch") === epoch)
+			);
+		});
+		const match = matches[0];
+		if (matches.length !== 1 || match === undefined)
+			throw new TypeError("creator cleanup checkpoint proof is unavailable");
+		return match;
+	};
+	const closedEpoch = material.predecessor.trust.currentEpoch;
+	const cut = candidate("drp-hard-epoch-cut", closedEpoch);
+	const qc = candidate("drp-seal-qc", closedEpoch);
+	const cutRecord = decodeCanonical(cut.bytes) as Record<string, unknown>;
+	const opened = openCreatorAuthorSettlement({
+		exactCanonicalRecordBytes: candidate("drp-creator-author-settlement-state").bytes,
+		expectedCommitQcRef: qc.ref,
+		expectedCurrentAclDigest: bytesToLowerHex(
+			hashDomain("ts-drp/latched-acl/v3", material.predecessorExactCanonicalLatchedAclBytes)
+		),
+		expectedCutValueDigest: bytesToLowerHex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
+		expectedSnapshotManifestDigest: cutRecord.snapshotManifestDigest,
+		expectedSuccessorAclDigest: bytesToLowerHex(
+			hashDomain("ts-drp/latched-acl/v3", material.exactCanonicalLatchedAclBytes)
+		),
+		floorTrust: material.successor.trust,
+	});
+	const checkpoint = opened.ok ? resolveCreatorAuthorSettlement(opened.capability) : undefined;
+	if (
+		checkpoint === undefined ||
+		checkpoint.historyRoot !== cutRecord.historyRoot ||
+		checkpoint.historySize !== cutRecord.historySize
+	) {
+		throw new TypeError("creator cleanup checkpoint proof is invalid");
+	}
+	const generations: GenerationRecord[] = [];
+	let cursor: Parameters<AheDurableStore["readGenerationPage"]>[0]["cursor"];
+	do {
+		const page = await material.store.readGenerationPage({
+			objectId: material.successor.head.objectId,
+			limit: 64,
+			...(cursor === undefined ? {} : { cursor }),
+		});
+		if (!page.ok) throw new TypeError("creator cleanup generation enumeration failed");
+		generations.push(...page.value.generations);
+		cursor = page.value.nextCursor ?? undefined;
+	} while (cursor !== undefined);
+	const state = await issuance.inspectPruningState(material.issuanceScope);
+	const plan = await material.issuanceStore.readSettlementPlan(material.issuanceScope);
+	const rows: {
+		authorSequence: number;
+		epoch: number;
+		issued: true;
+		outbox: true;
+		publishState: "pending" | "published";
+	}[] = [];
+	let throughAuthorSequence: number | null = null;
+	if (closedEpoch >= 2 && settlementPlanPermitsAuthenticatedPruning(plan)) {
+		let afterKey: DurableOutboxPageInput["afterKey"] =
+			state.prunedThroughAuthorSequence === null
+				? null
+				: [material.issuanceScope.objectId, material.issuanceScope.author, state.prunedThroughAuthorSequence];
+		let done = false;
+		while (!done) {
+			const page = await material.issuanceStore.readOutboxPage({ scope: material.issuanceScope, afterKey, limit: 64 });
+			if (page.length === 0) break;
+			for (const raw of page) {
+				const row = outboxRowSnapshot(raw, material.issuanceScope);
+				if (row === undefined) throw new TypeError("creator cleanup issuance row is invalid");
+				const source = authenticatedSettlementSourceRow(
+					payload,
+					authorization,
+					row.canonicalPreimageBytes,
+					row.signature,
+					row.digest,
+					material.issuanceScope.author,
+					row.authorSequence,
+					frontier
+				);
+				if (
+					source === undefined ||
+					source.admitted.epoch > closedEpoch - 2 ||
+					!(
+						source.admitted.epoch < frontier.admissionEpoch ||
+						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
+					)
+				) {
+					done = true;
+					break;
+				}
+				const issued = await material.issuanceStore.readIssued(material.issuanceScope, row.authorSequence);
+				const issuedRow = outboxRowSnapshot({ commit: issued, publishState: row.publishState }, material.issuanceScope);
+				if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow))
+					throw new TypeError("creator cleanup issuance pair differs");
+				rows.push({
+					authorSequence: row.authorSequence,
+					epoch: source.admitted.epoch,
+					issued: true,
+					outbox: true,
+					publishState: row.publishState,
+				});
+				if (rows.length > payload.parameters.maxEpochVertices * 3)
+					throw new TypeError("creator cleanup issuance scan exceeded retained window");
+				throughAuthorSequence = row.authorSequence;
+				afterKey = [material.issuanceScope.objectId, material.issuanceScope.author, row.authorSequence];
+			}
+		}
+	}
+	const head = await material.store.readHead(material.successor.head.objectId);
+	if (!head.ok) throw new TypeError("creator cleanup head is unavailable");
+	const planned = planClosedEpochCleanup({
+		settlement: { admissionEpoch: frontier.admissionEpoch, terminalThrough: frontier.terminalThrough },
+		adoption: { adopted: true, activeHead: material.successor.head },
+		availabilityPolicyDigest: cutRecord.availabilityPolicyDigest,
+		close: {
+			closedEpoch,
+			commitQcRef: checkpoint.commitQcRef,
+			objectId: material.successor.head.objectId,
+			verified: true,
+		},
+		expectedHead: head.value,
+		generations,
+		issuance: {
+			complete: true,
+			lineage: state.lineage,
+			prunedThroughAuthorSequence: state.prunedThroughAuthorSequence,
+			rows,
+			scope: material.issuanceScope,
+			throughAuthorSequence,
+		},
+		snapshot: { adopted: true, manifestDigest: checkpoint.snapshotManifestDigest },
+	});
+	if (!planned.ok) {
+		if (planned.reason === "D109A_ROLLBACK_INSUFFICIENT" || planned.reason === "D109A_POLICY_UNSUPPORTED") return;
+		throw new TypeError(`creator cleanup refused: ${planned.reason}`);
+	}
+	const { issuance: prefix, ...reclamation } = planned.plan;
+	await ahe.reclaimClosedEpoch(reclamation);
+	if (prefix === null) return;
+	const expected = await material.store.readHead(material.successor.head.objectId);
+	if (!expected.ok || expected.value.kind !== "present" || !sameHead(expected.value, material.successor.head))
+		throw new TypeError("creator cleanup head changed");
+	await issuance.pruneAuthenticatedSettledPrefix({
+		closedEpoch,
+		commitQcRef: checkpoint.commitQcRef,
+		expectedLineage: prefix.lineage,
+		expectedPrunedThroughAuthorSequence: prefix.prunedThroughAuthorSequence,
+		scope: prefix.scope,
+		snapshotManifestDigest: checkpoint.snapshotManifestDigest,
+		throughAuthorSequence: prefix.throughAuthorSequence,
+	});
+}
+
 async function activateCreatorSuccessorLive(
 	material: CreatorSuccessorLiveMaterial,
 	bindings: CreatorSuccessorRuntimeBindings
@@ -8629,29 +9022,31 @@ async function activateCreatorSuccessorLive(
 			})
 		);
 		const successorIssuanceStore =
-			transportHandoff?.displacedSource === undefined
-				? material.predecessor.trust.currentEpoch > 0
-					? creatorFilteredIssuanceStore(
+			settlementFrontierFromHistory(successorHistoricalIssuance) !== undefined
+				? material.issuanceStore
+				: transportHandoff?.displacedSource === undefined
+					? material.predecessor.trust.currentEpoch > 0
+						? creatorFilteredIssuanceStore(
+								material.issuanceStore,
+								material.issuanceScope,
+								successorPayload,
+								successorAuthorization,
+								Number.MAX_SAFE_INTEGER,
+								material.pinnedGenesisAnchorDigest,
+								material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+								successorHistoricalIssuance
+							)
+						: material.issuanceStore
+					: creatorFilteredIssuanceStore(
 							material.issuanceStore,
 							material.issuanceScope,
-							successorPayload,
-							successorAuthorization,
-							Number.MAX_SAFE_INTEGER,
-							material.pinnedGenesisAnchorDigest,
-							material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+							transportHandoff.displacedSource.prepared,
+							transportHandoff.displacedSource.authorization,
+							undefined,
+							transportHandoff.displacedSource.pinnedGenesisAnchorDigest,
+							transportHandoff.displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 							successorHistoricalIssuance
-						)
-					: material.issuanceStore
-				: creatorFilteredIssuanceStore(
-						material.issuanceStore,
-						material.issuanceScope,
-						transportHandoff.displacedSource.prepared,
-						transportHandoff.displacedSource.authorization,
-						undefined,
-						transportHandoff.displacedSource.pinnedGenesisAnchorDigest,
-						transportHandoff.displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes,
-						successorHistoricalIssuance
-					);
+						);
 		creatorHistoricalIssuanceHandoffs.set(successor, successorHistoricalIssuance);
 		const recovered = await recoverV3LiveReplica({
 			capability: successor,
@@ -8706,6 +9101,17 @@ async function activateCreatorSuccessorLive(
 		if (!material.terminalizeSource()) {
 			activated.handle.deactivate();
 			return rejected("source-unavailable", "creator predecessor could not be terminalized");
+		}
+		try {
+			await cleanupCreatorSettlementSuccessor(
+				material,
+				successorPayload,
+				successorAuthorization,
+				successorHistoricalIssuance
+			);
+		} catch {
+			await Promise.resolve(activated.handle.deactivate());
+			return rejected("recovery-rejected", "creator authenticated cleanup failed");
 		}
 		return ObjectFreeze({ handle: activated.handle, ok: true as const });
 	} catch {

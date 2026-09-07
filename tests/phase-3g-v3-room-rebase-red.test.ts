@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
 
 const probe = vi.hoisted(() => ({
+	projectionHandles: new WeakMap<object, { vertices: unknown[]; anchorDigest: string; controlDigests: Set<string> }>(),
+	projectionAnchor: "b".repeat(64),
 	admittedSink: undefined as ((input: Readonly<Record<string, unknown>>) => void | Promise<void>) | undefined,
 	bootstrapIssues: 0,
 	completionOutcomes: [] as unknown[],
@@ -33,6 +35,30 @@ const probe = vi.hoisted(() => ({
 	trustNames: [] as string[],
 	trustStores: [] as Readonly<{ readonly anchor: string; readonly store: object }>[],
 }));
+
+// Declared controlled-node rows, not a replacement DAG algorithm.
+function controlledProjectionOrder(
+	vertices: readonly unknown[],
+	anchorDigest = probe.projectionAnchor,
+	controlDigests: ReadonlySet<string> = new Set()
+) {
+	const digests: string[] = [];
+	for (const vertex of vertices) {
+		if (typeof vertex !== "object" || vertex === null) throw new TypeError("controlled order vertex is invalid");
+		if (Reflect.get(vertex, "kind") === "drp-epoch-anchor") continue;
+		const bytes = Reflect.get(vertex, "digest");
+		if (!(bytes instanceof Uint8Array)) throw new TypeError("controlled order digest is invalid");
+		const digest = Buffer.from(bytes).toString("hex");
+		if (!controlDigests.has(digest) && !digests.includes(digest)) digests.push(digest);
+	}
+	return Object.freeze({
+		controlDigests: Object.freeze([...controlDigests].sort()),
+		objectId: `creator:${"d".repeat(32)}`,
+		epoch: 0,
+		anchorDigest,
+		digests: Object.freeze(digests),
+	});
+}
 
 vi.mock("@ts-drp/control-plane", async (importOriginal) => ({
 	...(await importOriginal()),
@@ -134,17 +160,34 @@ vi.mock("@ts-drp/protocol-v3", async (importOriginal) => ({
 
 vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 	...(await importOriginal()),
+	readV3ApplicationProjectionOrder: (input: { plane?: unknown }) => {
+		const plane = input?.plane;
+		const state = typeof plane === "object" && plane !== null ? probe.projectionHandles.get(plane) : undefined;
+		return state === undefined
+			? { ok: false, kind: "not-active", detail: "controlled projection plane is inactive" }
+			: { ok: true, order: controlledProjectionOrder(state.vertices, state.anchorDigest, state.controlDigests) };
+	},
 	prepareV3LiveGeneration: (input: { pinnedGenesisAnchorDigest: string }) => {
+		probe.projectionAnchor = input.pinnedGenesisAnchorDigest;
 		probe.nextCapabilityId += 1;
 		return Promise.resolve({
 			capability: Object.freeze({ anchor: input.pinnedGenesisAnchorDigest, id: probe.nextCapabilityId }),
-			descriptor: { anchorDigest: input.pinnedGenesisAnchorDigest, blueprintDigest: "b".repeat(64) },
+			descriptor: {
+				anchorDigest: input.pinnedGenesisAnchorDigest,
+				blueprintDigest: "b".repeat(64),
+				objectId: `creator:${"d".repeat(32)}`,
+				epoch: 0,
+			},
 			ok: true,
 		});
 	},
 	recoverV3LiveReplica: (input: Readonly<Record<string, unknown>>) => {
 		probe.recoveryInputs.push(input);
 		const targetCapability = Reflect.get(input, "capability");
+		if (typeof targetCapability === "object" && targetCapability !== null) {
+			const anchor = Reflect.get(targetCapability, "anchor");
+			if (typeof anchor === "string") probe.projectionAnchor = anchor;
+		}
 		const displacedSource = Reflect.get(input, "displacedSource");
 		const sourceCapability =
 			typeof displacedSource === "object" && displacedSource !== null
@@ -171,11 +214,25 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 				ok: false,
 			});
 		}
-		return Promise.resolve({ capability: {}, descriptor: { recoveredVertices: probe.recoveredVertices }, ok: true });
+		return Promise.resolve({
+			capability: {},
+			descriptor: {
+				recoveredVertices: probe.recoveredVertices,
+				applicationProjectionOrder: controlledProjectionOrder(probe.recoveredVertices),
+			},
+			ok: true,
+		});
 	},
 	activateV3LivePlane: (input: Readonly<Record<string, unknown>>) => {
-		probe.admittedSink = Reflect.get(input, "onAdmittedVertex") as typeof probe.admittedSink;
-		return {
+		const vertices: unknown[] = [...probe.recoveredVertices];
+		// Existing recovered rows declare no controls; settlement fence issuance below records its exact digest.
+		const controlDigests = new Set<string>();
+		const sink = Reflect.get(input, "onAdmittedVertex") as typeof probe.admittedSink;
+		probe.admittedSink = (delivery) => {
+			vertices.push(Reflect.get(delivery, "vertex"));
+			return sink?.(delivery);
+		};
+		const result = {
 			handle: {
 				completeRebaseSource: (input: unknown) => {
 					probe.completedSources.push(input);
@@ -184,7 +241,9 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 					return outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
 				},
 				currentEphemeralAuthority: () => undefined,
-				deactivate: () => undefined,
+				deactivate: () => {
+					probe.projectionHandles.delete(result.handle);
+				},
 				issueLocal: async (input: Readonly<Record<string, unknown>>) => {
 					probe.issueInputs.push(input);
 					probe.events.push("issue");
@@ -245,6 +304,8 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 			},
 			ok: true,
 		};
+		probe.projectionHandles.set(result.handle, { vertices, anchorDigest: probe.projectionAnchor, controlDigests });
+		return result;
 	},
 	routeV3Ingress: () => false,
 	routeV3RetainedIngress: () => false,
@@ -457,6 +518,8 @@ function expectFreshLogicalTimes(
 }
 
 beforeEach(() => {
+	probe.projectionHandles = new WeakMap();
+	probe.projectionAnchor = "b".repeat(64);
 	probe.admittedSink = undefined;
 	probe.bootstrapIssues = 0;
 	probe.completionOutcomes = [];

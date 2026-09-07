@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 150.057,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/startup-review-grok-retry/events.jsonl",
+  "exit_code": 1,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/startup-review-grok-retry/public.txt",
+  "stop_reason": "cancelled",
+  "timed_out": false
+}

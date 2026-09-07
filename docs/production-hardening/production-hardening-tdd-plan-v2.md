@@ -1,5 +1,67 @@
 # ts-drp-1 Production Hardening — Final Phased TDD Implementation Plan
 
+## Active handoff — grid continuity and the 64-writer workload
+
+**The 100-transition diagnostic is preserved. A separate bounded
+[memory-attribution pass](../../specs/grid-memory-attribution/README.md) is in progress.
+Next action: review the capture contract, then collect its 30-transition worker snapshots.**
+The user's 2026-09-06 scope correction still supersedes older sequencing that
+made broad governance or full parent acceptance prerequisites for diagnostics.
+Do not restart the broader governance redesign by default.
+
+Grid supplies the existing host-owned room-head capability and preserves
+creator-authenticated roster/world state through genuine close, adoption and
+cold reopen. One grid state kernel and one node-owned canonical application
+order govern live projection and snapshots. Protocol controls do not carry
+roster authority. Freshness floors still require genuine host authority;
+capability injection does not manufacture an external trusted provider.
+The W0/profile and optional-parameter schema/journal corrections support the
+current contract without changing carrier identity.
+
+The [completed diagnostic](../../.logs/d110c-grid-authority/grid100-diagnostic-terminal-lifecycle-repaired/summary.md)
+ran 64 active writers through 100 genuine transitions, 6,464 contributions,
+200 recovery events, ten creator restarts and final cold reopen with no duplicate
+issuance/publication. It exited naturally in 25 minutes 54 seconds with exact
+source custody and no remaining processes. Workload assertions, timeouts and
+heap settings were not weakened. Correctness and recovery assertions passed at
+this diagnostic scope; broader product acceptance is not implied.
+
+Memory remains unaccepted. Peak aggregate owned bytes were 354,150,122, below
+the 512,000,000-byte reference, but the final-window slope was approximately
+2,257,922 bytes per transition against a 165,161-byte reference. These process
+measurements include fake IndexedDB's persisted data and instrumentation; they
+do not isolate product-retained heap. The snapshot store's time-based retention
+is a candidate contributor, not a measured explanation for every retained byte.
+Do not relabel the slope as a pass or erase the earlier failed attempts.
+
+Separate RED/GREEN owners and three independent reviews established and repaired
+the pinned test-database terminal-transaction defect. Cleanup belongs to the
+dependency, not private-state mutation from the harness. Follower stores retain
+exact schema/version and namespace guards while using transactional clear/copy;
+issuance/journal stores are not transplanted. Observer cleanup retains the exact
+authenticated next-epoch suffix needed for accounting. Review findings,
+installation custody and test evidence are in the
+[dependency dispositions](../../.logs/d110c-grid-authority/fake-idb-review-dispositions.md).
+
+The final clear/copy checkpoint passes 49 combined lifecycle/integration tests
+and 106 additional storage/snapshot controls, plus targeted typecheck and
+formatting. The original three-transition 64-writer control remains under its
+unchanged 90-second limit. Browser restart/convergence/migration evidence remains
+at its recorded scope. After the diagnostic, the probe-only native TypeScript
+conversion passes all 18 lifecycle tests, typecheck, lint and formatting without
+exemptions, with checked runtime equivalence. It uses Node's native type stripping
+on the repository's Node 22 test toolchain (verified locally on 22.15.0).
+No product or workload source changed in that conversion.
+
+Keep the [567-case governance candidate](../../specs/current-registry-governance/README.md)
+and historical evidence intact. Current artifact attestations, broader coverage,
+the exact-byte grid JavaScript lint-language mismatch, fresh-isolation evidence
+and final acceptance/reviews remain separate work. Refresh current attestations
+only against reviewed bytes; never rewrite historical approvals. Select the
+smallest coherent registry correction actually needed by supported behavior.
+Continue separate RED/GREEN ownership and requested reviews at meaningful
+implementation checkpoints, not for every formatter or evidence adjustment.
+
 **Status:** build plan — supersedes `production-hardening-tdd-plan.md` (round 1)
 **Baseline:** `bf7d3516f6ed4be97a755698b4fb3a404e04dc0f` (`main`) — exactly the AHE v4 review baseline, zero drift
 **Goal:** take `ts-drp-1` from a research-grade signed operation-DAG to a production library capable of running an **MMORPG** or a **Discord-like chat at scale** — browser-first, hostile participants, churny NAT'd swarms.
@@ -105172,15 +105234,42 @@ byte-protected paths without explicit v3 CODEOWNERS patterns rely on the default
 owner rule, independently of mandatory root-status byte preservation. These
 clarifications change no custody boundary and require no new prose-review loop.
 
-The next authorized action is separate Astra-high RED authoring of the five
-proposed evidence files only. Existing tests, checkers, policies, workflows,
-registry, runtime and built outputs remain unchanged. Concrete preparation
-capsules, exact case/child cardinalities, post-authoring static baseline and the
-single attributable RED invocation remain execution/acceptance gates before
-GREEN. The old native preparation helper performs a download and cannot be
-silently reused under the accepted offline contract. W0's acceptance is not a
-substitute for fresh current-source validation. All parent grid, production,
-checkpoint, final-review and campaign obligations remain active.
+Separate Astra-high RED authoring and causal verification are complete;
+independent RED acceptance is the current pickup. Existing tests, checkers,
+policies, workflows, registry, runtime and protected built outputs remain
+unchanged. The sealed evidence is
+`.logs/d110c-registry-red-b68f1a59/`: 164 self-excluding manifest entries, SHA
+`0387516230624187c907c9ee7a2611765effc9df7dfb7c26f35acce281f33bcb`.
+Its summary owns the exact source hashes, commands, cardinalities and retained
+stops. GREEN is not released by this record.
+
+The final isolated whole-file run observed all 567 declared identities: 559
+baseline assertions failed through existing `evaluateProtocolV3Freeze` at
+`validateTuple`, with `accepted successor input drifted:
+packages/protocol-v3/registry/registry-v1.json`; eight oracle/identity cases
+passed. No cases skipped. Those guard failures establish causal RED, not
+successful negative mutations or current-contract acceptance. All recorded
+operations terminated quiescent without timeout or cleanup, and custody held.
+Runtime occurred in independently installed/built checkout R, not main.
+
+The packet retains the initial authored type error, lint errors, over-strong
+cross-root ambient classifier and two quoted Vitest title mismatches, with each
+subsequent changed experiment explicitly frozen. The final code has no authored
+strict diagnostic, syntax passes, lint reports zero errors and forty JSDoc
+warnings, and formatting passes. Strict compilation remains non-clean: eight
+diagnostics in unchanged selected tests are explicit GREEN repair debt, with
+five unselected diagnostics retained separately. Main and R have the same
+diagnostic multiset and identical shared source/type inputs, but main loads
+additional ancestor declarations; full ambient equivalence is not claimed.
+The [verification contract](../../specs/current-registry-governance/verification.md)
+records these narrow RED admissions and requires zero selected diagnostics plus
+stage-aware unselected comparison before GREEN acceptance. Formal RED reviewers
+must assess both dispositions and the preserved failures.
+
+The old native preparation helper performs a download and was not reused under
+the offline contract. W0's acceptance is not a substitute for this fresh
+current-source validation. All parent grid, production, checkpoint, final-review
+and campaign obligations remain active.
 
 Historical cleanup stop, resolved prospectively by the closed f5b0z record
 below: Node's authenticated successor material

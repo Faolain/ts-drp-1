@@ -9,6 +9,7 @@ import {
 import { DRPError } from "@ts-drp/errors";
 import {
 	applyPreparedBlueprintOperation,
+	type BlueprintExecutionContext,
 	type PreparedBlueprintRuntime,
 } from "@ts-drp/protocol-v3/blueprint-application";
 import type { IStagedStateMachine } from "@ts-drp/types";
@@ -146,9 +147,10 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 		return this.snapshot();
 	}
 
-	apply(operation: unknown): unknown {
+	apply(operation: unknown, executionContext?: BlueprintExecutionContext): unknown {
 		const result = applyPreparedBlueprintOperation({
 			expectedBlueprintDigest: this.#expectedBlueprintDigest,
+			...(executionContext === undefined ? {} : { executionContext }),
 			operation,
 			preparedBlueprintRuntime: this.#preparedBlueprintRuntime,
 			state: this.#state,
@@ -193,6 +195,7 @@ export interface BlueprintAuthorizationInput {
 export interface FoldBlueprintEpochInput {
 	readonly anchorHash: string;
 	readonly authorize?: ((input: BlueprintAuthorizationInput) => boolean) | undefined;
+	readonly executionContext?: ((input: BlueprintAuthorizationInput) => BlueprintExecutionContext) | undefined;
 	readonly machine: BlueprintStateMachine;
 	readonly vertices: ReadonlyMap<string, EpochVertex>;
 }
@@ -224,7 +227,20 @@ export function foldBlueprintEpoch(input: FoldBlueprintEpochInput): FoldBlueprin
 		if (authorized !== true) {
 			throw new DRPError("BLUEPRINT_AUTHORIZATION_REJECTED", "blueprint operation was not authorized");
 		}
-		outputs.push(stagedMachine.apply(vertex.operation));
+		let executionContext: BlueprintExecutionContext | undefined;
+		if (input.executionContext !== undefined) {
+			try {
+				executionContext = input.executionContext(
+					Object.freeze({ hash, operation: deepCloneCanonical(vertex.operation) })
+				);
+				if (executionContext === undefined) throw new TypeError("blueprint execution context is unavailable");
+			} catch (error) {
+				throw new DRPError("BLUEPRINT_AUTHORIZATION_REJECTED", "blueprint execution context resolution failed", {
+					cause: error,
+				});
+			}
+		}
+		outputs.push(stagedMachine.apply(vertex.operation, executionContext));
 	}
 	return Object.freeze({
 		adopt: (): BlueprintStateSnapshot => input.machine.adopt(stagedMachine),

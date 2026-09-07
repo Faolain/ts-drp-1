@@ -31,14 +31,49 @@ evidence directory; all paths are absolute. Each stage writes one exclusive
 custody before executing, under the roster's compiler ceiling.
 
 The baseline is captured after RED evidence exists and before GREEN edits.
-Selected-root diagnostics must be zero for acceptance; unrelated diagnostics
-are retained and compared by file/category/code/message/source anchor, keeping
-multiplicity while allowing line movement. Compiler hash/version and normalized
-options must match. Project source resolutions outside the selected checkout
-fail; dependency resolutions are recorded separately in source/type provenance.
-If the initial baseline has selected-root errors, record and disposition them
-before RED acceptance/GREEN handoff rather than silently classifying them as
-unrelated. RED authoring must happen first so the selected roots exist.
+Selected-root diagnostics must be zero for **GREEN acceptance**. Unselected
+diagnostics are retained and compared by file/category/code/message/source
+anchor, keeping multiplicity while allowing line movement. Compiler hash/version
+and normalized options must match. Project source resolutions outside the
+selected checkout fail; dependency resolutions are recorded separately in
+source/type provenance. RED authoring must happen first so the selected roots
+exist.
+
+Baseline acquisition, RED admission and GREEN acceptance are different claims.
+An initial selected-root error stops the released operation. Before another
+experiment, distinguish new authoring errors from errors in unchanged signed
+sources and explicitly disposition the latter as selected GREEN repair debt,
+not unrelated diagnostics. A separately frozen RED admission may retain only
+that exact debt plus the exact unselected baseline multiset, with zero authored
+RED diagnostics and unchanged strict compiler/configuration evidence. Keep the
+collector's non-clean report and failed operation; never make exit 1 alone an
+admission rule. The sealed
+[static disposition](../../.logs/d110c-registry-red-b68f1a59/static-amendment.md)
+and [audit](../../.logs/d110c-registry-red-b68f1a59/audit-baseline-disposition.md)
+own this phase's concrete debt and its provenance. Independent RED review must
+accept that disposition before GREEN release.
+
+Before GREEN verification, correct the one collector owner: compare the
+**unselected** baseline multiset while requiring zero selected diagnostics.
+Preserve full diagnostic reports and distinguish full-baseline equality from
+the phase-appropriate unselected comparison. Requiring all baseline errors to
+remain would contradict the requirement to clear selected debt. The released
+capsule must explicitly distinguish RED-isolation admission from GREEN-isolation
+acceptance; do not infer a debt exception from an arbitrary failing baseline.
+The unchanged collector used for RED and its failed statuses remain evidence,
+not a compatibility path to preserve in the current GREEN verifier.
+
+Different ancestor ambient declarations are not automatically project-source
+escape, nor are they merely harmless discovery telemetry. Retain each actual
+loaded-source/type inventory. For this RED pair, a separately reviewed
+[ambient disposition](../../.logs/d110c-registry-red-b68f1a59/ambient-disposition.md)
+admits the consumed reports with identical project and shared dependency inputs,
+configuration, recorded project edges and diagnostics, while explicitly denying
+identical full ambient environments. Its exact main-only declaration set is
+bound in the evidence; this is not a generic dependency waiver. No ambient
+overrides, dependency deletion or repeated compiler run made those environments
+equivalent. Future stage custody must preserve the same distinction rather
+than erase dependency provenance or claim full type-semantic equivalence.
 
 The collector labels decoded compiler text and file-byte digests separately.
 The installed Vite loader may create a transient bundle in

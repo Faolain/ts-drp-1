@@ -1,5 +1,7 @@
 import { type CDPSession, expect, type Page, test, type TestInfo } from "@playwright/test";
 
+import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+
 const BROWSER_VERSION = "151.0.7922.34";
 const CALIBRATION_LOSS_PERCENT = 100;
 const CAMPAIGN_LOSS_PERCENT = 30;
@@ -9730,6 +9732,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 		test.setTimeout(180_000);
 		const creatorContext = await browser.newContext();
 		const receiverContext = await browser.newContext();
+		await installGridRoomHeadAuthority([creatorContext, receiverContext]);
 		await Promise.all([
 			creatorContext.addInitScript(installRtcObserver),
 			receiverContext.addInitScript(installRtcObserver),
@@ -10039,6 +10042,7 @@ if (process.env["D108E4AY_RESET_REPLAY"] === "1") {
 		expect(browser.version()).toBe(BROWSER_VERSION);
 		const creatorContext = await browser.newContext();
 		const receiverContext = await browser.newContext();
+		await installGridRoomHeadAuthority([creatorContext, receiverContext]);
 		await Promise.all([
 			creatorContext.addInitScript(installRtcObserver),
 			receiverContext.addInitScript(installRtcObserver),
@@ -10224,6 +10228,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 	expect(browser.version()).toBe(BROWSER_VERSION);
 	const creatorContext = await browser.newContext();
 	const receiverContext = await browser.newContext();
+	await installGridRoomHeadAuthority([creatorContext, receiverContext]);
 	await Promise.all([
 		creatorContext.addInitScript(installRtcObserver),
 		receiverContext.addInitScript(installRtcObserver),

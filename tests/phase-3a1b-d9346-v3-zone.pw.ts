@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { resolve } from "node:path";
 
+import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
 import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
 
 const { decodeCanonical } = (
@@ -185,6 +186,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 	test.setTimeout(240_000);
 	const creatorContext = await browser.newContext();
 	const joinerContext = await browser.newContext();
+	await installGridRoomHeadAuthority([creatorContext, joinerContext]);
 	const creator = await creatorContext.newPage();
 	let joiner = await joinerContext.newPage();
 	try {

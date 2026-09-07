@@ -254,12 +254,21 @@ function isSafeIntegerBetween(value: unknown, minimum: number, maximum = Number.
 	return numberIsSafeInteger(value) && (value as number) >= minimum && (value as number) <= maximum;
 }
 
-function exactDecoded(bytes: Uint8Array, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+function exactDecoded(
+	bytes: Uint8Array,
+	keys: readonly string[],
+	optionalKeys: readonly string[] = []
+): Readonly<Record<string, unknown>> | undefined {
 	try {
 		const decoded = decodeCanonical(bytes);
 		if (typeof decoded !== "object" || decoded === null || arrayIsArray(decoded)) return undefined;
 		const decodedKeys = Object.keys(decoded);
-		if (decodedKeys.length !== keys.length || decodedKeys.some((key) => !keys.includes(key))) return undefined;
+		if (
+			keys.some((key) => !decodedKeys.includes(key)) ||
+			decodedKeys.some((key) => !keys.includes(key) && !optionalKeys.includes(key))
+		) {
+			return undefined;
+		}
 		if (!bytesEqual(encodeCanonical(decoded), bytes)) return undefined;
 		return decoded as Readonly<Record<string, unknown>>;
 	} catch {
@@ -321,6 +330,12 @@ function validateAnchor(anchor: Readonly<Record<string, unknown>>): boolean {
 }
 
 function validateParameters(parameters: Readonly<Record<string, unknown>>): boolean {
+	if (
+		getOwnPropertyDescriptor(parameters, "authorShareMultiplier") !== undefined &&
+		!isSafeIntegerBetween(parameters.authorShareMultiplier, 1, 1_000_000)
+	) {
+		return false;
+	}
 	for (const [key, minimum, maximum] of [
 		["maxEpochVertices", 32, 1_000_000],
 		["maxEpochBytes", 65_536, 1_073_741_824],
@@ -390,7 +405,7 @@ function captureInstall(input: unknown, genesisOnly: boolean): Captured<Captured
 		return failure("malformed-input");
 	}
 	const anchor = exactDecoded(anchorBytes, ANCHOR_KEYS);
-	const parameters = exactDecoded(parametersBytes, PARAMETER_KEYS);
+	const parameters = exactDecoded(parametersBytes, PARAMETER_KEYS, ["authorShareMultiplier"]);
 	if (anchor === undefined || parameters === undefined || !validateAnchor(anchor) || !validateParameters(parameters)) {
 		return failure("noncanonical-preimage");
 	}

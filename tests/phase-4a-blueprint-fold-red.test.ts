@@ -17,6 +17,7 @@ import {
 interface ApplicationModule {
 	applyPreparedBlueprintOperation(input: {
 		readonly expectedBlueprintDigest: string;
+		readonly executionContext?: unknown;
 		readonly operation: unknown;
 		readonly preparedBlueprintRuntime: PreparedBlueprintRuntime;
 		readonly state: unknown;
@@ -30,7 +31,7 @@ interface BlueprintStateSnapshot {
 
 interface BlueprintStateMachineInstance {
 	adopt(staged: BlueprintStateMachineInstance): BlueprintStateSnapshot;
-	apply(operation: unknown): unknown;
+	apply(operation: unknown, executionContext?: Readonly<{ author: string }>): unknown;
 	fork(): BlueprintStateMachineInstance;
 	snapshot(): BlueprintStateSnapshot;
 }
@@ -66,6 +67,9 @@ interface BlueprintFoldModule {
 	foldBlueprintEpoch(input: {
 		readonly anchorHash: string;
 		authorize(input: Readonly<{ readonly hash: string; readonly operation: unknown }>): boolean;
+		executionContext?(
+			input: Readonly<{ readonly hash: string; readonly operation: unknown }>
+		): Readonly<{ author: string }>;
 		readonly machine: BlueprintStateMachineInstance;
 		readonly vertices: ReadonlyMap<string, EpochVertex>;
 	}): FoldResult;
@@ -177,6 +181,37 @@ function prepareRuntimeWith(
 
 function prepareFixtureRuntime(): Promise<PreparedBlueprintRuntime> {
 	return prepareRuntimeWith({ prepareBlueprintAdmission, prepareBlueprintRuntime });
+}
+
+// A genuine small artifact makes the optional host context observable without
+// changing any historical artifact/package/freeze expectation. Authentication
+// of the author remains the trusted host's responsibility, like authorize().
+async function prepareContextRuntime(): Promise<PreparedBlueprintRuntime> {
+	const source = `function emit(input){const context=input.executionContext;const author=context===undefined?null:context.author;const mutation=context===undefined?null:Reflect.set(context,"author","f".repeat(64));return {state:[...input.state,author],output:{author,contextFrozen:context===undefined?null:Object.isFrozen(context),contextMutation:mutation,inputKeys:Object.keys(input).sort()}}}export const blueprint={exportSchemaVersion:1,artifactId:${JSON.stringify(blueprintPackage.implementation.artifactId)},runtimeProfile:"ecmascript-2024-sync-v1",reducers:{emit}};`;
+	const exactArtifactBytes = new TextEncoder().encode(source);
+	const selectedPackage = {
+		...blueprintPackage,
+		implementation: {
+			...blueprintPackage.implementation,
+			artifactDigest: hex(hashDomain(contract.domains.artifact, exactArtifactBytes)),
+		},
+		manifest: {
+			...blueprintPackage.manifest,
+			operations: blueprintPackage.manifest.operations.filter((operation) => operation.name === "emit"),
+		},
+	};
+	const canonicalBlueprintPackageBytes = encodeCanonical(selectedPackage);
+	const selectedDigest = hex(hashDomain(contract.domains.blueprint, canonicalBlueprintPackageBytes));
+	const preparedBlueprintAdmission = prepareBlueprintAdmission({
+		canonicalBlueprintPackageBytes,
+		expectedBlueprintDigest: selectedDigest,
+	});
+	return prepareBlueprintRuntime({
+		canonicalBlueprintPackageBytes,
+		exactArtifactBytes,
+		expectedBlueprintDigest: selectedDigest,
+		preparedBlueprintAdmission,
+	});
 }
 
 async function loadPhase4a(): Promise<{
@@ -381,6 +416,198 @@ function machine(
 		preparedBlueprintRuntime: runtime,
 	});
 }
+
+describe("optional authenticated author execution context RED", () => {
+	const author = "a".repeat(64);
+	const selectedOperation = { action: "emit", value: {} };
+
+	it("passes a detached frozen author context and keeps contextless reducer input unchanged", async () => {
+		const [{ application }, runtime] = await Promise.all([loadPhase4a(), prepareContextRuntime()]);
+		const input = {
+			expectedBlueprintDigest: runtime.blueprintDigest,
+			operation: selectedOperation,
+			preparedBlueprintRuntime: runtime,
+			state: [],
+		};
+		expect(application.applyPreparedBlueprintOperation(input)).toEqual({
+			state: [null],
+			output: { author: null, contextFrozen: null, contextMutation: null, inputKeys: ["operation", "state"] },
+		});
+		const executionContext = { author };
+		const result = application.applyPreparedBlueprintOperation({ ...input, executionContext });
+		expect(result).toEqual({
+			state: [author],
+			output: {
+				author,
+				contextFrozen: true,
+				contextMutation: false,
+				inputKeys: ["executionContext", "operation", "state"],
+			},
+		});
+		expect(executionContext).toEqual({ author });
+		expect(Object.isFrozen(executionContext), "CONTEXT_DOES_NOT_FREEZE_CALLER_OBJECT").toBe(false);
+		executionContext.author = "b".repeat(64);
+		expect(result.state).toEqual([author]);
+		expect(input.state).toEqual([]);
+	});
+
+	it.each([
+		["missing author", {}],
+		["short author", { author: "ab" }],
+		["uppercase author", { author: "A".repeat(64) }],
+		["nonhex author", { author: "z".repeat(64) }],
+		["numeric author", { author: 42 }],
+		["null context", null],
+		["array context", [author]],
+		["extra context key", { author, epoch: 0 }],
+		["symbol context key", { author, [Symbol("extra")]: true }],
+	] as const)("rejects %s at the context boundary", async (_name, executionContext) => {
+		const [{ application }, runtime] = await Promise.all([loadPhase4a(), prepareContextRuntime()]);
+		expect(() =>
+			application.applyPreparedBlueprintOperation({
+				expectedBlueprintDigest: runtime.blueprintDigest,
+				preparedBlueprintRuntime: runtime,
+				operation: selectedOperation,
+				state: [],
+				executionContext,
+			})
+		).toThrow(/execution context/u);
+	});
+
+	it("rejects author and input-context accessors without invoking them", async () => {
+		const [{ application }, runtime] = await Promise.all([loadPhase4a(), prepareContextRuntime()]);
+		let getterCalls = 0;
+		const executionContext = Object.defineProperty({}, "author", {
+			enumerable: true,
+			get(): string {
+				getterCalls += 1;
+				return author;
+			},
+		});
+		const input = {
+			expectedBlueprintDigest: runtime.blueprintDigest,
+			preparedBlueprintRuntime: runtime,
+			operation: selectedOperation,
+			state: [],
+		};
+		expect(() => application.applyPreparedBlueprintOperation({ ...input, executionContext })).toThrow(
+			/execution context/u
+		);
+		const accessorInput = Object.defineProperty({ ...input }, "executionContext", {
+			enumerable: true,
+			get(): unknown {
+				getterCalls += 1;
+				return { author };
+			},
+		});
+		expect(() => application.applyPreparedBlueprintOperation(accessorInput)).toThrow(/execution context/u);
+		expect(getterCalls).toBe(0);
+	});
+
+	it("threads explicit author context through state-machine apply without changing the old optional call", async () => {
+		const [{ fold }, runtime] = await Promise.all([loadPhase4a(), prepareContextRuntime()]);
+		const bytes = encodeCanonical([]);
+		const selected = new fold.BlueprintStateMachine({
+			exactCanonicalInitialStateBytes: bytes,
+			expectedInitialStateDigest: stateDigest(bytes),
+			expectedBlueprintDigest: runtime.blueprintDigest,
+			preparedBlueprintRuntime: runtime,
+		});
+		expect(selected.apply(selectedOperation, { author })).toMatchObject({ author, contextFrozen: true });
+		expect(decodeCanonical(selected.snapshot().exactCanonicalStateBytes)).toEqual([author]);
+		expect(selected.apply(selectedOperation)).toMatchObject({ author: null, inputKeys: ["operation", "state"] });
+		expect(decodeCanonical(selected.snapshot().exactCanonicalStateBytes)).toEqual([author, null]);
+	});
+
+	it("resolves each authorized hash once and folds the exact host author with detached callback operations", async () => {
+		const [{ fold }, runtime] = await Promise.all([loadPhase4a(), prepareContextRuntime()]);
+		const vertices = graph();
+		const ordered = orderedApplicationVertices(vertices);
+		for (const vertex of ordered)
+			vertices.set(vertex.hash, { ...vertex, operation: { action: "emit", value: { label: vertex.hash } } });
+		const originalBytes = encodeCanonical(
+			[...vertices].map(([hash, vertex]) => ({ hash, operation: vertex.operation ?? null }))
+		);
+		const authorByHash = new Map(ordered.map((vertex, index) => [vertex.hash, (index + 10).toString(16).repeat(64)]));
+		const bytes = encodeCanonical([]);
+		const selected = new fold.BlueprintStateMachine({
+			exactCanonicalInitialStateBytes: bytes,
+			expectedInitialStateDigest: stateDigest(bytes),
+			expectedBlueprintDigest: runtime.blueprintDigest,
+			preparedBlueprintRuntime: runtime,
+		});
+		const events: string[] = [];
+		const suppliedContexts: { author: string }[] = [];
+		const result = fold.foldBlueprintEpoch({
+			anchorHash: contract.graph.anchorHash,
+			vertices,
+			machine: selected,
+			authorize({ hash }): boolean {
+				events.push(`authorize:${hash}`);
+				return true;
+			},
+			executionContext(input): Readonly<{ author: string }> {
+				events.push(`context:${input.hash}`);
+				expect(Object.isFrozen(input)).toBe(true);
+				expect(input.operation).toEqual(vertices.get(input.hash)?.operation);
+				const operationValue = input.operation;
+				if (operationValue === null || typeof operationValue !== "object") throw new Error("missing context operation");
+				Reflect.set(operationValue, "action", "tampered-in-callback");
+				const selectedAuthor = authorByHash.get(input.hash);
+				if (selectedAuthor === undefined) throw new Error("unexpected context hash");
+				const value = { author: selectedAuthor };
+				suppliedContexts.push(value);
+				return value;
+			},
+		});
+		const authors = ordered.map((vertex) => authorByHash.get(vertex.hash));
+		expect(events).toEqual(ordered.flatMap((vertex) => [`authorize:${vertex.hash}`, `context:${vertex.hash}`]));
+		expect(decodeCanonical(result.staged.exactCanonicalStateBytes)).toEqual(authors);
+		expect(result.outputs).toEqual(
+			authors.map((selectedAuthor) => ({
+				author: selectedAuthor,
+				contextFrozen: true,
+				contextMutation: false,
+				inputKeys: ["executionContext", "operation", "state"],
+			}))
+		);
+		for (const context of suppliedContexts) context.author = "f".repeat(64);
+		expect(decodeCanonical(result.staged.exactCanonicalStateBytes)).toEqual(authors);
+		expect(
+			encodeCanonical([...vertices].map(([hash, vertex]) => ({ hash, operation: vertex.operation ?? null })))
+		).toEqual(originalBytes);
+		expect(decodeCanonical(selected.snapshot().exactCanonicalStateBytes)).toEqual([]);
+		expect(decodeCanonical(result.adopt().exactCanonicalStateBytes)).toEqual(authors);
+	});
+
+	it("never calls the context resolver for an unauthorized vertex or the anchor and preserves state", async () => {
+		const [{ fold }, runtime] = await Promise.all([loadPhase4a(), prepareContextRuntime()]);
+		const bytes = encodeCanonical([]);
+		const selected = new fold.BlueprintStateMachine({
+			exactCanonicalInitialStateBytes: bytes,
+			expectedInitialStateDigest: stateDigest(bytes),
+			expectedBlueprintDigest: runtime.blueprintDigest,
+			preparedBlueprintRuntime: runtime,
+		});
+		let calls = 0;
+		expect(
+			errorCode(() =>
+				fold.foldBlueprintEpoch({
+					anchorHash: contract.graph.anchorHash,
+					machine: selected,
+					vertices: graph(),
+					authorize: (): boolean => false,
+					executionContext: (): Readonly<{ author: string }> => {
+						calls += 1;
+						throw new Error("unauthorized context callback");
+					},
+				})
+			)
+		).toBe("BLUEPRINT_AUTHORIZATION_REJECTED");
+		expect(calls).toBe(0);
+		expect(decodeCanonical(selected.snapshot().exactCanonicalStateBytes)).toEqual([]);
+	});
+});
 
 describe("Phase 4a blueprint state machine/fold tests-only RED", () => {
 	it("has exactly one readiness boundary for the four missing natural owners", () => {

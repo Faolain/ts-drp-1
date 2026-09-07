@@ -6,6 +6,7 @@ import {
 	rtcBandwidthSample,
 	rtcObservations,
 } from "./fixtures/e4-aoi/rtc-observer.js";
+import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
 
 const ENTITY_COUNT = 128;
 const EXPECTED_ROUTED_BYTES = 570 * 691 + 30 * 708;
@@ -166,6 +167,7 @@ test("one real receiver sustains nearest-32 AOI recovery below the selected-pair
 	test.setTimeout(300_000);
 	const creatorContext = await browser.newContext();
 	const observerContext = await browser.newContext();
+	await installGridRoomHeadAuthority([creatorContext, observerContext]);
 	await Promise.all([
 		creatorContext.addInitScript(installRtcObserver),
 		observerContext.addInitScript(installRtcObserver),

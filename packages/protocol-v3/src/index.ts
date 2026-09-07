@@ -3077,8 +3077,14 @@ export async function prepareBlueprintRuntime(
 	return prepared;
 }
 
+/** Caller-authenticated metadata; the runtime validates and detaches it, but does not authenticate authors. */
+export interface BlueprintExecutionContext {
+	readonly author: string;
+}
+
 export interface ApplyPreparedBlueprintOperationInput {
 	readonly expectedBlueprintDigest: string;
+	readonly executionContext?: BlueprintExecutionContext;
 	readonly operation: unknown;
 	readonly preparedBlueprintRuntime: PreparedBlueprintRuntime;
 	readonly state: unknown;
@@ -3114,11 +3120,34 @@ function applicationFailure(
 export function applyPreparedBlueprintOperation(
 	input: ApplyPreparedBlueprintOperationInput
 ): PreparedBlueprintOperationResult {
+	const contextDescriptor =
+		input !== null && typeof input === "object"
+			? Object.getOwnPropertyDescriptor(input, "executionContext")
+			: undefined;
+	if (contextDescriptor !== undefined && !Object.hasOwn(contextDescriptor, "value")) {
+		throw new TypeError("blueprint execution context must be an own data property");
+	}
 	assertClosedRecord(
 		input,
-		["expectedBlueprintDigest", "operation", "preparedBlueprintRuntime", "state"],
+		[
+			"expectedBlueprintDigest",
+			"operation",
+			"preparedBlueprintRuntime",
+			"state",
+			...(contextDescriptor === undefined ? [] : ["executionContext"]),
+		],
 		"blueprint application input"
 	);
+	let executionContext: BlueprintExecutionContext | undefined;
+	if (contextDescriptor !== undefined) {
+		const context: unknown = contextDescriptor.value;
+		assertClosedRecord(context, ["author"], "blueprint execution context");
+		const author = ownDataProperty(context, "author", "blueprint execution context");
+		if (typeof author !== "string" || !/^[0-9a-f]{64}$/u.test(author)) {
+			throw new TypeError("blueprint execution context author is invalid");
+		}
+		executionContext = Object.freeze({ author });
+	}
 	const expectedBlueprintDigest = ownDataProperty(input, "expectedBlueprintDigest", "blueprint application input");
 	const preparedBlueprintRuntime = ownDataProperty(input, "preparedBlueprintRuntime", "blueprint application input");
 	const operation = ownDataProperty(input, "operation", "blueprint application input");
@@ -3171,7 +3200,11 @@ export function applyPreparedBlueprintOperation(
 	let result: unknown;
 	try {
 		result = intrinsicReflectApply(reducer, undefined, [
-			Object.freeze({ operation: detachedOperation, state: detachedState }),
+			Object.freeze({
+				operation: detachedOperation,
+				state: detachedState,
+				...(executionContext === undefined ? {} : { executionContext }),
+			}),
 		]);
 	} catch (error) {
 		return applicationFailure("BLUEPRINT_REDUCER_FAILED", "blueprint reducer threw synchronously", error);

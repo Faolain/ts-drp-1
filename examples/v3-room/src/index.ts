@@ -25,11 +25,13 @@ import {
 	activateV3LivePlane,
 	bindV3BlueprintLivePlane,
 	prepareV3LiveGeneration,
+	readV3ApplicationProjectionOrder,
 	recoverV3LiveReplica,
 	republishV3RetainedTo,
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	type V3AdmittedVertexSink,
+	type V3ApplicationProjectionOrder,
 	type V3LiveDescriptor,
 	type V3OperationAdmissionPolicy,
 	type V3PlaneHandle,
@@ -73,6 +75,7 @@ const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
 const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
 const UNSUPPORTED_LINEAGE_POLICY = "D110C_LINEAGE_POLICY_UNSUPPORTED";
 const SETTLEMENT_MANUAL_REVIEW_MESSAGE = "v3 room settlement plan requires manual review";
+const settlementManualReviewErrors = new WeakSet<TypeError>();
 // Object framing plus the nine encoded keys and the fixed kind, digest and version values.
 // The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
 const CREATOR_INVITE_FIXED_CANONICAL_BYTE_LENGTH = 346;
@@ -429,6 +432,15 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	rehearseMigration(input: V3RoomMigrationRehearsalInput): Promise<V3RoomMigrationRehearsalReceipt>;
 	sealEpoch(): Promise<CreatorLiveCloseResult>;
 	status(): CreatorLiveCloseStatus;
+}
+
+const startupWaitersForDiagnostics = new WeakMap<V3RoomSession, () => Promise<void>>();
+
+/** Waits for this session's original startup recovery, not later queue quiescence. */
+export async function waitForV3RoomStartupForDiagnostics(session: V3RoomSession): Promise<void> {
+	const wait = startupWaitersForDiagnostics.get(session);
+	if (wait === undefined) throw new TypeError("v3 room diagnostic session is unknown");
+	await wait();
 }
 
 const CREATOR_LOCAL_AVAILABILITY_POLICY_BYTES = encodeCanonical({
@@ -1376,12 +1388,28 @@ function validateDisplacementPolicy(application: V3RoomApplication): void {
 	}
 }
 
-function migrationCreatorAuthor(material: V3RoomCreatorInviteMaterial): string {
+function migrationLatchedAcl(material: V3RoomCreatorInviteMaterial): unknown {
+	const profile = decodeCanonical(material.exactCanonicalProfileBytes);
+	const settlement =
+		profile !== null && typeof profile === "object" && settlementProfileFor(Reflect.get(profile, "profileId")) === "v1";
 	const decoded = decodeCanonical(material.exactCanonicalLatchedAclBytes, {
 		maxBytes: 65_536,
-		maxDepth: 6,
-		maxItems: 512,
+		maxDepth: settlement ? 4 : 6,
+		maxItems: settlement ? 8_192 : 512,
 	});
+	if (
+		settlement &&
+		decoded !== null &&
+		typeof decoded === "object" &&
+		Reflect.get(decoded, "version") === 3 &&
+		(exactDenseArray(Reflect.get(decoded, "members"))?.length ?? Infinity) <= 256
+	)
+		return decoded;
+	return decodeCanonical(material.exactCanonicalLatchedAclBytes, { maxBytes: 65_536, maxDepth: 6, maxItems: 512 });
+}
+
+function migrationCreatorAuthor(material: V3RoomCreatorInviteMaterial): string {
+	const decoded = migrationLatchedAcl(material);
 	const members = exactDenseArray(
 		decoded !== null && typeof decoded === "object" ? Reflect.get(decoded, "members") : undefined
 	);
@@ -1418,7 +1446,7 @@ function migrationInviteAuthority(material: V3RoomCreatorInviteMaterial): Readon
 	const blueprintDigest =
 		preimage !== null && typeof preimage === "object" ? Reflect.get(preimage, "blueprintDigest") : undefined;
 	const objectId = preimage !== null && typeof preimage === "object" ? Reflect.get(preimage, "objectId") : undefined;
-	const acl = decodeCanonical(material.exactCanonicalLatchedAclBytes, { maxBytes: 65_536, maxDepth: 6, maxItems: 512 });
+	const acl = migrationLatchedAcl(material);
 	const aclObjectId = acl !== null && typeof acl === "object" ? Reflect.get(acl, "objectId") : undefined;
 	if (
 		preimage === null ||
@@ -1524,19 +1552,49 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	redirectSource?: RedirectSourceRecovery,
 	skipRoomHeadAuthority = false
 ): Promise<V3RoomSession<Projection>> {
+	if (
+		input.successorSnapshotDeclaration !== undefined &&
+		(input.createOperationAdmissionPolicy !== undefined || input.rebaseSourceInvite !== undefined)
+	) {
+		throw new TypeError("v3 room successor authority composition is unsupported");
+	}
+	const captureInvite = (
+		creatorInvite: string | V3RoomCreatorInviteMaterial
+	): {
+		invite: string;
+		material: V3RoomCreatorInviteMaterial;
+		settlementProfile: ReturnType<typeof settlementProfileFor>;
+	} => {
+		const invite = typeof creatorInvite === "string" ? creatorInvite : encodeCreatorInvite(creatorInvite);
+		const material = decodeCreatorInvite(invite);
+		const profileCarrier = decodeCanonical(material.exactCanonicalProfileBytes, {
+			maxBytes: 65_536,
+			maxDepth: 4,
+			maxItems: 128,
+		});
+		const profileId =
+			profileCarrier !== null && typeof profileCarrier === "object" && !Array.isArray(profileCarrier)
+				? Reflect.get(profileCarrier, "profileId")
+				: undefined;
+		const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
+		return { invite, material, settlementProfile };
+	};
+	let capturedInvite: ReturnType<typeof captureInvite> | undefined;
+	if (input.successorSnapshotDeclaration !== undefined && input.creatorFinalitySigner !== undefined) {
+		const creatorInvite = input.creatorInvite;
+		if (creatorInvite === undefined) {
+			throw new TypeError("v3 room successor authority composition is unsupported");
+		}
+		capturedInvite = captureInvite(creatorInvite);
+		if (capturedInvite.settlementProfile !== "v1") {
+			throw new TypeError("v3 room successor authority composition is unsupported");
+		}
+	}
 	const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(
 		input.application.bootstrapOperation,
 		APPLICATION_BATCH_LIMITS
 	);
 	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
-	if (
-		input.successorSnapshotDeclaration !== undefined &&
-		(input.createOperationAdmissionPolicy !== undefined ||
-			input.rebaseSourceInvite !== undefined ||
-			input.creatorFinalitySigner !== undefined)
-	) {
-		throw new TypeError("v3 room successor authority composition is unsupported");
-	}
 	if (
 		input.createOperationAdmissionPolicy !== undefined &&
 		typeof input.createOperationAdmissionPolicy !== "function"
@@ -1573,19 +1631,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					"ts-drp/v3-room-migration-local-store/v1",
 					encodeCanonical({ localNamespace: input.migrationDatabaseNamespace, scratchDigest })
 				)}`;
-	const invite =
-		typeof input.creatorInvite === "string" ? input.creatorInvite : encodeCreatorInvite(input.creatorInvite);
-	const material = decodeCreatorInvite(invite);
-	const profileCarrier = decodeCanonical(material.exactCanonicalProfileBytes, {
-		maxBytes: 65_536,
-		maxDepth: 4,
-		maxItems: 128,
-	});
-	const profileId =
-		profileCarrier !== null && typeof profileCarrier === "object" && !Array.isArray(profileCarrier)
-			? Reflect.get(profileCarrier, "profileId")
-			: undefined;
-	const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
+	const { invite, material, settlementProfile } = capturedInvite ?? captureInvite(input.creatorInvite);
 	const sourceInvite = input.rebaseSourceInvite;
 	const sourceMaterial =
 		sourceInvite === undefined
@@ -1813,6 +1859,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const acceptedVertices = new Map<string, V3RoomAcceptedVertex>();
 	const acceptedOperationRows = new Map<string, readonly V3RoomAcceptedOperation[] | null>();
 	let projection!: Projection;
+	let activeHandle: RoomPlaneHandle | undefined;
 	let authenticatedProjectionBase: V3RoomAuthenticatedProjectionBase | undefined;
 	let successorProjectionAuthority: V3RoomSuccessorAuthority | null = null;
 	let logicalTime = input.initialLogicalTime;
@@ -1826,6 +1873,66 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					creatorAuthor: roomCreatorAuthor,
 					objectId: input.objectId,
 				});
+	const orderedProjectionVertices = (
+		selected: ReadonlyMap<string, V3RoomAcceptedVertex>,
+		recoveryOrder?: V3ApplicationProjectionOrder
+	): readonly V3RoomAcceptedVertex[] => {
+		const activeOrder =
+			recoveryOrder === undefined && activeHandle !== undefined
+				? readV3ApplicationProjectionOrder({ plane: activeHandle })
+				: undefined;
+		if (activeOrder !== undefined && !activeOrder.ok) {
+			throw new TypeError(`v3 room application projection order is unavailable: ${activeOrder.kind}`);
+		}
+		const order =
+			recoveryOrder ??
+			(activeOrder?.ok === true ? activeOrder.order : recovered?.descriptor.applicationProjectionOrder);
+		const expectedEpoch = successorProjectionAuthority?.epoch ?? 0;
+		const expectedAnchor = successorProjectionAuthority?.anchorDigest ?? roomDescriptor.anchorDigest;
+		if (
+			order === undefined ||
+			exactRecord(order, ["objectId", "epoch", "anchorDigest", "digests", "controlDigests"]) === undefined ||
+			order.objectId !== input.objectId ||
+			order.epoch !== expectedEpoch ||
+			order.anchorDigest !== expectedAnchor ||
+			!Array.isArray(order.digests) ||
+			!Array.isArray(order.controlDigests)
+		) {
+			throw new TypeError("v3 room application projection order scope differs");
+		}
+		const ranks = new Map<string, number>();
+		for (const [index, digest] of order.digests.entries()) {
+			if (typeof digest !== "string" || !LOWER_HEX_256.test(digest) || digest === expectedAnchor || ranks.has(digest)) {
+				throw new TypeError("v3 room application projection order is invalid");
+			}
+			ranks.set(digest, index);
+		}
+		const controls = new Set<string>();
+		for (const [index, digest] of order.controlDigests.entries()) {
+			if (
+				typeof digest !== "string" ||
+				!LOWER_HEX_256.test(digest) ||
+				digest === expectedAnchor ||
+				ranks.has(digest) ||
+				(index > 0 && (order.controlDigests[index - 1] as string) >= digest)
+			) {
+				throw new TypeError("v3 room application projection order controls are invalid");
+			}
+			controls.add(digest);
+		}
+		for (const [digest, vertex] of selected) {
+			if (
+				(!ranks.has(digest) && !controls.has(digest)) ||
+				vertex.objectId !== input.objectId ||
+				vertex.epoch !== expectedEpoch
+			) {
+				throw new TypeError("v3 room application projection order omits an accepted vertex");
+			}
+		}
+		return [...selected.values()]
+			.filter((vertex) => !controls.has(hex(vertex.digest)))
+			.sort((left, right) => (ranks.get(hex(left.digest)) as number) - (ranks.get(hex(right.digest)) as number));
+	};
 	const expand = (vertex: V3RoomAcceptedVertex): readonly V3RoomAcceptedOperation[] | undefined => {
 		const identity = hex(vertex.digest);
 		const cached = acceptedOperationRows.get(identity);
@@ -1835,14 +1942,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		return expanded;
 	};
 	const stage = (
-		vertices: readonly V3RoomAcceptedVertex[]
+		vertices: readonly V3RoomAcceptedVertex[],
+		recoveryOrder?: V3ApplicationProjectionOrder
 	): Readonly<{
 		readonly additions: readonly Readonly<{ readonly identity: string; readonly vertex: V3RoomAcceptedVertex }>[];
 		readonly projection: Projection;
 	}> => {
 		const candidate = new Map(acceptedVertices);
 		const additions: Readonly<{ readonly identity: string; readonly vertex: V3RoomAcceptedVertex }>[] = [];
-		for (const vertex of [...vertices].sort(compareAcceptedVertices)) {
+		const selected = new Map(acceptedVertices);
+		for (const vertex of vertices) selected.set(hex(vertex.digest), vertex);
+		for (const vertex of orderedProjectionVertices(selected, recoveryOrder)) {
 			const identity = hex(vertex.digest);
 			if (candidate.has(identity)) continue;
 			const expanded = expand(vertex);
@@ -1852,7 +1962,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		const project = (selected: ReadonlyMap<string, V3RoomAcceptedVertex>): Projection => {
 			const currentEpochOperations = Object.freeze(
-				[...selected.values()].sort(compareAcceptedVertices).flatMap((vertex) => expand(vertex) ?? [])
+				orderedProjectionVertices(selected, recoveryOrder).flatMap((vertex) => expand(vertex) ?? [])
 			);
 			const baseBytes =
 				authenticatedProjectionBase === undefined
@@ -1914,15 +2024,61 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			});
 		}
 	};
-	const isSettlementFence = (vertex: V3RoomAcceptedVertex): boolean =>
-		settlementProfile === "v1" && Reflect.get(vertex.operation, "action") === "$drp.author-fence.v1";
-	const commit = async (vertices: readonly V3RoomAcceptedVertex[]): Promise<boolean> => {
+	const installSuccessorProjectionBase = (plane: RoomPlaneHandle, authority: V3RoomSuccessorAuthority): void => {
+		const projectionBaseResult = bindV3BlueprintLivePlane({ plane, purpose: "projection-base" });
+		if (!projectionBaseResult.ok) {
+			throw new TypeError(`v3 room successor projection base failed: ${projectionBaseResult.kind}`);
+		}
+		if (exactRecord(projectionBaseResult, PROJECTION_BASE_RESULT_KEYS) === undefined) {
+			throw new TypeError("v3 room successor projection base differs");
+		}
+		const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
+			projectionBaseResult.exactCanonicalApplicationStateBytes,
+			"migration"
+		);
+		if (
+			projectionBaseResult.objectId !== input.objectId ||
+			projectionBaseResult.epoch !== authority.epoch ||
+			projectionBaseResult.blueprintDigest !== roomDescriptor.blueprintDigest ||
+			projectionBaseResult.stateDigest !== digest("ts-drp/state/v3", exactCanonicalApplicationStateBytes)
+		) {
+			throw new TypeError("v3 room successor projection base differs");
+		}
+		const base = Object.freeze({
+			blueprintDigest: projectionBaseResult.blueprintDigest,
+			epoch: projectionBaseResult.epoch,
+			exactCanonicalApplicationStateBytes,
+			objectId: projectionBaseResult.objectId,
+			stateDigest: projectionBaseResult.stateDigest,
+		});
+		const baseProjection = input.application.projectAcceptedOperations(
+			Object.freeze({ authenticatedBase: base, currentEpochOperations: Object.freeze([]) })
+		);
+		const canonicalStateBytes = input.application.migration?.canonicalStateBytes;
+		if (typeof canonicalStateBytes !== "function") {
+			throw new TypeError("v3 room successor projection state is unavailable");
+		}
+		const projectedStateBytes = normalizeApplicationStateBytes(
+			Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
+			"migration"
+		);
+		if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
+			throw new TypeError("v3 room successor projection state differs");
+		}
+		authenticatedProjectionBase = base;
+		acceptedVertices.clear();
+		acceptedOperationRows.clear();
+	};
+	const commit = async (
+		vertices: readonly V3RoomAcceptedVertex[],
+		recoveryOrder?: V3ApplicationProjectionOrder
+	): Promise<boolean> => {
 		for (const vertex of vertices) {
 			const expanded = expand(vertex);
 			const latestChild = expanded?.at(-1)?.logicalTime ?? vertex.logicalTime;
 			logicalTime = Math.max(logicalTime, vertex.logicalTime + 2, latestChild + 2);
 		}
-		const candidate = stage(vertices.filter((vertex) => !isSettlementFence(vertex)));
+		const candidate = stage(vertices, recoveryOrder);
 		if (candidate.additions.length === 0) return false;
 		for (const { vertex } of candidate.additions) await input.onAcceptedVertex(vertex);
 		input.onProjection(candidate.projection);
@@ -1935,8 +2091,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const acceptedOperationSnapshot = (): readonly V3RoomAcceptedOperation[] =>
 		Object.freeze(
-			[...acceptedVertices.values()]
-				.sort(compareAcceptedVertices)
+			orderedProjectionVertices(acceptedVertices)
 				.flatMap((vertex) => expand(vertex) ?? [])
 				.map((row) => {
 					const operation = detachedRoomOperation(row.operation);
@@ -1960,7 +2115,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		);
 	if (input.successorSnapshotDeclaration === undefined) {
 		try {
-			if (!(await commit(recovered?.descriptor.recoveredVertices ?? Object.freeze([])))) {
+			if (
+				!(await commit(
+					recovered?.descriptor.recoveredVertices ?? Object.freeze([]),
+					recovered?.descriptor.applicationProjectionOrder
+				))
+			) {
 				projection = input.application.projectAcceptedOperations(
 					Object.freeze({ authenticatedBase: undefined, currentEpochOperations: Object.freeze([]) })
 				);
@@ -1973,12 +2133,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	}
 	const recoveredProjectionRejected = (recovered?.descriptor.recoveredVertices ?? Object.freeze([])).some(
 		(vertex) =>
-			!isSettlementFence(vertex) &&
+			!recovered?.descriptor.applicationProjectionOrder.controlDigests.includes(hex(vertex.digest)) &&
 			vertex.author === input.author &&
 			acceptedOperationRows.get(hex(vertex.digest)) === null
 	);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
-	let activeHandle: RoomPlaneHandle | undefined;
 	let recoverStartupPlane: (() => Promise<void>) | undefined;
 	let creatorCloseHandle: CreatorLiveCloseHandle | undefined;
 	let bindCurrentCreatorClose: ((plane: RoomPlaneHandle) => ReturnType<typeof bindCreatorLiveClose>) | undefined;
@@ -2004,7 +2163,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let redirectPromise: Promise<V3RoomSession<Projection>> | undefined;
 	let settlementHeld = false;
 	const assertSettlementUnheld = (): void => {
-		if (settlementHeld) throw new TypeError(SETTLEMENT_MANUAL_REVIEW_MESSAGE);
+		if (settlementHeld) {
+			const error = new TypeError(SETTLEMENT_MANUAL_REVIEW_MESSAGE);
+			settlementManualReviewErrors.add(error);
+			throw error;
+		}
 	};
 	let retainedBootstrapReady = !retainedBootstrapHeld;
 	let resolveRetainedBootstrap: (() => void) | undefined;
@@ -2229,6 +2392,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		return true;
 	};
 	let startupReplay: V3RoomAcceptedVertex[] | undefined;
+	const commitSuccessorProjection = async (): Promise<void> => {
+		if (startupReplay === undefined) throw new TypeError("v3 room successor replay is unavailable");
+		// Keep activation deliveries buffered while replayable application callbacks
+		// await. The authenticated base already contains every predecessor effect.
+		while (startupReplay.length !== 0) {
+			const replay = startupReplay.splice(0);
+			await commit(replay);
+		}
+		startupReplay = undefined;
+		projection = stage(Object.freeze([])).projection;
+		input.onProjection(projection);
+	};
 	const admittedSink = async ({
 		vertex,
 	}: Parameters<V3AdmittedVertexSink>[0]): Promise<
@@ -2284,7 +2459,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					);
 					prepared = durable.prepared;
 					recovered = durable.recovered;
-					await commit(recovered.descriptor.recoveredVertices);
+					await commit(recovered.descriptor.recoveredVertices, recovered.descriptor.applicationProjectionOrder);
 				}
 				if (recovered === undefined) throw new TypeError("v3 room recovered genesis custody is unavailable");
 				const activated = activateV3LivePlane({
@@ -2364,54 +2539,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				}
 				activeHandle = reopened.handle as RoomPlaneHandle;
 				successorProjectionAuthority = successorAuthority(reopened.trust, activeHandle);
-				const projectionBaseResult = bindV3BlueprintLivePlane({ plane: activeHandle, purpose: "projection-base" });
-				if (!projectionBaseResult.ok) {
-					throw new TypeError(`v3 room successor projection base failed: ${projectionBaseResult.kind}`);
-				}
-				if (exactRecord(projectionBaseResult, PROJECTION_BASE_RESULT_KEYS) === undefined) {
-					throw new TypeError("v3 room successor projection base differs");
-				}
-				const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
-					projectionBaseResult.exactCanonicalApplicationStateBytes,
-					"migration"
-				);
-				if (
-					projectionBaseResult.objectId !== input.objectId ||
-					projectionBaseResult.epoch !== successorProjectionAuthority.epoch ||
-					projectionBaseResult.blueprintDigest !== roomDescriptor.blueprintDigest ||
-					projectionBaseResult.stateDigest !== digest("ts-drp/state/v3", exactCanonicalApplicationStateBytes)
-				) {
-					throw new TypeError("v3 room successor projection base differs");
-				}
-				authenticatedProjectionBase = Object.freeze({
-					blueprintDigest: projectionBaseResult.blueprintDigest,
-					epoch: projectionBaseResult.epoch,
-					exactCanonicalApplicationStateBytes,
-					objectId: projectionBaseResult.objectId,
-					stateDigest: projectionBaseResult.stateDigest,
-				});
-				const baseProjection = input.application.projectAcceptedOperations(
-					Object.freeze({
-						authenticatedBase: authenticatedProjectionBase,
-						currentEpochOperations: Object.freeze([]),
-					})
-				);
-				const canonicalStateBytes = input.application.migration?.canonicalStateBytes;
-				if (typeof canonicalStateBytes !== "function") {
-					throw new TypeError("v3 room successor projection state is unavailable");
-				}
-				const projectedStateBytes = normalizeApplicationStateBytes(
-					Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
-					"migration"
-				);
-				if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
-					throw new TypeError("v3 room successor projection state differs");
-				}
-				const replay = startupReplay;
-				startupReplay = undefined;
-				await commit(replay);
-				projection = stage(Object.freeze([])).projection;
-				input.onProjection(projection);
+				installSuccessorProjectionBase(activeHandle, successorProjectionAuthority);
+				await commitSuccessorProjection();
 			}
 			if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
 				if (input.application.migration === undefined) {
@@ -2451,7 +2580,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					: await republishV3RetainedTo(activeHandle, targetPeerId);
 			if (!result.ok) throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
 		});
-		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+		if (
+			input.creatorFinalitySigner !== undefined &&
+			(input.successorSnapshotDeclaration === undefined || settlementProfile === "v1")
+		) {
 			const creatorFinalitySigner = input.creatorFinalitySigner;
 			const voteStore = await openBrowserSealVoteStore({ databaseName: input.databaseName });
 			creatorCloseStoreClosers.push(voteStore.close);
@@ -2683,7 +2815,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const issueOwned = async (owned: readonly PendingIssue[]): Promise<void> => {
 		if (owned.length === 0) return;
-		if (activeHandle === undefined) {
+		if (activeHandle === undefined || (settlementProfile === "v1" && creatorSuccessorAdoptionTask !== undefined)) {
 			rejectOwned(owned, new TypeError("v3 room live plane is unavailable"));
 			return;
 		}
@@ -2953,10 +3085,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			);
 		}
 		const displacedSequences = new Set(sources.map((source) => source.authorSequence));
+		const priorFence =
+			current?.fenceSequence == null
+				? undefined
+				: await issuanceStore.readIssued(settlementScope, current.fenceSequence);
+		const priorFenceEpoch =
+			priorFence == null
+				? undefined
+				: Reflect.get(decodeCanonical(priorFence.envelope.canonicalPreimageBytes) as object, "epoch");
 		const fenceSequence =
 			current?.fenceSequence !== null &&
 			current?.fenceSequence !== undefined &&
-			displacedSequences.has(current.fenceSequence)
+			(displacedSequences.has(current.fenceSequence) || priorFenceEpoch !== activeHandle?.epoch)
 				? null
 				: (current?.fenceSequence ?? null);
 		const unchanged =
@@ -3574,8 +3714,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		rehearsalInput: V3RoomMigrationRehearsalInput
 	): Promise<V3RoomMigrationRehearsalReceipt> => {
 		if (terminalFailure !== undefined) throw terminalFailure;
-		assertSettlementUnheld();
 		if (closed) throw new TypeError("v3 room session is closed");
+		assertSettlementUnheld();
 		if (authenticatedProjectionBase !== undefined) {
 			throw new TypeError("D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE");
 		}
@@ -3753,8 +3893,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			try {
 				const openedTarget = await createV3RoomSessionOwned(targetInput, true, undefined, true);
 				target = openedTarget;
+				// Fresh target open authenticates its bootstrap; protocol controls contribute no application callback rows.
 				const bootstrapAcceptedCount = targetAccepted.length;
-				if (bootstrapAcceptedCount < 1) throw new TypeError("v3 room migration target bootstrap was not accepted");
 				const importPromises = firstProjection.importOperations.map((operation) => openedTarget.issue(operation));
 				await Promise.all(importPromises);
 				const targetProjection = openedTarget.projection();
@@ -3910,8 +4050,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		activationInput: V3RoomMigrationActivationInput
 	): Promise<V3RoomMigrationActivationReceipt> => {
 		if (terminalFailure !== undefined) throw terminalFailure;
-		assertSettlementUnheld();
 		if (closed) throw new TypeError("v3 room session is closed");
+		assertSettlementUnheld();
 		if (migrationActivationAuthority === undefined || input.application.migration === undefined) {
 			throw new TypeError("v3 room migration activation is unavailable");
 		}
@@ -4121,7 +4261,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (!published.ok) {
 			// The admission callback can record a target hold while publication awaits it.
 			const admissionFailure = terminalFailure as unknown;
-			if (admissionFailure instanceof TypeError && admissionFailure.message === SETTLEMENT_MANUAL_REVIEW_MESSAGE) {
+			if (admissionFailure instanceof TypeError && settlementManualReviewErrors.has(admissionFailure)) {
 				throw admissionFailure;
 			}
 			const failure = new TypeError(`v3 room migration activation failed: ${published.kind}`);
@@ -4233,6 +4373,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return roomHeadFailure("D110C_FLOOR_MISMATCH");
 		}
 		assertSessionOpen();
+		startupReplay = [];
 		const activated = await activateCreatorSuccessorAdoption({
 			capability: published.capability,
 			expectedRoomHead: openedRoomHeadState.stable,
@@ -4242,6 +4383,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
 		});
 		if (activated.ok !== true) {
+			startupReplay = undefined;
 			const failure = new TypeError("D110C_B_ACTIVATION_STALLED");
 			terminalFailure = failure;
 			creatorCloseHandle = undefined;
@@ -4259,6 +4401,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			replacementOwned = false;
 		};
 		const throwAfterReplacementCleanup = async (primary: unknown): Promise<never> => {
+			startupReplay = undefined;
 			try {
 				await releaseReplacement();
 			} catch (cleanup) {
@@ -4286,6 +4429,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
 		}
 		const failCloseRebind = async (): Promise<never> => {
+			startupReplay = undefined;
 			activeHandle = replacement;
 			replacementOwned = false;
 			successorProjectionAuthority = authority;
@@ -4303,6 +4447,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		successorProjectionAuthority = authority;
 		creatorCloseHandle = rebound.handle;
 		creatorCloseUnavailableContinuity = "continuous";
+		try {
+			installSuccessorProjectionBase(replacement, authority);
+			await commitSuccessorProjection();
+			if (settlementProfile === "v1") {
+				await publishAccepted();
+				await drainRebaseOutbox();
+			}
+		} catch (error) {
+			startupReplay = undefined;
+			terminalFailure = error;
+			await shutdown().catch(() => undefined);
+			await predecessorClose.stop().catch(() => undefined);
+			throw error;
+		}
 		await predecessorClose.stop();
 	};
 	const adoptCreatorSuccessor = (): Promise<void> => {
@@ -4351,7 +4509,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		sessionCloseTask = task;
 		return task;
 	};
-	return Object.freeze({
+	const session: V3RoomSession<Projection> = Object.freeze({
 		activateMigration,
 		adoptCreatorSuccessor(): Promise<void> {
 			return adoptCreatorSuccessor();
@@ -4486,6 +4644,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			);
 		},
 	});
+	startupWaitersForDiagnostics.set(session, async (): Promise<void> => {
+		if (terminalFailure !== undefined) throw terminalFailure;
+		if (closed) throw new TypeError("v3 room session is closed");
+		await rebasePromise;
+		if (terminalFailure !== undefined) throw terminalFailure;
+		if (closed) throw new TypeError("v3 room session is closed");
+	});
+	return session;
 }
 
 async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthority>(

@@ -2,6 +2,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { expect, type Page, test } from "@playwright/test";
 import { resolve } from "node:path";
 
+import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
 import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
 
 const { hashDomain } = (
@@ -98,6 +99,7 @@ function bytes(value: string): Uint8Array {
 test("one current referee decision makes one writer-issued outcome durable across reconnect", async ({ browser }) => {
 	test.setTimeout(180_000);
 	const contexts = await Promise.all([browser.newContext(), browser.newContext(), browser.newContext()]);
+	await installGridRoomHeadAuthority(contexts);
 	const [alice, bob, referee] = await Promise.all(contexts.map((context) => context.newPage()));
 	try {
 		await Promise.all([openGrid(alice), openGrid(bob), openGrid(referee)]);

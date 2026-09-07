@@ -11,6 +11,7 @@ import {
 } from "./internal/seal-authority-custody.js";
 import { resolveSealAuthorityIdentity } from "./internal/seal-authority-identity.js";
 import { openSealAuthority, verifySealQC } from "./seal.js";
+import { settlementProfileFor } from "./settlement-profile.js";
 import { decodeSnapshotManifest } from "./snapshot-transfer.js";
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
 
@@ -273,7 +274,8 @@ export function prepareCreatorAnchorSigningRequest(
 			!plainRecord(profile) ||
 			!exactKeys(profile, ["cryptoSuiteId", "profileId", "quorum", "signers"]) ||
 			profile.cryptoSuiteId !== "ed25519-sha256-v3" ||
-			profile.profileId !== "creator-trusted-v1" ||
+			typeof profile.profileId !== "string" ||
+			(profile.profileId !== "creator-trusted-v1" && settlementProfileFor(profile.profileId) === "none") ||
 			profile.quorum !== 1 ||
 			!Array.isArray(profile.signers) ||
 			!Array.isArray(signerSet) ||
@@ -538,7 +540,7 @@ export function completeCreatorSuccessor(
 			genesisAnchorDigest: state.material.genesisAnchorDigest,
 			kind: "drp-anchor-trust-state",
 			objectId: state.material.objectId,
-			profileId: "creator-trusted-v1",
+			profileId: (decodeCanonicalValue(state.material.exactCanonicalProfileBytes) as Record<string, unknown>).profileId,
 			quorum: 1,
 			version: 1,
 		});
@@ -595,7 +597,7 @@ export function openCreatorSuccessorTrust(
 			decodedRecord.kind !== "drp-anchor-trust-state" ||
 			decodedRecord.objectId !== material.objectId ||
 			decodedRecord.genesisAnchorDigest !== material.genesisAnchorDigest ||
-			decodedRecord.profileId !== "creator-trusted-v1" ||
+			decodedRecord.profileId !== currentTrust.profileId ||
 			decodedRecord.quorum !== 1 ||
 			compareBytes(profileBytes, material.exactCanonicalProfileBytes) !== 0 ||
 			compareBytes(signerSetBytes, material.exactCanonicalSignerSetBytes) !== 0

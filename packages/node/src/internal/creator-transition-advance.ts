@@ -10,10 +10,12 @@ import {
 	CREATOR_AUTHOR_SETTLEMENT_KIND,
 	type CreatorAuthorIssuanceFrontiersIdentity,
 	type CreatorAuthorSettlementIdentity,
+	frontierFor,
 	openCreatorAuthorIssuanceFrontiers,
 	openCreatorAuthorSettlement,
 	resolveCreatorAuthorIssuanceFrontiers,
 	resolveCreatorAuthorSettlement,
+	type VerifiedCreatorAuthorSettlement,
 } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import {
 	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
@@ -22,6 +24,7 @@ import {
 	openCreatorIssuanceRetirement,
 	resolveCreatorIssuanceRetirement,
 } from "@ts-drp/protocol-v3/creator-issuance-retirement";
+import { type LatchedAclSnapshot, openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import { digestBlob, type GenerationRef } from "@ts-drp/storage";
 
@@ -37,6 +40,8 @@ export interface InspectCreatorTransitionAdvanceInput {
 	readonly proofRefs: readonly GenerationRef[];
 	readonly proposed: CreatorTransitionClosure;
 	readonly successorTrust: CurrentAnchorTrust;
+	/** Final settlement validation requires the ACL bytes from the authenticated snapshot owner. */
+	readonly settlementAcl?: Readonly<{ current: Uint8Array; successor: Uint8Array }>;
 }
 
 export type InspectCreatorTransitionAdvanceResult =
@@ -52,6 +57,7 @@ export interface VerifiedCreatorHistoricalIssuance {
 }
 
 export interface CreatorHistoricalIssuanceIdentity {
+	readonly admissionEpoch?: number;
 	readonly admittedAuthorSequence: number | null;
 	readonly author: string;
 	readonly closedAnchorDigest: string;
@@ -518,6 +524,7 @@ function openedSettlement(
 	| Readonly<{
 			readonly candidate: DetachedClosureCandidate;
 			readonly identity: CreatorAuthorSettlementIdentity;
+			readonly capability: VerifiedCreatorAuthorSettlement;
 	  }>
 	| undefined {
 	const decodedCut = record(cut);
@@ -547,10 +554,12 @@ function openedSettlement(
 		decodedCut.objectId !== identity.objectId ||
 		decodedCut.epoch !== identity.closedEpoch ||
 		decodedCut.previousAnchor !== identity.closedAnchorDigest ||
+		decodedCut.historyRoot !== identity.historyRoot ||
+		decodedCut.historySize !== identity.historySize ||
 		identity.successorAnchorDigest !== floorTrust.currentAnchorDigest ||
 		identity.successorEpoch !== floorTrust.currentEpoch
 		? undefined
-		: Object.freeze({ candidate, identity });
+		: Object.freeze({ candidate, identity, capability: opened.capability });
 }
 
 /**
@@ -575,6 +584,45 @@ export function openVerifiedCreatorHistoricalIssuance(
 		const cut = uniqueCandidate(input.closure.candidates, "drp-hard-epoch-cut", closedEpoch);
 		const qc = uniqueCandidate(input.closure.candidates, "drp-seal-qc", closedEpoch, "commit");
 		const acl = uniqueCandidate(input.closure.candidates, "drp-v3-latched-acl", closedEpoch);
+		if (settlementProfileFor(input.floorTrust.profileId) === "v1") {
+			const candidates = settlementCandidates(input.closure);
+			const candidate = candidates[0];
+			if (
+				retirement.length !== 0 ||
+				aggregate.length !== 0 ||
+				candidates.length !== 1 ||
+				candidate === undefined ||
+				cut === undefined ||
+				qc === undefined ||
+				acl === undefined ||
+				!exactClosureOccurrence(input.closure.closure, candidate)
+			)
+				return undefined;
+			const opened = openedSettlement(
+				candidate,
+				input.floorTrust,
+				cut,
+				qc,
+				hex(hashDomain("ts-drp/latched-acl/v3", acl.bytes))
+			);
+			const frontier = opened === undefined ? undefined : frontierFor(opened.capability, input.author);
+			if (opened === undefined || frontier === undefined) return undefined;
+			const capability = Object.freeze({}) as VerifiedCreatorHistoricalIssuance;
+			verifiedHistoricalIssuance.set(
+				capability,
+				Object.freeze({
+					admissionEpoch: frontier[1],
+					admittedAuthorSequence: frontier[2],
+					author: frontier[0],
+					closedAnchorDigest: opened.identity.closedAnchorDigest,
+					closedEpoch: opened.identity.closedEpoch,
+					objectId: opened.identity.objectId,
+					successorAnchorDigest: opened.identity.successorAnchorDigest,
+					successorEpoch: opened.identity.successorEpoch,
+				})
+			);
+			return capability;
+		}
 		if (
 			retirement.length !== 1 ||
 			cut === undefined ||
@@ -827,9 +875,55 @@ function authenticatedSettlementPair(input: InspectCreatorTransitionAdvanceInput
 	) {
 		return undefined;
 	}
+	const openAcl = (bytes: Uint8Array, trust: CurrentAnchorTrust, digest: string): LatchedAclSnapshot | undefined => {
+		const opened = openCanonicalLatchedAclSnapshot({
+			exactCanonicalLatchedAclBytes: bytes,
+			expectedAclDigest: digest,
+			expectedEpoch: trust.currentEpoch,
+			expectedObjectId: trust.objectId,
+			expectedProfileId: trust.profileId,
+		});
+		return opened.ok ? opened.snapshot : undefined;
+	};
+	if (input.mode === "stage" && input.settlementAcl === undefined) return undefined;
+	const boundCurrentAcl =
+		input.settlementAcl === undefined
+			? undefined
+			: openAcl(input.settlementAcl.current, input.currentTrust, currentAclDigest);
+	const boundSuccessorAcl =
+		input.settlementAcl === undefined
+			? undefined
+			: openAcl(input.settlementAcl.successor, input.successorTrust, openedProposed.identity.successorAclDigest);
+	if (input.settlementAcl !== undefined && (boundCurrentAcl === undefined || boundSuccessorAcl === undefined))
+		return undefined;
+	const advance = (
+		predecessor: null | {
+			candidateDigest: string;
+			closedEpoch: number;
+			successorEpoch: number;
+			frontiers: CreatorAuthorSettlementIdentity["frontiers"];
+		}
+	): ReturnType<typeof inspectCreatorAuthorSettlementAdvance> => {
+		// The early verify pass authenticates the cryptographic closure before
+		// snapshot I/O. Its caller must repeat with snapshot ACLs before acceptance.
+		if (input.settlementAcl === undefined) return Object.freeze({ ok: true });
+		return inspectCreatorAuthorSettlementAdvance({
+			currentAcl: boundCurrentAcl,
+			successorAcl: boundSuccessorAcl,
+			predecessor,
+			proposed: {
+				closedEpoch: openedProposed.identity.closedEpoch,
+				successorEpoch: openedProposed.identity.successorEpoch,
+				frontiers: openedProposed.identity.frontiers,
+				priorCheckpointDigest: openedProposed.identity.priorCheckpointDigest,
+				priorCheckpointKind: openedProposed.identity.priorCheckpointKind,
+			},
+		});
+	};
 	if (input.currentTrust.currentEpoch === 0) {
 		return openedProposed.identity.priorCheckpointKind === "genesis" &&
-			openedProposed.identity.priorCheckpointDigest === CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL
+			openedProposed.identity.priorCheckpointDigest === CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL &&
+			advance(null).ok
 			? Object.freeze({ proposed })
 			: undefined;
 	}
@@ -851,7 +945,13 @@ function authenticatedSettlementPair(input: InspectCreatorTransitionAdvanceInput
 	);
 	return openedCurrent !== undefined &&
 		openedProposed.identity.priorCheckpointKind === "settled-v1" &&
-		openedProposed.identity.priorCheckpointDigest === current.ref.digest
+		openedProposed.identity.priorCheckpointDigest === current.ref.digest &&
+		advance({
+			candidateDigest: current.ref.digest,
+			closedEpoch: openedCurrent.identity.closedEpoch,
+			successorEpoch: openedCurrent.identity.successorEpoch,
+			frontiers: openedCurrent.identity.frontiers,
+		}).ok
 		? Object.freeze({ current, proposed })
 		: undefined;
 }

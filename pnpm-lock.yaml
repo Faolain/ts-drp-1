@@ -8,6 +8,9 @@ patchedDependencies:
   "@libp2p/webrtc@6.0.26":
     hash: 095e3209e392a50a8457e1cb0212b46479d959912104124d6c159e21821cbef5
     path: patches/@libp2p__webrtc@6.0.26.patch
+  fake-indexeddb@6.2.5:
+    hash: 3dfda3e8700e39fa865b23a1d54d22608bb7ffcd11370c38386119897d6b63e7
+    path: patches/fake-indexeddb@6.2.5.patch
 
 importers:
   .:
@@ -84,7 +87,7 @@ importers:
         version: 0.5.4(@typescript-eslint/eslint-plugin@8.29.0(@typescript-eslint/parser@8.29.0(eslint@9.23.0)(typescript@5.8.2))(eslint@9.23.0)(typescript@5.8.2))(eslint@9.23.0)(typescript@5.8.2)(vitest@3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0))
       fake-indexeddb:
         specifier: 6.2.5
-        version: 6.2.5
+        version: 6.2.5(patch_hash=3dfda3e8700e39fa865b23a1d54d22608bb7ffcd11370c38386119897d6b63e7)
       fast-check:
         specifier: ^4.9.0
         version: 4.9.0
@@ -14103,7 +14106,7 @@ snapshots:
       iconv-lite: 0.4.24
       tmp: 0.0.33
 
-  fake-indexeddb@6.2.5: {}
+  fake-indexeddb@6.2.5(patch_hash=3dfda3e8700e39fa865b23a1d54d22608bb7ffcd11370c38386119897d6b63e7): {}
 
   fast-check@4.9.0:
     dependencies:

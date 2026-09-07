@@ -122,7 +122,8 @@
 			"protobufjs"
 		],
 		"patchedDependencies": {
-			"@libp2p/webrtc@6.0.26": "patches/@libp2p__webrtc@6.0.26.patch"
+			"@libp2p/webrtc@6.0.26": "patches/@libp2p__webrtc@6.0.26.patch",
+			"fake-indexeddb@6.2.5": "patches/fake-indexeddb@6.2.5.patch"
 		}
 	}
 }

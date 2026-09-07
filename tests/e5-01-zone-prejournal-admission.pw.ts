@@ -1,5 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
+import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+
 interface Approval {
 	readonly signatureHex: string;
 	readonly signer: string;
@@ -93,6 +95,7 @@ test("two real members admit one co-signed outcome before journal and recover it
 	test.setTimeout(180_000);
 	const aliceContext = await browser.newContext();
 	const bobContext = await browser.newContext();
+	await installGridRoomHeadAuthority([aliceContext, bobContext]);
 	const alice = await aliceContext.newPage();
 	const bob = await bobContext.newPage();
 	try {

@@ -2,14 +2,28 @@
 
 ## Next agent prompt
 
+**Re-scoped by the user on 2026-09-06:** retain this unfinished work, but do not
+continue its full redesign by default or serialize grid integration behind it.
+The parent plan's opening handoff now owns the execution sequence. Its next
+action is grid room-head capability wiring, followed by authenticated successor
+continuity and the bounded 64-writer diagnostic workload. Select only concrete
+current registry corrections needed for supported behavior, reusing useful
+coverage here. The independent RED review batch was interrupted for this scope
+change; partial outputs are preserved, not acceptance. The remainder of this
+document records the broader candidate, not a release mandate or an automatic
+workload execution prerequisite.
+
 You are replacing obsolete development governance with one prospective current
 contract under the user's explicit greenfield authorization. W0 is accepted.
-The corrected design confirmation is accepted for **RED authoring only**.
-Read its [dispositions](../../.logs/d110c-registry-confirmation-89394d1f/public/root-dispositions.md)
-with the exact reviewed candidate preserved in that immutable packet. Release
-the separate Astra-high RED owner to create only the five proposed evidence
-files. Freeze the concrete static/runtime capsule and authored cardinalities
-before executing; GREEN remains gated on accepted causal RED. Update this
+The corrected design confirmation released **RED authoring only**. Separate
+RED authoring and causal verification are complete; independent RED acceptance
+remains pending if this broader candidate is resumed. Review the sealed
+[evidence summary](../../.logs/d110c-registry-red-b68f1a59/red-evidence-summary.json)
+and retained failed experiments with the original design
+[dispositions](../../.logs/d110c-registry-confirmation-89394d1f/public/root-dispositions.md).
+The static debt and differing ambient compiler inputs have narrow RED-only
+dispositions; they are not clean typecheck claims. GREEN remains gated on
+independent acceptance of the RED evidence and those dispositions. Update this
 handoff before ending a pass. Do not ask again for the authorization already
 recorded in the production-hardening plan.
 
@@ -17,7 +31,10 @@ recorded in the production-hardening plan.
 - [x] Choose an acyclic authority direction and a hash-bound semantic seam.
 - [x] Freeze the inventory, routing harness, oracle literals and gate commands.
 - [x] Obtain Grok high, Sol high and Fable xhigh corrected-plan acceptance.
-- [ ] Release and verify separate RED/GREEN implementation.
+- [x] Author and causally verify the separate RED evidence.
+- [ ] Obtain independent RED acceptance, including static evidence dispositions.
+- [ ] Release and verify separate GREEN implementation, clearing selected
+  compiler debt and correcting the stage-aware diagnostic comparison.
 - [ ] Verify main custody/static checks and two independent current-source
   runtime checkouts, sign the current baseline, then
   prove actual checkpoint-to-working-tree preservation and final review.
@@ -361,8 +378,11 @@ routing controls from source-semantic mutants. Its [gate roster](./gate-plan.mjs
 derives exact whole-file and controlled-reference invocations from the inventory;
 it prints commands without launching them. The fresh strict
 [compiler runner](./typecheck.mjs) collects that roster with actual configuration
-and source-resolution evidence. It is drafted, not executed or accepted; freeze
-all three artifacts with the corrected review before RED release.
+and source-resolution evidence. Its RED reports retain selected repair debt and
+separate dependency provenance; the verification contract defines the narrow
+RED admission and stricter GREEN acceptance obligation. Correct the collector's
+diagnostic comparison before GREEN verification rather than treating current
+whole-baseline equality as permission to retain debt.
 
 The inventory also records the unchanged verification-only v2 closure. Copy
 those actual current bytes and modes into fresh controlled repositories so the

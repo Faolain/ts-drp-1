@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 
 import { installRtcObserver, resetRtcObserver, rtcObservations } from "./fixtures/e4-aoi/rtc-observer.js";
 import type { RtcObservation } from "./fixtures/e4-aoi/rtc-observer.js";
+import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
 
 const OWNER_READY = existsSync("packages/ephemeral/src/aoi-projection.ts");
 const LOSS_PERCENT = 30;
@@ -211,6 +212,7 @@ test("three real clients recover targeted AOI state after raw loss without durab
 	const creatorContext = await browser.newContext();
 	const observerContext = await browser.newContext();
 	const excludedContext = await browser.newContext();
+	await installGridRoomHeadAuthority([creatorContext, observerContext, excludedContext]);
 	await Promise.all([
 		creatorContext.addInitScript(installRtcObserver),
 		observerContext.addInitScript(installRtcObserver),

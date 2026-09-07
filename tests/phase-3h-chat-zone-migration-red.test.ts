@@ -138,7 +138,7 @@ describe("Phase 3h chat and zone migration composition RED", () => {
 			"applicationBatch",
 			"causalJoin",
 			"commit-outcome-v1",
-			"join",
+			"installRoster",
 			"migrationActivation",
 			"migrationRecord",
 			"placeBlock",
@@ -166,7 +166,40 @@ describe("Phase 3h chat and zone migration composition RED", () => {
 				logicalTime: 2,
 			}),
 		];
-		expect(migrationCapability(application).prepare(accepted)).toEqual(prepareZoneMigration(accepted));
+		const historical = prepareZoneMigration(accepted);
+		const current = migrationCapability(application).prepare(accepted);
+		expect(current.importOperations).toEqual(historical.importOperations);
+		expect(decodeCanonical(current.exactCanonicalApplicationStateBytes)).toEqual({
+			version: 1,
+			blocks: decodeCanonical(historical.exactCanonicalApplicationStateBytes),
+			outcomes: [],
+			roster: [],
+		});
+		// Accepted creator join authority survives preparation; constructor members
+		// alone deliberately did not populate the blocks-only case above.
+		const roster = [
+			{ author: "a".repeat(64), order: 0, peerId: "creator" },
+			{ author: "b".repeat(64), order: 1, peerId: "writer" },
+		];
+		const withRoster = migrationCapability(application).prepare([
+			acceptedOperation(
+				{ action: "installRoster", roster: { entries: [...roster].reverse() } },
+				{
+					author: "a".repeat(64),
+					authorSequence: 0,
+					logicalTime: 0,
+					vertexDigest: "0".repeat(64),
+				}
+			),
+			...accepted,
+		]);
+		expect(withRoster.importOperations).toEqual(historical.importOperations);
+		expect(decodeCanonical(withRoster.exactCanonicalApplicationStateBytes)).toEqual({
+			version: 1,
+			blocks: decodeCanonical(historical.exactCanonicalApplicationStateBytes),
+			outcomes: [],
+			roster,
+		});
 		expect(() =>
 			migrationCapability(application).prepare([
 				acceptedOperation(Object.freeze({ action: "placeBlock", id: "same", kind: "stone", x: 1, y: 2 })),

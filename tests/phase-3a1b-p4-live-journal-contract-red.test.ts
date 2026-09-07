@@ -1,4 +1,4 @@
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { parseStorageObjectId } from "@ts-drp/storage";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -25,6 +25,112 @@ import {
 	NODE_DEATH_TUPLES,
 	NODE_SCHEMA,
 } from "./fixtures/phase-3a1b-p4/live-journal-contract.js";
+import { captureLiveJournalInput } from "../packages/live-journal/src/contract.js";
+
+describe("current optional author-share live-journal install contract", () => {
+	const hex = (bytes: Uint8Array): string => Buffer.from(bytes).toString("hex");
+	const decodedRecord = (bytes: Uint8Array): Record<string, unknown> => {
+		const value = decodeCanonical(bytes);
+		if (value === null || typeof value !== "object" || Array.isArray(value))
+			throw new TypeError("invalid fixture record");
+		return { ...value };
+	};
+	const parameters = (): Record<string, unknown> => decodedRecord(createLiveJournalMaterial().parametersBytes);
+	const inputFor = (
+		operation: "install" | "installEpochAnchor",
+		selected: Record<string, unknown>
+	): {
+		input: {
+			detachedAnchorSignature: Uint8Array;
+			objectId: string;
+			exactCanonicalAnchorPreimageBytes: Uint8Array;
+			exactCanonicalParametersCarrierBytes: Uint8Array;
+		};
+		parametersDigest: string;
+		scope: { objectId: string; epoch: number; anchorDigest: string };
+	} => {
+		const material = createLiveJournalMaterial();
+		const exactCanonicalParametersCarrierBytes = encodeCanonical(selected);
+		const parametersDigest = hex(hashDomain("ts-drp/parameters/v3", exactCanonicalParametersCarrierBytes));
+		const anchor = {
+			...decodedRecord(material.anchorBytes),
+			epoch: operation === "install" ? 0 : 1,
+			parametersDigest,
+		};
+		const exactCanonicalAnchorPreimageBytes = encodeCanonical(anchor);
+		return {
+			input: {
+				detachedAnchorSignature: new Uint8Array(material.signature),
+				objectId: material.objectId,
+				exactCanonicalAnchorPreimageBytes,
+				exactCanonicalParametersCarrierBytes,
+			},
+			parametersDigest,
+			scope: {
+				objectId: material.objectId,
+				epoch: anchor.epoch,
+				anchorDigest: hex(hashDomain("ts-drp/epoch-anchor/v3", exactCanonicalAnchorPreimageBytes)),
+			},
+		};
+	};
+	for (const operation of ["install", "installEpochAnchor"] as const) {
+		it.each([undefined, 1, 4, 1_000_000])(`${operation} preserves exact optional multiplier %s`, (multiplier) => {
+			const selected = parameters();
+			if (multiplier !== undefined) selected.authorShareMultiplier = multiplier;
+			const { input, parametersDigest, scope } = inputFor(operation, selected);
+			expect(captureLiveJournalInput(operation, input)).toEqual({
+				ok: true,
+				value: {
+					parametersDigest,
+					stored: {
+						detachedAnchorSignature: input.detachedAnchorSignature,
+						exactCanonicalAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes,
+						exactCanonicalParametersCarrierBytes: input.exactCanonicalParametersCarrierBytes,
+						nextJournalSequence: 0,
+						parametersDigest,
+						scope,
+					},
+				},
+			});
+		});
+		it.each(["zero", "negative", "fraction", "over-maximum", "unknown-extra", "missing-mandatory"])(
+			`${operation} rejects optional contract violation %s`,
+			(kind) => {
+				const selected = { ...parameters(), authorShareMultiplier: 4 };
+				const mutated: Record<string, unknown> = selected;
+				if (kind === "zero") mutated.authorShareMultiplier = 0;
+				if (kind === "negative") mutated.authorShareMultiplier = -1;
+				if (kind === "fraction") mutated.authorShareMultiplier = 1.5;
+				if (kind === "over-maximum") mutated.authorShareMultiplier = 1_000_001;
+				if (kind === "unknown-extra") mutated.unregistered = 4;
+				if (kind === "missing-mandatory") delete mutated.maxEpochVertices;
+				expect(captureLiveJournalInput(operation, inputFor(operation, mutated).input)).toEqual({
+					ok: false,
+					kind: "noncanonical-preimage",
+				});
+			}
+		);
+		it(`${operation} distinguishes absent and present-one identity without stripping or defaults`, () => {
+			const absent = inputFor(operation, parameters());
+			const present = inputFor(operation, { ...parameters(), authorShareMultiplier: 1 });
+			expect(absent.parametersDigest).not.toBe(present.parametersDigest);
+			expect(absent.input.exactCanonicalParametersCarrierBytes).not.toEqual(
+				present.input.exactCanonicalParametersCarrierBytes
+			);
+			for (const [anchor, carrier] of [
+				[absent, present],
+				[present, absent],
+			] as const) {
+				expect(
+					captureLiveJournalInput(operation, {
+						...anchor.input,
+						exactCanonicalParametersCarrierBytes: carrier.input.exactCanonicalParametersCarrierBytes,
+					})
+				).toEqual({ ok: false, kind: "digest-mismatch" });
+			}
+		});
+	}
+});
 
 function exactRegistryConstraintIds(): readonly string[] {
 	const pairs = (prefix: string, fields: readonly string[]): readonly string[] =>

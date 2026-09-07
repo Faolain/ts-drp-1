@@ -5,6 +5,7 @@ import {
 	createV3RoomSession,
 	type V3RoomAcceptedOperation,
 	type V3RoomCreatorInviteMaterial,
+	type V3RoomHeadAuthority,
 	type V3RoomMigrationActivationReceipt,
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
@@ -24,7 +25,10 @@ import {
 	verifyOutcomeCommitOperation,
 } from "@ts-drp/outcome-commit";
 
-const ZONE_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];for(const entry of operation.batch.entries){const child=entry.operation;if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(child,["action","id","kind","x","y"])||child.action!=="placeBlock"||typeof child.id!=="string"||child.id.length===0||typeof child.kind!=="string"||child.kind.length===0||!Number.isSafeInteger(child.x)||!Number.isSafeInteger(child.y))throw new TypeError("invalid application batch entry");prior=entry.logicalTime;output.push(child)}return {output,state:input.state}}function causalJoinReducer(input){return {output:null,state:input.state}}function commitOutcomeReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","proof"])||operation.action!=="commit-outcome-v1"||!exactKeys(operation.proof,["action","approvals","clientOperationId","exactCanonicalIntentBytes","exactCanonicalPayloadBytes"]))throw new TypeError("invalid outcome commit");return {output:operation,state:input.state}}function joinReducer(input){return {output:input.operation,state:input.state}}function migrationActivationReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","decision"])||operation.action!=="migrationActivation"||operation.decision===null||typeof operation.decision!=="object"||Array.isArray(operation.decision))throw new TypeError("invalid migration activation");return {output:null,state:input.state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,"commit-outcome-v1":commitOutcomeReducer,join:joinReducer,migrationActivation:migrationActivationReducer,migrationRecord:migrationRecordReducer,placeBlock:placeBlockReducer}};`;
+import { createZoneStateKernel, emptyZoneState, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
+import zoneStateSource from "./zone-state.js?raw";
+
+const KERNEL_EXPORT_DECLARATION = "\nexport { createZoneStateKernel, emptyZoneState };\n";
 const PARAMETERS = Object.freeze({
 	authorShareMultiplier: 4,
 	maxEpochVertices: 8192,
@@ -51,6 +55,17 @@ export interface ZoneBlock {
 	readonly x: number;
 	readonly y: number;
 }
+
+export interface V3ZoneRoomHeadOpenContext {
+	readonly author: string;
+	readonly creatorInvite: string | V3RoomCreatorInviteMaterial;
+	readonly objectId: string;
+	readonly operation: "create" | "join";
+}
+
+export type V3ZoneRoomHeadAuthorityForOpen = (
+	context: Readonly<V3ZoneRoomHeadOpenContext>
+) => V3RoomHeadAuthority | Promise<V3RoomHeadAuthority>;
 
 type EntityDelta = ReturnType<typeof decodeEntityDeltaBatch>[number];
 
@@ -218,6 +233,7 @@ interface ZoneProjection {
 	readonly acceptedDigests: readonly string[];
 	readonly blocks: readonly ZoneBlock[];
 	readonly outcomes: readonly OutcomeCommitAdmissionOperation[];
+	readonly roster: readonly Readonly<Enrollment & { readonly order: number }>[];
 	readonly transportPeerAuthors: readonly Readonly<{ readonly author: string; readonly peerId: string }>[];
 	readonly writerAuthors: readonly string[];
 }
@@ -346,9 +362,17 @@ export interface V3ZoneApi {
  * Create the grid-specific durable projection over the shared v3 room.
  * @param node Authenticated node that owns the room transport and signer.
  * @param onProjection Observer for deterministic durable and transient projections.
+ * @param roomHeadAuthorityForOpen Host-owned authority acquisition; initialization belongs to the host.
  * @returns The bounded zone application API.
  */
-export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnapshot) => void): V3ZoneApi {
+export function createV3ZoneApi(
+	node: DRPNode,
+	onProjection: (snapshot: ZoneSnapshot) => void,
+	roomHeadAuthorityForOpen: V3ZoneRoomHeadAuthorityForOpen
+): V3ZoneApi {
+	if (typeof roomHeadAuthorityForOpen !== "function") {
+		throw new TypeError("v3 zone room-head authority factory is required");
+	}
 	const localAuthor = node.keychain.localAuthorId;
 	const localPeerId = node.networkNode.peerId;
 	const enrollment = encodeEnrollment({ author: localAuthor, peerId: localPeerId });
@@ -622,7 +646,8 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	const performOpen = async (
 		selectedZoneId: string,
 		creatorInvite: string | V3RoomCreatorInviteMaterial,
-		bootstrapMembers: readonly Readonly<Enrollment & { readonly order: number }>[]
+		bootstrapMembers: readonly Readonly<Enrollment & { readonly order: number }>[],
+		operation: "create" | "join"
 	): Promise<void> => {
 		resetZoneState();
 		zoneId = selectedZoneId;
@@ -634,6 +659,11 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			if (separator <= 0) throw new TypeError("v3 zone creator identity is invalid");
 			const creatorPeerId = selectedZoneId.slice(0, separator);
 			const creatorAuthor = creatorAuthorFromInvite(creatorInvite);
+			const roomHeadAuthority = await roomHeadAuthorityForOpen(
+				Object.freeze({ author: localAuthor, creatorInvite, objectId: selectedZoneId, operation })
+			);
+			validateRoomHeadAuthority(roomHeadAuthority);
+			if (closeRequested) throw new Error("v3 zone closed during open");
 			const application = createV3ZoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor);
 			opened = await createV3RoomSession<ZoneProjection>({
 				application,
@@ -689,6 +719,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				},
 				openTransport: (openedObjectId) => node.openRoomNetwork(openedObjectId),
 				publicKeyBytes: bytes(localAuthor),
+				roomHeadAuthority,
 				signRegisteredVertexDigest: (registeredDigest) => node.keychain.signWithLocalAuthor(registeredDigest),
 			});
 			sourceRoom = opened;
@@ -1013,7 +1044,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 					...decodedMembers.map((member, index) => Object.freeze({ ...member, order: index + 1 })),
 				]);
 				const material = await createCreatorInviteMaterial(node, selectedZoneId, members);
-				await performOpen(selectedZoneId, material, members);
+				await performOpen(selectedZoneId, material, members, "create");
 				if (room === undefined) throw new Error("v3 zone did not open");
 				invite = encodeZoneInvite({ roomInvite: room.invite, zoneId: selectedZoneId });
 				emit();
@@ -1061,7 +1092,8 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				await performOpen(
 					decoded.zoneId,
 					decoded.roomInvite,
-					Object.freeze([Object.freeze({ author: localAuthor, order: 1, peerId: localPeerId })])
+					Object.freeze([Object.freeze({ author: localAuthor, order: 1, peerId: localPeerId })]),
+					"join"
 				);
 				invite = encodedInvite;
 				emit();
@@ -1246,11 +1278,12 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
  * @returns Exact canonical durable zone state bytes.
  */
 function canonicalZoneStateBytes(projection: ZoneProjection): Uint8Array {
-	return encodeCanonical(
-		projection.outcomes.length === 0
-			? projection.blocks
-			: Object.freeze({ blocks: projection.blocks, outcomes: projection.outcomes })
-	);
+	return encodeCanonical({
+		version: 1,
+		blocks: projection.blocks,
+		outcomes: projection.outcomes,
+		roster: projection.roster,
+	});
 }
 
 /**
@@ -1265,11 +1298,12 @@ export function createV3ZoneApplication(
 	creatorPeerId: string,
 	creatorAuthor: string
 ): Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["application"] {
-	const material = applicationMaterial();
+	const kernel = createZoneStateKernel(creatorAuthor, creatorPeerId);
+	const material = applicationMaterial(creatorPeerId, creatorAuthor);
 	return Object.freeze({
 		batchableOperationActions: Object.freeze(["placeBlock"]),
 		bootstrapOperation: Object.freeze({
-			action: "join",
+			action: "installRoster",
 			roster: Object.freeze({ entries: Object.freeze(members.map((entry) => Object.freeze({ ...entry }))) }),
 		}),
 		canonicalBlueprintPackageBytes: material.canonicalBlueprintPackageBytes,
@@ -1284,83 +1318,75 @@ export function createV3ZoneApplication(
 		displacementPolicies: Object.freeze({ placeBlock: "rebase" as const }),
 		migration: Object.freeze({
 			canonicalStateBytes: canonicalZoneStateBytes,
-			prepare: prepareZoneMigration,
+			prepare: (operations: readonly V3RoomAcceptedOperation[]) => prepareZoneMigration(operations, kernel),
 		}),
 		projectAcceptedOperations: (input: V3RoomProjectionInput) => {
-			if (input.authenticatedBase !== undefined) {
-				throw new TypeError("D110C_0C1G_GRID_AUTHORITY_BASE_UNAVAILABLE");
-			}
-			return projectZone(input.currentEpochOperations, creatorPeerId, creatorAuthor);
+			const base =
+				input.authenticatedBase === undefined
+					? undefined
+					: decodeZoneState(input.authenticatedBase.exactCanonicalApplicationStateBytes, kernel);
+			return projectZone(input.currentEpochOperations, kernel, base);
 		},
 	});
 }
 
 function projectZone(
 	operations: readonly V3RoomAcceptedOperation[],
-	creatorPeerId: string,
-	creatorAuthor: string
+	kernel: ZoneStateKernel,
+	base?: ZoneProjection
 ): ZoneProjection {
-	const roster = new Map<string, Readonly<Enrollment & { readonly order: number }>>();
-	const rosterOrders = new Map<number, Readonly<Enrollment & { readonly order: number }>>();
-	const blocks = new Map<string, ZoneBlock>();
-	const outcomes = new Map<string, OutcomeCommitAdmissionOperation>();
+	let state: ZoneState =
+		base === undefined
+			? emptyZoneState()
+			: { version: 1, blocks: base.blocks, outcomes: base.outcomes, roster: base.roster };
 	const acceptedDigests = new Set<string>();
-	for (const acceptedOperation of operations) {
-		acceptedDigests.add(acceptedOperation.vertexDigest);
-		const action = Reflect.get(acceptedOperation.operation, "action");
-		if (action === "migrationActivation" || action === "migrationRecord") continue;
-		if (action === "join") {
-			const rosterValue = Reflect.get(acceptedOperation.operation, "roster");
-			const members =
-				typeof rosterValue === "object" && rosterValue !== null ? Reflect.get(rosterValue, "entries") : undefined;
-			if (!Array.isArray(members)) continue;
-			const parsedMembers = members.map(exactMember);
-			const creatorSignedRoster = parsedMembers.some(
-				(member) =>
-					member?.order === 0 &&
-					member.author === creatorAuthor &&
-					acceptedOperation.author === creatorAuthor &&
-					member.peerId === creatorPeerId
-			);
-			if (!creatorSignedRoster) continue;
-			for (const member of parsedMembers) {
-				if (member === undefined) continue;
-				if (member.order === 0 && member.peerId !== creatorPeerId) continue;
-				const existing = roster.get(member.peerId);
-				const existingOrder = rosterOrders.get(member.order);
-				if (
-					(existing === undefined || existing.author === member.author) &&
-					(existingOrder === undefined ||
-						(existingOrder.author === member.author && existingOrder.peerId === member.peerId))
-				) {
-					roster.set(member.peerId, member);
-					rosterOrders.set(member.order, member);
-				}
-			}
-		}
-		if (action === "placeBlock") {
-			const block = exactBlock(acceptedOperation.operation);
-			if (block === undefined) throw new TypeError("v3 zone placeBlock operation is invalid");
-			blocks.set(block.id, block);
-		}
-		if (action === "commit-outcome-v1") {
-			const outcome = verifiedOutcomeCarrier(acceptedOperation.operation);
-			const existing = outcomes.get(outcome.proof.clientOperationId);
-			if (existing !== undefined) throw new TypeError("v3 zone outcome identity conflicts");
-			outcomes.set(outcome.proof.clientOperationId, outcome);
-		}
+	for (const accepted of operations) {
+		acceptedDigests.add(accepted.vertexDigest);
+		// Signature and current-room admission remain owned by the authenticated
+		// boundary. The exact same pure transition owns live and folded state.
+		const operation =
+			accepted.operation.action === "commit-outcome-v1"
+				? verifiedOutcomeCarrier(accepted.operation)
+				: accepted.operation;
+		state = kernel.apply(state, operation, accepted.author).state;
 	}
-	const entries = [...roster.values()].sort(
-		(left, right) =>
-			left.order - right.order || compareText(left.author, right.author) || compareText(left.peerId, right.peerId)
-	);
+	return zoneProjection([...acceptedDigests], state);
+}
+
+function zoneProjection(acceptedDigests: readonly string[], state: ZoneState): ZoneProjection {
 	return Object.freeze({
 		acceptedDigests: Object.freeze([...acceptedDigests]),
-		blocks: Object.freeze([...blocks.values()].sort((left, right) => compareText(left.id, right.id))),
-		outcomes: Object.freeze([...outcomes.values()]),
-		transportPeerAuthors: Object.freeze(entries.map(({ author, peerId }) => Object.freeze({ author, peerId }))),
-		writerAuthors: Object.freeze(entries.map(({ author }) => author)),
+		blocks: state.blocks,
+		outcomes: state.outcomes,
+		roster: state.roster,
+		transportPeerAuthors: Object.freeze(state.roster.map(({ author, peerId }) => Object.freeze({ author, peerId }))),
+		writerAuthors: Object.freeze(state.roster.map(({ author }) => author)),
 	});
+}
+
+function decodeZoneState(stateBytes: Uint8Array, kernel: ZoneStateKernel): ZoneProjection {
+	const invalidState = (): never => {
+		throw new TypeError("v3 zone authenticated projection state is invalid");
+	};
+	let value: unknown;
+	try {
+		value = decodeCanonical(stateBytes, {
+			maxBytes: PARAMETERS.maxSnapshotBytes,
+			maxDepth: 32,
+			maxItems: PARAMETERS.maxSnapshotBytes,
+		});
+	} catch {
+		return invalidState();
+	}
+	const state = kernel.captureState(value);
+	try {
+		for (const outcome of state.outcomes) verifiedOutcomeCarrier(outcome);
+	} catch {
+		return invalidState();
+	}
+	const projection = zoneProjection([], state);
+	if (!sameBytes(canonicalZoneStateBytes(projection), stateBytes)) return invalidState();
+	return projection;
 }
 
 function preparedOutcomeCarrier(operation: Readonly<Record<string, unknown>>): PreparedOutcomeIntent {
@@ -1409,6 +1435,49 @@ function creatorAuthorFromSignerSet(exactCanonicalSignerSetBytes: Uint8Array): s
 	return publicKey;
 }
 
+function validateRoomHeadAuthority(value: unknown): asserts value is V3RoomHeadAuthority {
+	if (
+		typeof value !== "object" ||
+		value === null ||
+		Array.isArray(value) ||
+		!["begin", "commit", "create", "migrate", "read"].every(
+			(method) => typeof Reflect.get(value, method) === "function"
+		)
+	) {
+		throw new TypeError("v3 zone room-head authority provider is invalid");
+	}
+	const initialization: unknown = Reflect.get(value, "initialization");
+	if (typeof initialization !== "object" || initialization === null || Array.isArray(initialization)) {
+		throw new TypeError("v3 zone room-head authority initialization is invalid");
+	}
+	const kind: unknown = Reflect.get(initialization, "kind");
+	const keys = Object.keys(initialization);
+	if ((kind === "create" || kind === "reopen") && keys.length === 1 && keys.includes("kind")) return;
+	if (kind === "migrate" && keys.length === 2 && keys.includes("kind") && keys.includes("head")) {
+		const head: unknown = Reflect.get(initialization, "head");
+		if (typeof head === "object" && head !== null && !Array.isArray(head)) {
+			const headKeys = Object.keys(head);
+			const currentAnchorDigest: unknown = Reflect.get(head, "currentAnchorDigest");
+			const epoch: unknown = Reflect.get(head, "epoch");
+			const objectId: unknown = Reflect.get(head, "objectId");
+			if (
+				headKeys.length === 3 &&
+				["currentAnchorDigest", "epoch", "objectId"].every((key) => headKeys.includes(key)) &&
+				typeof currentAnchorDigest === "string" &&
+				/^[0-9a-f]{64}$/u.test(currentAnchorDigest) &&
+				typeof epoch === "number" &&
+				Number.isSafeInteger(epoch) &&
+				epoch >= 0 &&
+				typeof objectId === "string" &&
+				objectId.length > 0
+			) {
+				return;
+			}
+		}
+	}
+	throw new TypeError("v3 zone room-head authority initialization is invalid");
+}
+
 function creatorAuthorFromInvite(invite: string | V3RoomCreatorInviteMaterial): string {
 	if (typeof invite !== "string") return creatorAuthorFromSignerSet(invite.exactCanonicalSignerSetBytes);
 	const decoded = decodeCanonical(bytes(invite), { maxBytes: 131_072, maxDepth: 4, maxItems: 128 });
@@ -1419,57 +1488,13 @@ function creatorAuthorFromInvite(invite: string | V3RoomCreatorInviteMaterial): 
 }
 
 function emptyProjection(): ZoneProjection {
-	return Object.freeze({
-		acceptedDigests: Object.freeze([]),
-		blocks: Object.freeze([]),
-		outcomes: Object.freeze([]),
-		transportPeerAuthors: Object.freeze([]),
-		writerAuthors: Object.freeze([]),
-	});
+	return zoneProjection([], emptyZoneState());
 }
 
-function exactMember(value: unknown): Readonly<Enrollment & { readonly order: number }> | undefined {
-	if (typeof value !== "object" || value === null) return undefined;
-	const author = Reflect.get(value, "author");
-	const order = Reflect.get(value, "order");
-	const peerId = Reflect.get(value, "peerId");
-	return typeof author === "string" &&
-		/^[0-9a-f]{64}$/u.test(author) &&
-		Number.isSafeInteger(order) &&
-		Number(order) >= 0 &&
-		Number(order) <= 8 &&
-		typeof peerId === "string" &&
-		peerId.length > 0
-		? Object.freeze({ author, order: Number(order), peerId })
-		: undefined;
-}
-
-function exactBlock(value: unknown): ZoneBlock | undefined {
-	if (typeof value !== "object" || value === null) return undefined;
-	const keys = Reflect.ownKeys(value);
-	if (
-		keys.length !== 5 ||
-		!keys.every((key) => key === "action" || key === "id" || key === "kind" || key === "x" || key === "y")
-	) {
-		return undefined;
-	}
-	const action = Reflect.get(value, "action");
-	const id = Reflect.get(value, "id");
-	const kind = Reflect.get(value, "kind");
-	const x = Reflect.get(value, "x");
-	const y = Reflect.get(value, "y");
-	return action === "placeBlock" &&
-		typeof id === "string" &&
-		id.length > 0 &&
-		typeof kind === "string" &&
-		kind.length > 0 &&
-		Number.isSafeInteger(x) &&
-		Number.isSafeInteger(y)
-		? Object.freeze({ id, kind, x: x as number, y: y as number })
-		: undefined;
-}
-
-function prepareZoneMigration(operations: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection {
+function prepareZoneMigration(
+	operations: readonly V3RoomAcceptedOperation[],
+	kernel: ZoneStateKernel
+): V3RoomMigrationProjection {
 	const blocks = new Map<string, ZoneBlock>();
 	for (const row of operations) {
 		const action = Reflect.get(row.operation, "action");
@@ -1478,15 +1503,17 @@ function prepareZoneMigration(operations: readonly V3RoomAcceptedOperation[]): V
 			throw new TypeError("v3 zone outcome migration requires an authenticated transfer owner");
 		}
 		if (action !== "placeBlock") continue;
-		const block = exactBlock(row.operation);
+		const block = kernel.blockForOperation(row.operation);
 		if (block === undefined) throw new TypeError("v3 zone migration block is invalid");
 		if (blocks.has(block.id)) throw new TypeError("v3 zone migration identity conflicts");
 		blocks.set(block.id, block);
 	}
-	const state = Object.freeze([...blocks.values()].sort((left, right) => compareText(left.id, right.id)));
+	const projection = projectZone(operations, kernel);
 	return Object.freeze({
-		exactCanonicalApplicationStateBytes: encodeCanonical(state),
-		importOperations: Object.freeze(state.map((block) => Object.freeze({ action: "placeBlock", ...block }))),
+		exactCanonicalApplicationStateBytes: canonicalZoneStateBytes(projection),
+		importOperations: Object.freeze(
+			projection.blocks.map((block) => Object.freeze({ action: "placeBlock", ...block }))
+		),
 	});
 }
 
@@ -1666,7 +1693,9 @@ async function createCreatorInviteMaterial(
 	objectId: string,
 	members: readonly Readonly<Enrollment & { readonly order: number }>[]
 ): Promise<V3RoomCreatorInviteMaterial> {
-	const application = applicationMaterial();
+	const creator = members.find(({ author, order }) => author === node.keychain.localAuthorId && order === 0);
+	if (creator === undefined) throw new TypeError("v3 zone creator enrollment is unavailable");
+	const application = applicationMaterial(creator.peerId, node.keychain.localAuthorId);
 	const exactCanonicalLatchedAclBytes = encodeCanonical({
 		epoch: 0,
 		kind: "drp-v3-latched-acl",
@@ -1692,13 +1721,9 @@ async function createCreatorInviteMaterial(
 		signers: signerSet,
 	});
 	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
-	const creator = members.find(({ author, order }) => author === node.keychain.localAuthorId && order === 0);
-	if (creator === undefined) throw new TypeError("v3 zone creator enrollment is unavailable");
 	return createV3RoomCreatorInviteMaterial({
 		blueprintDigest: application.blueprintDigest,
-		exactCanonicalApplicationStateBytes: canonicalZoneStateBytes(
-			projectZone([], creator.peerId, node.keychain.localAuthorId)
-		),
+		exactCanonicalApplicationStateBytes: canonicalZoneStateBytes(emptyProjection()),
 		exactCanonicalLatchedAclBytes,
 		exactCanonicalParametersCarrierBytes,
 		exactCanonicalProfileBytes,
@@ -1708,12 +1733,21 @@ async function createCreatorInviteMaterial(
 	});
 }
 
-function applicationMaterial(): Readonly<{
+function applicationMaterial(
+	creatorPeerId: string,
+	creatorAuthor: string
+): Readonly<{
 	readonly blueprintDigest: string;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["application"]["catalog"];
 }> {
-	const exactArtifactBytes = new TextEncoder().encode(ZONE_ARTIFACT_SOURCE);
+	if (!zoneStateSource.endsWith(KERNEL_EXPORT_DECLARATION)) {
+		throw new TypeError("v3 zone state kernel export differs");
+	}
+	const artifactSource = `${zoneStateSource.slice(0, -KERNEL_EXPORT_DECLARATION.length)}
+const zone = createZoneStateKernel(${JSON.stringify(creatorAuthor)}, ${JSON.stringify(creatorPeerId)});
+export const blueprint = {exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:zone.reducers};`;
+	const exactArtifactBytes = new TextEncoder().encode(artifactSource);
 	const artifactDigest = digest("ts-drp/blueprint-artifact/v3", exactArtifactBytes);
 	const operation = (
 		name: string,
@@ -1744,7 +1778,7 @@ function applicationMaterial(): Readonly<{
 				operation("applicationBatch", [Object.freeze({ name: "batch", type: "canonical-object" })]),
 				operation("causalJoin", []),
 				operation("commit-outcome-v1", [Object.freeze({ name: "proof", type: "canonical-object" })]),
-				operation("join", [Object.freeze({ name: "roster", type: "canonical-object" })]),
+				operation("installRoster", [Object.freeze({ name: "roster", type: "canonical-object" })]),
 				operation("migrationActivation", [Object.freeze({ name: "decision", type: "canonical-object" })]),
 				operation("migrationRecord", [Object.freeze({ name: "record", type: "canonical-object" })]),
 				operation("placeBlock", [

@@ -1,6 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
+import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+
 const SAMPLE_COUNT = 300;
 const SAMPLE_INTERVAL_MS = 33;
 const TARGETED_READY = readFileSync("packages/ephemeral/src/index.ts", "utf8").includes("publishTo(");
@@ -102,6 +104,7 @@ test("one real observer receives 32 targeted entities below the routed downstrea
 	const creatorContext = await browser.newContext();
 	const observerContext = await browser.newContext();
 	const excludedContext = await browser.newContext();
+	await installGridRoomHeadAuthority([creatorContext, observerContext, excludedContext]);
 	const creator = await creatorContext.newPage();
 	const observer = await observerContext.newPage();
 	const excluded = await excludedContext.newPage();

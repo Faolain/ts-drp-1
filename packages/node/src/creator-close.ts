@@ -11,15 +11,22 @@ import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import { ANCHOR_TRUST_STATE_MAX_RECORD_BYTES, type CurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import {
 	completeCreatorAuthorIssuanceFrontiers,
+	completeCreatorAuthorSettlement,
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_GENESIS_SENTINEL,
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES,
+	CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL,
 	CREATOR_AUTHOR_SETTLEMENT_KIND,
 	CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES,
 	type CreatorAuthorIssuanceFrontier,
+	type CreatorAuthorSettlementFrontier,
+	frontierFor,
 	openCreatorAuthorIssuanceFrontiers,
+	openCreatorAuthorSettlement,
 	prepareCreatorAuthorIssuanceFrontiers,
+	prepareCreatorAuthorSettlement,
 	resolveCreatorAuthorIssuanceFrontiers,
+	type VerifiedCreatorAuthorSettlement,
 } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import { openCreatorSuccessorTrust, prepareCreatorClose } from "@ts-drp/protocol-v3/creator-close";
 import {
@@ -598,6 +605,131 @@ async function authorIssuanceFrontiersCandidate(
 	});
 }
 
+async function authorSettlementCandidate(
+	input: Omit<Parameters<typeof authorIssuanceFrontiersCandidate>[0], "legacy"> &
+		Readonly<{ historyRoot: string; historySize: number }>
+): Promise<Readonly<{ bytes: Uint8Array; priorRef?: GenerationRef; ref: GenerationRef }>> {
+	const currentAcl = openedLatchedAcl(input.currentExactAclBytes, input.currentTrust, input.currentAclDigest);
+	const successorAcl = openedLatchedAcl(input.successorExactAclBytes, input.successorTrust, input.successorAclDigest);
+	if (currentAcl === undefined || successorAcl === undefined) {
+		throw new TypeError("creator settlement ACL authority is unavailable");
+	}
+	const candidates = input.current.candidates.filter((candidate) => {
+		try {
+			return (decodeCanonical(candidate.bytes) as Record<string, unknown>).kind === CREATOR_AUTHOR_SETTLEMENT_KIND;
+		} catch {
+			return false;
+		}
+	});
+	if (candidates.length !== (input.currentTrust.currentEpoch === 0 ? 0 : 1)) {
+		throw new TypeError("creator settlement predecessor is unavailable");
+	}
+	const previous = candidates[0];
+	let prior: VerifiedCreatorAuthorSettlement | undefined;
+	if (previous !== undefined) {
+		const epoch = input.currentTrust.currentEpoch - 1;
+		const cut = uniqueRecordCandidate(input.current.candidates, "drp-hard-epoch-cut", epoch);
+		const qc = uniqueRecordCandidate(input.current.candidates, "drp-seal-qc", epoch, "commit");
+		const acl = uniqueRecordCandidate(input.current.candidates, "drp-v3-latched-acl", epoch);
+		const cutRecord = cut === undefined ? undefined : decodeCanonical(cut.bytes);
+		if (cut === undefined || qc === undefined || acl === undefined || !plainRecord(cutRecord)) {
+			throw new TypeError("creator settlement predecessor proof is unavailable");
+		}
+		const opened = openCreatorAuthorSettlement({
+			exactCanonicalRecordBytes: previous.bytes,
+			expectedCommitQcRef: qc.ref,
+			expectedCurrentAclDigest: candidateAclDigest(acl),
+			expectedCutValueDigest: hex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
+			expectedSnapshotManifestDigest: cutRecord.snapshotManifestDigest,
+			expectedSuccessorAclDigest: input.currentAclDigest,
+			floorTrust: input.currentTrust,
+		});
+		if (!opened.ok) throw new TypeError("creator settlement predecessor proof is invalid");
+		prior = opened.capability;
+	}
+	const currentMembers = new Set(currentAcl.members.map(({ author }) => author));
+	const byAuthor = new Map<string, Map<number, string>>();
+	const duplicates = new Set<string>();
+	for (const [digest, identity] of input.graph.authors) {
+		const slots = byAuthor.get(identity.author) ?? new Map<number, string>();
+		if (slots.has(identity.authorSequence)) duplicates.add(identity.author);
+		slots.set(identity.authorSequence, digest);
+		byAuthor.set(identity.author, slots);
+	}
+	const frontiers: CreatorAuthorSettlementFrontier[] = [];
+	for (const { author } of successorAcl.members) {
+		if (!currentMembers.has(author)) {
+			frontiers.push(Object.freeze([author, input.successorTrust.currentEpoch, null] as const));
+			continue;
+		}
+		const previousFrontier = prior === undefined ? undefined : frontierFor(prior, author);
+		if (prior !== undefined && previousFrontier === undefined) {
+			throw new TypeError("creator settlement predecessor member is unavailable");
+		}
+		const admissionEpoch = previousFrontier?.[1] ?? 0;
+		let boundary = previousFrontier?.[2] ?? null;
+		const slots = byAuthor.get(author) ?? new Map<number, string>();
+		const regressed = [...slots.keys()].some((sequence) => boundary !== null && sequence <= boundary);
+		if (duplicates.has(author) || regressed) {
+			if (author === input.issuanceScope.author) {
+				throw new TypeError(
+					duplicates.has(author)
+						? "creator issuance-frontier author slot is ambiguous"
+						: "creator issuance-frontier boundary regressed"
+				);
+			}
+		} else {
+			for (const [sequence, digest] of slots) {
+				const operation = input.graph.vertices.get(digest)?.operation;
+				const fence = operation?.fenceSequence;
+				if (
+					operation?.action === "$drp.author-fence.v1" &&
+					operation.version === 1 &&
+					typeof fence === "number" &&
+					Number.isSafeInteger(fence) &&
+					fence >= 0 &&
+					fence <= sequence &&
+					(boundary === null || fence > boundary)
+				) {
+					boundary = fence === 0 ? null : fence - 1;
+				}
+			}
+			let next = boundary === null ? 0 : boundary + 1;
+			while (slots.has(next)) {
+				boundary = next;
+				next += 1;
+			}
+		}
+		frontiers.push(Object.freeze([author, admissionEpoch, boundary] as const));
+	}
+	const prepared = prepareCreatorAuthorSettlement({
+		commitQcRef: input.qcRef,
+		currentAclDigest: input.currentAclDigest,
+		currentTrust: input.currentTrust,
+		cutValueDigest: input.cutValueDigest,
+		frontiers,
+		historyRoot: input.historyRoot,
+		historySize: input.historySize,
+		priorCheckpointDigest: previous?.ref.digest ?? CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL,
+		priorCheckpointKind: previous === undefined ? "genesis" : "settled-v1",
+		snapshotManifestDigest: input.snapshotManifestDigest,
+		successorAclDigest: input.successorAclDigest,
+		successorTrust: input.successorTrust,
+	});
+	if (!prepared.ok) throw new TypeError("creator settlement preparation failed");
+	const detachedSignature = await signCreatorIssuanceRetirementRequest({
+		request: prepared.signingRequest,
+		signer: input.signer,
+	});
+	const completed = completeCreatorAuthorSettlement({ detachedSignature, preparation: prepared.preparation });
+	if (!completed.ok) throw new TypeError("creator settlement completion failed");
+	return Object.freeze({
+		bytes: completed.exactCanonicalRecordBytes,
+		ref: refFor(completed.exactCanonicalRecordBytes),
+		...(previous === undefined ? {} : { priorRef: copiedRef(previous.ref) }),
+	});
+}
+
 function sameHead(left: PresentHead, right: PresentHead): boolean {
 	return (
 		left.closureDigest === right.closureDigest &&
@@ -1046,21 +1178,24 @@ export async function bindCreatorLiveClose(
 					const successorTrustRef = refFor(finalized.exactCanonicalTrustStateRecordBytes);
 					const cutValueRef = refFor(prepared.exactCanonicalCutValueBytes);
 					const commitQcRef = refFor(finalized.exactCanonicalCommitQcBytes);
-					const retirement = await issuanceRetirementCandidate({
-						current,
-						currentTrust: registration.currentTrust,
-						cutValueDigest: prepared.valueDigest,
-						durableReplay,
-						graph,
-						issuanceScope: registration.issuanceScope,
-						issuanceStore: registration.issuanceStore,
-						maxEpochVertices: registration.maxEpochVertices,
-						qcRef: commitQcRef,
-						signer: input.signer,
-						snapshotManifestDigest: persistedSnapshot.manifestDigest,
-						successorTrust: successor.trust,
-					});
-					const aggregate = await authorIssuanceFrontiersCandidate({
+					const settlement = settlementProfileFor(registration.currentTrust.profileId) === "v1";
+					const retirement = settlement
+						? undefined
+						: await issuanceRetirementCandidate({
+								current,
+								currentTrust: registration.currentTrust,
+								cutValueDigest: prepared.valueDigest,
+								durableReplay,
+								graph,
+								issuanceScope: registration.issuanceScope,
+								issuanceStore: registration.issuanceStore,
+								maxEpochVertices: registration.maxEpochVertices,
+								qcRef: commitQcRef,
+								signer: input.signer,
+								snapshotManifestDigest: persistedSnapshot.manifestDigest,
+								successorTrust: successor.trust,
+							});
+					const frontierInput = {
 						current,
 						currentAclDigest: anchor.aclDigest,
 						currentExactAclBytes: registration.exactCanonicalLatchedAclBytes,
@@ -1069,46 +1204,57 @@ export async function bindCreatorLiveClose(
 						graph,
 						issuanceScope: registration.issuanceScope,
 						issuanceStore: registration.issuanceStore,
-						legacy: retirement,
 						qcRef: commitQcRef,
 						signer: input.signer,
 						snapshotManifestDigest: persistedSnapshot.manifestDigest,
 						successorAclDigest: aclDigest,
 						successorExactAclBytes: encodeCanonical(acl),
 						successorTrust: successor.trust,
-					});
+					};
+					const aggregate =
+						retirement === undefined
+							? await authorSettlementCandidate({
+									...frontierInput,
+									historyRoot: commitment.historyRoot,
+									historySize: commitment.historySize,
+								})
+							: await authorIssuanceFrontiersCandidate({ ...frontierInput, legacy: retirement });
+					const controls = retirement === undefined ? [aggregate] : [retirement, aggregate];
 					const proposed = Object.freeze(
 						[
 							...current.references.filter(
 								({ digest }) =>
-									digest !== current.trustRef.digest &&
-									digest !== retirement.priorRef?.digest &&
-									digest !== aggregate.priorRef?.digest
+									digest !== current.trustRef.digest && !controls.some((control) => digest === control.priorRef?.digest)
 							),
 							successorTrustRef,
 							cutValueRef,
 							commitQcRef,
-							retirement.ref,
-							aggregate.ref,
+							...controls.map(({ ref }) => ref),
 						].sort(compareRef)
 					);
 					const proposedCandidates = creatorCloseCandidates([
 						...current.candidates.filter(
 							({ ref }) =>
 								ref.digest !== current.trustRef.digest &&
-								ref.digest !== retirement.priorRef?.digest &&
-								ref.digest !== aggregate.priorRef?.digest
+								!controls.some((control) => ref.digest === control.priorRef?.digest)
 						),
 						{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
 						{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
 						{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
-						{ bytes: retirement.bytes, ref: retirement.ref },
-						{ bytes: aggregate.bytes, ref: aggregate.ref },
+						...controls.map(({ bytes, ref }) => ({ bytes, ref })),
 					]);
 					const advance = inspectCreatorTransitionAdvance({
 						current: { candidates: current.candidates, closure: current.references },
 						currentTrust: registration.currentTrust,
 						mode: "stage",
+						...(settlement
+							? {
+									settlementAcl: {
+										current: registration.exactCanonicalLatchedAclBytes,
+										successor: encodeCanonical(acl),
+									},
+								}
+							: {}),
 						proofRefs: [cutValueRef, commitQcRef],
 						proposed: { candidates: proposedCandidates, closure: proposed },
 						successorTrust: successor.trust,
@@ -1122,8 +1268,7 @@ export async function bindCreatorLiveClose(
 							{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
 							{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
 							{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
-							{ bytes: retirement.bytes, ref: retirement.ref },
-							{ bytes: aggregate.bytes, ref: aggregate.ref },
+							...controls.map(({ bytes, ref }) => ({ bytes, ref })),
 						],
 						acceptedProposed
 					);

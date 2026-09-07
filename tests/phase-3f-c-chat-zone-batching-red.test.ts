@@ -262,7 +262,7 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 			"applicationBatch",
 			"causalJoin",
 			"commit-outcome-v1",
-			"join",
+			"installRoster",
 			"migrationActivation",
 			"migrationRecord",
 			"placeBlock",
@@ -273,7 +273,16 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 			name: "applicationBatch",
 		});
 		expect(application.projectAcceptedOperations).toBeTypeOf("function");
-		const reduced = await reduceBatch(application, Object.freeze({ durable: "unchanged" }), [
+		const initialState = Object.freeze({
+			version: 1,
+			blocks: [
+				{ id: "a", kind: "dirt", x: -1, y: -2 },
+				{ id: "retained", kind: "stone", x: 7, y: 8 },
+			],
+			outcomes: [],
+			roster: [{ author, order: 0, peerId: "peer:creator" }],
+		});
+		const reduced = await reduceBatch(application, initialState, [
 			Object.freeze({
 				logicalTime: 3,
 				operation: Object.freeze({ action: "placeBlock", id: "a", kind: "stone", x: 1, y: 2 }),
@@ -288,11 +297,27 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 				{ action: "placeBlock", id: "a", kind: "stone", x: 1, y: 2 },
 				{ action: "placeBlock", id: "b", kind: "dirt", x: 3, y: 4 },
 			],
-			state: { durable: "unchanged" },
+			state: {
+				...initialState,
+				blocks: [
+					{ id: "a", kind: "stone", x: 1, y: 2 },
+					{ id: "b", kind: "dirt", x: 3, y: 4 },
+					{ id: "retained", kind: "stone", x: 7, y: 8 },
+				],
+			},
 		});
-		const maximalZone = await reduceBatch(application, Object.freeze({ durable: "unchanged" }), maximalEntries("zone"));
+		const maximalZone = await reduceBatch(application, initialState, maximalEntries("zone"));
 		expect(maximalZone.output).toHaveLength(16);
-		expect(maximalZone.state).toEqual({ durable: "unchanged" });
+		expect(maximalZone.state).toEqual({
+			...initialState,
+			blocks: [
+				...initialState.blocks,
+				...maximalEntries("zone").map(({ operation }) => {
+					const { id, kind, x, y } = operation;
+					return { id, kind, x, y };
+				}),
+			].sort((left, right) => (String(left.id) < String(right.id) ? -1 : String(left.id) > String(right.id) ? 1 : 0)),
+		});
 		for (const operation of [
 			Object.freeze({
 				action: "applicationBatch",
@@ -307,7 +332,7 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 				batch: Object.freeze({ entries: maximalEntries("chat", 2), version: 1 }),
 			}),
 		]) {
-			await expect(reduceOperation(application, Object.freeze({ durable: "unchanged" }), operation)).rejects.toThrow();
+			await expect(reduceOperation(application, initialState, operation)).rejects.toThrow();
 		}
 		for (const operation of malformedBatchOperations(
 			Object.freeze({
@@ -315,7 +340,7 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 				operation: Object.freeze({ action: "placeBlock", id: "shape", kind: "stone", x: 1, y: 2 }),
 			})
 		)) {
-			await expect(reduceOperation(application, Object.freeze({ durable: "unchanged" }), operation)).rejects.toThrow();
+			await expect(reduceOperation(application, initialState, operation)).rejects.toThrow();
 		}
 		const vertexDigest = "2".repeat(64);
 		const projection = application.projectAcceptedOperations({

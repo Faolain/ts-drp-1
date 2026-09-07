@@ -59,6 +59,16 @@ export type ClosedEpochCleanupPlanningResult =
 	| Readonly<{ readonly ok: false; readonly reason: ClosedEpochCleanupRefusal }>
 	| Readonly<{ readonly ok: true; readonly plan: ClosedEpochCleanupPlan }>;
 
+type SettlementCleanupFrontier = Readonly<{ admissionEpoch: number; terminalThrough: number | null }>;
+type SettlementCleanupPlanningResult =
+	| Readonly<{ readonly ok: false; readonly reason: ClosedEpochCleanupRefusal }>
+	| Readonly<{
+			readonly ok: true;
+			readonly plan: Omit<ClosedEpochCleanupPlan, "issuance"> & {
+				readonly issuance: ClosedEpochCleanupPlan["issuance"] | null;
+			};
+	  }>;
+
 type CapturedInput = Readonly<{
 	readonly adoption: Readonly<Record<string, unknown>>;
 	readonly availabilityPolicyDigest: unknown;
@@ -67,6 +77,7 @@ type CapturedInput = Readonly<{
 	readonly generations: readonly unknown[];
 	readonly issuance: Readonly<Record<string, unknown>>;
 	readonly snapshot: Readonly<Record<string, unknown>>;
+	readonly settlement?: SettlementCleanupFrontier;
 }>;
 
 type CopiedGeneration = Readonly<{
@@ -105,6 +116,7 @@ function captureInput(value: unknown): CapturedInput | undefined {
 			"generations",
 			"issuance",
 			"snapshot",
+			...(value.settlement === undefined ? [] : ["settlement"]),
 		]) ||
 		!record(value.adoption) ||
 		!record(value.close) ||
@@ -114,6 +126,16 @@ function captureInput(value: unknown): CapturedInput | undefined {
 	) {
 		return undefined;
 	}
+	if (
+		value.settlement !== undefined &&
+		(!record(value.settlement) ||
+			!exactKeys(value.settlement, ["admissionEpoch", "terminalThrough"]) ||
+			!Number.isSafeInteger(value.settlement.admissionEpoch) ||
+			Number(value.settlement.admissionEpoch) < 0 ||
+			(value.settlement.terminalThrough !== null &&
+				(!Number.isSafeInteger(value.settlement.terminalThrough) || Number(value.settlement.terminalThrough) < 0)))
+	)
+		return undefined;
 	return Object.freeze({
 		adoption: value.adoption,
 		availabilityPolicyDigest: value.availabilityPolicyDigest,
@@ -122,6 +144,7 @@ function captureInput(value: unknown): CapturedInput | undefined {
 		generations: value.generations,
 		issuance: value.issuance,
 		snapshot: value.snapshot,
+		...(value.settlement === undefined ? {} : { settlement: value.settlement as SettlementCleanupFrontier }),
 	});
 }
 
@@ -353,8 +376,9 @@ function validSnapshot(value: Readonly<Record<string, unknown>>): boolean {
 function copiedIssuance(
 	value: Readonly<Record<string, unknown>>,
 	objectId: StorageObjectId,
-	closedEpoch: number
-): ClosedEpochCleanupPlan["issuance"] | undefined {
+	closedEpoch: number,
+	settlement?: SettlementCleanupFrontier
+): ClosedEpochCleanupPlan["issuance"] | null | undefined {
 	if (
 		!exactKeys(value, [
 			"complete",
@@ -378,8 +402,8 @@ function copiedIssuance(
 		copiedObjectId(value.scope.objectId) !== objectId ||
 		typeof value.scope.author !== "string" ||
 		!HEX_DIGEST.test(value.scope.author) ||
-		!Number.isSafeInteger(value.throughAuthorSequence) ||
-		Number(value.throughAuthorSequence) < 0 ||
+		(!(settlement !== undefined && value.throughAuthorSequence === null) &&
+			(!Number.isSafeInteger(value.throughAuthorSequence) || Number(value.throughAuthorSequence) < 0)) ||
 		!Array.isArray(value.rows)
 	) {
 		return undefined;
@@ -388,6 +412,14 @@ function copiedIssuance(
 	const lineage = Object.freeze({ exhausted: value.lineage.exhausted, next: Number(value.lineage.next) });
 	const prunedThroughAuthorSequence =
 		value.prunedThroughAuthorSequence === null ? null : Number(value.prunedThroughAuthorSequence);
+	if (settlement !== undefined && value.throughAuthorSequence === null) {
+		return value.rows.length === 0 &&
+			(prunedThroughAuthorSequence === null ||
+				lineage.next > prunedThroughAuthorSequence ||
+				(lineage.exhausted && lineage.next === prunedThroughAuthorSequence))
+			? null
+			: undefined;
+	}
 	const consumed =
 		lineage.next > throughAuthorSequence || (lineage.exhausted && lineage.next === throughAuthorSequence);
 	if (
@@ -413,10 +445,19 @@ function copiedIssuance(
 			Number(candidate.authorSequence) < first ||
 			Number(candidate.authorSequence) > throughAuthorSequence ||
 			!Number.isSafeInteger(candidate.epoch) ||
-			Number(candidate.epoch) !== closedEpoch ||
+			(settlement === undefined
+				? Number(candidate.epoch) !== closedEpoch
+				: Number(candidate.epoch) < 0 ||
+					Number(candidate.epoch) > closedEpoch - 2 ||
+					!(
+						Number(candidate.epoch) < settlement.admissionEpoch ||
+						(settlement.terminalThrough !== null && Number(candidate.authorSequence) <= settlement.terminalThrough)
+					)) ||
 			candidate.issued !== true ||
 			candidate.outbox !== true ||
-			candidate.publishState !== "published" ||
+			(settlement === undefined
+				? candidate.publishState !== "published"
+				: candidate.publishState !== "published" && candidate.publishState !== "pending") ||
 			seen.has(Number(candidate.authorSequence))
 		) {
 			return undefined;
@@ -437,9 +478,15 @@ function copiedIssuance(
 /**
  * Plans one closed-epoch cleanup without opening a store, mutating state, or scheduling work.
  * @param input - Detached facts already authenticated by the owning Phase-5/6a components.
+ * @param input.settlement - Successor-authenticated incarnation and terminal boundary, for settlement only.
+ * @param input.settlement
  * @returns One deep-frozen plan or the first exact refusal in the closed precedence.
  */
-export function planClosedEpochCleanup(input: unknown): ClosedEpochCleanupPlanningResult {
+export function planClosedEpochCleanup(input: {
+	readonly settlement: SettlementCleanupFrontier;
+}): SettlementCleanupPlanningResult;
+export function planClosedEpochCleanup(input: unknown): ClosedEpochCleanupPlanningResult;
+export function planClosedEpochCleanup(input: unknown): SettlementCleanupPlanningResult {
 	try {
 		const captured = captureInput(input);
 		if (captured === undefined) return refused("D109A_IDENTITY_INVALID");
@@ -481,7 +528,9 @@ export function planClosedEpochCleanup(input: unknown): ClosedEpochCleanupPlanni
 		if (captured.availabilityPolicyDigest !== LOCAL_ONLY_POLICY_DIGEST) {
 			return refused("D109A_POLICY_UNSUPPORTED");
 		}
-		const issuance = copiedIssuance(captured.issuance, objectId, closedEpoch);
+		if (captured.settlement !== undefined && captured.settlement.admissionEpoch > closedEpoch + 1)
+			return refused("D109A_OUTBOX_INCOMPLETE");
+		const issuance = copiedIssuance(captured.issuance, objectId, closedEpoch, captured.settlement);
 		if (issuance === undefined) return refused("D109A_OUTBOX_INCOMPLETE");
 
 		return Object.freeze({

@@ -1,0 +1,1597 @@
+{
+  "input": ".logs/grid-memory-attribution/capture30-startup-settled/worker/telemetry.jsonl",
+  "inputSha256": "b19aec41a4b00084c8d48f2ecdb30ce16255967269debdb4b2bf05514b3e5ca9",
+  "captureComplete": false,
+  "terminalAccountingSeen": false,
+  "definitions": {
+    "logicalPayloadBytes": "UTF-8 string values and binary leaves; no object overhead; not actual retained heap",
+    "memory": "heapUsed/external/arrayBuffers/RSS separate; arrayBuffers is a subset of external; ownedBytes=heapUsed+arrayBuffers",
+    "slope": "OLS of pre-capture post-GC process counters, transitions10..30 inclusive; profiling only, NOT acceptance or the unprofiled tail32 metric"
+  },
+  "worker": {
+    "kind": "worker-identity",
+    "pid": 30538,
+    "ppid": 30517,
+    "threadId": 0,
+    "isMainThread": true,
+    "vitestWorkerId": "1",
+    "vitestPoolId": "1",
+    "node": "v22.15.0",
+    "v8": "12.4.254.21-node.24",
+    "execArgv": [
+      "--expose-gc",
+      "--conditions",
+      "node",
+      "--conditions",
+      "development"
+    ],
+    "heapLimit": 4345298944,
+    "gcAvailable": true,
+    "patchSha256": "3dfda3e8700e39fa865b23a1d54d22608bb7ffcd11370c38386119897d6b63e7",
+    "sourceHashes": {
+      "tests/fixtures/grid-memory-profiler.ts": "814473b01055f8ec04aacfede0f386c9eb336a356434d205888325f78ebc30f3",
+      "tests/fixtures/grid-memory-storage-census.ts": "d85d91877a6dab0045e4f0d22b042b59b4890cb23f27bd7a72523a5ed1a74d2a",
+      "tests/fixtures/grid-transition-workload.ts": "ca95d950e8a28b78b7545592c218f94d6d9fed2187207850abf1107591e7a815",
+      "tests/fixtures/grid-room-workload.ts": "5c33c6e28aab6259ca2e7977228a5565f2cd2e05af24b877a2fe5a50342ea534",
+      "tests/phase-6b-grid-30-transition-attribution.test.ts": "ec81ddfa36068bc22d81a21ce880023a6e3c6e911293f77c68f7f1aefa7e9d30",
+      "packages/node/src/v3-live.ts": "9c988d5bae3b8a8f622824a8defd925ca2f3d5d7ef23f71cdad5c265da7b5096",
+      "node_modules/fake-indexeddb/build/esm/FDBTransaction.js": "1e621c71d0fb29aa1e71a53293fdc69c33e0c28c3aea0a87066a0d830a8382f5",
+      "node_modules/fake-indexeddb/build/esm/lib/Database.js": "1f4c8e4ab3f2623aa1bf0380964acb0a5dfbae64aaa832a1a37fb028cf42c188",
+      "node_modules/fake-indexeddb/build/cjs/FDBTransaction.js": "e781f5d76f6abee988840ec4d33b1f39ec060d358e62a62e99281fcfbee22ef5",
+      "node_modules/fake-indexeddb/build/cjs/lib/Database.js": "1ea08519e5c86e0a06fff7e79e7f8e29b1bb8774070d1f52a21f404e30ba184e"
+    },
+    "acceptance": false,
+    "memoryDefinition": "heapUsed/external/arrayBuffers/rss separate; arrayBuffers is included in external; ownedBytes=heapUsed+arrayBuffers",
+    "logicalPayloadDefinition": "stored binary byte lengths plus UTF-8 strings; not retained heap or a heap correction"
+  },
+  "snapshots": [
+    {
+      "kind": "snapshot-complete",
+      "transitions": 10,
+      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/capture30-startup-settled/worker/transition-10.heapsnapshot",
+      "sha256": "04559ceadae20eac4b7c99d6df6f12af647c51b6286d201fadf1063acf60f5f2",
+      "durationMs": 1507.1176249999844,
+      "before": {
+        "heapUsed": 111680424,
+        "heapTotal": 164970496,
+        "external": 55553157,
+        "arrayBuffers": 33920032,
+        "rss": 436191232,
+        "ownedBytes": 145600456
+      },
+      "afterCapture": {
+        "heapUsed": 115057776,
+        "heapTotal": 124600320,
+        "external": 128174563,
+        "arrayBuffers": 106541438,
+        "rss": 663552000,
+        "ownedBytes": 221599214
+      },
+      "pid": 30538,
+      "threadId": 0,
+      "acceptance": false
+    },
+    {
+      "kind": "snapshot-complete",
+      "transitions": 20,
+      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/capture30-startup-settled/worker/transition-20.heapsnapshot",
+      "sha256": "b90970cef4bada1d78d28ffe012a1d70b5482470baf45c6be0152b49c6537bec",
+      "durationMs": 1843.8365840000333,
+      "before": {
+        "heapUsed": 122619272,
+        "heapTotal": 211107840,
+        "external": 70270331,
+        "arrayBuffers": 48637206,
+        "rss": 590725120,
+        "ownedBytes": 171256478
+      },
+      "afterCapture": {
+        "heapUsed": 124313144,
+        "heapTotal": 136134656,
+        "external": 152252129,
+        "arrayBuffers": 130619004,
+        "rss": 764477440,
+        "ownedBytes": 254932148
+      },
+      "pid": 30538,
+      "threadId": 0,
+      "acceptance": false
+    },
+    {
+      "kind": "snapshot-complete",
+      "transitions": 30,
+      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/capture30-startup-settled/worker/transition-30.heapsnapshot",
+      "sha256": "58b51c026b674a08090112c67dc7cc4681ae482c0053a54923fb8fba747d8249",
+      "durationMs": 1977.8964579999447,
+      "before": {
+        "heapUsed": 130992456,
+        "heapTotal": 223166464,
+        "external": 85211207,
+        "arrayBuffers": 63578082,
+        "rss": 633962496,
+        "ownedBytes": 194570538
+      },
+      "afterCapture": {
+        "heapUsed": 132017000,
+        "heapTotal": 142163968,
+        "external": 175826894,
+        "arrayBuffers": 154193769,
+        "rss": 915128320,
+        "ownedBytes": 286210769
+      },
+      "pid": 30538,
+      "threadId": 0,
+      "acceptance": false
+    }
+  ],
+  "profileSlope10to30": {
+    "heapUsed": 903789.3610389613,
+    "external": 1489059.272727273,
+    "arrayBuffers": 1489059.272727273,
+    "rss": 3403765.3610389624,
+    "ownedBytes": 2392848.633766233
+  },
+  "boundaries": [
+    {
+      "transitions": 10,
+      "totalDatabaseCount": 257,
+      "owners": {
+        "runtimePlanesMeasured": 64,
+        "runtime_networkRegistrations": 64,
+        "runtime_authorVertexCounts": 127,
+        "runtime_closeAuthors": 131,
+        "runtime_closeCharges": 195,
+        "runtime_closeVertices": 195,
+        "runtime_controlVertices": 127,
+        "runtime_latchedOperations": 0,
+        "runtime_pendingIngress": 0,
+        "runtime_pendingIngressBytes": 0,
+        "runtime_quarantinedDigests": 0,
+        "runtime_rebaseSnapshotRows": 2,
+        "runtime_causalityIndex": 195,
+        "runtime_gatePresent": 64,
+        "runtime_drainingPendingIngress": 0,
+        "runtime_terminalBarrierPresent": 0,
+        "runtime_releaseTerminalBarrierPresent": 0,
+        "runtime_active": 64,
+        "runtime_terminal": 0,
+        "activeRoomOwners": 64,
+        "peers": 64,
+        "ingressHandlers": 64,
+        "receivedDigests": 2,
+        "heldPeers": 0,
+        "publicationFailurePeers": 0,
+        "heldApplicationPeers": 0,
+        "transportEnvelopes": 65,
+        "projectionCells": 64,
+        "projectionPayloadBytes": 661696,
+        "activationRealms": 64,
+        "observedStores": 64,
+        "observedPlanes": 64,
+        "observerCommits": 66,
+        "observerAdvances": 126,
+        "observerIssueAttempts": 65,
+        "observerCommitHandles": 66,
+        "observerIssuePlans": 66,
+        "observerTimeline": 193,
+        "observerAmbiguities": 0,
+        "observerPublications": 66,
+        "observerPlanWrites": 63,
+        "observerPrunes": 63,
+        "observerCleanup": 63,
+        "observerSnapshots": 0,
+        "observerCloseGraphs": 0,
+        "retainedRecoverySources": 2,
+        "authorSequenceCursors": 64
+      },
+      "totals": {
+        "key": "all-physical-stores",
+        "rows": 7919,
+        "logicalPayloadBytes": 18027446
+      },
+      "byStoreAndStatus": [
+        {
+          "key": "drp-snapshot-quarantine-v1:chunks:verified-unexpired",
+          "rows": 640,
+          "logicalPayloadBytes": 11569280
+        },
+        {
+          "key": "drp-live-journal-v1:acceptedEntries:closed-epoch",
+          "rows": 2763,
+          "logicalPayloadBytes": 1734480
+        },
+        {
+          "key": "ahe:blobs:rollback",
+          "rows": 320,
+          "logicalPayloadBytes": 1087936
+        },
+        {
+          "key": "drp-live-journal-v1:scopes:closed-epoch",
+          "rows": 640,
+          "logicalPayloadBytes": 863936
+        },
+        {
+          "key": "ahe:blobs:shared",
+          "rows": 320,
+          "logicalPayloadBytes": 753856
+        },
+        {
+          "key": "ahe:blobs:active",
+          "rows": 128,
+          "logicalPayloadBytes": 587840
+        },
+        {
+          "key": "drp-snapshot-quarantine-v1:scopes:verified-unexpired",
+          "rows": 640,
+          "logicalPayloadBytes": 500480
+        },
+        {
+          "key": "drp-issuance-v1:issuedRecords:closed-epoch",
+          "rows": 272,
+          "logicalPayloadBytes": 179916
+        },
+        {
+          "key": "ahe:generations:rollback",
+          "rows": 128,
+          "logicalPayloadBytes": 137152
+        },
+        {
+          "key": "ahe:promotions:rollback",
+          "rows": 704,
+          "logicalPayloadBytes": 118272
+        },
+        {
+          "key": "drp-live-journal-v1:scopes:current-epoch",
+          "rows": 64,
+          "logicalPayloadBytes": 86400
+        },
+        {
+          "key": "ahe:generations:active",
+          "rows": 64,
+          "logicalPayloadBytes": 76928
+        },
+        {
+          "key": "ahe:promotions:active",
+          "rows": 384,
+          "logicalPayloadBytes": 64512
+        },
+        {
+          "key": "drp-live-journal-v1:acceptedEntries:current-epoch",
+          "rows": 131,
+          "logicalPayloadBytes": 59784
+        },
+        {
+          "key": "primary:sealEvidence:closed-epoch",
+          "rows": 10,
+          "logicalPayloadBytes": 45259
+        },
+        {
+          "key": "drp-issuance-v1:issuedRecords:current-epoch",
+          "rows": 66,
+          "logicalPayloadBytes": 41712
+        },
+        {
+          "key": "drp-issuance-v1:issuanceOutbox:closed-epoch",
+          "rows": 272,
+          "logicalPayloadBytes": 39436
+        },
+        {
+          "key": "ahe:objects:active",
+          "rows": 64,
+          "logicalPayloadBytes": 20864
+        },
+        {
+          "key": "primary:signerState:closed-epoch",
+          "rows": 10,
+          "logicalPayloadBytes": 17370
+        },
+        {
+          "key": "drp-issuance-v1:issuanceOutbox:current-epoch",
+          "rows": 66,
+          "logicalPayloadBytes": 9570
+        },
+        {
+          "key": "primary:voteOutbox:closed-epoch",
+          "rows": 20,
+          "logicalPayloadBytes": 8140
+        },
+        {
+          "key": "primary:voteSlots:closed-epoch",
+          "rows": 20,
+          "logicalPayloadBytes": 8140
+        },
+        {
+          "key": "drp-issuance-v1:settlementPlans:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 6732
+        },
+        {
+          "key": "drp-issuance-v1:lineages:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 6656
+        },
+        {
+          "key": "ahe:storageMeta:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 2752
+        },
+        {
+          "key": "primary:storageMeta:unknown",
+          "rows": 1,
+          "logicalPayloadBytes": 43
+        },
+        {
+          "key": "ahe:sealEvidence:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:signerState:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:voteOutbox:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:voteSlots:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:blobs:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:generations:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:objects:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:promotions:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        }
+      ],
+      "byEpochAndStatus": [
+        {
+          "key": "0:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "1:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "2:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "3:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "4:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "5:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "6:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "7:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "8:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "9:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "8:rollback",
+          "rows": 256,
+          "logicalPayloadBytes": 968448
+        },
+        {
+          "key": "0:closed-epoch",
+          "rows": 457,
+          "logicalPayloadBytes": 755906
+        },
+        {
+          "key": "9:shared",
+          "rows": 256,
+          "logicalPayloadBytes": 634368
+        },
+        {
+          "key": "9:active",
+          "rows": 64,
+          "logicalPayloadBytes": 459904
+        },
+        {
+          "key": "8:closed-epoch",
+          "rows": 606,
+          "logicalPayloadBytes": 323167
+        },
+        {
+          "key": "9:closed-epoch",
+          "rows": 606,
+          "logicalPayloadBytes": 323167
+        },
+        {
+          "key": "shared:rollback",
+          "rows": 832,
+          "logicalPayloadBytes": 255424
+        },
+        {
+          "key": "1:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "2:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "3:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "4:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "5:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "6:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "7:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "10:current-epoch",
+          "rows": 327,
+          "logicalPayloadBytes": 197466
+        },
+        {
+          "key": "shared:active",
+          "rows": 512,
+          "logicalPayloadBytes": 162304
+        },
+        {
+          "key": "10:active",
+          "rows": 64,
+          "logicalPayloadBytes": 127936
+        },
+        {
+          "key": "10:shared",
+          "rows": 64,
+          "logicalPayloadBytes": 119488
+        },
+        {
+          "key": "9:rollback",
+          "rows": 64,
+          "logicalPayloadBytes": 119488
+        },
+        {
+          "key": "unknown:unknown",
+          "rows": 193,
+          "logicalPayloadBytes": 16183
+        },
+        {
+          "key": "unknown:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        }
+      ]
+    },
+    {
+      "transitions": 20,
+      "totalDatabaseCount": 257,
+      "owners": {
+        "runtimePlanesMeasured": 64,
+        "runtime_networkRegistrations": 64,
+        "runtime_authorVertexCounts": 127,
+        "runtime_closeAuthors": 131,
+        "runtime_closeCharges": 195,
+        "runtime_closeVertices": 195,
+        "runtime_controlVertices": 127,
+        "runtime_latchedOperations": 0,
+        "runtime_pendingIngress": 0,
+        "runtime_pendingIngressBytes": 0,
+        "runtime_quarantinedDigests": 0,
+        "runtime_rebaseSnapshotRows": 2,
+        "runtime_causalityIndex": 195,
+        "runtime_gatePresent": 64,
+        "runtime_drainingPendingIngress": 0,
+        "runtime_terminalBarrierPresent": 0,
+        "runtime_releaseTerminalBarrierPresent": 0,
+        "runtime_active": 64,
+        "runtime_terminal": 0,
+        "activeRoomOwners": 64,
+        "peers": 64,
+        "ingressHandlers": 64,
+        "receivedDigests": 2,
+        "heldPeers": 0,
+        "publicationFailurePeers": 0,
+        "heldApplicationPeers": 0,
+        "transportEnvelopes": 65,
+        "projectionCells": 64,
+        "projectionPayloadBytes": 661696,
+        "activationRealms": 64,
+        "observedStores": 64,
+        "observedPlanes": 64,
+        "observerCommits": 66,
+        "observerAdvances": 126,
+        "observerIssueAttempts": 65,
+        "observerCommitHandles": 66,
+        "observerIssuePlans": 66,
+        "observerTimeline": 193,
+        "observerAmbiguities": 0,
+        "observerPublications": 66,
+        "observerPlanWrites": 63,
+        "observerPrunes": 63,
+        "observerCleanup": 63,
+        "observerSnapshots": 0,
+        "observerCloseGraphs": 0,
+        "retainedRecoverySources": 2,
+        "authorSequenceCursors": 64
+      },
+      "totals": {
+        "key": "all-physical-stores",
+        "rows": 12539,
+        "logicalPayloadBytes": 32228164
+      },
+      "byStoreAndStatus": [
+        {
+          "key": "drp-snapshot-quarantine-v1:chunks:verified-unexpired",
+          "rows": 1280,
+          "logicalPayloadBytes": 23138560
+        },
+        {
+          "key": "drp-live-journal-v1:acceptedEntries:closed-epoch",
+          "rows": 5403,
+          "logicalPayloadBytes": 2926480
+        },
+        {
+          "key": "drp-live-journal-v1:scopes:closed-epoch",
+          "rows": 1280,
+          "logicalPayloadBytes": 1727936
+        },
+        {
+          "key": "ahe:blobs:rollback",
+          "rows": 320,
+          "logicalPayloadBytes": 1088000
+        },
+        {
+          "key": "drp-snapshot-quarantine-v1:scopes:verified-unexpired",
+          "rows": 1280,
+          "logicalPayloadBytes": 1000960
+        },
+        {
+          "key": "ahe:blobs:shared",
+          "rows": 320,
+          "logicalPayloadBytes": 749760
+        },
+        {
+          "key": "ahe:blobs:active",
+          "rows": 128,
+          "logicalPayloadBytes": 587904
+        },
+        {
+          "key": "drp-issuance-v1:issuedRecords:closed-epoch",
+          "rows": 272,
+          "logicalPayloadBytes": 179930
+        },
+        {
+          "key": "ahe:generations:rollback",
+          "rows": 128,
+          "logicalPayloadBytes": 137152
+        },
+        {
+          "key": "ahe:promotions:rollback",
+          "rows": 704,
+          "logicalPayloadBytes": 118272
+        },
+        {
+          "key": "primary:sealEvidence:closed-epoch",
+          "rows": 20,
+          "logicalPayloadBytes": 90519
+        },
+        {
+          "key": "drp-live-journal-v1:scopes:current-epoch",
+          "rows": 64,
+          "logicalPayloadBytes": 86400
+        },
+        {
+          "key": "ahe:generations:active",
+          "rows": 64,
+          "logicalPayloadBytes": 76928
+        },
+        {
+          "key": "ahe:promotions:active",
+          "rows": 384,
+          "logicalPayloadBytes": 64512
+        },
+        {
+          "key": "drp-live-journal-v1:acceptedEntries:current-epoch",
+          "rows": 131,
+          "logicalPayloadBytes": 59784
+        },
+        {
+          "key": "drp-issuance-v1:issuedRecords:current-epoch",
+          "rows": 66,
+          "logicalPayloadBytes": 41714
+        },
+        {
+          "key": "drp-issuance-v1:issuanceOutbox:closed-epoch",
+          "rows": 272,
+          "logicalPayloadBytes": 39436
+        },
+        {
+          "key": "primary:signerState:closed-epoch",
+          "rows": 20,
+          "logicalPayloadBytes": 34740
+        },
+        {
+          "key": "ahe:objects:active",
+          "rows": 64,
+          "logicalPayloadBytes": 20864
+        },
+        {
+          "key": "primary:voteOutbox:closed-epoch",
+          "rows": 40,
+          "logicalPayloadBytes": 16280
+        },
+        {
+          "key": "primary:voteSlots:closed-epoch",
+          "rows": 40,
+          "logicalPayloadBytes": 16280
+        },
+        {
+          "key": "drp-issuance-v1:issuanceOutbox:current-epoch",
+          "rows": 66,
+          "logicalPayloadBytes": 9570
+        },
+        {
+          "key": "drp-issuance-v1:settlementPlans:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 6732
+        },
+        {
+          "key": "drp-issuance-v1:lineages:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 6656
+        },
+        {
+          "key": "ahe:storageMeta:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 2752
+        },
+        {
+          "key": "primary:storageMeta:unknown",
+          "rows": 1,
+          "logicalPayloadBytes": 43
+        },
+        {
+          "key": "ahe:sealEvidence:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:signerState:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:voteOutbox:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:voteSlots:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:blobs:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:generations:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:objects:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:promotions:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        }
+      ],
+      "byEpochAndStatus": [
+        {
+          "key": "0:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "1:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "10:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "11:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "12:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "13:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "14:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "15:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "16:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "17:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "18:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "19:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "2:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "3:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "4:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "5:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "6:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "7:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "8:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "9:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "18:rollback",
+          "rows": 256,
+          "logicalPayloadBytes": 968512
+        },
+        {
+          "key": "0:closed-epoch",
+          "rows": 457,
+          "logicalPayloadBytes": 755906
+        },
+        {
+          "key": "19:shared",
+          "rows": 256,
+          "logicalPayloadBytes": 630272
+        },
+        {
+          "key": "19:active",
+          "rows": 64,
+          "logicalPayloadBytes": 459904
+        },
+        {
+          "key": "18:closed-epoch",
+          "rows": 606,
+          "logicalPayloadBytes": 323174
+        },
+        {
+          "key": "19:closed-epoch",
+          "rows": 606,
+          "logicalPayloadBytes": 323174
+        },
+        {
+          "key": "shared:rollback",
+          "rows": 832,
+          "logicalPayloadBytes": 255424
+        },
+        {
+          "key": "1:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "10:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "11:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "12:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "13:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "14:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "15:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "16:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "17:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "2:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "3:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "4:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "5:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "6:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "7:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "8:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "9:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "20:current-epoch",
+          "rows": 327,
+          "logicalPayloadBytes": 197468
+        },
+        {
+          "key": "shared:active",
+          "rows": 512,
+          "logicalPayloadBytes": 162304
+        },
+        {
+          "key": "20:active",
+          "rows": 64,
+          "logicalPayloadBytes": 128000
+        },
+        {
+          "key": "19:rollback",
+          "rows": 64,
+          "logicalPayloadBytes": 119488
+        },
+        {
+          "key": "20:shared",
+          "rows": 64,
+          "logicalPayloadBytes": 119488
+        },
+        {
+          "key": "unknown:unknown",
+          "rows": 193,
+          "logicalPayloadBytes": 16183
+        },
+        {
+          "key": "unknown:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        }
+      ]
+    },
+    {
+      "transitions": 30,
+      "totalDatabaseCount": 257,
+      "owners": {
+        "runtimePlanesMeasured": 64,
+        "runtime_networkRegistrations": 64,
+        "runtime_authorVertexCounts": 127,
+        "runtime_closeAuthors": 131,
+        "runtime_closeCharges": 195,
+        "runtime_closeVertices": 195,
+        "runtime_controlVertices": 127,
+        "runtime_latchedOperations": 0,
+        "runtime_pendingIngress": 0,
+        "runtime_pendingIngressBytes": 0,
+        "runtime_quarantinedDigests": 0,
+        "runtime_rebaseSnapshotRows": 2,
+        "runtime_causalityIndex": 195,
+        "runtime_gatePresent": 64,
+        "runtime_drainingPendingIngress": 0,
+        "runtime_terminalBarrierPresent": 0,
+        "runtime_releaseTerminalBarrierPresent": 0,
+        "runtime_active": 64,
+        "runtime_terminal": 0,
+        "activeRoomOwners": 64,
+        "peers": 64,
+        "ingressHandlers": 64,
+        "receivedDigests": 2,
+        "heldPeers": 0,
+        "publicationFailurePeers": 0,
+        "heldApplicationPeers": 0,
+        "transportEnvelopes": 65,
+        "projectionCells": 64,
+        "projectionPayloadBytes": 661696,
+        "activationRealms": 64,
+        "observedStores": 64,
+        "observedPlanes": 64,
+        "observerCommits": 66,
+        "observerAdvances": 126,
+        "observerIssueAttempts": 65,
+        "observerCommitHandles": 66,
+        "observerIssuePlans": 66,
+        "observerTimeline": 193,
+        "observerAmbiguities": 0,
+        "observerPublications": 66,
+        "observerPlanWrites": 63,
+        "observerPrunes": 63,
+        "observerCleanup": 63,
+        "observerSnapshots": 0,
+        "observerCloseGraphs": 0,
+        "retainedRecoverySources": 2,
+        "authorSequenceCursors": 64
+      },
+      "totals": {
+        "key": "all-physical-stores",
+        "rows": 17159,
+        "logicalPayloadBytes": 46446982
+      },
+      "byStoreAndStatus": [
+        {
+          "key": "drp-snapshot-quarantine-v1:chunks:verified-unexpired",
+          "rows": 1920,
+          "logicalPayloadBytes": 34707840
+        },
+        {
+          "key": "drp-live-journal-v1:acceptedEntries:closed-epoch",
+          "rows": 8043,
+          "logicalPayloadBytes": 4118501
+        },
+        {
+          "key": "drp-live-journal-v1:scopes:closed-epoch",
+          "rows": 1920,
+          "logicalPayloadBytes": 2591936
+        },
+        {
+          "key": "drp-snapshot-quarantine-v1:scopes:verified-unexpired",
+          "rows": 1920,
+          "logicalPayloadBytes": 1501440
+        },
+        {
+          "key": "ahe:blobs:rollback",
+          "rows": 320,
+          "logicalPayloadBytes": 1088000
+        },
+        {
+          "key": "ahe:blobs:shared",
+          "rows": 320,
+          "logicalPayloadBytes": 759552
+        },
+        {
+          "key": "ahe:blobs:active",
+          "rows": 128,
+          "logicalPayloadBytes": 592128
+        },
+        {
+          "key": "drp-issuance-v1:issuedRecords:closed-epoch",
+          "rows": 272,
+          "logicalPayloadBytes": 179951
+        },
+        {
+          "key": "ahe:generations:rollback",
+          "rows": 128,
+          "logicalPayloadBytes": 137152
+        },
+        {
+          "key": "primary:sealEvidence:closed-epoch",
+          "rows": 30,
+          "logicalPayloadBytes": 135779
+        },
+        {
+          "key": "ahe:promotions:rollback",
+          "rows": 704,
+          "logicalPayloadBytes": 118272
+        },
+        {
+          "key": "drp-live-journal-v1:scopes:current-epoch",
+          "rows": 64,
+          "logicalPayloadBytes": 86400
+        },
+        {
+          "key": "ahe:generations:active",
+          "rows": 64,
+          "logicalPayloadBytes": 76928
+        },
+        {
+          "key": "ahe:promotions:active",
+          "rows": 384,
+          "logicalPayloadBytes": 64512
+        },
+        {
+          "key": "drp-live-journal-v1:acceptedEntries:current-epoch",
+          "rows": 131,
+          "logicalPayloadBytes": 59829
+        },
+        {
+          "key": "primary:signerState:closed-epoch",
+          "rows": 30,
+          "logicalPayloadBytes": 52110
+        },
+        {
+          "key": "drp-issuance-v1:issuedRecords:current-epoch",
+          "rows": 66,
+          "logicalPayloadBytes": 41759
+        },
+        {
+          "key": "drp-issuance-v1:issuanceOutbox:closed-epoch",
+          "rows": 272,
+          "logicalPayloadBytes": 39436
+        },
+        {
+          "key": "primary:voteOutbox:closed-epoch",
+          "rows": 60,
+          "logicalPayloadBytes": 24420
+        },
+        {
+          "key": "primary:voteSlots:closed-epoch",
+          "rows": 60,
+          "logicalPayloadBytes": 24420
+        },
+        {
+          "key": "ahe:objects:active",
+          "rows": 64,
+          "logicalPayloadBytes": 20864
+        },
+        {
+          "key": "drp-issuance-v1:issuanceOutbox:current-epoch",
+          "rows": 66,
+          "logicalPayloadBytes": 9570
+        },
+        {
+          "key": "drp-issuance-v1:settlementPlans:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 6732
+        },
+        {
+          "key": "drp-issuance-v1:lineages:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 6656
+        },
+        {
+          "key": "ahe:storageMeta:unknown",
+          "rows": 64,
+          "logicalPayloadBytes": 2752
+        },
+        {
+          "key": "primary:storageMeta:unknown",
+          "rows": 1,
+          "logicalPayloadBytes": 43
+        },
+        {
+          "key": "ahe:sealEvidence:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:signerState:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:voteOutbox:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "ahe:voteSlots:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:blobs:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:generations:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:objects:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        },
+        {
+          "key": "primary:promotions:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        }
+      ],
+      "byEpochAndStatus": [
+        {
+          "key": "0:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "1:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "10:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "11:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "12:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "13:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "14:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "15:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "16:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "17:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "18:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "19:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "2:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "20:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "21:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "22:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "23:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "24:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "25:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "26:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "27:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "28:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "29:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "3:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "4:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "5:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "6:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "7:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "8:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "9:verified-unexpired",
+          "rows": 128,
+          "logicalPayloadBytes": 1206976
+        },
+        {
+          "key": "28:rollback",
+          "rows": 256,
+          "logicalPayloadBytes": 968512
+        },
+        {
+          "key": "0:closed-epoch",
+          "rows": 457,
+          "logicalPayloadBytes": 755906
+        },
+        {
+          "key": "29:shared",
+          "rows": 256,
+          "logicalPayloadBytes": 640064
+        },
+        {
+          "key": "29:active",
+          "rows": 64,
+          "logicalPayloadBytes": 459904
+        },
+        {
+          "key": "29:closed-epoch",
+          "rows": 606,
+          "logicalPayloadBytes": 323216
+        },
+        {
+          "key": "28:closed-epoch",
+          "rows": 606,
+          "logicalPayloadBytes": 323174
+        },
+        {
+          "key": "shared:rollback",
+          "rows": 832,
+          "logicalPayloadBytes": 255424
+        },
+        {
+          "key": "1:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "10:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "11:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "12:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "13:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "14:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "15:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "16:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "17:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "18:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "19:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "2:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "20:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "21:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "22:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "23:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "24:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "25:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "26:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "27:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "3:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "4:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "5:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "6:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "7:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "8:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "9:closed-epoch",
+          "rows": 334,
+          "logicalPayloadBytes": 213491
+        },
+        {
+          "key": "30:current-epoch",
+          "rows": 327,
+          "logicalPayloadBytes": 197558
+        },
+        {
+          "key": "shared:active",
+          "rows": 512,
+          "logicalPayloadBytes": 162304
+        },
+        {
+          "key": "30:active",
+          "rows": 64,
+          "logicalPayloadBytes": 132224
+        },
+        {
+          "key": "29:rollback",
+          "rows": 64,
+          "logicalPayloadBytes": 119488
+        },
+        {
+          "key": "30:shared",
+          "rows": 64,
+          "logicalPayloadBytes": 119488
+        },
+        {
+          "key": "unknown:unknown",
+          "rows": 193,
+          "logicalPayloadBytes": 16183
+        },
+        {
+          "key": "unknown:empty",
+          "rows": 0,
+          "logicalPayloadBytes": 0
+        }
+      ]
+    }
+  ]
+}

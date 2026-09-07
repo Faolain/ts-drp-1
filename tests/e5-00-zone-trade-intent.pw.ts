@@ -2,6 +2,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { expect, type Page, test } from "@playwright/test";
 import { resolve } from "node:path";
 
+import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
 import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
 
 const { decodeCanonical, hashDomain } = (
@@ -112,6 +113,7 @@ test("two real zone members co-sign one reviewable trade intent without durable 
 	test.setTimeout(180_000);
 	const aliceContext = await browser.newContext();
 	const bobContext = await browser.newContext();
+	await installGridRoomHeadAuthority([aliceContext, bobContext]);
 	const alice = await aliceContext.newPage();
 	const bob = await bobContext.newPage();
 	try {

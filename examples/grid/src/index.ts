@@ -5,7 +5,13 @@ import { env } from "./env";
 import { createModularGridNetwork, type ModularGridNetworkSession } from "./modular-network";
 import { isModularNetworkEnv, getNetworkConfigFromEnv as selectNetworkConfigFromEnv } from "./network-config";
 import { enableUIControls, renderNetwork, renderZone } from "./render";
-import { createV3ZoneApi, type V3ZoneApi } from "./v3-zone";
+import { createV3ZoneApi, type V3ZoneApi, type V3ZoneRoomHeadAuthorityForOpen } from "./v3-zone";
+
+declare global {
+	interface Window {
+		__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: V3ZoneRoomHeadAuthorityForOpen;
+	}
+}
 
 interface GridNetworkSession {
 	readonly node: DRPNode;
@@ -166,7 +172,15 @@ async function main(): Promise<void> {
 			stop: (): Promise<void> => node.stop(),
 		};
 		await node.start();
-		zone = createV3ZoneApi(node, renderZone);
+		zone = createV3ZoneApi(node, renderZone, (context) => {
+			const factory = window.__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
+			if (typeof factory !== "function") {
+				throw new TypeError(
+					"v3 zone room-head authority is unavailable: the application host must configure its factory"
+				);
+			}
+			return factory(context);
+		});
 		target.__TS_DRP_GRID_SESSION__ = session;
 		target.__TS_DRP_V3_ZONE__ = zone;
 		window.dispatchEvent(new CustomEvent("ts-drp:grid-ready", { detail: session.snapshot() }));

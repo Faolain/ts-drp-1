@@ -8,6 +8,7 @@ import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protoco
 import { openCreatorCheckpointTrust } from "@ts-drp/protocol-v3/creator-checkpoint";
 import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
+import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";
 import {
 	type AheDurableStore,
@@ -805,6 +806,22 @@ export async function verifyCreatorSuccessorAdoption(input: unknown): Promise<Ad
 		}
 		const snapshot = await verifySnapshot(facts, chain);
 		if (snapshot === undefined) return failure("snapshot-invalid", "creator close snapshot is invalid");
+		if (
+			settlementProfileFor(chain.successorTrust.profileId) === "v1" &&
+			!inspectCreatorTransitionAdvance({
+				current: { candidates: closure.currentCandidates, closure: facts.currentReferences },
+				currentTrust: facts.currentTrust,
+				mode: "verify",
+				proofRefs: [facts.closeResult.cutValueRef, facts.closeResult.commitQcRef],
+				proposed: { candidates: closure.proposedCandidates, closure: facts.proposedReferences },
+				successorTrust: chain.successorTrust,
+				settlementAcl: {
+					current: facts.exactCanonicalLatchedAclBytes,
+					successor: encodeCanonical(snapshot.payload.acl),
+				},
+			}).ok
+		)
+			return failure("chain-invalid", "creator settlement ACL advance is invalid");
 		const resolved = verifiedCatalog(captured.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
 		if (resolved === undefined) return failure("blueprint-invalid", "creator successor blueprint is invalid");
 		const projected = projection(facts, chain, snapshot, resolved);
@@ -867,7 +884,8 @@ async function authenticatedSuccessorIssuanceScope(
 	objectId: StorageObjectId,
 	expectedAclDigest: string,
 	expectedEpoch: number,
-	exactCanonicalLatchedAclBytes: Uint8Array
+	exactCanonicalLatchedAclBytes: Uint8Array,
+	expectedProfileId: string
 ): Promise<AuthenticatedSuccessorIssuanceScopeResult> {
 	let writers: readonly string[];
 	try {
@@ -876,6 +894,7 @@ async function authenticatedSuccessorIssuanceScope(
 			expectedAclDigest,
 			expectedEpoch,
 			expectedObjectId: objectId,
+			expectedProfileId,
 		});
 		if (!opened.ok) return Object.freeze({ ok: false as const, reason: "authority" as const });
 		writers = opened.snapshot.members.flatMap(({ author, groups }) =>
@@ -1147,6 +1166,7 @@ async function reopenCreatorSuccessorMaterial(
 						expectedAclDigest: String(currentAnchor.aclDigest),
 						expectedEpoch: currentEpoch,
 						expectedObjectId: objectId,
+						expectedProfileId: predecessorTrust.profileId,
 					})
 				: undefined;
 		if (
@@ -1156,12 +1176,26 @@ async function reopenCreatorSuccessorMaterial(
 		) {
 			return coldFailure("chain-invalid", "creator predecessor ACL cannot be reconstructed");
 		}
+		if (
+			settlementProfileFor(successorTrust.profileId) === "v1" &&
+			!inspectCreatorTransitionAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				currentTrust: predecessorTrust,
+				mode: "verify",
+				proofRefs: [cutCandidate.ref, selectedQc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+				successorTrust,
+				settlementAcl: { current: predecessorExactCanonicalLatchedAclBytes, successor: exactCanonicalLatchedAclBytes },
+			}).ok
+		)
+			return coldFailure("chain-invalid", "creator settlement ACL advance is invalid");
 		const issuance = await authenticatedSuccessorIssuanceScope(
 			input,
 			objectId,
 			String(successorAnchor.aclDigest),
 			successorEpoch,
-			exactCanonicalLatchedAclBytes
+			exactCanonicalLatchedAclBytes,
+			successorTrust.profileId
 		);
 		if (!issuance.ok) {
 			const detail =
@@ -1480,8 +1514,22 @@ async function authenticatePendingCandidate(
 			expectedAclDigest: String(currentAnchor.aclDigest),
 			expectedEpoch: expectedPrevious.epoch,
 			expectedObjectId: objectId,
+			expectedProfileId: predecessorTrust.profileId,
 		});
-		return openedPredecessorAcl.ok
+		return openedPredecessorAcl.ok &&
+			(settlementProfileFor(successorTrust.profileId) !== "v1" ||
+				inspectCreatorTransitionAdvance({
+					current: { candidates: currentCandidates, closure: currentGeneration.closure },
+					currentTrust: predecessorTrust,
+					mode: "verify",
+					proofRefs: [cutCandidate.ref, selectedQc.ref],
+					proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+					successorTrust,
+					settlementAcl: {
+						current: predecessorAclCandidates[0]?.bytes as Uint8Array,
+						successor: encodeCanonical(snapshot.payload.acl),
+					},
+				}).ok)
 			? Object.freeze({ closureDigest: closureDigest.value, generation: candidate, head: candidateHead })
 			: undefined;
 	} catch {
