@@ -41,8 +41,8 @@ function databaseFilename(primaryFilename: string): string {
 function rawCounts(primaryFilename: string): Readonly<{ chunks: number; scopes: number }> {
 	const database = new DatabaseSync(databaseFilename(primaryFilename), { readOnly: true });
 	try {
-		const chunks = database.prepare("SELECT COUNT(*) AS count FROM snapshot_chunks").get()?.count;
-		const scopes = database.prepare("SELECT COUNT(*) AS count FROM snapshot_scopes").get()?.count;
+		const chunks = database.prepare("SELECT COUNT(*) AS count FROM snapshot_chunks_v2").get()?.count;
+		const scopes = database.prepare("SELECT COUNT(*) AS count FROM snapshot_scopes_v2").get()?.count;
 		return { chunks: Number(chunks), scopes: Number(scopes) };
 	} finally {
 		database.close();
@@ -113,7 +113,7 @@ describe.skipIf(!ownerExists)("Phase 4c-b genuine Node SQLite quarantine RED", (
 		expect(rawCounts(primaryFilename)).toEqual({ chunks: 0, scopes: 1 });
 		const database = new DatabaseSync(databaseFilename(primaryFilename), { readOnly: true });
 		try {
-			expect(database.prepare("PRAGMA user_version").get()?.user_version).toBe(1);
+			expect(database.prepare("PRAGMA user_version").get()?.user_version).toBe(2);
 			expect(database.prepare("PRAGMA journal_mode").get()?.journal_mode).toBe("wal");
 			expect(database.prepare("PRAGMA synchronous").get()?.synchronous).toBe(2);
 			expect(
@@ -121,20 +121,20 @@ describe.skipIf(!ownerExists)("Phase 4c-b genuine Node SQLite quarantine RED", (
 					.prepare("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name")
 					.all()
 					.map(({ name }) => name)
-			).toEqual(["snapshot_chunks", "snapshot_scopes"]);
+			).toEqual(["snapshot_chunks_v2", "snapshot_owner_v2", "snapshot_scopes_v2"]);
 			expect(
 				database
-					.prepare("PRAGMA table_xinfo(snapshot_scopes)")
+					.prepare("PRAGMA table_xinfo(snapshot_scopes_v2)")
 					.all()
 					.map(({ name }) => name)
 			).toEqual(SNAPSHOT_QUARANTINE_SCHEMA.node.scopeColumns);
 			expect(
 				database
-					.prepare("PRAGMA table_xinfo(snapshot_chunks)")
+					.prepare("PRAGMA table_xinfo(snapshot_chunks_v2)")
 					.all()
 					.map(({ name }) => name)
 			).toEqual(SNAPSHOT_QUARANTINE_SCHEMA.node.chunkColumns);
-			const row = database.prepare("SELECT * FROM snapshot_scopes").get() as Record<string, unknown>;
+			const row = database.prepare("SELECT * FROM snapshot_scopes_v2").get() as Record<string, unknown>;
 			expect(row).toMatchObject({
 				anchor: selected.declaration.scope.anchor,
 				chunk_count: 3,
@@ -142,6 +142,8 @@ describe.skipIf(!ownerExists)("Phase 4c-b genuine Node SQLite quarantine RED", (
 				manifest_digest: selected.declaration.scope.manifestDigest,
 				object_id: selected.declaration.scope.objectId,
 				state: "open",
+				retention: "temporary",
+				descriptors: JSON.stringify(selected.declaration.chunks),
 				total_bytes: 262_149,
 			});
 			expect(new Uint8Array(row.exact_manifest_bytes as Uint8Array)).toEqual(

@@ -4,84 +4,36 @@ import { consumeSnapshotVerificationReceipt } from "@ts-drp/compaction/snapshot-
 import {
 	SNAPSHOT_QUARANTINE_RETENTION_MS,
 	type SnapshotChunkDescriptor,
+	snapshotQuarantineContract,
 	type SnapshotQuarantineDeclaration,
 	type SnapshotQuarantinePort,
 	type SnapshotQuarantineScope,
 	type SnapshotQuarantineScopeKey,
 	type SnapshotQuarantineStatus,
 	type SnapshotQuarantineStore,
+	type SnapshotRecoveryInspection,
+	type SnapshotRecoveryLimits,
+	type SnapshotRecoveryOwnerStatus,
 	type SnapshotVerificationQuarantine,
 	type SnapshotVerificationReceipt,
 	type VerifiedSnapshotQuarantineReference,
 } from "@ts-drp/storage/snapshot-transfer";
-import { DatabaseSync } from "node:sqlite";
+import { randomUUID } from "node:crypto";
+import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 
 export interface NodeSnapshotQuarantineStoreOptions {
 	readonly primaryFilename: string;
+	readonly recoveryLimits?: SnapshotRecoveryLimits;
 }
 
-type FailureCode =
-	| "aborted"
-	| "closed"
-	| "conflict"
-	| "expired"
-	| "incomplete"
-	| "invalid-carrier"
-	| "malformed-input"
-	| "poisoned"
-	| "receipt-invalid"
-	| "storage-failed"
-	| "unsupported-schema";
-
-type CapturedDeclaration = Readonly<{
-	readonly chunks: readonly SnapshotChunkDescriptor[];
-	readonly exactCanonicalManifestBytes: Uint8Array;
-	readonly scope: SnapshotQuarantineScopeKey;
-	readonly totalBytes: number;
-}>;
-
-const MAX_MANIFEST_BYTES = 212_387;
-const MAX_CHUNKS = 2_048;
-const MAX_BYTES = 268_435_456;
-const intrinsicArrayBufferPrototype = ArrayBuffer.prototype;
-const intrinsicObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-const intrinsicObjectGetPrototypeOf = Object.getPrototypeOf;
-const intrinsicReflectApply = Reflect.apply;
-const intrinsicTypedArrayPrototype = intrinsicObjectGetPrototypeOf(Uint8Array.prototype);
-const intrinsicTypedArrayBufferGetter = intrinsicObjectGetOwnPropertyDescriptor(intrinsicTypedArrayPrototype, "buffer")
-	?.get as (this: Uint8Array) => ArrayBufferLike;
-const intrinsicTypedArrayByteLengthGetter = intrinsicObjectGetOwnPropertyDescriptor(
-	intrinsicTypedArrayPrototype,
-	"byteLength"
-)?.get as (this: Uint8Array) => number;
-const intrinsicTypedArrayByteOffsetGetter = intrinsicObjectGetOwnPropertyDescriptor(
-	intrinsicTypedArrayPrototype,
-	"byteOffset"
-)?.get as (this: Uint8Array) => number;
-const intrinsicArrayBufferByteLengthGetter = intrinsicObjectGetOwnPropertyDescriptor(
-	intrinsicArrayBufferPrototype,
-	"byteLength"
-)?.get as (this: ArrayBuffer) => number;
-const intrinsicArrayBufferResizableGetter = intrinsicObjectGetOwnPropertyDescriptor(
-	intrinsicArrayBufferPrototype,
-	"resizable"
-)?.get as ((this: ArrayBuffer) => boolean) | undefined;
-const intrinsicUint8Array = Uint8Array;
-const intrinsicUint8ArrayPrototype = Uint8Array.prototype;
-const intrinsicUint8ArraySet = Uint8Array.prototype.set;
-
-class QuarantineError extends Error {
-	readonly code: FailureCode;
-
-	constructor(code: FailureCode, message: string, cause?: unknown) {
-		super(message, cause === undefined ? undefined : { cause });
-		this.code = code;
-	}
-}
-
-function failure(code: FailureCode, message: string, cause?: unknown): QuarantineError {
-	return new QuarantineError(code, message, cause);
-}
+const {
+	captureDeclaration,
+	captureDescriptor,
+	captureExactBytes: exactBytes,
+	createError: failure,
+	isError,
+} = snapshotQuarantineContract;
+type CapturedDeclaration = SnapshotQuarantineDeclaration;
 
 function promiseCapture<Result>(operation: () => Promise<Result>): Promise<Result> {
 	try {
@@ -101,114 +53,27 @@ function exactRecord(value: unknown, fields: readonly string[]): value is Readon
 		typeof value === "object" &&
 		Object.getPrototypeOf(value) === Object.prototype &&
 		Reflect.ownKeys(value).length === fields.length &&
-		fields.every((field) => Reflect.has(value, field))
+		fields.every((field) => Object.prototype.hasOwnProperty.call(value, field))
 	);
 }
 
-function exactBytes(value: unknown, label: string, maximum: number): Uint8Array {
-	try {
-		if (intrinsicObjectGetPrototypeOf(value) !== intrinsicUint8ArrayPrototype) throw new TypeError();
-		const byteLength = intrinsicReflectApply(intrinsicTypedArrayByteLengthGetter, value, []);
-		const byteOffset = intrinsicReflectApply(intrinsicTypedArrayByteOffsetGetter, value, []);
-		const buffer = intrinsicReflectApply(intrinsicTypedArrayBufferGetter, value, []);
-		if (intrinsicObjectGetPrototypeOf(buffer) !== intrinsicArrayBufferPrototype) throw new TypeError();
-		const bufferByteLength = intrinsicReflectApply(intrinsicArrayBufferByteLengthGetter, buffer, []);
-		const resizable =
-			intrinsicArrayBufferResizableGetter === undefined
-				? false
-				: intrinsicReflectApply(intrinsicArrayBufferResizableGetter, buffer, []);
-		if (byteLength <= 0 || byteOffset !== 0 || byteLength !== bufferByteLength || byteLength > maximum || resizable) {
-			throw new TypeError();
-		}
-		const copy = new intrinsicUint8Array(byteLength);
-		intrinsicReflectApply(intrinsicUint8ArraySet, copy, [value]);
-		return copy;
-	} catch (error) {
-		throw failure("invalid-carrier", `${label} carrier is invalid`, error);
+function captureOptions(value: unknown): {
+	primaryFilename: string;
+	recoveryLimits: SnapshotRecoveryLimits | undefined;
+} {
+	if (!exactRecord(value, ["primaryFilename"]) && !exactRecord(value, ["primaryFilename", "recoveryLimits"])) {
+		throw failure("malformed-input", "node snapshot quarantine options are malformed");
 	}
-}
-
-function hex64(value: unknown): value is string {
-	return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
-}
-
-function captureScope(value: unknown): SnapshotQuarantineScopeKey {
-	if (!exactRecord(value, ["anchor", "epoch", "manifestDigest", "objectId"])) {
-		throw failure("malformed-input", "snapshot quarantine scope is malformed");
+	const primaryFilename = value.primaryFilename;
+	if (typeof primaryFilename !== "string" || primaryFilename === "") {
+		throw failure("malformed-input", "node snapshot quarantine options are malformed");
 	}
-	const { anchor, epoch, manifestDigest, objectId } = value;
-	if (
-		!hex64(anchor) ||
-		typeof epoch !== "number" ||
-		!Number.isSafeInteger(epoch) ||
-		epoch < 0 ||
-		!hex64(manifestDigest) ||
-		typeof objectId !== "string" ||
-		objectId.length === 0
-	) {
-		throw failure("malformed-input", "snapshot quarantine scope is malformed");
-	}
-	return Object.freeze({ anchor, epoch, manifestDigest, objectId });
-}
-
-function captureDescriptor(value: unknown): SnapshotChunkDescriptor {
-	if (!exactRecord(value, ["byteLength", "digest", "index"])) {
-		throw failure("malformed-input", "snapshot chunk descriptor is malformed");
-	}
-	const { byteLength, digest, index } = value;
-	if (
-		typeof byteLength !== "number" ||
-		!Number.isSafeInteger(byteLength) ||
-		byteLength <= 0 ||
-		byteLength > 131_072 ||
-		!hex64(digest) ||
-		typeof index !== "number" ||
-		!Number.isSafeInteger(index) ||
-		index < 0
-	) {
-		throw failure("malformed-input", "snapshot chunk descriptor is malformed");
-	}
-	return Object.freeze({ byteLength, digest, index });
-}
-
-function captureDeclaration(value: unknown): CapturedDeclaration {
-	if (!exactRecord(value, ["chunks", "exactCanonicalManifestBytes", "scope", "totalBytes"])) {
-		throw failure("malformed-input", "snapshot quarantine declaration is malformed");
-	}
-	if (!Array.isArray(value.chunks) || value.chunks.length === 0 || value.chunks.length > MAX_CHUNKS) {
-		throw failure("malformed-input", "snapshot quarantine descriptor count is invalid");
-	}
-	const chunks = Object.freeze(value.chunks.map(captureDescriptor));
-	for (let index = 0; index < chunks.length; index += 1) {
-		if (chunks[index]?.index !== index) throw failure("malformed-input", "snapshot descriptors are not contiguous");
-	}
-	const sum = chunks.reduce((total, descriptor) => total + descriptor.byteLength, 0);
-	if (
-		typeof value.totalBytes !== "number" ||
-		!Number.isSafeInteger(value.totalBytes) ||
-		value.totalBytes <= 0 ||
-		value.totalBytes > MAX_BYTES ||
-		value.totalBytes !== sum
-	) {
-		throw failure("malformed-input", "snapshot quarantine totalBytes is invalid");
-	}
-	return Object.freeze({
-		chunks,
-		exactCanonicalManifestBytes: exactBytes(value.exactCanonicalManifestBytes, "snapshot manifest", MAX_MANIFEST_BYTES),
-		scope: captureScope(value.scope),
-		totalBytes: value.totalBytes,
-	});
-}
-
-function captureOptions(value: unknown): string {
-	if (
-		!exactRecord(value, ["primaryFilename"]) ||
-		typeof value.primaryFilename !== "string" ||
-		value.primaryFilename === ""
-	) {
-		throw failure("malformed-input", "Node snapshot quarantine options are malformed");
-	}
-	return value.primaryFilename;
+	return {
+		primaryFilename,
+		recoveryLimits: Object.prototype.hasOwnProperty.call(value, "recoveryLimits")
+			? snapshotQuarantineContract.captureRecoveryLimits(value.recoveryLimits)
+			: undefined,
+	};
 }
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
@@ -235,79 +100,264 @@ function runTransaction<Result>(database: DatabaseSync, operation: () => Result)
 	}
 }
 
-function tableColumns(database: DatabaseSync, table: string): readonly string[] {
-	return database
-		.prepare(`PRAGMA table_xinfo(${table})`)
-		.all()
-		.map(({ name }) => String(name));
+const scopeColumns = [
+	"object_id",
+	"epoch",
+	"anchor",
+	"manifest_digest",
+	"exact_manifest_bytes",
+	"total_bytes",
+	"chunk_count",
+	"expires_at",
+	"state",
+] as const;
+const chunkColumns = [
+	"object_id",
+	"epoch",
+	"anchor",
+	"manifest_digest",
+	"chunk_index",
+	"chunk_digest",
+	"byte_length",
+	"exact_bytes",
+] as const;
+const ownerColumns = [
+	"id",
+	"max_recovery_scopes",
+	"max_recovery_content_bytes",
+	"recovery_scopes",
+	"recovery_content_bytes",
+	"legacy_unclassified_scopes",
+	"legacy_unclassified_content_bytes",
+] as const;
+function validateTable(database: DatabaseSync, name: string, columns: readonly string[], primary: number): void {
+	const rows = database.prepare(`PRAGMA table_xinfo(${name})`).all();
+	const integer = new Set([
+		"epoch",
+		"total_bytes",
+		"chunk_count",
+		"expires_at",
+		"chunk_index",
+		"byte_length",
+		...ownerColumns,
+	]);
+	const layout = database.prepare("SELECT wr,strict FROM pragma_table_list WHERE name=?").get(name);
+	const indexes = database.prepare(`PRAGMA index_list(${name})`).all();
+	if (
+		layout?.wr !== 1 ||
+		layout.strict !== 0 ||
+		rows.length !== columns.length ||
+		indexes.length !== 1 ||
+		indexes[0]?.origin !== "pk" ||
+		indexes[0]?.unique !== 1 ||
+		indexes[0]?.partial !== 0 ||
+		rows.some(
+			(row, index) =>
+				row.name !== columns[index] ||
+				row.type !==
+					(integer.has(String(row.name)) ? "INTEGER" : String(row.name).includes("bytes") ? "BLOB" : "TEXT") ||
+				Number(row.pk) !== (index < primary ? index + 1 : 0) ||
+				Number(row.notnull) !== (row.name === "descriptors" ? 0 : 1) ||
+				Number(row.hidden) !== 0
+		)
+	) {
+		throw failure("unsupported-schema", "Node snapshot quarantine table schema is unsupported");
+	}
 }
 
-function admitSchema(database: DatabaseSync): void {
-	const version = Number(database.prepare("PRAGMA user_version").get()?.user_version);
-	const tables = database
+function normalizeSchemaSql(sql: string): string {
+	return sql
+		.split(/('(?:''|[^'])*')/u)
+		.map((part, index) => (index % 2 === 1 ? part : part.replace(/[\s"]/gu, "").toLowerCase()))
+		.join("");
+}
+function schemaSql(database: DatabaseSync, table: string): string {
+	return normalizeSchemaSql(
+		String(database.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name=?").get(table)?.sql)
+	);
+}
+function assertSchemaSql(database: DatabaseSync, table: string, expected: readonly string[]): void {
+	const actual = schemaSql(database, table);
+	if (!expected.some((sql) => normalizeSchemaSql(sql) === actual))
+		throw failure("unsupported-schema", "Node snapshot quarantine constraints are unsupported");
+}
+function validateSchema(database: DatabaseSync, version: number): void {
+	const suffix = version === 1 ? "" : "_v2";
+	const names = database
 		.prepare("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name")
 		.all()
-		.map(({ name }) => String(name));
-	if (version === 0 && tables.length === 0) {
-		database.exec(`
-			CREATE TABLE snapshot_scopes(
-				object_id TEXT NOT NULL,
-				epoch INTEGER NOT NULL,
-				anchor TEXT NOT NULL,
-				manifest_digest TEXT NOT NULL,
-				exact_manifest_bytes BLOB NOT NULL,
-				total_bytes INTEGER NOT NULL,
-				chunk_count INTEGER NOT NULL,
-				expires_at INTEGER NOT NULL,
-				state TEXT NOT NULL,
-				PRIMARY KEY(object_id, epoch, anchor, manifest_digest)
-			) WITHOUT ROWID;
-			CREATE TABLE snapshot_chunks(
-				object_id TEXT NOT NULL,
-				epoch INTEGER NOT NULL,
-				anchor TEXT NOT NULL,
-				manifest_digest TEXT NOT NULL,
-				chunk_index INTEGER NOT NULL,
-				chunk_digest TEXT NOT NULL,
-				byte_length INTEGER NOT NULL,
-				exact_bytes BLOB NOT NULL,
-				PRIMARY KEY(object_id, epoch, anchor, manifest_digest, chunk_index),
-				FOREIGN KEY(object_id, epoch, anchor, manifest_digest)
-					REFERENCES snapshot_scopes(object_id, epoch, anchor, manifest_digest) ON DELETE CASCADE
-			) WITHOUT ROWID;
-			PRAGMA user_version=1;
-		`);
-		return;
-	}
+		.map((row) => row.name);
+	const expected =
+		version === 1
+			? ["snapshot_chunks", "snapshot_scopes"]
+			: ["snapshot_chunks_v2", "snapshot_owner_v2", "snapshot_scopes_v2"];
 	if (
-		version !== 1 ||
-		JSON.stringify(tables) !== JSON.stringify(["snapshot_chunks", "snapshot_scopes"]) ||
-		JSON.stringify(tableColumns(database, "snapshot_scopes")) !==
-			JSON.stringify([
-				"object_id",
-				"epoch",
-				"anchor",
-				"manifest_digest",
-				"exact_manifest_bytes",
-				"total_bytes",
-				"chunk_count",
-				"expires_at",
-				"state",
-			]) ||
-		JSON.stringify(tableColumns(database, "snapshot_chunks")) !==
-			JSON.stringify([
-				"object_id",
-				"epoch",
-				"anchor",
-				"manifest_digest",
-				"chunk_index",
-				"chunk_digest",
-				"byte_length",
-				"exact_bytes",
-			])
-	) {
+		JSON.stringify(names) !== JSON.stringify(expected) ||
+		database.prepare("SELECT name FROM sqlite_schema WHERE type IN ('trigger','view')").all().length !== 0
+	)
 		throw failure("unsupported-schema", "Node snapshot quarantine schema is unsupported");
+
+	const scopeBase = `CREATE TABLE snapshot_scopes${suffix}(object_id TEXT NOT NULL,epoch INTEGER NOT NULL,anchor TEXT NOT NULL,manifest_digest TEXT NOT NULL,exact_manifest_bytes BLOB NOT NULL,total_bytes INTEGER NOT NULL,chunk_count INTEGER NOT NULL,expires_at INTEGER NOT NULL,state TEXT NOT NULL`;
+	const scopeEnd = ",PRIMARY KEY(object_id,epoch,anchor,manifest_digest)) WITHOUT ROWID";
+	assertSchemaSql(
+		database,
+		"snapshot_scopes" + suffix,
+		version === 1
+			? [scopeBase + scopeEnd]
+			: [
+					scopeBase + ",retention TEXT NOT NULL,incarnation TEXT NOT NULL,descriptors TEXT" + scopeEnd,
+					scopeBase +
+						",retention TEXT NOT NULL DEFAULT 'legacy-unclassified',incarnation TEXT NOT NULL DEFAULT '',descriptors TEXT" +
+						scopeEnd,
+				]
+	);
+	assertSchemaSql(database, "snapshot_chunks" + suffix, [
+		`CREATE TABLE snapshot_chunks${suffix}(
+ object_id TEXT NOT NULL,epoch INTEGER NOT NULL,anchor TEXT NOT NULL,manifest_digest TEXT NOT NULL,
+ chunk_index INTEGER NOT NULL,chunk_digest TEXT NOT NULL,byte_length INTEGER NOT NULL,exact_bytes BLOB NOT NULL,
+ PRIMARY KEY(object_id,epoch,anchor,manifest_digest,chunk_index),
+ FOREIGN KEY(object_id,epoch,anchor,manifest_digest) REFERENCES snapshot_scopes${suffix}(object_id,epoch,anchor,manifest_digest) ON DELETE CASCADE
+ ) WITHOUT ROWID`,
+	]);
+	validateTable(
+		database,
+		"snapshot_scopes" + suffix,
+		version === 1 ? scopeColumns : [...scopeColumns, "retention", "incarnation", "descriptors"],
+		4
+	);
+	validateTable(database, "snapshot_chunks" + suffix, chunkColumns, 5);
+	const fk = database.prepare(`PRAGMA foreign_key_list(snapshot_chunks${suffix})`).all();
+	if (
+		fk.length !== 4 ||
+		fk.some(
+			(row, index) =>
+				row.table !== "snapshot_scopes" + suffix ||
+				row.from !== scopeColumns[index] ||
+				row.to !== scopeColumns[index] ||
+				row.on_delete !== "CASCADE" ||
+				row.on_update !== "NO ACTION" ||
+				Number(row.id) !== 0 ||
+				Number(row.seq) !== index
+		) ||
+		database.prepare(`PRAGMA foreign_key_list(snapshot_scopes${suffix})`).all().length !== 0
+	)
+		throw failure("unsupported-schema", "Node snapshot quarantine foreign key schema is unsupported");
+	if (version === 2) {
+		validateTable(database, "snapshot_owner_v2", ownerColumns, 1);
+		assertSchemaSql(database, "snapshot_owner_v2", [
+			`CREATE TABLE snapshot_owner_v2(
+ id INTEGER NOT NULL PRIMARY KEY,max_recovery_scopes INTEGER NOT NULL,max_recovery_content_bytes INTEGER NOT NULL,
+ recovery_scopes INTEGER NOT NULL,recovery_content_bytes INTEGER NOT NULL,
+ legacy_unclassified_scopes INTEGER NOT NULL,legacy_unclassified_content_bytes INTEGER NOT NULL) WITHOUT ROWID`,
+		]);
 	}
+	if (database.prepare("PRAGMA foreign_key_check").get() !== undefined)
+		throw failure("unsupported-schema", "snapshot quarantine foreign key data is unsupported");
+}
+function ownerStatus(database: DatabaseSync): SnapshotRecoveryOwnerStatus {
+	const count = database.prepare("SELECT COUNT(*) AS count FROM snapshot_owner_v2").get()?.count;
+	const row = database.prepare("SELECT * FROM snapshot_owner_v2 WHERE id=1").get();
+	if (count !== 1 || row?.id !== 1) throw failure("unsupported-schema", "Node snapshot owner metadata is unsupported");
+	const limits = snapshotQuarantineContract.captureRecoveryLimits({
+		maxRecoveryScopes: Number(row.max_recovery_scopes),
+		maxRecoveryContentBytes: Number(row.max_recovery_content_bytes),
+	});
+	const checked = (value: unknown): number => {
+		if (typeof value !== "number") throw failure("storage-failed", "snapshot owner accounting is invalid");
+		return snapshotQuarantineContract.addRecoveryContentBytes(0, value);
+	};
+	const recoveryScopes = checked(row.recovery_scopes);
+	const recoveryContentBytes = checked(row.recovery_content_bytes);
+	const legacyUnclassifiedScopes = checked(row.legacy_unclassified_scopes);
+	const legacyUnclassifiedContentBytes = checked(row.legacy_unclassified_content_bytes);
+	return Object.freeze({
+		limits,
+		recoveryScopes,
+		recoveryContentBytes,
+		legacyUnclassifiedScopes,
+		legacyUnclassifiedContentBytes,
+		migration: legacyUnclassifiedScopes === 0 ? "ready" : "classification-required",
+	});
+}
+function admitSchema(database: DatabaseSync, supplied: SnapshotRecoveryLimits | undefined): void {
+	runTransaction(database, () => {
+		const version = Number(database.prepare("PRAGMA user_version").get()?.user_version);
+		const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type='table'").all();
+		if (version === 0 && tables.length === 0) {
+			database.exec(`
+ CREATE TABLE snapshot_scopes_v2(
+ object_id TEXT NOT NULL, epoch INTEGER NOT NULL, anchor TEXT NOT NULL, manifest_digest TEXT NOT NULL,
+ exact_manifest_bytes BLOB NOT NULL, total_bytes INTEGER NOT NULL, chunk_count INTEGER NOT NULL,
+ expires_at INTEGER NOT NULL, state TEXT NOT NULL, retention TEXT NOT NULL, incarnation TEXT NOT NULL, descriptors TEXT,
+ PRIMARY KEY(object_id,epoch,anchor,manifest_digest)) WITHOUT ROWID;
+ CREATE TABLE snapshot_chunks_v2(
+ object_id TEXT NOT NULL, epoch INTEGER NOT NULL, anchor TEXT NOT NULL, manifest_digest TEXT NOT NULL,
+ chunk_index INTEGER NOT NULL, chunk_digest TEXT NOT NULL, byte_length INTEGER NOT NULL, exact_bytes BLOB NOT NULL,
+ PRIMARY KEY(object_id,epoch,anchor,manifest_digest,chunk_index),
+ FOREIGN KEY(object_id,epoch,anchor,manifest_digest) REFERENCES snapshot_scopes_v2(object_id,epoch,anchor,manifest_digest) ON DELETE CASCADE
+ ) WITHOUT ROWID;`);
+		} else if (version === 1) {
+			validateSchema(database, 1);
+			database.exec(`
+ ALTER TABLE snapshot_scopes RENAME TO snapshot_scopes_v2;
+ ALTER TABLE snapshot_chunks RENAME TO snapshot_chunks_v2;
+ ALTER TABLE snapshot_scopes_v2 ADD COLUMN retention TEXT NOT NULL DEFAULT 'legacy-unclassified';
+ ALTER TABLE snapshot_scopes_v2 ADD COLUMN incarnation TEXT NOT NULL DEFAULT '';
+ ALTER TABLE snapshot_scopes_v2 ADD COLUMN descriptors TEXT;`);
+		} else if (version !== 2) {
+			throw failure("unsupported-schema", "Node snapshot quarantine schema is unsupported");
+		}
+		if (version !== 2) {
+			let count = 0,
+				content = 0;
+			const selection =
+				"SELECT object_id,epoch,anchor,manifest_digest,total_bytes,length(exact_manifest_bytes) AS manifest_length FROM snapshot_scopes_v2";
+			const first = database.prepare(`${selection} ORDER BY object_id,epoch,anchor,manifest_digest LIMIT 1`);
+			const next = database.prepare(
+				`${selection} WHERE (object_id,epoch,anchor,manifest_digest) > (?,?,?,?) ORDER BY object_id,epoch,anchor,manifest_digest LIMIT 1`
+			);
+			const update = database.prepare(
+				"UPDATE snapshot_scopes_v2 SET incarnation=? WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
+			);
+			first.setReadBigInts(true);
+			next.setReadBigInts(true);
+			// Each get finishes before its UPDATE; only the immutable primary key advances traversal.
+			let row = first.get();
+			while (row !== undefined) {
+				const key = [
+					row.object_id as string,
+					row.epoch as bigint,
+					row.anchor as string,
+					row.manifest_digest as string,
+				] as const;
+				const charge = snapshotQuarantineContract.recoveryContentBytes(
+					Number(row.total_bytes),
+					Number(row.manifest_length)
+				);
+				count = snapshotQuarantineContract.addRecoveryContentBytes(count, 1);
+				content = snapshotQuarantineContract.addRecoveryContentBytes(content, charge);
+				update.run(randomUUID(), ...key);
+				row = next.get(...key);
+			}
+			const limits = supplied ?? snapshotQuarantineContract.defaultRecoveryLimits;
+			database.exec(`CREATE TABLE snapshot_owner_v2(
+ id INTEGER NOT NULL PRIMARY KEY, max_recovery_scopes INTEGER NOT NULL, max_recovery_content_bytes INTEGER NOT NULL,
+ recovery_scopes INTEGER NOT NULL, recovery_content_bytes INTEGER NOT NULL,
+ legacy_unclassified_scopes INTEGER NOT NULL, legacy_unclassified_content_bytes INTEGER NOT NULL) WITHOUT ROWID;`);
+			database
+				.prepare("INSERT INTO snapshot_owner_v2 VALUES(1,?,?,0,0,?,?)")
+				.run(limits.maxRecoveryScopes, limits.maxRecoveryContentBytes, count, content);
+			database.exec("PRAGMA user_version=2");
+		}
+		validateSchema(database, 2);
+		const persisted = ownerStatus(database).limits;
+		if (
+			supplied !== undefined &&
+			(supplied.maxRecoveryScopes !== persisted.maxRecoveryScopes ||
+				supplied.maxRecoveryContentBytes !== persisted.maxRecoveryContentBytes)
+		)
+			throw failure("policy-mismatch", "snapshot recovery policy differs from the durable owner");
+	});
 }
 
 /**
@@ -318,34 +368,151 @@ function admitSchema(database: DatabaseSync): void {
 export function createNodeSnapshotQuarantineStore(
 	options: NodeSnapshotQuarantineStoreOptions
 ): SnapshotQuarantineStore<SnapshotVerificationReceipt> {
-	const primaryFilename = captureOptions(options);
-	const database = new DatabaseSync(`${primaryFilename}.drp-snapshot-quarantine-v1.sqlite`);
+	const { primaryFilename, recoveryLimits } = captureOptions(options);
+	let acquired: DatabaseSync | undefined;
 	try {
+		const database = new DatabaseSync(`${primaryFilename}.drp-snapshot-quarantine-v1.sqlite`);
+		acquired = database;
 		database.exec(
 			"PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=1000;"
 		);
-		admitSchema(database);
+		admitSchema(database, recoveryLimits);
 	} catch (error) {
-		database.close();
-		if (error instanceof QuarantineError) throw error;
+		acquired?.close();
+		if (isError(error)) throw error;
 		throw failure("storage-failed", "Node snapshot quarantine admission failed", error);
 	}
+	const database = acquired;
 	let closed = false;
+	let terminated = false;
 	let closing: Promise<void> | undefined;
 	let tail = Promise.resolve();
 	const schedule = <Result>(operation: () => Result | Promise<Result>): Promise<Result> => {
 		if (closed) return Promise.reject(failure("closed", "snapshot quarantine store is closed"));
-		const selected = tail.then(operation);
+		const selected = tail
+			.then(() => {
+				if (terminated) throw failure("closed", "snapshot quarantine store is closed");
+				return operation();
+			})
+			.catch((error: unknown) => {
+				if (isError(error)) throw error;
+				throw failure("storage-failed", "Node snapshot quarantine operation failed", error);
+			});
 		tail = selected.then(
 			() => undefined,
 			() => undefined
 		);
 		return selected;
 	};
-	const sweep = (now: number): number => {
-		const result = database.prepare("DELETE FROM snapshot_scopes WHERE expires_at <= ?").run(now);
-		return Number(result.changes);
+
+	const requireMutable = (): void => {
+		if (ownerStatus(database).migration !== "ready")
+			throw failure("migration-required", "snapshot legacy classification is required");
 	};
+	const sweep = (now: number): number => {
+		if (ownerStatus(database).migration !== "ready") return 0;
+		return Number(
+			database.prepare("DELETE FROM snapshot_scopes_v2 WHERE expires_at <= ? AND retention='temporary'").run(now)
+				.changes
+		);
+	};
+	const recorded = (
+		declaration: CapturedDeclaration,
+		incarnation?: string
+	): Record<string, SQLOutputValue> | undefined => {
+		const selector = database
+			.prepare("SELECT * FROM snapshot_scopes_v2 WHERE object_id=? AND epoch=? AND anchor=? LIMIT 1")
+			.get(declaration.scope.objectId, declaration.scope.epoch, declaration.scope.anchor);
+		if (selector === undefined) return undefined;
+		if (
+			typeof selector.incarnation !== "string" ||
+			selector.incarnation.length === 0 ||
+			!["open", "verified", "poisoned"].includes(String(selector.state)) ||
+			!["temporary", "recovery", "legacy-unclassified"].includes(String(selector.retention)) ||
+			(selector.retention === "legacy-unclassified") !== (selector.descriptors === null) ||
+			(selector.descriptors !== null && typeof selector.descriptors !== "string")
+		)
+			throw failure("poisoned", "snapshot quarantine scope row is malformed");
+		if (incarnation !== undefined && selector.incarnation !== incarnation)
+			throw failure("stale-scope", "snapshot quarantine handle belongs to an earlier incarnation");
+		if (
+			selector.manifest_digest !== declaration.scope.manifestDigest ||
+			!sameBytes(
+				new Uint8Array(selector.exact_manifest_bytes as Uint8Array),
+				declaration.exactCanonicalManifestBytes
+			) ||
+			Number(selector.total_bytes) !== declaration.totalBytes ||
+			Number(selector.chunk_count) !== declaration.chunks.length ||
+			(selector.descriptors !== null && selector.descriptors !== JSON.stringify(declaration.chunks))
+		)
+			throw failure("conflict", "snapshot quarantine declaration conflicts with durable state");
+		if (selector.descriptors === null) {
+			for (const row of database
+				.prepare(
+					"SELECT chunk_index,chunk_digest,byte_length FROM snapshot_chunks_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
+				)
+				.iterate(...keyParameters(declaration.scope))) {
+				const expected = declaration.chunks[Number(row.chunk_index)];
+				if (
+					expected === undefined ||
+					expected.digest !== row.chunk_digest ||
+					expected.byteLength !== Number(row.byte_length)
+				)
+					throw failure("conflict", "snapshot legacy chunk identity conflicts with declaration");
+			}
+		}
+		return selector;
+	};
+	const statusOf = (
+		declaration: CapturedDeclaration,
+		row: NonNullable<ReturnType<typeof recorded>>
+	): SnapshotQuarantineStatus => {
+		const occupied = new Set(
+			database
+				.prepare(
+					"SELECT chunk_index FROM snapshot_chunks_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
+				)
+				.all(...keyParameters(declaration.scope))
+				.map((row) => Number(row.chunk_index))
+		);
+		return Object.freeze({
+			expiresAt: Number(row.expires_at),
+			kind: row.state as SnapshotQuarantineStatus["kind"],
+			retention: row.retention as SnapshotQuarantineStatus["retention"],
+			missingIndices: Object.freeze(
+				declaration.chunks.filter(({ index }) => !occupied.has(index)).map(({ index }) => index)
+			),
+		});
+	};
+	const inspectRecovery: SnapshotQuarantineStore<SnapshotVerificationReceipt>["inspectRecovery"] = (
+		input,
+		options = {}
+	) =>
+		promiseCapture(() => {
+			const declaration = captureDeclaration(input);
+			const signal = options.signal;
+			throwIfAborted(signal);
+			return schedule(() =>
+				runTransaction(database, (): SnapshotRecoveryInspection => {
+					throwIfAborted(signal);
+					const row = recorded(declaration);
+					return row === undefined
+						? Object.freeze({ kind: "missing" })
+						: Object.freeze({ kind: "present", status: statusOf(declaration, row) });
+				})
+			);
+		});
+	const recoveryStatus: SnapshotQuarantineStore<SnapshotVerificationReceipt>["recoveryStatus"] = (options = {}) =>
+		promiseCapture(() => {
+			const signal = options.signal;
+			throwIfAborted(signal);
+			return schedule(() =>
+				runTransaction(database, () => {
+					throwIfAborted(signal);
+					return ownerStatus(database);
+				})
+			);
+		});
 
 	const openScope = (
 		declarationInput: SnapshotQuarantineDeclaration,
@@ -357,24 +524,18 @@ export function createNodeSnapshotQuarantineStore(
 			throwIfAborted(signal);
 			return schedule(() => {
 				throwIfAborted(signal);
+
+				let incarnation = "";
 				try {
 					runTransaction(database, () => {
 						sweep(Date.now());
-						const selector = database
-							.prepare("SELECT manifest_digest FROM snapshot_scopes WHERE object_id=? AND epoch=? AND anchor=? LIMIT 1")
-							.get(declaration.scope.objectId, declaration.scope.epoch, declaration.scope.anchor);
-						if (selector !== undefined && selector.manifest_digest !== declaration.scope.manifestDigest) {
-							throw failure("conflict", "snapshot quarantine manifest conflicts with the occupied scope");
-						}
-						const existing = database
-							.prepare(
-								"SELECT exact_manifest_bytes,total_bytes,chunk_count FROM snapshot_scopes WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
-							)
-							.get(...keyParameters(declaration.scope));
+						const existing = recorded(declaration);
 						if (existing === undefined) {
+							requireMutable();
+							incarnation = randomUUID();
 							database
 								.prepare(
-									"INSERT INTO snapshot_scopes(object_id,epoch,anchor,manifest_digest,exact_manifest_bytes,total_bytes,chunk_count,expires_at,state) VALUES(?,?,?,?,?,?,?,?,?)"
+									"INSERT INTO snapshot_scopes_v2(object_id,epoch,anchor,manifest_digest,exact_manifest_bytes,total_bytes,chunk_count,expires_at,state,retention,incarnation,descriptors) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)"
 								)
 								.run(
 									...keyParameters(declaration.scope),
@@ -382,28 +543,22 @@ export function createNodeSnapshotQuarantineStore(
 									declaration.totalBytes,
 									declaration.chunks.length,
 									Date.now() + SNAPSHOT_QUARANTINE_RETENTION_MS,
-									"open"
+									"open",
+									"temporary",
+									incarnation,
+									JSON.stringify(declaration.chunks)
 								);
-							return;
-						}
-						const storedManifest = new Uint8Array(existing.exact_manifest_bytes as Uint8Array);
-						if (
-							!sameBytes(storedManifest, declaration.exactCanonicalManifestBytes) ||
-							Number(existing.total_bytes) !== declaration.totalBytes ||
-							Number(existing.chunk_count) !== declaration.chunks.length
-						) {
-							throw failure("conflict", "snapshot quarantine declaration conflicts with durable state");
-						}
+						} else incarnation = String(existing.incarnation);
 					});
 				} catch (error) {
-					if (error instanceof QuarantineError) throw error;
+					if (isError(error)) throw error;
 					throw failure("storage-failed", "Node snapshot quarantine open failed", error);
 				}
 
 				let released = false;
 				let canceled = false;
 				const ensureSession = (): void => {
-					if (released) throw failure("closed", "snapshot quarantine scope is closed");
+					if (released || terminated) throw failure("closed", "snapshot quarantine scope is closed");
 				};
 				const descriptorAt = (value: unknown): SnapshotChunkDescriptor => {
 					const descriptor = captureDescriptor(value);
@@ -417,30 +572,17 @@ export function createNodeSnapshotQuarantineStore(
 					}
 					return expected;
 				};
-				const queryStatus = (): SnapshotQuarantineStatus => {
-					const row = database
-						.prepare(
-							"SELECT expires_at,state FROM snapshot_scopes WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
-						)
-						.get(...keyParameters(declaration.scope));
-					if (row === undefined) throw failure(canceled ? "closed" : "expired", "snapshot quarantine scope is absent");
-					const missing = database
-						.prepare(
-							"SELECT chunk_index FROM snapshot_chunks WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=? ORDER BY chunk_index"
-						)
-						.all(...keyParameters(declaration.scope));
-					const occupied = new Set(missing.map(({ chunk_index }) => Number(chunk_index)));
-					return Object.freeze({
-						expiresAt: Number(row.expires_at),
-						kind: row.state as SnapshotQuarantineStatus["kind"],
-						missingIndices: Object.freeze(
-							declaration.chunks.filter(({ index }) => !occupied.has(index)).map(({ index }) => index)
-						),
-					});
+
+				const liveRow = (): NonNullable<ReturnType<typeof recorded>> => {
+					const row = recorded(declaration, incarnation);
+					if (row === undefined) throw failure("expired", "snapshot quarantine scope is absent");
+					return row;
 				};
+				const queryStatus = (): SnapshotQuarantineStatus => statusOf(declaration, liveRow());
 				const verificationQuarantine: SnapshotVerificationQuarantine = Object.freeze({
 					open(portSignal: AbortSignal): SnapshotQuarantinePort {
 						ensureSession();
+						if (closed) throw failure("closed", "snapshot quarantine store is closed");
 						let portClosed = false;
 						const ensurePort = (): void => {
 							ensureSession();
@@ -457,24 +599,27 @@ export function createNodeSnapshotQuarantineStore(
 								return promiseCapture(() => {
 									const descriptor = descriptorAt(descriptorInput);
 									ensurePort();
-									return schedule(() => {
-										ensurePort();
-										const row = database
-											.prepare(
-												"SELECT chunk_digest,byte_length,exact_bytes FROM snapshot_chunks WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=? AND chunk_index=?"
-											)
-											.get(...keyParameters(declaration.scope), descriptor.index);
-										if (row === undefined) return undefined;
-										const bytes = new Uint8Array(row.exact_bytes as Uint8Array);
-										if (
-											row.chunk_digest !== descriptor.digest ||
-											Number(row.byte_length) !== descriptor.byteLength ||
-											bytes.byteLength !== descriptor.byteLength
-										) {
-											throw failure("poisoned", "snapshot quarantine chunk row is corrupt");
-										}
-										return new Uint8Array(bytes);
-									});
+									return schedule(() =>
+										runTransaction(database, () => {
+											ensurePort();
+											if (recorded(declaration, incarnation) === undefined) return undefined;
+											const row = database
+												.prepare(
+													"SELECT chunk_digest,byte_length,exact_bytes FROM snapshot_chunks_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=? AND chunk_index=?"
+												)
+												.get(...keyParameters(declaration.scope), descriptor.index);
+											if (row === undefined) return undefined;
+											const bytes = new Uint8Array(row.exact_bytes as Uint8Array);
+											if (
+												row.chunk_digest !== descriptor.digest ||
+												Number(row.byte_length) !== descriptor.byteLength ||
+												bytes.byteLength !== descriptor.byteLength
+											) {
+												throw failure("poisoned", "snapshot quarantine chunk row is corrupt");
+											}
+											return new Uint8Array(bytes);
+										})
+									);
 								});
 							},
 							write: (descriptorInput: SnapshotChunkDescriptor, exactBytesInput: Uint8Array) => {
@@ -490,13 +635,15 @@ export function createNodeSnapshotQuarantineStore(
 										let conflict = false;
 										try {
 											runTransaction(database, () => {
-												const state = queryStatus();
-												if (state.kind === "poisoned") throw failure("poisoned", "snapshot quarantine is poisoned");
-												if (state.kind === "verified")
+												const row = liveRow();
+												requireMutable();
+												if (row.state === "poisoned" || (row.retention === "recovery" && row.state !== "verified"))
+													throw failure("poisoned", "snapshot quarantine is poisoned");
+												if (row.state === "verified")
 													throw failure("closed", "verified snapshot quarantine is immutable");
 												const existing = database
 													.prepare(
-														"SELECT chunk_digest,byte_length,exact_bytes FROM snapshot_chunks WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=? AND chunk_index=?"
+														"SELECT chunk_digest,byte_length,exact_bytes FROM snapshot_chunks_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=? AND chunk_index=?"
 													)
 													.get(...keyParameters(declaration.scope), descriptor.index);
 												if (existing !== undefined) {
@@ -508,7 +655,7 @@ export function createNodeSnapshotQuarantineStore(
 													) {
 														database
 															.prepare(
-																"UPDATE snapshot_scopes SET state='poisoned' WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
+																"UPDATE snapshot_scopes_v2 SET state='poisoned' WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
 															)
 															.run(...keyParameters(declaration.scope));
 														conflict = true;
@@ -517,7 +664,7 @@ export function createNodeSnapshotQuarantineStore(
 												}
 												database
 													.prepare(
-														"INSERT INTO snapshot_chunks(object_id,epoch,anchor,manifest_digest,chunk_index,chunk_digest,byte_length,exact_bytes) VALUES(?,?,?,?,?,?,?,?)"
+														"INSERT INTO snapshot_chunks_v2(object_id,epoch,anchor,manifest_digest,chunk_index,chunk_digest,byte_length,exact_bytes) VALUES(?,?,?,?,?,?,?,?)"
 													)
 													.run(
 														...keyParameters(declaration.scope),
@@ -528,12 +675,12 @@ export function createNodeSnapshotQuarantineStore(
 													);
 												database
 													.prepare(
-														"UPDATE snapshot_scopes SET expires_at=? WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
+														"UPDATE snapshot_scopes_v2 SET expires_at=? WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
 													)
 													.run(Date.now() + SNAPSHOT_QUARANTINE_RETENTION_MS, ...keyParameters(declaration.scope));
 											});
 										} catch (error) {
-											if (error instanceof QuarantineError) throw error;
+											if (isError(error)) throw error;
 											throw failure("storage-failed", "Node snapshot chunk write failed", error);
 										}
 										if (conflict) throw failure("conflict", "snapshot chunk conflicts with occupied bytes");
@@ -546,25 +693,34 @@ export function createNodeSnapshotQuarantineStore(
 				});
 
 				const scope: SnapshotQuarantineScope<SnapshotVerificationReceipt> = Object.freeze({
-					cancel: (cancelOptions: Readonly<{ readonly signal?: AbortSignal }> = {}) => {
-						throwIfAborted(cancelOptions.signal);
-						if (canceled) return Promise.resolve();
-						return schedule(() => {
+					cancel: (cancelOptions: Readonly<{ readonly signal?: AbortSignal }> = {}) =>
+						promiseCapture(() => {
+							ensureSession();
 							throwIfAborted(cancelOptions.signal);
-							try {
-								runTransaction(database, () => {
-									database
-										.prepare(
-											"DELETE FROM snapshot_scopes WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
-										)
-										.run(...keyParameters(declaration.scope));
-								});
-								canceled = true;
-							} catch (error) {
-								throw failure("storage-failed", "Node snapshot quarantine cancel failed", error);
-							}
-						});
-					},
+							if (closed) throw failure("closed", "snapshot quarantine store is closed");
+							if (canceled) return Promise.resolve();
+							return schedule(() => {
+								ensureSession();
+								throwIfAborted(cancelOptions.signal);
+								try {
+									runTransaction(database, () => {
+										const row = recorded(declaration, incarnation);
+										requireMutable();
+										if (row?.retention === "recovery")
+											throw failure("recovery-owned", "snapshot recovery ownership prevents cancellation");
+										database
+											.prepare(
+												"DELETE FROM snapshot_scopes_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
+											)
+											.run(...keyParameters(declaration.scope));
+									});
+									canceled = true;
+								} catch (error) {
+									if (isError(error)) throw error;
+									throw failure("storage-failed", "Node snapshot quarantine cancel failed", error);
+								}
+							});
+						}),
 					complete: (
 						receipt: SnapshotVerificationReceipt,
 						completeOptions: Readonly<{ readonly signal?: AbortSignal }> = {}
@@ -575,16 +731,19 @@ export function createNodeSnapshotQuarantineStore(
 							throwIfAborted(completeOptions.signal);
 							try {
 								return runTransaction(database, () => {
-									const status = queryStatus();
-									if (status.kind === "poisoned") throw failure("poisoned", "snapshot quarantine is poisoned");
-									if (status.kind !== "open" && status.kind !== "verified")
+									const row = liveRow();
+									requireMutable();
+									if (row.state === "poisoned" || (row.retention === "recovery" && row.state !== "verified"))
+										throw failure("poisoned", "snapshot quarantine is poisoned");
+									if (row.state !== "open" && row.state !== "verified")
 										throw failure("poisoned", "snapshot quarantine state is invalid");
+									const status = statusOf(declaration, row);
 									if (status.missingIndices.length !== 0)
 										throw failure("incomplete", "snapshot quarantine is incomplete");
 									const occupied = Number(
 										database
 											.prepare(
-												"SELECT COUNT(*) AS count FROM snapshot_chunks WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
+												"SELECT COUNT(*) AS count FROM snapshot_chunks_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
 											)
 											.get(...keyParameters(declaration.scope))?.count
 									);
@@ -610,7 +769,7 @@ export function createNodeSnapshotQuarantineStore(
 									if (status.kind === "open") {
 										const transition = database
 											.prepare(
-												"UPDATE snapshot_scopes SET state='verified' WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=? AND state='open'"
+												"UPDATE snapshot_scopes_v2 SET state='verified' WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=? AND state='open'"
 											)
 											.run(...keyParameters(declaration.scope));
 										if (Number(transition.changes) !== 1)
@@ -623,7 +782,7 @@ export function createNodeSnapshotQuarantineStore(
 									}) satisfies VerifiedSnapshotQuarantineReference;
 								});
 							} catch (error) {
-								if (error instanceof QuarantineError) throw error;
+								if (isError(error)) throw error;
 								throw failure("storage-failed", "Node snapshot quarantine completion failed", error);
 							}
 						});
@@ -633,20 +792,94 @@ export function createNodeSnapshotQuarantineStore(
 						return schedule(() => {
 							ensureSession();
 							throwIfAborted(missingOptions.signal);
-							return queryStatus().missingIndices;
+							return runTransaction(database, () => queryStatus().missingIndices);
 						});
 					},
 					release: () => {
 						released = true;
 						return Promise.resolve();
 					},
+					retainForRecovery: (options: Readonly<{ readonly signal?: AbortSignal }> = {}) =>
+						promiseCapture(() => {
+							const signal = options.signal;
+							ensureSession();
+							throwIfAborted(signal);
+							return schedule(() => {
+								ensureSession();
+								throwIfAborted(signal);
+								return runTransaction(database, () => {
+									const row = liveRow();
+									const owner = ownerStatus(database);
+									if (owner.migration !== "ready")
+										throw failure("migration-required", "snapshot legacy classification is required");
+									if (row.state === "poisoned" || (row.retention === "recovery" && row.state !== "verified"))
+										throw failure("poisoned", "snapshot quarantine is poisoned");
+									if (row.retention === "temporary" && Number(row.expires_at) <= Date.now())
+										throw failure("expired", "temporary snapshot quarantine has expired");
+									if (row.state !== "verified") throw failure("incomplete", "snapshot quarantine is not verified");
+									snapshotQuarantineContract.validateRecoveryManifest(declaration);
+									let count = 0;
+									const selection =
+										"SELECT chunk_index,chunk_digest,byte_length,exact_bytes FROM snapshot_chunks_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?";
+									const first = database.prepare(`${selection} ORDER BY chunk_index LIMIT 1`);
+									const next = database.prepare(`${selection} AND chunk_index>? ORDER BY chunk_index LIMIT 1`);
+									first.setReadBigInts(true);
+									next.setReadBigInts(true);
+									// Completed keyset reads keep no native iterator or previous payload alive.
+									let chunk = first.get(...keyParameters(declaration.scope));
+									while (chunk !== undefined) {
+										snapshotQuarantineContract.validateRecoveryChunk(
+											declaration,
+											{
+												index: (typeof chunk.chunk_index === "bigint"
+													? Number(chunk.chunk_index)
+													: chunk.chunk_index) as number,
+												digest: chunk.chunk_digest as string,
+												byteLength: (typeof chunk.byte_length === "bigint"
+													? Number(chunk.byte_length)
+													: chunk.byte_length) as number,
+											},
+											chunk.exact_bytes as Uint8Array
+										);
+										count += 1;
+										const index = chunk.chunk_index as bigint;
+										chunk = undefined;
+										chunk = next.get(...keyParameters(declaration.scope), index);
+									}
+									if (count !== declaration.chunks.length)
+										throw failure("incomplete", "snapshot quarantine closure is incomplete");
+									if (row.retention === "recovery") return;
+									const recoveryScopes = snapshotQuarantineContract.addRecoveryContentBytes(owner.recoveryScopes, 1);
+									const recoveryContentBytes = snapshotQuarantineContract.addRecoveryContentBytes(
+										owner.recoveryContentBytes,
+										snapshotQuarantineContract.recoveryContentBytes(
+											declaration.totalBytes,
+											declaration.exactCanonicalManifestBytes.byteLength
+										)
+									);
+									if (
+										recoveryScopes > owner.limits.maxRecoveryScopes ||
+										recoveryContentBytes > owner.limits.maxRecoveryContentBytes
+									)
+										throw failure("recovery-full", "snapshot recovery capacity is full");
+									database
+										.prepare(
+											"UPDATE snapshot_scopes_v2 SET retention='recovery' WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
+										)
+										.run(...keyParameters(declaration.scope));
+									database
+										.prepare("UPDATE snapshot_owner_v2 SET recovery_scopes=?,recovery_content_bytes=? WHERE id=1")
+										.run(recoveryScopes, recoveryContentBytes);
+								});
+							});
+						}),
 					scope: declaration.scope,
 					status: (statusOptions: Readonly<{ readonly signal?: AbortSignal }> = {}) => {
 						throwIfAborted(statusOptions.signal);
 						return schedule(() => {
 							ensureSession();
 							throwIfAborted(statusOptions.signal);
-							return queryStatus();
+							return runTransaction(database, queryStatus);
 						});
 					},
 					verificationQuarantine,
@@ -663,6 +896,7 @@ export function createNodeSnapshotQuarantineStore(
 			try {
 				return runTransaction(database, () => sweep(Date.now()));
 			} catch (error) {
+				if (isError(error)) throw error;
 				throw failure("storage-failed", "Node snapshot quarantine sweep failed", error);
 			}
 		});
@@ -671,9 +905,12 @@ export function createNodeSnapshotQuarantineStore(
 	const close = (): Promise<void> => {
 		if (closing !== undefined) return closing;
 		closed = true;
-		closing = tail.then(() => database.close());
+		closing = tail.then(() => {
+			terminated = true;
+			database.close();
+		});
 		return closing;
 	};
 
-	return Object.freeze({ close, openScope, sweepExpired });
+	return Object.freeze({ close, inspectRecovery, recoveryStatus, openScope, sweepExpired });
 }

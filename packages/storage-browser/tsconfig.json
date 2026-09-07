@@ -17,8 +17,13 @@
 		"playwright.protocol-v2-inert.config.ts"
 	],
 	"exclude": [
+		"tests/assets/snapshot-recovery-retention-entry.ts",
+		"tests/snapshot-recovery-retention-red.pw.ts",
+		"playwright.snapshot-recovery-retention.config.ts",
 		"dist",
 		"./*.d.ts",
+		"tests/assets/snapshot-recovery-owner-entry.ts",
+		"tests/snapshot-recovery-owner-red.pw.ts",
 		"tests/assets/phase-4c-c-snapshot-source-entry.ts",
 		"tests/assets/phase-4c-c-snapshot-transfer-entry.ts",
 		"tests/assets/phase-4c-b-snapshot-quarantine-entry.ts",

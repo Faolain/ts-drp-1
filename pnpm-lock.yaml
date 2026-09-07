@@ -52,6 +52,18 @@ importers:
       "@release-it-plugins/workspaces":
         specifier: ^5.0.3
         version: 5.0.3(release-it@17.11.0(typescript@5.8.2))
+      "@ts-drp/compaction":
+        specifier: workspace:*
+        version: link:packages/compaction
+      "@ts-drp/protocol-v3":
+        specifier: workspace:*
+        version: link:packages/protocol-v3
+      "@ts-drp/storage":
+        specifier: workspace:*
+        version: link:packages/storage
+      "@ts-drp/storage-browser":
+        specifier: workspace:*
+        version: link:packages/storage-browser
       "@typescript-eslint/parser":
         specifier: ^8.21.0
         version: 8.29.0(eslint@9.23.0)(typescript@5.8.2)
@@ -1244,6 +1256,9 @@ importers:
       "@ts-drp/canonical":
         specifier: 0.11.0
         version: link:../canonical
+      "@ts-drp/protocol-v3":
+        specifier: 0.11.0
+        version: link:../protocol-v3
 
   packages/storage-browser:
     dependencies:

@@ -55,7 +55,9 @@
 		"clean": "rm -rf dist/ node_modules/",
 		"prepack": "tsc -b",
 		"test": "pnpm --dir ../.. exec vitest run packages/storage-browser/tests --no-coverage --maxWorkers=1 --minWorkers=1",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "pnpm run typecheck:snapshot-recovery-owner && pnpm run typecheck:grid-snapshot-content-delivery && tsc --noEmit",
+		"typecheck:grid-snapshot-content-delivery": "tsc --project ../../tests/fixtures/grid-snapshot-content-delivery/tsconfig.json",
+		"typecheck:snapshot-recovery-owner": "tsc --project ../../tests/fixtures/snapshot-recovery-owner/tsconfig.json",
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {

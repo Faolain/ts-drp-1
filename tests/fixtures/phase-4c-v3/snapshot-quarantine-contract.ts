@@ -13,8 +13,13 @@ export const SNAPSHOT_QUARANTINE_FAILURE_CODES = Object.freeze([
 	"incomplete",
 	"invalid-carrier",
 	"malformed-input",
+	"migration-required",
 	"poisoned",
+	"policy-mismatch",
 	"receipt-invalid",
+	"recovery-full",
+	"recovery-owned",
+	"stale-scope",
 	"storage-failed",
 	"unsupported-schema",
 ] as const);
@@ -35,13 +40,20 @@ export const SNAPSHOT_QUARANTINE_DECLARATION_FIELDS = Object.freeze([
 	"totalBytes",
 ] as const);
 
-export const SNAPSHOT_QUARANTINE_STORE_METHODS = Object.freeze(["close", "openScope", "sweepExpired"] as const);
+export const SNAPSHOT_QUARANTINE_STORE_METHODS = Object.freeze([
+	"close",
+	"inspectRecovery",
+	"openScope",
+	"recoveryStatus",
+	"sweepExpired",
+] as const);
 
 export const SNAPSHOT_QUARANTINE_SESSION_METHODS = Object.freeze([
 	"cancel",
 	"complete",
 	"missingIndices",
 	"release",
+	"retainForRecovery",
 	"status",
 ] as const);
 
@@ -50,7 +62,10 @@ export const SNAPSHOT_QUARANTINE_RECEIPT_EXPORTS = Object.freeze([
 	"verifySnapshotStreamWithReceipt",
 ] as const);
 
-export const SNAPSHOT_QUARANTINE_COMMON_EXPORTS = Object.freeze(["SNAPSHOT_QUARANTINE_RETENTION_MS"] as const);
+export const SNAPSHOT_QUARANTINE_COMMON_EXPORTS = Object.freeze([
+	"SNAPSHOT_QUARANTINE_RETENTION_MS",
+	"snapshotQuarantineContract",
+] as const);
 export const SNAPSHOT_QUARANTINE_NODE_EXPORTS = Object.freeze(["createNodeSnapshotQuarantineStore"] as const);
 export const SNAPSHOT_QUARANTINE_BROWSER_EXPORTS = Object.freeze(["createBrowserSnapshotQuarantineStore"] as const);
 export const SNAPSHOT_QUARANTINE_ROOT_RUNTIME_ROSTERS = Object.freeze({
@@ -161,16 +176,19 @@ export const SNAPSHOT_QUARANTINE_SCHEMA = Object.freeze({
 		scopeFields: Object.freeze([
 			"anchor",
 			"chunkCount",
+			"descriptors",
 			"epoch",
 			"exactCanonicalManifestBytes",
 			"expiresAt",
+			"incarnation",
 			"manifestDigest",
 			"objectId",
+			"retention",
 			"state",
 			"totalBytes",
 		] as const),
-		stores: Object.freeze(["chunks", "scopes"] as const),
-		version: 1,
+		stores: Object.freeze(["chunks", "owner", "scopes"] as const),
+		version: 2,
 	}),
 	node: Object.freeze({
 		chunkColumns: Object.freeze([
@@ -194,9 +212,12 @@ export const SNAPSHOT_QUARANTINE_SCHEMA = Object.freeze({
 			"chunk_count",
 			"expires_at",
 			"state",
+			"retention",
+			"incarnation",
+			"descriptors",
 		] as const),
-		tables: Object.freeze(["snapshot_chunks", "snapshot_scopes"] as const),
-		userVersion: 1,
+		tables: Object.freeze(["snapshot_chunks_v2", "snapshot_owner_v2", "snapshot_scopes_v2"] as const),
+		userVersion: 2,
 	}),
 });
 

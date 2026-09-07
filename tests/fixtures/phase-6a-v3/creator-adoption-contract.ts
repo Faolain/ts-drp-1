@@ -708,6 +708,8 @@ function decoratedSnapshotStore(
 ): SnapshotQuarantineStore<SnapshotVerificationReceipt> {
 	return Object.freeze<SnapshotQuarantineStore<SnapshotVerificationReceipt>>({
 		close: () => backend.close(),
+		inspectRecovery: (declaration, options) => backend.inspectRecovery(declaration, options),
+		recoveryStatus: (options) => backend.recoveryStatus(options),
 		openScope: async (declaration, options) => {
 			observeDeclaration(declaration);
 			const scope = await backend.openScope(declaration, options);
@@ -719,6 +721,7 @@ function decoratedSnapshotStore(
 				complete: (receipt, selected) => scope.complete(receipt, selected),
 				missingIndices: (selected) => scope.missingIndices(selected),
 				release: () => scope.release(),
+				retainForRecovery: (selected) => scope.retainForRecovery(selected),
 				scope: scope.scope,
 				status: (selected) => scope.status(selected),
 				verificationQuarantine: Object.freeze<SnapshotVerificationQuarantine>({

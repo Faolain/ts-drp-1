@@ -17,6 +17,7 @@ import { readFileSync, writeSync } from "node:fs";
 import { performance } from "node:perf_hooks";
 import { expect, vi } from "vitest";
 
+import { deliverFixtureSnapshot, readFixtureSnapshotDeclaration } from "./grid-snapshot-content-delivery.js";
 import { fakeNetwork } from "./phase-4b-v3/live-snapshot.js";
 import { createTransientPayloadApplication } from "./phase-6b-d110c-0c1f5b/transient-payload-application.js";
 import { createV3ChatApplication } from "../../examples/v3-chat/src/index.js";
@@ -448,12 +449,9 @@ function transactionDone(value: IDBTransaction): Promise<void> {
 	});
 }
 
-// Deferred availability transport, not hot-follow authority: only byte-for-byte
-// copies of creator-published AHE/snapshot storage are delivered. The receiver's
-// ordinary room reopen still checks pinned genesis, published floor, closure,
-// snapshot, signatures and projection. Its issuance/journal are NEVER copied.
+// AHE availability transport only; authenticated reopen still validates authority.
 async function transferDatabase(sourceName: string, targetName: string): Promise<void> {
-	const namespace = /^(d110c-f5b-parent-\d+-peer-)(0|[1-9]\d*)(-fresh)?(--ahe|--drp-snapshot-quarantine-v1)$/u;
+	const namespace = /^(d110c-f5b-parent-\d+-peer-)(0|[1-9]\d*)(-fresh)?(--ahe)$/u;
 	const sourceScope = namespace.exec(sourceName);
 	const targetScope = namespace.exec(targetName);
 	if (
@@ -467,26 +465,7 @@ async function transferDatabase(sourceName: string, targetName: string): Promise
 		sourceScope[4] !== targetScope[4]
 	)
 		throw new TypeError("F5B_TRANSFER_DATABASE_SCOPE_INVALID");
-	const schema =
-		sourceScope[4] === "--ahe"
-			? PHASE_5E_SCHEMA_AUTHORITY
-			: {
-					version: 1,
-					stores: [
-						{
-							name: "chunks",
-							keyPath: ["objectId", "epoch", "anchor", "manifestDigest", "index"],
-							autoIncrement: false,
-							indexes: [],
-						},
-						{
-							name: "scopes",
-							keyPath: ["objectId", "epoch", "anchor", "manifestDigest"],
-							autoIncrement: false,
-							indexes: [{ name: "expiryAsc", keyPath: "expiresAt", unique: false, multiEntry: false }],
-						},
-					],
-				};
+	const schema = PHASE_5E_SCHEMA_AUTHORITY;
 	const expectedStores = [...schema.stores].sort((left, right) => left.name.localeCompare(right.name));
 	const schemaFor = async (database: IDBDatabase) => {
 		const transaction = database.transaction([...database.objectStoreNames], "readonly");
@@ -516,7 +495,7 @@ async function transferDatabase(sourceName: string, targetName: string): Promise
 	}
 	const source = await request(indexedDB.open(sourceName));
 	try {
-		expect(await schemaFor(source), "F5B_TRANSFER_SOURCE_EXACT_SCHEMA_NO_COUNTERS").toEqual(expectedStores);
+		expect(await schemaFor(source), "F5B_TRANSFER_SOURCE_EXACT_SCHEMA").toEqual(expectedStores);
 		if (existingTarget !== undefined) {
 			const previous = await request(indexedDB.open(targetName));
 			try {
@@ -544,6 +523,7 @@ async function transferDatabase(sourceName: string, targetName: string): Promise
 				};
 			})
 		);
+
 		const opening = indexedDB.open(targetName, source.version);
 		opening.onupgradeneeded = () => {
 			for (const row of rows)
@@ -577,37 +557,6 @@ async function transferDatabase(sourceName: string, targetName: string): Promise
 		}
 	} finally {
 		source.close();
-	}
-}
-
-async function producedDeclaration(databaseName: string, closedEpoch: number) {
-	const database = await request(indexedDB.open(`${databaseName}--drp-snapshot-quarantine-v1`));
-	try {
-		const reading = database.transaction(["scopes", "chunks"], "readonly");
-		const [scopes, chunks] = await Promise.all([
-			request(reading.objectStore("scopes").getAll()) as Promise<Record<string, unknown>[]>,
-			request(reading.objectStore("chunks").getAll()) as Promise<Record<string, unknown>[]>,
-		]);
-		const matching = scopes.filter((row) => row.epoch === closedEpoch && row.state === "verified");
-		expect(matching, "F5B_GENUINE_SNAPSHOT_DECLARATION_UNIQUE").toHaveLength(1);
-		const scope = required(matching[0]);
-		const selected = chunks
-			.filter((row) => ["objectId", "epoch", "anchor", "manifestDigest"].every((key) => row[key] === scope[key]))
-			.sort((a, b) => Number(a.index) - Number(b.index));
-		expect(selected, "F5B_GENUINE_SNAPSHOT_CHUNKS_COMPLETE").toHaveLength(Number(scope.chunkCount));
-		return {
-			chunks: selected.map((row) => ({ byteLength: row.byteLength, digest: row.digest, index: row.index })),
-			exactCanonicalManifestBytes: new Uint8Array(scope.exactCanonicalManifestBytes as Uint8Array),
-			scope: {
-				anchor: scope.anchor,
-				epoch: scope.epoch,
-				manifestDigest: scope.manifestDigest,
-				objectId: scope.objectId,
-			},
-			totalBytes: scope.totalBytes,
-		} as NonNullable<CreateV3RoomSessionInput["successorSnapshotDeclaration"]>;
-	} finally {
-		database.close();
 	}
 }
 
@@ -892,21 +841,29 @@ async function openRoom(
 		wideDiagnostic("reopen", "begin", closedEpoch + 1, peer.databaseName);
 		await stop(peer);
 		const origin = required(peers[0]);
+		let declaration: NonNullable<CreateV3RoomSessionInput["successorSnapshotDeclaration"]>;
 		if (transfer) {
 			wideDiagnostic("ahe-transfer", "begin", closedEpoch + 1, peer.databaseName);
 			await transferDatabase(`${origin.databaseName}--ahe`, `${peer.databaseName}--ahe`);
 			wideDiagnostic("ahe-transfer", "end", closedEpoch + 1, peer.databaseName);
 			wideDiagnostic("snapshot-transfer", "begin", closedEpoch + 1, peer.databaseName);
-			await transferDatabase(
-				`${origin.databaseName}--drp-snapshot-quarantine-v1`,
-				`${peer.databaseName}--drp-snapshot-quarantine-v1`
-			);
+			declaration = await deliverFixtureSnapshot({
+				sourcePrimaryDatabaseName: origin.databaseName,
+				targetPrimaryDatabaseName: peer.databaseName,
+				objectId,
+				closedEpoch,
+			});
 			wideDiagnostic("snapshot-transfer", "end", closedEpoch + 1, peer.databaseName);
 			peer.floor.receive(origin.floor.read());
+		} else {
+			wideDiagnostic("snapshot-declaration", "begin", closedEpoch + 1, peer.databaseName);
+			declaration = await readFixtureSnapshotDeclaration({
+				primaryDatabaseName: peer.databaseName,
+				objectId,
+				closedEpoch,
+			});
+			wideDiagnostic("snapshot-declaration", "end", closedEpoch + 1, peer.databaseName);
 		}
-		wideDiagnostic("snapshot-declaration", "begin", closedEpoch + 1, peer.databaseName);
-		const declaration = await producedDeclaration(peer.databaseName, closedEpoch);
-		wideDiagnostic("snapshot-declaration", "end", closedEpoch + 1, peer.databaseName);
 		const { creatorFinalitySigner, ...reopenInput } = peer.input;
 		wideDiagnostic("reopen-session", "begin", closedEpoch + 1, peer.databaseName);
 		peer.room = await createV3RoomSession({

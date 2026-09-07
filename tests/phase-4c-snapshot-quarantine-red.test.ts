@@ -195,8 +195,12 @@ describe("Phase 4c-b durable snapshot quarantine RED", () => {
 			"scope",
 			"totalBytes",
 		]);
-		expect(SNAPSHOT_QUARANTINE_SCHEMA.browser.stores).toEqual(["chunks", "scopes"]);
-		expect(SNAPSHOT_QUARANTINE_SCHEMA.node.tables).toEqual(["snapshot_chunks", "snapshot_scopes"]);
+		expect(SNAPSHOT_QUARANTINE_SCHEMA.browser.stores).toEqual(["chunks", "owner", "scopes"]);
+		expect(SNAPSHOT_QUARANTINE_SCHEMA.node.tables).toEqual([
+			"snapshot_chunks_v2",
+			"snapshot_owner_v2",
+			"snapshot_scopes_v2",
+		]);
 	});
 
 	it("keeps the independent missing-set and retention oracle non-prefix and boundary-exact", () => {

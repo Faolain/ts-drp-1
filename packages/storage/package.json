@@ -45,6 +45,7 @@
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
-		"@ts-drp/canonical": "0.11.0"
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0"
 	}
 }

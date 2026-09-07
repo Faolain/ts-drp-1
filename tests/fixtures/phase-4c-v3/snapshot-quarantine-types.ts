@@ -36,10 +36,27 @@ export type VerifiedSnapshotQuarantineReference = Readonly<{
 	readonly scope: SnapshotQuarantineScopeKey;
 }>;
 
+export interface SnapshotRecoveryLimits {
+	readonly maxRecoveryScopes: number;
+	readonly maxRecoveryContentBytes: number;
+}
+export type SnapshotRetention = "temporary" | "recovery" | "legacy-unclassified";
+export interface SnapshotRecoveryOwnerStatus {
+	readonly limits: SnapshotRecoveryLimits;
+	readonly recoveryScopes: number;
+	readonly recoveryContentBytes: number;
+	readonly legacyUnclassifiedScopes: number;
+	readonly legacyUnclassifiedContentBytes: number;
+	readonly migration: "ready" | "classification-required";
+}
+export type SnapshotRecoveryInspection =
+	| Readonly<{ kind: "missing" }>
+	| Readonly<{ kind: "present"; status: SnapshotQuarantineStatus }>;
 export type SnapshotQuarantineStatus = Readonly<{
 	readonly expiresAt: number;
 	readonly kind: "open" | "poisoned" | "verified";
 	readonly missingIndices: readonly number[];
+	readonly retention: SnapshotRetention;
 }>;
 
 export interface SnapshotQuarantineScope<Receipt extends object> {
@@ -52,11 +69,17 @@ export interface SnapshotQuarantineScope<Receipt extends object> {
 	): Promise<VerifiedSnapshotQuarantineReference>;
 	missingIndices(options?: Readonly<{ readonly signal?: AbortSignal }>): Promise<readonly number[]>;
 	release(): Promise<void>;
+	retainForRecovery(options?: Readonly<{ readonly signal?: AbortSignal }>): Promise<void>;
 	status(options?: Readonly<{ readonly signal?: AbortSignal }>): Promise<SnapshotQuarantineStatus>;
 }
 
 export interface SnapshotQuarantineStore<Receipt extends object> {
 	close(): Promise<void>;
+	inspectRecovery(
+		declaration: SnapshotQuarantineDeclaration,
+		options?: Readonly<{ readonly signal?: AbortSignal }>
+	): Promise<SnapshotRecoveryInspection>;
+	recoveryStatus(options?: Readonly<{ readonly signal?: AbortSignal }>): Promise<SnapshotRecoveryOwnerStatus>;
 	openScope(
 		declaration: SnapshotQuarantineDeclaration,
 		options?: Readonly<{ readonly signal?: AbortSignal }>
@@ -114,6 +137,7 @@ export interface NodeSnapshotQuarantineModule {
 	createNodeSnapshotQuarantineStore(
 		options: Readonly<{
 			readonly primaryFilename: string;
+			readonly recoveryLimits?: SnapshotRecoveryLimits;
 		}>
 	): SnapshotQuarantineStore<SnapshotVerificationReceipt>;
 }
@@ -122,6 +146,7 @@ export interface BrowserSnapshotQuarantineModule {
 	createBrowserSnapshotQuarantineStore(
 		options: Readonly<{
 			readonly primaryDatabaseName: string;
+			readonly recoveryLimits?: SnapshotRecoveryLimits;
 		}>
 	): Promise<SnapshotQuarantineStore<SnapshotVerificationReceipt>>;
 }

@@ -36,14 +36,14 @@ test("admits the exact isolated schema in Chromium, Firefox and WebKit", async (
 	};
 	expect(value.chunks).toBe(0);
 	expect(value.scopes).toBe(1);
-	expect(value.estimateCalls).toBe(1);
+	expect(value.estimateCalls).toBe(0);
 	expect(value.strict).toBe(true);
 	expect(value.schema).toEqual({
 		chunkKeyPath: SNAPSHOT_QUARANTINE_SCHEMA.browser.chunksKeyPath,
 		expiryIndex: true,
 		scopeKeyPath: SNAPSHOT_QUARANTINE_SCHEMA.browser.scopesKeyPath,
 		stores: SNAPSHOT_QUARANTINE_SCHEMA.browser.stores,
-		version: 1,
+		version: 2,
 	});
 	expect(value.scopeFields).toEqual(SNAPSHOT_QUARANTINE_SCHEMA.browser.scopeFields);
 });
