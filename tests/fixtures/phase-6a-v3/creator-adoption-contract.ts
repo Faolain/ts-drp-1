@@ -403,6 +403,9 @@ export interface GenuineCreatorAdoptionFixture {
 }
 
 export interface GenuineCreatorAdoptionFixtureOptions {
+	/** Test-only producer seam; leaves original scope/receipt identity intact. */
+	createSnapshotStore?(): Promise<SnapshotQuarantineStore<SnapshotVerificationReceipt>>;
+	onCloseObservation?: Parameters<typeof bindCreatorLiveClose>[0]["onObservation"];
 	readonly applicationBatch?: boolean;
 	readonly authorizedPrivateKeySeedHexes?: readonly string[];
 	readonly causalJoinOperation?: boolean;
@@ -1093,9 +1096,9 @@ function deleteDatabase(name: string): Promise<void> {
  * @param options - Optional distinct object identity for cross-close swap controls.
  * @returns Genuine sealed handle, trusted catalog, mutation controls and cleanup owner.
  */
-export async function openGenuineCreatorAdoptionFixture(
+export async function prepareGenuineCreatorAdoptionFixture(
 	options: GenuineCreatorAdoptionFixtureOptions = {}
-): Promise<GenuineCreatorAdoptionFixture> {
+): Promise<PreparedGenuineCreatorAdoptionFixture> {
 	const modules = options.modules ?? (await defaultCreatorAdoptionFixtureModules());
 	const {
 		activateV3LivePlane,
@@ -1150,6 +1153,8 @@ export async function openGenuineCreatorAdoptionFixture(
 	});
 	if (aheBackend === undefined || aheStore === undefined)
 		throw new TypeError("D.108b fixture AHE store capture failed");
+	const capturedAheBackend = aheBackend;
+	const capturedAheStore = aheStore;
 	const openedCurrentTrust = await createCurrentAnchorTrustStore({
 		objectId: fixture.objectId as Parameters<typeof createCurrentAnchorTrustStore>[0]["objectId"],
 		pinnedGenesisAnchorDigest: fixture.anchorDigest,
@@ -1370,7 +1375,8 @@ export async function openGenuineCreatorAdoptionFixture(
 	const [vote, evidence, rawSnapshotStore] = await Promise.all([
 		openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
 		openBrowserSealEvidenceStore({ databaseName: primaryDatabaseName }),
-		createBrowserSnapshotQuarantineStore({ primaryDatabaseName: snapshotDatabaseName }),
+		options.createSnapshotStore?.() ??
+			createBrowserSnapshotQuarantineStore({ primaryDatabaseName: snapshotDatabaseName }),
 	]);
 	if (vote.observation.incarnation !== evidence.observation.incarnation) {
 		throw new TypeError("D.108b fixture seal incarnation mismatch");
@@ -1386,7 +1392,7 @@ export async function openGenuineCreatorAdoptionFixture(
 			minRollbackGenerations: 2,
 			mode: "local-only",
 		}),
-		onObservation: () => undefined,
+		onObservation: options.onCloseObservation ?? ((): void => undefined),
 		plane: activation.handle,
 		signer: signer.signer as unknown as Parameters<typeof bindCreatorLiveClose>[0]["signer"],
 		snapshotStore,
@@ -1395,104 +1401,168 @@ export async function openGenuineCreatorAdoptionFixture(
 	});
 	if (!bound.ok) throw new TypeError(`D.108b fixture close binding failed: ${bound.reason}`);
 	const current = await detachedHeadEvidence(aheBackend, await bound.handle.inspectDurableHead());
-	const closeResult = await bound.handle.close();
-	controls.adoptionPhase = true;
-	const proposed = await detachedHeadEvidence(aheBackend, await bound.handle.inspectDurableHead());
-	const parsedObjectId = parseStorageObjectId(fixture.objectId);
-	if (!parsedObjectId.ok) throw new TypeError("D.108b fixture object identity is invalid");
-	const generationPage = await aheBackend.readGenerationPage({ objectId: parsedObjectId.value, limit: 128 });
-	if (!generationPage.ok || generationPage.value.nextCursor !== null) {
-		throw new TypeError("D.108b fixture generation page is unavailable");
-	}
-	const journalScope = Object.freeze({ anchorDigest: fixture.anchorDigest, epoch: 0, objectId: parsedObjectId.value });
-	const journalReadiness = await recovered.journal.readiness({ scope: journalScope });
-	if (!journalReadiness.ok || !journalReadiness.ready) {
-		throw new TypeError("D.108b fixture journal snapshot is unavailable");
-	}
-	const journalRows: LiveJournalAcceptedRow[] = [];
-	let afterSequence: number | null = null;
-	while (true) {
-		const journalPage: Awaited<ReturnType<DurableLiveJournalStore["readPage"]>> = await recovered.journal.readPage({
-			afterSequence,
-			limit: 128,
-			scope: journalScope,
-			snapshot: journalReadiness.snapshot,
+	const close = async (): Promise<void> => {
+		await bound.handle.stop();
+		activation.handle.deactivate();
+		await Promise.all([vote.close(), evidence.close(), snapshotStore.close(), recovered.close(), fixture.close()]);
+		await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
+	};
+	const finish = async (closeResult: CreatorLiveCloseResult): Promise<GenuineCreatorAdoptionFixture> => {
+		const aheBackend = capturedAheBackend;
+		const aheStore = capturedAheStore;
+		controls.adoptionPhase = true;
+		const proposed = await detachedHeadEvidence(aheBackend, await bound.handle.inspectDurableHead());
+		const parsedObjectId = parseStorageObjectId(fixture.objectId);
+		if (!parsedObjectId.ok) throw new TypeError("D.108b fixture object identity is invalid");
+		const generationPage = await aheBackend.readGenerationPage({ objectId: parsedObjectId.value, limit: 128 });
+		if (!generationPage.ok || generationPage.value.nextCursor !== null) {
+			throw new TypeError("D.108b fixture generation page is unavailable");
+		}
+		const journalScope = Object.freeze({
+			anchorDigest: fixture.anchorDigest,
+			epoch: 0,
+			objectId: parsedObjectId.value,
 		});
-		if (!journalPage.ok) throw new TypeError("D.108b fixture journal page is unavailable");
-		journalRows.push(...journalPage.rows);
-		if (journalPage.nextSequence === null) break;
-		afterSequence = journalPage.nextSequence;
-	}
-	const history = await genuineHistoryEvidence(
-		fixture.exactCanonicalAnchorPreimageBytes,
-		journalRows,
-		recovered.issuanceStore
-	);
-	if (declaration === undefined) throw new TypeError("D.108b fixture snapshot declaration capture failed");
-	const exactCanonicalProjectionBytes = expectedSuccessorProjection(
-		fixture.catalog,
-		closeResult,
-		current,
-		proposed,
-		history,
-		declaration
-	);
-	const reopenedSnapshot = await rawSnapshotStore.openScope(declaration);
-	const portController = new AbortController();
-	const port = reopenedSnapshot.verificationQuarantine.open(portController.signal);
-	const chunks = await Promise.all(
-		declaration.chunks.map(async (descriptor: SnapshotQuarantineDeclaration["chunks"][number]) => {
-			const bytes = await port.read(descriptor);
-			if (bytes === undefined) throw new TypeError("D.108b fixture snapshot chunk is unavailable");
-			return Uint8Array.from(bytes);
-		})
-	);
-	await port.discard();
-	await reopenedSnapshot.release();
-	return Object.freeze({
-		catalog: fixture.catalog,
-		close: async () => {
-			await bound.handle.stop();
-			activation.handle.deactivate();
-			await Promise.all([vote.close(), evidence.close(), snapshotStore.close(), recovered.close(), fixture.close()]);
-			await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
-		},
-		controls,
-		createRegisteredVertex: fixture.createRegisteredVertex,
-		evidence: Object.freeze({
-			aheBackend,
-			aheStore,
-			chunks: Object.freeze(chunks),
+		const journalReadiness = await recovered.journal.readiness({ scope: journalScope });
+		if (!journalReadiness.ok || !journalReadiness.ready) {
+			throw new TypeError("D.108b fixture journal snapshot is unavailable");
+		}
+		const journalRows: LiveJournalAcceptedRow[] = [];
+		let afterSequence: number | null = null;
+		while (true) {
+			const journalPage: Awaited<ReturnType<DurableLiveJournalStore["readPage"]>> = await recovered.journal.readPage({
+				afterSequence,
+				limit: 128,
+				scope: journalScope,
+				snapshot: journalReadiness.snapshot,
+			});
+			if (!journalPage.ok) throw new TypeError("D.108b fixture journal page is unavailable");
+			journalRows.push(...journalPage.rows);
+			if (journalPage.nextSequence === null) break;
+			afterSequence = journalPage.nextSequence;
+		}
+		const history = await genuineHistoryEvidence(
+			fixture.exactCanonicalAnchorPreimageBytes,
+			journalRows,
+			recovered.issuanceStore
+		);
+		if (declaration === undefined) throw new TypeError("D.108b fixture snapshot declaration capture failed");
+		const exactCanonicalProjectionBytes = expectedSuccessorProjection(
+			fixture.catalog,
 			closeResult,
 			current,
-			currentTrust: openedCurrentTrust.trust,
-			declaration,
-			...(establishedPeer === undefined ? {} : { establishedPeer }),
-			exactCanonicalPayloadBytes: concatenate(chunks),
-			exactCanonicalProjectionBytes,
-			generations: Object.freeze([...generationPage.value.generations]),
-			history,
-			issuanceScope: Object.freeze({ author: fixture.author, objectId: fixture.objectId }),
-			issuanceMaintenance: recovered.issuanceMaintenance,
-			issuanceStore: recovered.issuanceStore,
-			journalRows: Object.freeze(journalRows),
-			journalSnapshot: journalReadiness.snapshot,
-			localIssued: Object.freeze({
-				authorSequence: latestLocalIssued.authorSequence,
-				digest: latestLocalIssued.digest,
-			}),
-			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(fixture.exactCanonicalLatchedAclBytes as Uint8Array),
 			proposed,
-			snapshotStore,
-		}),
+			history,
+			declaration
+		);
+		const reopenedSnapshot = await rawSnapshotStore.openScope(declaration);
+		const portController = new AbortController();
+		const port = reopenedSnapshot.verificationQuarantine.open(portController.signal);
+		const chunks = await Promise.all(
+			declaration.chunks.map(async (descriptor: SnapshotQuarantineDeclaration["chunks"][number]) => {
+				const bytes = await port.read(descriptor);
+				if (bytes === undefined) throw new TypeError("D.108b fixture snapshot chunk is unavailable");
+				return Uint8Array.from(bytes);
+			})
+		);
+		await port.discard();
+		await reopenedSnapshot.release();
+		return Object.freeze({
+			catalog: fixture.catalog,
+			close,
+			controls,
+			createRegisteredVertex: fixture.createRegisteredVertex,
+			evidence: Object.freeze({
+				aheBackend,
+				aheStore,
+				chunks: Object.freeze(chunks),
+				closeResult,
+				current,
+				currentTrust: openedCurrentTrust.trust,
+				declaration,
+				...(establishedPeer === undefined ? {} : { establishedPeer }),
+				exactCanonicalPayloadBytes: concatenate(chunks),
+				exactCanonicalProjectionBytes,
+				generations: Object.freeze([...generationPage.value.generations]),
+				history,
+				issuanceScope: Object.freeze({ author: fixture.author, objectId: fixture.objectId }),
+				issuanceMaintenance: recovered.issuanceMaintenance,
+				issuanceStore: recovered.issuanceStore,
+				journalRows: Object.freeze(journalRows),
+				journalSnapshot: journalReadiness.snapshot,
+				localIssued: Object.freeze({
+					authorSequence: latestLocalIssued.authorSequence,
+					digest: latestLocalIssued.digest,
+				}),
+				predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(fixture.exactCanonicalLatchedAclBytes as Uint8Array),
+				proposed,
+				snapshotStore,
+			}),
+			handle: bound.handle,
+			journal: recovered.journal,
+			modules,
+			runtimeBindings: Object.freeze({ messageQueueManager, networkNode, onAdmittedVertex }),
+			scope: journalScope,
+			routeRegisteredVertex,
+			signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
+		});
+	};
+	return {
+		aheBackend,
+		close,
+		controls,
+		current,
+		finish,
 		handle: bound.handle,
 		journal: recovered.journal,
 		modules,
-		runtimeBindings: Object.freeze({ messageQueueManager, networkNode, onAdmittedVertex }),
-		scope: journalScope,
-		routeRegisteredVertex,
+		objectId: fixture.objectId,
+		snapshotStore: rawSnapshotStore,
+		sealDatabaseName: primaryDatabaseName,
+		evidencePort: evidence.store,
+		votePort: vote.store,
+		plane: activation.handle,
 		signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
-	});
+	};
+}
+
+export interface PreparedGenuineCreatorAdoptionFixture {
+	readonly plane: V3PlaneHandle;
+	readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
+	readonly aheBackend: AheDurableStore;
+	readonly controls: GenuineCreatorAdoptionFixture["controls"];
+	readonly current: DetachedHeadEvidence;
+	readonly handle: CreatorLiveCloseHandle;
+	readonly journal: DurableLiveJournalStore;
+	readonly modules: GenuineCreatorAdoptionFixtureModules;
+	readonly objectId: string;
+	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+	readonly sealDatabaseName: string;
+	readonly evidencePort: Parameters<typeof bindCreatorLiveClose>[0]["evidenceStore"];
+	readonly votePort: Parameters<typeof bindCreatorLiveClose>[0]["voteStore"];
+	close(): Promise<void>;
+	finish(result: CreatorLiveCloseResult): Promise<GenuineCreatorAdoptionFixture>;
+}
+
+/**
+ * Opens the existing adoption fixture through its unchanged genuine close.
+ * @param options - Existing genuine creator fixture construction and observation choices.
+ * @returns Original sealed fixture after genuine close and successor preparation.
+ */
+export async function openGenuineCreatorAdoptionFixture(
+	options: GenuineCreatorAdoptionFixtureOptions = {}
+): Promise<GenuineCreatorAdoptionFixture> {
+	const prepared = await prepareGenuineCreatorAdoptionFixture(options);
+	try {
+		return await prepared.finish(await prepared.handle.close());
+	} catch (error) {
+		try {
+			await prepared.close();
+		} catch (cleanupError) {
+			console.error("GENUINE_CREATOR_FIXTURE_CLEANUP_FAILED", cleanupError);
+		}
+		throw error;
+	}
 }
 
 /**

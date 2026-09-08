@@ -928,6 +928,7 @@ async function persistSnapshot(
 		});
 		await verified.completion;
 		await scope.complete(await verified.receipt);
+		await scope.retainForRecovery();
 		return Object.freeze({
 			declaration: Object.freeze({
 				chunks: Object.freeze(decoded.chunks.map((chunk) => Object.freeze({ ...chunk }))),

@@ -2,25 +2,33 @@
 
 ## Next Agent Prompt
 
-Status: versioned ownership (1a-0), bounded retention (1a-1), and fixture
-content delivery (1b-0) are accepted, 2026-09-07. The
+Status: versioned ownership (1a-0), bounded retention (1a-1), fixture content
+delivery (1b-0), and producer pre-sign retention (1b-1) are accepted, 2026-09-07. The
 [review ledger](review.md) owns qualified verdicts, root dispositions and exact
 evidence. Earlier failed or ineligible attempts remain preserved. Frozen
 contract checkpoints retain their original framing; this handoff owns live
-execution status. Producer/recipient integration and long-running boundedness
-remain unaccepted.
+execution status. Remaining recipient/native integration and long-running
+boundedness remain unaccepted.
 
 The accepted seams form one dependency-complete checkpoint; the
 [commit-boundary audit](review.md#accepted-foundations-checkpoint) separates them
 from unrelated memory diagnostics and native product experiments still in the
-shared worktree. Next draft and independently review the producer-only contract for
-verification → retention → pre-sign authoritative dependence in
-[creator close](../../packages/node/src/creator-close.ts). The existing scope
-retention capability is the owner; no new storage API is needed. Retention must
-finish before the close actor records cut evidence or obtains successor votes,
-not merely before a later head swap. Define refusal and uncertain-completion
-retry controls before separate RED and GREEN. Do not add promotion to shared
-adoption/recovery verification as part of this producer seam.
+shared worktree. The [producer-only contract](slices/01b-1-producer-presign-retention.md)
+has separate accepted RED/GREEN authors and qualified independent reviews under
+the [joint disposition](../../.logs/bounded-storage-lifecycle/producer-presign-green-reviews-01/root-disposition.json).
+Its [handoff](../../.logs/bounded-storage-lifecycle/producer-presign-green-01/handoff.md)
+owns executed gates; the [ledger](review.md#1b-1-green-implemented-independent-acceptance-pending)
+owns evidence corrections and limits. All review processes are terminal. Retention
+now finishes before creator-close dependence, not merely before a later head swap.
+The existing snapshot owner remains the authority; ordinary adoption/recovery
+verification must not create a permanent pin.
+
+Next, materialize and independently review the declaration-free recovery contract
+(slice 2). Its accepted owner prerequisite is complete, and its lookup/consumer
+boundary must be settled before protected-set planning. Define exact authenticated
+identity selection, bounded non-creating owner reads, and current/pending/rollback
+integration as independently verifiable seams; no production edits are authorized
+by draft reconnaissance. Update this handoff with the synthesized next contract.
 
 Keep recipient pinning, pending/rollback dependency protection, reclamation,
 legacy classification and declaration-free recovery separately reviewed. The
@@ -52,7 +60,8 @@ your pass.
 - [x] Versioned owner and stale-client fence (slice 1a-0).
 - [x] Bounded atomic retention (slice 1a-1).
 - [x] Fixture snapshot content delivery (slice 1b-0).
-- [ ] Producer/recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
+- [x] Producer pre-sign retention (slice 1b-1).
+- [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
 - [ ] Protected-dependency planner and durable retirement protocol (slices 3–4).
 - [ ] Authenticated legacy classification after discovery/planning/fencing (remaining slice 1 migration obligation).

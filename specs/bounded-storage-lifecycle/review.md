@@ -929,3 +929,380 @@ a fresh cross-browser run. Existing broader compiler failures remain open.
 The earlier independent RED/GREEN reviews and their explicit dispositions remain
 the acceptance authority; this audit changes packaging, not implementation or
 frozen oracles. Producer retention is the next contract, not part of this GREEN.
+
+### 1b-1 producer contract draft
+
+The [producer contract](slices/01b-1-producer-presign-retention.md) isolates the
+existing `persistSnapshot` boundary: complete verification and recovery retention
+before returning to close orchestration. Source inspection confirms this precedes
+replay sealing and the seal actor's first cut-evidence write, not just head
+publication. Refusal or lost acknowledgement cannot cache successful persistence.
+
+The draft requires real-owner capacity refusal, held-promotion ordering,
+before-commit and lost-acknowledgement retries, conservative post-retention debt,
+and a native SQLite cold-process boundary. It distinguishes setup writes from
+close-dependent writes and live-binding retry from process-cold recovery. The
+single-owner audit keeps enforcement in snapshot storage and ordering in creator
+close; no new product API or parallel retention owner is proposed.
+
+This is a contract draft, not a RED or GREEN verdict. No production code or
+accepted oracle changed. Requested independent contract reviews must complete
+before separate-author RED work. The next action is to freeze the draft with
+the relevant close/seal/storage and fixture sources into the review packet.
+
+### 1b-1 contract review in progress
+
+The [source-grounded packet](../../.logs/bounded-storage-lifecycle/producer-presign-contract-reviews-01/packet.md)
+is frozen with exact source and control custody. Independent reconstruction,
+local argument transport and CLI processing checks pass; all 90 review-control
+tests pass. The packet carries the draft and relevant full source files without
+earlier reviewer opinions. These controls establish review provenance, not
+production correctness or provider context acceptance.
+
+Grok, Kimi and Opus were launched once each with tools disabled. Kimi has a
+100-step cap; Opus uses xhigh effort. Grok returned qualified `CHANGES_REQUIRED`.
+Opus returned required changes but declared incomplete context, so its result is
+classified `NO_VERDICT`, not approval. Both exited naturally with exact custody,
+no tool invocation, no forced cleanup and no survivors. Kimi remains active;
+monitor that existing run without restarting it. The native cold-store boundary
+and the producer fixture's lack of external room-floor ownership require root
+reconciliation, recorded separately in
+[read-only reconnaissance](../../.logs/bounded-storage-lifecycle/producer-presign-contract-01/root-recon.md).
+No production or frozen test changes are authorized by this in-progress round.
+
+The separate [retry feasibility probe](../../.logs/bounded-storage-lifecycle/producer-presign-contract-01/retry-probe.stdout.json)
+passes against real SQLite and the current fake-IndexedDB owner runtime. Both
+temporary-verified and recovery-owned scopes re-verify without source fetches,
+then retain with a single scope/content charge. The real stream verifier reads
+quarantine first and only writes fetched chunks. This contradicts Grok's
+unconditional claim that retry is impossible, while supporting the requested
+explicit retry invariant and supplementary stream source in the next packet.
+Observed fake-IndexedDB transactions report requested strict durability; this is
+runtime feasibility, not native browser or producer-close proof. The contract
+still needs revision and independent review before RED authoring.
+
+### 1b-1 revised contract review
+
+The [first-round root disposition](../../.logs/bounded-storage-lifecycle/producer-presign-contract-reviews-01/root-disposition.json)
+records qualified change requests from Grok and Kimi, and Opus's ineligible
+incomplete-context result. Kimi also exited naturally, with one assistant step,
+no tool invocation and exact custody. Original source files are archived with
+the packet and raw results. The round does not authorize RED.
+
+Root accepts explicit retry controls but rejects the unconditional claim that
+the stream always writes verified chunks, and the claim that a failure after
+successful persistence leaves its cache unset. The real read-first verifier and
+the feasibility probe contradict those claims. The revised contract pins both
+retry paths, the exact completed handle, a pre-delegation retention barrier,
+pre-commitment/replay ordering, and a first-post-persistence derivation fault.
+It also names ready-v2 runtimes, temporary refusal residue and finite-pool impact.
+
+The cold test now separates pre-kill observed seal-call ordering from cold SQLite
+snapshot/AHE inspection. It expressly forbids deriving seal absence from empty
+fake IndexedDB or AHE head alone, and requires positive observation controls and
+early-completion detection. This is not a replacement for the parent's genuine
+native-browser cold adoption and external-floor integration obligations.
+
+The [second packet](../../.logs/bounded-storage-lifecycle/producer-presign-contract-reviews-02/packet.md)
+adds the full stream verifier and its built form, installed fake-IndexedDB
+transaction behavior, fixture construction, seal factories, relevant runtime
+registration/replay excerpts and feasibility evidence. Exact reconstruction,
+transport/CLI checks and all 90 review-control tests pass. Fresh tool-free Grok,
+Kimi and Opus contract reviews are active on that exact packet. Do not alter its
+selected sources or restart the running reviews. Production code and accepted
+oracles remain unchanged; no RED authoring is authorized yet.
+
+The [current consumer baseline](../../.logs/bounded-storage-lifecycle/producer-presign-contract-01/consumer-baseline.json)
+passes 31 live-close, adoption/commit and repeat-close tests. The named strict
+owner project also passes. Scoped baseline lint fails once in the unchanged
+adoption test at its `await reopened.append(...)` call (`await-thenable`);
+[lint output](../../.logs/bounded-storage-lifecycle/producer-presign-contract-01/consumer-baseline-lint.log).
+This is a recorded baseline failure, not a passing lint gate or a new contract
+regression. No code or oracle was edited to remove it. Revised contract and
+handoff formatting pass separately.
+
+### 1b-1 baseline-anchor correction
+
+The [second-round disposition](../../.logs/bounded-storage-lifecycle/producer-presign-contract-reviews-02/root-disposition.json)
+records qualified approvals from Grok and Kimi and a qualified Opus change
+request. All three exited naturally with exact custody, no tool use, no forced
+cleanup and no surviving processes. Source snapshots and original results are
+preserved. The round does not authorize RED because the baseline correction
+still needs independent review.
+
+The corrected contract keeps pre-close observations and adds a precise baseline
+at entry to the snapshot `openScope` call, before owner delegation. Staging
+activity must be characterized separately; cut/vote/actor-close or successor
+publication in that interval remains forbidden. The cold AHE image is compared
+to the persistence-entry image, with staging reconciled once rather than
+silently absorbed into a later retention baseline. Root inspected the actual
+staging/fold/export bodies; those belong in the next review packet.
+
+Optional clarifications pin released-success sweep survival, exact fresh
+capacity-refusal residue, enrollment-versus-vote observations, and the existing
+birth-verified child termination discipline. Receipt identity is stronger than
+merely using a stable wrapper: the producer decorator must preserve the original
+backend quarantine object, because completion consumes a receipt bound to it.
+The adoption-phase read wrapper is not a producer completion recipe.
+
+No production code or accepted oracle changed. Contract formatting passes; the
+previous consumer/type baseline and its recorded lint failure remain unchanged.
+Next prepare the corrected source-grounded contract review, not GREEN code.
+
+### 1b-1 corrected contract review running
+
+The [third exact packet](../../.logs/bounded-storage-lifecycle/producer-presign-contract-reviews-03/packet.md)
+includes the corrected contract, actual staging/fold/export bodies and the
+previously supplied runtime/owner context. Reconstruction, local transport and
+CLI processing checks pass; all 90 review-control tests pass. Grok, Kimi
+(100-step cap) and Opus xhigh runs are active with tools disabled. Monitor these
+existing runs; do not restart them or change their selected inputs.
+
+The [targeted consumer inventory](../../.logs/bounded-storage-lifecycle/producer-presign-contract-01/consumer-inventory.md)
+distinguishes genuine long-running workloads from prefix controls and stubbed
+entry tests. It identifies the 30/60/100-transition and six-transition native grid
+paths as finite-pool risks without changing their limits or calling that
+prediction a post-GREEN result. The RED author still must complete the transitive
+consumer inventory before freeze. No production change or RED authorization has
+occurred in this review round.
+
+### 1b-1 contract accepted; separate RED next
+
+The [third-round disposition](../../.logs/bounded-storage-lifecycle/producer-presign-contract-reviews-03/root-disposition.json)
+accepts qualified Grok, Kimi and Opus approvals with no required changes. All
+three exited naturally with unchanged inputs, no tools, no forced cleanup and
+no surviving processes. The original selected sources are frozen alongside the
+packet. This authorizes separate RED construction, not GREEN or production
+boundedness acceptance.
+
+The disposition carries test-authoring obligations: prove exact module-spy
+interception; preserve receipt and minted seal-capability identities; distinguish
+bind-time enrollment from close dependence; and reach a real transaction edge
+for the before-commit fault. Retry evidence must include exact durable chunk
+images. Child checkpoints must hold before returning to the producer, with the
+actual injected SQLite filenames available for cold reopen. Instrumentation
+failure is not a causal RED and cannot justify a production hook.
+
+The targeted inventory now also distinguishes fresh-per-object retained-heap
+campaigns and fresh-database repeat-close attempts from same-owner endurance.
+The separate author must finish transitive classification before freezing RED.
+No production code or accepted oracle changed. The prior passing consumer/type
+baseline and recorded unchanged lint failure remain the baseline, not new RED
+evidence. Requested independent RED review must precede a distinct GREEN author.
+
+### 1b-1 RED construction: causal producer failures
+
+The separate author has materialized the producer fixture and dual-adapter
+cases, but has not frozen the suite. The
+[first focused report](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/focused-red-first.json)
+passes the instrumentation/owner preconditions and fails every producer case on
+missing retention or commitment reached before the retention barrier. The
+[cumulative observations](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/focused-red-first.log)
+show genuine verification and release with no producer promotion; these are not
+setup-timeout failures. Later retry assertions are still awaiting execution
+through a retained producer path and are not claimed proven by this baseline.
+
+The [precondition evidence](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/preconditions-04.log)
+establishes original capability/receipt identities, actual seal observations,
+empty characterized staging deltas, strict fake-IndexedDB retention,
+zero-fetch unchanged-row re-verification, and real transaction rollback controls
+for both adapters. Earlier failed setup/type runs remain preserved. The initial
+JSON-only reporter did not retain console telemetry; the subsequent verbose
+reports do. None of this is native browser durability acceptance.
+
+The [consumer preservation report](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/consumer-preservation.json)
+passes the existing live-close/adoption/repeat-close baseline after test-only
+fixture extraction. The pre-commit retry now additionally pins the durable scope
+incarnation and all scope fields except the intended retention transition.
+That correction still needs the final source-bound rerun.
+
+The [expanded focused report](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/focused-freeze-01.json)
+also covers genuine queued-work staging and the native held-child control. Its
+producer cold-process case fails on an observed early effect, not a setup timeout.
+This remains RED evidence, not proof of the unexecuted retained-producer path.
+The refreshed [consumer](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/consumer-preservation-freeze-01.json)
+and [snapshot-owner](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/owner-preservation-freeze-01.json)
+preservation reports pass.
+
+The named strict producer project belongs to the Node package because Node owns
+`persistSnapshot`; a passing control-plane check is not its package gate. The
+[broader Node check](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/node-typecheck-final.log)
+still fails. Its thirteen diagnostic lines match the
+[historical Node baseline](../../.logs/d110c-0c1f5b0d-green-1063feca/typecheck-node.log)
+exactly after normalizing the workspace prefix, with no added or removed
+diagnostics. This attribution does not turn the broader gate green.
+
+### 1b-1 RED frozen; independent review next
+
+The [separate-author handoff](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/handoff.md)
+records the final commands and proof limits. Root verified all ten
+[source hashes](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/source-hashes-freeze-02.sha256)
+against both live files and frozen copies. The
+[freeze-02 focused report](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/focused-freeze-02.json)
+retains ten passing controls and eleven causal producer failures. Named strict
+types, lint and format have terminal passing receipts; the broader Node gate
+remains the attributed failure above. Prior reports remain preserved.
+
+Root also ran the contract's remaining preservation families: receipt/quarantine,
+issuance retention, cleanup/reclamation and accepted snapshot content delivery.
+The [supplemental report](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/root-contract-preservation-01.json)
+passes all 196 tests; its [command receipt](../../.logs/bounded-storage-lifecycle/producer-presign-red-01/root-contract-preservation-01-receipt.json)
+records the selected paths and terminal exit. Frozen source hashes remain exact
+after that run. This closes the focused regression-evidence gap, not the native
+browser or endurance obligations.
+
+Requested independent RED reviews remain required before a distinct GREEN author
+may edit the producer. Review preparation is not approval of the oracle, and no
+unexecuted retry or compliant native producer tail is claimed proven. Production
+code, retention defaults and endurance workloads are unchanged.
+
+### 1b-1 independent RED reviews in progress
+
+Root qualified the [compact review packet](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/packet.md)
+by exact reconstruction of selected source, all reported assertions and complete
+native telemetry records. All ten frozen authored files remain full inputs;
+repetitive report metadata and log output are explicitly omitted, with raw hashes
+retained. The [input verification](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/root-input-verification.json)
+and [control tests](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/controls.log)
+pass. The earlier larger packet's [local CLI preflight failure](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-01/kimi-help-probe.json)
+is preserved; it was not a model review or verdict.
+
+Separate Grok, Kimi (100-step cap) and Opus xhigh RED reviews have been launched
+against the exact qualified packet. Natural terminal evidence, source/control
+integrity and explicit root dispositions are still required. Launch authority
+is neither oracle approval nor authorization for GREEN implementation.
+
+Grok has a [qualified terminal RED approval](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/run-grok/terminal.json)
+with [no required changes](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/run-grok/public.txt).
+Root accepts its causal-RED assessment and its explicit limits: unexecuted retry
+and compliant native-producer tails still require GREEN evidence, and the broader
+Node failure and long-running obligations remain open. Natural exit, unchanged
+source/control integrity and empty cleanup/survivor lists were verified. Kimi and
+Opus reviews remain pending; this partial disposition does not authorize GREEN.
+
+Opus also has a [qualified terminal RED approval](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/run-opus/terminal.json)
+with [no required changes and optional findings](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/run-opus/public.txt).
+Root accepts the approval, with these dispositions:
+
+- Run the named strict target independently while the broader Node check fails;
+  the aggregate command remains a failure, not a proxy pass.
+- GREEN must execute the previously unreached assertions and classify setup or
+  process deadlines separately from contract failures. Do not expand timing limits.
+- Keep the matching child/parent transport bounds: child `< 48000` and parent
+  rejection at `>= 48000` agree. Widening only one is not a correction.
+- The source/dist mix stays auditable through input hashes. This seam changes
+  only the producer, whose current source is asserted; a storage/API change would
+  require separately reviewed scope, not silent reliance on this native test.
+- Distinct object IDs produce distinct owner triples and satisfy the capacity
+  contract. The injected signal is specific to the precommit fault. Post-complete
+  byte reads intentionally measure actual owner content. None requires RED edits.
+
+Natural exit, exact source/control integrity and empty cleanup/survivor lists
+were verified. The claimed explanation for historical command exit-code differences
+is not relied on; root's attribution is the exact diagnostic comparison. Kimi
+remains pending, so these two approvals still do not authorize GREEN.
+
+### 1b-1 RED accepted; distinct GREEN next
+
+Kimi returned a [qualified terminal approval](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/run-kimi/terminal.json)
+with [no required changes](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/run-kimi/public.txt),
+using one assistant step within the 100-step cap. Root verified natural exit,
+exact source/control integrity and empty cleanup/survivor lists. Its optional
+notes preserve the strict staging baseline, spy-interception control, declaration
+metadata transport and bounded deterministic parent control; none requires edits.
+To strengthen the empty lint-log receipt, root directly reran the same selected
+ESLint surface with zero allowed warnings and observed exit 0. The inherited root
+TypeScript configuration was also read and confirms strict mode.
+
+The [combined root disposition](../../.logs/bounded-storage-lifecycle/producer-presign-red-reviews-02/root-disposition.json)
+accepts all three independent RED approvals and authorizes a distinct GREEN author
+for the accepted producer seam only. Frozen tests are not editable by GREEN.
+Unexecuted assertion tails must now pass against implementation; qualified RED
+does not establish producer integration, native browser adoption or long-running
+boundedness. Broader package compiler debt remains an attributed failure.
+
+### 1b-1 GREEN implemented; independent acceptance pending
+
+The [distinct GREEN author handoff](../../.logs/bounded-storage-lifecycle/producer-presign-green-01/handoff.md)
+records the producer-only implementation. Root inspected the exact diff and
+caller order: the existing snapshot owner completes retention before persistence
+can populate the close cache; commitment, replay and seal effects remain downstream.
+The refactor-clean audit found no new owner or adapter to extract. Release, error
+propagation and captured-identity retry retain their existing semantics. All ten
+frozen RED files still match their accepted hashes.
+
+Current [test receipts](../../.logs/bounded-storage-lifecycle/producer-presign-green-01/test-summary.json)
+show focused 21, consumer 31 and owner 119 passing; root independently ran the
+[supplemental 196-test gate](../../.logs/bounded-storage-lifecycle/producer-presign-green-root-01/preservation-196-receipt.json).
+The named strict target, lint with zero allowed warnings, formatting and diff
+checks pass. The broader Node compiler remains a failure with
+[13 unchanged diagnostic identities](../../.logs/bounded-storage-lifecycle/producer-presign-green-01/node-typecheck-comparison.json),
+not a green aggregate typecheck. Previously unexecuted retry/cache assertions and
+the true producer held-after-retention/cold-reopen tail now pass. Native evidence
+is limited to real SQLite snapshot/AHE persistence and observed pre-kill fake-IDB
+seal ordering; it does not establish native browser or seal-store cold recovery.
+
+Root reconstructed the [GREEN review packet](../../.logs/bounded-storage-lifecycle/producer-presign-green-reviews-01/packet.md)
+from exact sources, all reported assertions and full native telemetry; its
+[input verification](../../.logs/bounded-storage-lifecycle/producer-presign-green-reviews-01/root-input-verification.json)
+and 90 qualification controls pass. Separate Grok, Kimi (100-step cap) and Opus
+xhigh reviews are running against that frozen packet. No terminal disposition is
+yet accepted.
+
+The first [Codex run](../../.logs/bounded-storage-lifecycle/producer-presign-green-codex-01/status.json)
+is `NO_VERDICT`: it reported no required code fixes, but a remaining child required
+supervisor cleanup after the CLI exited. Its public output and evidence are
+preserved, not promoted to qualified acceptance. Root is correcting review
+supervision; no producer or frozen-test correction follows from that execution
+failure. Same-owner six/30/60/100 workloads remain unrun predicted finite-pool
+conflicts, and reclamation/native integration/endurance obligations remain open.
+
+Grok, Kimi and Opus now have qualified terminal GREEN approvals, each with no
+required changes: [Grok](../../.logs/bounded-storage-lifecycle/producer-presign-green-reviews-01/run-grok/public.txt),
+[Kimi](../../.logs/bounded-storage-lifecycle/producer-presign-green-reviews-01/run-kimi/public.txt),
+[Opus](../../.logs/bounded-storage-lifecycle/producer-presign-green-reviews-01/run-opus/public.txt).
+Root verified natural exit, exact source/control integrity, no tool/compaction
+events and empty cleanup/survivor lists for all three; Kimi used one assistant
+step. Their optional findings are dispositioned as follows:
+
+- Opus correctly narrows the current late-checkpoint control. With GREEN present,
+  the producer retains before signing, then the child performs another idempotent
+  retention after close. This run proves that the cumulative oracle rejects a
+  post-signing checkpoint; it is not a new late-only-retention mutation test.
+  Historical RED late-only evidence remains preserved. The current source,
+  entered barrier and true native early-effect race separately establish the
+  producer ordering boundary. The GREEN packet's introductory "signs first"
+  wording must not be used to claim a stronger current control. Frozen oracles
+  need no change for this evidence-description correction.
+- Conservative failed-attempt debt remains finite and unreclaimed. Before-commit
+  refusal leaves temporary residue; after-commit uncertainty and later failure
+  can leave recovery-owned content. Successful retry may subsequently depend on
+  that content. No age-based deletion or pool enlargement is authorized.
+- Close exposes no cancellation surface, so no signal is missing from its current
+  call contract. A future cancellation API would need reviewed propagation and
+  uncertain-completion semantics, not an unrequested change here.
+- Kimi's split lost-ack coverage is accepted at its actual scope: producer
+  decorator failure follows real commit, while owner-native faults independently
+  cover transaction acknowledgement/death boundaries. Its prefix-selection note
+  concerns unchanged accepted storage behavior, not a new defect in this seam.
+
+Root additionally ran the [room-runtime consumer regression](../../.logs/bounded-storage-lifecycle/producer-presign-green-extra-01/room-runtime-receipt.json):
+21 tests pass. This run occurred after the review packet freeze and is not part
+of its 367 reported outcomes or a same-owner endurance claim. The replacement
+Codex review remains the outstanding acceptance gate; the first ineligible run
+is not reused as approval.
+
+The replacement [Codex second opinion](../../.logs/bounded-storage-lifecycle/producer-presign-green-codex-02/stdout.log)
+returned no required fixes or optional code changes. Root accepts it after
+verifying natural exit, exact source custody and no remaining child even at the
+CLI's exit: the bounded shutdown drain was unused, and no cleanup occurred.
+The original `NO_VERDICT` run remains preserved; no inferred explanation for its
+leftover process is treated as established fact.
+
+The [joint root disposition](../../.logs/bounded-storage-lifecycle/producer-presign-green-reviews-01/root-disposition.json)
+accepts the producer-only GREEN and authorizes its focused commit, preserving
+unrelated dirty-worktree experiments and every frozen oracle. This completes
+1b-1, not the parent retention obligation or production boundedness. The next
+active work is a reviewed slice-2 declaration-discovery contract; recipient
+installation, native integration and protected pending/rollback dependencies
+remain required, separately scoped work.
