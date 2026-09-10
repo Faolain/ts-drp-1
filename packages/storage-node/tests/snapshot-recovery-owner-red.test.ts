@@ -343,6 +343,7 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 			"captureDescriptor",
 			"captureExactBytes",
 			"captureRecoveryLimits",
+			"captureScope",
 			"createError",
 			"defaultRecoveryLimits",
 			"isError",

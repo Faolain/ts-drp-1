@@ -12,6 +12,7 @@ import {
 	type SnapshotRecoveryInspection,
 	type SnapshotRecoveryLimits,
 	type SnapshotRecoveryOwnerStatus,
+	type SnapshotRecoveryStore,
 	type SnapshotVerificationQuarantine,
 	type SnapshotVerificationReceipt,
 	type VerifiedSnapshotQuarantineReference,
@@ -507,7 +508,7 @@ function fromScopeRow(value: unknown): ScopeRow {
  */
 export async function createBrowserSnapshotQuarantineStore(
 	options: BrowserSnapshotQuarantineStoreOptions
-): Promise<SnapshotQuarantineStore<SnapshotVerificationReceipt>> {
+): Promise<SnapshotRecoveryStore<SnapshotVerificationReceipt>> {
 	const { primaryDatabaseName, recoveryLimits } = captureOptions(options);
 	let acquired: IDBDatabase | undefined;
 	try {
@@ -633,6 +634,48 @@ export async function createBrowserSnapshotQuarantineStore(
 			),
 		});
 	};
+	const lookupRecoveryDeclaration: SnapshotRecoveryStore<SnapshotVerificationReceipt>["lookupRecoveryDeclaration"] = (
+		input,
+		options = {}
+	) =>
+		promiseCapture(() => {
+			const scope = snapshotQuarantineContract.captureScope(input);
+			const signal = options.signal;
+			throwIfAborted(signal);
+			return schedule(() =>
+				transact(
+					database,
+					"readonly",
+					async (transaction) => {
+						throwIfAborted(signal);
+						const scopes = transaction.objectStore("scopes");
+						const raw: unknown = await requestResult(scopes.get(scopeKey(scope)));
+						if (raw === undefined) {
+							// Advance the third component, admitting every fourth-key class.
+							const range = IDBKeyRange.bound(
+								[scope.objectId, scope.epoch, scope.anchor],
+								[scope.objectId, scope.epoch, scope.anchor + "\0"],
+								false,
+								true
+							);
+							if ((await requestResult(scopes.getKey(range))) !== undefined)
+								throw failure("conflict", "snapshot identity is occupied by another digest");
+							return Object.freeze({ kind: "missing" as const });
+						}
+						const row = fromScopeRow(raw);
+						if (
+							row.objectId !== scope.objectId ||
+							row.epoch !== scope.epoch ||
+							row.anchor !== scope.anchor ||
+							row.manifestDigest !== scope.manifestDigest
+						)
+							throw failure("poisoned", "snapshot exact key disagrees with durable metadata");
+						return snapshotQuarantineContract.validateRecoveryManifest(scope, row);
+					},
+					{ signal }
+				)
+			);
+		});
 	const inspectRecovery: SnapshotQuarantineStore<SnapshotVerificationReceipt>["inspectRecovery"] = (
 		input,
 		options = {}
@@ -962,5 +1005,5 @@ export async function createBrowserSnapshotQuarantineStore(
 		});
 		return closing;
 	};
-	return Object.freeze({ close, inspectRecovery, recoveryStatus, openScope, sweepExpired });
+	return Object.freeze({ close, inspectRecovery, lookupRecoveryDeclaration, recoveryStatus, openScope, sweepExpired });
 }

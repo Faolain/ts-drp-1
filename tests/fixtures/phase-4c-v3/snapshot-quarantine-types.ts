@@ -87,6 +87,27 @@ export interface SnapshotQuarantineStore<Receipt extends object> {
 	sweepExpired(options?: Readonly<{ readonly signal?: AbortSignal }>): Promise<number>;
 }
 
+export type SnapshotRecoveryDeclarationLookup =
+	| Readonly<{ kind: "missing" }>
+	| Readonly<{
+			kind: "present";
+			declaration: SnapshotQuarantineDeclaration;
+			state: "open" | "poisoned" | "verified";
+			retention: SnapshotRetention;
+			expiresAt: number;
+	  }>;
+
+export interface SnapshotRecoveryDeclarationReader {
+	lookupRecoveryDeclaration(
+		scope: SnapshotQuarantineScopeKey,
+		options?: Readonly<{ readonly signal?: AbortSignal }>
+	): Promise<SnapshotRecoveryDeclarationLookup>;
+}
+
+export interface SnapshotRecoveryStore<Receipt extends object>
+	extends SnapshotQuarantineStore<Receipt>,
+		SnapshotRecoveryDeclarationReader {}
+
 export interface SnapshotStreamCompletion {
 	readonly chunkCount: number;
 	readonly exactByteLength: number;
@@ -139,7 +160,7 @@ export interface NodeSnapshotQuarantineModule {
 			readonly primaryFilename: string;
 			readonly recoveryLimits?: SnapshotRecoveryLimits;
 		}>
-	): SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+	): SnapshotRecoveryStore<SnapshotVerificationReceipt>;
 }
 
 export interface BrowserSnapshotQuarantineModule {
@@ -148,7 +169,7 @@ export interface BrowserSnapshotQuarantineModule {
 			readonly primaryDatabaseName: string;
 			readonly recoveryLimits?: SnapshotRecoveryLimits;
 		}>
-	): Promise<SnapshotQuarantineStore<SnapshotVerificationReceipt>>;
+	): Promise<SnapshotRecoveryStore<SnapshotVerificationReceipt>>;
 }
 
 /**

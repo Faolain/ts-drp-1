@@ -14,6 +14,7 @@ import {
 	type SnapshotRecoveryInspection,
 	type SnapshotRecoveryLimits,
 	type SnapshotRecoveryOwnerStatus,
+	type SnapshotRecoveryStore,
 	type SnapshotVerificationQuarantine,
 	type SnapshotVerificationReceipt,
 	type VerifiedSnapshotQuarantineReference,
@@ -34,6 +35,8 @@ const {
 	isError,
 } = snapshotQuarantineContract;
 type CapturedDeclaration = SnapshotQuarantineDeclaration;
+const intrinsicJSONParse = JSON.parse;
+const intrinsicSyntaxError = SyntaxError;
 
 function promiseCapture<Result>(operation: () => Promise<Result>): Promise<Result> {
 	try {
@@ -367,7 +370,7 @@ function admitSchema(database: DatabaseSync, supplied: SnapshotRecoveryLimits | 
  */
 export function createNodeSnapshotQuarantineStore(
 	options: NodeSnapshotQuarantineStoreOptions
-): SnapshotQuarantineStore<SnapshotVerificationReceipt> {
+): SnapshotRecoveryStore<SnapshotVerificationReceipt> {
 	const { primaryFilename, recoveryLimits } = captureOptions(options);
 	let acquired: DatabaseSync | undefined;
 	try {
@@ -499,6 +502,92 @@ export function createNodeSnapshotQuarantineStore(
 					return row === undefined
 						? Object.freeze({ kind: "missing" })
 						: Object.freeze({ kind: "present", status: statusOf(declaration, row) });
+				})
+			);
+		});
+	const lookupRecoveryDeclaration: SnapshotRecoveryStore<SnapshotVerificationReceipt>["lookupRecoveryDeclaration"] = (
+		input,
+		options = {}
+	) =>
+		promiseCapture(() => {
+			const scope = snapshotQuarantineContract.captureScope(input);
+			const signal = options.signal;
+			throwIfAborted(signal);
+			return schedule(() =>
+				runTransaction(database, () => {
+					throwIfAborted(signal);
+					const limits = snapshotQuarantineContract.limits;
+					// The current writer's compact ASCII JSON: brackets, descriptors, commas.
+					const descriptorBytes =
+						2 +
+						limits.maxChunks *
+							JSON.stringify({
+								index: limits.maxChunks - 1,
+								byteLength: limits.snapshotChunkBytes,
+								digest: "f".repeat(64),
+							}).length +
+						limits.maxChunks -
+						1;
+					const exact = "FROM snapshot_scopes_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?";
+					// Scalar predicates prevent native-to-JS copies of corrupt TEXT/BLOB values,
+					// including TEXT whose character length stops at an embedded NUL.
+					const preflight = database
+						.prepare(
+							`SELECT (
+					typeof(exact_manifest_bytes)='blob' AND length(exact_manifest_bytes) BETWEEN 1 AND ${limits.maxManifestBytes}
+					AND typeof(state)='text' AND length(CAST(state AS BLOB)) BETWEEN 1 AND 8 AND instr(state,char(0))=0
+					AND typeof(retention)='text' AND length(CAST(retention AS BLOB)) BETWEEN 1 AND 19 AND instr(retention,char(0))=0
+					AND typeof(incarnation)='text' AND length(CAST(incarnation AS BLOB)) BETWEEN 1 AND 36
+					AND (descriptors IS NULL OR (typeof(descriptors)='text' AND length(CAST(descriptors AS BLOB)) BETWEEN 1 AND ${descriptorBytes} AND instr(descriptors,char(0))=0))
+					AND typeof(total_bytes)='integer' AND total_bytes BETWEEN 1 AND ${limits.maxSnapshotBytes}
+					AND typeof(chunk_count)='integer' AND chunk_count BETWEEN 1 AND ${limits.maxChunks}
+					AND typeof(expires_at)='integer' AND expires_at BETWEEN 0 AND ${Number.MAX_SAFE_INTEGER}
+				) AS valid ${exact}`
+						)
+						.get(...keyParameters(scope));
+					if (preflight === undefined) {
+						const occupied = database
+							.prepare(
+								"SELECT 1 AS occupied FROM snapshot_scopes_v2 WHERE object_id=? AND epoch=? AND anchor=? LIMIT 1"
+							)
+							.get(scope.objectId, scope.epoch, scope.anchor);
+						if (occupied !== undefined) throw failure("conflict", "snapshot identity is occupied by another digest");
+						return Object.freeze({ kind: "missing" as const });
+					}
+					if (preflight.valid !== 1)
+						throw failure("poisoned", "snapshot recovery metadata exceeds its durable envelope");
+					// The exact primary key already binds identity. Reuse the captured key;
+					// never materialize another unbounded copy of the persisted objectId.
+					const row = database
+						.prepare(
+							`SELECT exact_manifest_bytes,total_bytes,chunk_count,expires_at,state,retention,incarnation,descriptors ${exact}`
+						)
+						.get(...keyParameters(scope));
+					if (row === undefined) throw failure("storage-failed", "snapshot exact row vanished within its transaction");
+					if ((row.retention === "legacy-unclassified") !== (row.descriptors === null))
+						throw failure("poisoned", "snapshot descriptor nullness disagrees with retention");
+					let descriptors: unknown = null;
+					if (row.descriptors !== null) {
+						if (typeof row.descriptors !== "string")
+							throw failure("poisoned", "snapshot durable descriptors must be text");
+						try {
+							descriptors = intrinsicJSONParse(row.descriptors);
+						} catch (error) {
+							if (error instanceof intrinsicSyntaxError)
+								throw failure("poisoned", "snapshot durable descriptors are invalid", error);
+							throw failure("storage-failed", "snapshot durable descriptors processing failed", error);
+						}
+					}
+					return snapshotQuarantineContract.validateRecoveryManifest(scope, {
+						exactCanonicalManifestBytes: row.exact_manifest_bytes,
+						totalBytes: row.total_bytes,
+						chunkCount: row.chunk_count,
+						expiresAt: row.expires_at,
+						state: row.state,
+						retention: row.retention,
+						incarnation: row.incarnation,
+						descriptors,
+					});
 				})
 			);
 		});
@@ -912,5 +1001,5 @@ export function createNodeSnapshotQuarantineStore(
 		return closing;
 	};
 
-	return Object.freeze({ close, inspectRecovery, recoveryStatus, openScope, sweepExpired });
+	return Object.freeze({ close, inspectRecovery, lookupRecoveryDeclaration, recoveryStatus, openScope, sweepExpired });
 }

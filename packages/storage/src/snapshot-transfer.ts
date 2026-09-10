@@ -79,6 +79,24 @@ export interface SnapshotRecoveryLimits {
 	readonly maxRecoveryScopes: number;
 	readonly maxRecoveryContentBytes: number;
 }
+export interface SnapshotRecoveryDeclarationReader {
+	lookupRecoveryDeclaration(
+		scope: SnapshotQuarantineScopeKey,
+		options?: Readonly<{ readonly signal?: AbortSignal }>
+	): Promise<SnapshotRecoveryDeclarationLookup>;
+}
+export interface SnapshotRecoveryStore<Receipt extends object>
+	extends SnapshotQuarantineStore<Receipt>,
+		SnapshotRecoveryDeclarationReader {}
+export type SnapshotRecoveryDeclarationLookup =
+	| Readonly<{ kind: "missing" }>
+	| Readonly<{
+			kind: "present";
+			declaration: SnapshotQuarantineDeclaration;
+			state: "open" | "poisoned" | "verified";
+			retention: SnapshotRetention;
+			expiresAt: number;
+	  }>;
 export type SnapshotRetention = "temporary" | "recovery" | "legacy-unclassified";
 export type SnapshotRecoveryInspection =
 	| Readonly<{ kind: "missing" }>
@@ -145,6 +163,7 @@ const intrinsicArrayBufferResizableGetter = intrinsicObjectGetOwnPropertyDescrip
 const intrinsicUint8Array = Uint8Array;
 const intrinsicUint8ArrayPrototype = Uint8Array.prototype;
 const intrinsicUint8ArraySet = Uint8Array.prototype.set;
+const intrinsicTextEncoder = TextEncoder;
 
 class QuarantineError extends Error {
 	readonly code: SnapshotQuarantineFailureCode;
@@ -293,21 +312,96 @@ function addRecoveryContentBytes(left: number, right: number): number {
 function recoveryContentBytes(totalBytes: number, manifestByteLength: number): number {
 	return addRecoveryContentBytes(totalBytes, manifestByteLength);
 }
-function validateRecoveryManifest(declaration: SnapshotQuarantineDeclaration): void {
+type RecoveryMetadata = Readonly<{
+	exactCanonicalManifestBytes: unknown;
+	totalBytes: unknown;
+	chunkCount: unknown;
+	descriptors: unknown;
+	incarnation: unknown;
+	state: unknown;
+	retention: unknown;
+	expiresAt: unknown;
+}>;
+function validateRecoveryManifest(declaration: SnapshotQuarantineDeclaration): void;
+function validateRecoveryManifest(
+	scope: SnapshotQuarantineScopeKey,
+	metadata: RecoveryMetadata
+): Extract<SnapshotRecoveryDeclarationLookup, { kind: "present" }>;
+function validateRecoveryManifest(
+	input: SnapshotQuarantineDeclaration | SnapshotQuarantineScopeKey,
+	metadata?: RecoveryMetadata
+): void | Extract<SnapshotRecoveryDeclarationLookup, { kind: "present" }> {
 	try {
-		const decoded = decodeSnapshotManifest({
-			exactCanonicalManifestBytes: declaration.exactCanonicalManifestBytes,
-			expectedManifestDigest: declaration.scope.manifestDigest,
-			profile: { maxManifestBytes: MAX_MANIFEST_BYTES, maxSnapshotBytes: MAX_BYTES, snapshotChunkBytes: 131_072 },
-		});
+		const scope =
+			metadata === undefined ? (input as SnapshotQuarantineDeclaration).scope : (input as SnapshotQuarantineScopeKey);
+		if (
+			metadata !== undefined &&
+			(typeof metadata.incarnation !== "string" ||
+				metadata.incarnation.length === 0 ||
+				metadata.incarnation.length > 36 ||
+				new intrinsicTextEncoder().encode(metadata.incarnation).byteLength > 36 ||
+				!["open", "poisoned", "verified"].includes(metadata.state as string) ||
+				!["temporary", "recovery", "legacy-unclassified"].includes(metadata.retention as string) ||
+				(metadata.retention === "legacy-unclassified") !== (metadata.descriptors === null) ||
+				(metadata.retention === "recovery" && metadata.state !== "verified") ||
+				typeof metadata.totalBytes !== "number" ||
+				!Number.isSafeInteger(metadata.totalBytes) ||
+				metadata.totalBytes <= 0 ||
+				metadata.totalBytes > MAX_BYTES ||
+				typeof metadata.chunkCount !== "number" ||
+				!Number.isSafeInteger(metadata.chunkCount) ||
+				metadata.chunkCount <= 0 ||
+				metadata.chunkCount > MAX_CHUNKS ||
+				typeof metadata.expiresAt !== "number" ||
+				!Number.isSafeInteger(metadata.expiresAt) ||
+				metadata.expiresAt < 0)
+		)
+			throw failure("poisoned", "snapshot recovery metadata is invalid");
+		const bytes =
+			metadata === undefined
+				? (input as SnapshotQuarantineDeclaration).exactCanonicalManifestBytes
+				: (metadata.exactCanonicalManifestBytes as Uint8Array);
+		let manifestResult: ReturnType<typeof decodeSnapshotManifest>;
+		try {
+			const decoded = decodeSnapshotManifest({
+				exactCanonicalManifestBytes: bytes,
+				expectedManifestDigest: scope.manifestDigest,
+				profile: { maxManifestBytes: MAX_MANIFEST_BYTES, maxSnapshotBytes: MAX_BYTES, snapshotChunkBytes: 131_072 },
+			});
+			manifestResult = decoded;
+		} catch (error) {
+			if (metadata === undefined) throw error;
+			switch ((error as { code?: unknown } | null)?.code) {
+				case "manifest-digest-mismatch":
+				case "manifest-invalid":
+				case "manifest-noncanonical":
+				case "manifest-too-large":
+					throw failure("poisoned", "snapshot recovery manifest is invalid", error);
+				default:
+					throw failure("storage-failed", "snapshot recovery manifest processing failed", error);
+			}
+		}
+		const decoded = manifestResult;
+		const declaration =
+			metadata === undefined
+				? (input as SnapshotQuarantineDeclaration)
+				: {
+						scope,
+						exactCanonicalManifestBytes: bytes,
+						totalBytes: metadata.totalBytes,
+						chunks: metadata.descriptors === null ? decoded.chunks : metadata.descriptors,
+					};
+		const chunks = declaration.chunks;
 		if (
 			decoded.manifest.objectId !== declaration.scope.objectId ||
 			decoded.manifest.epoch !== declaration.scope.epoch ||
 			decoded.manifest.anchor !== declaration.scope.anchor ||
 			decoded.manifest.totalBytes !== declaration.totalBytes ||
-			decoded.chunks.length !== declaration.chunks.length ||
+			!Array.isArray(chunks) ||
+			decoded.chunks.length !== chunks.length ||
+			(metadata !== undefined && decoded.chunks.length !== metadata.chunkCount) ||
 			decoded.chunks.some((expected, index) => {
-				const actual = declaration.chunks[index];
+				const actual = chunks[index];
 				return (
 					!exactRecord(actual, ["byteLength", "digest", "index"]) ||
 					actual.index !== expected.index ||
@@ -316,8 +410,25 @@ function validateRecoveryManifest(declaration: SnapshotQuarantineDeclaration): v
 				);
 			})
 		)
-			throw new TypeError("snapshot recovery manifest identity is inconsistent");
+			throw failure("poisoned", "snapshot recovery manifest identity is inconsistent");
+		if (metadata !== undefined)
+			return Object.freeze({
+				kind: "present",
+				declaration: Object.freeze({
+					scope: Object.freeze({ ...scope }),
+					exactCanonicalManifestBytes: decoded.exactCanonicalManifestBytes,
+					chunks: decoded.chunks,
+					totalBytes: metadata.totalBytes as number,
+				}),
+				state: metadata.state as "open" | "poisoned" | "verified",
+				retention: metadata.retention as SnapshotRetention,
+				expiresAt: metadata.expiresAt as number,
+			});
 	} catch (error) {
+		if (metadata !== undefined) {
+			if (error instanceof QuarantineError) throw error;
+			throw failure("storage-failed", "snapshot recovery manifest processing failed", error);
+		}
 		throw failure("poisoned", "snapshot recovery manifest is invalid", error);
 	}
 }
@@ -357,6 +468,7 @@ export const snapshotQuarantineContract = Object.freeze({
 	}),
 	defaultRecoveryLimits: Object.freeze({ maxRecoveryScopes: 4, maxRecoveryContentBytes: MAX_BYTES }),
 	captureDeclaration,
+	captureScope,
 	captureDescriptor,
 	captureExactBytes: exactBytes,
 	captureRecoveryLimits,

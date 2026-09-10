@@ -5,6 +5,70 @@ versioned-owner findings are dispositioned in the executable slice. Freeze the
 amended independent RED before assigning its distinct GREEN author; review the
 resulting implementation and these fixes together before accepting the seam.
 
+## 2a GREEN accepted; cold recovery contract next
+
+The integrated parent review is complete: Grok, Kimi and Opus xhigh each returned
+qualified natural approval of metadata observation, and Codex found no actionable
+integrated defect. The [joint disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-integrated-green-reviews-01/root-disposition.md)
+records source corroboration, advisory decisions and evidence limits; the
+[closure](../../.logs/bounded-storage-lifecycle/declaration-discovery-integrated-green-reviews-01/green-closure.json)
+binds current/frozen custody and all terminal receipts. Kimi used one step within
+its 100-step cap; there was no tool use, compaction, forced cleanup or survivor.
+This accepts 2a, not cold/pending recovery, startup, rollback, recipient retention
+or production boundedness. Draft the cold-only consumer contract next.
+
+Opus's non-blocking observations concern the inline-key assertion, shared
+transaction scope, independent envelope derivation, parse-boundary nullness
+checks and descriptor insertion-order interoperability. Root preserves the
+tested behavior and records the future-change invariants rather than changing
+the accepted candidate. Readonly scheduling is not claimed universally
+non-blocking. Archival RED graph drivers remain historical tools, not
+clean-checkout current-candidate gates; unrelated preservation experiments and
+generated artifacts are outside the focused commit boundary.
+
+### Separately accepted 2a-1 correction
+
+The separately authored [GREEN handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-green-01/handoff.json)
+and [root verification](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-green-root-01/verification.json)
+record the implemented correction, unchanged frozen oracles, focused gates,
+shipped output equivalence and qualified before/after measurements.
+[Codex](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-green-codex-01/stdout.log)
+found no actionable findings and explicitly corroborated mandatory source proof.
+Current-candidate Grok, Kimi and Opus xhigh returned qualified natural approvals
+for 2a-1 only. The [root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-green-reviews-01/root-disposition.md)
+accepts the correction and records their advisory findings; the
+[closure](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-green-reviews-01/green-closure.json)
+binds all three terminal receipts and exact inputs. Kimi stayed within its
+100-step cap. There was no tool use, compaction, forced cleanup or survivor.
+These bounded corrective verdicts did not substitute for parent review; the
+separate integrated review above now closes that acceptance boundary.
+
+The [root review boundary](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-green-root-01/README.md)
+owns the scheduling disposition: a product-free reproduction of WebKit navigation
+failure remains unpassed in the default command; unchanged exact-title
+partitions pass the complete original semantic set. Historical consumer
+failures, dormant assertions and measured cost regressions remain explicit.
+Root's fully resolved read-only compiler check closes the relative-config
+diagnostic qualification without changing emitted product bytes. No later
+recovery or production boundedness is accepted.
+
+### Accepted RED foundation
+
+The [current RED closure](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-red-reviews-02/red-closure.json)
+integrates the unchanged parent candidate with separate deterministic-manifest
+and foreign-owner additions. Grok, Kimi and Opus returned qualified delta
+approvals; bounded Codex review found no actionable defects. Earlier Opus
+required changes are preserved and resolved, not rewritten as earlier approval.
+
+The [mandatory GREEN handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-red-reviews-02/root-disposition.md)
+owns all dispositions: empty-string ordering, mandatory source proof of primitive
+nonretention and owner-class recognition, whole-operation normalization, exact
+branch attribution, deterministic-regression exit interpretation, and fresh
+GREEN artifact custody. Root corrected overstatements about positive sentinel
+coverage without weakening any oracle. Its separate GREEN implementation and
+AFTER comparison are now accepted at the bounded corrective scope above.
+Historical sections below are not current acceptance.
+
 ## Corrected implementation checkpoint
 
 [Codex's corrective-delta review](../../.logs/grid-memory-attribution/recovery-owner-corrective-codex-review-01/stdout.log)
@@ -1306,3 +1370,459 @@ unrelated dirty-worktree experiments and every frozen oracle. This completes
 active work is a reviewed slice-2 declaration-discovery contract; recipient
 installation, native integration and protected pending/rollback dependencies
 remain required, separately scoped work.
+
+## 2a declaration-discovery contract review
+
+The [draft contract](slices/02a-declaration-discovery.md) separates exact metadata
+observation from authenticated recovery and byte acquisition. Its
+[type-only probe](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/type-probe.json)
+supports an explicit discovery capability on the same owner while preserving
+the narrower producer interface. It is not runtime or package-typecheck evidence.
+The owner, authority and no-fallback constraints are part of contract acceptance,
+not justification for carrying a duplicate implementation.
+
+The [review packet manifest](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-01/selection-manifest.json)
+records the exact draft and source excerpts sent independently to Grok, Kimi and
+Opus xhigh. [Root reconstruction](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-01/root-input-verification.json)
+passes without source drift; [90 harness controls](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-01/controls.log)
+pass, including terminal/custody failures, context changes and the Kimi step cap.
+The local transport/help probes prove CLI input handling, not model context
+capacity. No prior reviewer conclusions are in the packet.
+
+All three reviews terminated naturally with qualified `CHANGES_REQUIRED` verdicts:
+[Grok](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-01/run-grok/public.txt),
+[Kimi](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-01/run-kimi/public.txt),
+and [Opus](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-01/run-opus/public.txt).
+The [root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-01/root-disposition.json)
+owns every required/optional finding and the deliberate post-review revision.
+The original packet and terminal evidence remain preserved.
+
+The revised draft makes exact-key priority, rejected-promise carriers, mandatory
+legacy observation, metadata-only binding, interoperability controls and SQLite
+pre-copy bounds normative. Root selected an existence-only conflict probe after
+an exact miss; competing-body corruption does not change that identity collision.
+This removes arbitrary three-field row selection and needs revised-contract
+review rather than inferred approval. No contract freeze or separate RED/GREEN
+authoring is authorized. The parent and full production-hardening obligations
+remain open.
+
+The [revised packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-02/selection-manifest.json)
+includes the underlying owner and adoption fixtures as additional source context.
+Its [independent reconstruction](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-02/root-input-verification.json)
+and [90 harness controls](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-02/controls.log)
+pass. All three reviewers returned qualified approvals:
+[Grok](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-02/run-grok/public.txt),
+[Kimi](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-02/run-kimi/public.txt),
+and [Opus](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-02/run-opus/public.txt).
+Root nevertheless [holds RED authorization](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-02/root-disposition.json):
+the optional exact-member audit found an accepted test that pins the inner shared
+helper roster without the proposed `captureScope`. That omitted test makes the
+blanket no-test-change rule conflict with the proposed API, despite the approvals.
+
+The amendment explicitly permits only a separate RED author to add that one
+expected helper member, preserving the original evidence and all other members,
+assertions, package exports and root rosters. It also records optional bound and
+legacy/lifecycle clarifications. No test or product source has changed yet.
+The [amended packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-03/selection-manifest.json)
+includes the previously omitted exact-roster tests and correct cold-reopen wrapper;
+the earlier packet's pending-wrapper description is corrected in the
+[recon note](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/consumer-entry-recon.md).
+Its [reconstruction](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-03/root-input-verification.json)
+and [90 harness controls](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-03/controls.log)
+pass. Grok, Kimi and Opus xhigh are reviewing the amendment; terminal verdicts and
+root disposition are pending. Preserve these selected inputs until all terminate.
+
+Grok has since returned [qualified approval](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-03/run-grok/terminal.json).
+Opus returned a concrete correction request but marked context incomplete, so
+its [terminal classification](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-03/run-opus/terminal.json)
+is `NO_VERDICT`, not approval or qualified rejection. Root independently confirmed
+the omitted exact factory-type oracle conflict: the actual generated historical
+oracle compiles cleanly, while proposed richer factory aliases produce exactly
+two TS2344 failures in the [type probe](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/exact-type-probe.json).
+This remains type-only evidence, not an implementation or a new RED oracle.
+The [preliminary disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-03/root-preliminary-disposition.md)
+also records caller-key/metadata-bound and transaction-mode clarifications needed
+before another contract review. Kimi is still running; preserve the current
+selected inputs until it terminates. RED authorization remains held regardless
+of that pending verdict because the newly confirmed type-surface conflict must
+be explicitly resolved first.
+
+Kimi then returned a [qualified correction request](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-03/run-kimi/public.txt).
+The [final root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-03/root-disposition.json)
+accepts the no-competitor round-trip precondition and independently verified
+type-oracle/key-bound/transaction corrections. It rejects the claimed impossibility
+of an exact IndexedDB prefix range: advancing the third string component bounds
+all fourth-key types. The [native Chromium probe](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/idb-prefix-probe.json)
+checks actual key-only reads across key classes and neighboring triples. This is
+algorithm feasibility, not RED or product acceptance.
+
+The [runtime/type-oracle amended packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-04/selection-manifest.json)
+includes the actual historical type fixture and both new feasibility probes.
+Its [reconstruction](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-04/root-input-verification.json)
+and [90 review controls](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-04/controls.log)
+pass. Grok, Kimi and Opus xhigh are running against that exact revision. The only
+proposed historical-test edits remain separate-RED-only: one inner helper member
+and two exact expected factory return types with independent expected discovery
+definitions. No product or test source has changed; freeze and authoring await
+terminal reviews and root disposition.
+
+Grok returned [qualified approval](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-04/run-grok/terminal.json).
+Opus reported incomplete adapter-test context; its
+[response](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-04/run-opus/public.txt)
+is therefore `NO_VERDICT`, despite its raw correction label. The root
+[exact-surface inventory](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/exact-surface-inventory.json)
+records the missing browser/adapter source identities and search evidence:
+the historical method-roster constants have no consumers in the searched
+source/test tree, and no additional helper-roster evolution was found in the
+browser owner suite. This completes evidence, not authorization for additional
+oracle edits. Kimi subsequently returned
+[qualified approval](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-04/run-kimi/terminal.json)
+against the unchanged selected contract; all three round-04 processes are terminal.
+The [focused baseline receipt](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/existing-oracles-receipt.json)
+records the existing owner and exact-surface suites passing with coverage disabled;
+the earlier coverage-enabled attempt failed the global coverage threshold.
+Neither result is discovery RED/GREEN acceptance. Resolve the outstanding review
+qualification before authoring RED.
+
+The [Opus context-completion packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-opus-context-05/selection-manifest.json)
+keeps the round-04 contract and sources unchanged and supplies the omitted
+browser/adapter evidence plus completed inventory. Its
+[independent reconstruction](../../.logs/bounded-storage-lifecycle/declaration-discovery-opus-context-05/root-input-verification.json)
+and [review controls](../../.logs/bounded-storage-lifecycle/declaration-discovery-opus-context-05/controls.log)
+pass. Only Opus xhigh is authorized and running; Grok/Kimi are not restarted.
+Separately, the [positive exact-type probe](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/positive-exact-type-probe.json)
+confirms the expected richer hierarchy rejects unchanged factories and accepts
+independently declared richer virtual product types. It changes no selected input
+and is not included in the live packet. This is satisfiability evidence only,
+not separate RED or product GREEN acceptance.
+
+The [native baseline receipt](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/native-baselines-receipt.json)
+records the existing owner suite passing on Chromium and the existing retention
+suite passing on Chromium, Firefox and WebKit, with selected review inputs still
+exact afterward. These are regression baselines only: no discovery API or new
+discovery oracle exists yet. The [round-04 disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-reviews-04/root-disposition.json)
+records every Opus finding and its root resolution; the remaining gate is the
+live context-completion review.
+
+Opus then returned [qualified approval](../../.logs/bounded-storage-lifecycle/declaration-discovery-opus-context-05/run-opus/terminal.json)
+with complete context and no required changes. Its
+[root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-opus-context-05/root-disposition.json)
+resolves the remaining optional clarifications. The
+[contract freeze](../../.logs/bounded-storage-lifecycle/declaration-discovery-contract-freeze-01/manifest.json)
+preserves the reviewed source bytes and binds all three qualified approvals.
+Separate RED authoring is now authorized under its exact assignment; product
+edits remain forbidden until RED is frozen and independently accepted.
+
+### 2a RED candidate — frozen; GREEN correction unresolved
+
+The [round-01 disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-01/root-disposition.md)
+authorizes one separate RED correction pass, not GREEN. The complete reviewed
+candidate is [archived](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-01/archived-candidate.json)
+before edits. Product and all other accepted oracles remain unchanged.
+
+| Round  | Input custody                                                                                                                             | Qualified findings                                                                                                                                                                                                                                                                                                                                                                   | Disposition                                                                                                                                                                                    |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RED 01 | [Immutable packet and source archive](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-01/archived-candidate.json) | [Grok: changes required](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-01/run-grok/terminal.json); [Kimi: approved](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-01/run-kimi/terminal.json); [Opus: no verdict, timeout](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-01/run-opus/terminal.json)     | Correct three oracle issues; no GREEN acceptance.                                                                                                                                              |
+| RED 02 | [Corrected immutable snapshot](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-02/selection-manifest.json)        | [Grok: approved](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-02/run-grok/terminal.json); [Kimi: timeout, no verdict](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-02/run-kimi/terminal.json); [Opus: timeout, no verdict](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-02/run-opus/terminal.json). | [Disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-02/root-disposition.md): preserve Grok approval; narrow context for the two remaining reviews. No GREEN. |
+
+The [correction handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-correction-02/handoff.json)
+and [root verification](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-02/root-candidate-verification.json)
+record strict/lint/format exit zero (31 JSDoc warnings), Node 91 masked failures
+and two passing controls, and 107 masked failures plus two passing controls per
+native browser. All 327 browser tests executed in 4.9 minutes. The 108 gate inputs
+and actual resolved bundles match before/after; downstream semantics remain
+pending behind the absent API. The exact correction touches four candidate paths
+and the separately recorded status-only document delta, not product or historical
+oracle expectations. The review packet has 28 focused selections backed by 130
+immutable sources. Prior runner controls plus snapshot-path validation pass;
+packet reconstruction and local transport checks pass. These are review-launch
+qualifications, not RED approval.
+
+The [RED-03 source selection](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-03/selection-manifest.json)
+retains the identical corrected candidate and full source custody, with exact
+excerpts of unchanged native factories and a concise historical-gate summary.
+Kimi returned [qualified approval](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-03/run-kimi/terminal.json)
+in one assistant step under the 100-step cap; its [disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-03/root-kimi-disposition.md)
+qualifies optional instrumentation observations without changing the candidate.
+Opus completed naturally, but the actual final result lacked the required schema;
+its [terminal classification](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-03/run-opus/terminal.json)
+remains `NO_VERDICT`. Earlier [public messages](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-03/run-opus/public-messages-unqualified.json)
+contain a concrete caller-key copy finding. Root [proved it natively](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/root-caller-key-copy-probe.log),
+independent of the review's qualification failure. The [disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-03/root-disposition.md)
+authorizes a separate narrow RED correction; it does not retrofit the verdict.
+The packet is 304,314 bytes; source reconstruction, local transport
+and the reused 91 runner controls pass. Grok's RED-02 approval is preserved.
+All RED-03 review processes are terminal. No product/test threshold changed, and no
+GREEN is authorized before correction and qualified review of the new candidate.
+
+The separate [caller-key correction handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-correction-04/handoff.json)
+now records completed strict/lint/format and unchanged-budget Node/native gates.
+[Root verification](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-correction-04/root-candidate-verification.json)
+confirms stable pinned inputs, exact before/after resolved graphs, and only the
+three authorized file changes. All discovery behavior remains masked by the
+absent API; passing controls establish native observation only.
+The [RED-04 packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-04/selection-manifest.json)
+has exact source reconstruction and passing runner/transport controls. Grok
+returned [qualified approval](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-04/run-grok/terminal.json)
+with no required changes; root [dispositioned its optional findings](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-04/root-grok-disposition.md).
+Kimi returned [qualified approval](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-04/run-kimi/terminal.json)
+in one assistant step under the 100-step cap; root [dispositioned its findings](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-04/root-kimi-disposition.md),
+including correcting its description of the trailing occupancy check. Opus xhigh
+returned [qualified approval](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-04/run-opus/terminal.json)
+with no required changes; root [dispositioned its optional findings](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-04/root-opus-disposition.md).
+All review processes are terminal with exact custody. Earlier approvals and
+NO_VERDICT results retain their historical scope.
+
+The [RED freeze](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-freeze-01/manifest.json)
+binds all three current approvals, the contract and immutable oracle hashes.
+Root verified current source equality before authorizing a distinct GREEN author
+for the existing shared and native owners. Tests, budgets, schema and historical
+selection behavior remain frozen. GREEN implementation and actual native gates
+have completed in the [author handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-green-01/handoff.json),
+with stable inputs and frozen oracles. Focused discovery, retention, ownership
+and consumer assertions pass; default repository-wide coverage failures remain
+separate from the established coverage-off focused convention.
+The separate RED diagnostic author then [confirmed an allocation error-code gap](../../.logs/bounded-storage-lifecycle/declaration-discovery-allocation-probe-01/report.json).
+Root [requires correction before acceptance](../../.logs/bounded-storage-lifecycle/declaration-discovery-allocation-probe-01/root-disposition.md):
+a controlled owned-copy failure becomes `poisoned`, not `storage-failed`, despite
+valid durable metadata and successful unarmed controls. The ownership design is
+under read-only investigation; no decoder surface evolution or frozen-test edit
+is yet authorized. Product code is held. Independent GREEN review remains required.
+
+The proposed [2a-1 failure-provenance seam](slices/02a-1-failure-provenance.md)
+keeps invalid-data ownership in canonical/protocol validation and operational
+mapping at storage, reusing decoder-owned output rather than adding a parser.
+The independent [UTF-8 feasibility probe](../../.logs/bounded-storage-lifecycle/declaration-discovery-utf8-probe-01/report.json)
+matched native fatal decoding in 89,838 Node cases and preserved controlled
+conversion failures. It is not browser or product integration evidence. The
+proposal explicitly records the full-roundtrip CPU/temporary-byte tradeoff and
+requires native corrective RED, unchanged frozen oracles and current-candidate
+reviews. Focused contract review remains pending; no correction is implemented.
+
+Root's [native JSON feasibility probe](../../.logs/bounded-storage-lifecycle/declaration-discovery-json-probe-01/report.json)
+preserves equivalent descriptor representations while demonstrating native syntax
+rejections, without product changes. The proposal now names the narrowly scoped
+native `SyntaxError` boundary and its compromised-intrinsic limitation, grounded
+in the ECMAScript parsing contract. This is input to focused contract review,
+not corrective RED or acceptance evidence.
+
+Focused Grok, Kimi (100-step cap) and Opus xhigh contract reviews completed
+against the same [immutable selected packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-01/selection-manifest.json).
+The [reconstruction receipt](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-01/root-input-verification.json)
+and [control tests](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-01/controls.log)
+qualify preparation, not provider verdicts or product behavior. The delegated
+preparation stopped before completion; root finished and verified its partial
+artifacts locally before separately authorizing each run. No corrective RED or
+GREEN is authorized by a launch. The [root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-01/root-disposition.md)
+accepts Grok/Opus's required mapping, compatibility and resource-bound changes
+while preserving Kimi's approval of the earlier snapshot. The revised proposal
+uses a [bounded streaming diagnostic](../../.logs/bounded-storage-lifecycle/declaration-discovery-utf8-stream-probe-01/report.json)
+instead of whole-input validation re-encoding and requires focused re-review.
+No reviewer has approved the revised proposal; all first-round processes are
+terminal and no corrective RED or GREEN is authorized.
+
+The [second focused packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-02/selection-manifest.json)
+now carries the revised contract, streaming evidence and previously omitted
+compatibility caller sections. Root verified exact reconstruction, local
+transport and the reused control suite before authorizing fresh Grok, Kimi and
+Opus reviews. Kimi approved the revision. Grok completed with required changes;
+the [partial root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-02/root-partial-disposition.md)
+uses current-product and standard evidence to reject two unsupported BOM/reset
+claims and clarifies the finite-code and parent-contract boundaries. No
+algorithm change or acceptance follows from that disposition. Opus's second-round attempt ended
+with a [server-overload error and no verdict](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-02/run-opus/terminal.json),
+not approval or a contract finding. Preserve that attempt and wait for the other
+findings before qualifying a new Opus run on the appropriate packet. The
+first-round terminal verdicts remain scoped to their earlier packet. All
+second-round processes are now terminal. The [clarified third packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-03/selection-manifest.json)
+has terminal results: Grok returned a qualified approval; Opus reported incomplete
+context and has [no eligible verdict](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-03/run-opus/terminal.json).
+The [root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-03/root-partial-disposition.md)
+clarifies already-selected implementation boundaries and rejects the inferred
+deep-JSON failure using a [32-case native all-engine probe](../../.logs/bounded-storage-lifecycle/declaration-discovery-json-depth-probe-01/report.json).
+An independent read-only [consumer audit](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-consumer-audit-01/report.md)
+identifies actual affected suites, built resolution and generic large-string
+exposure. The [bounded cost samples](../../.logs/bounded-storage-lifecycle/declaration-discovery-utf8-cost-probe-01/report.json)
+show substantial ASCII overhead in the instrumented diagnostic; actual product
+timings remain required before GREEN acceptance. Neither diagnostic is product RED.
+The [fourth packet](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-04/selection-manifest.json)
+supplies the requested relevant source/test context, corpus generator, built codec
+and selected native algorithms. Reconstruction, transport and all 91 control tests
+passed before root authorized one fresh Opus xhigh review. It returned qualified
+`CHANGES_REQUIRED` with complete context. Grok/Kimi approvals remain scoped to their
+unchanged normative choices, not the new evidence bytes. No product or frozen
+oracle changed during contract review.
+
+The final [root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-04/root-disposition.md)
+resolves Opus's five concrete requirements: dependency-edge class identity,
+existing downstream fallbacks, deterministic STRING messages, hot-path cost
+measurements and dormant-assertion qualification. The
+[current error-edge diagnostic](../../.logs/bounded-storage-lifecycle/declaration-discovery-error-edge-probe-01/report.json)
+demonstrates distinct canonical instances coexisting with correct protocol-cause
+ownership and preserved baseline messages; it is not corrected product RED.
+The [closure receipt](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-04/contract-closure.json)
+binds the accepted current contract and exact terminal scopes. This is root
+acceptance with resolved findings, not unanimous reviewer approval. All contract
+review processes are terminal. Separate corrective RED remains incomplete;
+GREEN remains held until new frozen RED and its requested independent reviews.
+The first broader author turn ended with a platform safety error after read-only
+inspection, before creating files or executing tests. Its read-only handoff
+identified no blocked tool operation or live process. A narrower ordinary codec
+compatibility-control assignment completed without intrinsic replacement or
+execution retries. Required fault-boundary, resource and downstream RED remains
+outstanding; compatibility passes alone cannot satisfy the full corrective gate.
+
+The [compatibility handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-controls-01/handoff.json)
+records 180 passing tests in both the dedicated no-alias Vitest workspace and
+normal root discovery, with focused strict typecheck, lint and formatting passing.
+The exhaustive native-fatal comparison covers 65,792 one/two-byte payloads;
+all five final gates preserved the 20 held product and 29 frozen oracle hashes.
+Root inspected the entry and runner configuration. Focused runs disable coverage;
+the retained default-coverage attempt passed its tests but exited nonzero on the
+global coverage threshold. This is compatibility evidence, not a full-suite pass
+or corrective RED acceptance. The [bounded Codex review](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-controls-01/root-review.md)
+found no actionable test defects; root rechecked all observed gate hashes against
+disk. This does not replace the requested full corrective RED reviews.
+
+The [static dependency trace](../../.logs/bounded-storage-lifecycle/declaration-discovery-dependency-graph-01/disposition.md)
+extends the selected-file custody observations to literal transitive Node ESM
+imports. The inspected protocol/compaction edges resolve to one canonical
+artifact; adapter snapshot exports reach the shared/protocol snapshot exports.
+The runtime-generated blueprint artifact import remains explicitly unresolved.
+This is not runtime same-instance classification or browser bundle attestation.
+The [ordinary browser compatibility handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-browser-controls-01/handoff.json)
+records all twelve groups passing across Chromium, Firefox and WebKit, with no
+skips or retries and focused strict/lint/format gates passing. Actual canonical
+dist bundle inputs and served bundle hashes agree across all attachments.
+The [bounded independent review](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-browser-controls-01/root-review.md)
+found no actionable defects. Root verified every observed gate/input hash against
+current bytes. These controls cover ordinary codec compatibility, not manifest
+timings, resource bounds, fault provenance or native discovery mapping. They do
+not authorize the interrupted broader fault work or GREEN.
+
+After revalidating the interruption's read-only handoff (no identified blocked
+tool invocation or partial test execution), root authorized one bounded local
+canonical/protocol exception-provenance RED assignment to the same separate
+author. It uses controlled thrown values in isolated test processes, not actual
+memory exhaustion, external targets, or a retry of the broader all-owner task.
+No safeguard changes, product edits, frozen-oracle edits or GREEN are authorized.
+The still-required native storage, downstream and resource suites remain separate.
+
+The resulting [bounded local codec RED handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-codec-red-01/handoff.json)
+now records fifteen causal classification failures and four passes in both the
+dedicated workspace and root discovery. All eighteen children pass their import,
+validity, reached-binding, deterministic-owner, retry and unchanged-byte controls;
+canonical input-copy propagation already passes. Focused strict/lint/format gates
+pass, and root rechecked all 78 observed inputs in each final/root receipt.
+The [bounded independent review and root disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-codec-red-01/root-review.md)
+found no actionable test defects and preserve the remaining scope explicitly.
+This is causal evidence at six local processing boundaries, not the full RED
+freeze or the requested full-suite Grok/Kimi/Opus acceptance. GREEN stays held.
+
+Separate native failure-mapping RED has completed focused gates. The
+[initial native counterexamples](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-native-red-01/initial-root-review.md)
+reproduce operational errors mapped to `poisoned` in genuine SQLite and Chromium
+lookups, with exact valid/retry and unchanged-record controls. These diagnostic
+runs are not the normative failing gate or the remaining all-engine matrix.
+Current native owner sources
+contain discovery while the native package factory builds still expose the prior
+method set. Use the existing in-memory source-entry convention with actual built
+dependencies and explicit custody; stale-build missing-method failures are not
+failure-provenance RED. Native artifact freshness remains unproved for acceptance.
+
+Native, resource and downstream RED now have completed focused gates and bounded
+independent review. The [integration checkpoint](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-red-integration-01/root-checkpoint.md)
+records final evidence selection, resolved oracle/custody findings and preserved
+limitations. Supplemental decoder-output ownership and validation-stage fault
+oracles remain under integration review. Runtime nonaccumulation proof remains
+unavailable from call telemetry and must be dispositioned explicitly. No full
+corrective RED freeze or GREEN is authorized.
+
+The [repeated live-batch fixture baseline](../../.logs/bounded-storage-lifecycle/declaration-discovery-live-batch-cost-01/root-review.md)
+adds five actual runs per selected batch/split workload with stable bundled input
+hashes. Its independent review found no actionable diagnostic defect but explicitly
+limits the evidence to complete local fixture durations and observed issuance/
+admission outcomes, not reducer outputs, durable issuance throughput or a full
+deployed node. Keep source-entry, fixture-owned seams and fixed-order warmup
+qualifications when comparing against corrected artifacts.
+
+The [actual product codec/manifest cost baseline](../../.logs/bounded-storage-lifecycle/declaration-discovery-product-codec-cost-01/root-review.md)
+ran the held decoder artifacts in Node and all three browser engines, including
+the exact manifest envelope and bounded larger strings without allocating a
+snapshot payload. Its review preserves batch timing, timer-resolution, bundle
+retention and source-to-dist limitations. Repeat these workloads on corrected
+artifacts before cost acceptance; baseline success does not satisfy RED.
+
+The additional [affected-consumer baseline](../../.logs/bounded-storage-lifecycle/declaration-discovery-consumer-baseline-01/report.json)
+ran the twelve selected root consumer suites on the held candidate: 114 tests
+passed and four failed, with all 86 observed source/oracle inputs unchanged.
+The [static-input attribution](../../.logs/bounded-storage-lifecycle/declaration-discovery-consumer-baseline-01/attribution.json)
+matches the relevant tests, fixture, registry and v3-live source to `HEAD`.
+Three failures are the historical 26-versus-27 golden-vector count guards; one
+is an older v3-live roster missing four existing projection/census names.
+These are pre-correction baseline failures, not a green consumer-suite claim or
+permission to edit frozen assertions. The passing selection includes manifest
+stream behavior, built-package subprocess resolution, snapshot transfer,
+creator close/adoption and blueprint fold/snapshot cases. Full-goal clean-suite
+acceptance remains open; corrective GREEN must distinguish any new regression.
+
+An ordinary [product hot-path baseline](../../.logs/bounded-storage-lifecycle/declaration-discovery-hotpath-baseline-01/report.json)
+now measures unmodified package-export admission/runtime preparation, prepared
+operation application and blueprint state-machine application using the existing
+application fixture at three string scales. Named resolved artifacts, core
+sources and fixture hashes stayed unchanged. This is local Node timing evidence,
+not a transitive-graph attestation or a corrected-candidate comparison.
+The [selected genuine live-batch cases](../../.logs/bounded-storage-lifecycle/declaration-discovery-hotpath-baseline-01/live-batch-report.json)
+also pass for two/sixteen operations and the exact byte ceiling. Their recorded
+durations include setup, signing and storage; seven other tests were not selected.
+Do not treat these single test-body durations as isolated codec benchmarks or
+full live-batch performance acceptance.
+
+A focused [manifest-preservation baseline](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-02/baseline-manifest-preservation.log)
+passes the three selected historical cases for owner export/type routes,
+pre-copy carrier bounds and manifest/descriptor invariants. The other twelve
+cases were not selected; this is not a full stream-suite pass or corrective RED.
+
+The [pre-correction dependency baseline](../../.logs/bounded-storage-lifecycle/declaration-discovery-provenance-contract-reviews-01/baseline-disposition.json)
+passes canonical typecheck and canonical/protocol-source lint. The canonical
+package test command has a vector-count assertion failure and two unresolved
+error-package imports, recorded separately from corrective provenance RED.
+No source, dependency or frozen oracle was changed to make that baseline pass.
+Re-running those same canonical tests with the existing root configuration
+resolves both error-package imports without edits; only the vector-count
+assertion remains. That source-integrated command and its qualified result are
+recorded in the same baseline receipt.
+A [diagnostic continuation of the vector loop](../../.logs/bounded-storage-lifecycle/declaration-discovery-canonical-vector-probe-01/report.json)
+matches canonical bytes and framed digests for all 27 current vectors with
+unchanged source, registry and historical test hashes. It reuses the original
+test's extracted hydration helpers; it is not an independent grammar oracle and
+does not make the historical count assertion pass or prove decoding behavior.
+
+The corrections enforce existing requirements: bounded native materialization
+without length/prefix identity false positives, SQLite miss-only occupancy probes,
+and direct IndexedDB exact-key addressing. Root's native
+[pre-copy counterexample](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/root-precopy-collision-probe.json)
+and [hit-probe counterexample](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/root-sqlite-hit-probe-oracle.json)
+establish the first two. The disposition narrows Grok's unsupported digest-order
+claim and reclassifies Kimi's optional label against the actual contract.
+
+The [round-01 handoff](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-01/handoff-final-05.json)
+owns executed strict/lint/format and native RED gates. Its harness controls pass;
+absent-API failures leave downstream discovery semantics pending. The
+[historical preflight ledger](../../.logs/bounded-storage-lifecycle/declaration-discovery-red-reviews-01/root-preflight-ledger.md)
+preserves earlier mixed harness failures, coverage failure and timeout evidence.
+Built dependencies were captured during/after that run, not before it; do not
+upgrade that evidence retrospectively.
+
+The user's one-off [Fable report](../../.logs/bounded-storage-lifecycle/fable-trajectory-01/public.txt)
+supports the architecture and calls for process correction. Its
+[root disposition](../../.logs/bounded-storage-lifecycle/fable-trajectory-01/root-assessment.md)
+requires a focused correction/review path and prospective immutable snapshots,
+without weakening approved corruption/boundedness requirements. The
+[status-only document receipt](../../.logs/bounded-storage-lifecycle/declaration-discovery-plan-01/status-only-contract-custody.json)
+proves that correcting stale execution prose did not change the normative contract.
+Neither Fable nor this documentation change replaces the required phase reviews.
+
+Focused spec formatting and diff checks pass. The earlier full main-plan
+formatting attempt exhausted Node's heap; no broad formatting or package/compiler
+pass is claimed from the focused gates.

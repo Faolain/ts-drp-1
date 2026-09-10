@@ -23,12 +23,49 @@ now finishes before creator-close dependence, not merely before a later head swa
 The existing snapshot owner remains the authority; ordinary adoption/recovery
 verification must not create a permanent pin.
 
-Next, materialize and independently review the declaration-free recovery contract
-(slice 2). Its accepted owner prerequisite is complete, and its lookup/consumer
-boundary must be settled before protected-set planning. Define exact authenticated
-identity selection, bounded non-creating owner reads, and current/pending/rollback
-integration as independently verifiable seams; no production edits are authorized
-by draft reconnaissance. Update this handoff with the synthesized next contract.
+[Declaration discovery](slices/02a-declaration-discovery.md) and its
+[failure-provenance correction](slices/02a-1-failure-provenance.md) are accepted,
+2026-09-10. Separate RED/GREEN authors, bounded corrective reviews and integrated
+parent Grok/Kimi/Opus xhigh reviews are complete. The
+[joint disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-integrated-green-reviews-01/root-disposition.md)
+and [closure](../../.logs/bounded-storage-lifecycle/declaration-discovery-integrated-green-reviews-01/green-closure.json)
+own exact acceptance, Codex's second opinion and advisory decisions. All review
+processes are terminal. Do not repeat completed reviews or relabel historical
+required changes and NO_VERDICT attempts as earlier approvals.
+
+This capability observes metadata on the existing owner; it neither authenticates
+activation authority nor proves byte availability or installs retention. Preserve
+its same-owner lifecycle, exact-key precedence and bounded non-mutating reads.
+The linked corrective dispositions keep source proof of primitive-piece
+nonretention, empty-input ordering, exact class ownership and whole-decoder
+normalization binding. Runtime traces alone do not prove nonretention.
+
+Default WebKit navigation remains unpassed; authorized exact-title partitions
+establish the complete original semantic set, not default-harness endurance.
+Consumer failures and measured Node-only costs remain qualified in the joint
+disposition. Build-before-test and the distinction between archival RED drivers
+and current GREEN custody remain explicit; frozen historical graph gates cannot
+certify rebuilt product hashes. The preservation inventory is not a staging list
+for unrelated dirty browser/grid experiments.
+
+Next, draft the cold-only 2b contract before separate RED. Derive initial object
+selection from captured trusted expected room identity, authenticate the durable
+chain and compare the expected successor before discovery, then derive the
+predecessor snapshot key from the authenticated cut. Keep declaration-taking live
+producer verification narrow. Review public input evolution, failure mapping,
+missing/replaced-byte refusal and historical fixture evolution explicitly; no
+optional discovery method, decorating owner or caller-declaration fallback.
+Pending recovery, shipped startup and usable rollback remain separate seams.
+Neither metadata discovery nor removing a caller parameter establishes bounded
+historical recovery. No later recovery, retirement or production boundedness is
+accepted.
+
+The [review ledger](review.md#2a-declaration-discovery-contract-review) owns prior
+attempts, findings, source-custody qualifications and the user's completed one-off
+Fable trajectory review. Do not repeat those completed reviews or reclassify old
+NO_VERDICT results. Preserve authenticated cold/pending recovery, shipped startup,
+usable rollback and all later slice-2 obligations; metadata discovery is not those
+outcomes.
 
 Keep recipient pinning, pending/rollback dependency protection, reclamation,
 legacy classification and declaration-free recovery separately reviewed. The
@@ -61,6 +98,7 @@ your pass.
 - [x] Bounded atomic retention (slice 1a-1).
 - [x] Fixture snapshot content delivery (slice 1b-0).
 - [x] Producer pre-sign retention (slice 1b-1).
+- [x] Exact metadata declaration observation and failure provenance (slice 2a).
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
 - [ ] Protected-dependency planner and durable retirement protocol (slices 3–4).

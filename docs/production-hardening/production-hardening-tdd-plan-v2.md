@@ -2,9 +2,32 @@
 
 ## Active handoff — grid continuity and the 64-writer workload
 
-**The 100-transition diagnostic is preserved. A separate bounded
-[memory-attribution pass](../../specs/grid-memory-attribution/README.md) is in progress.
-Next action: review the capture contract, then collect its 30-transition worker snapshots.**
+**The 100-transition diagnostic and follow-up memory attribution are preserved.
+The primary [end-to-end storage investigation](../../specs/grid-memory-production/lifecycle-audit.md)
+finds incomplete history retirement and a required-snapshot expiry availability gap.
+Independent review and diagnostic corrections are complete; production memory/storage acceptance remains open.
+The user authorized production-sensible bounded-lifecycle implementation on
+2026-09-07. Follow the [bounded storage lifecycle plan](../../specs/bounded-storage-lifecycle/README.md)
+for recovery ownership, reviewed retirement contracts and staged RED/GREEN work;
+do not add deletion or expand scale ahead of those safety gates.**
+The [declaration-discovery checkpoint](../../specs/bounded-storage-lifecycle/review.md#2a-green-accepted-cold-recovery-contract-next)
+now accepts observation-only 2a and its failure-provenance correction after
+separate RED/GREEN authors, corrective and integrated Grok/Kimi100/Opus xhigh
+reviews, and Codex second opinions. The [joint disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-integrated-green-reviews-01/root-disposition.md)
+owns findings, exact source/artifact custody, logged gates and binding evidence
+limits. Default WebKit navigation remains unpassed; scheduling-only partitions
+establish the complete unchanged original semantic set, not default-harness
+endurance. Historical consumer failures and material Node-only cost increases
+remain explicit. Do not repeat completed reviews or reinterpret old NO_VERDICT
+results. Next draft the cold-only 2b contract: trusted identity and authentication
+must precede declaration selection, with narrow live producer verification
+preserved. Declaration-free recovery and production boundedness remain open.
+The user's
+completed one-off Fable assessment guided the
+process correction; no product acceptance is claimed before GREEN verification
+and its independent reviews.
+Producer retention has landed; declaration-free recovery, recipient installation and bounded
+historical recovery remain unaccepted.
 The user's 2026-09-06 scope correction still supersedes older sequencing that
 made broad governance or full parent acceptance prerequisites for diagnostics.
 Do not restart the broader governance redesign by default.

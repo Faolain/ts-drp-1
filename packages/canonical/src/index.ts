@@ -30,7 +30,7 @@ const DEFAULT_LIMITS: Readonly<CanonicalLimits> = Object.freeze({
 	maxBytes: 256 * 1024 * 1024,
 });
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
-const textDecoder = new TextDecoder("utf-8", { fatal: true });
+const intrinsicTextDecoder = TextDecoder;
 const textEncoder = new TextEncoder();
 const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 
@@ -89,6 +89,31 @@ function assertWellFormedString(value: string): void {
 			throw new CanonicalEncodingError("string contains an unpaired surrogate");
 		}
 	}
+}
+
+function decodeUtf8String(bytes: Uint8Array): string {
+	const decoder = new intrinsicTextDecoder("utf-8");
+	// Native default decoding strips exactly one initial payload BOM.
+	let matched = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
+	const comparePiece = (piece: string): void => {
+		const encoded = textEncoder.encode(piece);
+		if (encoded.byteLength > bytes.byteLength - matched) {
+			throw new CanonicalDecodingError("invalid UTF-8 string");
+		}
+		for (let index = 0; index < encoded.byteLength; index++) {
+			if (encoded[index] !== bytes[matched + index]) {
+				throw new CanonicalDecodingError("invalid UTF-8 string");
+			}
+		}
+		matched += encoded.byteLength;
+	};
+	for (let offset = 0; offset < bytes.byteLength; offset += 4096) {
+		comparePiece(decoder.decode(bytes.subarray(offset, offset + 4096), { stream: true }));
+	}
+	comparePiece(decoder.decode());
+	if (matched !== bytes.byteLength) throw new CanonicalDecodingError("invalid UTF-8 string");
+	// Flush reset the decoder; only now produce the accepted whole string.
+	return decoder.decode(bytes);
 }
 
 function encodeVarUint(input: number | bigint): Uint8Array {
@@ -472,12 +497,14 @@ function decodeInternal(reader: Reader, depth: number): Decoded {
 		}
 		case TAG.STRING: {
 			const length = Number(reader.varUint());
-			let decodedString: string;
+			let bytes: Uint8Array;
 			try {
-				decodedString = textDecoder.decode(reader.take(length));
-			} catch {
-				throw new CanonicalDecodingError("invalid UTF-8 string");
+				bytes = reader.take(length);
+			} catch (error) {
+				if (error instanceof CanonicalDecodingError) throw new CanonicalDecodingError("invalid UTF-8 string");
+				throw error;
 			}
+			const decodedString = decodeUtf8String(bytes);
 			assertWellFormedString(decodedString);
 			value = decodedString;
 			break;

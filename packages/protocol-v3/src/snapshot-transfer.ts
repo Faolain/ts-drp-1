@@ -1,4 +1,11 @@
-import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import {
+	CanonicalDecodingError,
+	CanonicalEncodingError,
+	compareBytes,
+	decodeCanonical,
+	encodeCanonical,
+	hashDomain,
+} from "@ts-drp/canonical";
 
 export const SNAPSHOT_MANIFEST_MAX_BYTES = 212_387 as const;
 
@@ -79,6 +86,7 @@ type SnapshotManifestFailureCode =
 	| "manifest-digest-mismatch"
 	| "manifest-invalid"
 	| "manifest-noncanonical"
+	| "manifest-processing-failed"
 	| "manifest-too-large";
 
 class SnapshotManifestError extends TypeError {
@@ -145,11 +153,12 @@ function intrinsicReadableView(input: Uint8Array, name: string): Uint8Array {
 }
 
 function copyExactCarrier(input: Uint8Array, name: string, allowEmpty = false): Uint8Array {
+	let byteLength: number;
 	try {
 		if (intrinsicObjectGetPrototypeOf(input) !== intrinsicUint8ArrayPrototype) {
 			throw new TypeError(`${name} must be an unshared Uint8Array`);
 		}
-		const byteLength = intrinsicReflectApply(intrinsicTypedArrayByteLengthGetter, input, []);
+		byteLength = intrinsicReflectApply(intrinsicTypedArrayByteLengthGetter, input, []);
 		const byteOffset = intrinsicReflectApply(intrinsicTypedArrayByteOffsetGetter, input, []);
 		const buffer = intrinsicReflectApply(intrinsicTypedArrayBufferGetter, input, []);
 		if (intrinsicObjectGetPrototypeOf(buffer) !== intrinsicArrayBuffer.prototype) {
@@ -163,13 +172,12 @@ function copyExactCarrier(input: Uint8Array, name: string, allowEmpty = false): 
 		if ((!allowEmpty && byteLength === 0) || byteOffset !== 0 || byteLength !== bufferByteLength || resizable) {
 			throw new TypeError(`${name} must use one full, attached, non-resizable buffer`);
 		}
-		const output = new intrinsicUint8Array(byteLength);
-		intrinsicReflectApply(intrinsicUint8ArraySet, output, [input]);
-		return output;
 	} catch (error) {
-		if (error instanceof TypeError && error.message.startsWith(name)) throw error;
-		throw new TypeError(`${name} is unreadable`, { cause: error });
+		throw new SnapshotManifestError("manifest-invalid", `${name} is invalid`, { cause: error });
 	}
+	const output = new intrinsicUint8Array(byteLength);
+	intrinsicReflectApply(intrinsicUint8ArraySet, output, [input]);
+	return output;
 }
 
 function exactRecord(value: unknown, fields: readonly string[], name: string): Record<string, unknown> {
@@ -207,6 +215,7 @@ function decodeRecord(bytes: Uint8Array): Record<string, unknown> {
 	try {
 		value = decodeCanonical(bytes, { maxBytes: SNAPSHOT_MANIFEST_MAX_BYTES });
 	} catch (error) {
+		if (!(error instanceof CanonicalDecodingError) && !(error instanceof CanonicalEncodingError)) throw error;
 		throw new SnapshotManifestError("manifest-noncanonical", "manifest canonical bytes are invalid", {
 			cause: error,
 		});
@@ -215,6 +224,7 @@ function decodeRecord(bytes: Uint8Array): Record<string, unknown> {
 	try {
 		canonical = encodeCanonical(value, { maxBytes: SNAPSHOT_MANIFEST_MAX_BYTES });
 	} catch (error) {
+		if (!(error instanceof CanonicalDecodingError) && !(error instanceof CanonicalEncodingError)) throw error;
 		throw new SnapshotManifestError("manifest-invalid", "manifest value is outside the canonical profile", {
 			cause: error,
 		});
@@ -339,83 +349,83 @@ export function decodeSnapshotManifest(input: {
 	readonly expectedManifestDigest: string;
 	readonly profile: SnapshotTransferProfile;
 }): DecodedSnapshotManifest {
-	const exactCanonicalManifestBytes = input.exactCanonicalManifestBytes;
-	const expectedManifestDigest = input.expectedManifestDigest;
-	const suppliedProfile = input.profile;
-	const profile: SnapshotTransferProfile = Object.freeze({
-		maxManifestBytes: suppliedProfile.maxManifestBytes,
-		maxSnapshotBytes: suppliedProfile.maxSnapshotBytes,
-		snapshotChunkBytes: suppliedProfile.snapshotChunkBytes,
-	});
-	assertProfile(profile);
-	const carrierLength = exactByteLength(exactCanonicalManifestBytes);
-	if (carrierLength > SNAPSHOT_MANIFEST_MAX_BYTES) {
-		throw new SnapshotManifestError("manifest-too-large", "manifest exceeds the pre-copy byte limit");
-	}
-	let bytes: Uint8Array;
 	try {
-		bytes = copyExactCarrier(exactCanonicalManifestBytes, "manifest carrier");
+		const exactCanonicalManifestBytes = input.exactCanonicalManifestBytes;
+		const expectedManifestDigest = input.expectedManifestDigest;
+		const suppliedProfile = input.profile;
+		const profile: SnapshotTransferProfile = Object.freeze({
+			maxManifestBytes: suppliedProfile.maxManifestBytes,
+			maxSnapshotBytes: suppliedProfile.maxSnapshotBytes,
+			snapshotChunkBytes: suppliedProfile.snapshotChunkBytes,
+		});
+		assertProfile(profile);
+		const carrierLength = exactByteLength(exactCanonicalManifestBytes);
+		if (carrierLength > SNAPSHOT_MANIFEST_MAX_BYTES) {
+			throw new SnapshotManifestError("manifest-too-large", "manifest exceeds the pre-copy byte limit");
+		}
+		const bytes = copyExactCarrier(exactCanonicalManifestBytes, "manifest carrier");
+		assertDigest(expectedManifestDigest, "expectedManifestDigest");
+		const manifestDigest = hex(hashDomain(MANIFEST_DOMAIN, bytes));
+		if (manifestDigest !== expectedManifestDigest) {
+			throw new SnapshotManifestError("manifest-digest-mismatch", "manifest digest does not match exact bytes");
+		}
+		const manifest = decodeRecord(bytes);
+		if (
+			manifest.kind !== "drp-snapshot-manifest" ||
+			manifest.protocolMajor !== 3 ||
+			manifest.encodingVersion !== "drp-canonical-profile-1"
+		) {
+			throw new SnapshotManifestError("manifest-invalid", "manifest discriminator is invalid");
+		}
+		if (typeof manifest.objectId !== "string" || manifest.objectId.length < 1 || manifest.objectId.length > 1024) {
+			throw new SnapshotManifestError("manifest-invalid", "manifest.objectId is invalid");
+		}
+		safeInteger(manifest.epoch, 0, "manifest.epoch");
+		safeInteger(manifest.schemaVersion, 1, "manifest.schemaVersion");
+		assertDigest(manifest.anchor, "manifest.anchor");
+		assertDigest(manifest.stateDigest, "manifest.stateDigest");
+		assertDigest(manifest.aclDigest, "manifest.aclDigest");
+		assertDigest(manifest.payloadDigest, "manifest.payloadDigest");
+		const totalBytes = safeInteger(manifest.totalBytes, 1, "manifest.totalBytes");
+		if (totalBytes > profile.maxSnapshotBytes) {
+			throw new SnapshotManifestError("manifest-invalid", "manifest.totalBytes exceeds the authenticated limit");
+		}
+		const manifestChunks = manifest.chunks;
+		if (!Array.isArray(manifestChunks) || manifestChunks.length < 1 || manifestChunks.length > 2_048) {
+			throw new SnapshotManifestError("manifest-invalid", "manifest.chunks count is invalid");
+		}
+		let sum = 0;
+		const chunks = manifestChunks.map((value, index): SnapshotChunkDescriptor => {
+			const chunk = exactRecord(value, CHUNK_FIELDS, `manifest.chunks[${index}]`);
+			const chunkIndex = safeInteger(chunk.index, 0, `manifest.chunks[${index}].index`);
+			if (chunkIndex !== index) {
+				throw new SnapshotManifestError("manifest-invalid", "manifest chunk indices must be contiguous");
+			}
+			assertDigest(chunk.digest, `manifest.chunks[${index}].digest`);
+			const byteLength = safeInteger(chunk.byteLength, 1, `manifest.chunks[${index}].byteLength`);
+			const final = index === manifestChunks.length - 1;
+			if ((!final && byteLength !== profile.snapshotChunkBytes) || byteLength > profile.snapshotChunkBytes) {
+				throw new SnapshotManifestError("manifest-invalid", "manifest chunk length is invalid");
+			}
+			sum += byteLength;
+			if (!Number.isSafeInteger(sum) || sum > profile.maxSnapshotBytes) {
+				throw new SnapshotManifestError("manifest-invalid", "manifest chunk sum exceeds the authenticated limit");
+			}
+			return Object.freeze({ byteLength, digest: chunk.digest, index: chunkIndex });
+		});
+		if (sum !== totalBytes) {
+			throw new SnapshotManifestError("manifest-invalid", "manifest chunk lengths do not equal totalBytes");
+		}
+		return Object.freeze({
+			chunks: Object.freeze(chunks),
+			exactCanonicalManifestBytes: bytes,
+			manifest: Object.freeze({ ...manifest, chunks: Object.freeze(chunks) }),
+			manifestDigest,
+		});
 	} catch (error) {
-		throw new SnapshotManifestError("manifest-invalid", "manifest carrier is invalid", { cause: error });
+		if (error instanceof SnapshotManifestError) throw error;
+		throw new SnapshotManifestError("manifest-processing-failed", "manifest processing failed", { cause: error });
 	}
-	assertDigest(expectedManifestDigest, "expectedManifestDigest");
-	const manifestDigest = hex(hashDomain(MANIFEST_DOMAIN, bytes));
-	if (manifestDigest !== expectedManifestDigest) {
-		throw new SnapshotManifestError("manifest-digest-mismatch", "manifest digest does not match exact bytes");
-	}
-	const manifest = decodeRecord(bytes);
-	if (
-		manifest.kind !== "drp-snapshot-manifest" ||
-		manifest.protocolMajor !== 3 ||
-		manifest.encodingVersion !== "drp-canonical-profile-1"
-	) {
-		throw new SnapshotManifestError("manifest-invalid", "manifest discriminator is invalid");
-	}
-	if (typeof manifest.objectId !== "string" || manifest.objectId.length < 1 || manifest.objectId.length > 1024) {
-		throw new SnapshotManifestError("manifest-invalid", "manifest.objectId is invalid");
-	}
-	safeInteger(manifest.epoch, 0, "manifest.epoch");
-	safeInteger(manifest.schemaVersion, 1, "manifest.schemaVersion");
-	assertDigest(manifest.anchor, "manifest.anchor");
-	assertDigest(manifest.stateDigest, "manifest.stateDigest");
-	assertDigest(manifest.aclDigest, "manifest.aclDigest");
-	assertDigest(manifest.payloadDigest, "manifest.payloadDigest");
-	const totalBytes = safeInteger(manifest.totalBytes, 1, "manifest.totalBytes");
-	if (totalBytes > profile.maxSnapshotBytes) {
-		throw new SnapshotManifestError("manifest-invalid", "manifest.totalBytes exceeds the authenticated limit");
-	}
-	const manifestChunks = manifest.chunks;
-	if (!Array.isArray(manifestChunks) || manifestChunks.length < 1 || manifestChunks.length > 2_048) {
-		throw new SnapshotManifestError("manifest-invalid", "manifest.chunks count is invalid");
-	}
-	let sum = 0;
-	const chunks = manifestChunks.map((value, index): SnapshotChunkDescriptor => {
-		const chunk = exactRecord(value, CHUNK_FIELDS, `manifest.chunks[${index}]`);
-		const chunkIndex = safeInteger(chunk.index, 0, `manifest.chunks[${index}].index`);
-		if (chunkIndex !== index) {
-			throw new SnapshotManifestError("manifest-invalid", "manifest chunk indices must be contiguous");
-		}
-		assertDigest(chunk.digest, `manifest.chunks[${index}].digest`);
-		const byteLength = safeInteger(chunk.byteLength, 1, `manifest.chunks[${index}].byteLength`);
-		const final = index === manifestChunks.length - 1;
-		if ((!final && byteLength !== profile.snapshotChunkBytes) || byteLength > profile.snapshotChunkBytes) {
-			throw new SnapshotManifestError("manifest-invalid", "manifest chunk length is invalid");
-		}
-		sum += byteLength;
-		if (!Number.isSafeInteger(sum) || sum > profile.maxSnapshotBytes) {
-			throw new SnapshotManifestError("manifest-invalid", "manifest chunk sum exceeds the authenticated limit");
-		}
-		return Object.freeze({ byteLength, digest: chunk.digest, index: chunkIndex });
-	});
-	if (sum !== totalBytes) {
-		throw new SnapshotManifestError("manifest-invalid", "manifest chunk lengths do not equal totalBytes");
-	}
-	return Object.freeze({
-		chunks: Object.freeze(chunks),
-		exactCanonicalManifestBytes: bytes,
-		manifest: Object.freeze({ ...manifest, chunks: Object.freeze(chunks) }),
-		manifestDigest,
-	});
 }
 
 /**
