@@ -2530,7 +2530,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
 					pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
 					signRegisteredVertexDigest: input.signRegisteredVertexDigest,
-					snapshotDeclaration: input.successorSnapshotDeclaration,
 					snapshotStore,
 					store: aheStores[0],
 				});

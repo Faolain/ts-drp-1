@@ -41,6 +41,7 @@ import {
 	type CreatorAdoptionRoomHead,
 	installCreatorAdoptionPendingRecovery,
 } from "./internal/creator-adoption-recover.js";
+import { sameCreatorRoomHead } from "./internal/creator-room-head.js";
 import {
 	type CreatorSuccessorLiveMaterial,
 	type CreatorSuccessorLiveSeed,
@@ -977,7 +978,7 @@ async function reopenCreatorSuccessorMaterial(
 		if (rawBootstrapOperationBytes !== undefined && exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined) {
 			return coldFailure("malformed-input", "creator successor bootstrap policy input is invalid");
 		}
-		const parsedObjectId = parseStorageObjectId(input.snapshotDeclaration.scope.objectId);
+		const parsedObjectId = parseStorageObjectId(input.expectedRoomHead.objectId);
 		if (!parsedObjectId.ok) return coldFailure("chain-invalid", "creator successor object identity is invalid");
 		const objectId = parsedObjectId.value;
 		const recovered = await input.store.recoverActiveGeneration(objectId);
@@ -1135,10 +1136,28 @@ async function reopenCreatorSuccessorMaterial(
 			successorTrust,
 			successorTrustRecord,
 		});
-		const snapshot = await verifySnapshot(input, chain);
+		if (!sameCreatorRoomHead(input.expectedRoomHead, successorTrust)) {
+			return coldFailure("D110C_FLOOR_MISMATCH", "creator successor differs from the authenticated room-head floor");
+		}
+		let snapshotDeclaration: SnapshotQuarantineDeclaration;
+		try {
+			const observation = await input.snapshotStore.lookupRecoveryDeclaration({
+				objectId: String(chain.cut.objectId),
+				epoch: Number(chain.cut.epoch),
+				anchor: String(chain.cut.previousAnchor),
+				manifestDigest: String(chain.cut.snapshotManifestDigest),
+			});
+			if (observation.kind !== "present" || observation.state === "poisoned") {
+				return coldFailure("snapshot-unavailable", "creator successor snapshot is unavailable");
+			}
+			snapshotDeclaration = observation.declaration;
+		} catch {
+			return coldFailure("snapshot-unavailable", "creator successor snapshot is unavailable");
+		}
+		const snapshot = await verifySnapshot({ snapshotDeclaration, snapshotStore: input.snapshotStore }, chain);
 		if (snapshot === undefined) return coldFailure("snapshot-unavailable", "creator successor snapshot is unavailable");
 		const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
-		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
+		const manifestDigest = snapshotDeclaration.scope.manifestDigest;
 		if (
 			resolved === undefined ||
 			successorProjection.record.anchorDigest !== successorTrust.currentAnchorDigest ||

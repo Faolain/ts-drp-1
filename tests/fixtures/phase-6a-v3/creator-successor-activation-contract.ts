@@ -80,7 +80,6 @@ export const CREATOR_SUCCESSOR_REOPEN_INPUT_KEYS = Object.freeze([
 	"networkNode",
 	"onAdmittedVertex",
 	"pinnedGenesisAnchorDigest",
-	"snapshotDeclaration",
 	"snapshotStore",
 	"store",
 ] as const);
@@ -99,7 +98,6 @@ export const CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS = Object.freeze([
 	"onAdmittedVertex",
 	"pinnedGenesisAnchorDigest",
 	"signRegisteredVertexDigest",
-	"snapshotDeclaration",
 	"snapshotStore",
 	"store",
 ] as const);

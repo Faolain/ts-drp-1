@@ -5,6 +5,294 @@ versioned-owner findings are dispositioned in the executable slice. Freeze the
 amended independent RED before assigning its distinct GREEN author; review the
 resulting implementation and these fixes together before accepting the seam.
 
+## 2b GREEN accepted; commit-boundary audit next
+
+Authenticated declaration-free cold recovery is accepted under the
+[joint disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/root-disposition.md)
+and [closure](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/green-closure.json).
+Grok and Opus HIGH through actual `claude-phel` returned qualified approvals;
+both processes are terminal. B1 is closed for this limited seam. The disposition
+owns the pre-acquisition equality advisory, other findings, exact custody and
+binding evidence limits. Broader timeout, coverage and compiler failures remain
+failed, not waived for broader acceptance.
+
+The [commit-boundary audit](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/commit-boundary-disposition.md)
+is complete. The user [authorized review and inclusion of required harness fixes](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/harness-prerequisite-authority.md);
+the isolated candidate is now accepted under the
+[harness disposition](../../.logs/bounded-storage-lifecycle/harness-prerequisite-reviews-01/root-disposition.md)
+and [closure](../../.logs/bounded-storage-lifecycle/harness-prerequisite-reviews-01/closure.json).
+Grok and actual `claude-phel` Opus HIGH returned qualified approvals. Root closed
+Opus's pre-commit evidence requests: the complete isolated HEAD delta is exactly
+58 source/test paths, and the real room importer requires the shim export.
+Fresh product51, native224 and room8 passed; focused typechecks, format and lint
+passed with three JSDoc warnings in the preserved helper. Completion helper
+runtime behavior remains unverified, and all earlier failed gates remain failed.
+Commit the exact candidate and cold handoffs, then review the next pending-only
+contract; no new RED/GREEN allocation is implied by this checkpoint.
+Do not whole-file-stage unrelated dirty browser/grid/memory work. Preserve the
+accepted candidate and frozen tests, and continue the separate pending/startup,
+rollback and remaining production obligations. Do not repeat completed reviews
+or treat cold-only acceptance as bounded-history acceptance.
+
+## 2b GREEN held; later-consumer execution required
+
+Historical pre-integrated pickup: the cumulative corrective RED is accepted under the
+[joint disposition](../../.logs/bounded-storage-lifecycle/preservation-correction-red-reviews-01/root-disposition.md)
+after qualified Grok and Opus HIGH (`claude-phel`) approvals. The
+[final corrective run](../../.logs/bounded-storage-lifecycle/preservation-correction-red-05/handoff.md)
+passed all 51 registrations without retries or skips. Perform integrated GREEN
+review of the held product candidate, accepted oracles and actual native evidence.
+Include the disposition's advisories, especially returned-declaration checking
+before scope acquisition and the limits of no-activation/no-effects evidence.
+B1's execution component is evidenced, but B1 closure and GREEN acceptance remain
+held. Both review processes are terminal; do not repeat this accepted RED review.
+The chronology below preserves earlier failures, not current rerun instructions.
+
+The [joint disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-02/root-disposition.md)
+records Opus high's qualified CHANGES_REQUIRED and Grok's NO_VERDICT after
+automatic compaction. Both processes are terminal; no Kimi or substitute reviewer
+ran. Opus found no defect in the four-file product diff, but the serially unrun
+later room consumers prevent GREEN readiness. The native matrix is not a
+substitute for those integration cases.
+
+Root chose a [separately authored tests-only correction](../../.logs/bounded-storage-lifecycle/preservation-correction-red-01/authorization.md)
+followed by the full default product suite, not title partitions. Its scope is
+the proven stale export arrays and the one lifetime expectation that conflicts
+with the accepted successor-migration refusal. Product code, all other scenarios
+and default gates remain frozen. Any newly exposed failure needs its own
+disposition. The reproduced transport timeout and broader coverage/compiler
+failures remain explicitly unpassed, not silently waived.
+
+The [first correction handoff](../../.logs/bounded-storage-lifecycle/preservation-correction-red-01/handoff.md)
+records passing export assertions (coverage exits still fail) and the corrected
+lifetime case passing in all engines. The full browser gate remains failed:
+33 passed, three projection-base failures and 15 serially unrun. The
+[read-only diagnosis](../../.logs/bounded-storage-lifecycle/projection-base-count-diagnosis-01/findings.md)
+shows the singleton observation expectation predates the shared hot/cold owner.
+Root authorizes only the [phase-bound RED extension](../../.logs/bounded-storage-lifecycle/preservation-correction-red-02/authorization.md):
+one actual retrieval per intended hot/hot/cold phase, retaining descriptor and
+state/issuance checks. This expressly permits two passive observation scalars;
+product code stays frozen. The next full run may add list/JSON reporting to retain
+attachments, without changing selection or execution limits. New failures still
+require disposition; no earlier failed result is upgraded.
+
+The phase-bound run is terminal at 33 passed / three failed / 15 unrun. Its
+retained per-engine attachments prove the intended hot/hot/cold phase sequence;
+the later grid-control constructor now fails before its intended negative.
+The [grid diagnosis](../../.logs/bounded-storage-lifecycle/grid-control-identity-diagnosis-01/findings.md)
+establishes two obsolete fixture assumptions: invalid creator identity and a
+blanket refusal replaced by versioned roster-bearing state validation. The
+[next separate RED allocation](../../.logs/bounded-storage-lifecycle/preservation-correction-red-03/authorization.md)
+corrects only the unit identity and exact malformed-state expectation, keeping
+the original bad bytes and both tagged authority negatives. Later consumers
+remain unexecuted; no product change or GREEN acceptance is authorized.
+
+The grid correction is static-verified but not browser-verified. Before its
+unused full-run authority was exercised, the [later-consumer source audit](../../.logs/bounded-storage-lifecycle/later-consumer-source-audit-01/findings.md)
+proved four old caller-declaration faults disconnected by the intended 2b seam.
+The [paired RED allocation](../../.logs/bounded-storage-lifecycle/preservation-correction-red-04/authorization.md)
+supersedes that unused run: preserve each hint mutation as a substantive
+recovery/issuance independence control and preserve its refusal obligation at
+the real returned-discovery boundary. The other ten matrix refusals and all
+registrations remain unchanged. This is a separately recorded test evolution,
+not permission to restore caller authority or accept bare success strings.
+The [payload reach diagnosis](../../.logs/bounded-storage-lifecycle/payload-proxy-source-audit-01/findings.md)
+also found that the old frozen-target fault proxy could refuse before reading
+bytes. Its separately authorized forwarding correction requires actual lookup,
+verified scope, byte mutation and completed cleanup; the old refusal alone is
+not payload-integrity evidence.
+
+The [paired correction handoff](../../.logs/bounded-storage-lifecycle/preservation-correction-red-04/handoff.md)
+records 104 passing controls and passing static gates. The full browser command
+is terminal at **48 passed / one failed / two serially unrun**. Root's independent
+raw-report audit confirms all twelve hint/discovery pairs and three genuine
+payload-corruption traces, with original attachments retained. Chromium and
+WebKit completed all registrations; Firefox's bootstrap case failed on the
+Playwright-rendered `TypeError:` prefix before its remaining assertions and
+later cases ran. Those obligations remain open. The
+[serialization diagnosis](../../.logs/bounded-storage-lifecycle/bootstrap-error-serialization-diagnosis-01/findings.md)
+supports a [separate same-page error-observation correction](../../.logs/bounded-storage-lifecycle/preservation-correction-red-05/authorization.md),
+preserving exact constructor/name/message and all later assertions. Product
+behavior and default gates stay frozen. Its final full run and root audit are
+linked at the current pickup above. Corrective and integrated reviews remain
+pending.
+
+After corrective RED acceptance and actual later-consumer execution, obtain
+Grok and Opus high review with a smaller bounded packet. The user requires Opus
+to launch through `claude-phel`; no alternative launcher is implied.
+No GREEN, pending/startup/rollback or boundedness acceptance is granted.
+
+## 2b GREEN verification complete; qualified review pending
+
+The [verification handoff](../../.logs/bounded-storage-lifecycle/cold-discovery-green-verify-02/handoff.md)
+owns the complete unchanged-input execution record. Focused strict projects,
+native cold recovery (56 SQLite and 168 browser cases), room callsite and
+historical browser activation checks pass. Root independently audited the
+candidate, native receipts and build inputs. No GREEN acceptance is claimed.
+
+The [broader failure disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-green-preservation-diagnosis-01/root-findings.md)
+owns the limits: two pre-existing export-roster conflicts, a reproduced live
+transport timeout, unchanged broader compiler diagnostics and coverage-exiting
+root commands remain unpassed gates. The full product browser run remains
+24 passed, three failed and 24 serially unrun. A single supplemental replay
+observed the existing hot-adoption migration guard rejecting the queued rehearsal,
+with no cold reopen called; it does not replace that failed default run or cover
+its unexecuted branches. Original results and preparation failures are preserved.
+
+The newer checkpoint above owns the review outcome and explicit separate
+correction authority. Do not otherwise amend frozen tests or claim
+pending recovery, shipped startup, rollback or production boundedness. The
+separate authentication RED correction below remains accepted.
+
+## 2b authentication RED correction accepted; GREEN verification next
+
+The separate test-only correction is accepted under the
+[joint disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-auth-red-reviews-01/root-disposition.md)
+and [closure](../../.logs/bounded-storage-lifecycle/cold-discovery-auth-red-reviews-01/red-closure.json).
+Grok and Opus high both returned qualified approvals with exact frozen custody;
+Kimi was not used. The disposition owns every advisory and the distinction
+between reviewed bodies and hash-archived evidence. Both review processes are
+terminal. No production implementation is accepted by this RED checkpoint.
+
+Real native recovery now reaches authentication for the original trust/cut/QC
+faults, while additive bitrot cases preserve the storage-integrity barrier.
+All 56 SQLite and 168 Chromium/Firefox/WebKit cases pass under unchanged defaults,
+with no skipped or flaky cases. Strict typecheck, build, formatting and harness
+controls pass; lint exits 0 with existing warnings. Root independently audited
+the original roster, source allocation and actual native receipts. These are
+corrective RED results on the held GREEN candidate, not a newly executed
+pre-GREEN causal failure.
+
+The newer checkpoint above owns GREEN verification and review status.
+Freeze the corrected tests; GREEN may not
+edit them. Keep coverage-exiting commands qualified as failed full gates and
+retain all historical results below. Pending recovery, startup, rollback and
+production boundedness remain unaccepted.
+
+## 2b GREEN diagnostic: authentication oracle correction required
+
+The separate GREEN author implemented the allocated four-file seam; acceptance
+is still pending. The preserved [Firefox diagnostic receipt](../../.logs/bounded-storage-lifecycle/cold-discovery-green-01/firefox-diagnostic-01.json)
+records a terminal exit 1 with unchanged inputs. Its epoch-one partition executed
+all 24 cases: 21 passed and the trust, cut and QC corruption cases failed because
+they returned `storage-failed`, not the asserted `chain-invalid`. This is neither
+a full native-matrix pass nor evidence that those authentication gates ran.
+
+Root's source audit on 2026-09-25 identifies a fault-placement conflict. The
+[SQLite mutations](../../tests/fixtures/cold-discovery/node-mutations.ts) and
+[IndexedDB mutations](../../tests/fixtures/cold-discovery/browser-mutations.ts)
+replace blob bytes under their original digest. Both native recovery owners
+invoke the [closure verifier](../../packages/storage/src/internal/closure-verifier.ts)
+before returning an active generation; it rejects the mismatched bytes.
+The cold owner's existing generation-unavailable mapping therefore runs before
+authentication. Earlier direct `getBlob` probes did not exercise this barrier.
+Do not weaken closure integrity or remap generic storage failures to satisfy
+these assertions.
+
+The [root native diagnosis](../../.logs/bounded-storage-lifecycle/cold-discovery-oracle-diagnosis-01/root-disposition.md)
+also corroborates the raw `ADOPTED_BLOB_CORRUPT` reason in fresh SQLite processes
+on both branches. It owns runtime custody and the preserved initial diagnostic
+setup failure; this is bounded diagnostic evidence, not a replacement gate.
+
+The [full frozen SQLite rerun](../../.logs/bounded-storage-lifecycle/cold-discovery-green-01/native-original-oracles-resume-01.json)
+subsequently executed all 48 cases: 42 passed, and only those three corruption
+expectations on each branch failed. No cases were skipped or cancelled, and
+source/build custody stayed unchanged. Fresh focused typecheck and the eight
+room-callsite assertions pass; allocated-product lint exits 0 with one existing
+room JSDoc warning. Their `*-resume-01` receipts remain beside that native run.
+These checks do not accept the incomplete GREEN phase.
+
+The [full browser rerun](../../.logs/bounded-storage-lifecycle/cold-discovery-green-01/browser-original-oracles-resume-01.json)
+executed all 144 cases in the unchanged default configuration: 126 passed and
+only the corresponding 18 corruption expectations failed. No cases were skipped
+or flaky. Its custody receipt records one root status-only ledger edit during
+the run, not a test/product/build change; do not claim every input was unchanged.
+
+The separate RED author's digest-consistent durable-state prototype proves
+native recovery can succeed before genuine authentication rejects the intended
+fault. Normal and no-op rewrite controls still recover and issue. Root's
+[explicit correction authorization](../../.logs/bounded-storage-lifecycle/cold-discovery-oracle-diagnosis-01/red-evolution-authorization.md)
+owns exact file boundaries, evidence qualifications and required controls.
+That authorized correction is now accepted at the checkpoint above. Original
+bitrot cases remain separately covered, with original authentication fault
+semantics and actual reached-gate provenance. The four-file GREEN patch remains
+held for preservation verification and its own independent reviews; no default
+gate limit is relaxed.
+
+## Corrected 2b RED accepted; separate GREEN authorized (historical checkpoint)
+
+The [joint disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-red-reviews-02/root-disposition.md)
+accepts the corrected RED: qualified Grok and Opus xhigh approvals, plus Kimi's
+complete approval accepted by explicit user direction despite a CLI crash. Its
+machine NO_VERDICT record remains intact; no retry was launched. Root confirmed
+the invalid-object capture/parser split, searched cold callsites and recorded
+browser headroom and coverage criteria. All review processes are terminal.
+The distinct GREEN author may now change only the allocated product seam;
+implementation and every later roadmap obligation remain unaccepted.
+
+### Historical correction boundary
+
+The [root RED disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-red-reviews-01/root-disposition.md)
+owns the frozen evidence, qualified Grok/Kimi approvals, Opus NO_VERDICT and
+advisory decisions. Public Opus segments identify native fixture assumptions to
+probe but do not repair its missing terminal schema. The
+[native diagnostic disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-completion-controls-01/root-disposition.md)
+corroborates existing byte-race and legacy oracles, but proves that RED's
+quarantine wrapper breaks native receipt identity on open completion. It
+authorizes a separate test-only observer correction and refreeze, not a product
+workaround or weaker read assertions. The [current root preparation](../../.logs/bounded-storage-lifecycle/cold-discovery-red-reviews-02/root-pre-review.md)
+records the completed correction, audited native matrices, exact additional
+oracle/path exceptions and preserved unsuccessful attempts. The newer joint
+disposition above supersedes its pre-review status, not its evidence limits.
+Envelope-masked assertions, historical runtime failures and root coverage
+failures remain explicit qualifications.
+
+## 2b contract accepted; separate RED authorized
+
+The third qualified round has natural Grok/Kimi/Opus xhigh approval. The
+[accepted disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-03/root-disposition.md)
+and [closure](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-03/closure.json)
+bind exact reviewed inputs and authorize separate RED only. All review processes
+are terminal. Source-only runner selection is explicit: a new dedicated project
+must prove collected assertion-level RED without changing the root package
+coverage threshold. Native cases, preservation gates and all new files/configs
+remain subject to RED freeze and independent review before GREEN.
+
+### Historical required corrections
+
+The second round ended naturally with qualified Grok/Kimi approval and Opus
+`CHANGES_REQUIRED`. The [second disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-02/root-disposition.md)
+records source corroboration and every advisory; its
+[closure](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-02/closure.json)
+binds exact reviewed inputs and terminal receipts. Root adopts Opus's missing
+room callsite gate: the revised draft requires a new parsed-source RED assertion
+and preserves native recovery evidence separately. Cleanup, roster and reached-gate
+clarifications are also prospective amendments, not accepted implementation.
+All processes are terminal; Kimi used one step within its 100-step cap. No product
+or test file changed. Review the bounded amendments before authorizing RED.
+The [amendment verification](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-02/amendment-verification.json)
+records unchanged scanned source/config custody, focused documentation and diff
+checks passing, and the parent plan formatter failing at its default heap limit.
+No memory-limit increase or broader formatting pass is claimed.
+
+The first contract round ended naturally with qualified Grok and Opus xhigh
+`CHANGES_REQUIRED` and Kimi `APPROVED` for the initial draft only. The
+[disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-01/root-disposition.md)
+owns every finding and source-derived resolution; the
+[closure](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-01/closure.json)
+binds terminal receipts and unchanged initial frozen inputs. No runtime result
+or later approval is inferred from these contract verdicts.
+
+The [revised contract](slices/02b-authenticated-cold-discovery.md) reuses the
+fixture's real predecessor owner, specifies local handling of a missing runtime
+capability, pins both branches in both native restart environments and preserves
+the actual prelookup/post-snapshot boundary. The
+[source audit](../../.logs/bounded-storage-lifecycle/cold-discovery-plan-02/audit.md)
+owns the prospective product/RED/preservation allocation. The TTL acquisition
+counter and dirty room-product oracle remain unchanged; their reached gates are
+explained, not relaxed. Separate RED is unauthorized pending qualified review of
+this revised contract. Product and test files remain unchanged by this revision.
+
 ## 2a GREEN accepted; cold recovery contract next
 
 The integrated parent review is complete: Grok, Kimi and Opus xhigh each returned

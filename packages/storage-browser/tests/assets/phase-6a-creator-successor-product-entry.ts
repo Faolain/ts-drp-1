@@ -1898,7 +1898,7 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 
 function d110c0c1gGridControl(): PlainRecord {
 	const dependencies = directDependencies();
-	const application = dependencies.createV3ZoneApplication(Object.freeze([]), "peer:grid", "author:grid");
+	const application = dependencies.createV3ZoneApplication(Object.freeze([]), "peer:grid", "a".repeat(64));
 	let detail = "fulfilled";
 	try {
 		application.projectAcceptedOperations(
@@ -1958,6 +1958,8 @@ type D110c0c1cFault =
 
 async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promise<PlainRecord> {
 	const databaseName = `d108e3-direct-${name}`;
+	const pairedHintFault = ["snapshot-object", "snapshot-epoch", "snapshot-anchor", "snapshot-manifest"].includes(fault);
+	const requireSnapshotEffects = pairedHintFault || fault === "snapshot-payload";
 	const roomHeadAuthority = d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" }));
 	let room = await createDirectRoom(name, { roomHeadAuthority });
 	directRooms.set(name, room);
@@ -1971,6 +1973,7 @@ async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promis
 		await room.sealEpoch();
 		await room.adoptCreatorSuccessor();
 		const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, 1);
+		const hot = pairedHintFault ? d110c0cColdRoomSnapshot(room) : undefined;
 		await closeDirectForReopen(name);
 		const stableEvidence = await d110cRoomHeadEvidence(name);
 		const stable = exactRecord(exactRecord(stableEvidence.state).stable);
@@ -2013,19 +2016,61 @@ async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promis
 			manifest[0] = (manifest[0] ?? 0) ^ 1;
 			selectedDeclaration = Object.freeze({ ...declaration, exactCanonicalManifestBytes: manifest });
 		}
-		const attemptBefore = await d110cRoomHeadEvidence(name);
-		instrumentation().configure({});
-		instrumentation().d110c0c1cSetFault(
-			["ahe-lineage", "issuance-lineage", "possession", "snapshot-payload"].includes(fault) ? fault : null
-		);
-		let detail = "fulfilled";
-		try {
+		let hintControl: PlainRecord | undefined;
+		if (pairedHintFault) {
+			const prefixRows = await d110c0c1IssuanceRows(databaseName);
+			instrumentation().configure({});
 			room = await createDirectRoom(name, {
 				roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "reopen" })),
-				...(selectedDeclaration === undefined ? {} : { successorSnapshotDeclaration: selectedDeclaration }),
+				successorSnapshotDeclaration: selectedDeclaration,
 				withCreatorSigner: false,
 			});
 			directRooms.set(name, room);
+			const reopened = d110c0cColdRoomSnapshot(room);
+			const floorAfterReopen = await d110cRoomHeadEvidence(name);
+			await room.issue(
+				Object.freeze({
+					action: "message",
+					clientOperationId: `${name}-hint-after-reopen`,
+					text: `${name}-hint-after-reopen`,
+				})
+			);
+			hintControl = Object.freeze({
+				after: d110c0cColdRoomSnapshot(room),
+				coldReopenCount: instrumentation().d110cColdReopenCount(),
+				floorAfterIssue: await d110cRoomHeadEvidence(name),
+				floorAfterReopen,
+				floorBefore: stableEvidence,
+				hot,
+				postReopenRows: await d110c0c1IssuanceRows(databaseName),
+				prefixRows,
+				reopened,
+				selectedDeclaration: normalize(selectedDeclaration),
+			});
+			await closeDirectForReopen(name);
+		}
+		const attemptBefore = await d110cRoomHeadEvidence(name);
+		const securityBefore = requireSnapshotEffects
+			? Object.freeze({ ahe: await d110cAheEvidence(databaseName), issuance: await d110c0c1IssuanceRows(databaseName) })
+			: undefined;
+		instrumentation().configure({});
+		instrumentation().d110c0c1cSetFault(
+			pairedHintFault || ["ahe-lineage", "issuance-lineage", "possession", "snapshot-payload"].includes(fault)
+				? fault
+				: null
+		);
+		let detail = "fulfilled";
+		let negativeRoomState: PlainRecord | null = null;
+		try {
+			room = await createDirectRoom(name, {
+				roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "reopen" })),
+				...(selectedDeclaration === undefined
+					? {}
+					: { successorSnapshotDeclaration: pairedHintFault ? declaration : selectedDeclaration }),
+				withCreatorSigner: false,
+			});
+			directRooms.set(name, room);
+			if (requireSnapshotEffects) negativeRoomState = d110c0cColdRoomSnapshot(room);
 		} catch (error) {
 			detail = directFailureDetail(error);
 		}
@@ -2036,6 +2081,19 @@ async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promis
 			coldReopenCount: instrumentation().d110cColdReopenCount(),
 			detail,
 			fault,
+			...(requireSnapshotEffects
+				? {
+						genuineDeclaration: normalize(declaration),
+						hintControl,
+						negativeRoomState,
+						securityAfter: Object.freeze({
+							ahe: await d110cAheEvidence(databaseName),
+							issuance: await d110c0c1IssuanceRows(databaseName),
+						}),
+						securityBefore,
+						trace: normalize(instrumentation().d110c0c1TraceSnapshot()),
+					}
+				: {}),
 		});
 	} finally {
 		await discardDirectRoom(name);

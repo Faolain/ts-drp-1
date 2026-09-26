@@ -30,6 +30,8 @@ export const D108D1A_V3_LIVE_EXPORTS = Object.freeze([
 	"activateV3LivePlane",
 	"bindV3BlueprintLivePlane",
 	"prepareV3LiveGeneration",
+	"readV3ApplicationProjectionOrder",
+	"readV3RuntimeOwnerCensus",
 	"recoverV3LiveReplica",
 	"republishV3RetainedTo",
 	"routeV3Ingress",

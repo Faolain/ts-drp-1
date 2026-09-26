@@ -2,6 +2,12 @@
 
 ## Next Agent Prompt
 
+Current user review override (2026-09-25): use only Opus at high and Grok for
+new independent review rounds; launch Opus through `claude-phel` (2026-09-26).
+Do not launch Kimi for now. Implementation and
+diagnostic subagents use Astra at xhigh. This supersedes older prospective
+review-roster instructions below, without changing historical verdicts or evidence.
+
 Status: versioned ownership (1a-0), bounded retention (1a-1), fixture content
 delivery (1b-0), and producer pre-sign retention (1b-1) are accepted, 2026-09-07. The
 [review ledger](review.md) owns qualified verdicts, root dispositions and exact
@@ -48,7 +54,47 @@ and current GREEN custody remain explicit; frozen historical graph gates cannot
 certify rebuilt product hashes. The preservation inventory is not a staging list
 for unrelated dirty browser/grid experiments.
 
-Next, draft the cold-only 2b contract before separate RED. Derive initial object
+The corrected separately authored RED for the accepted
+[cold-only 2b contract](slices/02b-authenticated-cold-discovery.md) is accepted,
+2026-09-10. The [joint RED disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-red-reviews-02/root-disposition.md)
+owns qualified Grok/Opus approvals, Kimi's complete approval accepted by explicit
+user direction despite its CLI crash, exact custody and all advisory decisions.
+No Kimi retry was launched. Earlier incomplete verdicts remain historical.
+The identity-preserving observer correction, separate obsolete-roster removal
+and byte-identical standalone-driver relocation are now frozen. Preserve their
+oracles; native port reads precede legacy refusal. This is the historical RED
+checkpoint, not acceptance of subsequently implemented GREEN.
+
+The distinct GREEN author has implemented the exact four-file allocation. Its
+proven corruption-oracle conflict now has an accepted separately authored
+[authentication-oracle correction](../../.logs/bounded-storage-lifecycle/cold-discovery-auth-red-reviews-01/root-disposition.md),
+with qualified Grok and Opus high approvals. The
+[current checkpoint](review.md#2b-green-accepted-commit-boundary-audit-next)
+now accepts cold-only GREEN and closes B1 after qualified Grok and actual
+`claude-phel` Opus HIGH integrated reviews. The
+[joint disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/root-disposition.md)
+owns all advisories and evidence limits. The user
+[authorized the required harness prerequisites](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/harness-prerequisite-authority.md)
+after the commit-boundary audit. The isolated candidate is now accepted under the
+[harness disposition](../../.logs/bounded-storage-lifecycle/harness-prerequisite-reviews-01/root-disposition.md)
+after qualified Grok and `claude-phel` Opus HIGH approvals, fresh product51,
+native224 and room8 passes, and focused compile/lint/format checks. Three helper
+JSDoc warnings and the helper's source-only runtime qualification remain explicit.
+The exact 58-file HEAD delta excludes unrelated memory/grid diagnostics. Commit
+that candidate with the cold handoffs, then freeze the separate pending-recovery
+contract before assigning distinct RED/GREEN authors. Do not repeat
+completed reviews. The earlier compacted Grok attempt remains NO_VERDICT, and
+broader timeout, coverage and compiler failures remain failed. Preserve the
+closure-integrity barrier and accepted frozen oracles. The third contract round's
+[disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-03/root-disposition.md)
+and [closure](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-03/closure.json)
+own contract acceptance; the newer joint RED disposition authorizes GREEN.
+All review processes are terminal. Follow the explicit
+source-only runner qualification, exact
+[source allocation](../../.logs/bounded-storage-lifecycle/cold-discovery-plan-02/audit.md)
+and preserved native evidence requirements. GREEN must not change frozen tests.
+Its fixture evolution and fresh-process/page evidence must be explicit; the
+existing in-memory "cold" helper is not restart proof. Derive initial object
 selection from captured trusted expected room identity, authenticate the durable
 chain and compare the expected successor before discovery, then derive the
 predecessor snapshot key from the authenticated cut. Keep declaration-taking live
@@ -83,8 +129,8 @@ verification and the delivery-before-floor boundary remain intact.
 Use the durable named strict projects. Broader package compiler diagnostics are
 unchanged failures, not green claims; the ledger distinguishes current fixture
 gates from historical native runs. Preserve the earlier grid64 timeout and all
-unchanged workload/memory thresholds. Obtain Grok, Kimi (100-step cap), and Opus
-xhigh contract/RED/GREEN reviews at meaningful checkpoints with terminal evidence
+unchanged workload/memory thresholds. Obtain Grok and Opus high
+contract/RED/GREEN reviews at meaningful checkpoints with terminal evidence
 and explicit dispositions.
 
 The user authorizes production-sensible implementation for thousands of epochs;
@@ -99,6 +145,7 @@ your pass.
 - [x] Fixture snapshot content delivery (slice 1b-0).
 - [x] Producer pre-sign retention (slice 1b-1).
 - [x] Exact metadata declaration observation and failure provenance (slice 2a).
+- [x] Authenticated declaration-free cold recovery (slice 2b).
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
 - [ ] Protected-dependency planner and durable retirement protocol (slices 3–4).
@@ -180,9 +227,11 @@ unshipped scaffolding.
 Legacy classification cannot be a backend-only unblock switch. The accepted
 owner conservatively holds inherited rows while descriptors and recovery roles
 are unknown. The [room opener](../../examples/v3-room/src/index.ts) has trusted
-current/pending room-head expectations, but still requires a supplied successor
-snapshot declaration; the [recovery owner](../../packages/node/src/creator-adoption.ts)
-authenticates that declaration against the cut rather than discovering it.
+current/pending room-head expectations, but its startup selection and pending
+recovery still require a supplied successor snapshot declaration. The accepted
+[cold recovery owner](../../packages/node/src/creator-adoption.ts) now authenticates
+the chain and expected successor before discovering the exact predecessor scope;
+that does not migrate the other recovery branches.
 The existing [cleanup planner](../../packages/node/src/internal/closed-epoch-cleanup.ts)
 protects AHE lineage but does not yet establish every current, pending and rollback
 snapshot dependency. A maintenance binding is plumbing, not that missing authority.

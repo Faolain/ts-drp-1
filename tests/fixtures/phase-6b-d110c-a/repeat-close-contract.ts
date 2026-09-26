@@ -3,12 +3,7 @@ import { type AccumulatorSnapshot, CompactMerkleAccumulator } from "@ts-drp/comp
 // eslint-disable-next-line import/no-unresolved -- Workspace subpath resolves after the required package build.
 import { createRecoverableFinalitySigner } from "@ts-drp/keychain/finality";
 import type { LiveJournalAcceptedRow } from "@ts-drp/live-journal";
-import { type AheDurableStore, digestBlob, type GenerationRef } from "@ts-drp/storage";
-import type {
-	SnapshotQuarantineDeclaration,
-	SnapshotQuarantineStore,
-	SnapshotVerificationReceipt,
-} from "@ts-drp/storage/snapshot-transfer";
+import { type AheDurableStore, digestBlob, type GenerationRef, parseStorageObjectId } from "@ts-drp/storage";
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,6 +26,7 @@ import {
 import type { CreatorSuccessorLiveMaterial } from "../../../packages/node/src/internal/creator-successor-live.js";
 import type { V3PlaneHandle } from "../../../packages/node/src/v3-live.js";
 import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
+import { createBrowserSnapshotQuarantineStore } from "../../../packages/storage-browser/src/snapshot-transfer.js";
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
 import {
 	type DetachedHeadEvidence,
@@ -197,8 +193,6 @@ export interface D110c0b1RedMaterial {
 
 interface D110c0b1ColdFacts {
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
-	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
-	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
 	readonly store: AheDurableStore;
 }
 
@@ -321,7 +315,13 @@ async function hostileCarrierRefusal(
 	const snapshotDatabaseName = `d110c-a-hostile-snapshot-${crypto.randomUUID()}`;
 	const closers: StoreCloser[] = [];
 	let successor: V3PlaneHandle | undefined;
+	let primaryFailure: unknown;
+	let failed = false;
+	let output: D110cAHostileCarrierEvidence | undefined;
+	const failures: unknown[] = [];
 	try {
+		const parsedObjectId = parseStorageObjectId(base.scope.objectId);
+		if (!parsedObjectId.ok) throw new TypeError("D110C_A_HOSTILE_FIXTURE_OBJECT_ID_INVALID");
 		const verified = await base.modules.verifyCreatorSuccessorAdoption({ catalog: base.catalog, handle: base.handle });
 		if (!verified.ok) throw new TypeError(`D110C_A_HOSTILE_VERIFY_FAILED:${verified.kind}`);
 		const material = consumeCreatorAdoptionIntent(verified.intent, base.handle);
@@ -348,7 +348,7 @@ async function hostileCarrierRefusal(
 		}
 		successor = activated.handle as V3PlaneHandle;
 		const beforeRoomHead = copiedRoomHead(successor);
-		const beforeDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);
+		const beforeDurable = await base.evidence.aheBackend.recoverActiveGeneration(parsedObjectId.value);
 		const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
 		const [vote, evidenceStore, snapshotStore] = await Promise.all([
 			base.modules.openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
@@ -371,19 +371,36 @@ async function hostileCarrierRefusal(
 			storageIncarnation: vote.observation.incarnation,
 			voteStore: vote.store,
 		});
-		const afterDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);
-		return Object.freeze({
+		const afterDurable = await base.evidence.aheBackend.recoverActiveGeneration(parsedObjectId.value);
+		output = Object.freeze({
 			carrier,
 			durableHeadUnchanged: JSON.stringify(afterDurable) === JSON.stringify(beforeDurable),
 			reason: bound.ok ? "UNEXPECTED_SUCCESS" : bound.reason,
 			roomHeadUnchanged: JSON.stringify(copiedRoomHead(successor)) === JSON.stringify(beforeRoomHead),
 		});
+	} catch (error) {
+		failed = true;
+		primaryFailure = error;
+		throw error;
 	} finally {
-		await Promise.resolve(successor?.deactivate()).catch(() => undefined);
-		await Promise.all(closers.map((closer) => closer.close().catch(() => undefined)));
-		await base.close();
-		await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
+		for (const action of [
+			(): Promise<void> => Promise.resolve(successor?.deactivate()),
+			...closers.map((closer) => (): Promise<void> => closer.close()),
+			(): Promise<void> => base.close(),
+			(): Promise<void> => deleteDatabase(primaryDatabaseName),
+			(): Promise<void> => deleteDatabase(snapshotDatabaseName),
+		]) {
+			try {
+				await action();
+			} catch (error) {
+				failures.push(error);
+			}
+		}
+		if (failed) attachCleanupErrors(primaryFailure, failures);
 	}
+	if (failures.length > 0) throw new AggregateError(failures, "D110C_A_HOSTILE_CLEANUP_FAILED");
+	if (output === undefined) throw new Error("D110C_A_HOSTILE_OUTPUT_UNAVAILABLE");
+	return output;
 }
 
 async function hostileCarrierRefusals(): Promise<readonly D110cAHostileCarrierEvidence[]> {
@@ -420,12 +437,32 @@ async function rejectedMessage(task: Promise<unknown>, missing: string): Promise
 }
 
 function deleteDatabase(name: string): Promise<void> {
-	return new Promise((resolvePromise) => {
+	return new Promise((resolvePromise, reject) => {
 		const request = indexedDB.deleteDatabase(name);
 		request.addEventListener("success", () => resolvePromise(), { once: true });
-		request.addEventListener("error", () => resolvePromise(), { once: true });
-		request.addEventListener("blocked", () => resolvePromise(), { once: true });
+		request.addEventListener("error", () => reject(request.error), { once: true });
+		request.addEventListener("blocked", () => reject(new Error(`D110C_A_DATABASE_DELETE_BLOCKED:${name}`)), {
+			once: true,
+		});
 	});
+}
+
+/** Retain the construction failure as primary while recording cleanup failures. */
+function attachCleanupErrors(error: unknown, cleanupErrors: readonly unknown[]): void {
+	if (cleanupErrors.length === 0) return;
+	try {
+		if (error !== null && (typeof error === "object" || typeof error === "function") && Object.isExtensible(error)) {
+			Object.defineProperty(error, "cleanupErrors", { value: Object.freeze([...cleanupErrors]), enumerable: true });
+			return;
+		}
+	} catch {
+		/* A hostile thrown value must remain the primary failure. */
+	}
+	try {
+		console.error("D110C_A_CLEANUP_FAILURES", cleanupErrors);
+	} catch {
+		/* Reporting is best effort. */
+	}
 }
 
 async function bytesForRow(hot: D109dHotFixture, row: LiveJournalAcceptedRow): Promise<Uint8Array> {
@@ -582,16 +619,47 @@ async function detachedHeadForInspection(
 export async function openD110cARepeatCloseFixture(
 	options: D110cARepeatCloseOptions = {}
 ): Promise<D110cARepeatCloseFixture> {
+	if (options.creator?.createSnapshotStore !== undefined) {
+		throw new TypeError("D110C_A_CALLER_SNAPSHOT_FACTORY_UNSUPPORTED");
+	}
 	const [carrierRefusals, overflow] =
 		options.retainedControls === false
 			? [Object.freeze([]), "D110C_A_RETAINED_CONTROLS_NOT_RUN"]
 			: await Promise.all([hostileCarrierRefusals(), overflowRefusal()]);
-	const hot = await openD109dHotFixture({
-		creator: Object.freeze({
-			...options.creator,
-			...(options.objectId === undefined ? {} : { objectId: options.objectId }),
-		}),
-	});
+	const predecessorSnapshotDatabaseName = `d110c-a-predecessor-snapshot-${crypto.randomUUID()}`;
+	const predecessorOwners: StoreCloser[] = [];
+	let predecessorSnapshotStore: Awaited<ReturnType<typeof createBrowserSnapshotQuarantineStore>> | undefined;
+	let hot: D109dHotFixture;
+	try {
+		hot = await openD109dHotFixture({
+			creator: Object.freeze({
+				...options.creator,
+				...(options.objectId === undefined ? {} : { objectId: options.objectId }),
+				createSnapshotStore: async () => {
+					const factory =
+						options.creator?.modules?.createBrowserSnapshotQuarantineStore ?? createBrowserSnapshotQuarantineStore;
+					const owner = await factory({ primaryDatabaseName: predecessorSnapshotDatabaseName });
+					predecessorOwners.push(owner);
+					predecessorSnapshotStore = owner;
+					return owner;
+				},
+			}),
+		});
+	} catch (error) {
+		const cleanupErrors: unknown[] = [];
+		for (const owner of predecessorOwners) {
+			try {
+				await owner.close();
+			} catch (failure) {
+				cleanupErrors.push(failure);
+			}
+		}
+		await deleteDatabase(`${predecessorSnapshotDatabaseName}--drp-snapshot-quarantine-v1`).catch((failure: unknown) =>
+			cleanupErrors.push(failure)
+		);
+		attachCleanupErrors(error, cleanupErrors);
+		throw error;
+	}
 	const primaryDatabaseName = `d110c-a-seal-${crypto.randomUUID()}`;
 	const snapshotDatabaseName = `d110c-a-snapshot-${crypto.randomUUID()}`;
 	const closers: StoreCloser[] = [];
@@ -622,11 +690,25 @@ export async function openD110cARepeatCloseFixture(
 	const cleanup = async (): Promise<void> => {
 		if (closed) return;
 		closed = true;
-		await Promise.resolve(latestSuccessor?.deactivate()).catch(() => undefined);
-		await closeHandle?.stop().catch(() => undefined);
-		await Promise.all(closers.map((closer) => closer.close().catch(() => undefined)));
-		await hot.close();
-		await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
+		const failures: unknown[] = [];
+		const attempt = async (action: () => unknown): Promise<void> => {
+			try {
+				await action();
+			} catch (error) {
+				failures.push(error);
+			}
+		};
+		await attempt(() => latestSuccessor?.deactivate());
+		await attempt(() => closeHandle?.stop());
+		await attempt(() => hot.close());
+		for (const closer of [...closers, ...predecessorOwners]) await attempt(() => closer.close());
+		for (const name of [
+			primaryDatabaseName,
+			snapshotDatabaseName,
+			`${predecessorSnapshotDatabaseName}--drp-snapshot-quarantine-v1`,
+		])
+			await attempt(() => deleteDatabase(name));
+		if (failures.length > 0) throw new AggregateError(failures, "D110C_A_CLEANUP_FAILED");
 	};
 	const recoverCurrentSuccessor = async (): Promise<Readonly<Record<string, unknown>>> => {
 		if (originalBootstrap === undefined) throw new TypeError("D110C_0B1_ORIGINAL_BOOTSTRAP_UNAVAILABLE");
@@ -667,8 +749,7 @@ export async function openD110cARepeatCloseFixture(
 					liveJournalStore: hot.base.journal,
 					pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
 					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
-					snapshotDeclaration: coldFacts.snapshotDeclaration,
-					snapshotStore: coldFacts.snapshotStore,
+					snapshotStore: predecessorSnapshotStore,
 					store: coldFacts.store,
 					...hot.runtimeBindings,
 				},
@@ -1044,8 +1125,7 @@ export async function openD110cARepeatCloseFixture(
 						liveJournalStore: hot.base.journal,
 						pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
 						signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
-						snapshotDeclaration: coldFacts.snapshotDeclaration,
-						snapshotStore: coldFacts.snapshotStore,
+						snapshotStore,
 						store: coldFacts.store,
 						...hot.runtimeBindings,
 					}),
@@ -1217,6 +1297,7 @@ export async function openD110cARepeatCloseFixture(
 			},
 		});
 	} catch (error) {
+		const cleanupErrors: unknown[] = [];
 		try {
 			if (closeHandle !== undefined && options.afterRepeatCloseFailure !== undefined) {
 				await options.afterRepeatCloseFailure({
@@ -1229,9 +1310,11 @@ export async function openD110cARepeatCloseFixture(
 					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
 				});
 			}
-		} finally {
-			await cleanup();
+		} catch (failure) {
+			cleanupErrors.push(failure);
 		}
+		await cleanup().catch((failure: unknown) => cleanupErrors.push(failure));
+		attachCleanupErrors(error, cleanupErrors);
 		throw error;
 	}
 }

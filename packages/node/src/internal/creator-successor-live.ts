@@ -4,11 +4,7 @@ import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import type { CurrentAnchorTrust, SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import type { AheDurableStore, GenerationRef, PresentHead } from "@ts-drp/storage";
-import type {
-	SnapshotQuarantineDeclaration,
-	SnapshotQuarantineStore,
-	SnapshotVerificationReceipt,
-} from "@ts-drp/storage/snapshot-transfer";
+import type { SnapshotRecoveryStore, SnapshotVerificationReceipt } from "@ts-drp/storage/snapshot-transfer";
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
 import type { CreatorExpectedRoomHead } from "./creator-room-head.js";
@@ -96,8 +92,7 @@ export interface CreatorSuccessorReopenInput {
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly pinnedGenesisAnchorDigest: string;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
-	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
-	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+	readonly snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
 	readonly store: AheDurableStore;
 }
 

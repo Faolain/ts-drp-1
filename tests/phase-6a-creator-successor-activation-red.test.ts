@@ -208,7 +208,6 @@ describe("D.108d1 creator successor activation RED", () => {
 					signerCount += 1;
 					return Promise.resolve(new Uint8Array());
 				},
-				snapshotDeclaration: downstream,
 				snapshotStore: downstream,
 				store: downstream,
 				...additions,
@@ -289,7 +288,6 @@ describe("D.108d1 creator successor activation RED", () => {
 			"networkNode",
 			"onAdmittedVertex",
 			"pinnedGenesisAnchorDigest",
-			"snapshotDeclaration",
 			"snapshotStore",
 			"store",
 		]);
@@ -308,7 +306,6 @@ describe("D.108d1 creator successor activation RED", () => {
 			"onAdmittedVertex",
 			"pinnedGenesisAnchorDigest",
 			"signRegisteredVertexDigest",
-			"snapshotDeclaration",
 			"snapshotStore",
 			"store",
 		]);

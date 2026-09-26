@@ -123,7 +123,6 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 			"onAdmittedVertex",
 			"pinnedGenesisAnchorDigest",
 			"signRegisteredVertexDigest",
-			"snapshotDeclaration",
 			"snapshotStore",
 			"store",
 		]);

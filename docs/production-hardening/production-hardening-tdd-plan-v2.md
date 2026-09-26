@@ -2,6 +2,12 @@
 
 ## Active handoff — grid continuity and the 64-writer workload
 
+Current user review override (2026-09-25): new review rounds use Opus at high and
+Grok only; Opus launches through `claude-phel` per the 2026-09-26 instruction.
+Kimi is suspended for now. Subagents use Astra at xhigh. Preserve all
+historical review records; older prospective model/effort instructions yield to
+this override.
+
 **The 100-transition diagnostic and follow-up memory attribution are preserved.
 The primary [end-to-end storage investigation](../../specs/grid-memory-production/lifecycle-audit.md)
 finds incomplete history retirement and a required-snapshot expiry availability gap.
@@ -19,14 +25,56 @@ limits. Default WebKit navigation remains unpassed; scheduling-only partitions
 establish the complete unchanged original semantic set, not default-harness
 endurance. Historical consumer failures and material Node-only cost increases
 remain explicit. Do not repeat completed reviews or reinterpret old NO_VERDICT
-results. Next draft the cold-only 2b contract: trusted identity and authentication
+results. Separately authored RED is frozen for the accepted
+[cold-only 2b draft](../../specs/bounded-storage-lifecycle/slices/02b-authenticated-cold-discovery.md): trusted identity and authentication
 must precede declaration selection, with narrow live producer verification
-preserved. Declaration-free recovery and production boundedness remain open.
+preserved. Qualified Grok/Kimi/Opus xhigh approval of the corrected contract is
+recorded in the [root disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-03/root-disposition.md).
+The [RED review disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-red-reviews-01/root-disposition.md)
+records qualified Grok/Kimi approvals, Opus NO_VERDICT from an incomplete final
+response, and the original native fixture questions. The
+[native diagnostic disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-completion-controls-01/root-disposition.md)
+established that the test wrapper, not native receipt binding, prevented valid
+open completion. The separately authored identity-preserving correction is now
+accepted under the [joint RED disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-red-reviews-02/root-disposition.md):
+qualified Grok/Opus xhigh approvals and Kimi's complete approval accepted by user
+direction despite its CLI crash. The failed execution record remains intact;
+no retry was launched. Root confirmed capture/callsite advisories and recorded
+browser timing and coverage criteria. The distinct GREEN author implemented the
+allocated four-file seam. Its [diagnostic disposition](../../specs/bounded-storage-lifecycle/review.md#2b-green-diagnostic-authentication-oracle-correction-required)
+records a native corruption-oracle conflict: altered bytes are rejected by
+storage closure integrity before the intended authentication gates. A separate
+native prototype proved the correction. The separately authored test-only RED
+evolution is now accepted under the
+[joint corrective disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-auth-red-reviews-01/root-disposition.md)
+after qualified Grok and Opus high approvals. The
+[live checkpoint](../../specs/bounded-storage-lifecycle/review.md#2b-green-accepted-commit-boundary-audit-next)
+accepts cold-only GREEN and closes B1 after qualified Grok and actual
+`claude-phel` Opus HIGH integrated reviews. The
+[joint disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/root-disposition.md)
+owns findings, exact custody and evidence limits. The
+[commit-boundary disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/commit-boundary-disposition.md)
+records required pre-existing harness fixes. The user now
+[authorizes their separate review and inclusion](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/harness-prerequisite-authority.md)
+with isolated candidate verification. That integration now has qualified Grok
+and `claude-phel` Opus HIGH approval under the
+[harness disposition](../../.logs/bounded-storage-lifecycle/harness-prerequisite-reviews-01/root-disposition.md):
+fresh product51, native224 and room8 passed, alongside focused compile/lint/format
+checks. Three preserved-helper JSDoc warnings and source-only completion-helper
+coverage remain explicit. Root confirmed exactly 58 source/test changes and the
+real shim importer. Commit only this candidate and cold handoffs; unrelated
+memory/grid diagnostics remain out. The pending-only contract is next, before
+separate RED/GREEN allocation. Separate recovery seams remain open.
+The prior compacted Grok attempt remains NO_VERDICT; broader
+timeout, coverage and compiler failures remain failed. Preserve historical
+oracles/reports and all default gate limits. Pending recovery, shipped
+declaration-free startup, rollback and production boundedness remain open.
 The user's
 completed one-off Fable assessment guided the
 process correction; no product acceptance is claimed before GREEN verification
 and its independent reviews.
-Producer retention has landed; declaration-free recovery, recipient installation and bounded
+Producer retention and cold-only discovery are accepted; shipped declaration-free
+startup, recipient installation and bounded
 historical recovery remain unaccepted.
 The user's 2026-09-06 scope correction still supersedes older sequencing that
 made broad governance or full parent acceptance prerequisites for diagnostics.

@@ -2,12 +2,15 @@ import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { build, type Plugin } from "esbuild";
 import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { captureProcessForest, processClosure } from "./fixtures/process-forest.js";
+import {
+	type ProductBrowserServer,
+	startProductBrowserServer as startSharedProductBrowserServer,
+} from "./fixtures/product-browser-server.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 const contractLoad = import(
@@ -466,8 +469,8 @@ function d110c0c1TestInstrumentation() {
 					'\t\td110c0c1TestInstrumentation()?.d110c0c1SetOwner(null);\n\t\tif (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);'
 				);
 				replaceOnce(
-					'\t\t\t} catch {\n\t\t\t\treturn recoveryFailure("admission-rejected", "v3 recovery admission failed");\n\t\t\t}\n\t\t\tif (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {',
-					'\t\t\t} catch {\n\t\t\t\treturn recoveryFailure("admission-rejected", "v3 recovery admission failed");\n\t\t\t}\n\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\tauthorSequence: row.authorSequence,\n\t\t\t\tclassification: classified?.kind ?? "rejected",\n\t\t\t\tdigest: lowerHexDigest(row.digest),\n\t\t\t\tpayloadEpoch: payload.provenance.epoch,\n\t\t\t}));\n\t\t\tif (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {'
+					'\t\t\tif (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {',
+					'\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\tauthorSequence: row.authorSequence,\n\t\t\t\tclassification: classified?.kind ?? "rejected",\n\t\t\t\tdigest: lowerHexDigest(row.digest),\n\t\t\t\tpayloadEpoch: payload.provenance.epoch,\n\t\t\t}));\n\t\t\tif (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {'
 				);
 				replaceOnce(
 					"\t\t\t\tif (\n\t\t\t\t\tauthenticatedFilterRow ||\n\t\t\t\t\tauthenticatedGenesisRow !== undefined ||\n\t\t\t\t\tauthenticatedHistoricalRow !== undefined\n\t\t\t\t) {",
@@ -485,6 +488,11 @@ function d110c0c1TestInstrumentation() {
 					`${shared}
 import * as actual from ${JSON.stringify(v3Live)};
 export const prepareV3LiveGeneration = actual.prepareV3LiveGeneration;
+export const readV3ApplicationProjectionOrder = (input) => actual.readV3ApplicationProjectionOrder(
+  input !== null && typeof input === "object" && "plane" in input
+    ? { ...input, plane: unwrapPlane(input.plane) }
+    : input
+);
 export const recoverV3LiveReplica = async (input) => {
   if (input?.displacedSource?.activationVertexDigest !== undefined) {
     state.redirectRecoveryCount += 1;
@@ -509,8 +517,10 @@ export const bindV3BlueprintLivePlane = (input) => {
       callableMembers: Object.freeze(
         keys.filter((key) => typeof Reflect.get(result, key) === "function").map(String).sort()
       ),
+      epoch: Object.getOwnPropertyDescriptor(result, "epoch")?.value,
       frozen: Object.isFrozen(result),
       keys: Object.freeze(keys.map(String).sort()),
+      phase: state.d110c0c1Phase,
     }));
   }
   return result;
@@ -646,25 +656,66 @@ export const reopenCreatorSuccessorAdoption = async (input) => {
     selected = Object.freeze({ ...input, store });
   }
   if (fault === "snapshot-payload") {
-    const snapshotStore = new Proxy(input.snapshotStore, {
-      get(target, key) {
+    const snapshotStore = new Proxy({}, {
+      get(_facade, key) {
+        const target = input.snapshotStore;
+        if (key === "lookupRecoveryDeclaration") {
+          return async (...args) => {
+            const found = await Reflect.apply(target.lookupRecoveryDeclaration, target, args);
+            state.d110c0c1Trace.push(Object.freeze({
+              classification: "snapshot-payload-lookup",
+              key: Object.freeze({ ...args[0] }),
+              kind: found.kind,
+              scope: found.kind === "present" ? Object.freeze({ ...found.declaration.scope }) : null,
+            }));
+            return found;
+          };
+        }
         if (key === "openScope") {
           return async (...args) => {
             const scope = await Reflect.apply(target.openScope, target, args);
-            const verificationQuarantine = new Proxy(scope.verificationQuarantine, {
-              get(quarantine, quarantineKey) {
+            state.d110c0c1Trace.push(Object.freeze({ classification: "snapshot-payload-acquired", scope: Object.freeze({ ...args[0].scope }) }));
+            const verificationQuarantine = new Proxy({}, {
+              get(_quarantineFacade, quarantineKey) {
+                const quarantine = scope.verificationQuarantine;
                 if (quarantineKey === "open") {
                   return (...openArgs) => {
                     const port = Reflect.apply(quarantine.open, quarantine, openArgs);
-                    return new Proxy(port, {
-                      get(portTarget, portKey) {
+                    state.d110c0c1Trace.push(Object.freeze({ classification: "snapshot-payload-opened" }));
+                    return new Proxy({}, {
+                      get(_portFacade, portKey) {
+                        const portTarget = port;
                         if (portKey === "read") {
                           return async (...readArgs) => {
                             const bytes = await Reflect.apply(portTarget.read, portTarget, readArgs);
-                            if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) return bytes;
+                            if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+                              state.d110c0c1Trace.push(Object.freeze({
+                                classification: "snapshot-payload-read", applied: false,
+                                byteLength: bytes instanceof Uint8Array ? bytes.byteLength : null,
+                                descriptor: Object.freeze({ ...readArgs[0] }),
+                              }));
+                              return bytes;
+                            }
                             const corrupted = Uint8Array.from(bytes);
                             corrupted[0] = (corrupted[0] ?? 0) ^ 1;
+                            const digest = async (value) => Array.from(
+                              new Uint8Array(await crypto.subtle.digest("SHA-256", value)),
+                              (byte) => byte.toString(16).padStart(2, "0")
+                            ).join("");
+                            const [originalSha256, corruptedSha256] = await Promise.all([digest(bytes), digest(corrupted)]);
+                            state.d110c0c1Trace.push(Object.freeze({
+                              classification: "snapshot-payload-read", applied: true,
+                              byteLength: bytes.byteLength, descriptor: Object.freeze({ ...readArgs[0] }),
+                              originalFirstByte: bytes[0], corruptedFirstByte: corrupted[0], originalSha256, corruptedSha256,
+                            }));
                             return corrupted;
+                          };
+                        }
+                        if (portKey === "discard") {
+                          return async (...discardArgs) => {
+                            const result = await Reflect.apply(portTarget.discard, portTarget, discardArgs);
+                            state.d110c0c1Trace.push(Object.freeze({ classification: "snapshot-payload-discarded" }));
+                            return result;
                           };
                         }
                         const value = Reflect.get(portTarget, portKey, portTarget);
@@ -677,13 +728,78 @@ export const reopenCreatorSuccessorAdoption = async (input) => {
                 return typeof value === "function" ? value.bind(quarantine) : value;
               },
             });
-            return new Proxy(scope, {
-              get(scopeTarget, scopeKey) {
+            return new Proxy({}, {
+              get(_scopeFacade, scopeKey) {
+                const scopeTarget = scope;
                 if (scopeKey === "verificationQuarantine") return verificationQuarantine;
+                if (scopeKey === "status") {
+                  return async (...statusArgs) => {
+                    const result = await Reflect.apply(scopeTarget.status, scopeTarget, statusArgs);
+                    state.d110c0c1Trace.push(Object.freeze({ classification: "snapshot-payload-status", status: Object.freeze({ ...result }) }));
+                    return result;
+                  };
+                }
+                if (scopeKey === "release") {
+                  return async (...releaseArgs) => {
+                    const result = await Reflect.apply(scopeTarget.release, scopeTarget, releaseArgs);
+                    state.d110c0c1Trace.push(Object.freeze({ classification: "snapshot-payload-released" }));
+                    return result;
+                  };
+                }
                 const value = Reflect.get(scopeTarget, scopeKey, scopeTarget);
                 return typeof value === "function" ? value.bind(scopeTarget) : value;
               },
             });
+          };
+        }
+        const value = Reflect.get(target, key, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    selected = Object.freeze({ ...input, snapshotStore });
+  }
+  if (["snapshot-object", "snapshot-epoch", "snapshot-anchor", "snapshot-manifest"].includes(fault)) {
+    const snapshotStore = new Proxy({}, {
+      get(_facade, key) {
+        const target = input.snapshotStore;
+        if (key === "lookupRecoveryDeclaration") {
+          return async (...args) => {
+            state.d110c0c1Trace.push(Object.freeze({
+              classification: "snapshot-declaration-lookup",
+              fault,
+              key: Object.freeze({ ...args[0] }),
+            }));
+            const found = await Reflect.apply(target.lookupRecoveryDeclaration, target, args);
+            if (found?.kind !== "present") throw new TypeError("D110C_0C1C_REAL_DECLARATION_ABSENT");
+            const original = found.declaration;
+            let declaration;
+            if (fault === "snapshot-manifest") {
+              const manifest = Uint8Array.from(original.exactCanonicalManifestBytes);
+              if (manifest.byteLength === 0) throw new TypeError("D110C_0C1C_REAL_MANIFEST_ABSENT");
+              manifest[0] ^= 1;
+              declaration = Object.freeze({ ...original, exactCanonicalManifestBytes: manifest });
+            } else {
+              const scope = Object.freeze({
+                ...original.scope,
+                ...(fault === "snapshot-object" ? { objectId: "creator:foreign" } : {}),
+                ...(fault === "snapshot-epoch" ? { epoch: original.scope.epoch + 1 } : {}),
+                ...(fault === "snapshot-anchor" ? { anchor: "e".repeat(64) } : {}),
+              });
+              declaration = Object.freeze({ ...original, scope });
+            }
+            state.d110c0c1Trace.push(Object.freeze({
+              classification: "snapshot-declaration-fault-applied",
+              fault,
+              originalDeclaration: Object.freeze({ ...original,
+                scope: Object.freeze({ ...original.scope }),
+                exactCanonicalManifestBytes: Uint8Array.from(original.exactCanonicalManifestBytes),
+              }),
+              returnedDeclaration: Object.freeze({ ...declaration,
+                scope: Object.freeze({ ...declaration.scope }),
+                exactCanonicalManifestBytes: Uint8Array.from(declaration.exactCanonicalManifestBytes),
+              }),
+            }));
+            return Object.freeze({ ...found, declaration });
           };
         }
         const value = Reflect.get(target, key, target);
@@ -747,11 +863,6 @@ export const activateCreatorSuccessorAdoption = async (input) => {
 	};
 }
 
-interface ProductBrowserServer {
-	readonly origin: string;
-	close(): Promise<void>;
-}
-
 interface RelayMessageObservation {
 	readonly data: Uint8Array;
 	readonly objectId: string;
@@ -780,93 +891,8 @@ interface LifetimeCounts {
 	readonly verificationCount: number;
 }
 
-async function startProductBrowserServer(entryPoint: string): Promise<ProductBrowserServer> {
-	const configUrl = new URL("../../../vite.config.mts", import.meta.url).href;
-	const loaded = (await import(configUrl)) as Readonly<{
-		workspaceAliases?: Readonly<Record<string, string>>;
-	}>;
-	if (loaded.workspaceAliases === undefined) throw new TypeError("D.108d2 workspace aliases are unavailable");
-	const aliases = Object.freeze(
-		Object.fromEntries(
-			Object.entries(loaded.workspaceAliases).filter(
-				([specifier]) =>
-					!new Set([
-						"@ts-drp/node/creator-adoption",
-						"@ts-drp/node/creator-adoption-activate",
-						"@ts-drp/node/creator-adoption-commit",
-						"@ts-drp/node/creator-adoption-recover",
-						"@ts-drp/node/creator-adoption-stage",
-						"@ts-drp/node/creator-close",
-						"@ts-drp/node/v3-live",
-					]).has(specifier)
-			)
-		)
-	);
-	const bundled = await build({
-		alias: aliases,
-		bundle: true,
-		format: "esm",
-		platform: "browser",
-		plugins: [lifetimeInstrumentationPlugin()],
-		stdin: {
-			contents: `
-import { createV3ChatApplication } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-chat/src/index.ts"))};
-import { createV3ZoneApplication } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/grid/src/v3-zone.ts"))};
-import { createV3RoomCreatorInviteMaterial, createV3RoomSession } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"))};
-import { bindV3BlueprintLivePlane } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"))};
-import { Keychain } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/keychain/src/index.ts"))};
-import { createRecoverableFinalitySigner } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/keychain/src/finality.ts"))};
-import ${JSON.stringify(entryPoint)};
-Object.defineProperty(globalThis, "__d108e3DirectRoomDependencies", {
-  configurable: false,
-  value: Object.freeze({
-    bindV3BlueprintLivePlane,
-    createRecoverableFinalitySigner,
-    createV3ChatApplication,
-    createV3ZoneApplication,
-    createV3RoomCreatorInviteMaterial,
-    createV3RoomSession,
-    Keychain,
-  }),
-  writable: false,
-});`,
-			loader: "js",
-			resolveDir: REPOSITORY_ROOT,
-		},
-		write: false,
-	});
-	const entry = bundled.outputFiles[0]?.text;
-	if (entry === undefined) throw new TypeError("D.108d2 browser bundle is absent");
-	const server: Server = createServer((request, response) => {
-		const headers = {
-			"cross-origin-embedder-policy": "require-corp",
-			"cross-origin-opener-policy": "same-origin",
-		};
-		if (request.url === "/entry.js") {
-			response.writeHead(200, { ...headers, "cache-control": "no-store", "content-type": "text/javascript" });
-			response.end(entry);
-			return;
-		}
-		if (request.url === "/" || request.url === "/index.html") {
-			response.writeHead(200, { ...headers, "cache-control": "no-store", "content-type": "text/html" });
-			response.end("<!doctype html><meta charset=utf-8><script type=module src=/entry.js></script>");
-			return;
-		}
-		response.writeHead(404).end();
-	});
-	await new Promise<void>((resolvePromise, reject) => {
-		server.once("error", reject);
-		server.listen(0, "127.0.0.1", resolvePromise);
-	});
-	const address = server.address();
-	if (address === null || typeof address === "string") throw new TypeError("D.108d2 browser server did not bind");
-	return Object.freeze({
-		origin: `http://127.0.0.1:${address.port}`,
-		close: async (): Promise<void> =>
-			new Promise<void>((resolvePromise, reject) =>
-				server.close((error) => (error === undefined ? resolvePromise() : reject(error)))
-			),
-	});
+function startProductBrowserServer(entryPoint: string): Promise<ProductBrowserServer> {
+	return startSharedProductBrowserServer(entryPoint, [lifetimeInstrumentationPlugin()]);
 }
 
 type Carrier = Awaited<ReturnType<typeof window.phase6aCreatorSuccessorProduct.exportSuccessor>>;
@@ -2106,7 +2132,11 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 				},
 				settled: [
 					{ order: adoptionBeforeRehearsal.order, status: adoptionBeforeRehearsal.status },
-					{ order: rehearsalAfterAdoption.order, status: rehearsalAfterAdoption.status },
+					{
+						detail: rehearsalAfterAdoption.detail,
+						order: rehearsalAfterAdoption.order,
+						status: rehearsalAfterAdoption.status,
+					},
 				],
 			},
 			independent: {
@@ -2270,11 +2300,11 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 				],
 			},
 			adoptionThenRehearsal: {
-				after: { migrationRecordIssueCount: 1 },
+				after: { migrationRecordIssueCount: 0 },
 				before: { firstSettled: false, preRecord: 0, secondSettled: false },
 				settled: [
 					{ order: 1, status: "fulfilled" },
-					{ order: 2, status: "fulfilled" },
+					{ detail: "D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE", order: 2, status: "rejected" },
 				],
 			},
 			independent: {
@@ -2681,14 +2711,30 @@ test("D.110c-0c1g preserves authenticated projection base across a stable epoch-
 		expect(projectionBases).toEqual([
 			{
 				callableMembers: [],
+				epoch: 1,
 				frozen: true,
 				keys: ["blueprintDigest", "epoch", "exactCanonicalApplicationStateBytes", "objectId", "ok", "stateDigest"],
+				phase: "prefix-0-to-1",
+			},
+			{
+				callableMembers: [],
+				epoch: 2,
+				frozen: true,
+				keys: ["blueprintDigest", "epoch", "exactCanonicalApplicationStateBytes", "objectId", "ok", "stateDigest"],
+				phase: "prefix-1-to-2",
+			},
+			{
+				callableMembers: [],
+				epoch: 2,
+				frozen: true,
+				keys: ["blueprintDigest", "epoch", "exactCanonicalApplicationStateBytes", "objectId", "ok", "stateDigest"],
+				phase: "control-cold-reopen-epoch-2",
 			},
 		]);
 		expect(evidence.successorMigrationDetail).toBe("D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE");
 		expect(projectionTexts(afterMigrationRefusal)).toEqual([...expectedAfter, "d110c-0c1-after-migration-refusal"]);
 		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1gGridControl())).toEqual({
-			detail: "D110C_0C1G_GRID_AUTHORITY_BASE_UNAVAILABLE",
+			detail: "v3 zone authenticated projection state is invalid",
 			malformedTagged: {
 				detail: "v3 blueprint binding input is invalid",
 				kind: "malformed-input",
@@ -2767,6 +2813,10 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 		const matrix = d110c0cArray(
 			d110c0cRecord(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1cMatrix("matrix"))).results
 		).map(d110c0cRecord);
+		await testInfo.attach("d110c-0c1c-green", {
+			body: Buffer.from(JSON.stringify({ control: evidence, matrix })),
+			contentType: "application/json",
+		});
 		expect(matrix).toEqual([
 			expect.objectContaining({
 				coldReopenCount: 1,
@@ -2791,12 +2841,7 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 				})
 			),
 			expect.objectContaining({ coldReopenCount: 0, detail: "D110C_FLOOR_INVALID", fault: "stable-cross-object" }),
-			expect.objectContaining({
-				coldReopenCount: 1,
-				detail: "v3 room successor reopen failed: chain-invalid: creator successor object identity is invalid",
-				fault: "snapshot-object",
-			}),
-			...(["snapshot-epoch", "snapshot-anchor", "snapshot-manifest"] as const).map((fault) =>
+			...(["snapshot-object", "snapshot-epoch", "snapshot-anchor", "snapshot-manifest"] as const).map((fault) =>
 				expect.objectContaining({
 					coldReopenCount: 1,
 					detail: "v3 room successor reopen failed: snapshot-unavailable: creator successor snapshot is unavailable",
@@ -2820,10 +2865,156 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 			}),
 		]);
 		for (const result of matrix) expect(result.afterDigest).toBe(result.beforeDigest);
-		await testInfo.attach("d110c-0c1c-green", {
-			body: Buffer.from(JSON.stringify({ control: evidence, matrix })),
-			contentType: "application/json",
-		});
+		const assertHintPair = (result: Readonly<Record<string, unknown>>): void => {
+			const fault = String(result.fault);
+			const hint = d110c0cRecord(result.hintControl);
+			const genuine = d110c0cRecord(result.genuineDeclaration);
+			const genuineScope = d110c0cRecord(genuine.scope);
+			const hot = d110c0cRecord(hint.hot);
+			const reopened = d110c0cRecord(hint.reopened);
+			const after = d110c0cRecord(hint.after);
+			const floorBefore = d110c0cRecord(hint.floorBefore);
+			const stable = d110c0cRecord(d110c0cRecord(floorBefore.state).stable);
+			const authority = d110c0cRecord(hot.authority);
+			const prefix = d110c0cArray(hint.prefixRows).map(d110c0cRecord);
+			const issued = d110c0cArray(hint.postReopenRows).map(d110c0cRecord);
+			const expectedText = `matrix-${fault}-hint-after-reopen`;
+			expect(hint.coldReopenCount).toBe(1);
+			expect(authority).toMatchObject({ epoch: 2, lifecycle: "active", profileId: "creator-trusted-v1" });
+			expect(stable).toEqual({ currentAnchorDigest: authority.anchorDigest, epoch: 2, objectId: authority.objectId });
+			expect(genuineScope).toMatchObject({ epoch: 1, objectId: authority.objectId });
+			expect(reopened.authority).toEqual(hot.authority);
+			expect(reopened.acl).toEqual(hot.acl);
+			expect(reopened.projection).toEqual(hot.projection);
+			expect(reopened.roomId).toBe(hot.roomId);
+			expect(reopened.status).toEqual({
+				closeAuthority: "unavailable",
+				continuity: "continuous",
+				lifecycle: "active",
+				trust: {
+					byzantineFaultTolerant: false,
+					kind: "creator-certified",
+					quorum: 1,
+					signerCount: 1,
+					text: "Creator-certified; one of one; not Byzantine-fault-tolerant.",
+				},
+			});
+			expect(after.authority).toEqual(reopened.authority);
+			expect(after.acl).toEqual(reopened.acl);
+			expect(after.status).toEqual(reopened.status);
+			expect(after.roomId).toBe(reopened.roomId);
+			expect(hint.floorAfterReopen).toEqual(floorBefore);
+			expect(hint.floorAfterIssue).toEqual(floorBefore);
+			expect(result.beforeDigest).toBe(floorBefore.stateDigest);
+			expect(
+				prefix.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+			).toEqual([
+				{ authorSequence: 0, epoch: 0, publishState: "published" },
+				{ authorSequence: 1, epoch: 0, publishState: "published" },
+				{ authorSequence: 2, epoch: 1, publishState: "published" },
+			]);
+			expect(issued).toEqual([
+				...prefix,
+				expect.objectContaining({
+					anchor: authority.anchorDigest,
+					author: prefix[0]?.author,
+					authorSequence: 3,
+					epoch: 2,
+					objectId: authority.objectId,
+					publishState: "published",
+				}),
+			]);
+			const hotAccepted = d110c0cArray(d110c0cRecord(hot.projection).accepted);
+			const afterAccepted = d110c0cArray(d110c0cRecord(after.projection).accepted);
+			expect(hotAccepted.map((row) => d110c0cRecord(row).text)).toEqual([
+				`matrix-${fault}-zero`,
+				`matrix-${fault}-one`,
+			]);
+			expect(afterAccepted).toEqual([
+				...hotAccepted,
+				expect.objectContaining({
+					author: prefix[0]?.author,
+					authorSequence: 3,
+					clientOperationId: expectedText,
+					digest: issued[3]?.digest,
+					text: expectedText,
+				}),
+			]);
+			expect(after.projection).toEqual({ ...d110c0cRecord(hot.projection), accepted: afterAccepted });
+			const expectedDeclaration: Record<string, unknown> & { scope: Record<string, unknown> } = {
+				...genuine,
+				scope: { ...genuineScope },
+			};
+			if (fault === "snapshot-object") expectedDeclaration.scope.objectId = "creator:foreign";
+			if (fault === "snapshot-epoch") expectedDeclaration.scope.epoch = Number(genuineScope.epoch) + 1;
+			if (fault === "snapshot-anchor") expectedDeclaration.scope.anchor = "e".repeat(64);
+			if (fault === "snapshot-manifest") {
+				const manifest = String(d110c0cRecord(genuine.exactCanonicalManifestBytes).bytes);
+				expect(manifest).toMatch(/^(?:[0-9a-f]{2})+$/);
+				expectedDeclaration.exactCanonicalManifestBytes = {
+					bytes: (parseInt(manifest.slice(0, 2), 16) ^ 1).toString(16).padStart(2, "0") + manifest.slice(2),
+				};
+			}
+			expect(hint.selectedDeclaration).toEqual(expectedDeclaration);
+			const trace = d110c0cArray(result.trace).map(d110c0cRecord);
+			expect(trace.filter((row) => row.classification === "snapshot-declaration-lookup")).toEqual([
+				{ classification: "snapshot-declaration-lookup", fault, key: genuineScope },
+			]);
+			expect(trace.filter((row) => row.classification === "snapshot-declaration-fault-applied")).toEqual([
+				{
+					classification: "snapshot-declaration-fault-applied",
+					fault,
+					originalDeclaration: genuine,
+					returnedDeclaration: expectedDeclaration,
+				},
+			]);
+			expect(trace.filter((row) => row.classification === "activation")).toEqual([]);
+			expect(result.negativeRoomState).toBeNull();
+			expect(result.securityAfter).toEqual(result.securityBefore);
+			expect(d110c0cRecord(result.securityBefore).issuance).toEqual(issued);
+		};
+		const assertPayloadReach = (result: Readonly<Record<string, unknown>>): void => {
+			const genuine = d110c0cRecord(result.genuineDeclaration);
+			const scope = d110c0cRecord(genuine.scope);
+			const trace = d110c0cArray(result.trace).map(d110c0cRecord);
+			const reached = trace.filter((row) => String(row.classification).startsWith("snapshot-payload-"));
+			expect(reached.map((row) => row.classification)).toEqual([
+				"snapshot-payload-lookup",
+				"snapshot-payload-acquired",
+				"snapshot-payload-opened",
+				"snapshot-payload-status",
+				"snapshot-payload-read",
+				"snapshot-payload-discarded",
+				"snapshot-payload-released",
+			]);
+			expect(reached[0]).toEqual({ classification: "snapshot-payload-lookup", key: scope, kind: "present", scope });
+			expect(reached[1]).toEqual({ classification: "snapshot-payload-acquired", scope });
+			expect(d110c0cRecord(reached[3]?.status)).toMatchObject({ kind: "verified", missingIndices: [] });
+			const read = d110c0cRecord(reached[4]);
+			const descriptor = d110c0cRecord(d110c0cArray(genuine.chunks)[0]);
+			expect(read.descriptor).toEqual(descriptor);
+			expect(read.applied).toBe(true);
+			expect(read.byteLength).toBe(descriptor.byteLength);
+			expect(Number(read.byteLength)).toBeGreaterThan(0);
+			expect(Number.isInteger(read.originalFirstByte)).toBe(true);
+			expect(Number(read.originalFirstByte)).toBeGreaterThanOrEqual(0);
+			expect(Number(read.originalFirstByte)).toBeLessThanOrEqual(255);
+			expect(read.corruptedFirstByte).toBe(Number(read.originalFirstByte) ^ 1);
+			expect(read.originalSha256).toMatch(/^[0-9a-f]{64}$/);
+			expect(read.corruptedSha256).toMatch(/^[0-9a-f]{64}$/);
+			expect(read.corruptedSha256).not.toBe(read.originalSha256);
+			expect(trace.filter((row) => row.classification === "activation")).toEqual([]);
+			expect(result.negativeRoomState).toBeNull();
+			expect(result.securityAfter).toEqual(result.securityBefore);
+		};
+		for (const result of matrix) {
+			if (
+				["snapshot-object", "snapshot-epoch", "snapshot-anchor", "snapshot-manifest"].includes(String(result.fault))
+			) {
+				assertHintPair(result);
+			}
+			if (result.fault === "snapshot-payload") assertPayloadReach(result);
+		}
 	} finally {
 		await page
 			.evaluate(() => window.phase6aCreatorSuccessorProduct.closeDirectCreator("stable-epoch-two"))
@@ -3159,9 +3350,28 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 		await missingPage.evaluate(() =>
 			window.phase6aCreatorSuccessorProduct.d110c0c1f4SetReopenFault("bootstrap-policy-missing")
 		);
-		const reopen = async (page: Page, databaseName: string): Promise<string> => {
-			try {
-				await page.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
+		const reopen = async (
+			page: Page,
+			databaseName: string
+		): Promise<
+			| { status: "fulfilled" }
+			| { status: "rejected"; isTypeError: boolean; name: string | null; message: string | null }
+		> =>
+			page.evaluate(
+				async (input) => {
+					try {
+						await window.phase6aCreatorSuccessorProduct.join(input);
+						return { status: "fulfilled" as const };
+					} catch (error) {
+						return {
+							status: "rejected" as const,
+							isTypeError: error instanceof TypeError,
+							name: error instanceof Error ? error.name : null,
+							message: error instanceof Error ? error.message : null,
+						};
+					}
+				},
+				{
 					channelName,
 					clientId: "bob",
 					databaseName,
@@ -3172,24 +3382,32 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 						objectId: epochThree.authority.objectId,
 					},
 					successorSnapshotDeclaration: epochThree.snapshotDeclaration,
-				});
-				return "fulfilled";
-			} catch (error) {
-				return error instanceof Error ? error.message : String(error);
-			}
-		};
+				}
+			);
 		const [controlDetail, treatmentDetail, missingDetail] = await Promise.all([
 			reopen(controlPage, controlDatabase),
 			reopen(treatmentPage, treatmentDatabase),
 			reopen(missingPage, missingDatabase),
 		]);
-		expect(controlDetail).toBe("fulfilled");
-		expect(treatmentDetail.split("\n", 1)[0]).toBe(
-			"page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"
-		);
-		expect(missingDetail.split("\n", 1)[0]).toBe(
-			"page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"
-		);
+		await testInfo.attach("d110c-0c1f4-reopen-outcomes", {
+			body: Buffer.from(JSON.stringify({ controlDetail, treatmentDetail, missingDetail })),
+			contentType: "application/json",
+		});
+		expect(controlDetail).toStrictEqual({ status: "fulfilled" });
+		expect(treatmentDetail).toStrictEqual({
+			status: "rejected",
+			isTypeError: true,
+			name: "TypeError",
+			message:
+				"v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected",
+		});
+		expect(missingDetail).toStrictEqual({
+			status: "rejected",
+			isTypeError: true,
+			name: "TypeError",
+			message:
+				"v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected",
+		});
 		const [control, treatment, missing] = await Promise.all([
 			controlPage.evaluate(
 				(databaseName) => window.phase6aCreatorSuccessorProduct.d110c0c1f2Evidence(databaseName),

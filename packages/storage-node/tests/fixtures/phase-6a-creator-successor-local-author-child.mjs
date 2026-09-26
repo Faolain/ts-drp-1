@@ -956,7 +956,6 @@ async function runCase(material, index, input) {
 				networkNode: node,
 				onAdmittedVertex: () => undefined,
 				signRegisteredVertexDigest: signer,
-				snapshotDeclaration: material.snapshot.declaration,
 				snapshotStore: snapshot.store,
 				store: ahe.store,
 			})
@@ -1113,7 +1112,6 @@ async function reopenBudgetCase(material, suffix, issuanceStore, selectedAuthori
 			networkNode: context.node,
 			onAdmittedVertex: () => undefined,
 			signRegisteredVertexDigest: (bytes) => Promise.resolve(signBytes(bytes, selectedAuthority)),
-			snapshotDeclaration: material.snapshot.declaration,
 			snapshotStore: context.snapshot.store,
 			store: context.ahe.store,
 		});
@@ -1206,7 +1204,6 @@ async function issueGenuineFuture(material, raw, selectedAuthority) {
 			networkNode: context.node,
 			onAdmittedVertex: () => undefined,
 			signRegisteredVertexDigest: (bytes) => Promise.resolve(signBytes(bytes, selectedAuthority)),
-			snapshotDeclaration: material.snapshot.declaration,
 			snapshotStore: context.snapshot.store,
 			store: context.ahe.store,
 		});

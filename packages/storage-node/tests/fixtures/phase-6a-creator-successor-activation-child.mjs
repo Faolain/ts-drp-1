@@ -453,7 +453,6 @@ async function cold(material, selectedMode) {
 				networkNode: node,
 				onAdmittedVertex: () => undefined,
 				signRegisteredVertexDigest: signFixtureVertex,
-				snapshotDeclaration: material.snapshot.declaration,
 				snapshotStore: stores.snapshot.store,
 				store: stores.ahe.store,
 			});

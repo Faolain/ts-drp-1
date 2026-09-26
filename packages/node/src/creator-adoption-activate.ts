@@ -37,7 +37,6 @@ const COLD_KEYS = Object.freeze([
 	"onAdmittedVertex",
 	"pinnedGenesisAnchorDigest",
 	"signRegisteredVertexDigest",
-	"snapshotDeclaration",
 	"snapshotStore",
 	"store",
 ]);
@@ -492,6 +491,7 @@ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Re
 	const reopened = await consumeCreatorSuccessorReopen(
 		Object.freeze({
 			...captured,
+			expectedRoomHead,
 			...(exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
 				? {}
 				: { exactCanonicalPinnedGenesisBootstrapOperationBytes }),

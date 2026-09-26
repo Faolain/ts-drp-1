@@ -453,7 +453,6 @@ export async function openContender(
 				networkNode: network(publications),
 				onAdmittedVertex: () => undefined,
 				signRegisteredVertexDigest,
-				snapshotDeclaration: (material.snapshot as PlainRecord).declaration,
 				snapshotStore: stores.snapshotStore,
 				store: countedStore,
 			});
