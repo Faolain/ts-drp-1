@@ -2,11 +2,10 @@
 
 ## Active handoff — grid continuity and the 64-writer workload
 
-Current user review override (2026-09-25): new review rounds use Opus at high and
-Grok only; Opus launches through `claude-phel` per the 2026-09-26 instruction.
-Kimi is suspended for now. Subagents use Astra at xhigh. Preserve all
-historical review records; older prospective model/effort instructions yield to
-this override.
+Current user review override (2026-10-02): new review rounds use an independent
+Codex 6.1 at xhigh. Implementation and investigation subagents use Codex 6.1 at
+high. Grok, Kimi and Opus are suspended for new rounds. Preserve historical
+records; older prospective model/effort instructions yield to this override.
 
 **The 100-transition diagnostic and follow-up memory attribution are preserved.
 The primary [end-to-end storage investigation](../../specs/grid-memory-production/lifecycle-audit.md)
@@ -62,9 +61,12 @@ and `claude-phel` Opus HIGH approval under the
 fresh product51, native224 and room8 passed, alongside focused compile/lint/format
 checks. Three preserved-helper JSDoc warnings and source-only completion-helper
 coverage remain explicit. Root confirmed exactly 58 source/test changes and the
-real shim importer. Commit only this candidate and cold handoffs; unrelated
-memory/grid diagnostics remain out. The pending-only contract is next, before
-separate RED/GREEN allocation. Separate recovery seams remain open.
+real shim importer. This candidate and cold handoffs landed as `b29369df`; unrelated
+memory/grid diagnostics remain out. The [pending-only contract](../../specs/bounded-storage-lifecycle/slices/02c-authenticated-pending-discovery.md)
+now has independent Codex 6.1 xhigh approval and a
+[root disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/root-disposition.md)
+authorizing isolated native/historical tests-only RED. GREEN remains held until
+separate RED review. Separate recovery seams remain open.
 The prior compacted Grok attempt remains NO_VERDICT; broader
 timeout, coverage and compiler failures remain failed. Preserve historical
 oracles/reports and all default gate limits. Pending recovery, shipped

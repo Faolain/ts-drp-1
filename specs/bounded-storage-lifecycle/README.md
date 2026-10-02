@@ -2,11 +2,24 @@
 
 ## Next Agent Prompt
 
-Current user review override (2026-09-25): use only Opus at high and Grok for
-new independent review rounds; launch Opus through `claude-phel` (2026-09-26).
-Do not launch Kimi for now. Implementation and
-diagnostic subagents use Astra at xhigh. This supersedes older prospective
-review-roster instructions below, without changing historical verdicts or evidence.
+Current user review override (2026-10-02): new independent reviews use a separate
+Codex 6.1 at xhigh. Implementation and investigation subagents use Codex 6.1 at
+high. Grok, Kimi and Opus are suspended for new rounds. This supersedes older
+prospective rosters without changing historical verdicts or evidence.
+
+Current pickup (2026-10-02): cold recovery and its reviewed harness prerequisites
+are committed as `b29369df`. The single-API
+[pending-discovery contract](slices/02c-authenticated-pending-discovery.md) is
+accepted for separate RED authoring under the
+[corrected contract disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/root-disposition.md).
+Implement the isolated native and historical tests-only RED allocations, then
+independently review their integrated evidence before assigning distinct GREEN.
+It explicitly preserves candidate-local
+availability filtering and the fully verified fork set; it does not remove the
+room's declaration-driven startup selector. Independent Codex 6.1 xhigh approved
+the amended owner-lifetime, unmasked-probe and historical-cleanup obligations;
+root audited complete custody and managed completion. No pending RED or
+implementation is accepted yet, and GREEN remains held.
 
 Status: versioned ownership (1a-0), bounded retention (1a-1), fixture content
 delivery (1b-0), and producer pre-sign retention (1b-1) are accepted, 2026-09-07. The
@@ -80,9 +93,9 @@ after the commit-boundary audit. The isolated candidate is now accepted under th
 after qualified Grok and `claude-phel` Opus HIGH approvals, fresh product51,
 native224 and room8 passes, and focused compile/lint/format checks. Three helper
 JSDoc warnings and the helper's source-only runtime qualification remain explicit.
-The exact 58-file HEAD delta excludes unrelated memory/grid diagnostics. Commit
-that candidate with the cold handoffs, then freeze the separate pending-recovery
-contract before assigning distinct RED/GREEN authors. Do not repeat
+The exact 58-file source/test delta excludes unrelated memory/grid diagnostics;
+it and four cold handoffs landed in `b29369df`. The separate pending-recovery
+contract is now accepted; follow the tests-only allocation above. Do not repeat
 completed reviews. The earlier compacted Grok attempt remains NO_VERDICT, and
 broader timeout, coverage and compiler failures remain failed. Preserve the
 closure-integrity barrier and accepted frozen oracles. The third contract round's
@@ -129,7 +142,7 @@ verification and the delivery-before-floor boundary remain intact.
 Use the durable named strict projects. Broader package compiler diagnostics are
 unchanged failures, not green claims; the ledger distinguishes current fixture
 gates from historical native runs. Preserve the earlier grid64 timeout and all
-unchanged workload/memory thresholds. Obtain Grok and Opus high
+unchanged workload/memory thresholds. Obtain independent Codex 6.1 xhigh
 contract/RED/GREEN reviews at meaningful checkpoints with terminal evidence
 and explicit dispositions.
 

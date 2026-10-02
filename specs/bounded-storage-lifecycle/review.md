@@ -5,6 +5,23 @@ versioned-owner findings are dispositioned in the executable slice. Freeze the
 amended independent RED before assigning its distinct GREEN author; review the
 resulting implementation and these fixes together before accepting the seam.
 
+## 2c pending contract accepted; separate RED next
+
+Cold checkpoint `b29369df` remains accepted. The independent Codex 6.1 xhigh
+[baseline review](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-01/public.md)
+approved pending contract readiness with one model-roster advisory. The
+[root disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-01/root-disposition.md)
+owns custody, the latest user override and root amendments before RED: explicit
+existing owner lifetime behavior, unmasked fixture/fault probes, and historical
+creation/cleanup/module identity. The fresh independent Codex 6.1 xhigh
+[amended review](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/public.md)
+returned APPROVED, CONTRACT_READY YES and CONTEXT_COMPLETE YES, without findings.
+Root read the complete verdict, audited all packet inputs/excerpts and managed
+completion, and accepted only contract readiness under the
+[new disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/root-disposition.md).
+Native and historical tests-only RED lanes may now proceed independently.
+No pending test or implementation acceptance is claimed; GREEN remains held.
+
 ## 2b GREEN accepted; commit-boundary audit next
 
 Authenticated declaration-free cold recovery is accepted under the
@@ -27,8 +44,10 @@ Opus's pre-commit evidence requests: the complete isolated HEAD delta is exactly
 Fresh product51, native224 and room8 passed; focused typechecks, format and lint
 passed with three JSDoc warnings in the preserved helper. Completion helper
 runtime behavior remains unverified, and all earlier failed gates remain failed.
-Commit the exact candidate and cold handoffs, then review the next pending-only
-contract; no new RED/GREEN allocation is implied by this checkpoint.
+The exact candidate and cold handoffs are committed as `b29369df`; root verified
+all 62 committed hashes, an empty index and unchanged shared working bytes.
+The [pending-only contract](slices/02c-authenticated-pending-discovery.md) has its
+own acceptance and RED allocation above; cold acceptance alone supplies neither.
 Do not whole-file-stage unrelated dirty browser/grid/memory work. Preserve the
 accepted candidate and frozen tests, and continue the separate pending/startup,
 rollback and remaining production obligations. Do not repeat completed reviews
