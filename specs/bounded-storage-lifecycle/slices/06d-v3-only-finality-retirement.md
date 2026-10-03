@@ -41,6 +41,15 @@ shipping disposition and proven replacement for any golden-path capability it
 represented. Do not silently drop an application or change operation admission
 by deleting similarly named crypto code.
 
+The separate [shipping ledger disposition](../../../.logs/bounded-storage-lifecycle/v3-shipping-capability-review-01/root-disposition.md)
+retains chat, additive RGB canvas, grid/zone, CLI/RPC and public SDK capabilities.
+It accepts one prospective host-neutral v3 room owner with application kernels
+and explicit host acquisition, not exact app/RPC schemas, real ports or runtime
+equivalence. The seeded v3-chat harness is not the shipping replacement, and zone
+overwrite is not additive canvas. Freeze app identity/time/retry semantics, genuine
+catalog/head/close custody, receive-only open and versioned bounded RPC/archive
+coverage separately before executable porting. No capability is silently archived.
+
 CLI/RPC create/connect reachability belongs to the same shipped activation audit;
 sharing a v3 room's network node does not itself enforce a v3-only product profile.
 Preserve every [Appendix C golden-path assertion](../../../docs/production-hardening/production-hardening-tdd-plan-v2.md#appendix-c--golden-path-verification),

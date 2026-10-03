@@ -237,6 +237,19 @@ subsequent preservation/import design; no external source or lost-input success
 is promised. The separately authored bounded observation contract has independent
 source acceptance below. Durable availability, custody and fences remain held.
 
+## V3 shipping/capability ledger — source direction accepted
+
+The separate HIGH [ledger](../../.logs/bounded-storage-lifecycle/v3-shipping-capability-plan-01/proposal.md)
+and independent XHIGH [APPROVED review](../../.logs/bounded-storage-lifecycle/v3-shipping-capability-review-01/public.md)
+are accepted under the [root disposition](../../.logs/bounded-storage-lifecycle/v3-shipping-capability-review-01/root-disposition.md).
+All chat/canvas/grid/CLI-RPC/SDK capabilities and actual Appendix C requirements
+remain. One promoted v3 room owner is the prospective direction; exact schemas,
+host/close custody, ports, runtime equivalence and golden acceptance remain open.
+The seeded chat harness and zone overwrite do not replace shipped chat or additive
+canvas. Current-v3 ACL and retired wire/durable policy remain separate held
+source contracts, now allocated to independent HIGH authors without product/runtime
+changes. No removal or app port advances ahead of the active recovery sequence.
+
 ## 2e-3 actual closed-cut data observation — contract accepted
 
 The separate HIGH [proposal](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-plan-01/proposal.md)

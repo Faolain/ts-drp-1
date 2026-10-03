@@ -12,8 +12,11 @@ Do not invent per-operation quorum receipts. Snapshot schema versions and
 inherited durable recovery data are not obsolete merely because they are labelled
 legacy; preserve their required recovery and migration work.
 The independent xhigh [scope disposition](../../.logs/bounded-storage-lifecycle/v3-only-scope-review-01/root-disposition.md)
-accepts this plan amendment only. Shipping/capability, current-v3 ACL authorization,
-and wire/durable-data policy remain held before an executable retirement allocation.
+accepts this plan amendment only. The separate
+[shipping ledger disposition](../../.logs/bounded-storage-lifecycle/v3-shipping-capability-review-01/root-disposition.md)
+now retains all app/CLI-RPC/SDK capabilities and accepts one prospective v3 room
+ownership direction, not exact schemas, ports or runtime equivalence. Current-v3
+ACL authorization and wire/durable-data policy remain held before executable retirement.
 
 Keep the execution order: finish 2c pending recovery, separately reviewed 2d
 declaration-free shipped startup and 2e usable rollback, and recipient snapshot
