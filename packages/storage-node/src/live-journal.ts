@@ -2,7 +2,10 @@ import {
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
 	captureLiveJournalAnchorReadObservation,
+	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalInput,
+	captureLiveJournalSignedAnchorReadInput,
+	captureLiveJournalSignedAnchorReadObservation,
 	classifyLiveJournalMutationObservation,
 	decideLiveJournalDuplicate,
 	deriveLiveJournalSnapshot,
@@ -13,11 +16,15 @@ import {
 	type LiveJournalAnchorReadInput,
 	type LiveJournalAnchorReadResult,
 	type LiveJournalFailureKind,
+	type LiveJournalHistoricalAnchorImportInput,
+	type LiveJournalHistoricalAnchorImportResult,
 	type LiveJournalPageInput,
 	type LiveJournalPageResult,
 	type LiveJournalReadinessInput,
 	type LiveJournalReadinessResult,
 	type LiveJournalScope,
+	type LiveJournalSignedAnchorReadInput,
+	type LiveJournalSignedAnchorReadResult,
 	type LiveJournalSnapshotToken,
 } from "@ts-drp/live-journal";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
@@ -211,6 +218,97 @@ function readScopeWriter(database: DatabaseSync, scope: LiveJournalScope): Store
 		parametersDigest: row.parameters_digest as string,
 		scope: { anchorDigest: row.anchor_digest as string, epoch: row.epoch as number, objectId: row.object_id as string },
 	};
+}
+
+type SignedScopeRead =
+	| Readonly<{ readonly ok: true; readonly stored: StoredScope | null }>
+	| Extract<LiveJournalSignedAnchorReadResult, { readonly ok: false }>;
+
+function readSignedScope(database: DatabaseSync, input: LiveJournalSignedAnchorReadInput): SignedScopeRead {
+	// All physical metadata and every carrier are gated before their projection into JS.
+	const row = statement(
+		database,
+		`WITH addressed AS (
+			SELECT *, typeof(object_id)='text' AND length(CAST(object_id AS BLOB)) BETWEEN 1 AND 4096
+				AND typeof(epoch)='integer' AND epoch BETWEEN 0 AND 9007199254740991
+				AND typeof(anchor_digest)='text' AND length(anchor_digest)=64 AND length(CAST(anchor_digest AS BLOB))=64
+				AND anchor_digest NOT GLOB '*[^0-9a-f]*'
+				AND typeof(next_journal_sequence)='integer' AND next_journal_sequence BETWEEN 0 AND 9007199254740991
+				AND typeof(parameters_digest)='text' AND length(parameters_digest)=64 AND length(CAST(parameters_digest AS BLOB))=64
+				AND parameters_digest NOT GLOB '*[^0-9a-f]*'
+				AND typeof(exact_anchor_preimage)='blob' AND length(exact_anchor_preimage) BETWEEN 1 AND 8192
+				AND typeof(detached_anchor_signature)='blob' AND length(detached_anchor_signature)=64
+				AND typeof(exact_parameters_carrier)='blob' AND length(exact_parameters_carrier) BETWEEN 1 AND 65536 AS physical_valid
+			FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?
+		), gated AS (
+			SELECT *, physical_valid AND length(exact_anchor_preimage)<=8192
+				AND length(exact_parameters_carrier)<=65536
+				AND length(exact_anchor_preimage)+64+length(exact_parameters_carrier)<=? AS admitted
+			FROM addressed
+		)
+		SELECT CASE WHEN NOT physical_valid THEN 'store-poisoned'
+			WHEN NOT admitted THEN 'read-budget-exceeded' ELSE 'present' END AS kind,
+			CASE WHEN admitted THEN object_id ELSE NULL END AS object_id,
+			CASE WHEN admitted THEN epoch ELSE NULL END AS epoch,
+			CASE WHEN admitted THEN anchor_digest ELSE NULL END AS anchor_digest,
+			CASE WHEN admitted THEN next_journal_sequence ELSE NULL END AS next_journal_sequence,
+			CASE WHEN admitted THEN parameters_digest ELSE NULL END AS parameters_digest,
+			CASE WHEN admitted THEN exact_anchor_preimage ELSE NULL END AS exact_anchor_preimage,
+			CASE WHEN admitted THEN detached_anchor_signature ELSE NULL END AS detached_anchor_signature,
+			CASE WHEN admitted THEN exact_parameters_carrier ELSE NULL END AS exact_parameters_carrier
+		FROM gated`
+	).get(...scopeParameters(input.scope), input.maxBytes);
+	if (row === undefined) return { ok: true, stored: null };
+	if (row.kind === "store-poisoned" || row.kind === "read-budget-exceeded") {
+		return Object.freeze({ kind: row.kind, ok: false });
+	}
+	if (row.kind !== "present") return failed("internal-invariant");
+	const captured = captureLiveJournalSignedAnchorReadObservation(input, {
+		detachedAnchorSignature: row.detached_anchor_signature,
+		exactCanonicalAnchorPreimageBytes: row.exact_anchor_preimage,
+		exactCanonicalParametersCarrierBytes: row.exact_parameters_carrier,
+		nextJournalSequence: row.next_journal_sequence,
+		parametersDigest: row.parameters_digest,
+		scope: { anchorDigest: row.anchor_digest, epoch: row.epoch, objectId: row.object_id },
+	});
+	return captured.ok ? { ok: true, stored: captured.value } : captured;
+}
+
+type EmptyClosureRead =
+	| Readonly<{ readonly ok: true; readonly kind: "empty"; readonly snapshot: DurableSnapshot | null }>
+	| Readonly<{ readonly ok: true; readonly kind: "populated" }>
+	| Extract<LiveJournalSignedAnchorReadResult, { readonly ok: false }>;
+
+function readEmptyClosure(database: DatabaseSync, input: LiveJournalSignedAnchorReadInput): EmptyClosureRead {
+	const scope = readSignedScope(database, input);
+	// Probe by complete scope regardless of the physical sequence key's type or value.
+	const exists =
+		statement(
+			database,
+			"SELECT 1 AS present FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? LIMIT 1"
+		).get(...scopeParameters(input.scope)) !== undefined;
+	if (!scope.ok) return scope;
+	if (scope.stored === null) return exists ? failed("store-poisoned") : { kind: "empty", ok: true, snapshot: null };
+	if ((scope.stored.nextJournalSequence === 0) === exists) return failed("store-poisoned");
+	if (exists) return { kind: "populated", ok: true };
+	const snapshot = captureAddressedClosure({ rows: [], scope: scope.stored });
+	return snapshot === undefined ? failed("store-poisoned") : { kind: "empty", ok: true, snapshot };
+}
+
+function readEmptyClosureReadonly(database: DatabaseSync, input: LiveJournalSignedAnchorReadInput): EmptyClosureRead {
+	database.exec("BEGIN");
+	try {
+		const result = readEmptyClosure(database, input);
+		database.exec("COMMIT");
+		return result;
+	} catch (error) {
+		try {
+			database.exec("ROLLBACK");
+		} catch {
+			// A read failure remains unreadable, never proof of an empty closure.
+		}
+		throw error;
+	}
 }
 
 function rowFromSql(row: Readonly<Record<string, unknown>>): StoredRow {
@@ -955,6 +1053,117 @@ export function createNodeDurableLiveJournalStore(
 		return result;
 	};
 
+	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
+	const readSignedAnchorEnvelope = async function (
+		input: LiveJournalSignedAnchorReadInput
+	): Promise<LiveJournalSignedAnchorReadResult> {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		const captured = captureLiveJournalSignedAnchorReadInput(input);
+		if (!captured.ok) return captured;
+		const unavailableAfterCapture = unavailable();
+		if (unavailableAfterCapture !== undefined) return unavailableAfterCapture;
+		let result: SignedScopeRead;
+		try {
+			database.exec("BEGIN");
+			result = readSignedScope(database, captured.value);
+			database.exec("COMMIT");
+		} catch {
+			try {
+				database.exec("ROLLBACK");
+			} catch {
+				// Preserve the native transaction failure, not an absence result.
+			}
+			return failed("substrate-failure");
+		}
+		if (!result.ok) {
+			if (result.kind === "store-poisoned") poisoned = true;
+			return result;
+		}
+		if (result.stored === null) return Object.freeze({ kind: "missing", ok: true });
+		const stored = result.stored;
+		return Object.freeze({
+			kind: "present",
+			ok: true,
+			parametersDigest: stored.parametersDigest,
+			scope: stored.scope,
+			envelope: Object.freeze({
+				objectId: stored.scope.objectId,
+				exactCanonicalAnchorPreimageBytes: stored.exactCanonicalAnchorPreimageBytes,
+				detachedAnchorSignature: stored.detachedAnchorSignature,
+				exactCanonicalParametersCarrierBytes: stored.exactCanonicalParametersCarrierBytes,
+			}),
+		});
+	};
+
+	const importHistoricalAnchor = async (
+		input: LiveJournalHistoricalAnchorImportInput
+		// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
+	): Promise<LiveJournalHistoricalAnchorImportResult> => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		const captured = captureLiveJournalHistoricalAnchorImportInput(input);
+		if (!captured.ok) return captured;
+		const unavailableAfterCapture = unavailable();
+		if (unavailableAfterCapture !== undefined) return unavailableAfterCapture;
+		const selected = captured.value;
+		const request = { maxBytes: selected.maxBytes, scope: selected.stored.scope };
+		let before: DurableSnapshot | null = null;
+		let idempotent = false;
+		let rejected: Extract<LiveJournalHistoricalAnchorImportResult, { readonly ok: false }> | undefined;
+		let admitted = false;
+		try {
+			database.exec("BEGIN IMMEDIATE");
+			const closure = readEmptyClosure(database, request);
+			if (!closure.ok) rejected = closure;
+			else if (closure.kind === "populated") rejected = Object.freeze({ kind: "import-populated", ok: false });
+			else {
+				before = closure.snapshot;
+				if (before !== null) {
+					if (sameInstalledScope(before.scope, selected.stored)) idempotent = true;
+					else rejected = failed("genesis-conflict");
+				}
+				if (rejected === undefined) {
+					admitted = true;
+					if (before === null) {
+						database.exec(
+							`INSERT INTO scopes(object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier) VALUES(${sqlText(request.scope.objectId)},${request.scope.epoch},${sqlText(request.scope.anchorDigest)},0,${sqlBlob(selected.stored.exactCanonicalAnchorPreimageBytes)},${sqlBlob(selected.stored.detachedAnchorSignature)},${sqlText(selected.parametersDigest)},${sqlBlob(selected.stored.exactCanonicalParametersCarrierBytes)})`
+						);
+					}
+				}
+			}
+			database.exec(rejected === undefined ? "COMMIT" : "ROLLBACK");
+		} catch {
+			try {
+				database.exec("ROLLBACK");
+			} catch {
+				// COMMIT may already have completed. The fresh native observation owns the outcome.
+			}
+			if (!admitted && rejected === undefined) return failed("substrate-failure");
+		}
+		if (rejected !== undefined) {
+			if (rejected.kind === "store-poisoned") poisoned = true;
+			return rejected;
+		}
+		let actual: DurableSnapshot | null | undefined;
+		try {
+			const closure = readEmptyClosureReadonly(database, request);
+			if (!closure.ok) {
+				if (closure.kind === "store-poisoned") {
+					poisoned = true;
+					return closure;
+				}
+				actual = undefined;
+			} else actual = closure.kind === "empty" ? closure.snapshot : undefined;
+		} catch {
+			actual = undefined;
+		}
+		const kind = classify(actual, before, { kind: "install", scope: selected.stored });
+		return kind === undefined
+			? Object.freeze({ idempotent, ok: true, parametersDigest: selected.parametersDigest, scope: request.scope })
+			: failed(kind);
+	};
+
 	const close = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
@@ -973,7 +1182,9 @@ export function createNodeDurableLiveJournalStore(
 		close,
 		installEpochAnchor,
 		installGenesis,
+		importHistoricalAnchor,
 		readAnchorPreimage,
+		readSignedAnchorEnvelope,
 		readiness,
 		readPage,
 	});

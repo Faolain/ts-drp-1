@@ -1,9 +1,8 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { openCurrentAnchorTrust } from "./anchor-trust-singleton.js";
 import { openCreatorSuccessorTrust } from "./creator-close.js";
-import type { CurrentAnchorTrust } from "./index.js";
+import { type CurrentAnchorTrust, verifyEd25519RegisteredDigest } from "./index.js";
 import {
 	mintCreatorAnchorTrustCheckpointPredecessor,
 	resolveCreatorAnchorTrustMaterial,
@@ -256,11 +255,10 @@ export function openCreatorCheckpointTrust(input: unknown): OpenCreatorCheckpoin
 		if (
 			!sameBytes(predecessor.exactCanonicalProfileBytes, genesisMaterial.exactCanonicalProfileBytes) ||
 			!sameBytes(predecessor.exactCanonicalSignerSetBytes, genesisMaterial.exactCanonicalSignerSetBytes) ||
-			!ed25519.verify(
+			!verifyEd25519RegisteredDigest(
 				predecessor.detachedCurrentAnchorSignature,
 				hexBytes(predecessor.currentAnchorDigest),
-				genesisMaterial.publicKey,
-				{ zip215: false }
+				genesisMaterial.publicKey
 			)
 		) {
 			return failure("predecessor-rejected");
@@ -268,13 +266,10 @@ export function openCreatorCheckpointTrust(input: unknown): OpenCreatorCheckpoin
 		if (
 			!sameBytes(current.exactCanonicalProfileBytes, predecessor.exactCanonicalProfileBytes) ||
 			!sameBytes(current.exactCanonicalSignerSetBytes, predecessor.exactCanonicalSignerSetBytes) ||
-			!ed25519.verify(
+			!verifyEd25519RegisteredDigest(
 				current.detachedCurrentAnchorSignature,
 				hexBytes(current.currentAnchorDigest),
-				genesisMaterial.publicKey,
-				{
-					zip215: false,
-				}
+				genesisMaterial.publicKey
 			)
 		) {
 			return failure("current-rejected");

@@ -2,7 +2,10 @@ import {
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
 	captureLiveJournalAnchorReadObservation,
+	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalInput,
+	captureLiveJournalSignedAnchorReadInput,
+	captureLiveJournalSignedAnchorReadObservation,
 	classifyLiveJournalMutationObservation,
 	decideLiveJournalDuplicate,
 	deriveLiveJournalSnapshot,
@@ -13,11 +16,15 @@ import {
 	type LiveJournalAnchorReadInput,
 	type LiveJournalAnchorReadResult,
 	type LiveJournalFailureKind,
+	type LiveJournalHistoricalAnchorImportInput,
+	type LiveJournalHistoricalAnchorImportResult,
 	type LiveJournalPageInput,
 	type LiveJournalPageResult,
 	type LiveJournalReadinessInput,
 	type LiveJournalReadinessResult,
 	type LiveJournalScope,
+	type LiveJournalSignedAnchorReadInput,
+	type LiveJournalSignedAnchorReadResult,
 	type LiveJournalSnapshotToken,
 } from "@ts-drp/live-journal";
 
@@ -410,6 +417,151 @@ function captureAddressedClosure(snapshot: DurableSnapshot): DurableSnapshot | u
 	} catch {
 		return undefined;
 	}
+}
+
+type SignedScopeRead =
+	| Readonly<{ readonly ok: true; readonly stored: StoredScope | null }>
+	| Extract<LiveJournalSignedAnchorReadResult, { readonly ok: false }>;
+
+function captureSignedRawScope(input: LiveJournalSignedAnchorReadInput, raw: unknown): SignedScopeRead {
+	if (raw === undefined) return { ok: true, stored: null };
+	const fields: Record<string, unknown> = {};
+	try {
+		if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return failed("store-poisoned");
+		const prototype = Object.getPrototypeOf(raw);
+		if (prototype !== Object.prototype && prototype !== null) return failed("store-poisoned");
+		const keys = Reflect.ownKeys(raw);
+		if (
+			keys.length !== RAW_SCOPE_KEYS.length ||
+			keys.some((key) => typeof key !== "string" || !RAW_SCOPE_KEYS.includes(key as (typeof RAW_SCOPE_KEYS)[number]))
+		) {
+			return failed("store-poisoned");
+		}
+		for (const key of RAW_SCOPE_KEYS) {
+			const descriptor = Object.getOwnPropertyDescriptor(raw, key);
+			if (descriptor === undefined || !("value" in descriptor) || !descriptor.enumerable)
+				return failed("store-poisoned");
+			fields[key] = descriptor.value;
+		}
+	} catch {
+		return failed("store-poisoned");
+	}
+	// IDB already cloned this entire row. Only the detached output is locally byte-bounded.
+	const captured = captureLiveJournalSignedAnchorReadObservation(input, {
+		detachedAnchorSignature: fields.detachedAnchorSignature,
+		exactCanonicalAnchorPreimageBytes: fields.exactCanonicalAnchorPreimageBytes,
+		exactCanonicalParametersCarrierBytes: fields.exactCanonicalParametersCarrierBytes,
+		nextJournalSequence: fields.nextJournalSequence,
+		parametersDigest: fields.parametersDigest,
+		scope: { anchorDigest: fields.anchorDigest, epoch: fields.epoch, objectId: fields.objectId },
+	});
+	return captured.ok ? { ok: true, stored: captured.value } : captured;
+}
+
+function signedTransactionTerminal(transaction: IDBTransaction): Promise<boolean> {
+	// A request/error event is not terminal: join the genuine complete or abort event.
+	let requestFailed = false;
+	return new Promise((resolve) => {
+		transaction.addEventListener("error", () => {
+			requestFailed = true;
+		});
+		transaction.addEventListener("complete", () => resolve(!requestFailed), { once: true });
+		transaction.addEventListener("abort", () => resolve(false), { once: true });
+	});
+}
+
+function addressedEntryExists(key: IDBValidKey | undefined, scope: LiveJournalScope): boolean {
+	const prefix = scopeKey(scope);
+	return Array.isArray(key) && key.length >= 3 && prefix.every((part, index) => key[index] === part);
+}
+
+type EmptyClosureRead =
+	| Readonly<{ readonly ok: true; readonly kind: "empty"; readonly snapshot: DurableSnapshot | null }>
+	| Readonly<{ readonly ok: true; readonly kind: "populated" }>
+	| Extract<LiveJournalSignedAnchorReadResult, { readonly ok: false }>;
+
+function captureEmptyClosure(
+	input: LiveJournalSignedAnchorReadInput,
+	raw: unknown,
+	key: IDBValidKey | undefined
+): EmptyClosureRead {
+	const captured = captureSignedRawScope(input, raw);
+	if (!captured.ok) return captured;
+	const exists = addressedEntryExists(key, input.scope);
+	if (captured.stored === null) return exists ? failed("store-poisoned") : { kind: "empty", ok: true, snapshot: null };
+	if ((captured.stored.nextJournalSequence === 0) === exists) return failed("store-poisoned");
+	if (exists) return { kind: "populated", ok: true };
+	const snapshot = captureAddressedClosure({ rows: [], scope: captured.stored });
+	return snapshot === undefined ? failed("store-poisoned") : { kind: "empty", ok: true, snapshot };
+}
+
+async function readEmptyClosure(
+	database: IDBDatabase,
+	input: LiveJournalSignedAnchorReadInput
+): Promise<EmptyClosureRead> {
+	const transaction = strictTransaction(database, ["acceptedEntries", "scopes"], "readonly");
+	const terminal = signedTransactionTerminal(transaction);
+	let result: EmptyClosureRead | undefined;
+	try {
+		const scopeRequest = transaction.objectStore("scopes").get(scopeKey(input.scope));
+		// One complete-prefix lower-bound key probe includes nonnumeric sequence keys.
+		const entryRequest = transaction
+			.objectStore("acceptedEntries")
+			.getKey(IDBKeyRange.lowerBound(scopeKey(input.scope)));
+		const [raw, key] = await Promise.all([requestResult(scopeRequest), requestResult(entryRequest)]);
+		result = captureEmptyClosure(input, raw, key);
+	} catch {
+		// Join the terminal below even when the request or capture failed.
+	}
+	if (!(await terminal) || result === undefined) throw new Error("indexeddb-read-failed");
+	return result;
+}
+
+type HistoricalWriterOutcome = Readonly<{
+	readonly admitted: boolean;
+	readonly before: DurableSnapshot | null;
+	readonly idempotent: boolean;
+	readonly rejected?: Extract<LiveJournalHistoricalAnchorImportResult, { readonly ok: false }>;
+}>;
+
+async function historicalAnchorWriter(
+	database: IDBDatabase,
+	input: StoredScope,
+	maxBytes: number
+): Promise<HistoricalWriterOutcome> {
+	const transaction = strictTransaction(database, ["acceptedEntries", "scopes"], "readwrite");
+	const terminal = signedTransactionTerminal(transaction);
+	let outcome: HistoricalWriterOutcome = { admitted: false, before: null, idempotent: false };
+	try {
+		const scopes = transaction.objectStore("scopes");
+		const scopeRequest = scopes.get(scopeKey(input.scope));
+		const entryRequest = transaction
+			.objectStore("acceptedEntries")
+			.getKey(IDBKeyRange.lowerBound(scopeKey(input.scope)));
+		const [raw, key] = await Promise.all([requestResult(scopeRequest), requestResult(entryRequest)]);
+		const closure = captureEmptyClosure({ maxBytes, scope: input.scope }, raw, key);
+		if (!closure.ok) outcome = { ...outcome, rejected: closure };
+		else if (closure.kind === "populated")
+			outcome = { ...outcome, rejected: Object.freeze({ kind: "import-populated", ok: false }) };
+		else {
+			const before = closure.snapshot;
+			if (before !== null && !sameInstalledScope(before.scope, input)) {
+				outcome = { ...outcome, before, rejected: failed("genesis-conflict") };
+			} else {
+				outcome = { admitted: true, before, idempotent: before !== null };
+				if (before === null) await requestResult(scopes.add(rawScope(input)));
+			}
+		}
+		if (outcome.rejected !== undefined) transaction.abort();
+	} catch {
+		try {
+			transaction.abort();
+		} catch {
+			// It may already be terminal. Never infer rollback from the caught error.
+		}
+	}
+	await terminal;
+	return outcome;
 }
 
 type WriterOutcome = Readonly<{
@@ -908,6 +1060,94 @@ export async function createBrowserDurableLiveJournalStore(
 		return result;
 	};
 
+	const readSignedAnchorEnvelope = async function (
+		input: LiveJournalSignedAnchorReadInput
+	): Promise<LiveJournalSignedAnchorReadResult> {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		const captured = captureLiveJournalSignedAnchorReadInput(input);
+		if (!captured.ok) return captured;
+		const unavailableAfterCapture = unavailable();
+		if (unavailableAfterCapture !== undefined) return unavailableAfterCapture;
+		let result: SignedScopeRead | undefined;
+		try {
+			const transaction = strictTransaction(database, ["scopes"], "readonly");
+			const terminal = signedTransactionTerminal(transaction);
+			try {
+				const request = transaction.objectStore("scopes").get(scopeKey(captured.value.scope));
+				result = captureSignedRawScope(captured.value, await requestResult(request));
+			} catch {
+				// A failed request must still join its admitted transaction terminal.
+			}
+			if (!(await terminal) || result === undefined) return failed("substrate-failure");
+		} catch {
+			return failed("substrate-failure");
+		}
+		if (!result.ok) {
+			if (result.kind === "store-poisoned") poisoned = true;
+			return result;
+		}
+		if (result.stored === null) return Object.freeze({ kind: "missing", ok: true });
+		const stored = result.stored;
+		return Object.freeze({
+			kind: "present",
+			ok: true,
+			parametersDigest: stored.parametersDigest,
+			scope: stored.scope,
+			envelope: Object.freeze({
+				objectId: stored.scope.objectId,
+				exactCanonicalAnchorPreimageBytes: stored.exactCanonicalAnchorPreimageBytes,
+				detachedAnchorSignature: stored.detachedAnchorSignature,
+				exactCanonicalParametersCarrierBytes: stored.exactCanonicalParametersCarrierBytes,
+			}),
+		});
+	};
+
+	const importHistoricalAnchor = async (
+		input: LiveJournalHistoricalAnchorImportInput
+	): Promise<LiveJournalHistoricalAnchorImportResult> => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		const captured = captureLiveJournalHistoricalAnchorImportInput(input);
+		if (!captured.ok) return captured;
+		const unavailableAfterCapture = unavailable();
+		if (unavailableAfterCapture !== undefined) return unavailableAfterCapture;
+		const selected = captured.value;
+		let outcome: HistoricalWriterOutcome;
+		try {
+			outcome = await historicalAnchorWriter(database, selected.stored, selected.maxBytes);
+		} catch {
+			return failed("substrate-failure");
+		}
+		if (outcome.rejected !== undefined) {
+			if (outcome.rejected.kind === "store-poisoned") poisoned = true;
+			return outcome.rejected;
+		}
+		if (!outcome.admitted) return failed("substrate-failure");
+		let actual: DurableSnapshot | null | undefined;
+		try {
+			const closure = await readEmptyClosure(database, { maxBytes: selected.maxBytes, scope: selected.stored.scope });
+			if (!closure.ok) {
+				if (closure.kind === "store-poisoned") {
+					poisoned = true;
+					return closure;
+				}
+				actual = undefined;
+			} else actual = closure.kind === "empty" ? closure.snapshot : undefined;
+		} catch {
+			actual = undefined;
+		}
+		const kind = observe(actual, outcome.before, { kind: "install", scope: selected.stored });
+		return kind === undefined
+			? Object.freeze({
+					idempotent: outcome.idempotent,
+					ok: true,
+					parametersDigest: selected.parametersDigest,
+					scope: selected.stored.scope,
+				})
+			: failed(kind);
+	};
+
 	const close = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
@@ -922,7 +1162,9 @@ export async function createBrowserDurableLiveJournalStore(
 		close,
 		installEpochAnchor,
 		installGenesis,
+		importHistoricalAnchor,
 		readAnchorPreimage,
+		readSignedAnchorEnvelope,
 		readiness,
 		readPage,
 	});

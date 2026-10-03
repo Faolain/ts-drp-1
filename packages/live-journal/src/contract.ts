@@ -4,10 +4,12 @@ import { parseStorageObjectId } from "@ts-drp/storage";
 import { LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES, LIVE_JOURNAL_DOMAINS } from "./types.js";
 import type {
 	LiveJournalAcceptedRow,
+	LiveJournalAnchorReadFailureKind,
 	LiveJournalAnchorReadInput,
 	LiveJournalAnchorReadResult,
 	LiveJournalFailureKind,
 	LiveJournalScope,
+	LiveJournalSignedAnchorReadInput,
 	LiveJournalSnapshotToken,
 } from "./types.js";
 
@@ -31,6 +33,7 @@ const intrinsicArrayKind = getOwnPropertyDescriptor(typedArrayPrototype, Symbol.
 const intrinsicArrayBufferLength = getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength")?.get as (
 	this: unknown
 ) => unknown;
+const intrinsicArrayBufferResizable = getOwnPropertyDescriptor(ArrayBuffer.prototype, "resizable")?.get;
 
 const SCOPE_KEYS = ["anchorDigest", "epoch", "objectId"] as const;
 const INSTALL_KEYS = [
@@ -424,6 +427,16 @@ function captureInstall(input: unknown, genesisOnly: boolean): Captured<Captured
 	) {
 		return failure("malformed-input");
 	}
+	return validateInstallMaterial(objectId, anchorBytes, signature, parametersBytes, genesisOnly);
+}
+
+function validateInstallMaterial(
+	objectId: string,
+	anchorBytes: Uint8Array,
+	signature: Uint8Array,
+	parametersBytes: Uint8Array,
+	genesisOnly: boolean
+): Captured<CapturedInstall> {
 	const anchor = exactDecoded(anchorBytes, ANCHOR_KEYS);
 	const parameters = exactDecoded(parametersBytes, PARAMETER_KEYS, ["authorShareMultiplier"]);
 	if (anchor === undefined || parameters === undefined || !validateAnchor(anchor) || !validateParameters(parameters)) {
@@ -455,6 +468,137 @@ function captureInstall(input: unknown, genesisOnly: boolean): Captured<Captured
 				scope,
 			}),
 		}),
+	});
+}
+
+type BoundedCapture<T> =
+	| Readonly<{ readonly ok: true; readonly value: T }>
+	| Readonly<{ readonly ok: false; readonly kind: LiveJournalAnchorReadFailureKind }>;
+
+function captureEnvelopeBytes(
+	record: Readonly<Record<string, unknown>>,
+	maxBytes: number,
+	invalid: "malformed-input" | "store-poisoned"
+): BoundedCapture<readonly [Uint8Array, Uint8Array, Uint8Array]> {
+	try {
+		const carriers = [
+			record.exactCanonicalAnchorPreimageBytes,
+			record.detachedAnchorSignature,
+			record.exactCanonicalParametersCarrierBytes,
+		];
+		const views: { buffer: ArrayBuffer; length: number; offset: number }[] = [];
+		for (const carrier of carriers) {
+			if (intrinsicArrayKind.call(carrier) !== "Uint8Array") return failure(invalid);
+			const length = intrinsicByteLength.call(carrier) as number;
+			const offset = intrinsicByteOffset.call(carrier) as number;
+			const buffer = intrinsicBuffer.call(carrier) as ArrayBuffer;
+			const bufferLength = intrinsicArrayBufferLength.call(buffer);
+			if (
+				getPrototypeOf(buffer) !== ArrayBuffer.prototype ||
+				length === 0 ||
+				offset !== 0 ||
+				length !== bufferLength ||
+				intrinsicArrayBufferResizable?.call(buffer) === true
+			)
+				return failure(invalid);
+			views.push({ buffer, length, offset });
+		}
+		const [anchor, signature, parameters] = views;
+		if (anchor === undefined || signature === undefined || parameters === undefined || signature.length !== 64) {
+			return failure(invalid);
+		}
+		if (anchor.length > 8192 || parameters.length > 65536 || anchor.length + 64 + parameters.length > maxBytes) {
+			return objectFreeze({
+				kind:
+					invalid === "store-poisoned" && (anchor.length > 8192 || parameters.length > 65536)
+						? "store-poisoned"
+						: "read-budget-exceeded",
+				ok: false,
+			});
+		}
+		return objectFreeze({
+			ok: true,
+			value: [
+				new Uint8Array(new Uint8Array(anchor.buffer, anchor.offset, anchor.length)),
+				new Uint8Array(new Uint8Array(signature.buffer, signature.offset, signature.length)),
+				new Uint8Array(new Uint8Array(parameters.buffer, parameters.offset, parameters.length)),
+			] as const,
+		});
+	} catch {
+		return failure(invalid);
+	}
+}
+
+/**
+ * Captures an exact signed-row request without inspecting durable entries.
+ * @param input - Closed scope and whole-envelope byte allowance.
+ * @returns Captured request or a malformed-input refusal.
+ */
+export function captureLiveJournalSignedAnchorReadInput(input: unknown): Captured<LiveJournalSignedAnchorReadInput> {
+	const record = snapshotRecord(input, ANCHOR_READ_KEYS);
+	if (record === undefined) return failure("malformed-input");
+	const scope = copyScope(record.scope);
+	if (scope === undefined || !isSafeIntegerBetween(record.maxBytes, 0, 262144)) return failure("malformed-input");
+	return objectFreeze({ ok: true, value: objectFreeze({ maxBytes: record.maxBytes, scope }) });
+}
+
+/**
+ * Gates every input carrier before copying or canonical material validation.
+ * @param input - Closed non-genesis envelope and whole-envelope byte allowance.
+ * @returns Captured install material or a local refusal.
+ */
+export function captureLiveJournalHistoricalAnchorImportInput(
+	input: unknown
+): BoundedCapture<CapturedInstall & Readonly<{ readonly maxBytes: number }>> {
+	const record = snapshotRecord(input, ["envelope", "maxBytes"]);
+	if (record === undefined || !isSafeIntegerBetween(record.maxBytes, 0, 262144)) return failure("malformed-input");
+	const envelope = snapshotRecord(record.envelope, INSTALL_KEYS);
+	if (envelope === undefined || typeof envelope.objectId !== "string" || !parseStorageObjectId(envelope.objectId).ok) {
+		return failure("malformed-input");
+	}
+	const bytes = captureEnvelopeBytes(envelope, record.maxBytes, "malformed-input");
+	if (!bytes.ok) return bytes;
+	const captured = validateInstallMaterial(envelope.objectId, ...bytes.value, false);
+	return captured.ok
+		? objectFreeze({ ok: true, value: objectFreeze({ ...captured.value, maxBytes: record.maxBytes }) })
+		: captured;
+}
+
+/**
+ * Validates a complete signed scope row, not its entry closure or readiness.
+ * @param expected - Exact captured scope and local envelope allowance.
+ * @param observation - Closed native stored scope projection.
+ * @returns Detached canonical stored material or a typed refusal.
+ */
+export function captureLiveJournalSignedAnchorReadObservation(
+	expected: LiveJournalSignedAnchorReadInput,
+	observation: unknown
+): BoundedCapture<LiveJournalStoredScope> {
+	const request = captureLiveJournalSignedAnchorReadInput(expected);
+	if (!request.ok) return request;
+	const record = snapshotRecord(observation, STORED_SCOPE_KEYS);
+	if (record === undefined) return failure("store-poisoned");
+	const scope = copyScope(record.scope);
+	if (
+		scope === undefined ||
+		!sameScope(scope, request.value.scope) ||
+		!isSafeIntegerBetween(record.nextJournalSequence, 0) ||
+		!isDigest(record.parametersDigest)
+	)
+		return failure("store-poisoned");
+	const bytes = captureEnvelopeBytes(record, request.value.maxBytes, "store-poisoned");
+	if (!bytes.ok) return bytes;
+	const material = validateInstallMaterial(scope.objectId, ...bytes.value, scope.epoch === 0);
+	if (
+		!material.ok ||
+		!sameScope(material.value.stored.scope, scope) ||
+		material.value.parametersDigest !== record.parametersDigest
+	) {
+		return failure("store-poisoned");
+	}
+	return objectFreeze({
+		ok: true,
+		value: objectFreeze({ ...material.value.stored, nextJournalSequence: record.nextJournalSequence }),
 	});
 }
 

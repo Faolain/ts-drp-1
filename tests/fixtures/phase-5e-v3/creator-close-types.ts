@@ -178,6 +178,8 @@ export interface CreatorCloseCandidateModules {
 export const EXPECTED_EXPORTS = Object.freeze({
 	creator: Object.freeze([
 		"completeCreatorSuccessor",
+		"inspectCreatorClosedCutSuccessorBinding",
+		"inspectCreatorHistoricalAnchorEnvelope",
 		"openCreatorSuccessorTrust",
 		"prepareCreatorAnchorSigningRequest",
 		"prepareCreatorClose",

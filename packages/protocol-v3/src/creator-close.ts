@@ -1,7 +1,6 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
-import type { CurrentAnchorTrust } from "./index.js";
+import { type CurrentAnchorTrust, verifyEd25519RegisteredDigest } from "./index.js";
 import type { CreatorAnchorSigningRequest } from "./internal/creator-anchor-signing-request.js";
 import {
 	type CreatorAnchorTrustMaterial,
@@ -24,6 +23,8 @@ const registry = registryJson as unknown as {
 				readonly fields: readonly {
 					name: string;
 					required: boolean;
+					type: string;
+					const: unknown;
 					constraints: Readonly<Record<string, unknown>>;
 				}[];
 			}>
@@ -119,7 +120,39 @@ interface CreatorPreparationState {
 const closeStates = new WeakMap<VerifiedCreatorClose, CreatorCloseState>();
 const preparationStates = new WeakMap<CreatorAnchorPreparation, CreatorPreparationState>();
 
-function failure(reason: string): Readonly<{ ok: false; reason: string }> {
+export type CreatorHistoricalAnchorEnvelopeFailureReason =
+	| "MALFORMED_HISTORICAL_ENVELOPE"
+	| "UNTRUSTED_CURRENT_ANCHOR"
+	| "HISTORICAL_ANCHOR_MISMATCH"
+	| "HISTORICAL_PARAMETERS_MISMATCH"
+	| "INVALID_HISTORICAL_SIGNATURE";
+
+export interface InspectCreatorHistoricalAnchorEnvelopeInput {
+	readonly successorTrust: CurrentAnchorTrust;
+	readonly envelope: Readonly<{
+		objectId: string;
+		exactCanonicalAnchorPreimageBytes: Uint8Array;
+		detachedAnchorSignature: Uint8Array;
+		exactCanonicalParametersCarrierBytes: Uint8Array;
+	}>;
+}
+
+export type InspectCreatorHistoricalAnchorEnvelopeResult =
+	| Readonly<{ ok: false; reason: CreatorHistoricalAnchorEnvelopeFailureReason }>
+	| Readonly<{
+			ok: true;
+			objectId: string;
+			epoch: number;
+			anchorDigest: string;
+			aclDigest: string;
+			parametersDigest: string;
+			profileDigest: string;
+			signerSetDigest: string;
+			cryptoSuiteId: string;
+			blueprintDigest: string;
+	  }>;
+
+function failure<Reason extends string>(reason: Reason): Readonly<{ ok: false; reason: Reason }> {
 	return Object.freeze({ ok: false as const, reason });
 }
 
@@ -147,7 +180,7 @@ function exactKeys(value: Readonly<Record<string, unknown>>, keys: readonly stri
 	);
 }
 
-function copyBytes(value: unknown, expectedLength?: number, maximumLength = 268_435_456): Uint8Array | undefined {
+function byteCarrierLength(value: unknown, expectedLength?: number, maximumLength = 268_435_456): number | undefined {
 	try {
 		if (intrinsicObjectGetPrototypeOf(value) !== intrinsicUint8ArrayPrototype) return undefined;
 		const bytes = value as Uint8Array;
@@ -164,12 +197,52 @@ function copyBytes(value: unknown, expectedLength?: number, maximumLength = 268_
 			return undefined;
 		}
 		if (expectedLength !== undefined && byteLength !== expectedLength) return undefined;
+		return byteLength;
+	} catch {
+		return undefined;
+	}
+}
+
+function copyBytes(value: unknown, expectedLength?: number, maximumLength = 268_435_456): Uint8Array | undefined {
+	const byteLength = byteCarrierLength(value, expectedLength, maximumLength);
+	if (byteLength === undefined) return undefined;
+	try {
 		const output = new intrinsicUint8Array(byteLength);
-		intrinsicReflectApply(intrinsicUint8ArraySet, output, [bytes]);
+		intrinsicReflectApply(intrinsicUint8ArraySet, output, [value]);
 		return output;
 	} catch {
 		return undefined;
 	}
+}
+
+function capturedRecord(value: unknown, fields: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+	if (!plainRecord(value) || !exactKeys(value, fields)) return undefined;
+	const captured: Record<string, unknown> = Object.create(null);
+	for (const field of fields) {
+		const descriptor = intrinsicObjectGetOwnPropertyDescriptor(value, field);
+		if (descriptor?.enumerable !== true || !("value" in descriptor)) return undefined;
+		captured[field] = descriptor.value;
+	}
+	return captured;
+}
+
+function validRegisteredAnchor(anchor: Readonly<Record<string, unknown>>): boolean {
+	return (
+		registry.kinds.epochAnchor?.fields.every((field) => {
+			const value = anchor[field.name];
+			if (field.const !== null && value !== field.const) return false;
+			if (field.type === "digest-hex") return typeof value === "string" && digestHex.test(value);
+			if (field.type === "safe-integer") return safeInteger(value, (field.constraints.minimum as number) ?? 0);
+			if (field.type === "enum")
+				return typeof value === "string" && (field.constraints.values as readonly string[]).includes(value);
+			return (
+				field.type === "string" &&
+				typeof value === "string" &&
+				value.length >= ((field.constraints.minimumUtf16Units as number) ?? 0) &&
+				value.length <= ((field.constraints.maximumUtf16Units as number) ?? Number.MAX_SAFE_INTEGER)
+			);
+		}) === true
+	);
 }
 
 function safeInteger(value: unknown, minimum = 0): value is number {
@@ -302,6 +375,96 @@ function validClosedParameters(value: Readonly<Record<string, unknown>>): boolea
 			);
 		})
 	);
+}
+
+/**
+ * Authenticates original historical anchor material against genuine immediate successor custody.
+ * @param input - Closed successor trust and the existing exact install envelope, without caller key authority.
+ * @returns Frozen compact material identities or one typed refusal; never historical trust or replay authority.
+ */
+export function inspectCreatorHistoricalAnchorEnvelope(input: unknown): InspectCreatorHistoricalAnchorEnvelopeResult {
+	try {
+		const captured = capturedRecord(input, ["successorTrust", "envelope"]);
+		if (captured === undefined) return failure("MALFORMED_HISTORICAL_ENVELOPE");
+		const envelope = capturedRecord(captured.envelope, [
+			"objectId",
+			"exactCanonicalAnchorPreimageBytes",
+			"detachedAnchorSignature",
+			"exactCanonicalParametersCarrierBytes",
+		]);
+		if (
+			envelope === undefined ||
+			typeof envelope.objectId !== "string" ||
+			byteCarrierLength(envelope.exactCanonicalAnchorPreimageBytes, undefined, 8192) === undefined ||
+			byteCarrierLength(envelope.detachedAnchorSignature, 64, 64) === undefined ||
+			byteCarrierLength(envelope.exactCanonicalParametersCarrierBytes, undefined, 65_536) === undefined
+		)
+			return failure("MALFORMED_HISTORICAL_ENVELOPE");
+		const material = resolveCreatorAnchorTrustMaterial(captured.successorTrust as CurrentAnchorTrust);
+		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
+		const anchorBytes = copyBytes(envelope.exactCanonicalAnchorPreimageBytes, undefined, 8192);
+		const signature = copyBytes(envelope.detachedAnchorSignature, 64, 64);
+		const parametersBytes = copyBytes(envelope.exactCanonicalParametersCarrierBytes, undefined, 65_536);
+		if (anchorBytes === undefined || signature === undefined || parametersBytes === undefined)
+			return failure("MALFORMED_HISTORICAL_ENVELOPE");
+		const anchor = exactCanonicalRecord(anchorBytes, "epochAnchor");
+		const successor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
+		const anchorDigestBytes = hashDomain(registry.kinds.epochAnchor?.domain ?? "", anchorBytes);
+		const anchorDigest = hex(anchorDigestBytes);
+		if (
+			anchor === undefined ||
+			successor === undefined ||
+			!validRegisteredAnchor(anchor) ||
+			!validRegisteredAnchor(successor) ||
+			envelope.objectId !== material.objectId ||
+			anchor.objectId !== material.objectId ||
+			successor.objectId !== material.objectId ||
+			!safeInteger(material.currentEpoch, 1) ||
+			successor.epoch !== material.currentEpoch ||
+			anchor.epoch !== material.currentEpoch - 1 ||
+			successor.previousAnchor !== anchorDigest ||
+			hex(hashDomain(registry.kinds.epochAnchor?.domain ?? "", material.exactCanonicalCurrentAnchorPreimageBytes)) !==
+				material.currentAnchorDigest ||
+			anchor.cryptoSuiteId !== "ed25519-sha256-v3" ||
+			anchor.cryptoSuiteId !== successor.cryptoSuiteId ||
+			anchor.profileDigest !== successor.profileDigest ||
+			anchor.profileDigest !== hex(hashDomain("ts-drp/profile/v3", material.exactCanonicalProfileBytes)) ||
+			anchor.signerSetDigest !== successor.signerSetDigest ||
+			anchor.signerSetDigest !== hex(hashDomain("ts-drp/signer-set/v3", material.exactCanonicalSignerSetBytes)) ||
+			anchor.blueprintDigest !== successor.blueprintDigest
+		)
+			return failure("HISTORICAL_ANCHOR_MISMATCH");
+		let parameters: unknown;
+		try {
+			parameters = decodeCanonicalValue(parametersBytes);
+		} catch {
+			return failure("HISTORICAL_PARAMETERS_MISMATCH");
+		}
+		const parametersDigest = hex(hashDomain(registry.kinds.parameters?.domain ?? "", parametersBytes));
+		if (
+			!plainRecord(parameters) ||
+			!validClosedParameters(parameters) ||
+			parametersDigest !== anchor.parametersDigest ||
+			parametersDigest !== successor.parametersDigest
+		)
+			return failure("HISTORICAL_PARAMETERS_MISMATCH");
+		if (!verifyEd25519RegisteredDigest(signature, anchorDigestBytes, material.publicKey))
+			return failure("INVALID_HISTORICAL_SIGNATURE");
+		return Object.freeze({
+			ok: true as const,
+			objectId: material.objectId,
+			epoch: anchor.epoch as number,
+			anchorDigest,
+			aclDigest: anchor.aclDigest as string,
+			parametersDigest,
+			profileDigest: anchor.profileDigest as string,
+			signerSetDigest: anchor.signerSetDigest as string,
+			cryptoSuiteId: anchor.cryptoSuiteId as string,
+			blueprintDigest: anchor.blueprintDigest as string,
+		});
+	} catch {
+		return failure("MALFORMED_HISTORICAL_ENVELOPE");
+	}
 }
 
 /**
@@ -634,11 +797,10 @@ export function completeCreatorSuccessor(
 		if (state === undefined || signature === undefined) return failure("INVALID_SUCCESSOR_SIGNATURE");
 		preparationStates.delete(input.preparation as CreatorAnchorPreparation);
 		if (
-			!ed25519.verify(
+			!verifyEd25519RegisteredDigest(
 				signature,
 				Uint8Array.from(state.anchorDigest.match(/../gu) ?? [], (part) => Number.parseInt(part, 16)),
-				state.material.publicKey,
-				{ zip215: false }
+				state.material.publicKey
 			)
 		) {
 			return failure("INVALID_SUCCESSOR_SIGNATURE");
@@ -725,7 +887,7 @@ export function openCreatorSuccessorTrust(
 			decodedRecord.currentAnchorDigest !== anchorDigest ||
 			decodedRecord.currentEpoch !== anchor.epoch ||
 			anchor.objectId !== material.objectId ||
-			!ed25519.verify(signature, anchorDigestBytes, material.publicKey, { zip215: false })
+			!verifyEd25519RegisteredDigest(signature, anchorDigestBytes, material.publicKey)
 		) {
 			return failure("CERTIFIED_VALUE_MISMATCH");
 		}

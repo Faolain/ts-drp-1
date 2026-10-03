@@ -1,0 +1,22 @@
+{
+	"extends": "./tsconfig.api.json",
+	"files": [
+		"capture.ts",
+		"instrument.ts",
+		"contract.ts",
+		"exercise.ts",
+		"generic.ts",
+		"node-entry.ts",
+		"node-mechanism.ts",
+		"browser-entry.ts",
+		"browser-mechanism.ts",
+		"browser-server.ts",
+		"browser-red.pw.ts",
+		"playwright.config.ts",
+		"build.ts",
+		"record.mts",
+		"vitest.config.ts",
+		"../../signed-anchor-mechanism-node-red.test.ts"
+	],
+	"include": []
+}

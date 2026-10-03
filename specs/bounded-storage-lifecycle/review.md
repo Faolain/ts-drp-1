@@ -5,6 +5,26 @@ versioned-owner findings are dispositioned in the executable slice. Freeze the
 amended independent RED before assigning its distinct GREEN author; review the
 resulting implementation and these fixes together before accepting the seam.
 
+## Signed historical-anchor mechanism and MAIN integration accepted
+
+The existing journal and private rollback provenance owner now provide bounded
+original signed material, authenticated populated-destination preservation and
+genuine absent/empty historical import under one proof ledger. The original
+independent product review found a real native admission-after-close bug; its
+historical NO is preserved. Separate HIGH causal regressions and distinct GREEN
+correction, followed by a fresh separate XHIGH
+[product disposition](../../.logs/bounded-storage-lifecycle/signed-anchor-close-correction-product-review-01/root-disposition.md),
+resolve that finding without changing the frozen oracles or budgets.
+The [focused MAIN landing](../../.logs/bounded-storage-lifecycle/signed-anchor-mechanism-main-01/root-disposition.md)
+owns actual changed-product shutdown, import/observation and independent-reopen
+results. Broad historical/source custody, protected roles/union, recipient/room
+rollback and every failed/open endurance/device gate remain held; this is not
+all-profile durable availability or native full-pressure acceptance.
+The [conditional role prerequisite](../../.logs/bounded-storage-lifecycle/protected-role-acquisition-review-01/root-disposition.md)
+and [pending-policy hold](../../.logs/bounded-storage-lifecycle/protected-pending-retirement-policy-review-01/root-disposition.md)
+remain source-only boundaries, not deletion authority. The live handoff owns the
+next separately reviewed storage acquisition allocation.
+
 ## V3-only scope amendment accepted; retirement execution held
 
 The user replaces enabled legacy-finality retention with

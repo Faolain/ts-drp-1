@@ -1,9 +1,13 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { compareBytes } from "@ts-drp/canonical";
-import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
+import type { DurableLiveJournalStore, InstallLiveJournalGenesisInput } from "@ts-drp/live-journal";
 import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { openCreatorCheckpointTrust } from "@ts-drp/protocol-v3/creator-checkpoint";
-import { inspectCreatorClosedCutSuccessorBinding, openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";
+import {
+	inspectCreatorClosedCutSuccessorBinding,
+	inspectCreatorHistoricalAnchorEnvelope,
+	openCreatorSuccessorTrust,
+} from "@ts-drp/protocol-v3/creator-close";
 import { resolveCreatorIssuanceRetirement } from "@ts-drp/protocol-v3/creator-issuance-retirement";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import registry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
@@ -13,6 +17,7 @@ import {
 	AHE_BOUNDED_READ_LIMITS,
 	type AheBoundedActiveRead,
 	type AheDurableStore,
+	type GenerationRecord,
 	type GenerationRef,
 	parseStorageObjectId,
 } from "@ts-drp/storage";
@@ -43,6 +48,36 @@ import {
 export type VerifiedCreatorClosedRollbackData = Readonly<Record<never, never>>;
 type VerifiedClosedAnchorDependency = Readonly<Record<never, never>>;
 type ClosedAclAnchorRequirement = Readonly<Record<never, never>>;
+export type CreatorClosedRollbackProofLedger = Readonly<Record<never, never>>;
+export type VerifiedInstalledHistoricalAnchor = Readonly<Record<never, never>>;
+export type CreatorClosedRollbackAnchorImportFailureKind =
+	| "malformed-input"
+	| "requirement-unavailable"
+	| "authority-invalid"
+	| "authority-stale"
+	| "source-unavailable"
+	| "source-invalid"
+	| "destination-unavailable"
+	| "destination-invalid"
+	| "proof-budget-exceeded"
+	| "install-outcome-unknown"
+	| "aborted"
+	| "release-failed"
+	| "internal-invariant";
+export type CreatorClosedRollbackAnchorImportInput = Readonly<{
+	requirement: ClosedAclAnchorRequirement;
+	sourceJournal: DurableLiveJournalStore;
+	proofLedger: CreatorClosedRollbackProofLedger;
+	signal?: AbortSignal;
+}>;
+type ImportFailure = Readonly<{
+	ok: false;
+	kind: CreatorClosedRollbackAnchorImportFailureKind;
+	cause?: Readonly<{ owner: "ahe" | "floor" | "source-journal" | "destination-journal"; reason: string }>;
+}>;
+export type CreatorClosedRollbackAnchorImportResult =
+	| Readonly<{ ok: true; material: VerifiedInstalledHistoricalAnchor }>
+	| ImportFailure;
 
 export interface CreatorRollbackFloorReader {
 	read(input: Readonly<{ scope: Readonly<{ objectId: string; pinnedGenesisAnchorDigest: string }> }>): Promise<
@@ -345,8 +380,38 @@ interface AnchorRequirementFacts {
 	}>[];
 	readonly head: AheBoundedActiveRead["head"];
 	readonly floor: CreatorExpectedRoomHead;
+	readonly closedAclDigest: string;
+	readonly frame: ImportFrame;
 }
+interface ImportFrame {
+	readonly input: Captured;
+	readonly reader: AheBoundedActiveRead;
+	readonly accounting: CreatorClosedRollbackProofAccounting;
+	readonly pending: Set<Promise<CreatorClosedRollbackAnchorImportResult>>;
+	readonly requirements: Set<ClosedAclAnchorRequirement>;
+	alive: boolean;
+}
+const frames = new WeakMap<AheBoundedActiveRead, ImportFrame>();
+const ledgers = new WeakMap<CreatorClosedRollbackProofLedger, ImportFrame>();
 const requirements = new WeakMap<ClosedAclAnchorRequirement, AnchorRequirementFacts>();
+const installedMaterials = new WeakMap<
+	VerifiedInstalledHistoricalAnchor,
+	Readonly<{
+		scope: AnchorRequirementFacts["scope"];
+		target: AnchorRequirementFacts["target"];
+		dependentTargets: AnchorRequirementFacts["dependentTargets"];
+		head: AnchorRequirementFacts["head"];
+		floor: AnchorRequirementFacts["floor"];
+		profileId: string;
+		source: DurableLiveJournalStore;
+		destination: DurableLiveJournalStore;
+		disposition: "present-in-place" | "installed-empty";
+		lengths: readonly number[];
+		anchorDigest: string;
+		parametersDigest: string;
+		signatureHex: string;
+	}>
+>();
 const dependencies = new WeakMap<
 	VerifiedClosedAnchorDependency,
 	Readonly<{
@@ -391,7 +456,22 @@ function deriveAnchorRequirement(
 		!exactCreatorTransitionOccurrence(closure.closure, retirement.candidate)
 	)
 		return undefined;
+	const frame = frames.get(reader);
+	if (frame === undefined || !frame.alive) return undefined;
+	const closedAcl = unique(closure, "drp-v3-latched-acl", identity.closedEpoch);
+	const closedAclDigest = creatorDataDigest("ts-drp/latched-acl/v3", closedAcl.bytes);
+	if (
+		!openCanonicalLatchedAclSnapshot({
+			exactCanonicalLatchedAclBytes: closedAcl.bytes,
+			expectedAclDigest: closedAclDigest,
+			expectedEpoch: identity.closedEpoch,
+			expectedObjectId: input.objectId,
+			expectedProfileId: trust.profileId,
+		}).ok
+	)
+		return undefined;
 	const requirement = Object.freeze({});
+	frame.requirements.add(requirement);
 	requirements.set(
 		requirement,
 		Object.freeze({
@@ -419,6 +499,8 @@ function deriveAnchorRequirement(
 			}),
 			head: Object.freeze({ ...reader.head }),
 			floor: Object.freeze({ ...floor }),
+			closedAclDigest,
+			frame,
 		})
 	);
 	return requirement;
@@ -636,6 +718,9 @@ async function authenticate(
 	let predecessorTrust = pin;
 	let transitionInput: Parameters<typeof inspectCreatorTransitionAdvance>[0] | undefined;
 	const accounting = createCreatorClosedRollbackProofAccounting(reader.blobs);
+	const frame: ImportFrame = { input, reader, accounting, pending: new Set(), requirements: new Set(), alive: true };
+	frames.set(reader, frame);
+	ledgers.set(accounting, frame);
 	const retainedDependencies: VerifiedClosedAnchorDependency[] = [];
 	const cuts: CutSummary[] = [];
 	if (n === 0) {
@@ -927,6 +1012,16 @@ export async function authenticateCreatorClosedRollbackData(
 	} catch (error) {
 		result = error instanceof Refusal ? error.result : failure("internal-invariant");
 	} finally {
+		if (reader !== undefined) {
+			const frame = frames.get(reader);
+			if (frame !== undefined) {
+				frame.alive = false;
+				ledgers.delete(frame.accounting);
+				for (const requirement of frame.requirements) requirements.delete(requirement);
+				frames.delete(reader);
+				await Promise.allSettled([...frame.pending]);
+			}
+		}
 		if (release !== undefined) {
 			try {
 				await release();
@@ -941,4 +1036,354 @@ export async function authenticateCreatorClosedRollbackData(
 	const observation = Object.freeze({});
 	observations.set(observation, facts);
 	return Object.freeze({ ok: true, observation });
+}
+
+function importFailure(
+	kind: CreatorClosedRollbackAnchorImportFailureKind,
+	owner?: NonNullable<ImportFailure["cause"]>["owner"],
+	reason?: string
+): ImportFailure {
+	return Object.freeze({
+		ok: false,
+		kind,
+		...(owner === undefined || reason === undefined ? {} : { cause: Object.freeze({ owner, reason }) }),
+	});
+}
+class ImportRefusal {
+	constructor(readonly result: ImportFailure) {}
+}
+interface CapturedImport extends CreatorClosedRollbackAnchorImportInput {
+	readonly sourceRead: DurableLiveJournalStore["readSignedAnchorEnvelope"];
+	readonly destinationRead: DurableLiveJournalStore["readSignedAnchorEnvelope"];
+	readonly install: DurableLiveJournalStore["importHistoricalAnchor"];
+}
+function captureImport(value: unknown): CreatorClosedRollbackAnchorImportInput | undefined {
+	try {
+		if (value === null || typeof value !== "object" || ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
+			return undefined;
+		const required = ["requirement", "sourceJournal", "proofLedger"];
+		const keys = Reflect.ownKeys(value);
+		if (
+			keys.some((key) => typeof key !== "string" || ![...required, "signal"].includes(key)) ||
+			required.some((key) => !keys.includes(key))
+		)
+			return undefined;
+		const fields: Record<string, unknown> = Object.create(null);
+		for (const key of keys) {
+			const descriptor = Object.getOwnPropertyDescriptor(value, key);
+			if (descriptor?.enumerable !== true || !("value" in descriptor)) return undefined;
+			fields[key as string] = descriptor.value;
+		}
+		for (const key of required) if (fields[key] === null || typeof fields[key] !== "object") return undefined;
+		if (fields.signal !== undefined) Reflect.apply(abortedGetter as (this: AbortSignal) => boolean, fields.signal, []);
+		return Object.freeze(fields) as unknown as CreatorClosedRollbackAnchorImportInput;
+	} catch {
+		return undefined;
+	}
+}
+function importCheck(input: CreatorClosedRollbackAnchorImportInput, facts: AnchorRequirementFacts): void {
+	if (isAborted(input.signal) || isAborted(facts.frame.input.signal)) throw new ImportRefusal(importFailure("aborted"));
+	if (!facts.frame.alive || ledgers.get(input.proofLedger) !== facts.frame)
+		throw new ImportRefusal(importFailure("requirement-unavailable"));
+}
+function nativeImportRefusal(reason: string, owner: "source-journal" | "destination-journal"): ImportRefusal {
+	const side = owner === "source-journal" ? "source" : "destination";
+	return new ImportRefusal(
+		importFailure(
+			reason === "read-budget-exceeded"
+				? "proof-budget-exceeded"
+				: reason === "outcome-unknown"
+					? "install-outcome-unknown"
+					: ["store-poisoned", "genesis-conflict"].includes(reason)
+						? `${side}-invalid`
+						: [
+									"store-closed",
+									"substrate-failure",
+									"unsupported-schema",
+									"durability-unavailable",
+									"import-populated",
+							  ].includes(reason)
+							? `${side}-unavailable`
+							: "internal-invariant",
+			owner,
+			reason
+		)
+	);
+}
+function sameImportGeneration(left: GenerationRecord, right: GenerationRecord): boolean {
+	const a = left.baseExpectedHead,
+		b = right.baseExpectedHead;
+	return (
+		left.objectId === right.objectId &&
+		left.generationId === right.generationId &&
+		left.closureDigest === right.closureDigest &&
+		left.state === right.state &&
+		a.kind === b.kind &&
+		a.objectId === b.objectId &&
+		(a.kind === "none" ||
+			(b.kind === "present" &&
+				a.generationId === b.generationId &&
+				a.closureDigest === b.closureDigest &&
+				a.revision === b.revision)) &&
+		left.closure.length === right.closure.length &&
+		left.closure.every(
+			(ref, index) => ref.digest === right.closure[index]?.digest && ref.byteLength === right.closure[index]?.byteLength
+		)
+	);
+}
+async function importCurrency(input: CapturedImport, facts: AnchorRequirementFacts): Promise<void> {
+	importCheck(input, facts);
+	const frame = facts.frame;
+	let rawFloor: unknown;
+	try {
+		rawFloor = await frame.input.floorRead({
+			scope: {
+				objectId: frame.input.objectId,
+				pinnedGenesisAnchorDigest: frame.input.pinnedGenesisAnchorDigest,
+			},
+		});
+	} catch {
+		throw new ImportRefusal(importFailure("authority-stale", "floor", "unavailable"));
+	}
+	importCheck(input, facts);
+	const floor = captureCreatorRoomFloor(rawFloor, frame.input.objectId, frame.input.pinnedGenesisAnchorDigest);
+	if (
+		!floor.ok ||
+		!sameCreatorRoomHead(floor.stable, {
+			objectId: facts.floor.objectId,
+			currentEpoch: facts.floor.epoch,
+			currentAnchorDigest: facts.floor.currentAnchorDigest,
+		})
+	)
+		throw new ImportRefusal(
+			importFailure("authority-stale", "floor", !floor.ok ? (floor.reason ?? floor.kind) : "changed")
+		);
+	const objectId = parseStorageObjectId(frame.input.objectId);
+	if (!objectId.ok) throw new ImportRefusal(importFailure("internal-invariant"));
+	let fresh: Awaited<ReturnType<Captured["acquire"]>>;
+	try {
+		fresh = await frame.input.acquire({
+			objectId: objectId.value,
+			ancestorCount: facts.floor.epoch === 0 ? 0 : 2,
+			limits: AHE_BOUNDED_READ_LIMITS,
+		});
+	} catch {
+		throw new ImportRefusal(importFailure("authority-invalid", "ahe", "unavailable"));
+	}
+	if (!fresh.ok)
+		throw new ImportRefusal(
+			importFailure(
+				fresh.reason === "READ_BUDGET_EXCEEDED" ? "proof-budget-exceeded" : "authority-stale",
+				"ahe",
+				fresh.reason
+			)
+		);
+	if (fresh.value.kind === "empty") throw new ImportRefusal(importFailure("authority-stale", "ahe", "empty"));
+	const reader = fresh.value.reader;
+	const release = bindMethod<AheBoundedActiveRead["release"]>(reader, "release");
+	let primary: unknown;
+	try {
+		importCheck(input, facts);
+		const keys = Object.keys(facts.head) as (keyof typeof facts.head)[];
+		if (
+			Object.keys(reader.head).length !== keys.length ||
+			keys.some((key) => reader.head[key] !== facts.head[key]) ||
+			reader.generations.length !== frame.reader.generations.length ||
+			reader.generations.some((generation, index) => {
+				const original = frame.reader.generations[index];
+				return original === undefined || !sameImportGeneration(generation, original);
+			}) ||
+			reader.blobs.length !== frame.reader.blobs.length ||
+			reader.blobs.some(
+				(blob) =>
+					!frame.reader.blobs.some(
+						(original) =>
+							blob.ref.digest === original.ref.digest &&
+							blob.ref.byteLength === original.ref.byteLength &&
+							compareBytes(blob.bytes, original.bytes) === 0
+					)
+			)
+		)
+			throw new ImportRefusal(importFailure("authority-stale", "ahe", "changed"));
+		const current = await bindMethod<AheBoundedActiveRead["checkCurrent"]>(reader, "checkCurrent")();
+		if (!current.ok)
+			throw new ImportRefusal(
+				importFailure(
+					current.reason === "READ_BUDGET_EXCEEDED" ? "proof-budget-exceeded" : "authority-stale",
+					"ahe",
+					current.reason
+				)
+			);
+		importCheck(input, facts);
+	} catch (error) {
+		primary = error;
+	} finally {
+		try {
+			await release();
+		} catch {
+			primary ??= new ImportRefusal(importFailure("release-failed"));
+		}
+	}
+	if (primary !== undefined) throw primary;
+	importCheck(input, facts);
+}
+async function acquireImportEnvelope(
+	input: CapturedImport,
+	facts: AnchorRequirementFacts,
+	owner: "source-journal" | "destination-journal"
+): Promise<InstallLiveJournalGenesisInput | undefined> {
+	importCheck(input, facts);
+	const allowance = Math.min(
+		AHE_BOUNDED_READ_LIMITS.maxUnionBytes - facts.frame.accounting.chargedBytes,
+		8192 + 64 + 65536
+	);
+	let result: Awaited<ReturnType<CapturedImport["sourceRead"]>>;
+	try {
+		result = await (owner === "source-journal" ? input.sourceRead : input.destinationRead)({
+			scope: facts.scope,
+			maxBytes: allowance,
+		});
+	} catch {
+		throw new ImportRefusal(
+			importFailure(owner === "source-journal" ? "source-unavailable" : "destination-unavailable")
+		);
+	}
+	if (!result.ok) throw nativeImportRefusal(result.kind, owner);
+	importCheck(input, facts);
+	if (result.kind === "missing") return undefined;
+	const envelope = result.envelope;
+	const bytes = [
+		envelope.exactCanonicalAnchorPreimageBytes,
+		envelope.detachedAnchorSignature,
+		envelope.exactCanonicalParametersCarrierBytes,
+	];
+	if (bytes.reduce((sum, carrier) => sum + carrier.byteLength, 0) > allowance)
+		throw new ImportRefusal(importFailure("internal-invariant"));
+	for (const carrier of bytes)
+		if (!facts.frame.accounting.charge(carrier)) throw new ImportRefusal(importFailure("proof-budget-exceeded"));
+	const inspected = inspectCreatorHistoricalAnchorEnvelope({ successorTrust: facts.successorTrust, envelope });
+	const identity = resolveCreatorIssuanceRetirement(facts.retirement.capability);
+	if (
+		!inspected.ok ||
+		identity === undefined ||
+		inspected.anchorDigest !== facts.scope.anchorDigest ||
+		inspected.anchorDigest !== identity.closedAnchorDigest ||
+		inspected.aclDigest !== facts.closedAclDigest ||
+		result.scope.objectId !== facts.scope.objectId ||
+		result.scope.epoch !== facts.scope.epoch ||
+		result.scope.anchorDigest !== facts.scope.anchorDigest ||
+		result.parametersDigest !== inspected.parametersDigest
+	)
+		throw new ImportRefusal(importFailure(owner === "source-journal" ? "source-invalid" : "destination-invalid"));
+	return envelope;
+}
+function equalImportEnvelope(a: InstallLiveJournalGenesisInput, b: InstallLiveJournalGenesisInput): boolean {
+	return (
+		a.objectId === b.objectId &&
+		compareBytes(a.exactCanonicalAnchorPreimageBytes, b.exactCanonicalAnchorPreimageBytes) === 0 &&
+		compareBytes(a.detachedAnchorSignature, b.detachedAnchorSignature) === 0 &&
+		compareBytes(a.exactCanonicalParametersCarrierBytes, b.exactCanonicalParametersCarrierBytes) === 0
+	);
+}
+async function runImport(
+	input: CapturedImport,
+	facts: AnchorRequirementFacts
+): Promise<CreatorClosedRollbackAnchorImportResult> {
+	try {
+		await importCurrency(input, facts);
+		let envelope = await acquireImportEnvelope(input, facts, "destination-journal");
+		let disposition: "present-in-place" | "installed-empty" = "present-in-place";
+		if (envelope === undefined) {
+			envelope = await acquireImportEnvelope(input, facts, "source-journal");
+			if (envelope === undefined) throw new ImportRefusal(importFailure("source-unavailable"));
+			const reread = await acquireImportEnvelope(input, facts, "source-journal");
+			if (reread === undefined || !equalImportEnvelope(envelope, reread))
+				throw new ImportRefusal(importFailure("source-invalid"));
+			await importCurrency(input, facts);
+			importCheck(input, facts);
+			let installed: Awaited<ReturnType<CapturedImport["install"]>>;
+			try {
+				installed = await input.install({
+					envelope,
+					maxBytes: Math.min(
+						AHE_BOUNDED_READ_LIMITS.maxUnionBytes - facts.frame.accounting.chargedBytes,
+						8192 + 64 + 65536
+					),
+				});
+			} catch {
+				throw new ImportRefusal(importFailure("install-outcome-unknown"));
+			}
+			if (!installed.ok) throw nativeImportRefusal(installed.kind, "destination-journal");
+			importCheck(input, facts);
+			disposition = "installed-empty";
+		}
+		const confirmed = await acquireImportEnvelope(input, facts, "destination-journal");
+		if (confirmed === undefined || !equalImportEnvelope(envelope, confirmed))
+			throw new ImportRefusal(importFailure("destination-invalid"));
+		await importCurrency(input, facts);
+		importCheck(input, facts);
+		const anchor = record(confirmed.exactCanonicalAnchorPreimageBytes);
+		const material = Object.freeze({});
+		installedMaterials.set(
+			material,
+			Object.freeze({
+				scope: facts.scope,
+				target: facts.target,
+				dependentTargets: facts.dependentTargets,
+				head: facts.head,
+				floor: facts.floor,
+				profileId: facts.successorTrust.profileId,
+				source: input.sourceJournal,
+				destination: facts.source,
+				disposition,
+				anchorDigest: facts.scope.anchorDigest,
+				parametersDigest: String(anchor.parametersDigest),
+				signatureHex: Array.from(confirmed.detachedAnchorSignature, (byte) => byte.toString(16).padStart(2, "0")).join(
+					""
+				),
+				lengths: Object.freeze([
+					confirmed.exactCanonicalAnchorPreimageBytes.byteLength,
+					confirmed.detachedAnchorSignature.byteLength,
+					confirmed.exactCanonicalParametersCarrierBytes.byteLength,
+				]),
+			})
+		);
+		return Object.freeze({ ok: true, material });
+	} catch (error) {
+		return error instanceof ImportRefusal ? error.result : importFailure("internal-invariant");
+	}
+}
+/**
+ * Authenticates existing destination material or imports only into a genuine empty closure.
+ * The original operation's live requirement/ledger pair is mandatory; stores remain borrowed.
+ * @param value - Closed input containing genuine private live provenance.
+ * @returns A private signed-material fact or typed refusal, not protected custody or replay readiness.
+ */
+export async function importCreatorClosedRollbackAnchor(
+	value: CreatorClosedRollbackAnchorImportInput
+): Promise<CreatorClosedRollbackAnchorImportResult> {
+	const captured = captureImport(value);
+	if (captured === undefined) return importFailure("malformed-input");
+	if (isAborted(captured.signal)) return importFailure("aborted");
+	const facts = requirements.get(captured.requirement);
+	if (facts === undefined || !facts.frame.alive || ledgers.get(captured.proofLedger) !== facts.frame)
+		return importFailure("requirement-unavailable");
+	let input: CapturedImport;
+	try {
+		input = Object.freeze({
+			...captured,
+			sourceRead: bindMethod<CapturedImport["sourceRead"]>(captured.sourceJournal, "readSignedAnchorEnvelope"),
+			destinationRead: bindMethod<CapturedImport["destinationRead"]>(facts.source, "readSignedAnchorEnvelope"),
+			install: bindMethod<CapturedImport["install"]>(facts.source, "importHistoricalAnchor"),
+		});
+	} catch {
+		return importFailure("malformed-input");
+	}
+	const admitted = runImport(input, facts);
+	facts.frame.pending.add(admitted);
+	try {
+		return await admitted;
+	} finally {
+		facts.frame.pending.delete(admitted);
+	}
 }

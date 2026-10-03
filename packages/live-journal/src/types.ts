@@ -116,6 +116,34 @@ export type LiveJournalAnchorReadResult =
 	  }>
 	| Readonly<{ readonly ok: false; readonly kind: LiveJournalAnchorReadFailureKind }>;
 
+export interface LiveJournalSignedAnchorReadInput {
+	readonly scope: LiveJournalScope;
+	readonly maxBytes: number;
+}
+
+export type LiveJournalSignedAnchorReadResult =
+	| Readonly<{ readonly ok: true; readonly kind: "missing" }>
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "present";
+			readonly scope: LiveJournalScope;
+			readonly parametersDigest: string;
+			readonly envelope: InstallLiveJournalGenesisInput;
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: LiveJournalAnchorReadFailureKind }>;
+
+export interface LiveJournalHistoricalAnchorImportInput {
+	readonly envelope: InstallLiveJournalGenesisInput;
+	readonly maxBytes: number;
+}
+
+export type LiveJournalHistoricalAnchorImportResult =
+	| Extract<InstallLiveJournalGenesisResult, { readonly ok: true }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: LiveJournalAnchorReadFailureKind | "import-populated";
+	  }>;
+
 export interface LiveJournalSnapshotToken {
 	readonly kind: "v3-live-journal-snapshot-token-1";
 	readonly scope: LiveJournalScope;
@@ -160,6 +188,10 @@ export interface DurableLiveJournalStore {
 	appendAccepted(input: AppendAcceptedVertexInput): Promise<AppendAcceptedVertexResult>;
 	readiness(input: LiveJournalReadinessInput): Promise<LiveJournalReadinessResult>;
 	readAnchorPreimage(input: LiveJournalAnchorReadInput): Promise<LiveJournalAnchorReadResult>;
+	readSignedAnchorEnvelope(input: LiveJournalSignedAnchorReadInput): Promise<LiveJournalSignedAnchorReadResult>;
+	importHistoricalAnchor(
+		input: LiveJournalHistoricalAnchorImportInput
+	): Promise<LiveJournalHistoricalAnchorImportResult>;
 	readPage(input: LiveJournalPageInput): Promise<LiveJournalPageResult>;
 	close(): Promise<void>;
 }

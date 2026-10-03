@@ -2,16 +2,44 @@
 
 ## Next Agent Prompt
 
-Active pickup (2026-10-03): separate Codex 6.1 HIGH tests-only RED for the
-[accepted signed historical-anchor mechanism](../../.logs/bounded-storage-lifecycle/rollback-signed-anchor-custody-review-01/root-disposition.md),
-immediately after the focused MAIN observer landing. Its
-[proposal](../../.logs/bounded-storage-lifecycle/rollback-signed-anchor-custody-plan-01/proposal.md)
-owns the exact bounded signed-envelope, empty-import and private orchestration seam.
-Derive genuine requirements before missing-destination refusal, with the same
-operation-private proof ledger; whole-observer success cannot be a repair prerequisite.
-Preserve exact populated destinations in place. Import only genuinely absent/empty
-closures, never fabricated empty rows or an uncapped populated scan. A fresh separate
-XHIGH readiness review precedes distinct HIGH GREEN and actual changed-product gates.
+Active pickup (2026-10-03): the signed historical-anchor mechanism is implemented
+and [focused MAIN integration accepted](../../.logs/bounded-storage-lifecycle/signed-anchor-mechanism-main-01/root-disposition.md).
+The original product review's native capture/close admission finding is resolved
+by the [separately reviewed lifetime correction](../../.logs/bounded-storage-lifecycle/signed-anchor-close-correction-product-review-01/root-disposition.md).
+Actual changed-product import/observation, independent reopen and causal shutdown
+assertions pass; frozen behavioral oracles and previous evidence partitions remain
+preserved. Broader historical custody is still open. Requirements derive before
+missing-destination refusal under the same operation-private proof ledger; whole
+observer success cannot be a repair prerequisite. Exact populated destinations
+stay in place, and import is limited to genuinely absent/empty closures. No fake
+empty rows or uncapped populated scan is permitted. Exact-U acquisition still
+conservatively refuses mandatory rereads after exhausting the same ledger;
+inclusive envelope admission and genuine equality-only dedup remain supported.
+
+Continue with the storage half of the conditional protected-role contract:
+bounded full physical metadata/candidate acquisition, complete same-head currency
+and joined release in the existing native owners. Its isolated source allocation
+is under fresh separate XHIGH review. Accept that focused allocation before
+tests-only HIGH RED, obtain independent RED readiness, then immediately release
+distinct HIGH GREEN and run the actual new assertions. Do not combine private
+Node role authentication, policy availability, protected union or deletion into
+this mechanical storage capability. Preserve old active-reader behavior and every
+fixed budget; no second full-U buffer or invented incarnation witness is allowed.
+Then continue actual current/pending snapshot/ACL authentication, genuine historical
+source/destination custody, complete protected roles and mandatory room/lifecycle
+consumption. Do not repeat unchanged full matrices at any handoff.
+
+The [protected-role prerequisite](../../.logs/bounded-storage-lifecycle/protected-role-acquisition-review-01/root-disposition.md)
+is accepted as a conditional current/pending source contract only. Actual snapshot
+payload, closed/successor ACL and adjacent/deferred policy remain mandatory. It
+does not release runtime acquisition, the complete protected union or deletion.
+Retirement-only pending advance remains unavailable pending an independently
+accepted pure forward/ACL-coverage law and genuine pending-material provenance.
+Its [source review](../../.logs/bounded-storage-lifecycle/protected-pending-retirement-policy-review-01/root-disposition.md)
+also holds non-genesis scope for an independent current-role law: unchanged
+current acceptance retains an aggregate that the proposed subcase forbids.
+Historical retirement-only acceptance is not forward-adoption authority. This
+debt is separate from the signed-anchor fix and releases no runtime policy.
 
 [2e-3 actual closed-cut data observation](slices/02e-3-authenticated-closed-cut-data-observation.md)
 is implemented and independently product-reviewed. Previously masked assertions
