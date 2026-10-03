@@ -17,7 +17,17 @@ import registryJson from "../registry/registry-v1.json" with { type: "json" };
 
 const registry = registryJson as unknown as {
 	readonly kinds: Readonly<
-		Record<string, Readonly<{ readonly domain: string; readonly fields: readonly { name: string }[] }>>
+		Record<
+			string,
+			Readonly<{
+				readonly domain: string;
+				readonly fields: readonly {
+					name: string;
+					required: boolean;
+					constraints: Readonly<Record<string, unknown>>;
+				}[];
+			}>
+		>
 	>;
 };
 const intrinsicArrayBufferPrototype = ArrayBuffer.prototype;
@@ -223,6 +233,111 @@ function successorAnchor(
 		signerSetDigest: currentAnchor.signerSetDigest,
 		stateDigest: cut.stateDigest,
 	});
+}
+
+function closedCutSuccessorEquation(
+	material: CreatorAnchorTrustMaterial,
+	anchorBytes: Uint8Array,
+	cutBytes: Uint8Array
+): Readonly<Record<string, unknown>> | undefined {
+	const anchor = exactCanonicalRecord(anchorBytes, "epochAnchor");
+	const cut = exactCanonicalRecord(cutBytes, "cutValue");
+	if (
+		anchor === undefined ||
+		cut === undefined ||
+		cut.kind !== "drp-hard-epoch-cut" ||
+		cut.protocolMajor !== 3 ||
+		cut.encodingVersion !== "drp-canonical-profile-1" ||
+		cut.objectId !== material.objectId ||
+		!safeInteger(cut.epoch) ||
+		anchor.epoch !== cut.epoch + 1 ||
+		anchor.previousAnchor !== cut.previousAnchor ||
+		!safeInteger(cut.closeSetCount, 1) ||
+		!safeInteger(cut.previousHistorySize) ||
+		!safeInteger(cut.historySize) ||
+		cut.historySize !== cut.previousHistorySize + cut.closeSetCount ||
+		typeof cut.closeReason !== "string" ||
+		cut.closeReason.length < 1 ||
+		cut.closeReason.length > 128 ||
+		compareBytes(encodeCanonical(cut.nextSignerSet), material.exactCanonicalSignerSetBytes) !== 0 ||
+		!plainRecord(cut.parameters) ||
+		!validClosedParameters(cut.parameters) ||
+		hex(hashDomain("ts-drp/parameters/v3", encodeCanonical(cut.parameters))) !== anchor.parametersDigest ||
+		anchor.profileDigest !== hex(hashDomain("ts-drp/profile/v3", material.exactCanonicalProfileBytes)) ||
+		anchor.signerSetDigest !== hex(hashDomain("ts-drp/signer-set/v3", material.exactCanonicalSignerSetBytes)) ||
+		anchor.cryptoSuiteId !== "ed25519-sha256-v3" ||
+		compareBytes(successorAnchor(anchor, cut), anchorBytes) !== 0
+	)
+		return undefined;
+	for (const field of [
+		"aclDigest",
+		"archiveIndexRoot",
+		"availabilityPolicyDigest",
+		"blueprintDigest",
+		"closeSetRoot",
+		"historyRoot",
+		"previousAnchor",
+		"previousCutDigest",
+		"previousHistoryRoot",
+		"snapshotManifestDigest",
+		"stateDigest",
+	]) {
+		if (typeof cut[field] !== "string" || !digestHex.test(cut[field] as string)) return undefined;
+	}
+	return cut;
+}
+
+function validClosedParameters(value: Readonly<Record<string, unknown>>): boolean {
+	const fields = registry.kinds.parameters?.fields;
+	return (
+		fields !== undefined &&
+		Reflect.ownKeys(value).every((key) => typeof key === "string" && fields.some((field) => field.name === key)) &&
+		fields.every((field) => {
+			if (!Object.hasOwn(value, field.name)) return !field.required;
+			const candidate = value[field.name];
+			return (
+				safeInteger(candidate) &&
+				candidate >= (field.constraints.minimum as number) &&
+				candidate <= (field.constraints.maximum as number)
+			);
+		})
+	);
+}
+
+/**
+ * Inspects exact closed-cut binding to genuine successor custody without minting old authority.
+ * @param input - Closed genuine successor trust and canonical CutValue bytes.
+ * @returns Detached identities or a frozen binding refusal.
+ */
+export function inspectCreatorClosedCutSuccessorBinding(input: unknown): Readonly<
+	| { ok: false; reason: string }
+	| {
+			ok: true;
+			cut: Readonly<Record<string, unknown>>;
+			successorAnchor: Readonly<Record<string, unknown>>;
+			successorAnchorDigest: string;
+	  }
+> {
+	try {
+		if (!plainRecord(input) || !exactKeys(input, ["successorTrust", "exactCanonicalCutValueBytes"]))
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		const material = resolveCreatorAnchorTrustMaterial(input.successorTrust as CurrentAnchorTrust);
+		const bytes = copyBytes(input.exactCanonicalCutValueBytes, undefined, 65_536);
+		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
+		if (bytes === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const cut = closedCutSuccessorEquation(material, material.exactCanonicalCurrentAnchorPreimageBytes, bytes);
+		const anchor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
+		return cut === undefined || anchor === undefined
+			? failure("CERTIFIED_VALUE_MISMATCH")
+			: Object.freeze({
+					ok: true as const,
+					cut,
+					successorAnchor: anchor,
+					successorAnchorDigest: material.currentAnchorDigest,
+				});
+	} catch {
+		return failure("CERTIFIED_VALUE_MISMATCH");
+	}
 }
 
 /**
@@ -634,7 +749,16 @@ export function openCreatorSuccessorTrust(
 		const valueDigest = hex(hashDomain(registry.kinds.cutValue?.domain ?? "", cutBytes));
 		if (verified.valueDigest !== valueDigest) return failure("CERTIFIED_VALUE_MISMATCH");
 		const currentAnchor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
-		if (currentAnchor === undefined || compareBytes(successorAnchor(currentAnchor, cut), anchorBytes) !== 0) {
+		if (
+			currentAnchor === undefined ||
+			cut.epoch !== material.currentEpoch ||
+			cut.previousAnchor !== material.currentAnchorDigest ||
+			cut.previousCutDigest !== currentAnchor.cutDigest ||
+			cut.previousHistoryRoot !== currentAnchor.historyRoot ||
+			cut.previousHistorySize !== currentAnchor.historySize ||
+			compareBytes(successorAnchor(currentAnchor, cut), anchorBytes) !== 0 ||
+			closedCutSuccessorEquation(material, anchorBytes, cutBytes) === undefined
+		) {
 			return failure("CERTIFIED_VALUE_MISMATCH");
 		}
 		const trust = mintCreatorAnchorTrustSuccessor(currentTrust, anchorBytes, signature);

@@ -1,0 +1,5 @@
+{
+	"extends": "../rollback-data-observation/tsconfig.api.json",
+	"files": ["api-contract.ts"],
+	"include": []
+}

@@ -129,9 +129,10 @@ export async function observeSQLite(
 		return evidence.reads.length - 1;
 	};
 	DatabaseSync.prototype.exec = function (sql: string): void {
-		if (/BEGIN\s+IMMEDIATE/i.test(sql)) {
+		const begin = /\bBEGIN(?:\s+(?:IMMEDIATE|DEFERRED|EXCLUSIVE))?\b/i.exec(sql);
+		if (begin) {
 			evidence.transactions++;
-			evidence.modes.push("BEGIN IMMEDIATE");
+			evidence.modes.push(begin[0].toUpperCase().replace(/\s+/g, " "));
 		}
 		if (/\b(INSERT|UPDATE|DELETE|REPLACE|ALTER|CREATE|DROP)\b/i.test(sql)) evidence.writes++;
 		Reflect.apply(exec, this, [sql]);
@@ -280,9 +281,42 @@ export function sqliteEnvironment(primaryFilename: string): DiscoveryEnvironment
 			const longKey: Key = { ...selected.declaration.scope, objectId: "x".repeat(5000) };
 			await store.openScope({ ...selected.declaration, scope: longKey });
 			await store.close();
+			const transactionModes = [];
+			for (const mode of ["BEGIN", "BEGIN IMMEDIATE"]) {
+				const observed = await observeSQLite(() =>
+					Promise.resolve(
+						use((db) => {
+							db.exec(mode);
+							const value = db
+								.prepare(`SELECT 1 FROM snapshot_scopes_v2 WHERE ${where}`)
+								.get(...parameters(selected.declaration.scope));
+							db.exec("COMMIT");
+							return value;
+						})
+					)
+				);
+				check(observed.value, { "1": 1 }, "native exact read result survives observation");
+				check(observed.evidence.transactions, 1, "native literal begin counted");
+				check(observed.evidence.modes, [mode], "native literal mode preserved");
+				check(observed.evidence.terminalEvents, ["COMMIT"], "native commit completes before settlement");
+				let rejection: unknown;
+				try {
+					bounded(observed.evidence, true, "sqlite");
+				} catch (error) {
+					rejection = error;
+				}
+				check(Boolean(rejection), mode === "BEGIN IMMEDIATE", "readonly validator distinguishes literal modes");
+				if (rejection)
+					check(
+						String(rejection).includes("existing sqlite transaction semantics"),
+						true,
+						"IMMEDIATE rejected for mode"
+					);
+				transactionModes.push({ mode, evidence: observed.evidence, rejected: Boolean(rejection) });
+			}
 			const result = await observeSQLite(() => {
 				use((db) => {
-					db.exec("BEGIN IMMEDIATE");
+					db.exec("BEGIN");
 					db.prepare(
 						"SELECT * FROM snapshot_scopes_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
 					).get("none", 1, "a", "b");
@@ -308,7 +342,7 @@ export function sqliteEnvironment(primaryFilename: string): DiscoveryEnvironment
 				const probe = await observeSQLite(() =>
 					Promise.resolve(
 						use((db) => {
-							db.exec("BEGIN IMMEDIATE");
+							db.exec("BEGIN");
 							db.prepare(`SELECT 1 FROM snapshot_scopes_v2 WHERE ${where}`).get("none", 1, "a", "b");
 							db.prepare(
 								scan
@@ -339,7 +373,7 @@ export function sqliteEnvironment(primaryFilename: string): DiscoveryEnvironment
 				const observed = await observeSQLite(() =>
 					Promise.resolve(
 						use((db) => {
-							db.exec("BEGIN IMMEDIATE");
+							db.exec("BEGIN");
 							const probe = (): void => {
 								const statement = db.prepare(
 									"SELECT 1 FROM snapshot_scopes_v2 AS s WHERE object_id=? AND epoch=? AND anchor=? LIMIT 1"
@@ -491,7 +525,7 @@ export function sqliteEnvironment(primaryFilename: string): DiscoveryEnvironment
 				const observed = await observeSQLite(() =>
 					Promise.resolve(
 						use((db) => {
-							db.exec("BEGIN IMMEDIATE");
+							db.exec("BEGIN");
 							const value = db.prepare(`SELECT ${projection} FROM snapshot_scopes_v2 WHERE ${where}`).get(...args);
 							db.exec("COMMIT");
 							return value;
@@ -508,7 +542,7 @@ export function sqliteEnvironment(primaryFilename: string): DiscoveryEnvironment
 				}
 				check(detected, refuse, "native stored long-key copy control");
 			}
-			return { native: true, instrumented: true, invalidObservationRejected: true, nul };
+			return { native: true, instrumented: true, invalidObservationRejected: true, transactionModes, nul };
 		},
 	};
 }

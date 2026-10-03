@@ -594,20 +594,24 @@ export function createNodeSnapshotQuarantineStore(
 			const signal = options.signal;
 			throwIfAborted(signal);
 			return schedule(() =>
-				runTransaction(database, () => {
-					throwIfAborted(signal);
-					const metadata = readRecoveryMetadata(scope);
-					if (metadata !== undefined) return metadata.observation;
-					if (
-						database
-							.prepare(
-								"SELECT 1 AS occupied FROM snapshot_scopes_v2 WHERE object_id=? AND epoch=? AND anchor=? LIMIT 1"
-							)
-							.get(scope.objectId, scope.epoch, scope.anchor) !== undefined
-					)
-						throw failure("conflict", "snapshot identity is occupied by another digest");
-					return Object.freeze({ kind: "missing" as const });
-				})
+				runTransaction(
+					database,
+					() => {
+						throwIfAborted(signal);
+						const metadata = readRecoveryMetadata(scope);
+						if (metadata !== undefined) return metadata.observation;
+						if (
+							database
+								.prepare(
+									"SELECT 1 AS occupied FROM snapshot_scopes_v2 WHERE object_id=? AND epoch=? AND anchor=? LIMIT 1"
+								)
+								.get(scope.objectId, scope.epoch, scope.anchor) !== undefined
+						)
+							throw failure("conflict", "snapshot identity is occupied by another digest");
+						return Object.freeze({ kind: "missing" as const });
+					},
+					"readonly"
+				)
 			);
 		});
 	const occupiedRecoveryScope = (scope: SnapshotQuarantineScopeKey): SnapshotQuarantineScopeKey | undefined => {
@@ -737,10 +741,14 @@ export function createNodeSnapshotQuarantineStore(
 			const signal = options.signal;
 			throwIfAborted(signal);
 			return schedule(() =>
-				runTransaction(database, () => {
-					throwIfAborted(signal);
-					return ownerStatus(database);
-				})
+				runTransaction(
+					database,
+					() => {
+						throwIfAborted(signal);
+						return ownerStatus(database);
+					},
+					"readonly"
+				)
 			);
 		});
 

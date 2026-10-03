@@ -4,8 +4,11 @@ Status: independently reviewed source contract accepted, 2026-10-03, under the
 [root disposition](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md).
 Tests-only RED and its bounded corrections have separate focused readiness
 [acceptance](../../../.logs/bounded-storage-lifecycle/rollback-data-bounded-delta-review-01/root-disposition.md).
-Distinct GREEN is active; changed-product verification, independent product review
-and root integration remain required. Historical native-pressure demand remains
+Distinct GREEN and independent product review are accepted under the
+[product disposition](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-product-review-01/root-disposition.md);
+the [focused MAIN integration](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-main-01/root-disposition.md)
+owns landing gates. Previously masked product assertions actually execute and pass.
+Historical native-pressure demand remains
 held, not completed by synthetic production-owner composition. The
 [live handoff](../README.md#next-agent-prompt) owns execution status. This is
 all-target byte authentication, not durable availability or usable room rollback.

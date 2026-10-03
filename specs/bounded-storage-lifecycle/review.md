@@ -270,7 +270,7 @@ canvas. Current-v3 ACL and retired wire/durable policy remain separate held
 source contracts, now allocated to independent HIGH authors without product/runtime
 changes. No removal or app port advances ahead of the active recovery sequence.
 
-## 2e-3 actual closed-cut data observation — contract accepted
+## 2e-3 actual closed-cut data observation — product accepted
 
 The separate HIGH [proposal](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-plan-01/proposal.md)
 and independent XHIGH [APPROVED verdict](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/public.md)
@@ -294,10 +294,21 @@ correction, accepted under the
 [bounded disposition](../../.logs/bounded-storage-lifecycle/rollback-data-bounded-delta-review-01/root-disposition.md).
 The original native-pressure demand remains held, not waived or completed. Tiny
 outer-input diagnostics remain evidence-only; they do not establish product success.
-Distinct HIGH GREEN is active within the existing allocation and must run every
-previously masked assertion against changed product before separate product review.
-No full-data runtime, protected
-custody, migration, usable room rollback or golden-path acceptance is claimed.
+Distinct HIGH GREEN implemented the allocated private observer and shared laws.
+Fresh separate XHIGH returns PRODUCT_READY, MASKED_ASSERTIONS_EXECUTED and
+CONTEXT_COMPLETE YES, findings NONE, under the
+[product disposition](../../.logs/bounded-storage-lifecycle/rollback-data-observation-product-review-01/root-disposition.md).
+Actual final-body native41, browser42 and qualified SAME_U9 pass; affected
+adoption/transition and pending source-only assertions pass. Separate HIGH authored
+and XHIGH reviewed the demonstrated literal-BEGIN telemetry correction. All affected
+metadata93 assertions then pass, but the command exits1 for inherited coverage2.13%
+below unchanged70. That global gate remains FAILED and unwaived.
+The [focused MAIN landing](../../.logs/bounded-storage-lifecycle/rollback-data-observation-main-01/root-disposition.md)
+owns exact-byte integration and actual local checks; unchanged browser matrices are
+not rerun for bookkeeping. Protected custody, migration, usable room rollback and
+golden-path acceptance remain open. The already accepted signed historical-anchor
+contract is the next separate tests-only RED; no source/import/protection claim is
+inherited from readonly data observation.
 
 ## 2e-2 exact journal-anchor — product and MAIN landing accepted
 

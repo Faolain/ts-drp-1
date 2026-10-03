@@ -237,7 +237,7 @@ export function bounded(
 			if (read.operation === "getAllKeys") check(read.count, 1, "bounded getAllKeys");
 		}
 	} else {
-		check(evidence.modes, ["BEGIN IMMEDIATE"], "existing sqlite transaction semantics");
+		check(evidence.modes, ["BEGIN"], "existing sqlite transaction semantics");
 		const bindsDigest = (read: Observation["reads"][number]): boolean =>
 			(read.plan?.join(" ") ?? "").includes("manifest_digest=?");
 		const occupancy = reads.filter((read) => !bindsDigest(read));

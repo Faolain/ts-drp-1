@@ -1,5 +1,5 @@
 import type { ResolvedBlueprintBytes, TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
-import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { CloseSetHistoryCommitment } from "@ts-drp/compaction";
 import { verifySnapshotStreamWithReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
@@ -42,6 +42,12 @@ import {
 	installCreatorAdoptionPendingRecovery,
 } from "./internal/creator-adoption-recover.js";
 import { sameCreatorRoomHead } from "./internal/creator-room-head.js";
+import {
+	canonicalCreatorDataRecord as canonicalRecord,
+	creatorSnapshotProjectionMatches,
+	validateCreatorSnapshotData,
+	verifiedCreatorSnapshotCatalog as verifiedCatalog,
+} from "./internal/creator-snapshot-data.js";
 import {
 	type CreatorSuccessorLiveMaterial,
 	type CreatorSuccessorLiveSeed,
@@ -190,15 +196,6 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 
 function currentProjectionKind(epoch: number): "v3-live-generation-1" | "v3-live-generation-2" {
 	return epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2";
-}
-
-function canonicalRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {
-	try {
-		const decoded = decodeCanonical(bytes);
-		return record(decoded) && sameBytes(encodeCanonical(decoded), bytes) ? decoded : undefined;
-	} catch {
-		return undefined;
-	}
 }
 
 function factsFor(handle: unknown): SealedAdoptionFacts | undefined {
@@ -496,26 +493,15 @@ async function verifySnapshot(
 			payloadBytes.set(chunk, offset);
 			offset += chunk.byteLength;
 		}
-		const payload = canonicalRecord(payloadBytes);
-		const manifest = canonicalRecord(facts.snapshotDeclaration.exactCanonicalManifestBytes);
-		if (
-			payload === undefined ||
-			manifest === undefined ||
-			facts.snapshotDeclaration.scope.manifestDigest !== chain.cut.snapshotManifestDigest ||
-			hex(hashDomain("ts-drp/snapshot-payload/v3", payloadBytes)) !== manifest.payloadDigest ||
-			payload.anchor !== manifest.anchor ||
-			payload.anchor !== chain.cut.previousAnchor ||
-			payload.objectId !== chain.cut.objectId ||
-			payload.epoch !== chain.cut.epoch ||
-			payload.archiveIndexRoot !== chain.cut.archiveIndexRoot ||
-			payload.blueprintDigest !== chain.cut.blueprintDigest ||
-			manifest.stateDigest !== chain.cut.stateDigest ||
-			manifest.aclDigest !== chain.cut.aclDigest ||
-			hex(hashDomain("ts-drp/state/v3", encodeCanonical(payload.application))) !== manifest.stateDigest ||
-			hex(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(payload.acl))) !== manifest.aclDigest
-		) {
+		const validated = validateCreatorSnapshotData(
+			payloadBytes,
+			facts.snapshotDeclaration.exactCanonicalManifestBytes,
+			chain.cut,
+			chain.successorTrust.profileId
+		);
+		if (facts.snapshotDeclaration.scope.manifestDigest !== chain.cut.snapshotManifestDigest || validated === undefined)
 			return undefined;
-		}
+		const { payload, manifest } = validated;
 		return Object.freeze({ exactCanonicalPayloadBytes: payloadBytes, manifest, payload });
 	} catch {
 		return undefined;
@@ -525,29 +511,6 @@ async function verifySnapshot(
 		} finally {
 			await scope?.release();
 		}
-	}
-}
-
-function verifiedCatalog(
-	catalog: TrustedBlueprintCatalog,
-	blueprintDigest: unknown,
-	expected: VerifiedChain["currentCatalog"]
-): ResolvedBlueprintBytes | undefined {
-	try {
-		if (typeof blueprintDigest !== "string") return undefined;
-		const resolved = catalog.resolve(blueprintDigest);
-		return resolved.blueprintDigest === blueprintDigest &&
-			resolved.blueprintDigest === expected.blueprintDigest &&
-			resolved.artifactDigest === hex(hashDomain("ts-drp/blueprint-artifact/v3", resolved.exactArtifactBytes)) &&
-			resolved.artifactDigest === expected.artifactDigest &&
-			resolved.artifactId === expected.artifactId &&
-			resolved.runtimeProfile === expected.runtimeProfile &&
-			resolved.evidence.catalogDigest === expected.catalogDigest &&
-			resolved.evidence.catalogDigest === catalog.catalogDigest
-			? resolved
-			: undefined;
-	} catch {
-		return undefined;
 	}
 }
 
@@ -1160,14 +1123,13 @@ async function reopenCreatorSuccessorMaterial(
 		const manifestDigest = snapshotDeclaration.scope.manifestDigest;
 		if (
 			resolved === undefined ||
-			successorProjection.record.anchorDigest !== successorTrust.currentAnchorDigest ||
-			successorProjection.record.epoch !== successorEpoch ||
-			successorProjection.record.objectId !== objectId ||
-			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||
-			successorProjection.record.parametersDigest !== successorAnchor.parametersDigest ||
-			successorProjection.record.snapshotManifestDigest !== manifestDigest ||
-			successorProjection.record.snapshotPayloadDigest !== snapshot.manifest.payloadDigest ||
-			successorProjection.record.stateDigest !== snapshot.manifest.stateDigest ||
+			!creatorSnapshotProjectionMatches(
+				successorProjection.record,
+				successorAnchor,
+				successorTrust.currentAnchorDigest,
+				manifestDigest,
+				snapshot.manifest
+			) ||
 			hex(hashDomain("ts-drp/parameters/v3", input.exactCanonicalParametersCarrierBytes)) !==
 				successorAnchor.parametersDigest
 		) {
@@ -1519,14 +1481,13 @@ async function authenticatePendingCandidate(
 		const manifestDigest = snapshotDeclaration.scope.manifestDigest;
 		if (
 			resolved === undefined ||
-			successorProjection.record.anchorDigest !== successorTrust.currentAnchorDigest ||
-			successorProjection.record.epoch !== expectedNext.epoch ||
-			successorProjection.record.objectId !== objectId ||
-			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||
-			successorProjection.record.parametersDigest !== successorAnchor.parametersDigest ||
-			successorProjection.record.snapshotManifestDigest !== manifestDigest ||
-			successorProjection.record.snapshotPayloadDigest !== snapshot.manifest.payloadDigest ||
-			successorProjection.record.stateDigest !== snapshot.manifest.stateDigest ||
+			!creatorSnapshotProjectionMatches(
+				successorProjection.record,
+				successorAnchor,
+				successorTrust.currentAnchorDigest,
+				manifestDigest,
+				snapshot.manifest
+			) ||
 			hex(hashDomain("ts-drp/parameters/v3", input.exactCanonicalParametersCarrierBytes)) !==
 				successorAnchor.parametersDigest
 		) {

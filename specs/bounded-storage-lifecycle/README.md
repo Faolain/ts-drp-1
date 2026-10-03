@@ -2,19 +2,29 @@
 
 ## Next Agent Prompt
 
-Active executable pickup (2026-10-03): distinct Codex 6.1 HIGH GREEN implements
-[2e-3 actual closed-cut data observation](slices/02e-3-authenticated-closed-cut-data-observation.md).
-The [source contract acceptance](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md)
-and [bounded RED readiness acceptance](../../.logs/bounded-storage-lifecycle/rollback-data-bounded-delta-review-01/root-disposition.md)
-own its exact private seam, frozen causal controls and unchanged budgets. The
-isolated author starts from journal landing `10dc618b`, imports the original RED,
-corrected shared assertions and reviewed SAME_U complement, and changes only the
-allocated product owners. Previously masked assertions must actually execute and
-pass against changed product, including genuine supported retirement-only genesis
-and non-genesis positives. Separate XHIGH product review and root integration remain
-required. Synthetic accounting composition is not native published pressure; that
-original demand stays held. Preserve the historical original readiness verdict,
-intentional metadata mode and all other frozen evidence.
+Active pickup (2026-10-03): separate Codex 6.1 HIGH tests-only RED for the
+[accepted signed historical-anchor mechanism](../../.logs/bounded-storage-lifecycle/rollback-signed-anchor-custody-review-01/root-disposition.md),
+immediately after the focused MAIN observer landing. Its
+[proposal](../../.logs/bounded-storage-lifecycle/rollback-signed-anchor-custody-plan-01/proposal.md)
+owns the exact bounded signed-envelope, empty-import and private orchestration seam.
+Derive genuine requirements before missing-destination refusal, with the same
+operation-private proof ledger; whole-observer success cannot be a repair prerequisite.
+Preserve exact populated destinations in place. Import only genuinely absent/empty
+closures, never fabricated empty rows or an uncapped populated scan. A fresh separate
+XHIGH readiness review precedes distinct HIGH GREEN and actual changed-product gates.
+
+[2e-3 actual closed-cut data observation](slices/02e-3-authenticated-closed-cut-data-observation.md)
+is implemented and independently product-reviewed. Previously masked assertions
+execute and pass against changed product, including genuine supported retirement-only
+genesis and non-genesis positives. The
+[product disposition](../../.logs/bounded-storage-lifecycle/rollback-data-observation-product-review-01/root-disposition.md)
+and [MAIN integration](../../.logs/bounded-storage-lifecycle/rollback-data-observation-main-01/root-disposition.md)
+own exact scope and qualifications. The separately reviewed literal-BEGIN recorder
+correction restores affected metadata assertions without changing the oracle or product.
+Its command still fails inherited global coverage; that gate remains unwaived.
+Synthetic accounting composition is not native published pressure; that original
+demand stays held. Preserve historical readiness, intentional old metadata mode and
+all frozen evidence.
 
 Pending recovery and current-floor shipped startup are implemented and accepted.
 The existing native owners now provide noncreating snapshot bytes, bounded active
@@ -22,7 +32,7 @@ AHE observation and exact bounded journal anchors. Their product and focused MAI
 landings are accepted; formerly masked assertions execute against changed product.
 The [review ledger](review.md) owns exact dispositions, raw reports and qualifications.
 Those observations do not establish all-profile durable availability or usable
-room rollback. After 2e-3, separately close genuine source/import/destination
+room rollback. Next separately close genuine source/import/destination
 custody, protected roles/fences and mandatory room/lifecycle rollback consumption,
 continued safe issuance/replay and registry reconciliation. Recipient snapshot
 retention remains its own destination installation/custody seam.

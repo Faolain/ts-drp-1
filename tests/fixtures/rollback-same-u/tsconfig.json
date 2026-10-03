@@ -1,0 +1,13 @@
+{
+	"extends": "../rollback-data-observation/tsconfig.api.json",
+	"files": [
+		"under-test.d.ts",
+		"contract.ts",
+		"hooks.ts",
+		"composition.ts",
+		"build.ts",
+		"vitest.config.ts",
+		"../../rollback-same-u-complement-red.test.ts"
+	],
+	"include": []
+}

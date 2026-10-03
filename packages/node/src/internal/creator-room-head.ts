@@ -62,3 +62,70 @@ export function sameCreatorRoomHead(
 		left.objectId === right.objectId
 	);
 }
+
+function exactFloorRecord(value: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+	if (value === null || typeof value !== "object") return undefined;
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) return undefined;
+	const actual = Reflect.ownKeys(value);
+	if (actual.length !== keys.length || actual.some((key) => typeof key !== "string" || !keys.includes(key)))
+		return undefined;
+	const output: Record<string, unknown> = Object.create(null);
+	for (const key of keys) {
+		const descriptor = Object.getOwnPropertyDescriptor(value, key);
+		if (descriptor?.enumerable !== true || !("value" in descriptor)) return undefined;
+		output[key] = descriptor.value;
+	}
+	return Object.freeze(output);
+}
+
+export type CreatorCapturedFloor =
+	| Readonly<{ ok: false; kind: "floor-unavailable" | "floor-invalid" | "floor-pending"; reason?: string }>
+	| Readonly<{ ok: true; stable: CreatorExpectedRoomHead }>;
+
+/**
+ * Captures an exact actual host result under the existing stable/pending adjacency laws.
+ * @param value - Result from the trusted host read port.
+ * @param objectId - Captured object scope.
+ * @param pin - Captured genesis identity.
+ * @returns Detached stable head or a distinct floor refusal.
+ */
+export function captureCreatorRoomFloor(value: unknown, objectId: string, pin: string): CreatorCapturedFloor {
+	try {
+		const failure = (
+			kind: "floor-unavailable" | "floor-invalid" | "floor-pending",
+			reason?: string
+		): CreatorCapturedFloor => Object.freeze({ ok: false, kind, ...(reason === undefined ? {} : { reason }) });
+		const result = exactFloorRecord(value, ["ok", "state"]) ?? exactFloorRecord(value, ["ok", "reason"]);
+		if (result === undefined) return failure("floor-invalid");
+		if (result.ok === false && (result.reason === "conflict" || result.reason === "unavailable"))
+			return failure("floor-unavailable", result.reason);
+		if (result.ok !== true || !Object.hasOwn(result, "state")) return failure("floor-invalid");
+		if (result.state === null) return failure("floor-unavailable");
+		const state = exactFloorRecord(result.state, ["stable", "pending"]);
+		const stable = captureCreatorExpectedRoomHead(state?.stable);
+		const valid = (head: CreatorExpectedRoomHead): boolean =>
+			head.objectId === objectId && (head.epoch !== 0 || head.currentAnchorDigest === pin);
+		if (state === undefined || stable === undefined || !valid(stable)) return failure("floor-invalid");
+		if (state.pending !== null) {
+			const pending = exactFloorRecord(state.pending, ["previous", "next"]);
+			const previous = captureCreatorExpectedRoomHead(pending?.previous);
+			const next = captureCreatorExpectedRoomHead(pending?.next);
+			if (
+				previous === undefined ||
+				next === undefined ||
+				!valid(previous) ||
+				!valid(next) ||
+				previous.epoch !== stable.epoch ||
+				previous.currentAnchorDigest !== stable.currentAnchorDigest ||
+				next.epoch !== stable.epoch + 1 ||
+				next.currentAnchorDigest === stable.currentAnchorDigest
+			)
+				return failure("floor-invalid");
+			return failure("floor-pending");
+		}
+		return Object.freeze({ ok: true, stable });
+	} catch {
+		return Object.freeze({ ok: false, kind: "floor-invalid" });
+	}
+}

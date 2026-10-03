@@ -23,6 +23,7 @@ import {
 	type CreatorIssuanceRetirementIdentity,
 	openCreatorIssuanceRetirement,
 	resolveCreatorIssuanceRetirement,
+	type VerifiedCreatorIssuanceRetirement,
 } from "@ts-drp/protocol-v3/creator-issuance-retirement";
 import { type LatchedAclSnapshot, openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
@@ -332,17 +333,26 @@ function compareRef(left: GenerationRef, right: GenerationRef): number {
 	return left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0;
 }
 
-function uniqueCandidate(
+/**
+ * Shared exact-byte selection and signed-control authentication law.
+ * @param candidates - Exact candidate bytes from the selected closure.
+ * @param kind - Required recognized record kind.
+ * @param epoch - Required authenticated epoch, when applicable.
+ * @param phase - Required certificate phase, when applicable.
+ * @returns Unique validated evidence, or undefined on ambiguity or refusal.
+ */
+export function uniqueCreatorTransitionCandidate(
 	candidates: readonly DetachedClosureCandidate[],
 	kind: string,
-	epoch: number,
+	epoch?: number,
 	phase?: string
 ): DetachedClosureCandidate | undefined {
 	const matches = candidates.filter((candidate) => {
 		const decoded = record(candidate);
 		return (
 			decoded?.kind === kind &&
-			(decoded.kind === "drp-anchor-trust-state" ? decoded.currentEpoch : decoded.epoch) === epoch &&
+			(epoch === undefined ||
+				(decoded.kind === "drp-anchor-trust-state" ? decoded.currentEpoch : decoded.epoch) === epoch) &&
 			(phase === undefined || decoded.phase === phase)
 		);
 	});
@@ -378,16 +388,29 @@ function settlementCandidates(closure: CreatorTransitionClosure): readonly Detac
 	return closure.candidates.filter((candidate) => record(candidate)?.kind === CREATOR_AUTHOR_SETTLEMENT_KIND);
 }
 
-function exactClosureOccurrence(closure: readonly GenerationRef[], candidate: DetachedClosureCandidate): boolean {
+/**
+ * Shared exact-byte selection and signed-control authentication law.
+ * @param closure - Exact authenticated closure refs.
+ * @param candidate - Actual selected signed carrier.
+ * @returns Unique validated evidence, or undefined on ambiguity or refusal.
+ */
+export function exactCreatorTransitionOccurrence(
+	closure: readonly GenerationRef[],
+	candidate: DetachedClosureCandidate
+): boolean {
 	return closure.filter((ref) => sameRef(ref, candidate.ref)).length === 1;
 }
 
 function currentAnchorAclDigest(closure: CreatorTransitionClosure, trust: CurrentAnchorTrust): string | undefined {
-	const trustCandidate = uniqueCandidate(closure.candidates, "drp-anchor-trust-state", trust.currentEpoch);
+	const trustCandidate = uniqueCreatorTransitionCandidate(
+		closure.candidates,
+		"drp-anchor-trust-state",
+		trust.currentEpoch
+	);
 	if (
 		trustCandidate === undefined ||
 		!exactCandidate(trustCandidate) ||
-		!exactClosureOccurrence(closure.closure, trustCandidate)
+		!exactCreatorTransitionOccurrence(closure.closure, trustCandidate)
 	) {
 		return undefined;
 	}
@@ -418,7 +441,15 @@ function currentAnchorAclDigest(closure: CreatorTransitionClosure, trust: Curren
 		: anchor.aclDigest;
 }
 
-function openedRetirement(
+/**
+ * Shared exact-byte selection and signed-control authentication law.
+ * @param candidate - Actual selected signed carrier.
+ * @param floorTrust - Genuine authenticated successor trust.
+ * @param cut - Exact actual closed CutValue occurrence.
+ * @param qc - Exact actual commit-QC occurrence.
+ * @returns Unique validated evidence, or undefined on ambiguity or refusal.
+ */
+export function openCreatorTransitionRetirement(
 	candidate: DetachedClosureCandidate,
 	floorTrust: CurrentAnchorTrust,
 	cut: DetachedClosureCandidate,
@@ -427,6 +458,7 @@ function openedRetirement(
 	| Readonly<{
 			readonly candidate: DetachedClosureCandidate;
 			readonly identity: CreatorIssuanceRetirementIdentity;
+			readonly capability: VerifiedCreatorIssuanceRetirement;
 	  }>
 	| undefined {
 	const decodedCut = record(cut);
@@ -453,10 +485,19 @@ function openedRetirement(
 		decodedCut.epoch !== identity.closedEpoch ||
 		decodedCut.previousAnchor !== identity.closedAnchorDigest
 		? undefined
-		: Object.freeze({ candidate, identity });
+		: Object.freeze({ candidate, identity, capability: opened.capability });
 }
 
-function openedAggregate(
+/**
+ * Shared exact-byte selection and signed-control authentication law.
+ * @param candidate - Actual selected signed carrier.
+ * @param floorTrust - Genuine authenticated successor trust.
+ * @param cut - Exact actual closed CutValue occurrence.
+ * @param qc - Exact actual commit-QC occurrence.
+ * @param currentAuthority - Genuine current trust or actual closed ACL bytes.
+ * @returns Unique validated evidence, or undefined on ambiguity or refusal.
+ */
+export function openCreatorTransitionAggregate(
 	candidate: DetachedClosureCandidate,
 	floorTrust: CurrentAnchorTrust,
 	cut: DetachedClosureCandidate,
@@ -514,7 +555,16 @@ function openedAggregate(
 		: Object.freeze({ candidate, identity });
 }
 
-function openedSettlement(
+/**
+ * Shared exact-byte selection and signed-control authentication law.
+ * @param candidate - Actual selected signed carrier.
+ * @param floorTrust - Genuine authenticated successor trust.
+ * @param cut - Exact actual closed CutValue occurrence.
+ * @param qc - Exact actual commit-QC occurrence.
+ * @param expectedCurrentAclDigest - Authenticated closed ACL expectation.
+ * @returns Unique validated evidence, or undefined on ambiguity or refusal.
+ */
+export function openCreatorTransitionSettlement(
 	candidate: DetachedClosureCandidate,
 	floorTrust: CurrentAnchorTrust,
 	cut: DetachedClosureCandidate,
@@ -579,38 +629,18 @@ export function openVerifiedCreatorHistoricalIssuance(
 	try {
 		if (input.floorTrust.currentEpoch < 1) return undefined;
 		const closedEpoch = input.floorTrust.currentEpoch - 1;
-		const retirement = retirementCandidates(input.closure);
-		const aggregate = aggregateCandidates(input.closure);
-		const cut = uniqueCandidate(input.closure.candidates, "drp-hard-epoch-cut", closedEpoch);
-		const qc = uniqueCandidate(input.closure.candidates, "drp-seal-qc", closedEpoch, "commit");
-		const acl = uniqueCandidate(input.closure.candidates, "drp-v3-latched-acl", closedEpoch);
-		if (settlementProfileFor(input.floorTrust.profileId) === "v1") {
-			const candidates = settlementCandidates(input.closure);
-			const candidate = candidates[0];
-			if (
-				retirement.length !== 0 ||
-				aggregate.length !== 0 ||
-				candidates.length !== 1 ||
-				candidate === undefined ||
-				cut === undefined ||
-				qc === undefined ||
-				acl === undefined ||
-				!exactClosureOccurrence(input.closure.closure, candidate)
-			)
-				return undefined;
-			const opened = openedSettlement(
-				candidate,
-				input.floorTrust,
-				cut,
-				qc,
-				hex(hashDomain("ts-drp/latched-acl/v3", acl.bytes))
-			);
-			const frontier = opened === undefined ? undefined : frontierFor(opened.capability, input.author);
-			if (opened === undefined || frontier === undefined) return undefined;
-			const capability = Object.freeze({}) as VerifiedCreatorHistoricalIssuance;
-			verifiedHistoricalIssuance.set(
-				capability,
-				Object.freeze({
+
+		const acl = uniqueCreatorTransitionCandidate(input.closure.candidates, "drp-v3-latched-acl", closedEpoch);
+		if (acl === undefined) return undefined;
+		const evidence = openCreatorTransitionClosedCutEvidence(input);
+		if (evidence === undefined) return undefined;
+		let selected: CreatorHistoricalIssuanceIdentity | undefined;
+		if (evidence.settlement !== undefined) {
+			const opened = evidence.settlement;
+			if (evidence.currentAclDigest !== hex(hashDomain("ts-drp/latched-acl/v3", acl.bytes))) return undefined;
+			const frontier = frontierFor(opened.capability, input.author);
+			if (frontier !== undefined)
+				selected = Object.freeze({
 					admissionEpoch: frontier[1],
 					admittedAuthorSequence: frontier[2],
 					author: frontier[0],
@@ -619,27 +649,11 @@ export function openVerifiedCreatorHistoricalIssuance(
 					objectId: opened.identity.objectId,
 					successorAnchorDigest: opened.identity.successorAnchorDigest,
 					successorEpoch: opened.identity.successorEpoch,
-				})
-			);
-			return capability;
-		}
-		if (
-			retirement.length !== 1 ||
-			cut === undefined ||
-			qc === undefined ||
-			acl === undefined ||
-			!exactClosureOccurrence(input.closure.closure, retirement[0] as DetachedClosureCandidate)
-		) {
-			return undefined;
-		}
-		let selected: CreatorHistoricalIssuanceIdentity | undefined;
-		if (
-			aggregate.length === 1 &&
-			exactClosureOccurrence(input.closure.closure, aggregate[0] as DetachedClosureCandidate)
-		) {
-			const opened = openedAggregate(aggregate[0] as DetachedClosureCandidate, input.floorTrust, cut, qc, { acl });
-			const frontier = opened?.identity.frontiers.find(([author]) => author === input.author);
-			if (opened !== undefined && frontier !== undefined) {
+				});
+		} else if (evidence.aggregate !== undefined) {
+			const opened = evidence.aggregate;
+			const frontier = opened.identity.frontiers.find(([author]) => author === input.author);
+			if (frontier !== undefined)
 				selected = Object.freeze({
 					admittedAuthorSequence: frontier[1],
 					author: frontier[0],
@@ -649,20 +663,17 @@ export function openVerifiedCreatorHistoricalIssuance(
 					successorAnchorDigest: opened.identity.successorAnchorDigest,
 					successorEpoch: opened.identity.successorEpoch,
 				});
-			}
-		} else if (aggregate.length === 0) {
-			const opened = openedRetirement(retirement[0] as DetachedClosureCandidate, input.floorTrust, cut, qc);
-			if (opened !== undefined && opened.identity.author === input.author) {
-				selected = Object.freeze({
-					admittedAuthorSequence: opened.identity.admittedAuthorSequence,
-					author: opened.identity.author,
-					closedAnchorDigest: opened.identity.closedAnchorDigest,
-					closedEpoch: opened.identity.closedEpoch,
-					objectId: opened.identity.objectId,
-					successorAnchorDigest: opened.identity.successorAnchorDigest,
-					successorEpoch: opened.identity.successorEpoch,
-				});
-			}
+		} else if (evidence.retirement !== undefined && evidence.retirement.identity.author === input.author) {
+			const identity = evidence.retirement.identity;
+			selected = Object.freeze({
+				admittedAuthorSequence: identity.admittedAuthorSequence,
+				author: identity.author,
+				closedAnchorDigest: identity.closedAnchorDigest,
+				closedEpoch: identity.closedEpoch,
+				objectId: identity.objectId,
+				successorAnchorDigest: identity.successorAnchorDigest,
+				successorEpoch: identity.successorEpoch,
+			});
 		}
 		if (
 			selected === undefined ||
@@ -715,10 +726,10 @@ function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput
 		return undefined;
 	}
 	const proposedRetirement = proposedMatches[0] as DetachedClosureCandidate;
-	if (!exactClosureOccurrence(input.proposed.closure, proposedRetirement)) return undefined;
+	if (!exactCreatorTransitionOccurrence(input.proposed.closure, proposedRetirement)) return undefined;
 	if (
 		currentMatches.length === 1 &&
-		!exactClosureOccurrence(input.current.closure, currentMatches[0] as DetachedClosureCandidate)
+		!exactCreatorTransitionOccurrence(input.current.closure, currentMatches[0] as DetachedClosureCandidate)
 	) {
 		return undefined;
 	}
@@ -729,7 +740,12 @@ function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput
 		sameRef(candidate.ref, input.proofRefs[1] as GenerationRef)
 	);
 	if (proposedCut === undefined || proposedQc === undefined) return undefined;
-	const openedProposed = openedRetirement(proposedRetirement, input.successorTrust, proposedCut, proposedQc);
+	const openedProposed = openCreatorTransitionRetirement(
+		proposedRetirement,
+		input.successorTrust,
+		proposedCut,
+		proposedQc
+	);
 	if (
 		openedProposed === undefined ||
 		openedProposed.identity.closedEpoch !== input.currentTrust.currentEpoch ||
@@ -744,19 +760,19 @@ function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput
 			: undefined;
 	}
 	const currentCandidate = currentMatches[0] as DetachedClosureCandidate;
-	const retiringCut = uniqueCandidate(
+	const retiringCut = uniqueCreatorTransitionCandidate(
 		input.current.candidates,
 		"drp-hard-epoch-cut",
 		input.currentTrust.currentEpoch - 1
 	);
-	const retiringQc = uniqueCandidate(
+	const retiringQc = uniqueCreatorTransitionCandidate(
 		input.current.candidates,
 		"drp-seal-qc",
 		input.currentTrust.currentEpoch - 1,
 		"commit"
 	);
 	if (retiringCut === undefined || retiringQc === undefined) return undefined;
-	const openedCurrent = openedRetirement(currentCandidate, input.currentTrust, retiringCut, retiringQc);
+	const openedCurrent = openCreatorTransitionRetirement(currentCandidate, input.currentTrust, retiringCut, retiringQc);
 	return openedCurrent !== undefined &&
 		openedProposed.identity.author === openedCurrent.identity.author &&
 		openedProposed.identity.priorRetirementCandidateDigest === currentCandidate.ref.digest &&
@@ -769,6 +785,97 @@ function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput
 				proposedIdentity: openedProposed.identity,
 			})
 		: undefined;
+}
+
+/**
+ * Authenticates the sole closed-cut representation using the shared control openers.
+ * This does not reconstruct the erased closed-epoch trust or replay its seal.
+ * @param input - Authenticated successor and exact selected closure.
+ * @returns Genuine signed evidence, or undefined on ambiguity/binding failure.
+ */
+export function openCreatorTransitionClosedCutEvidence(
+	input: Readonly<{
+		closure: CreatorTransitionClosure;
+		floorTrust: CurrentAnchorTrust;
+		currentTrust?: CurrentAnchorTrust;
+	}>
+):
+	| Readonly<{
+			cut: DetachedClosureCandidate;
+			qc: DetachedClosureCandidate;
+			representation: "settlement" | "aggregate-retirement" | "retirement-only";
+			currentAclDigest?: string;
+			retirement?: NonNullable<ReturnType<typeof openCreatorTransitionRetirement>>;
+			aggregate?: NonNullable<ReturnType<typeof openCreatorTransitionAggregate>>;
+			settlement?: NonNullable<ReturnType<typeof openCreatorTransitionSettlement>>;
+	  }>
+	| undefined {
+	const epoch = input.floorTrust.currentEpoch - 1;
+	const cut = uniqueCreatorTransitionCandidate(input.closure.candidates, "drp-hard-epoch-cut", epoch);
+	const qc = uniqueCreatorTransitionCandidate(input.closure.candidates, "drp-seal-qc", epoch, "commit");
+	if (
+		cut === undefined ||
+		qc === undefined ||
+		!exactCreatorTransitionOccurrence(input.closure.closure, cut) ||
+		!exactCreatorTransitionOccurrence(input.closure.closure, qc)
+	)
+		return undefined;
+	const retirements = retirementCandidates(input.closure);
+	const aggregates = aggregateCandidates(input.closure);
+	const settlements = settlementCandidates(input.closure);
+	if (settlementProfileFor(input.floorTrust.profileId) === "v1") {
+		const candidate = settlements[0];
+		const digest = candidate === undefined ? undefined : record(candidate)?.currentAclDigest;
+		if (
+			retirements.length !== 0 ||
+			aggregates.length !== 0 ||
+			settlements.length !== 1 ||
+			candidate === undefined ||
+			typeof digest !== "string" ||
+			!exactCreatorTransitionOccurrence(input.closure.closure, candidate)
+		)
+			return undefined;
+		const opened = openCreatorTransitionSettlement(candidate, input.floorTrust, cut, qc, digest);
+		return opened === undefined
+			? undefined
+			: Object.freeze({
+					cut,
+					qc,
+					representation: "settlement",
+					settlement: opened,
+					currentAclDigest: opened.identity.currentAclDigest,
+				});
+	}
+	if (settlements.length !== 0 || retirements.length !== 1 || aggregates.length > 1) return undefined;
+	const retirementCandidate = retirements[0];
+	if (
+		retirementCandidate === undefined ||
+		!exactCreatorTransitionOccurrence(input.closure.closure, retirementCandidate)
+	)
+		return undefined;
+	const retirement = openCreatorTransitionRetirement(retirementCandidate, input.floorTrust, cut, qc);
+	if (retirement === undefined) return undefined;
+	if (aggregates.length === 0) return Object.freeze({ cut, qc, representation: "retirement-only", retirement });
+	const aggregate = aggregates[0];
+	const acl = uniqueCreatorTransitionCandidate(input.closure.candidates, "drp-v3-latched-acl", epoch);
+	if (aggregate === undefined || !exactCreatorTransitionOccurrence(input.closure.closure, aggregate)) return undefined;
+	const opened = openCreatorTransitionAggregate(
+		aggregate,
+		input.floorTrust,
+		cut,
+		qc,
+		input.currentTrust === undefined ? { acl } : { trust: input.currentTrust }
+	);
+	return opened === undefined
+		? undefined
+		: Object.freeze({
+				cut,
+				qc,
+				representation: "aggregate-retirement",
+				retirement,
+				aggregate: opened,
+				currentAclDigest: opened.identity.currentAclDigest,
+			});
 }
 
 function authenticatedAggregatePair(
@@ -784,7 +891,7 @@ function authenticatedAggregatePair(
 	const proposedMatches = aggregateCandidates(input.proposed);
 	if (currentMatches.length > 1 || proposedMatches.length !== 1) return undefined;
 	const proposed = proposedMatches[0] as DetachedClosureCandidate;
-	if (!exactClosureOccurrence(input.proposed.closure, proposed)) return undefined;
+	if (!exactCreatorTransitionOccurrence(input.proposed.closure, proposed)) return undefined;
 	const proposedCut = input.proposed.candidates.find((candidate) =>
 		sameRef(candidate.ref, input.proofRefs[0] as GenerationRef)
 	);
@@ -792,7 +899,7 @@ function authenticatedAggregatePair(
 		sameRef(candidate.ref, input.proofRefs[1] as GenerationRef)
 	);
 	if (proposedCut === undefined || proposedQc === undefined) return undefined;
-	const openedProposed = openedAggregate(proposed, input.successorTrust, proposedCut, proposedQc, {
+	const openedProposed = openCreatorTransitionAggregate(proposed, input.successorTrust, proposedCut, proposedQc, {
 		trust: input.currentTrust,
 	});
 	if (
@@ -814,13 +921,15 @@ function authenticatedAggregatePair(
 			: undefined;
 	}
 	const current = currentMatches[0] as DetachedClosureCandidate;
-	if (!exactClosureOccurrence(input.current.closure, current)) return undefined;
+	if (!exactCreatorTransitionOccurrence(input.current.closure, current)) return undefined;
 	const closedEpoch = input.currentTrust.currentEpoch - 1;
-	const currentCut = uniqueCandidate(input.current.candidates, "drp-hard-epoch-cut", closedEpoch);
-	const currentQc = uniqueCandidate(input.current.candidates, "drp-seal-qc", closedEpoch, "commit");
-	const currentAcl = uniqueCandidate(input.current.candidates, "drp-v3-latched-acl", closedEpoch);
+	const currentCut = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-hard-epoch-cut", closedEpoch);
+	const currentQc = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-seal-qc", closedEpoch, "commit");
+	const currentAcl = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-v3-latched-acl", closedEpoch);
 	if (currentCut === undefined || currentQc === undefined || currentAcl === undefined) return undefined;
-	const openedCurrent = openedAggregate(current, input.currentTrust, currentCut, currentQc, { acl: currentAcl });
+	const openedCurrent = openCreatorTransitionAggregate(current, input.currentTrust, currentCut, currentQc, {
+		acl: currentAcl,
+	});
 	if (openedCurrent === undefined || openedProposed.identity.priorAggregateCandidateDigest !== current.ref.digest) {
 		return undefined;
 	}
@@ -858,7 +967,7 @@ function authenticatedSettlementPair(input: InspectCreatorTransitionAdvanceInput
 		return undefined;
 	}
 	const proposed = proposedMatches[0] as DetachedClosureCandidate;
-	if (!exactClosureOccurrence(input.proposed.closure, proposed)) return undefined;
+	if (!exactCreatorTransitionOccurrence(input.proposed.closure, proposed)) return undefined;
 	const proposedCut = input.proposed.candidates.find((candidate) =>
 		sameRef(candidate.ref, input.proofRefs[0] as GenerationRef)
 	);
@@ -867,7 +976,13 @@ function authenticatedSettlementPair(input: InspectCreatorTransitionAdvanceInput
 	);
 	const currentAclDigest = currentAnchorAclDigest(input.current, input.currentTrust);
 	if (proposedCut === undefined || proposedQc === undefined || currentAclDigest === undefined) return undefined;
-	const openedProposed = openedSettlement(proposed, input.successorTrust, proposedCut, proposedQc, currentAclDigest);
+	const openedProposed = openCreatorTransitionSettlement(
+		proposed,
+		input.successorTrust,
+		proposedCut,
+		proposedQc,
+		currentAclDigest
+	);
 	if (
 		openedProposed === undefined ||
 		openedProposed.identity.closedEpoch !== input.currentTrust.currentEpoch ||
@@ -928,15 +1043,15 @@ function authenticatedSettlementPair(input: InspectCreatorTransitionAdvanceInput
 			: undefined;
 	}
 	const current = currentMatches[0] as DetachedClosureCandidate;
-	if (!exactClosureOccurrence(input.current.closure, current)) return undefined;
+	if (!exactCreatorTransitionOccurrence(input.current.closure, current)) return undefined;
 	const closedEpoch = input.currentTrust.currentEpoch - 1;
-	const currentCut = uniqueCandidate(input.current.candidates, "drp-hard-epoch-cut", closedEpoch);
-	const currentQc = uniqueCandidate(input.current.candidates, "drp-seal-qc", closedEpoch, "commit");
-	const currentAcl = uniqueCandidate(input.current.candidates, "drp-v3-latched-acl", closedEpoch);
+	const currentCut = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-hard-epoch-cut", closedEpoch);
+	const currentQc = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-seal-qc", closedEpoch, "commit");
+	const currentAcl = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-v3-latched-acl", closedEpoch);
 	if (currentCut === undefined || currentQc === undefined || currentAcl === undefined || !exactCandidate(currentAcl)) {
 		return undefined;
 	}
-	const openedCurrent = openedSettlement(
+	const openedCurrent = openCreatorTransitionSettlement(
 		current,
 		input.currentTrust,
 		currentCut,
@@ -1020,9 +1135,14 @@ export function inspectCreatorTransitionAdvance(
 				: failure(result.reason);
 		}
 		const retiringEpoch = trust.currentEpoch - 1;
-		const retiringCut = uniqueCandidate(input.current.candidates, "drp-hard-epoch-cut", retiringEpoch);
-		const retiringQc = uniqueCandidate(input.current.candidates, "drp-seal-qc", retiringEpoch, "commit");
-		const retiringAcl = uniqueCandidate(input.current.candidates, "drp-v3-latched-acl", retiringEpoch);
+		const retiringCut = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-hard-epoch-cut", retiringEpoch);
+		const retiringQc = uniqueCreatorTransitionCandidate(
+			input.current.candidates,
+			"drp-seal-qc",
+			retiringEpoch,
+			"commit"
+		);
+		const retiringAcl = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-v3-latched-acl", retiringEpoch);
 		if (retiringCut === undefined || retiringQc === undefined || retiringAcl === undefined) {
 			return failure("RETIRING_PROOF_REFS_INVALID");
 		}
