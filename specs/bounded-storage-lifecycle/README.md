@@ -35,8 +35,12 @@ prospective rosters without changing historical verdicts or evidence.
 
 Current pickup (2026-10-03): pending recovery is committed as `d267b2f4` after
 independent GREEN approval and exact-byte main landing. Separate Codex 6.1 high
-RED for current-floor shipped startup is active in an isolated checkout of that
-commit; continue it, rather than duplicating the lane. Cold recovery and its
+RED for current-floor shipped startup is now accepted under the
+[readiness disposition](../../.logs/bounded-storage-lifecycle/startup-red-root-audit-01/root-disposition.md).
+Distinct Codex 6.1 high GREEN is active in an isolated checkout, limited to the
+room/chat product allocation and the exact frozen tests. Require previously masked
+assertions to execute and pass against changed product; startup product acceptance
+remains open. Cold recovery and its
 reviewed harness prerequisites remain committed as `b29369df`. The single-API
 [pending-discovery contract](slices/02c-authenticated-pending-discovery.md) is
 accepted for separate RED authoring under the
@@ -76,9 +80,10 @@ records source-only startup, usable-rollback and recipient-installation
 prerequisites. The [2d shipped startup contract](slices/02d-declaration-free-shipped-startup.md)
 is independently approved and root-accepted under its
 [contract disposition](../../.logs/bounded-storage-lifecycle/startup-selection-contract-review-01/root-disposition.md).
-The separate Codex 6.1 high RED owns current-floor startup and refresh/retry
-behavior. Freeze causal oracles and obtain
-xhigh RED readiness before a distinct GREEN author changes product. Usable rollback
+The frozen causal RED and separate xhigh readiness review are complete; two
+demonstrated behavior blind spots were corrected in that same review. The distinct
+GREEN author now owns current-floor startup and refresh/retry implementation.
+Do not change frozen oracles or repeat unchanged matrices for bookkeeping. Usable rollback
 is now resliced at a concrete storage prerequisite: the independently accepted
 [non-creating snapshot reader](slices/02e-0-noncreating-snapshot-read.md), under its
 [contract disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
@@ -227,7 +232,7 @@ your pass.
 - [x] Exact metadata declaration observation and failure provenance (slice 2a).
 - [x] Authenticated declaration-free cold recovery (slice 2b).
 - [x] Authenticated declaration-free pending recovery (slice 2c).
-- [ ] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); separate RED active.
+- [ ] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); RED accepted, distinct GREEN active.
 - [ ] Usable rollback: [reader prerequisite](slices/02e-0-noncreating-snapshot-read.md), bounded authenticated data, then mandatory room/lifecycle consumption and role reconciliation.
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).

@@ -49,9 +49,31 @@ The [2d startup contract](slices/02d-declaration-free-shipped-startup.md) has se
 Codex 6.1 xhigh APPROVED, CONTEXT_COMPLETE YES and root
 [acceptance](../../.logs/bounded-storage-lifecycle/startup-selection-contract-review-01/root-disposition.md).
 Two refusal-mapping findings were corrected and independently checked in that same
-review; the original proposal is preserved. Separate causal RED starts after the
+review; the original proposal is preserved. Separate causal RED followed the
 2c commit; contract approval is not startup product acceptance. Later product
 execution remains behind its own gates.
+
+## 2d RED accepted; distinct GREEN active
+
+Separate Codex 6.1 high tests-only RED is frozen under its
+[handoff](../../.logs/bounded-storage-lifecycle/startup-red-01/handoff.md).
+Independent Codex 6.1 xhigh returned
+[APPROVED](../../.logs/bounded-storage-lifecycle/startup-red-review-01/public.md),
+CONTEXT_COMPLETE YES. Root fully read the verdict/custody, checked the final
+source/Git bindings and retained raw evidence, and accepts readiness under the
+[disposition](../../.logs/bounded-storage-lifecycle/startup-red-root-audit-01/root-disposition.md).
+That same review resolved concrete failed-attempt effect and native store-open
+blind spots; only the affected existing cases were rerun. Original freezes,
+failed attempts, historical evidence and ordinary budgets remain preserved.
+
+Distinct Codex 6.1 high GREEN is immediately allocated to the room/chat product
+seam. Normative declaration-free recovery, retry/rebind and every previously
+masked downstream assertion must execute and pass unchanged against the product.
+Empty-old-hint diagnostics are controls, not success; historical serial skips and
+source-only/coverage/cleanup limits remain qualified. Broader failures remain
+failed. No kernel, native owner, schema, frozen oracle or budget change is allocated.
+Independent GREEN review and root product disposition remain required; startup,
+rollback, recipient custody, retirement and endurance are not accepted here.
 
 ## 2e-0 reader contract accepted; usable rollback remains open
 
