@@ -17,6 +17,9 @@ export type ParseResult<T> =
 	| { readonly ok: false; readonly reason: "INVALID_ARGUMENT" | "SHARED_BUFFER_INPUT" };
 
 export type StorageRejectionReason =
+	| "READ_BUDGET_EXCEEDED"
+	| "READ_STALE_HEAD"
+	| "READ_RELEASED"
 	| "STORE_CLOSED"
 	| "STORE_POISONED"
 	| "INVALID_ARGUMENT"
@@ -107,7 +110,45 @@ export type StoreCapabilities = {
 	readonly signingEligibility: "never" | "backend-capability-required";
 };
 
+export type AheBoundedReadLimits = Readonly<{
+	maxObjectGenerations: 7;
+	maxHeadBytes: 3326;
+	maxGenerationBytes: 7307;
+	maxClosureReferences: 7;
+	maxBlobBytes: 65536;
+	maxUnionBytes: 262144;
+}>;
+
+/** Fixed readonly observer entitlement, not a producer admission policy. */
+export const AHE_BOUNDED_READ_LIMITS: AheBoundedReadLimits = Object.freeze({
+	maxObjectGenerations: 7,
+	maxHeadBytes: 3326,
+	maxGenerationBytes: 7307,
+	maxClosureReferences: 7,
+	maxBlobBytes: 65536,
+	maxUnionBytes: 262144,
+});
+
+export type AheBoundedReadInput = Readonly<{
+	objectId: StorageObjectId;
+	ancestorCount: 0 | 2;
+	limits: AheBoundedReadLimits;
+}>;
+
+export type AheBoundedReadAcquisition =
+	| Readonly<{ kind: "empty"; head: NoHead }>
+	| Readonly<{ kind: "present"; reader: AheBoundedActiveRead }>;
+
+export interface AheBoundedActiveRead {
+	readonly head: PresentHead;
+	readonly generations: readonly GenerationRecord[];
+	readonly blobs: readonly Readonly<{ ref: GenerationRef; bytes: Uint8Array }>[];
+	checkCurrent(): Promise<StoreResult<Readonly<{ kind: "current" }>>>;
+	release(): Promise<void>;
+}
+
 export interface AheDurableStore {
+	acquireBoundedActiveRead(input: AheBoundedReadInput): Promise<StoreResult<AheBoundedReadAcquisition>>;
 	readonly capabilities: Readonly<StoreCapabilities>;
 	readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>>;
 	readGenerationPage(input: {

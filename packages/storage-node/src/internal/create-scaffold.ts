@@ -1,5 +1,7 @@
 import {
 	type ActiveGenerationSnapshot,
+	type AheBoundedReadAcquisition,
+	type AheBoundedReadInput,
 	type AheDurableStore,
 	type BlobDigest,
 	decodeGenerationRecordV1,
@@ -10,6 +12,7 @@ import {
 	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
+	AHE_BOUNDED_READ_LIMITS as LIMITS,
 	parseGenerationId,
 	type PresentHead,
 	type StorageObjectId,
@@ -17,9 +20,16 @@ import {
 	type StoreResult,
 } from "@ts-drp/storage";
 import {
+	boundedActiveReadSteps,
+	boundedHeadSteps,
+	BoundedReadBudgetError,
+	type BoundedReadRequest,
 	classifyPersistedState,
+	createBoundedReadAcquisition,
 	evaluateStorageAdapterCommand,
+	isBoundedReadCorruption,
 	PersistedStorageError,
+	prepareBoundedRead,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
 	storageAdapterClosureVerifier,
@@ -137,6 +147,9 @@ class SqliteAheDurableStore implements AheDurableStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
 	private closed = false;
 	private poisoned = false;
+	private boundedReads = 0;
+	private boundedClose: Promise<void> | undefined;
+	private resolveBoundedClose: (() => void) | undefined;
 	private readonly recoveryCertificates = new Map<StorageObjectId, string>();
 
 	public constructor(
@@ -156,6 +169,126 @@ class SqliteAheDurableStore implements AheDurableStore {
 
 	public readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
 		return this.run(commandWithKind("readHead", { objectId })) as Promise<StoreResult<ExpectedHead>>;
+	}
+
+	public acquireBoundedActiveRead(input: AheBoundedReadInput): Promise<StoreResult<AheBoundedReadAcquisition>> {
+		const prepared = prepareBoundedRead(input);
+		if (!prepared.ok) return Promise.resolve(prepared);
+		const result = this.runBoundedSteps(boundedActiveReadSteps(prepared.value));
+		if (!result.ok) return Promise.resolve(result);
+		return Promise.resolve({
+			ok: true,
+			value: createBoundedReadAcquisition(result.value, (head, released) =>
+				Promise.resolve(this.runBoundedSteps(boundedHeadSteps(head.objectId), released))
+			),
+		});
+	}
+
+	private runBoundedSteps<T>(
+		steps: Generator<BoundedReadRequest, StoreResult<T>, unknown>,
+		released?: () => boolean
+	): StoreResult<T> {
+		if (this.closed) return { ok: false, reason: "STORE_CLOSED" };
+		if (this.poisoned) return { ok: false, reason: "STORE_POISONED" };
+		if (released?.()) return { ok: false, reason: "READ_RELEASED" };
+		this.boundedReads++;
+		let active = false;
+		try {
+			this.connection.exec("BEGIN");
+			active = true;
+			let step = steps.next();
+			while (!step.done) step = steps.next(this.loadBoundedRequest(step.value));
+			this.connection.exec("COMMIT");
+			active = false;
+			this.latchBoundedFailure(step.value);
+			return step.value;
+		} catch (cause) {
+			if (active)
+				try {
+					this.connection.exec("ROLLBACK");
+				} catch {
+					/* Preserve primary native failure. */
+				}
+			const result: StoreResult<T> =
+				cause instanceof BoundedReadBudgetError
+					? { ok: false, reason: "READ_BUDGET_EXCEEDED" }
+					: cause instanceof PersistedStorageError
+						? { ok: false, reason: cause.reason }
+						: { ok: false, reason: "SUBSTRATE_FAILURE", cause };
+			this.latchBoundedFailure(result);
+			return result;
+		} finally {
+			this.boundedReads--;
+			if (this.closed && this.boundedReads === 0 && this.boundedClose !== undefined) {
+				this.connection.close();
+				this.resolveBoundedClose?.();
+				this.resolveBoundedClose = undefined;
+			}
+		}
+	}
+
+	private latchBoundedFailure(result: StoreResult<unknown>): void {
+		if (isBoundedReadCorruption(result)) {
+			this.poisoned = true;
+			this.recoveryCertificates.clear();
+		}
+	}
+
+	private loadBoundedRequest(request: BoundedReadRequest): unknown {
+		if (request.kind === "blob-preflight") {
+			for (const ref of request.references) {
+				const row = this.connection
+					.prepare("SELECT typeof(bytes) AS value_type,length(bytes) AS value_bytes FROM blobs WHERE digest=?")
+					.get(ref.digest) as DatabaseRow | undefined;
+				if (row?.value_type === "blob" && typeof row.value_bytes === "number" && row.value_bytes > LIMITS.maxBlobBytes)
+					return false;
+			}
+			return true;
+		}
+		if (request.kind === "keys") {
+			const rows = this.connection
+				.prepare(
+					"SELECT CASE WHEN typeof(generation_id)='text' AND length(CAST(generation_id AS BLOB))=64 THEN generation_id ELSE NULL END AS gated_key FROM generations WHERE object_id=? ORDER BY generation_id LIMIT ?"
+				)
+				.all(request.objectId, LIMITS.maxObjectGenerations + 1) as DatabaseRow[];
+			return rows.map((row) => row.gated_key);
+		}
+		if (request.kind === "promotion")
+			return (
+				this.connection
+					.prepare("SELECT 1 FROM promotions WHERE object_id=? AND generation_id=? AND digest=?")
+					.get(request.objectId, request.generationId, request.digest) !== undefined
+			);
+		const blob = request.kind === "blob";
+		const head = request.kind === "head";
+		const limit = blob ? LIMITS.maxBlobBytes : head ? LIMITS.maxHeadBytes : LIMITS.maxGenerationBytes;
+		const row = (
+			blob
+				? this.connection
+						.prepare(
+							"SELECT typeof(bytes) AS value_type,length(bytes) AS value_bytes,CASE WHEN typeof(bytes)='blob' AND length(bytes)<=? THEN bytes ELSE NULL END AS bytes FROM blobs WHERE digest=?"
+						)
+						.get(limit, request.digest)
+				: head
+					? this.connection
+							.prepare(
+								"SELECT typeof(head_record) AS value_type,length(head_record) AS value_bytes,CASE WHEN typeof(head_record)='blob' AND length(head_record)<=? THEN head_record ELSE NULL END AS head_record FROM objects WHERE object_id=?"
+							)
+							.get(limit, request.objectId)
+					: this.connection
+							.prepare(
+								"SELECT typeof(record) AS value_type,length(record) AS value_bytes,CASE WHEN typeof(generation_id)='text' AND length(CAST(generation_id AS BLOB))=64 THEN generation_id ELSE NULL END AS gated_key,CASE WHEN typeof(record)='blob' AND length(record)<=? THEN record ELSE NULL END AS record FROM generations WHERE object_id=? AND generation_id=?"
+							)
+							.get(limit, request.objectId, request.generationId)
+		) as DatabaseRow | undefined;
+		if (row === undefined || (head && row.value_type === "null")) return null;
+		if (head && row.value_type !== "blob") throw new PersistedStorageError("NON_CANONICAL_RECORD");
+		if (row.value_type === "blob" && typeof row.value_bytes === "number" && row.value_bytes > limit)
+			throw new BoundedReadBudgetError();
+		if (blob) return row.value_type === "blob" ? row.bytes : undefined;
+		return head
+			? { objectId: request.objectId, record: row.head_record }
+			: { objectId: request.objectId, generationId: row.gated_key, record: row.record };
 	}
 
 	public readGenerationPage(input: {
@@ -231,9 +364,13 @@ class SqliteAheDurableStore implements AheDurableStore {
 		if (!this.closed) {
 			this.closed = true;
 			this.recoveryCertificates.clear();
-			this.connection.close();
+			if (this.boundedReads === 0) this.connection.close();
+			else
+				this.boundedClose = new Promise((resolve) => {
+					this.resolveBoundedClose = resolve;
+				});
 		}
-		return Promise.resolve();
+		return this.boundedClose ?? Promise.resolve();
 	}
 
 	private run(command: unknown): Promise<StoreResult<unknown>> {

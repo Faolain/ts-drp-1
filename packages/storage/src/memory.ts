@@ -8,6 +8,8 @@ import { encodeGenerationRecordV1, encodeHeadRecordV1 } from "./codecs.js";
 import { TransitionOwner } from "./internal/transition.js";
 import type {
 	ActiveGenerationSnapshot,
+	AheBoundedReadAcquisition,
+	AheBoundedReadInput,
 	AheDurableStore,
 	BlobDigest,
 	ExpectedHead,
@@ -33,6 +35,10 @@ class MemoryAheDurableStore implements AheDurableStore {
 
 	public constructor() {
 		Object.freeze(this);
+	}
+
+	public acquireBoundedActiveRead(input: AheBoundedReadInput): Promise<StoreResult<AheBoundedReadAcquisition>> {
+		return Promise.resolve(this.owner.acquireBoundedActiveRead(input));
 	}
 
 	/**

@@ -145,7 +145,7 @@ historical ACL proof, legacy migration, and genuine room/registry rollback
 consumption remain mandatory. Byte access grants no retention lease or authority
 to lower host, issuance, signing or retirement safety floors.
 
-## 2e-1 bounded native read contract accepted; product remains open
+## 2e-1 bounded native reader accepted; focused main verification
 
 Separate Codex 6.1 high source synthesis and independent Codex 6.1 xhigh
 [APPROVED / CONTEXT_COMPLETE YES](../../.logs/bounded-storage-lifecycle/rollback-bounded-read-contract-review-01/public.md)
@@ -182,17 +182,35 @@ and tiny controls. The separate focused xhigh approval and
 [root disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-certificate-oracle-review-01/root-disposition.md)
 accept that correction; GREEN copied only the exact authorized postimage. Both
 opposite assertions execute and pass in native and all three browser engines.
-The product candidate is now frozen for a new independent xhigh review. Native
-behavior passes with coverage failure unwaived; browser evidence is the original
-full run plus one unchanged untraced failed-title positive, not a clean aggregate.
-Completed readiness reviews and unchanged matrices stay closed.
+The separate xhigh [product verdict](../../.logs/bounded-storage-lifecycle/bounded-active-read-product-review-01/public.md)
+requires only concrete unsafe browser cleanup; no product-source correction is
+confirmed. Root's [bounded disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-product-review-01/root-disposition.md)
+freezes product/oracles and releases a distinct HIGH outer-ownership correction.
+Its [focused runtime allocation](../../.logs/bounded-storage-lifecycle/bounded-active-read-cleanup-root-01/root-runtime-allocation.md)
+preserves original product calls and budgets, visible failed controls and unknown
+historical deletion/stall cause. Native behavior passes with coverage failure
+unwaived; browser evidence remains original full164 plus focused1, not clean165.
+The separate focused xhigh [APPROVED / B1 CLOSED verdict](../../.logs/bounded-storage-lifecycle/bounded-active-read-cleanup-review-01/public.md)
+and [root disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-cleanup-review-01/root-disposition.md)
+now accept the useful product capability. Actual cleanup deletes/inventory precede
+context closure; controlled failures stay failed. The initial Chromium GC failure
+remains distinct from its retained-promise timeout repeat; only that repeat executes
+the final synthetic-retention branch. No all-platform final-owner pass is claimed.
+Exact product/oracle postimages are integrated under the
+[transfer receipt](../../.logs/bounded-storage-lifecycle/bounded-active-read-green-integration-01/transfer.json).
+Build/static gates, fresh native56 assertions, genuine producer12 and focused
+accessor/certificate9 browser cases pass on the merged runtime under the
+[landing disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-green-integration-01/root-disposition.md).
+Only already accepted snapshot-reader input differences required that affected
+verification; unchanged full matrices stay closed. Global coverage and original
+browser failures remain unwaived.
 
 This is fixed observer entitlement on the existing store, not producer admission,
 profile-complete historical authentication or usable rollback. Valid over-budget
 objects refuse whole without poisoning, trimming, certificates or cleanup. Native
 readonly/bounded-work evidence, separately reviewed RED, distinct GREEN and product
-acceptance remain required. Snapshot-reader GREEN proceeds independently; overlapping
-GREEN/integration owners stay serialized. Full-profile closed-ACL and older-QC
+acceptance and exact main landing are complete within that narrow scope.
+The accepted snapshot reader remains unchanged. Full-profile closed-ACL and older-QC
 authentication, genuine room rollback/checkpoint promotion/registry roles, later
 sustained admission/maintenance and all golden paths remain mandatory.
 
@@ -211,7 +229,17 @@ the unchanged proof budget; G8 refusal is not usable rollback.
 No data RED/GREEN, room rollback, registry reconciliation or product acceptance
 is authorized by this source-only disposition.
 
-## 2e-2 exact journal-anchor contract accepted; implementation remains open
+The separate [historical custody review](../../.logs/bounded-storage-lifecycle/rollback-anchor-custody-contract-review-01/public.md)
+now accepts only the existing-journal preservation law and authentic dependency
+boundary under its [root disposition](../../.logs/bounded-storage-lifecycle/rollback-anchor-custody-contract-review-01/root-disposition.md).
+Root selects surviving genuine signed material under existing authority for
+subsequent preservation/import design; no external source or lost-input success
+is promised. The next HIGH source author is materializing the bounded data-observation
+contract under its [allocation](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-root-01/root-allocation.md).
+It must distinguish actual all-target authentication from still-held durable
+availability, custody and fences. No data RED/GREEN allocation is accepted yet.
+
+## 2e-2 exact journal-anchor implemented; independent product review
 
 The separate HIGH proposal and independent XHIGH
 [APPROVED review](../../.logs/bounded-storage-lifecycle/rollback-journal-anchor-contract-review-01/public.md)
@@ -235,6 +263,22 @@ accepts the scope correction and identifies only the unobserved getKey range-rea
 blind spot. Root's [bounded allocation](../../.logs/bounded-storage-lifecycle/journal-anchor-read-red-review-01/root-disposition.md)
 requires native-preserving observation and one tiny control, not an unchanged
 matrix rerun, before focused review and immediate distinct GREEN.
+That getKey correction now has separate focused xhigh approval and
+[immediate GREEN allocation](../../.logs/bounded-storage-lifecycle/journal-anchor-read-getkey-correction-review-01/root-disposition.md).
+GREEN implements the shared exact-byte law and both native owners. Its first
+actual gate reaches every product assertion; five failures are caused by the
+fixture summarizing an already summarized transport record a second time.
+The separate RED author's [one-pass capture allocation](../../.logs/bounded-storage-lifecycle/journal-anchor-summary-oracle-root-01/root-allocation.md)
+preserves genuine freezing/mutation observations, native calls and every expected
+assertion. Its separate focused xhigh [APPROVED verdict](../../.logs/bounded-storage-lifecycle/journal-anchor-summary-oracle-review-01/public.md)
+and [root disposition](../../.logs/bounded-storage-lifecycle/journal-anchor-summary-oracle-review-01/root-disposition.md)
+released actual changed-product gates. Fresh native/shared28 assertions pass;
+browser71 plus unchanged exact-title1 establishes all original semantics, not a
+clean combined72 pass. The failed WebKit row has no product/cleanup receipt;
+primary cause and exact historical deletion remain unknown. Old browser30 passes;
+ordinary native/compiler/coverage failures stay unwaived. Separate xhigh product
+review is active. Required declaration-pin and direct delegate evolution remain
+bound to real emitted/type conflicts.
 Historical protected/legacy custody and both independent authenticated
 digest bindings remain mandatory before full-profile success; missing preimages
 cannot be fabricated. This does not accept usable rollback, room/registry roles,

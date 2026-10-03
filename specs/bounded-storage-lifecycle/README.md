@@ -122,9 +122,19 @@ The same RED author's complete native-record and distinct blob-union corrections
 now have separate focused xhigh approval. The
 [corrected readiness disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-correction-review-01/root-disposition.md)
 accepts R1/R2 closure and allocates the distinct Codex 6.1 high GREEN author.
-That candidate is frozen for a new separate xhigh product review: actual native
-and producer assertions pass; browser evidence is the original full run plus one
-unchanged untraced WebKit title, not a clean aggregate pass.
+That candidate's separate xhigh
+[product review](../../.logs/bounded-storage-lifecycle/bounded-active-read-product-review-01/root-disposition.md)
+confirmed no product-source correction and required only unsafe outer browser
+cleanup to be corrected. The distinct HIGH correction now has focused xhigh
+approval and [bounded product acceptance](../../.logs/bounded-storage-lifecycle/bounded-active-read-cleanup-review-01/root-disposition.md).
+Exact reviewed sources and frozen oracles are integrated on MAIN; affected
+build/static gates, fresh native assertions and proportionate three-engine
+browser verification pass under the
+[landing disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-green-integration-01/root-disposition.md).
+The unchanged global coverage gate remains failed. Original browser evidence
+remains the full run plus one unchanged untraced WebKit title, not a clean aggregate.
+Historical deletion and stall cause stay unknown. Prospective cleanup closes only
+the concrete ownership defect, without rewriting that frozen default run.
 An actual ordinary-recovery trace demonstrated a separate certificate-observation
 blind spot: the old predicate ignored paged full-record scans. A narrow separate RED
 [correction disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-certificate-oracle-review-01/root-disposition.md)
@@ -144,13 +154,27 @@ is reviewed, not full-data execution. The separate
 is independently approved and root-accepted for distinct tests-only RED under its
 [disposition](../../.logs/bounded-storage-lifecycle/rollback-journal-anchor-contract-review-01/root-disposition.md).
 That RED candidate's digest-consistent exact-key scope correction is accepted.
-Its separate xhigh review requires only the concrete getKey observation gap under
-the [narrow correction allocation](../../.logs/bounded-storage-lifecycle/journal-anchor-read-red-review-01/root-disposition.md).
-Focused approval must immediately release distinct GREEN; no unchanged matrices
-are reopened. Separate protected historical custody contract design is active.
+Its independently approved getKey correction immediately released distinct GREEN
+under the [readiness disposition](../../.logs/bounded-storage-lifecycle/journal-anchor-read-getkey-correction-review-01/root-disposition.md).
+The existing journal owners now implement exact bounded anchor reads. The first
+changed-product native gate exposed a concrete double-summary fixture error.
+The separate RED author's one-pass correction now has focused xhigh
+[acceptance](../../.logs/bounded-storage-lifecycle/journal-anchor-summary-oracle-review-01/root-disposition.md).
+Fresh changed-product native assertions pass. All original browser semantics
+execute successfully across the combined run and one unchanged exact-title repeat;
+the original WebKit timeout remains failed, with primary cause and historical
+deletion unknown. A separate xhigh product review is active; no budgets or
+expected assertions changed and no closed reviews reopened. The separate
+[historical custody source-law disposition](../../.logs/bounded-storage-lifecycle/rollback-anchor-custody-contract-review-01/root-disposition.md)
+accepts the same-journal preservation direction, not a completed source/import
+guarantee or executable full-data allocation.
 Supported retirement-only non-genesis protection/legacy custody still needs its
 separate contract; reading existing bytes does not establish that guarantee.
-Then separately prove bounded, profile-complete authenticated closed-cut data and the mandatory genuine
+The next HIGH source author is materializing the bounded all-target data-observation
+contract under its [allocation](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-root-01/root-allocation.md),
+before separate xhigh acceptance and distinct RED/GREEN. It authenticates actual
+application/closed-ACL bytes, not durable availability, migration or old seal replay.
+Then separately prove profile-complete custody and the mandatory genuine
 room/lifecycle rollback consumer and registry-role reconciliation. Observation
 alone is not usable rollback. Recipient retention remains a separate destination
 custody/installation seam; none of this authorizes retirement.

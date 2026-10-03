@@ -1,5 +1,7 @@
 import {
 	type ActiveGenerationSnapshot,
+	type AheBoundedReadAcquisition,
+	type AheBoundedReadInput,
 	type AheDurableStore,
 	type BlobDigest,
 	type BlobExistencePort,
@@ -11,16 +13,24 @@ import {
 	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
+	AHE_BOUNDED_READ_LIMITS as LIMITS,
 	parseBlobDigest,
+	parseGenerationId,
 	type PresentHead,
 	type StorageObjectId,
 	type StoreCapabilities,
 	type StoreResult,
 } from "@ts-drp/storage";
 import {
+	boundedActiveReadSteps,
+	boundedHeadSteps,
+	type BoundedReadRequest,
 	classifyPersistedState,
+	createBoundedReadAcquisition,
 	evaluateStorageAdapterCommand,
+	isBoundedReadCorruption,
 	PersistedStorageError,
+	prepareBoundedRead,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
 	storageAdapterClosureVerifier,
@@ -206,6 +216,116 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 
 	public readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
 		return this.run(commandWithKind("readHead", { objectId })) as Promise<StoreResult<ExpectedHead>>;
+	}
+
+	public acquireBoundedActiveRead(input: AheBoundedReadInput): Promise<StoreResult<AheBoundedReadAcquisition>> {
+		const prepared = prepareBoundedRead(input);
+		if (!prepared.ok) return Promise.resolve(prepared);
+		return this.runBoundedSteps(boundedActiveReadSteps(prepared.value), false).then((result) =>
+			!result.ok
+				? result
+				: {
+						ok: true,
+						value: createBoundedReadAcquisition(result.value, (head, released) =>
+							this.runBoundedSteps(boundedHeadSteps(head.objectId), true, released)
+						),
+					}
+		);
+	}
+
+	private async runBoundedSteps<T>(
+		steps: Generator<BoundedReadRequest, StoreResult<T>, unknown>,
+		headOnly: boolean,
+		released?: () => boolean
+	): Promise<StoreResult<T>> {
+		const database = this.lifecycle.startOperation();
+		if (database === undefined) return { ok: false, reason: "STORE_CLOSED" };
+		const turn = this.lifecycle.acquireRecoveryTurn();
+		const releaseTurn = typeof turn === "function" ? turn : await turn;
+		let transaction: IDBTransaction | undefined;
+		let completion: Promise<TransactionOutcome> | undefined;
+		try {
+			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+			if (released?.()) return { ok: false, reason: "READ_RELEASED" };
+			transaction = database.transaction(headOnly ? [PHASE_2D_OBJECTS_STORE] : allAuthorityStores(), "readonly");
+			completion = transactionOutcome(transaction);
+			let step = steps.next();
+			while (!step.done) step = steps.next(await this.loadBoundedRequest(transaction, step.value));
+			const outcome = await completion;
+			if (!outcome.ok) return substrateFailure(outcome.cause);
+			if (isBoundedReadCorruption(step.value)) {
+				this.recoveryCertificates.clear();
+				this.lifecycle.latchPoison("NON_CANONICAL_RECORD");
+			}
+			return step.value;
+		} catch (cause) {
+			if (transaction !== undefined) abortIfActive(transaction);
+			if (completion !== undefined) await completion;
+			return substrateFailure(cause);
+		} finally {
+			releaseTurn();
+			this.lifecycle.finishOperation();
+		}
+	}
+
+	private async loadBoundedRequest(transaction: IDBTransaction, request: BoundedReadRequest): Promise<unknown> {
+		if (request.kind === "blob-preflight") return true;
+		if (request.kind === "keys") {
+			return new Promise((resolve, reject) => {
+				const keys: unknown[] = [];
+				const cursorRequest = transaction
+					.objectStore(PHASE_2D_GENERATIONS_STORE)
+					.openKeyCursor(IDBKeyRange.lowerBound([request.objectId]));
+				cursorRequest.onerror = (): void => reject(cursorRequest.error);
+				cursorRequest.onsuccess = (): void => {
+					const cursor = cursorRequest.result;
+					if (cursor === null || !Array.isArray(cursor.key) || cursor.key[0] !== request.objectId) {
+						resolve(keys);
+						return;
+					}
+					// Native key cloning is unavoidable. Stop immediately on any invalid in-prefix key.
+					if (cursor.key.length !== 2 || typeof cursor.key[1] !== "string" || !parseGenerationId(cursor.key[1]).ok) {
+						keys.push(null);
+						resolve(keys);
+						return;
+					}
+					keys.push(cursor.key[1]);
+					if (keys.length === LIMITS.maxObjectGenerations + 1) {
+						resolve(keys);
+						return;
+					}
+					cursor.continue();
+				};
+			});
+		}
+		if (request.kind === "promotion")
+			return (
+				(await requestValue(
+					transaction
+						.objectStore(PHASE_2D_PROMOTIONS_STORE)
+						.getKey([request.objectId, request.generationId, request.digest])
+				)) !== undefined
+			);
+		if (request.kind === "blob") {
+			const row = await requestValue(transaction.objectStore(PHASE_2D_BLOBS_STORE).get(request.digest));
+			return row === undefined ? null : rowProperty(row, "bytes");
+		}
+		const head = request.kind === "head";
+		const row = await requestValue(
+			transaction
+				.objectStore(head ? PHASE_2D_OBJECTS_STORE : PHASE_2D_GENERATIONS_STORE)
+				.get(head ? request.objectId : [request.objectId, request.generationId])
+		);
+		return row === undefined
+			? null
+			: head
+				? { objectId: rowProperty(row, "objectId"), record: rowProperty(row, "record") }
+				: {
+						objectId: rowProperty(row, "objectId"),
+						generationId: rowProperty(row, "generationId"),
+						record: rowProperty(row, "record"),
+					};
 	}
 
 	public readGenerationPage(input: {

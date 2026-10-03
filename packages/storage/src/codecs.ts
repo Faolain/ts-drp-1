@@ -1,4 +1,4 @@
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { CanonicalDecodingError, decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 
 import {
 	bytesEqual,
@@ -7,7 +7,12 @@ import {
 	hasSharedBacking,
 	isClosedRecord,
 } from "./internal/validation.js";
-import type { ExpectedHead, GenerationRecord, StoreResult } from "./types.js";
+import {
+	type ExpectedHead,
+	type GenerationRecord,
+	AHE_BOUNDED_READ_LIMITS as LIMITS,
+	type StoreResult,
+} from "./types.js";
 import { digestClosure } from "./values.js";
 
 type Envelope = {
@@ -20,14 +25,32 @@ function nonCanonical<T>(): StoreResult<T> {
 	return { ok: false, reason: "NON_CANONICAL_RECORD" };
 }
 
-function decodeEnvelope(bytes: Uint8Array): StoreResult<Envelope> {
+function decodeEnvelope(bytes: Uint8Array, bounded?: "head" | "generation"): StoreResult<Envelope> {
 	if (!(bytes instanceof Uint8Array)) return nonCanonical();
 	if (hasSharedBacking(bytes)) return { ok: false, reason: "SHARED_BUFFER_INPUT" };
+	if (
+		bounded !== undefined &&
+		bytes.byteLength > (bounded === "head" ? LIMITS.maxHeadBytes : LIMITS.maxGenerationBytes)
+	) {
+		return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+	}
 	const copied = new Uint8Array(bytes);
 	let decoded: unknown;
 	try {
-		decoded = decodeCanonical(copied);
-	} catch {
+		decoded = decodeCanonical(
+			copied,
+			bounded === undefined
+				? undefined
+				: {
+						maxBytes: bounded === "head" ? LIMITS.maxHeadBytes : LIMITS.maxGenerationBytes,
+						maxDepth: bounded === "head" ? 2 : 4,
+						maxItems: bounded === "head" ? 33 : 127,
+					}
+		);
+	} catch (cause) {
+		if (bounded !== undefined && cause instanceof CanonicalDecodingError && cause.resourceLimit !== undefined) {
+			return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+		}
 		return nonCanonical();
 	}
 	if (!isClosedRecord(decoded, ["storageSchemaVersion", "kind", "body"])) return nonCanonical();
@@ -40,6 +63,16 @@ function decodeEnvelope(bytes: Uint8Array): StoreResult<Envelope> {
 		return nonCanonical();
 	}
 	let reencoded: Uint8Array;
+	if (
+		bounded === "generation" &&
+		typeof decoded.body === "object" &&
+		decoded.body !== null &&
+		"closure" in decoded.body &&
+		Array.isArray(decoded.body.closure) &&
+		decoded.body.closure.length > LIMITS.maxClosureReferences
+	) {
+		return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+	}
 	try {
 		reencoded = encodeCanonical(decoded);
 	} catch {
@@ -84,10 +117,11 @@ export function encodeHeadRecordV1(value: ExpectedHead): Uint8Array {
 /**
  * Decodes one exact v1 head persistence envelope.
  * @param bytes - Input value.
+ * @param bounded - Optional fixed observer decoding profile; ordinary callers retain defaults.
  * @returns The decoded head or a stable rejection.
  */
-export function decodeHeadRecordV1(bytes: Uint8Array): StoreResult<ExpectedHead> {
-	const decoded = decodeEnvelope(bytes);
+export function decodeHeadRecordV1(bytes: Uint8Array, bounded?: "head"): StoreResult<ExpectedHead> {
+	const decoded = decodeEnvelope(bytes, bounded);
 	if (!decoded.ok) return decoded;
 	if (decoded.value.storageSchemaVersion !== 1 || decoded.value.kind !== "head") {
 		return { ok: false, reason: "UNSUPPORTED_STORAGE_SCHEMA" };
@@ -111,10 +145,11 @@ export function encodeGenerationRecordV1(value: GenerationRecord): Uint8Array {
 /**
  * Decodes one exact v1 generation persistence envelope.
  * @param bytes - Input value.
+ * @param bounded - Optional fixed observer decoding profile; ordinary callers retain defaults.
  * @returns The decoded generation or a stable rejection.
  */
-export function decodeGenerationRecordV1(bytes: Uint8Array): StoreResult<GenerationRecord> {
-	const decoded = decodeEnvelope(bytes);
+export function decodeGenerationRecordV1(bytes: Uint8Array, bounded?: "generation"): StoreResult<GenerationRecord> {
+	const decoded = decodeEnvelope(bytes, bounded);
 	if (!decoded.ok) return decoded;
 	if (decoded.value.storageSchemaVersion !== 1 || decoded.value.kind !== "generation") {
 		return { ok: false, reason: "UNSUPPORTED_STORAGE_SCHEMA" };

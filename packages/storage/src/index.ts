@@ -23,7 +23,12 @@ export type {
 	StorageCapacityPort,
 } from "./capacity.js";
 export { createMemoryAheDurableStore } from "./memory.js";
+export { AHE_BOUNDED_READ_LIMITS } from "./types.js";
 export type {
+	AheBoundedActiveRead,
+	AheBoundedReadAcquisition,
+	AheBoundedReadInput,
+	AheBoundedReadLimits,
 	AheDurableStore,
 	ActiveGenerationSnapshot,
 	BlobDigest,

@@ -28,7 +28,7 @@ This preserves the required rollback-before-later-admission/retirement sequence.
 
 | Bound                                         | Fixed read profile          | Source/representation rationale                                                                                                     |
 | --------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| G, total object generation rows               | 7                           | Bootstrap plus three ordinary two-record transitions, including first non-genesis oldest closed-cut target; every row/state counts. |
+| G, total object generation rows               | 7                           | Fixed observer entitlement; every row/state counts, including both shipped bootstrap records. Genuine unpruned epoch three refuses. |
 | H, encoded head bytes                         | 3,326                       | Closed storage-v1 envelope; object ID≤1024 UTF-16 units, ≤3072 UTF-8 bytes; 64-hex IDs/digests and safe revision.                   |
 | F, refs per examined generation               | 7                           | Largest clean current producer L closure, aggregate+retirement; settlement L≤6 and genesis L=2. Generic refs also count.            |
 | R, encoded generation bytes                   | 7,307                       | Conservative closed-v1 bound `6627+v(F)+97F`, with `v(7)=1`; no whole-decoder default allowance.                                    |
@@ -40,26 +40,32 @@ These are reviewed **local observer entitlement limits**, not existing global ca
 measured budgets or wire validity rules. Execution cannot raise them to fit a failing run. They are not a heap
 budget increase. No object, ref, catalog or profile is silently exempted.
 
-### Why seven rows, not five
+### Fixed entitlement and actual producer debt
 
-Ordinary bootstrap creates L0; each successful close/adoption creates Q then L.
-Without physical reclamation, epoch 0/1/2/3 checkpoints have 1/3/5/7 rows, and the
-selected epoch-3 pair is L3/Q2/L2. The bounded advance removes obsolete refs from
-the new closure; it does **not** delete generation rows. Actual successor cleanup
-returns without a settlement frontier, without either maintenance capability, or
-on unsupported availability policy in the [successor cleanup owner](../../../packages/node/src/v3-live.ts). Thus the
-non-settlement supported route cannot be assumed to have three rows at epoch 3.
+The new native producer evidence, independently accepted under the
+[empirical disposition](../../../.logs/bounded-storage-lifecycle/bounded-active-read-red-review-01/root-disposition.md),
+supersedes the earlier source-only bootstrap-one premise. Actual shipped
+epoch 0/1/2/3 checkpoints contain **2/4/6/8** rows without settlement cleanup and
+**2/3/3/3** with it, across all three engines. Both bootstrap records count.
+The bounded advance removes obsolete refs from the new closure; it does **not**
+delete generation rows. Actual successor cleanup may return without a settlement
+frontier, either maintenance capability or supported availability policy in the
+[successor cleanup owner](../../../packages/node/src/v3-live.ts).
 
-When settlement/native/local-policy cleanup succeeds after adoption, the planner
-retains exactly three, deletes the entire older prefix and normalizes oldest L's
-base through the [node planner](../../../packages/node/src/internal/closed-epoch-cleanup.ts)
-and [transactional maintenance owner](../../../packages/storage/src/maintenance.ts).
-Its next two-head transition reaches five before cleanup. No-refusal successful
-cleanup therefore gives post-adoption counts 1/3/3/3; an eligible post-adoption
-prune can first occur at epoch 1 with an empty prefix. This is source control flow,
-not fresh runtime evidence. Ordinary no-cleanup counts 1/3/5/7 establish G=7's
-minimum purpose. It is **not** a cap on retries/forks, nor enough for endless
-unpruned legacy history; later G+1 refuses instead of choosing seven preferred rows.
+Successful settlement cleanup retains three, erases both earlier bootstrap
+records and normalizes the selected oldest L's base through the
+[node planner](../../../packages/node/src/internal/closed-epoch-cleanup.ts) and
+[transactional maintenance owner](../../../packages/storage/src/maintenance.ts).
+The genuine epoch-three oldest is the accepted epoch-two head, not a synthetic
+genesis substitute; reading it must not walk its erased prefix.
+
+**G=7 remains unchanged.** Genuine unpruned nonsettlement epoch three therefore
+requires whole, nonpoisoning budget refusal before generation values. This is
+safe observation, not usable rollback availability for that debt state. The
+entitlement is neither a retry/fork admission cap nor permission to choose seven
+preferred rows. Supported sustained availability remains a mandatory later
+maintenance/admission obligation; this empirical correction authorizes no
+producer redesign, budget increase or weaker full-profile requirement.
 
 ### Full closure and carrier qualifications
 

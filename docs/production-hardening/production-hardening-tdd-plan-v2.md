@@ -40,12 +40,17 @@ implements noncreating byte access on the existing native owners; exhaustive
 uninstrumented original-title semantics, focused timeout-cleanup review and bounded
 product/main acceptance are complete. The separately accepted
 [bounded AHE read contract](../../specs/bounded-storage-lifecycle/slices/02e-1-bounded-active-generation-read.md)
-has accepted corrected tests-only RED readiness and a frozen distinct GREEN
-candidate under independent product review. Previously masked assertions execute
-against changed product; failed aggregate/coverage gates stay qualified.
-Exact journal-anchor RED has one focused getKey observation correction before
-independent approval and immediate distinct GREEN. Full-profile
-data authentication, genuine rollback/registry
+has accepted corrected tests-only RED readiness, distinct GREEN and focused
+unsafe-cleanup correction after independent review. Exact MAIN integration and
+affected verification are accepted. Previously masked assertions execute against changed
+product; failed aggregate/coverage gates stay qualified. Exact journal-anchor RED,
+getKey and one-pass summary corrections are independently approved. Its changed-
+product native assertions and original browser semantics pass with a preserved
+combined WebKit timeout qualification; separate xhigh product review is active.
+Same-journal historical preservation is source-law accepted, not durable source
+availability or migration completion. The next bounded actual-data observation
+contract is being materialized before separate review and RED/GREEN. Full-profile
+custody, genuine rollback/registry
 consumption, recipient retention and later lifecycle/endurance gates remain open.
 The live lifecycle handoff and review ledger own current status; older narrative
 below remains qualified history, not instructions to reopen completed reviews.

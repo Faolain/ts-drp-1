@@ -1,5 +1,7 @@
 import type {
 	ActiveGenerationSnapshot,
+	AheBoundedReadAcquisition,
+	AheBoundedReadInput,
 	BlobDigest,
 	ExpectedHead,
 	GenerationId,
@@ -10,6 +12,15 @@ import type {
 	StorageRejectionReason,
 	StoreResult,
 } from "../types.js";
+import { AHE_BOUNDED_READ_LIMITS as LIMITS } from "../types.js";
+import {
+	boundedActiveReadSteps,
+	BoundedReadBudgetError,
+	type BoundedReadRequest,
+	createBoundedReadAcquisition,
+	prepareBoundedRead,
+} from "./bounded-read.js";
+import { encodeGenerationRecordV1, encodeHeadRecordV1 } from "../codecs.js";
 import { acceptBlob, acceptPromotion, accepts, type Authorization, finish, next, start } from "./closure-verifier.js";
 import { checkedHeadRevision, digestBlob, digestClosure } from "../values.js";
 import {
@@ -104,6 +115,59 @@ export class TransitionOwner {
 	 * @param durability - Input value.
 	 */
 	public constructor(private readonly durability: TransitionDurability) {}
+
+	/**
+	 * Observe ephemeral state through the same serial bounded law, never granting durability.
+	 * @param input - Closed approved observer request.
+	 * @returns Detached acquisition or whole non-mutating refusal.
+	 */
+	public acquireBoundedActiveRead(input: AheBoundedReadInput): StoreResult<AheBoundedReadAcquisition> {
+		const prepared = prepareBoundedRead(input);
+		if (!prepared.ok) return prepared;
+		const failure = this.lifecycleFailure();
+		if (failure !== undefined) return failure;
+		try {
+			const steps = boundedActiveReadSteps(prepared.value);
+			let step = steps.next();
+			while (!step.done) step = steps.next(this.loadBoundedRequest(step.value));
+			if (!step.value.ok) return step.value;
+			return {
+				ok: true,
+				value: createBoundedReadAcquisition(step.value.value, (head, released) => {
+					const lifecycle = this.lifecycleFailure();
+					return Promise.resolve(
+						lifecycle ?? (released() ? { ok: false, reason: "READ_RELEASED" } : this.readHead(head.objectId))
+					);
+				}),
+			};
+		} catch (cause) {
+			return cause instanceof BoundedReadBudgetError
+				? { ok: false, reason: "READ_BUDGET_EXCEEDED" }
+				: { ok: false, reason: "SUBSTRATE_FAILURE", cause };
+		}
+	}
+
+	private loadBoundedRequest(request: BoundedReadRequest): unknown {
+		if (request.kind === "blob-preflight")
+			return request.references.every((ref) => (this.blobs.get(ref.digest)?.byteLength ?? 0) <= LIMITS.maxBlobBytes);
+		if (request.kind === "blob") return this.blobs.get(request.digest) ?? null;
+		const object = this.objects.get(request.objectId);
+		if (request.kind === "head")
+			return object === undefined || object.head.kind === "none"
+				? null
+				: { objectId: request.objectId, record: encodeHeadRecordV1(object.head) };
+		if (request.kind === "keys") return object?.generationIds.slice(0, LIMITS.maxObjectGenerations + 1) ?? [];
+		if (request.kind === "promotion")
+			return this.promoted.has(`${request.objectId}\0${request.generationId}\0${request.digest}`);
+		const generation = object?.generations.get(request.generationId);
+		if (generation === undefined) return null;
+		if (generation.closure.length > LIMITS.maxClosureReferences) throw new BoundedReadBudgetError();
+		return {
+			objectId: request.objectId,
+			generationId: request.generationId,
+			record: encodeGenerationRecordV1(generation),
+		};
+	}
 
 	private lifecycleFailure(): StoreResult<never> | undefined {
 		if (this.closed) return rejected("STORE_CLOSED");

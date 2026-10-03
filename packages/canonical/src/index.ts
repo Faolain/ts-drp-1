@@ -44,6 +44,17 @@ export class CanonicalEncodingError extends TypeError {
 export class CanonicalDecodingError extends TypeError {
 	readonly [DRP_ERROR_BRAND] = true;
 	readonly code = "CANONICAL_DECODING";
+	declare readonly resourceLimit?: "bytes" | "depth" | "items";
+
+	/**
+	 * Preserves ordinary malformed-byte errors while labelling resource exhaustion.
+	 * @param message - Decoder failure detail.
+	 * @param resourceLimit - Exact exhausted resource, absent for malformed bytes.
+	 */
+	public constructor(message?: string, resourceLimit?: "bytes" | "depth" | "items") {
+		super(message);
+		if (resourceLimit !== undefined) this.resourceLimit = resourceLimit;
+	}
 }
 
 /**
@@ -352,7 +363,7 @@ class Reader {
 	public countItems(count = 1): void {
 		this.items += count;
 		if (this.items > this.limits.maxItems) {
-			throw new CanonicalDecodingError("canonical value exceeds item limit");
+			throw new CanonicalDecodingError("canonical value exceeds item limit", "items");
 		}
 	}
 
@@ -455,7 +466,7 @@ function decodeTypedArray(reader: Reader, tag: number): Float32Array | Float64Ar
 
 function decodeInternal(reader: Reader, depth: number): Decoded {
 	if (depth > reader.limits.maxDepth) {
-		throw new CanonicalDecodingError("canonical value exceeds maximum nesting depth");
+		throw new CanonicalDecodingError("canonical value exceeds maximum nesting depth", "depth");
 	}
 	reader.countItems();
 	const start = reader.offset;
@@ -540,7 +551,7 @@ export function decodeCanonical(input: Uint8Array, limits: Partial<CanonicalLimi
 	const bytes = new Uint8Array(input);
 	const configured: CanonicalLimits = { ...DEFAULT_LIMITS, ...limits };
 	if (bytes.byteLength > configured.maxBytes) {
-		throw new CanonicalDecodingError("canonical value exceeds byte limit");
+		throw new CanonicalDecodingError("canonical value exceeds byte limit", "bytes");
 	}
 	const reader = new Reader(bytes, configured);
 	const value = decodeInternal(reader, 0).value;
