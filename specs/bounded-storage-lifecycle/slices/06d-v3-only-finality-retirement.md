@@ -56,8 +56,23 @@ Preserve every [Appendix C golden-path assertion](../../../docs/production-harde
 including concurrent Writer grant and Finality-role revocation, ACL resolver
 behavior and revoked authority. Freeze the current-v3 authorization counterpart
 before removal; a permission named Finality is not itself an obsolete attestation.
-An unresolved role/authority mapping is contract work, not permission to delete
-the assertion or manufacture operation receipts.
+The [accepted operation-authorization contract](../../../.logs/bounded-storage-lifecycle/v3-authorization-contract-review-01/root-disposition.md)
+selects the existing latched-ACL owner for one early operation decision and
+genuine next-anchor role composition. Its prospective A/B allocations are not
+runtime or profile-complete authorization acceptance. Fixed creator seal-key
+continuity is distinct from ACL Finality/key and Admin revocation; preview output
+must not replace authenticated signer continuity. Dynamic signer changes,
+certified successors and jointly invalid close selection require separately
+governed contracts. Preserve every golden authority assertion through those
+prerequisites, not by deleting assertions or manufacturing operation receipts.
+
+The [accepted retired-wire/durable-input policy](../../../.logs/bounded-storage-lifecycle/v3-wire-durable-policy-review-01/root-disposition.md)
+requires raw structural admission before generated decoding can erase retired
+type/field evidence, under one Node eligibility owner. Preserve current v3
+signature fields, CUSTOM, discovery and its required transport. Whole old
+live-object-family refusal follows genuine capability ports; versioned bounded
+RPC/query and actual repair remain separate contracts. This is prospective
+policy, not enforcement, porting or retirement acceptance.
 
 If a current durable record requires old evidence for safe recovery or migration,
 retain or isolate that required read/transition path with fail-closed semantics
@@ -65,6 +80,10 @@ and an explicit removal condition. Do not enable new legacy authoring through
 it. Snapshot-owner inherited rows, migration barriers and recovery debt remain
 protected until authenticated classification and retirement fencing justify
 their handling. Greenfield shipping is not authority to erase current data.
+Supported current-v3 durable predecessors remain protected regardless of schema
+or legacy labels. Existing whole-array historical rehydration is not a bounded
+importer, and small cursor memory does not bound total migration work. Missing
+original signed source remains held debt, never fabricated recovery authority.
 Inherited-data classification remains ordered after protected planning and
 cross-store fences; finishing fresh-owner recipient retention does not clear the
 migration barrier or claim all inherited rooms migrated.

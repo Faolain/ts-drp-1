@@ -19,10 +19,30 @@ Independent Codex 6.1 xhigh returned APPROVED with complete scoped context and
 matching custody. Root read the complete verdict/custody and independently
 checked the inputs, projections and source hashes under the
 [scope disposition](../../.logs/bounded-storage-lifecycle/v3-only-scope-review-01/root-disposition.md).
-Shipping/capability, current-v3 ACL authorization, and wire/durable-data policy
-remain execution holds before retirement RED; no removal allocation or product
-acceptance is granted. Existing history, verdicts and failed gates remain
+Shipping ports, complete current-v3 authorization and runtime wire/durable-data
+enforcement remain execution holds before retirement RED; their separately
+accepted prospective contracts below grant no removal allocation or product
+acceptance. Existing history, verdicts and failed gates remain
 unchanged, including the whole historical plan formatter's heap-limit failure.
+
+## Prospective v3 authorization and wire/durable policies accepted
+
+Separate HIGH source authors and separate XHIGH reviewers establish the
+[operation-authorization disposition](../../.logs/bounded-storage-lifecycle/v3-authorization-contract-review-01/root-disposition.md)
+and [retired-wire/durable-input disposition](../../.logs/bounded-storage-lifecycle/v3-wire-durable-policy-review-01/root-disposition.md).
+Root read the complete proposals/verdicts and structured custody and checked
+the source bindings. Approval selects one existing ACL decision owner and
+prospective causal A/B, plus raw structural wire admission under one Node
+eligibility owner; it establishes no runtime, port, golden or retirement result.
+Fixed creator signer continuity remains binding. Role-driven signer transitions,
+certified successors and jointly invalid close selection remain separately held.
+Versioned authority-bearing RPC, bounded query/archive coverage and actual repair
+must preserve shipped capability before old live-family refusal. Current-v3
+durable predecessors and original historical source/debt remain protected;
+whole-array rehydration and cursor-memory bounds are not bounded import proof.
+Full-profile custody, planning/fences, genuine consumers and all release gates
+remain open. Active 2e-3 RED and every closed review, budget and failed-gate
+qualification remain unchanged.
 
 ## 2c GREEN and main integration accepted
 

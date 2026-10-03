@@ -44,10 +44,12 @@ issuance safety or recovery/migration required by durable data. Do not add
 per-operation quorum receipts. The [accepted shipping ledger](../../.logs/bounded-storage-lifecycle/v3-shipping-capability-review-01/root-disposition.md)
 retains chat, additive canvas, grid/zone, CLI/RPC and SDK capabilities and accepts
 one prospective v3 room owner, not exact schemas/ports or runtime equivalence.
-Seeded chat and zone overwrite are not shipping replacements. Separate HIGH
-source-only current-v3 ACL and retired-wire/durable-policy investigations address
-the remaining scope holds; independent XHIGH acceptance is still required.
-They authorize no app port or retirement ahead of the recovery sequence.
+Seeded chat and zone overwrite are not shipping replacements. The separately
+accepted [operation-authorization contract](../../.logs/bounded-storage-lifecycle/v3-authorization-contract-review-01/root-disposition.md)
+and [retired-wire/durable-input policy](../../.logs/bounded-storage-lifecycle/v3-wire-durable-policy-review-01/root-disposition.md)
+select prospective laws only. Genuine consumer evidence, governed signer
+prerequisites, exact app/RPC contracts and ports remain held; neither approval
+authorizes runtime retirement ahead of the recovery sequence.
 
 Continue in order: usable rollback and recipient retention; protected-dependency
 planning, crash-safe retirement, journal/current-v3 signing-evidence cleanup and
