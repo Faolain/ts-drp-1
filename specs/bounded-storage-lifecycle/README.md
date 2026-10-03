@@ -33,8 +33,11 @@ Codex 6.1 at xhigh. Implementation and investigation subagents use Codex 6.1 at
 high. Grok, Kimi and Opus are suspended for new rounds. This supersedes older
 prospective rosters without changing historical verdicts or evidence.
 
-Current pickup (2026-10-03): cold recovery and its reviewed harness prerequisites
-are committed as `b29369df`. The single-API
+Current pickup (2026-10-03): pending recovery is committed as `d267b2f4` after
+independent GREEN approval and exact-byte main landing. Separate Codex 6.1 high
+RED for current-floor shipped startup is active in an isolated checkout of that
+commit; continue it, rather than duplicating the lane. Cold recovery and its
+reviewed harness prerequisites remain committed as `b29369df`. The single-API
 [pending-discovery contract](slices/02c-authenticated-pending-discovery.md) is
 accepted for separate RED authoring under the
 [corrected contract disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/root-disposition.md).
@@ -73,11 +76,17 @@ records source-only startup, usable-rollback and recipient-installation
 prerequisites. The [2d shipped startup contract](slices/02d-declaration-free-shipped-startup.md)
 is independently approved and root-accepted under its
 [contract disposition](../../.logs/bounded-storage-lifecycle/startup-selection-contract-review-01/root-disposition.md).
-After the focused 2c commit, immediately assign separate Codex 6.1 high RED for
-current-floor startup and refresh/retry behavior. Freeze causal oracles and obtain
+The separate Codex 6.1 high RED owns current-floor startup and refresh/retry
+behavior. Freeze causal oracles and obtain
 xhigh RED readiness before a distinct GREEN author changes product. Usable rollback
-planning may proceed independently; rollback and recipient retention execution
-remain later separately reviewed seams.
+is now resliced at a concrete storage prerequisite: the independently accepted
+[non-creating snapshot reader](slices/02e-0-noncreating-snapshot-read.md), under its
+[contract disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
+Reader execution remains held behind 2d product acceptance. Then separately prove
+bounded, profile-complete authenticated closed-cut data and the mandatory genuine
+room/lifecycle rollback consumer and registry-role reconciliation. Observation
+alone is not usable rollback. Recipient retention remains a separate destination
+custody/installation seam; none of this authorizes retirement.
 
 Status: versioned ownership (1a-0), bounded retention (1a-1), fixture content
 delivery (1b-0), and producer pre-sign retention (1b-1) are accepted, 2026-09-07. The
@@ -217,6 +226,9 @@ your pass.
 - [x] Producer pre-sign retention (slice 1b-1).
 - [x] Exact metadata declaration observation and failure provenance (slice 2a).
 - [x] Authenticated declaration-free cold recovery (slice 2b).
+- [x] Authenticated declaration-free pending recovery (slice 2c).
+- [ ] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); separate RED active.
+- [ ] Usable rollback: [reader prerequisite](slices/02e-0-noncreating-snapshot-read.md), bounded authenticated data, then mandatory room/lifecycle consumption and role reconciliation.
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
 - [ ] Protected-dependency planner and durable retirement protocol (slices 3–4).

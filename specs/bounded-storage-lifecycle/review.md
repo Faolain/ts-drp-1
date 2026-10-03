@@ -53,6 +53,24 @@ review; the original proposal is preserved. Separate causal RED starts after the
 2c commit; contract approval is not startup product acceptance. Later product
 execution remains behind its own gates.
 
+## 2e-0 reader contract accepted; usable rollback remains open
+
+The focused source-grounded proposal and independent Codex 6.1 xhigh
+[review](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/public.md)
+establish a useful serial prerequisite: byte acquisition on the existing snapshot
+owner without `openScope` creation/sweep or verification completion. Root accepts
+the exact [reader contract](slices/02e-0-noncreating-snapshot-read.md) under its
+[disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
+Same-selector conflict and reader-local queued-close findings were corrected and
+independently checked during that same review; original framing remains preserved.
+Execution is held behind 2d product acceptance; no reader implementation is claimed.
+
+The two-closed-cut direction supports further synthesis, not usable rollback
+completion. Bounded AHE selection, older-QC authentication limits, non-settlement
+historical ACL proof, legacy migration, and genuine room/registry rollback
+consumption remain mandatory. Byte access grants no retention lease or authority
+to lower host, issuance, signing or retirement safety floors.
+
 ## 2c RED readiness history
 
 The following records preserve chronological decisions. The GREEN entry above
