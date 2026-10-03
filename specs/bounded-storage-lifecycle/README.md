@@ -33,25 +33,51 @@ Codex 6.1 at xhigh. Implementation and investigation subagents use Codex 6.1 at
 high. Grok, Kimi and Opus are suspended for new rounds. This supersedes older
 prospective rosters without changing historical verdicts or evidence.
 
-Current pickup (2026-10-02): cold recovery and its reviewed harness prerequisites
+Current pickup (2026-10-03): cold recovery and its reviewed harness prerequisites
 are committed as `b29369df`. The single-API
 [pending-discovery contract](slices/02c-authenticated-pending-discovery.md) is
 accepted for separate RED authoring under the
 [corrected contract disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/root-disposition.md).
-Resume the isolated native tests-only RED allocation from its preserved fixture
-precondition corrections. The historical caller-acquisition cleanup correction
-is accepted for historical RED readiness after root raw-evidence audit and fresh
-independent xhigh approval under the
+Pending RED readiness is accepted under the
+[GREEN allocation](../../.logs/bounded-storage-lifecycle/pending-native-red-review-06/root-disposition.md).
+The distinct Codex 6.1 high GREEN implementation is now accepted after separate
+Codex 6.1 xhigh approval under the
+[product disposition](../../.logs/bounded-storage-lifecycle/pending-green-review-01/root-disposition.md).
+Actual declaration-free product cases, including the formerly masked assertions,
+and the unchanged default product-browser baseline pass. Exact-byte main integration
+is accepted under the [landing disposition](../../.logs/bounded-storage-lifecycle/pending-green-integration-01/root-disposition.md)
+with affected build/static gates passing and identical runtime bundles. The focused
+checkpoint includes only reviewed sources and canonical handoffs. Preserve unrelated
+dirty work and all budgets; do not repeat unchanged matrices for bookkeeping.
+The broader historical coverage failure remains failed.
+Accepted owner-fault/I/O, divergent-fork, verifier-control and historical findings
+stay closed; diagnostics are not the evidence for product success.
+
+Historical RED readiness remains accepted under the
 [historical disposition](../../.logs/bounded-storage-lifecycle/pending-historical-red-review-02/root-disposition.md).
-Its nonexhaustive cleanup evidence remains qualified. Finish the native freeze
-and independent review, then audit the lanes' cross-lane integration
-before assigning distinct GREEN. Do not change product code to repair RED tests.
-It explicitly preserves candidate-local
-availability filtering and the fully verified fork set; it does not remove the
-room's declaration-driven startup selector. Independent Codex 6.1 xhigh approved
-the amended owner-lifetime, unmasked-probe and historical-cleanup obligations;
-root audited complete custody and managed completion. Overall pending RED and
-implementation remain unaccepted; GREEN remains held.
+Its nonexhaustive cleanup evidence remains qualified. Complete byte-identical
+cross-lane static/historical and native verification is audited under the
+[integration disposition](../../.logs/bounded-storage-lifecycle/pending-red-crosslane-root-audit-03/root-disposition.md).
+Those prior RED owner/instrumentation controls were not product acceptance;
+their downstream assertions remained envelope-masked until fresh GREEN.
+Verification without
+promotion is not durable recovery ownership. Preserve candidate-local availability
+filtering and the fully verified fork set; this seam does not remove the room's
+declaration-driven startup selector. The affected control integration is verified
+under the [bounded delta](../../.logs/bounded-storage-lifecycle/pending-red-crosslane-root-audit-04/delta.json),
+without repeating unchanged native or historical matrices. The newer GREEN
+disposition owns implementation acceptance and its fresh behavioral evidence.
+
+The [later recovery reconnaissance](review.md#later-recovery-reconnaissance-planning-only)
+records source-only startup, usable-rollback and recipient-installation
+prerequisites. The [2d shipped startup contract](slices/02d-declaration-free-shipped-startup.md)
+is independently approved and root-accepted under its
+[contract disposition](../../.logs/bounded-storage-lifecycle/startup-selection-contract-review-01/root-disposition.md).
+After the focused 2c commit, immediately assign separate Codex 6.1 high RED for
+current-floor startup and refresh/retry behavior. Freeze causal oracles and obtain
+xhigh RED readiness before a distinct GREEN author changes product. Usable rollback
+planning may proceed independently; rollback and recipient retention execution
+remain later separately reviewed seams.
 
 Status: versioned ownership (1a-0), bounded retention (1a-1), fixture content
 delivery (1b-0), and producer pre-sign retention (1b-1) are accepted, 2026-09-07. The
@@ -127,7 +153,7 @@ native224 and room8 passes, and focused compile/lint/format checks. Three helper
 JSDoc warnings and the helper's source-only runtime qualification remain explicit.
 The exact 58-file source/test delta excludes unrelated memory/grid diagnostics;
 it and four cold handoffs landed in `b29369df`. The separate pending-recovery
-contract is now accepted; follow the tests-only allocation above. Do not repeat
+contract and reviewed GREEN are accepted; follow the current pickup above. Do not repeat
 completed reviews. The earlier compacted Grok attempt remains NO_VERDICT, and
 broader timeout, coverage and compiler failures remain failed. Preserve the
 closure-integrity barrier and accepted frozen oracles. The third contract round's
@@ -362,6 +388,14 @@ commands before GREEN. Record typecheck, lint/format, affected tests, requested
 review findings/dispositions and terminal process status at each phase.
 Pre-existing failures remain failures with attribution, never green claims.
 The native snapshot characterization is not proof of all production open paths.
+
+Prioritize product implementation once its bounded RED correction is accepted.
+GREEN must execute the previously masked product assertions against changed
+product code; harness diagnostics cannot substitute for that success. Additional
+harness work needs a demonstrated behavioral blind spot, instrumentation effect
+or unsafe cleanup. Non-runtime control or bookkeeping changes do not reopen
+completed reviews or justify repeating unchanged full matrices. Preserve frozen
+behavioral oracles and all ordinary budgets.
 
 No visual UI is required for core persistence work. If a slice produces a
 visual artifact, run unprimed screenshot-critique as its final acceptance check;

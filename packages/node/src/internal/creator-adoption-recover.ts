@@ -1,10 +1,6 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import type { AheDurableStore } from "@ts-drp/storage";
-import type {
-	SnapshotQuarantineDeclaration,
-	SnapshotQuarantineStore,
-	SnapshotVerificationReceipt,
-} from "@ts-drp/storage/snapshot-transfer";
+import type { SnapshotRecoveryStore, SnapshotVerificationReceipt } from "@ts-drp/storage/snapshot-transfer";
 
 export interface CreatorAdoptionRoomHead {
 	readonly currentAnchorDigest: string;
@@ -21,8 +17,7 @@ export interface CreatorAdoptionPendingRecoveryInput {
 	readonly expectedNextRoomHead: CreatorAdoptionRoomHead;
 	readonly expectedPreviousRoomHead: CreatorAdoptionRoomHead;
 	readonly pinnedGenesisAnchorDigest: string;
-	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
-	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+	readonly snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
 	readonly store: AheDurableStore;
 }
 

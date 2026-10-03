@@ -14,7 +14,6 @@ const INPUT_KEYS = Object.freeze([
 	"expectedNextRoomHead",
 	"expectedPreviousRoomHead",
 	"pinnedGenesisAnchorDigest",
-	"snapshotDeclaration",
 	"snapshotStore",
 	"store",
 ]);

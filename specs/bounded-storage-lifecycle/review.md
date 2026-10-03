@@ -11,7 +11,7 @@ The user replaces enabled legacy-finality retention with
 [scoped Phase 6d retirement](slices/06d-v3-only-finality-retirement.md), preserving
 all golden paths, current-v3 signing/certificates/recovery, and migration required
 by current durable data. The [live handoff](README.md#next-agent-prompt) owns
-sequencing; 2c remains the next executable seam and GREEN remains held.
+sequencing; retirement execution remains held behind recovery acceptance.
 The separate Codex 6.1 high
 [consumer audit](../../.logs/bounded-storage-lifecycle/v3-only-scope-plan-01/finality-consumer-audit.md)
 is source-only evidence, not removal or shipped activation acceptance.
@@ -24,7 +24,39 @@ remain execution holds before retirement RED; no removal allocation or product
 acceptance is granted. Existing history, verdicts and failed gates remain
 unchanged, including the whole historical plan formatter's heap-limit failure.
 
-## 2c historical RED ready; native and combined RED acceptance held
+## 2c GREEN and main integration accepted
+
+The distinct Codex 6.1 high author implemented the accepted four-file pending
+recovery allocation without changing the frozen oracles. Separate Codex 6.1
+xhigh returned [APPROVED](../../.logs/bounded-storage-lifecycle/pending-green-review-01/public.md),
+CONTEXT_COMPLETE YES, without actionable findings. Root read the complete verdict,
+read custody and independent checker and accepts the isolated implementation under
+the [product disposition](../../.logs/bounded-storage-lifecycle/pending-green-review-01/root-disposition.md).
+Actual native product assertions, including every prior masked case, pass; the
+unchanged full default product-browser baseline passes at original budgets.
+Owner preconditions and obsolete-key diagnostic refusals remain separate evidence.
+Historical focused assertions pass; the broader root coverage command remains
+failed and unwaived. Failed attempts and inherited cleanup/source-only boundaries
+are preserved. Exact-byte main integration is now accepted under the
+[landing disposition](../../.logs/bounded-storage-lifecycle/pending-green-integration-01/root-disposition.md):
+affected build/static gates pass, runtime bundles are byte-identical, and unrelated
+dirty work is preserved. The focused checkpoint contains only reviewed source and
+canonical handoffs;
+startup selection, rollback, recipient retention, retirement and endurance are
+not accepted by this seam.
+
+The [2d startup contract](slices/02d-declaration-free-shipped-startup.md) has separate
+Codex 6.1 xhigh APPROVED, CONTEXT_COMPLETE YES and root
+[acceptance](../../.logs/bounded-storage-lifecycle/startup-selection-contract-review-01/root-disposition.md).
+Two refusal-mapping findings were corrected and independently checked in that same
+review; the original proposal is preserved. Separate causal RED starts after the
+2c commit; contract approval is not startup product acceptance. Later product
+execution remains behind its own gates.
+
+## 2c RED readiness history
+
+The following records preserve chronological decisions. The GREEN entry above
+owns current execution status; earlier required changes are not relabelled passes.
 
 Cold checkpoint `b29369df` remains accepted. The independent Codex 6.1 xhigh
 [baseline review](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-01/public.md)
@@ -53,9 +85,97 @@ HISTORICAL_RED_READY YES and CONTEXT_COMPLETE YES. The
 accepts historical readiness only and closes H1; H2 nonexhaustive helper-branch
 execution remains qualified. The excluded pre-return frozen-fixture resource
 limitation is not this defect. Preserve the original freeze and failed results.
-The native lane still needs independent review, followed by root cross-lane
-integration before overall RED acceptance. Historical approval is not native,
-combined RED or implementation acceptance; GREEN remains held.
+The reviewed native freeze is preserved under the
+[bounded review packet](../../.logs/bounded-storage-lifecycle/pending-native-red-review-04/packet.md).
+Root checked its retained evidence hashes, actual runtime classifications,
+application/durable observation oracles, cleanup and complete unchanged product
+browser baseline. These checks are not exhaustive dependency semantics or
+cryptographic reauthentication. The packet distinguishes actual owner and isolated
+legacy-interface instrumentation reaches from declaration-free product cases whose
+downstream assertions remain envelope-masked; earlier fixture failures stay failed.
+A separate Codex 6.1 xhigh native
+[review](../../.logs/bounded-storage-lifecycle/pending-native-red-review-04/public.md)
+returned CHANGES_REQUIRED with complete scoped context. Root read its complete
+verdict/custody and confirmed both source-derived counterexamples: missing exact
+owner-fault/per-candidate I/O protection and an equivalent-only mixed availability
+control. The [disposition](../../.logs/bounded-storage-lifecycle/pending-native-red-review-04/root-disposition.md)
+owns terminal custody and the same RED author's tests-only correction allocation.
+The corrective freeze passed qualified root static/byte-custody inspection, but
+its fresh SQLite run exposed a competing-scope retention oracle mismatch. The
+[runtime hold](../../.logs/bounded-storage-lifecycle/pending-native-pre-matrix-root-audit-05/runtime-hold-disposition.md)
+owns the bounded correction: verification without promotion leaves temporary
+ownership, so correct the independent schedule instead of changing lifecycle.
+Preserve that complete failed run and inspect the superseding freeze before
+further native launches; static controls are not runtime acceptance. Root has now
+audited the bounded source correction and granted a
+[fresh execution release](../../.logs/bounded-storage-lifecycle/pending-native-pre-matrix-root-audit-05/checkpoint03-disposition.md)
+only. The corrected full native run and fresh unchanged product baseline are
+terminal, with root custody/accounting checks under the
+[new pre-review boundary](../../.logs/bounded-storage-lifecycle/pending-native-red-review-05/root-pre-review.md).
+Exact controller self-controls and real unmasked native diagnostics remain
+distinct; ordinary declaration-free downstream assertions are still masked.
+The new independent xhigh
+[review](../../.logs/bounded-storage-lifecycle/pending-native-red-review-05/public.md)
+completed with CHANGES_REQUIRED, NATIVE_RED_READY NO and CONTEXT_COMPLETE YES.
+Root read its complete verdict/custody/checker and audited the final bindings.
+The [native disposition](../../.logs/bounded-storage-lifecycle/pending-native-red-review-05/root-disposition.md)
+closes F1/F2 for bounded native RED and assigns only F3's structural verifier
+self-control correction to the same distinct RED author. The three old argument
+literals can produce no-op negatives for a legitimate selected-facts call;
+this is source-grounded prospective composition evidence, not an executed GREEN
+failure. Preserve the genuine runtime matrix and product baseline. The bounded
+correction needs separate xhigh review and root overall RED disposition, not
+production compatibility solely for test spelling. The review's disclosed
+context recovery and selected/raw/dependency limits remain explicit.
+The same author's bounded correction is now frozen, with exact one-file custody
+and unchanged runtime inputs/outputs under the
+[root audit](../../.logs/bounded-storage-lifecycle/pending-native-red-root-audit-06/final-custody.json).
+The [separate focused review](../../.logs/bounded-storage-lifecycle/pending-native-red-review-06/public.md)
+completed APPROVED, F3_CLOSED YES and CONTEXT_COMPLETE YES, without findings.
+The affected cross-lane checks are verified under the
+[bounded delta](../../.logs/bounded-storage-lifecycle/pending-red-crosslane-root-audit-04/delta.json).
+Source models do not execute GREEN;
+the prior native and product-browser runs are inherited exact-byte evidence,
+not fresh correction runs. The failed metadata builder and actual changed-file
+whitespace-check status remain preserved and qualified. The
+[new disposition](../../.logs/bounded-storage-lifecycle/pending-native-red-review-06/root-disposition.md)
+accepts F3 and overall RED readiness while retaining the accepted F1/F2 and
+historical boundaries. The distinct Codex 6.1 high GREEN author is now assigned
+the accepted product allocation. Actual downstream product execution and the
+separate xhigh GREEN review remain required; no product acceptance is implied.
+The prior isolated cross-lane
+checkout completed qualified
+[static/historical checks](../../.logs/bounded-storage-lifecycle/pending-red-crosslane-root-audit-01/root-disposition.md);
+its old native matrix remains explicitly unlaunched. The updated exact-source
+integration now has independently audited static/historical and complete native
+execution under the [integration disposition](../../.logs/bounded-storage-lifecycle/pending-red-crosslane-root-audit-03/root-disposition.md).
+Its unchanged source/build custody, actual downstream masks and preserved failed
+reporter remain explicit; integration is not a substitute for the native review.
+Historical
+approval and qualified integration checks are retained readiness evidence, not
+implementation acceptance. GREEN must pass the formerly masked product assertions
+against changed product code; diagnostic success cannot replace that gate.
+
+## Later recovery reconnaissance — planning only
+
+Separate Codex 6.1 high source audits identify prerequisites, not accepted
+contracts or runtime behavior. Root read the complete memos, checked their
+source custody and inspected the central authority/dependency boundaries.
+
+The [startup audit](../../.logs/bounded-storage-lifecycle/startup-authority-consumer-recon-01/memo.md)
+finds no ordinary omission dependency in the named shipped roots, but failure
+ordering still needs a reviewed contract. The
+[rollback audit](../../.logs/bounded-storage-lifecycle/usable-rollback-recon-01/memo.md)
+distinguishes physical parents supporting current recovery from two independent
+authenticated historical states; reconstruction must not imply old-head
+activation or lower any safety floor. The
+[recipient audit](../../.logs/bounded-storage-lifecycle/recipient-retention-recon-01/memo.md)
+separates temporary byte verification from authenticated destination installation:
+fixture copying and local creator-close custody are not remote installation
+authority. Resolve same-authority ingress before retention allocation; new
+wire/custody authority requires product direction. Keep these seams separately
+reviewed and preserve the existing execution order. No later product edits,
+tests, runtime proof or acceptance are supplied by these scouts.
 
 ## 2b GREEN accepted; commit-boundary audit next
 

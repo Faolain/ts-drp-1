@@ -72,7 +72,7 @@ function inspect(text: string): { cold: boolean; pending: boolean; selector: boo
 		expression.left.name.text === "successorSnapshotDeclaration" &&
 		ts.isIdentifier(expression.right) &&
 		expression.right.text === "undefined";
-	return { cold: !coldKeys.has("snapshotDeclaration"), pending: pendingKeys.has("snapshotDeclaration"), selector };
+	return { cold: !coldKeys.has("snapshotDeclaration"), pending: !pendingKeys.has("snapshotDeclaration"), selector };
 }
 
 /**
@@ -101,23 +101,24 @@ function mutateCall(text: string, name: string, action: "remove" | "add" | "spre
 	);
 }
 
-describe("cold-only room wiring", () => {
+describe("declaration-free recovery room wiring (source-only)", () => {
 	it("COLD_CALL_MUST_OMIT_DECLARATION", () => {
 		expect(inspect(source).cold, "COLD_CALL_RETAINS_SNAPSHOT_DECLARATION").toBe(true);
 	});
-	it("pending declaration remains supplied", () => {
-		expect(inspect(source).pending).toBe(true);
+	it("PENDING_CALL_MUST_OMIT_DECLARATION", () => {
+		expect(inspect(source).pending, "PENDING_CALL_RETAINS_SNAPSHOT_DECLARATION").toBe(true);
 	});
 	it("actual shared startup selector remains declaration-driven", () => {
 		expect(inspect(source).selector).toBe(true);
 	});
 	it("retained cold-key mutant kills the cold assertion", () => {
-		const observed = inspect(mutateCall(source, "reopenCreatorSuccessorAdoption", "add"));
+		const omitted = mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "remove");
+		const observed = inspect(mutateCall(omitted, "reopenCreatorSuccessorAdoption", "add"));
 		expect(observed).toEqual({ cold: false, pending: true, selector: true });
 		expect(() => expect(observed.cold, "MUTANT_COLD_KEY").toBe(true)).toThrow("MUTANT_COLD_KEY");
 	});
-	it("removed pending-key mutant kills the pending assertion", () => {
-		const observed = inspect(mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "remove"));
+	it("retained pending-key mutant kills the pending assertion", () => {
+		const observed = inspect(mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "add"));
 		expect(observed.pending).toBe(false);
 		expect(observed.selector).toBe(true);
 		expect(() => expect(observed.pending, "MUTANT_PENDING_KEY").toBe(true)).toThrow("MUTANT_PENDING_KEY");
@@ -126,15 +127,19 @@ describe("cold-only room wiring", () => {
 		const marker = "if (input.successorSnapshotDeclaration === undefined) {";
 		const start = source.indexOf(marker, source.indexOf("const activateStartupPlane ="));
 		expect(start).toBeGreaterThan(0);
-		const mutant = source.slice(0, start) + source.slice(start).replace(marker, "if (input.unrelated === undefined) {");
+		const mutant = mutateCall(
+			source.slice(0, start) + source.slice(start).replace(marker, "if (input.unrelated === undefined) {"),
+			"recoverPendingCreatorSuccessorAdoption",
+			"remove"
+		);
 		expect(mutant).toContain("input.successorSnapshotDeclaration");
 		const observed = inspect(mutant);
 		expect(observed.selector).toBe(false);
 		expect(observed.pending).toBe(true);
 		expect(() => expect(observed.selector, "MUTANT_SELECTOR").toBe(true)).toThrow("MUTANT_SELECTOR");
 	});
-	it("removing only the cold key makes all three gates green", () => {
-		expect(inspect(mutateCall(source, "reopenCreatorSuccessorAdoption", "remove"))).toEqual({
+	it("removing only the pending key makes all three gates green", () => {
+		expect(inspect(mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "remove"))).toEqual({
 			cold: true,
 			pending: true,
 			selector: true,
@@ -148,5 +153,19 @@ describe("cold-only room wiring", () => {
 			"CALLSITE_NOT_UNIQUE"
 		);
 		expect(() => inspect(source + "\nreopenCreatorSuccessorAdoption({});")).toThrow("CALLSITE_NOT_UNIQUE");
+	});
+	it("malformed, symbol, duplicate and unresolved pending arguments fail closed", () => {
+		const marker = "recoverPendingCreatorSuccessorAdoption({";
+		for (const property of ["...unresolved,", "[Symbol.iterator]: unresolved,", "get unresolved() { return 0; },"]) {
+			expect(() => inspect(source.replace(marker, marker + property))).toThrow("CALL_PROPERTY_UNRESOLVED");
+		}
+		expect(() => inspect(source.replace(marker, marker + "snapshotStore: duplicate,"))).toThrow(
+			"CALL_PROPERTY_DUPLICATE"
+		);
+		expect(() => inspect(source.replace(marker, "recoverPendingCreatorSuccessorAdoption(unresolved, {"))).toThrow(
+			"CALL_ARGUMENT_UNRESOLVED"
+		);
+		expect(() => inspect(source.replace(marker, "anotherFunction({"))).toThrow("CALLSITE_NOT_UNIQUE");
+		expect(() => inspect(source + "\nrecoverPendingCreatorSuccessorAdoption({});")).toThrow("CALLSITE_NOT_UNIQUE");
 	});
 });

@@ -2493,7 +2493,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						expectedNextRoomHead: selectedPending.next,
 						expectedPreviousRoomHead: selectedPending.previous,
 						pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
-						snapshotDeclaration: input.successorSnapshotDeclaration,
 						snapshotStore,
 						store: aheStores[0],
 					});

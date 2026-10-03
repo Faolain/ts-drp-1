@@ -1505,10 +1505,18 @@ async function authenticatePendingCandidate(
 			successorTrust,
 			successorTrustRecord,
 		});
-		const snapshot = await verifySnapshot(input, chain);
+		const observation = await input.snapshotStore.lookupRecoveryDeclaration({
+			objectId: String(chain.cut.objectId),
+			epoch: Number(chain.cut.epoch),
+			anchor: String(chain.cut.previousAnchor),
+			manifestDigest: String(chain.cut.snapshotManifestDigest),
+		});
+		if (observation.kind !== "present" || observation.state === "poisoned") return undefined;
+		const snapshotDeclaration = observation.declaration;
+		const snapshot = await verifySnapshot({ snapshotDeclaration, snapshotStore: input.snapshotStore }, chain);
 		if (snapshot === undefined) return undefined;
 		const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
-		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
+		const manifestDigest = snapshotDeclaration.scope.manifestDigest;
 		if (
 			resolved === undefined ||
 			successorProjection.record.anchorDigest !== successorTrust.currentAnchorDigest ||
@@ -1566,11 +1574,15 @@ async function recoverPendingCreatorSuccessorMaterial(
 	try {
 		const expectedPrevious = exactRoomHead(input.expectedPreviousRoomHead);
 		const expectedNext = exactRoomHead(input.expectedNextRoomHead);
-		const parsedObjectId = parseStorageObjectId(input.snapshotDeclaration.scope.objectId);
 		if (
 			input.authenticationProfile !== "creator-only" ||
 			expectedPrevious === undefined ||
-			expectedNext === undefined ||
+			expectedNext === undefined
+		) {
+			return pendingRecoveryFailure("chain-invalid", "creator pending room-head input is invalid");
+		}
+		const parsedObjectId = parseStorageObjectId(expectedPrevious.objectId);
+		if (
 			!parsedObjectId.ok ||
 			expectedPrevious.objectId !== parsedObjectId.value ||
 			expectedNext.objectId !== parsedObjectId.value ||

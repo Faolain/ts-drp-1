@@ -11,9 +11,10 @@ import {
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
-	type GenuineCreatorAdoptionFixture,
-	openGenuineCreatorAdoptionFixture,
-} from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
+	type PendingHistoricalFixture,
+	withPendingHistoricalFixtures,
+} from "./fixtures/pending-historical/owned-snapshot.js";
+import type { GenuineCreatorAdoptionFixture } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
 import { activateCreatorSuccessorAdoption } from "../packages/node/src/creator-adoption-activate.js";
 import { commitCreatorSuccessorAdoption } from "../packages/node/src/creator-adoption-commit.js";
 import * as recoverSurface from "../packages/node/src/creator-adoption-recover.js";
@@ -64,7 +65,7 @@ async function verifiedIntent(fixture: GenuineCreatorAdoptionFixture): Promise<u
 	return verified.intent;
 }
 
-function recoveryInput(fixture: GenuineCreatorAdoptionFixture): Readonly<Record<string, unknown>> {
+function recoveryInput(fixture: PendingHistoricalFixture): Readonly<Record<string, unknown>> {
 	const candidate = fixture.evidence.current.candidates.find(
 		({ ref }) =>
 			ref.byteLength === fixture.evidence.closeResult.currentTrustRef.byteLength &&
@@ -95,8 +96,7 @@ function recoveryInput(fixture: GenuineCreatorAdoptionFixture): Readonly<Record<
 			objectId: fixture.evidence.currentTrust.objectId,
 		}),
 		pinnedGenesisAnchorDigest: fixture.evidence.currentTrust.genesisAnchorDigest,
-		snapshotDeclaration: fixture.evidence.declaration,
-		snapshotStore: fixture.evidence.snapshotStore,
+		snapshotStore: fixture.pendingSnapshotStore,
 		store: fixture.evidence.aheStore,
 	});
 }
@@ -160,9 +160,9 @@ async function installDifferentClosureCandidate(fixture: GenuineCreatorAdoptionF
 
 describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
 	it("stages without a head swap and publishes through one owner-bound CAS", async () => {
-		const fixture = await openGenuineCreatorAdoptionFixture();
-		const foreign = await openGenuineCreatorAdoptionFixture();
-		try {
+		await withPendingHistoricalFixtures(async (acquire) => {
+			const fixture = await acquire();
+			const foreign = await acquire();
 			expect(Object.keys(stageSurface).sort()).toEqual([
 				"publishStagedCreatorSuccessorAdoption",
 				"stageCreatorSuccessorAdoption",
@@ -238,14 +238,12 @@ describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
 			expect(
 				await publishStagedCreatorSuccessorAdoption({ capability: staged.capability, handle: fixture.handle })
 			).toMatchObject({ kind: "intent-unavailable", ok: false });
-		} finally {
-			await Promise.all([fixture.close(), foreign.close()]);
-		}
+		});
 	});
 
 	it("recovers equivalent Complete retries deterministically across both AHE orderings", async () => {
-		const fixture = await openGenuineCreatorAdoptionFixture();
-		try {
+		await withPendingHistoricalFixtures(async (acquire) => {
+			const fixture = await acquire();
 			const first = await verifiedIntent(fixture);
 			const second = await verifiedIntent(fixture);
 			expect(await stageCreatorSuccessorAdoption({ handle: fixture.handle, intent: first })).toMatchObject({
@@ -266,7 +264,10 @@ describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
 				}
 			};
 			const input = recoveryInput(fixture);
+			expect(Object.keys(input)).not.toContain("snapshotDeclaration");
+			expect(input.snapshotStore).toBe(fixture.pendingSnapshotStore);
 			const recovered = await recoverPendingCreatorSuccessorAdoption(input);
+			console.info("PENDING_HISTORICAL_RETRY_INITIAL_RESULT", recovered);
 			expect(Object.keys(recovered).sort()).toEqual(["head", "lifecycle", "ok", "recovery"]);
 			expect(recovered).toMatchObject({
 				head: input.expectedNextRoomHead,
@@ -283,18 +284,20 @@ describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
 			const swapCount = fixture.controls.aheOperationCounts.get("swapHead");
 			expect(await recoverPendingCreatorSuccessorAdoption(input)).toMatchObject({ ok: true, recovery: "active-new" });
 			expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(swapCount);
-		} finally {
-			await fixture.close();
-		}
+		});
 	});
 
 	it("fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates", async () => {
-		const absent = await openGenuineCreatorAdoptionFixture();
-		const incomplete = await openGenuineCreatorAdoptionFixture();
-		const forked = await openGenuineCreatorAdoptionFixture();
-		try {
+		await withPendingHistoricalFixtures(async (acquire) => {
+			const absent = await acquire();
+			const incomplete = await acquire();
+			const forked = await acquire();
 			const absentInput = recoveryInput(absent);
-			expect(await recoverPendingCreatorSuccessorAdoption(absentInput)).toMatchObject({
+			expect(Object.keys(absentInput)).not.toContain("snapshotDeclaration");
+			expect(absentInput.snapshotStore).toBe(absent.pendingSnapshotStore);
+			const absentResult = await recoverPendingCreatorSuccessorAdoption(absentInput);
+			console.info("PENDING_HISTORICAL_ABSENT_INITIAL_RESULT", absentResult);
+			expect(absentResult).toMatchObject({
 				kind: "pending-missing",
 				ok: false,
 			});
@@ -334,8 +337,6 @@ describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
 				kind: "true-fork",
 				ok: false,
 			});
-		} finally {
-			await Promise.all([absent.close(), incomplete.close(), forked.close()]);
-		}
+		});
 	});
 });
