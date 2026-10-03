@@ -23,6 +23,7 @@ import type {
 	V3RoomAcceptedOperation,
 	V3RoomApplication,
 	V3RoomCreatorInviteMaterial,
+	V3RoomHeadAuthority,
 	V3RoomSession,
 	V3RoomTransport,
 } from "../examples/v3-room/src/index.js";
@@ -423,6 +424,20 @@ async function openRoom(
 ): Promise<MigrationSession> {
 	const { createV3RoomSession } = await roomModule;
 	const author = input.author ?? input.material.author;
+	const stable = {
+		currentAnchorDigest: input.material.invite.pinnedGenesisAnchorDigest,
+		epoch: 0,
+		objectId: input.objectId,
+	};
+	const state = () => ({ pending: null, stable: { ...stable } });
+	const roomHeadAuthority = Object.freeze<V3RoomHeadAuthority>({
+		initialization: Object.freeze({ kind: "reopen" }),
+		begin: async () => Promise.resolve({ ok: false, reason: "conflict" }),
+		commit: async () => Promise.resolve({ ok: false, reason: "conflict" }),
+		create: async () => Promise.resolve({ ok: true, state: state() }),
+		migrate: async () => Promise.resolve({ ok: true, state: state() }),
+		read: async () => Promise.resolve({ ok: true, state: state() }),
+	});
 	return (await createV3RoomSession({
 		application: input.application,
 		author,
@@ -453,7 +468,7 @@ async function openRoom(
 			return inertTransport(input.databaseName, openedObjectId);
 		},
 		publicKeyBytes: bytes(author),
-		roomHeadAuthority: undefined as never,
+		roomHeadAuthority,
 		signRegisteredVertexDigest:
 			input.signer ?? ((registeredDigest) => Promise.resolve(ed25519.sign(registeredDigest, input.material.seed))),
 	})) as MigrationSession;

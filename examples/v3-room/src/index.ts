@@ -44,7 +44,6 @@ import {
 } from "@ts-drp/protocol-v3";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import { parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
-import type { SnapshotQuarantineDeclaration } from "@ts-drp/storage/snapshot-transfer";
 import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
 import { createBrowserDurableIssuanceStore } from "@ts-drp/storage-browser/issuance";
 import { createBrowserDurableLiveJournalStore } from "@ts-drp/storage-browser/live-journal";
@@ -412,7 +411,6 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	readonly rebaseSourceInvite?: string | V3RoomCreatorInviteMaterial;
 	readonly roomHeadAuthority: V3RoomHeadAuthority;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
-	readonly successorSnapshotDeclaration?: SnapshotQuarantineDeclaration;
 }
 
 export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
@@ -1552,12 +1550,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	redirectSource?: RedirectSourceRecovery,
 	skipRoomHeadAuthority = false
 ): Promise<V3RoomSession<Projection>> {
-	if (
-		input.successorSnapshotDeclaration !== undefined &&
-		(input.createOperationAdmissionPolicy !== undefined || input.rebaseSourceInvite !== undefined)
-	) {
-		throw new TypeError("v3 room successor authority composition is unsupported");
-	}
 	const captureInvite = (
 		creatorInvite: string | V3RoomCreatorInviteMaterial
 	): {
@@ -1579,17 +1571,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
 		return { invite, material, settlementProfile };
 	};
-	let capturedInvite: ReturnType<typeof captureInvite> | undefined;
-	if (input.successorSnapshotDeclaration !== undefined && input.creatorFinalitySigner !== undefined) {
-		const creatorInvite = input.creatorInvite;
-		if (creatorInvite === undefined) {
-			throw new TypeError("v3 room successor authority composition is unsupported");
-		}
-		capturedInvite = captureInvite(creatorInvite);
-		if (capturedInvite.settlementProfile !== "v1") {
-			throw new TypeError("v3 room successor authority composition is unsupported");
-		}
-	}
 	const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(
 		input.application.bootstrapOperation,
 		APPLICATION_BATCH_LIMITS
@@ -1631,17 +1612,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					"ts-drp/v3-room-migration-local-store/v1",
 					encodeCanonical({ localNamespace: input.migrationDatabaseNamespace, scratchDigest })
 				)}`;
-	const { invite, material, settlementProfile } = capturedInvite ?? captureInvite(input.creatorInvite);
+	const { invite, material, settlementProfile } = captureInvite(input.creatorInvite);
 	const sourceInvite = input.rebaseSourceInvite;
 	const sourceMaterial =
 		sourceInvite === undefined
 			? undefined
 			: decodeCreatorInvite(typeof sourceInvite === "string" ? sourceInvite : encodeCreatorInvite(sourceInvite));
-	const {
-		rebaseSourceInvite: _rebaseSourceInvite,
-		successorSnapshotDeclaration: _successorSnapshotDeclaration,
-		...inputWithoutRebase
-	} = input;
 	const objectIdResult = parseStorageObjectId(input.objectId);
 	if (!objectIdResult.ok) throw new TypeError("v3 room object id is invalid");
 	const roomHeadScope = Object.freeze({
@@ -1665,31 +1641,26 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				(method) => typeof Reflect.get(candidate, method) === "function"
 			)
 		) {
-			if (input.creatorFinalitySigner !== undefined || input.successorSnapshotDeclaration !== undefined) {
-				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
-			}
-		} else {
-			roomHeadAuthority = candidate;
-			openedRoomHeadState = await initializeRoomHeadAuthority(candidate, roomHeadScope, genesisRoomHead);
-			if (openedRoomHeadState.pending !== null && input.successorSnapshotDeclaration === undefined) {
-				return roomHeadFailure("D110C_FLOOR_RECOVERY_UNAVAILABLE");
-			}
-			if (
-				openedRoomHeadState.pending === null &&
-				input.successorSnapshotDeclaration === undefined &&
-				!sameRoomHead(openedRoomHeadState.stable, genesisRoomHead)
-			) {
-				return roomHeadFailure("D110C_FLOOR_MISMATCH");
-			}
-			if (
-				openedRoomHeadState.pending === null &&
-				input.successorSnapshotDeclaration !== undefined &&
-				openedRoomHeadState.stable.epoch < 1
-			) {
-				return roomHeadFailure("D110C_FLOOR_HEAD_AHEAD");
-			}
+			return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
 		}
+		roomHeadAuthority = candidate;
+		openedRoomHeadState = await initializeRoomHeadAuthority(candidate, roomHeadScope, genesisRoomHead);
 	}
+	const selectRoomStartup = (): "genesis" | "internal" | "successor" => {
+		if (redirectSource !== undefined || requireFreshTrust || skipRoomHeadAuthority) return "internal";
+		if (openedRoomHeadState === undefined) return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+		if (openedRoomHeadState.pending !== null) return "successor";
+		return sameRoomHead(openedRoomHeadState.stable, genesisRoomHead) ? "genesis" : "successor";
+	};
+	if (
+		selectRoomStartup() === "successor" &&
+		(input.createOperationAdmissionPolicy !== undefined ||
+			input.rebaseSourceInvite !== undefined ||
+			(input.creatorFinalitySigner !== undefined && settlementProfile !== "v1"))
+	) {
+		throw new TypeError("v3 room successor authority composition is unsupported");
+	}
+	const { rebaseSourceInvite: _rebaseSourceInvite, ...inputWithoutRebase } = input;
 	const inviteAuthority = migrationInviteAuthority(material);
 	const roomInviteAuthority = input.application.migration === undefined ? undefined : inviteAuthority;
 	if (inviteAuthority.objectId !== input.objectId) {
@@ -1805,7 +1776,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let prepared: PreparedRoomState | undefined;
 	let recovered: RecoveredRoomState | undefined;
 	let retainedBootstrapHeld = false;
-	if (input.successorSnapshotDeclaration === undefined) {
+	if (selectRoomStartup() !== "successor") {
 		const durable = await prepareDurableRoomState(
 			Object.freeze({ ...input, issuanceDatabaseName }),
 			material,
@@ -1862,6 +1833,23 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let activeHandle: RoomPlaneHandle | undefined;
 	let authenticatedProjectionBase: V3RoomAuthenticatedProjectionBase | undefined;
 	let successorProjectionAuthority: V3RoomSuccessorAuthority | null = null;
+	const refreshRoomHeadState = async (): Promise<void> => {
+		if (selectRoomStartup() === "internal") return;
+		if (roomHeadAuthority === undefined) return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+		const refreshed = await readRoomHeadAuthority(roomHeadAuthority, roomHeadScope);
+		const current = activeHandle?.currentEphemeralAuthority() ?? successorProjectionAuthority;
+		const expected = refreshed.pending?.next ?? refreshed.stable;
+		if (current !== undefined && current !== null) {
+			if (expected.epoch < current.epoch) return roomHeadFailure("D110C_FLOOR_REGRESSION");
+			if (
+				expected.objectId !== current.objectId ||
+				(expected.epoch === current.epoch && expected.currentAnchorDigest !== current.anchorDigest)
+			) {
+				return roomHeadFailure("D110C_FLOOR_MISMATCH");
+			}
+		}
+		openedRoomHeadState = refreshed;
+	};
 	let logicalTime = input.initialLogicalTime;
 	const roomCreatorAuthor = roomInviteAuthority === undefined ? input.author : roomInviteAuthority.creatorAuthor;
 	const currentMigrationRecordAuthority = (): MigrationRecordAuthority | undefined =>
@@ -2113,7 +2101,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				})
 			)
 		);
-	if (input.successorSnapshotDeclaration === undefined) {
+	if (selectRoomStartup() !== "successor") {
 		try {
 			if (
 				!(await commit(
@@ -2444,7 +2432,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		transport = openedTransport;
 		let successorSnapshotStore: Awaited<ReturnType<typeof createBrowserSnapshotQuarantineStore>> | undefined;
 		const activateStartupPlane = async (recovering: boolean): Promise<void> => {
-			if (input.successorSnapshotDeclaration === undefined) {
+			if (recovering) await refreshRoomHeadState();
+			if (selectRoomStartup() !== "successor") {
 				if (recovering) {
 					const durable = await prepareDurableRoomState(
 						Object.freeze({ ...input, issuanceDatabaseName }),
@@ -2540,7 +2529,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				installSuccessorProjectionBase(activeHandle, successorProjectionAuthority);
 				await commitSuccessorProjection();
 			}
-			if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+			if (input.creatorFinalitySigner !== undefined && selectRoomStartup() !== "successor") {
 				if (input.application.migration === undefined) {
 					throw new TypeError("v3 room creator close initial state is unavailable");
 				}
@@ -2580,7 +2569,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		if (
 			input.creatorFinalitySigner !== undefined &&
-			(input.successorSnapshotDeclaration === undefined || settlementProfile === "v1")
+			(selectRoomStartup() !== "successor" || settlementProfile === "v1")
 		) {
 			const creatorFinalitySigner = input.creatorFinalitySigner;
 			const voteStore = await openBrowserSealVoteStore({ databaseName: input.databaseName });
@@ -3666,7 +3655,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 	};
 	const rebasePromise =
-		settlementProfile === "none" && sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
+		settlementProfile === "none" && sourceMaterial === undefined && selectRoomStartup() !== "successor"
 			? Promise.resolve()
 			: enqueueLifetimeTransition(async () => {
 					try {
@@ -4312,9 +4301,25 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const performCreatorSuccessorAdoption = async (): Promise<void> => {
 		if (terminalFailure !== undefined) throw terminalFailure;
+		await refreshRoomHeadState();
 		if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
 		if (activeHandle === undefined || transport === undefined) {
 			throw new TypeError("v3 room live plane is unavailable");
+		}
+		if (openedRoomHeadState !== undefined) {
+			const current = activeHandle.currentEphemeralAuthority();
+			if (
+				openedRoomHeadState.pending !== null ||
+				(current !== undefined &&
+					!sameRoomHead(openedRoomHeadState.stable, {
+						currentAnchorDigest: current.anchorDigest,
+						epoch: current.epoch,
+						objectId: current.objectId,
+					}))
+			) {
+				await recoverSettlementOwner();
+				return;
+			}
 		}
 		const closeStatus = creatorCloseHandle.status();
 		if (successorProjectionAuthority !== null && closeStatus.lifecycle === "active") {
@@ -4360,6 +4365,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			openedRoomHeadState.stable,
 			nextRoomHead
 		);
+		openedRoomHeadState = pendingRoomHead;
 		assertSessionOpen();
 		const published = await publishStagedCreatorSuccessorAdoption({
 			capability: staged.capability,

@@ -92,7 +92,6 @@ const D108D2_ROOM_INPUT_KEYS = Object.freeze([
 	"rebaseSourceInvite",
 	"roomHeadAuthority",
 	"signRegisteredVertexDigest",
-	"successorSnapshotDeclaration",
 ] as const);
 const D108D2_CHAT_JOIN_INPUT_KEYS = Object.freeze([
 	"channelName",
@@ -100,7 +99,6 @@ const D108D2_CHAT_JOIN_INPUT_KEYS = Object.freeze([
 	"databaseName",
 	"invite",
 	"roomHead",
-	"successorSnapshotDeclaration",
 ] as const);
 
 const ADOPTION_MARKER =

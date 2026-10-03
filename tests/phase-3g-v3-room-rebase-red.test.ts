@@ -2,7 +2,7 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
+import type { V3RoomCreatorInviteMaterial, V3RoomHeadAuthority } from "../examples/v3-room/src/index.js";
 
 const probe = vi.hoisted(() => ({
 	projectionHandles: new WeakMap<object, { vertices: unknown[]; anchorDigest: string; controlDigests: Set<string> }>(),
@@ -441,14 +441,28 @@ function acceptedVertex(
 }
 
 function roomInput(selectedApplication = application()): Readonly<Record<string, unknown>> {
+	const creatorInvite = invite("b".repeat(64));
+	const objectId = `creator:${"d".repeat(32)}`;
+	const state = () => ({
+		pending: null,
+		stable: { currentAnchorDigest: creatorInvite.pinnedGenesisAnchorDigest, epoch: 0, objectId },
+	});
+	const roomHeadAuthority = Object.freeze<V3RoomHeadAuthority>({
+		initialization: Object.freeze({ kind: "reopen" }),
+		begin: async () => Promise.resolve({ ok: false, reason: "conflict" }),
+		commit: async () => Promise.resolve({ ok: false, reason: "conflict" }),
+		create: async () => Promise.resolve({ ok: true, state: state() }),
+		migrate: async () => Promise.resolve({ ok: true, state: state() }),
+		read: async () => Promise.resolve({ ok: true, state: state() }),
+	});
 	return Object.freeze({
 		application: selectedApplication,
 		author: "author-local",
-		creatorInvite: invite("b".repeat(64)),
+		creatorInvite,
 		databaseName: "target-plane",
 		initialLogicalTime: 9,
 		issuanceDatabaseName: "shared-lineage",
-		objectId: `creator:${"d".repeat(32)}`,
+		objectId,
 		onAcceptedVertex: () => undefined,
 		onProjection: () => undefined,
 		openTransport: () => ({
@@ -461,6 +475,7 @@ function roomInput(selectedApplication = application()): Readonly<Record<string,
 		}),
 		publicKeyBytes: Uint8Array.of(1),
 		rebaseSourceInvite: invite("a".repeat(64)),
+		roomHeadAuthority,
 		signRegisteredVertexDigest: () => Promise.resolve(new Uint8Array(64)),
 	});
 }

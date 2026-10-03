@@ -1253,24 +1253,27 @@ test("D.110c-0b0 provider crash and classification matrix fails closed", async (
 	expect(matrix.createMalformed).toBe("D110C_FLOOR_INVALID");
 	expect(matrix.createUnavailable).toBe("D110C_FLOOR_UNAVAILABLE");
 	expect(matrix.crossGenesis).toBe("D110C_FLOOR_INVALID");
-	expect(matrix.floorAhead).toBe("D110C_FLOOR_MISMATCH");
-	expect(matrix.headAhead).toBe("D110C_FLOOR_HEAD_AHEAD");
+	expect(matrix.floorAhead).toBe(
+		"v3 room successor reopen failed: chain-invalid: creator successor generation lineage is invalid"
+	);
+	expect(matrix.headAhead).toBe("v3 room trust installation failed: trust-rejected");
 	expect(matrix.migrateCrossObject).toBe("D110C_FLOOR_INVALID");
 	expect(matrix.missingReopen).toBe("D110C_FLOOR_MIGRATION_REQUIRED");
-	expect(adoption("pendingInvalid").detail).toBe("D110C_FLOOR_PENDING_INVALID");
+	expect(adoption("pendingInvalid").detail).toBe("D110C_FLOOR_RECOVERY_UNAVAILABLE");
 	expect(matrix.readMalformed).toBe("D110C_FLOOR_INVALID");
 	expect(matrix.readUnavailable).toBe("D110C_FLOOR_UNAVAILABLE");
 	expect(adoption("regression").detail).toBe("D110C_FLOOR_REGRESSION");
 
 	const noDeclaration = matrix.pendingWithoutDeclaration as Readonly<Record<string, unknown>>;
 	expect(noDeclaration).toMatchObject({
-		coldReopenCount: 0,
-		detail: "D110C_FLOOR_RECOVERY_UNAVAILABLE",
-		transportOpenCount: 0,
+		coldReopenCount: 1,
+		detail: "fulfilled",
+		transportOpenCount: 1,
+		state: { pending: null, stable: { epoch: 1 } },
 	});
 	for (const [key, operations] of [
-		["pendingOldAhe", ["create", "read", "begin", "read", "commit", "read"]],
-		["pendingNewAhe", ["create", "read", "begin", "commit", "read", "commit", "read"]],
+		["pendingOldAhe", ["create", "read", "read", "begin", "read", "commit", "read"]],
+		["pendingNewAhe", ["create", "read", "read", "begin", "commit", "read", "commit", "read"]],
 	] as const) {
 		const recovered = matrix[key] as Readonly<Record<string, unknown>>;
 		expect(recovered).toMatchObject({ coldReopenCount: 1, operations, transportOpenCount: 1 });
@@ -2824,13 +2827,13 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 				fault: "ahe-lineage",
 			}),
 			expect.objectContaining({
-				coldReopenCount: 0,
-				detail: "D110C_FLOOR_MISMATCH",
+				coldReopenCount: 1,
+				detail: "fulfilled",
 				fault: "missing-snapshot",
 			}),
 			expect.objectContaining({
 				coldReopenCount: 0,
-				detail: "D110C_FLOOR_HEAD_AHEAD",
+				detail: "v3 room trust installation failed: trust-rejected",
 				fault: "epoch-zero",
 			}),
 			...(["lower-epoch", "higher-epoch", "different-anchor"] as const).map((fault) =>
@@ -2865,6 +2868,21 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 			}),
 		]);
 		for (const result of matrix) expect(result.afterDigest).toBe(result.beforeDigest);
+		const omitted = matrix.find((result) => result.fault === "missing-snapshot");
+		if (omitted === undefined) throw new TypeError("D110C_NO_HINT_CONTROL_ABSENT");
+		const omittedHot = d110c0cRecord(omitted.hot),
+			omittedReopened = d110c0cRecord(omitted.reopened),
+			omittedAfter = d110c0cRecord(omitted.after);
+		for (const field of ["authority", "acl", "projection", "roomId"] as const)
+			expect(omittedReopened[field]).toEqual(omittedHot[field]);
+		expect(omittedAfter.authority).toEqual(omittedReopened.authority);
+		expect(d110c0cArray(d110c0cRecord(omittedAfter.projection).accepted)).toEqual([
+			...d110c0cArray(d110c0cRecord(omittedHot.projection).accepted),
+			expect.objectContaining({
+				clientOperationId: "matrix-missing-snapshot-no-hint-after",
+				text: "matrix-missing-snapshot-no-hint-after",
+			}),
+		]);
 		const assertHintPair = (result: Readonly<Record<string, unknown>>): void => {
 			const fault = String(result.fault);
 			const hint = d110c0cRecord(result.hintControl);

@@ -2,7 +2,6 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
-	type CreateV3RoomSessionInput,
 	type V3RoomAcceptedOperation,
 	type V3RoomApplication,
 	type V3RoomCreatorInviteMaterial,
@@ -37,7 +36,6 @@ const PARAMETERS = Object.freeze({
 });
 const CLIENT_IDS = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi"] as const;
 export type ClientId = (typeof CLIENT_IDS)[number];
-type SuccessorSnapshotDeclaration = NonNullable<CreateV3RoomSessionInput["successorSnapshotDeclaration"]>;
 
 // Floors begin above the bootstrap vertex's resumed value (logical time 1 + stride 2).
 const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: string }>>> = Object.freeze({
@@ -57,7 +55,6 @@ interface JoinInput {
 	readonly databaseName: string;
 	readonly invite: string;
 	readonly roomHead?: V3RoomHead;
-	readonly successorSnapshotDeclaration?: SuccessorSnapshotDeclaration;
 }
 
 interface RoomJoinInput extends Omit<JoinInput, "invite"> {
@@ -897,9 +894,6 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 		publicKeyBytes: bytes(author),
 		roomHeadAuthority: chatRoomHeadAuthority(input.roomHead),
 		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
-		...(input.successorSnapshotDeclaration === undefined
-			? {}
-			: { successorSnapshotDeclaration: input.successorSnapshotDeclaration }),
 	});
 	source.room = room;
 	if (redirectedRoom !== undefined) retainedSourceBridges.add(room);
@@ -940,9 +934,6 @@ const api = Object.freeze({
 			creatorInvite: input.invite,
 			databaseName: input.databaseName,
 			...(input.roomHead === undefined ? {} : { roomHead: input.roomHead }),
-			...(input.successorSnapshotDeclaration === undefined
-				? {}
-				: { successorSnapshotDeclaration: input.successorSnapshotDeclaration }),
 		});
 	},
 	async adoptSuccessor(): Promise<void> {

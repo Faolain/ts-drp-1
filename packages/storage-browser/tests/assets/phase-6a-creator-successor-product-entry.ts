@@ -1501,7 +1501,8 @@ async function directAdoptionSettlement(
 
 async function directPendingRecovery(
 	name: string,
-	ordering: "old-ahe" | "new-ahe"
+	ordering: "old-ahe" | "new-ahe",
+	includeDeclaration = true
 ): Promise<Readonly<Record<string, unknown>>> {
 	const control = createDirectRoomHeadControl();
 	const databaseName = `d108e3-direct-${name}`;
@@ -1520,19 +1521,33 @@ async function directPendingRecovery(
 		abandonDirectRoom(name);
 		instrumentation().configure({});
 		let transportOpenCount = 0;
-		const reopened = await createDirectRoom(name, {
-			control,
-			initialization: Object.freeze({ kind: "reopen" }),
-			onOpenTransport: () => {
-				transportOpenCount += 1;
-			},
-			successorSnapshotDeclaration: snapshotDeclaration,
-			withCreatorSigner: false,
-		});
+		let reopened: DirectRoomSession;
+		try {
+			reopened = await createDirectRoom(name, {
+				control,
+				initialization: Object.freeze({ kind: "reopen" }),
+				onOpenTransport: () => {
+					transportOpenCount += 1;
+				},
+				...(includeDeclaration ? { successorSnapshotDeclaration: snapshotDeclaration } : {}),
+				withCreatorSigner: false,
+			});
+		} catch (error) {
+			if (includeDeclaration) throw error;
+			return Object.freeze({
+				coldReopenCount: instrumentation().d110cColdReopenCount(),
+				detail: directFailureDetail(error),
+				interrupted,
+				operations: Object.freeze([...control.operations]),
+				state: control.state,
+				transportOpenCount,
+			});
+		}
 		directRooms.set(name, reopened);
 		await reopened.issue({ action: "message", clientOperationId: crypto.randomUUID(), text: `recovered-${ordering}` });
 		return Object.freeze({
 			coldReopenCount: instrumentation().d110cColdReopenCount(),
+			detail: "fulfilled",
 			interrupted,
 			operations: Object.freeze([...control.operations]),
 			state: control.state,
@@ -1550,33 +1565,7 @@ async function directPendingRecovery(
 }
 
 async function directPendingWithoutDeclaration(name: string): Promise<Readonly<Record<string, unknown>>> {
-	const control = createDirectRoomHeadControl();
-	try {
-		const room = await createDirectRoom(name, { control });
-		directRooms.set(name, room);
-		await room.sealEpoch();
-		instrumentation().configure({ failBeforePublication: true });
-		const interrupted = await settlementDetail(room.adoptCreatorSuccessor());
-		await closeDirectForReopen(name);
-		instrumentation().configure({});
-		let transportOpenCount = 0;
-		const detail = await directOpenSettlement(name, {
-			control,
-			initialization: Object.freeze({ kind: "reopen" }),
-			onOpenTransport: () => {
-				transportOpenCount += 1;
-			},
-			withCreatorSigner: false,
-		});
-		return Object.freeze({
-			coldReopenCount: instrumentation().d110cColdReopenCount(),
-			detail,
-			interrupted,
-			transportOpenCount,
-		});
-	} finally {
-		await discardDirectRoom(name);
-	}
+	return directPendingRecovery(name, "old-ahe", false);
 }
 
 async function directHeadAhead(name: string): Promise<string> {
@@ -1973,7 +1962,7 @@ async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promis
 		await room.sealEpoch();
 		await room.adoptCreatorSuccessor();
 		const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, 1);
-		const hot = pairedHintFault ? d110c0cColdRoomSnapshot(room) : undefined;
+		const hot = pairedHintFault || fault === "missing-snapshot" ? d110c0cColdRoomSnapshot(room) : undefined;
 		await closeDirectForReopen(name);
 		const stableEvidence = await d110cRoomHeadEvidence(name);
 		const stable = exactRecord(exactRecord(stableEvidence.state).stable);
@@ -2070,6 +2059,27 @@ async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promis
 				withCreatorSigner: false,
 			});
 			directRooms.set(name, room);
+			if (fault === "missing-snapshot") {
+				const reopened = d110c0cColdRoomSnapshot(room);
+				await room.issue(
+					Object.freeze({
+						action: "message",
+						clientOperationId: `${name}-no-hint-after`,
+						text: `${name}-no-hint-after`,
+					})
+				);
+				const after = await d110cRoomHeadEvidence(name);
+				return Object.freeze({
+					after: d110c0cColdRoomSnapshot(room),
+					afterDigest: after.stateDigest,
+					beforeDigest: attemptBefore.stateDigest,
+					coldReopenCount: instrumentation().d110cColdReopenCount(),
+					detail: "fulfilled",
+					fault,
+					hot,
+					reopened,
+				});
+			}
 			if (requireSnapshotEffects) negativeRoomState = d110c0cColdRoomSnapshot(room);
 		} catch (error) {
 			detail = directFailureDetail(error);
@@ -2264,6 +2274,7 @@ async function d110cFloorMatrix(): Promise<Readonly<Record<string, unknown>>> {
 	const floorAheadResult = await directOpenSettlement(floorAheadName, {
 		control: floorAhead,
 		initialization: Object.freeze({ kind: "reopen" }),
+		withCreatorSigner: false,
 	});
 
 	return Object.freeze({

@@ -44,7 +44,8 @@ function keys(node: ts.CallExpression): ReadonlySet<string> {
 }
 
 /**
- * Inspect the exact shared startup selector, not another declaration occurrence.
+ * Inspect the exact shared startup selector and its floor dependency. Runtime
+ * refresh/route behavior is independently exercised through real public rooms.
  * @param text
  */
 function inspect(text: string): { cold: boolean; pending: boolean; selector: boolean } {
@@ -63,15 +64,34 @@ function inspect(text: string): { cold: boolean; pending: boolean; selector: boo
 	);
 	if (selectors.length !== 1) throw new Error(`STARTUP_SELECTOR_NOT_UNIQUE:${selectors.length}`);
 	const expression = (selectors[0] as ts.IfStatement).expression;
-	const selector =
-		ts.isBinaryExpression(expression) &&
-		expression.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
-		ts.isPropertyAccessExpression(expression.left) &&
-		ts.isIdentifier(expression.left.expression) &&
-		expression.left.expression.text === "input" &&
-		expression.left.name.text === "successorSnapshotDeclaration" &&
-		ts.isIdentifier(expression.right) &&
-		expression.right.text === "undefined";
+	const declarations = new Map<string, ts.Node[]>();
+	const collect = (node: ts.Node): void => {
+		if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer !== undefined)
+			declarations.set(node.name.text, [...(declarations.get(node.name.text) ?? []), node.initializer]);
+		if (ts.isFunctionDeclaration(node) && node.name !== undefined && node.body !== undefined)
+			declarations.set(node.name.text, [...(declarations.get(node.name.text) ?? []), node.body]);
+		ts.forEachChild(node, collect);
+	};
+	collect(file);
+	const seen = new Set<string>();
+	const floorDependency = (node: ts.Node): boolean => {
+		if (ts.isIdentifier(node) && !seen.has(node.text)) {
+			seen.add(node.text);
+			if (
+				[
+					"openedRoomHeadState",
+					"roomHeadAuthority",
+					"captureRoomHeadState",
+					"initializeRoomHeadAuthority",
+					"readRoomHeadAuthority",
+				].includes(node.text)
+			)
+				return true;
+			if (node.text !== "input" && (declarations.get(node.text) ?? []).some(floorDependency)) return true;
+		}
+		return node.getChildren(file).some(floorDependency);
+	};
+	const selector = !expression.getText(file).includes("successorSnapshotDeclaration") && floorDependency(expression);
 	return { cold: !coldKeys.has("snapshotDeclaration"), pending: !pendingKeys.has("snapshotDeclaration"), selector };
 }
 
@@ -108,42 +128,54 @@ describe("declaration-free recovery room wiring (source-only)", () => {
 	it("PENDING_CALL_MUST_OMIT_DECLARATION", () => {
 		expect(inspect(source).pending, "PENDING_CALL_RETAINS_SNAPSHOT_DECLARATION").toBe(true);
 	});
-	it("actual shared startup selector remains declaration-driven", () => {
+	it("actual shared startup selector depends on current floor, never caller hint", () => {
 		expect(inspect(source).selector).toBe(true);
 	});
 	it("retained cold-key mutant kills the cold assertion", () => {
 		const omitted = mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "remove");
 		const observed = inspect(mutateCall(omitted, "reopenCreatorSuccessorAdoption", "add"));
-		expect(observed).toEqual({ cold: false, pending: true, selector: true });
+		expect(observed.cold).toBe(false);
+		expect(observed.pending).toBe(true);
 		expect(() => expect(observed.cold, "MUTANT_COLD_KEY").toBe(true)).toThrow("MUTANT_COLD_KEY");
 	});
 	it("retained pending-key mutant kills the pending assertion", () => {
 		const observed = inspect(mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "add"));
 		expect(observed.pending).toBe(false);
-		expect(observed.selector).toBe(true);
 		expect(() => expect(observed.pending, "MUTANT_PENDING_KEY").toBe(true)).toThrow("MUTANT_PENDING_KEY");
 	});
-	it("removed actual selector dependency kills its assertion despite other occurrences", () => {
-		const marker = "if (input.successorSnapshotDeclaration === undefined) {";
-		const start = source.indexOf(marker, source.indexOf("const activateStartupPlane ="));
-		expect(start).toBeGreaterThan(0);
-		const mutant = mutateCall(
-			source.slice(0, start) + source.slice(start).replace(marker, "if (input.unrelated === undefined) {"),
-			"recoverPendingCreatorSuccessorAdoption",
-			"remove"
-		);
-		expect(mutant).toContain("input.successorSnapshotDeclaration");
-		const observed = inspect(mutant);
-		expect(observed.selector).toBe(false);
-		expect(observed.pending).toBe(true);
-		expect(() => expect(observed.selector, "MUTANT_SELECTOR").toBe(true)).toThrow("MUTANT_SELECTOR");
+	it("old hint and unrelated selectors kill the actual selector assertion", () => {
+		const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+		const cold = call(file, "reopenCreatorSuccessorAdoption"),
+			pending = call(file, "recoverPendingCreatorSuccessorAdoption");
+		const selectors: ts.IfStatement[] = [];
+		for (let node: ts.Node | undefined = cold.parent; node !== undefined; node = node.parent)
+			if (
+				ts.isIfStatement(node) &&
+				node.elseStatement !== undefined &&
+				node.elseStatement.pos <= cold.pos &&
+				node.elseStatement.end >= cold.end &&
+				node.elseStatement.pos <= pending.pos &&
+				node.elseStatement.end >= pending.end
+			)
+				selectors.push(node);
+		expect(selectors).toHaveLength(1);
+		const selector = selectors[0];
+		if (selector === undefined) throw new TypeError("COLD_SELECTOR_CONTROL_NOT_UNIQUE");
+		const expression = selector.expression;
+		for (const replacement of ["input.successorSnapshotDeclaration === undefined", "input.unrelated === undefined"]) {
+			const mutant = source.slice(0, expression.getStart(file)) + replacement + source.slice(expression.end);
+			const observed = inspect(mutant);
+			expect(observed.selector).toBe(false);
+			expect(observed.pending).toBe(true);
+			expect(() => expect(observed.selector, "MUTANT_SELECTOR").toBe(true)).toThrow("MUTANT_SELECTOR");
+		}
 	});
-	it("removing only the pending key makes all three gates green", () => {
-		expect(inspect(mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "remove"))).toEqual({
-			cold: true,
-			pending: true,
-			selector: true,
-		});
+	it("key omission alone cannot establish a floor-selected startup", () => {
+		const observed = inspect(mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "remove"));
+		expect(observed.cold).toBe(true);
+		expect(observed.pending).toBe(true);
+		if (source.includes("if (input.successorSnapshotDeclaration === undefined) {"))
+			expect(observed.selector).toBe(false);
 	});
 	it("spreads, missing and ambiguous cold calls fail closed", () => {
 		expect(() => inspect(mutateCall(source, "reopenCreatorSuccessorAdoption", "spread"))).toThrow(

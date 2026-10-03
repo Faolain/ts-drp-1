@@ -173,69 +173,31 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 		expect(D108E2B_BROWSER_BEHAVIORS).toHaveLength(4);
 	});
 
-	it("rejects only unsupported cold successor compositions before reading room authorities", async () => {
-		const exercise = async (
-			extra: Readonly<Record<string, unknown>>,
-			includeDeclaration: boolean
-		): Promise<Readonly<Record<string, unknown>>> => {
-			const reads = { application: 0, signer: 0, store: 0, transport: 0 };
+	it("earlier invalid application still wins before state-selected composition", async () => {
+		for (const extra of [
+			{ createOperationAdmissionPolicy: (): object => Object.freeze({}) },
+			{ creatorFinalitySigner: Object.freeze({}) },
+			{ rebaseSourceInvite: "invalid-source" },
+		]) {
+			const reads = { application: 0, signer: 0, transport: 0 };
 			const input = {
 				...extra,
 				get application(): never {
-					reads.application += 1;
+					reads.application++;
 					throw new TypeError("D.108e2b application authority was read");
 				},
-				get databaseName(): never {
-					reads.store += 1;
-					throw new TypeError("D.108e2b store authority was read");
+				get signRegisteredVertexDigest(): never {
+					reads.signer++;
+					throw new TypeError("unexpected signer getter");
 				},
 				get openTransport(): never {
-					reads.transport += 1;
-					throw new TypeError("D.108e2b transport authority was read");
+					reads.transport++;
+					throw new TypeError("unexpected transport getter");
 				},
-				get signRegisteredVertexDigest(): never {
-					reads.signer += 1;
-					throw new TypeError("D.108e2b signer authority was read");
-				},
-				...(includeDeclaration ? { successorSnapshotDeclaration: Object.freeze({}) } : {}),
 			};
-			let detail = "fulfilled";
-			try {
-				await createV3RoomSession(input as never);
-			} catch (error) {
-				detail = error instanceof Error ? error.message : String(error);
-			}
-			return Object.freeze({ detail, reads: Object.freeze({ ...reads }) });
-		};
-
-		const unsupported = [];
-		for (const [key, value] of [
-			["createOperationAdmissionPolicy", (): Readonly<Record<string, never>> => Object.freeze({})],
-			["creatorFinalitySigner", Object.freeze({ sign: () => Promise.resolve(new Uint8Array(64)) })],
-			["rebaseSourceInvite", "d108e2b-source-invite"],
-		] as const) {
-			unsupported.push(Object.freeze({ ...(await exercise({ [key]: value }, true)), key }));
+			await expect(createV3RoomSession(input as never)).rejects.toThrow("D.108e2b application authority was read");
+			expect(reads).toEqual({ application: 1, signer: 0, transport: 0 });
 		}
-		expect(unsupported).toEqual(
-			["createOperationAdmissionPolicy", "creatorFinalitySigner", "rebaseSourceInvite"].map((key) => ({
-				detail: "v3 room successor authority composition is unsupported",
-				key,
-				reads: { application: 0, signer: 0, store: 0, transport: 0 },
-			}))
-		);
-
-		const supported = await Promise.all([
-			exercise({ createOperationAdmissionPolicy: (): Readonly<Record<string, never>> => Object.freeze({}) }, false),
-			exercise({ creatorFinalitySigner: Object.freeze({}) }, false),
-			exercise({ rebaseSourceInvite: "d108e2b-source-invite" }, false),
-			exercise({}, true),
-		]);
-		expect(supported).toEqual(
-			Array.from({ length: 4 }, () => ({
-				detail: "D.108e2b application authority was read",
-				reads: { application: 1, signer: 0, store: 0, transport: 0 },
-			}))
-		);
 	});
 });
 
@@ -440,39 +402,70 @@ async function roomAuthorityReadOrderFixtures(): Promise<
 	return Object.freeze(fixtures);
 }
 
-it("classifies complete legacy and settlement successor compositions before reading room authorities", async () => {
+it("classifies complete legacy and settlement successor compositions from initialized scoped floor", async () => {
 	const fixtures = await roomAuthorityReadOrderFixtures();
 	const observations = [];
-	const expected = [];
 	for (const { profileId, invite } of fixtures) {
+		const objectId = (decodeCanonical(invite.exactCanonicalGenesisAnchorPreimageBytes) as Record<string, unknown>)
+			.objectId;
 		for (const composition of ["factory", "rebase", "signer", "declaration-only"] as const) {
-			const reads = { application: 0, signer: 0, store: 0, transport: 0 };
-			// The declaration is deliberately never consumed at this ordering boundary.
-			// Reaching application proves classification only, not signer trust or activation.
+			const reads = { application: 0, signer: 0, store: 0, transport: 0, floor: 0 };
+			const calls = { policy: 0, sign: 0, transport: 0 };
+			const application = createV3ChatApplication("alice");
+			const stable = Object.freeze({ objectId, epoch: 1, currentAnchorDigest: "f".repeat(64) });
+			const provider = Object.freeze({
+				initialization: Object.freeze({ kind: "reopen" }),
+				begin: async () => Promise.resolve({ ok: false, reason: "conflict" }),
+				commit: async () => Promise.resolve({ ok: false, reason: "conflict" }),
+				create: async () => Promise.resolve({ ok: false, reason: "conflict" }),
+				migrate: async () => Promise.resolve({ ok: false, reason: "conflict" }),
+				read: async () => {
+					reads.floor++;
+					return Promise.resolve({ ok: true, state: { pending: null, stable } });
+				},
+			});
 			const input = {
 				creatorInvite: invite,
-				successorSnapshotDeclaration: Object.freeze({}),
+				objectId,
+				roomHeadAuthority: provider,
 				...(composition === "factory"
-					? { createOperationAdmissionPolicy: (): Readonly<Record<string, never>> => Object.freeze({}) }
+					? {
+							createOperationAdmissionPolicy: (): object => {
+								calls.policy++;
+								return Object.freeze({});
+							},
+						}
 					: {}),
 				...(composition === "rebase" ? { rebaseSourceInvite: invite } : {}),
 				...(composition === "signer"
-					? { creatorFinalitySigner: Object.freeze({ sign: () => Promise.resolve(new Uint8Array(64)) }) }
+					? {
+							creatorFinalitySigner: Object.freeze({
+								sign: async () => {
+									calls.sign++;
+									return Promise.resolve(new Uint8Array(64));
+								},
+							}),
+						}
 					: {}),
-				get application(): never {
-					reads.application += 1;
-					throw new TypeError("D.108e2b application authority was read");
+				get application(): ReturnType<typeof createV3ChatApplication> {
+					reads.application++;
+					return application;
 				},
-				get databaseName(): never {
-					reads.store += 1;
-					throw new TypeError("D.108e2b store authority was read");
+				get databaseName(): string {
+					reads.store++;
+					return "startup-composition-unit";
+				},
+				get issuanceDatabaseName(): string | undefined {
+					if (composition !== "rebase") return undefined;
+					reads.store++;
+					return "startup-composition-unit--issuance";
 				},
 				get openTransport(): never {
-					reads.transport += 1;
+					reads.transport++;
 					throw new TypeError("D.108e2b transport authority was read");
 				},
 				get signRegisteredVertexDigest(): never {
-					reads.signer += 1;
+					reads.signer++;
 					throw new TypeError("D.108e2b signer authority was read");
 				},
 			};
@@ -482,20 +475,23 @@ it("classifies complete legacy and settlement successor compositions before read
 			} catch (error) {
 				detail = error instanceof Error ? error.message : String(error);
 			}
-			observations.push(Object.freeze({ profileId, composition, detail, reads: Object.freeze({ ...reads }) }));
 			const permitted =
 				composition === "declaration-only" ||
 				(composition === "signer" && profileId === "creator-trusted-settlement-v1");
-			expected.push({
-				profileId,
-				composition,
-				detail: permitted
-					? "D.108e2b application authority was read"
-					: "v3 room successor authority composition is unsupported",
-				reads: { application: permitted ? 1 : 0, signer: 0, store: 0, transport: 0 },
-			});
+			observations.push({ profileId, composition, detail, reads, calls });
+			expect(calls).toEqual({ policy: 0, sign: 0, transport: 0 });
+			expect(reads.application).toBeGreaterThan(0);
+			expect(reads.store).toBeGreaterThan(0);
+			expect(reads.floor, "COMPOSITION_REQUIRES_ACTUAL_INITIALIZED_FLOOR").toBe(1);
+			if (permitted) {
+				expect(detail).toBe("D.108e2b transport authority was read");
+				expect(reads.transport).toBe(1);
+			} else {
+				expect(detail).toBe("v3 room successor authority composition is unsupported");
+				expect(reads.signer).toBe(0);
+				expect(reads.transport).toBe(0);
+			}
 		}
 	}
-	console.log(JSON.stringify({ kind: "F5B_ROOM_GUARD_OBSERVATIONS", observations }));
-	expect(observations, "F5B_ROOM_GUARD_PROFILE_AUTHORITY_READ_ORDER").toEqual(expected);
+	console.log(JSON.stringify({ kind: "STARTUP_STATE_COMPOSITION_OBSERVATIONS", observations }));
 });

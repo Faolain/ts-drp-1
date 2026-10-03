@@ -53,7 +53,7 @@ review; the original proposal is preserved. Separate causal RED followed the
 2c commit; contract approval is not startup product acceptance. Later product
 execution remains behind its own gates.
 
-## 2d RED accepted; distinct GREEN active
+## 2d startup product and main landing accepted
 
 Separate Codex 6.1 high tests-only RED is frozen under its
 [handoff](../../.logs/bounded-storage-lifecycle/startup-red-01/handoff.md).
@@ -66,14 +66,31 @@ That same review resolved concrete failed-attempt effect and native store-open
 blind spots; only the affected existing cases were rerun. Original freezes,
 failed attempts, historical evidence and ordinary budgets remain preserved.
 
-Distinct Codex 6.1 high GREEN is immediately allocated to the room/chat product
-seam. Normative declaration-free recovery, retry/rebind and every previously
-masked downstream assertion must execute and pass unchanged against the product.
-Empty-old-hint diagnostics are controls, not success; historical serial skips and
-source-only/coverage/cleanup limits remain qualified. Broader failures remain
-failed. No kernel, native owner, schema, frozen oracle or budget change is allocated.
-Independent GREEN review and root product disposition remain required; startup,
-rollback, recipient custody, retirement and endurance are not accepted here.
+Distinct Codex 6.1 high GREEN implemented the room/chat seam. Separate Codex 6.1
+xhigh returned [APPROVED](../../.logs/bounded-storage-lifecycle/startup-green-review-01/public.md),
+CONTEXT_COMPLETE YES, without actionable findings. Root fully read the final
+verdict/custody and product diff, independently checked raw/source/runtime bindings,
+and accepts the exact candidate under the
+[product disposition](../../.logs/bounded-storage-lifecycle/startup-green-review-01/root-disposition.md).
+Actual native startup and fresh default product-browser gates pass; previously
+masked base/replay/write and process-death tails execute. Empty-old-hint diagnostics
+remain separate controls, not normative success. The proven historical conflicts
+were corrected by a separate RED author and accepted under their focused
+[disposition](../../.logs/bounded-storage-lifecycle/startup-binding-red-root-audit-01/root-disposition.md).
+Changed historical runtime inputs received a fresh full default run; unchanged
+native inputs retained their exact actual run without repetition.
+
+Focused unit assertions pass, but both commands remain failed at the unchanged
+global coverage threshold. Broader export-roster/raw-loader failures and old
+failed attempts remain failed. Scoped static/build checks pass with the inherited
+JSDoc warning. Cleanup, source-only observation, synthetic-state and in-memory
+chat-host qualifications remain explicit in custody. The exact main checkpoint is
+accepted under the [landing disposition](../../.logs/bounded-storage-lifecycle/startup-green-integration-01/root-disposition.md):
+affected build/strict/static gates pass, rebuilt runtime executables are byte-identical,
+and the clean staged bytes exclude preserved overlapping user work. The broader
+integration lint scope retains JSDoc warnings with zero errors. Checkout-specific
+observer paths qualify graph-byte comparison, not executable equivalence.
+Usable rollback, recipient custody, retirement and endurance remain open.
 
 ## 2e-0 reader contract accepted; usable rollback remains open
 
@@ -85,7 +102,8 @@ the exact [reader contract](slices/02e-0-noncreating-snapshot-read.md) under its
 [disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
 Same-selector conflict and reader-local queued-close findings were corrected and
 independently checked during that same review; original framing remains preserved.
-Execution is held behind 2d product acceptance; no reader implementation is claimed.
+Startup product acceptance is complete. Begin separate reader RED after its focused
+main landing; no reader implementation or RED readiness is claimed yet.
 
 The two-closed-cut direction supports further synthesis, not usable rollback
 completion. Bounded AHE selection, older-QC authentication limits, non-settlement

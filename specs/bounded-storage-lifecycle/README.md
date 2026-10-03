@@ -33,14 +33,20 @@ Codex 6.1 at xhigh. Implementation and investigation subagents use Codex 6.1 at
 high. Grok, Kimi and Opus are suspended for new rounds. This supersedes older
 prospective rosters without changing historical verdicts or evidence.
 
-Current pickup (2026-10-03): pending recovery is committed as `d267b2f4` after
-independent GREEN approval and exact-byte main landing. Separate Codex 6.1 high
-RED for current-floor shipped startup is now accepted under the
-[readiness disposition](../../.logs/bounded-storage-lifecycle/startup-red-root-audit-01/root-disposition.md).
-Distinct Codex 6.1 high GREEN is active in an isolated checkout, limited to the
-room/chat product allocation and the exact frozen tests. Require previously masked
-assertions to execute and pass against changed product; startup product acceptance
-remains open. Cold recovery and its
+Current pickup (2026-10-03): current-floor shipped startup is independently
+approved and root-accepted under the
+[product disposition](../../.logs/bounded-storage-lifecycle/startup-green-review-01/root-disposition.md).
+Its exact focused main checkpoint is accepted under the
+[landing disposition](../../.logs/bounded-storage-lifecycle/startup-green-integration-01/root-disposition.md).
+Immediately begin separate Codex 6.1 high RED for the accepted non-creating
+snapshot reader. Startup now refreshes
+actual authority for recovery/retry and authenticates pending or stable successors
+without caller declarations; its previously masked product assertions execute
+and pass. Native and default browser gates pass at unchanged budgets. Focused
+unit assertions pass, but their global coverage commands remain failed and
+unwaived. Preserve the separately accepted historical correction, unrelated work
+and closed reviews; exact runtime inheritance does not require repeating unchanged
+matrices. Pending recovery remains committed as `d267b2f4`. Cold recovery and its
 reviewed harness prerequisites remain committed as `b29369df`. The single-API
 [pending-discovery contract](slices/02c-authenticated-pending-discovery.md) is
 accepted for separate RED authoring under the
@@ -80,14 +86,14 @@ records source-only startup, usable-rollback and recipient-installation
 prerequisites. The [2d shipped startup contract](slices/02d-declaration-free-shipped-startup.md)
 is independently approved and root-accepted under its
 [contract disposition](../../.logs/bounded-storage-lifecycle/startup-selection-contract-review-01/root-disposition.md).
-The frozen causal RED and separate xhigh readiness review are complete; two
-demonstrated behavior blind spots were corrected in that same review. The distinct
-GREEN author now owns current-floor startup and refresh/retry implementation.
+The frozen causal RED, bounded historical correction and separate xhigh product
+review are complete; the startup product disposition above owns acceptance.
 Do not change frozen oracles or repeat unchanged matrices for bookkeeping. Usable rollback
 is now resliced at a concrete storage prerequisite: the independently accepted
 [non-creating snapshot reader](slices/02e-0-noncreating-snapshot-read.md), under its
 [contract disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
-Reader execution remains held behind 2d product acceptance. Then separately prove
+Reader RED is the current executable pickup after the focused startup checkpoint; product implementation still
+requires separate RED readiness and a distinct GREEN author. Then separately prove
 bounded, profile-complete authenticated closed-cut data and the mandatory genuine
 room/lifecycle rollback consumer and registry-role reconciliation. Observation
 alone is not usable rollback. Recipient retention remains a separate destination
@@ -232,7 +238,7 @@ your pass.
 - [x] Exact metadata declaration observation and failure provenance (slice 2a).
 - [x] Authenticated declaration-free cold recovery (slice 2b).
 - [x] Authenticated declaration-free pending recovery (slice 2c).
-- [ ] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); RED accepted, distinct GREEN active.
+- [x] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); product and focused main landing accepted.
 - [ ] Usable rollback: [reader prerequisite](slices/02e-0-noncreating-snapshot-read.md), bounded authenticated data, then mandatory room/lifecycle consumption and role reconciliation.
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
@@ -315,9 +321,9 @@ unshipped scaffolding.
 
 Legacy classification cannot be a backend-only unblock switch. The accepted
 owner conservatively holds inherited rows while descriptors and recovery roles
-are unknown. The [room opener](../../examples/v3-room/src/index.ts) has trusted
-current/pending room-head expectations, but its startup selection and pending
-recovery still require a supplied successor snapshot declaration. The accepted
+are unknown. The [room opener](../../examples/v3-room/src/index.ts) selects
+current/pending recovery from detached host-floor expectations without a supplied
+successor snapshot declaration. The accepted
 [cold recovery owner](../../packages/node/src/creator-adoption.ts) now authenticates
 the chain and expected successor before discovering the exact predecessor scope;
 that does not migrate the other recovery branches.
