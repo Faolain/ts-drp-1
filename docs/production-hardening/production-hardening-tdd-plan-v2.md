@@ -46,10 +46,13 @@ affected verification are accepted. Previously masked assertions execute against
 product; failed aggregate/coverage gates stay qualified. Exact journal-anchor RED,
 getKey and one-pass summary corrections are independently approved. Its changed-
 product native assertions and original browser semantics pass with a preserved
-combined WebKit timeout qualification; separate xhigh product review is active.
+combined WebKit timeout qualification. Separate xhigh product review and focused
+unsafe-cleanup correction are accepted; exact MAIN landing and fresh affected
+native/three-engine browser verification pass without repeating unchanged matrices.
 Same-journal historical preservation is source-law accepted, not durable source
 availability or migration completion. The next bounded actual-data observation
-contract is being materialized before separate review and RED/GREEN. Full-profile
+contract has separate source acceptance; the journal prerequisite is landed and
+fresh tests-only RED is the active pickup before separate readiness and GREEN. Full-profile
 custody, genuine rollback/registry
 consumption, recipient retention and later lifecycle/endurance gates remain open.
 The live lifecycle handoff and review ledger own current status; older narrative

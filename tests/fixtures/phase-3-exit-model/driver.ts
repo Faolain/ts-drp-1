@@ -152,6 +152,12 @@ class ControlledJournalStore implements DurableLiveJournalStore {
 		return this.#delegate.readPage(input);
 	}
 
+	readAnchorPreimage(
+		input: Parameters<DurableLiveJournalStore["readAnchorPreimage"]>[0]
+	): ReturnType<DurableLiveJournalStore["readAnchorPreimage"]> {
+		return this.#delegate.readAnchorPreimage(input);
+	}
+
 	close(): Promise<void> {
 		return this.#delegate.close();
 	}

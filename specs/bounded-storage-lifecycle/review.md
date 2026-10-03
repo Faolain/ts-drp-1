@@ -234,12 +234,29 @@ now accepts only the existing-journal preservation law and authentic dependency
 boundary under its [root disposition](../../.logs/bounded-storage-lifecycle/rollback-anchor-custody-contract-review-01/root-disposition.md).
 Root selects surviving genuine signed material under existing authority for
 subsequent preservation/import design; no external source or lost-input success
-is promised. The next HIGH source author is materializing the bounded data-observation
-contract under its [allocation](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-root-01/root-allocation.md).
-It must distinguish actual all-target authentication from still-held durable
-availability, custody and fences. No data RED/GREEN allocation is accepted yet.
+is promised. The separately authored bounded observation contract has independent
+source acceptance below. Durable availability, custody and fences remain held.
 
-## 2e-2 exact journal-anchor implemented; independent product review
+## 2e-3 actual closed-cut data observation — contract accepted
+
+The separate HIGH [proposal](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-plan-01/proposal.md)
+and independent XHIGH [APPROVED verdict](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/public.md)
+establish the private [all-target observation contract](slices/02e-3-authenticated-closed-cut-data-observation.md)
+under its [root disposition](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md).
+It requires actual application/closed-ACL bytes for all distinct cuts, genuine
+profile/control authority and double-bound old anchors, serial verified recovery
+payloads, SAME proof accounting, cleanup and final currency before private provenance.
+Signed old QC bytes do not recreate erased seal trust. Trusted host installation
+is not same-origin rollback detection, cross-store atomicity or durable availability.
+
+Only the two allocated SQLite metadata calls gain prospective explicit readonly
+mode; separate RED owns their exact old-mode pin evolution and native proof before
+GREEN. The intentional old BEGIN IMMEDIATE semantics remain accepted history.
+Journal product acceptance/main integration is complete; fresh tests-only RED is
+the active pickup before separate readiness and distinct GREEN/product review. No full-data runtime, protected
+custody, migration, usable room rollback or golden-path acceptance is claimed.
+
+## 2e-2 exact journal-anchor — product and MAIN landing accepted
 
 The separate HIGH proposal and independent XHIGH
 [APPROVED review](../../.logs/bounded-storage-lifecycle/rollback-journal-anchor-contract-review-01/public.md)
@@ -276,8 +293,24 @@ released actual changed-product gates. Fresh native/shared28 assertions pass;
 browser71 plus unchanged exact-title1 establishes all original semantics, not a
 clean combined72 pass. The failed WebKit row has no product/cleanup receipt;
 primary cause and exact historical deletion remain unknown. Old browser30 passes;
-ordinary native/compiler/coverage failures stay unwaived. Separate xhigh product
-review is active. Required declaration-pin and direct delegate evolution remain
+ordinary native/compiler/coverage failures stay unwaived. The separate xhigh
+[REQUIRED_CHANGES verdict](../../.logs/bounded-storage-lifecycle/journal-anchor-product-review-01/public.md)
+and [root disposition](../../.logs/bounded-storage-lifecycle/journal-anchor-product-review-01/root-disposition.md)
+find no product/API defect and hold only prospective outer cleanup: the failed
+row attempts a new page after its context closed. The distinct HIGH reversible
+correction now has separate focused XHIGH approval and
+[root product acceptance](../../.logs/bounded-storage-lifecycle/journal-anchor-timeout-cleanup-review-01/root-disposition.md).
+Positive, closed-target rejection, retained pending timeout and outer delete-error
+controls retain genuine primary failures and bounded visible cleanup. The
+[exact MAIN landing](../../.logs/bounded-storage-lifecycle/journal-anchor-green-integration-01/root-disposition.md)
+passes fresh native28 and selected browser21 on all three engines, including
+actual exact deletion/empty inventory before fulfilled context close. Affected
+build/static gates pass. Composed canonical/storage runtime differs from the
+candidate because accepted AHE sources already landed; no unchanged-runtime
+inheritance or full72 rerun is claimed. Historical failed aggregate, ordinary
+native/compiler/coverage failures and unknown historical deletion stay qualified.
+No full matrix was repeated for the cleanup delta.
+Required declaration-pin and direct delegate evolution remain
 bound to real emitted/type conflicts.
 Historical protected/legacy custody and both independent authenticated
 digest bindings remain mandatory before full-profile success; missing preimages

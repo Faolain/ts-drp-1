@@ -3,6 +3,7 @@ export const P4_BROWSER_METHODS = Object.freeze([
 	"close",
 	"installEpochAnchor",
 	"installGenesis",
+	"readAnchorPreimage",
 	"readiness",
 	"readPage",
 ] as const);

@@ -1,9 +1,11 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { parseStorageObjectId } from "@ts-drp/storage";
 
-import { LIVE_JOURNAL_DOMAINS } from "./types.js";
+import { LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES, LIVE_JOURNAL_DOMAINS } from "./types.js";
 import type {
 	LiveJournalAcceptedRow,
+	LiveJournalAnchorReadInput,
+	LiveJournalAnchorReadResult,
 	LiveJournalFailureKind,
 	LiveJournalScope,
 	LiveJournalSnapshotToken,
@@ -15,6 +17,20 @@ const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor.bind(Object);
 const arrayIsArray = Array.isArray.bind(Array);
 const numberIsSafeInteger = Number.isSafeInteger.bind(Number);
 const objectFreeze = Object.freeze.bind(Object);
+const typedArrayPrototype = getPrototypeOf(Uint8Array.prototype) as object;
+const intrinsicByteLength = getOwnPropertyDescriptor(typedArrayPrototype, "byteLength")?.get as (
+	this: unknown
+) => unknown;
+const intrinsicByteOffset = getOwnPropertyDescriptor(typedArrayPrototype, "byteOffset")?.get as (
+	this: unknown
+) => unknown;
+const intrinsicBuffer = getOwnPropertyDescriptor(typedArrayPrototype, "buffer")?.get as (this: unknown) => unknown;
+const intrinsicArrayKind = getOwnPropertyDescriptor(typedArrayPrototype, Symbol.toStringTag)?.get as (
+	this: unknown
+) => unknown;
+const intrinsicArrayBufferLength = getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength")?.get as (
+	this: unknown
+) => unknown;
 
 const SCOPE_KEYS = ["anchorDigest", "epoch", "objectId"] as const;
 const INSTALL_KEYS = [
@@ -32,6 +48,8 @@ const RECEIVED_KEYS = [
 ] as const;
 const LOCAL_KEYS = ["author", "authorSequence", "scope", "sourceKind", "vertexDigest"] as const;
 const READINESS_KEYS = ["scope"] as const;
+const ANCHOR_READ_KEYS = ["maxBytes", "scope"] as const;
+const ANCHOR_READ_OBSERVATION_KEYS = ["exactCanonicalAnchorPreimageBytes", "scope"] as const;
 const TOKEN_KEYS = [
 	"genesisDigest",
 	"highWatermark",
@@ -180,7 +198,9 @@ type MutationObservationInput = Readonly<{
 
 type MutationDecision = "exact-new" | "exact-old" | "mixed" | "unreadable";
 
-function failure(kind: LiveJournalFailureKind): Captured<never> {
+function failure(
+	kind: LiveJournalFailureKind
+): Readonly<{ readonly ok: false; readonly kind: LiveJournalFailureKind }> {
 	return objectFreeze({ kind, ok: false });
 }
 
@@ -582,15 +602,70 @@ function capturePage(input: unknown): Captured<CapturedPage> {
  * @returns A detached immutable value or a closed failure.
  */
 export function captureLiveJournalInput(
-	operation: "append" | "install" | "installEpochAnchor" | "page" | "readiness" | "received",
+	operation: "anchorRead" | "append" | "install" | "installEpochAnchor" | "page" | "readiness" | "received",
 	input: unknown
-): Captured<CapturedInstall | CapturedPage | LiveJournalPendingRow | LiveJournalScope> {
+): Captured<CapturedInstall | CapturedPage | LiveJournalAnchorReadInput | LiveJournalPendingRow | LiveJournalScope> {
+	if (operation === "anchorRead") return captureAnchorRead(input);
 	if (operation === "install") return captureInstall(input, true);
 	if (operation === "installEpochAnchor") return captureInstall(input, false);
 	if (operation === "append") return captureAppend(input);
 	if (operation === "readiness") return captureReadiness(input);
 	if (operation === "page") return capturePage(input);
 	return validateReceived(input as LiveJournalPendingRow);
+}
+
+function captureAnchorRead(input: unknown): Captured<LiveJournalAnchorReadInput> {
+	const record = snapshotRecord(input, ANCHOR_READ_KEYS);
+	if (record === undefined) return failure("malformed-input");
+	const scope = copyScope(record.scope);
+	if (scope === undefined || !isSafeIntegerBetween(record.maxBytes, 0, LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES)) {
+		return failure("malformed-input");
+	}
+	return objectFreeze({ ok: true, value: objectFreeze({ maxBytes: record.maxBytes, scope }) });
+}
+
+/**
+ * Captures only an exact anchor projection, gating intrinsic bytes before copy or decoding.
+ * @param expected - Untrusted exact scope and local byte allowance.
+ * @param observation - Closed native anchor projection, not a complete stored scope.
+ * @returns Detached anchor bytes or a read-local refusal.
+ */
+export function captureLiveJournalAnchorReadObservation(
+	expected: LiveJournalAnchorReadInput,
+	observation: unknown
+): LiveJournalAnchorReadResult {
+	const captured = captureAnchorRead(expected);
+	if (!captured.ok) return captured;
+	const record = snapshotRecord(observation, ANCHOR_READ_OBSERVATION_KEYS);
+	if (record === undefined) return failure("store-poisoned");
+	const scope = copyScope(record.scope);
+	if (scope === undefined || !sameScope(scope, captured.value.scope)) return failure("store-poisoned");
+	let bytes: Uint8Array;
+	try {
+		const carrier = record.exactCanonicalAnchorPreimageBytes;
+		if (intrinsicArrayKind.call(carrier) !== "Uint8Array") return failure("store-poisoned");
+		const length = intrinsicByteLength.call(carrier) as number;
+		const buffer = intrinsicBuffer.call(carrier) as ArrayBuffer;
+		// The ArrayBuffer brand check rejects actual shared backing, even behind shadowed properties.
+		intrinsicArrayBufferLength.call(buffer);
+		if (length === 0) return failure("store-poisoned");
+		if (length > captured.value.maxBytes) return objectFreeze({ kind: "read-budget-exceeded", ok: false });
+		const offset = intrinsicByteOffset.call(carrier) as number;
+		bytes = new Uint8Array(new Uint8Array(buffer, offset, length));
+	} catch {
+		return failure("store-poisoned");
+	}
+	const anchor = exactDecoded(bytes, ANCHOR_KEYS);
+	if (
+		anchor === undefined ||
+		!validateAnchor(anchor) ||
+		anchor.objectId !== scope.objectId ||
+		anchor.epoch !== scope.epoch ||
+		lowerHex(hashDomain("ts-drp/epoch-anchor/v3", bytes)) !== scope.anchorDigest
+	) {
+		return failure("store-poisoned");
+	}
+	return objectFreeze({ exactCanonicalAnchorPreimageBytes: bytes, kind: "present", ok: true, scope });
 }
 
 function sameBytesOptional(left: Uint8Array | undefined, right: Uint8Array | undefined): boolean {

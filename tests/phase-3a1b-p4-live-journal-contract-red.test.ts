@@ -381,12 +381,13 @@ function expectedSingleReceivedSnapshot(): Readonly<Record<string, unknown>> {
 }
 
 describe("D.93.34 p4-a frozen shared contract", () => {
-	it("freezes the exact six methods, fifteen failures, three domains and closed input keys", () => {
+	it("freezes the exact seven methods, fifteen failures, three domains and closed input keys", () => {
 		expect(LIVE_JOURNAL_METHODS).toEqual([
 			"appendAccepted",
 			"close",
 			"installEpochAnchor",
 			"installGenesis",
+			"readAnchorPreimage",
 			"readiness",
 			"readPage",
 		]);

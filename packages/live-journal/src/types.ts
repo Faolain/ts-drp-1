@@ -97,6 +97,25 @@ export interface LiveJournalReadinessInput {
 	readonly scope: LiveJournalScope;
 }
 
+export const LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES = 8192 as const;
+
+export interface LiveJournalAnchorReadInput {
+	readonly scope: LiveJournalScope;
+	readonly maxBytes: number;
+}
+
+export type LiveJournalAnchorReadFailureKind = LiveJournalFailureKind | "read-budget-exceeded";
+
+export type LiveJournalAnchorReadResult =
+	| Readonly<{ readonly ok: true; readonly kind: "missing" }>
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "present";
+			readonly scope: LiveJournalScope;
+			readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: LiveJournalAnchorReadFailureKind }>;
+
 export interface LiveJournalSnapshotToken {
 	readonly kind: "v3-live-journal-snapshot-token-1";
 	readonly scope: LiveJournalScope;
@@ -140,6 +159,7 @@ export interface DurableLiveJournalStore {
 	installEpochAnchor(input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult>;
 	appendAccepted(input: AppendAcceptedVertexInput): Promise<AppendAcceptedVertexResult>;
 	readiness(input: LiveJournalReadinessInput): Promise<LiveJournalReadinessResult>;
+	readAnchorPreimage(input: LiveJournalAnchorReadInput): Promise<LiveJournalAnchorReadResult>;
 	readPage(input: LiveJournalPageInput): Promise<LiveJournalPageResult>;
 	close(): Promise<void>;
 }

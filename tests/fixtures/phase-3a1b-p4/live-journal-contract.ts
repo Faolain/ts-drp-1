@@ -5,6 +5,7 @@ export const LIVE_JOURNAL_METHODS = Object.freeze([
 	"close",
 	"installEpochAnchor",
 	"installGenesis",
+	"readAnchorPreimage",
 	"readiness",
 	"readPage",
 ] as const);

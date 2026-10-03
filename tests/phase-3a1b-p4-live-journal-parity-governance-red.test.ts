@@ -35,9 +35,11 @@ const EXACT_EXPORT = Object.freeze({
 	types: "./dist/src/live-journal.d.ts",
 });
 const SHARED_RUNTIME_EXPORTS = Object.freeze([
+	"LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES",
 	"LIVE_JOURNAL_DOMAINS",
 	"LIVE_JOURNAL_FAILURE_KINDS",
 	"captureLiveJournalInput",
+	"captureLiveJournalAnchorReadObservation",
 	"classifyLiveJournalMutationObservation",
 	"decideLiveJournalDuplicate",
 	"deriveLiveJournalSnapshot",
@@ -48,9 +50,13 @@ const SHARED_DECLARATION_EXPORTS = Object.freeze([
 	"DurableLiveJournalStore",
 	"InstallLiveJournalGenesisInput",
 	"InstallLiveJournalGenesisResult",
+	"LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES",
 	"LIVE_JOURNAL_DOMAINS",
 	"LIVE_JOURNAL_FAILURE_KINDS",
 	"LiveJournalAcceptedRow",
+	"LiveJournalAnchorReadFailureKind",
+	"LiveJournalAnchorReadInput",
+	"LiveJournalAnchorReadResult",
 	"LiveJournalFailureKind",
 	"LiveJournalPageInput",
 	"LiveJournalPageResult",
@@ -59,6 +65,7 @@ const SHARED_DECLARATION_EXPORTS = Object.freeze([
 	"LiveJournalScope",
 	"LiveJournalSnapshotToken",
 	"captureLiveJournalInput",
+	"captureLiveJournalAnchorReadObservation",
 	"classifyLiveJournalMutationObservation",
 	"decideLiveJournalDuplicate",
 	"deriveLiveJournalSnapshot",
@@ -342,7 +349,7 @@ describe("D.93.34 p4-d parity and governance RED", () => {
 			expect(text).not.toMatch(/\b(?:LiveJournalBackend|createDurableLiveJournalStore)\b/u);
 		}
 		expect(sha256("packages/live-journal/dist/src/contract.d.ts")).toBe(
-			"5faa4b32eb79e64aecf4d03a57dd366060714432c9f2086e4a1b5eed96441ec5"
+			"7706e5716d8e7e9b070e491010cdc79c26aa4df0215ed8aac77192eb5ac737c3"
 		);
 	});
 

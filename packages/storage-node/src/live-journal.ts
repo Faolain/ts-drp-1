@@ -1,6 +1,7 @@
 import {
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
+	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalInput,
 	classifyLiveJournalMutationObservation,
 	decideLiveJournalDuplicate,
@@ -9,6 +10,8 @@ import {
 	type InstallLiveJournalGenesisInput,
 	type InstallLiveJournalGenesisResult,
 	type LiveJournalAcceptedRow,
+	type LiveJournalAnchorReadInput,
+	type LiveJournalAnchorReadResult,
 	type LiveJournalFailureKind,
 	type LiveJournalPageInput,
 	type LiveJournalPageResult,
@@ -425,7 +428,7 @@ function captureAddressedClosure(snapshot: DurableSnapshot): DurableSnapshot | u
 /**
  * Creates the strict Node live-journal capability.
  * @param options - Exact primary SQLite filename options.
- * @returns A strict six-method live-journal capability.
+ * @returns The strict live-journal capability.
  */
 export function createNodeDurableLiveJournalStore(
 	options: NodeDurableLiveJournalStoreOptions
@@ -897,6 +900,61 @@ export function createNodeDurableLiveJournalStore(
 		}) as LiveJournalPageResult;
 	};
 
+	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
+	const readAnchorPreimage = async (input: LiveJournalAnchorReadInput): Promise<LiveJournalAnchorReadResult> => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		const captured = captureLiveJournalInput("anchorRead", input);
+		if (!captured.ok) return failed(captured.kind);
+		const selected = captured.value as LiveJournalAnchorReadInput;
+		const unavailableAfterCapture = unavailable();
+		if (unavailableAfterCapture !== undefined) return unavailableAfterCapture;
+		let result: LiveJournalAnchorReadResult;
+		try {
+			database.exec("BEGIN");
+			// Exact equality to the captured canonical key bounds every projected key.
+			// CASE short-circuits the BLOB projection until physical type/length and allowance pass.
+			const row = statement(
+				database,
+				`WITH addressed AS (
+					SELECT object_id, epoch, anchor_digest, exact_anchor_preimage,
+						typeof(object_id)='text' AND length(CAST(object_id AS BLOB)) BETWEEN 1 AND 4096
+						AND typeof(epoch)='integer' AND epoch BETWEEN 0 AND 9007199254740991
+						AND typeof(anchor_digest)='text' AND length(CAST(anchor_digest AS BLOB))=64
+						AND anchor_digest NOT GLOB '*[^0-9a-f]*' AS key_valid
+					FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?
+				)
+				SELECT CASE
+					WHEN NOT key_valid OR typeof(exact_anchor_preimage)!='blob' OR length(exact_anchor_preimage)=0 THEN 'store-poisoned'
+					WHEN length(exact_anchor_preimage)>? THEN 'read-budget-exceeded'
+					ELSE 'present' END AS kind,
+					CASE WHEN key_valid AND typeof(exact_anchor_preimage)='blob'
+						AND length(exact_anchor_preimage)>0 AND length(exact_anchor_preimage)<=?
+						THEN exact_anchor_preimage ELSE NULL END AS exact_anchor_preimage
+				FROM addressed`
+			).get(...scopeParameters(selected.scope), selected.maxBytes, selected.maxBytes);
+			if (row === undefined) result = Object.freeze({ kind: "missing", ok: true });
+			else if (row.kind === "store-poisoned") result = failed("store-poisoned");
+			else if (row.kind === "read-budget-exceeded") result = Object.freeze({ kind: "read-budget-exceeded", ok: false });
+			else if (row.kind === "present") {
+				result = captureLiveJournalAnchorReadObservation(selected, {
+					exactCanonicalAnchorPreimageBytes: row.exact_anchor_preimage,
+					scope: selected.scope,
+				});
+			} else result = failed("internal-invariant");
+			database.exec("COMMIT");
+		} catch {
+			try {
+				database.exec("ROLLBACK");
+			} catch {
+				// Preserve the original native transaction failure.
+			}
+			return failed("substrate-failure");
+		}
+		if (!result.ok && result.kind === "store-poisoned") poisoned = true;
+		return result;
+	};
+
 	const close = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
@@ -910,5 +968,13 @@ export function createNodeDurableLiveJournalStore(
 		return closePromise;
 	};
 
-	return Object.freeze({ appendAccepted, close, installEpochAnchor, installGenesis, readiness, readPage });
+	return Object.freeze({
+		appendAccepted,
+		close,
+		installEpochAnchor,
+		installGenesis,
+		readAnchorPreimage,
+		readiness,
+		readPage,
+	});
 }

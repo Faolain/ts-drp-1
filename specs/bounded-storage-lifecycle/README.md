@@ -163,16 +163,28 @@ The separate RED author's one-pass correction now has focused xhigh
 Fresh changed-product native assertions pass. All original browser semantics
 execute successfully across the combined run and one unchanged exact-title repeat;
 the original WebKit timeout remains failed, with primary cause and historical
-deletion unknown. A separate xhigh product review is active; no budgets or
-expected assertions changed and no closed reviews reopened. The separate
+deletion unknown. The separate xhigh
+[product disposition](../../.logs/bounded-storage-lifecycle/journal-anchor-product-review-01/root-disposition.md)
+finds no product/API correction and holds only demonstrated unsafe outer cleanup.
+The distinct HIGH lifetime correction now has separate focused xhigh
+[bounded product acceptance](../../.logs/bounded-storage-lifecycle/journal-anchor-timeout-cleanup-review-01/root-disposition.md).
+Exact reviewed sources and frozen oracles are integrated on MAIN; fresh native
+and proportionate three-engine browser assertions, affected build/static gates
+and real exact deletion before context close pass under the
+[landing disposition](../../.logs/bounded-storage-lifecycle/journal-anchor-green-integration-01/root-disposition.md).
+The failed historical aggregate and ordinary/compiler/coverage gates remain
+qualified, not waived. No budgets or expected assertions changed and no closed
+reviews reopened. The separate
 [historical custody source-law disposition](../../.logs/bounded-storage-lifecycle/rollback-anchor-custody-contract-review-01/root-disposition.md)
 accepts the same-journal preservation direction, not a completed source/import
 guarantee or executable full-data allocation.
 Supported retirement-only non-genesis protection/legacy custody still needs its
 separate contract; reading existing bytes does not establish that guarantee.
-The next HIGH source author is materializing the bounded all-target data-observation
-contract under its [allocation](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-root-01/root-allocation.md),
-before separate xhigh acceptance and distinct RED/GREEN. It authenticates actual
+The bounded all-target [data-observation contract](slices/02e-3-authenticated-closed-cut-data-observation.md)
+now has separate HIGH authorship and xhigh
+[source acceptance](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md).
+The journal prerequisite is accepted and integrated. The active pickup is fresh
+distinct tests-only RED for 2e-3, before separate readiness and GREEN. It authenticates actual
 application/closed-ACL bytes, not durable availability, migration or old seal replay.
 Then separately prove profile-complete custody and the mandatory genuine
 room/lifecycle rollback consumer and registry-role reconciliation. Observation
@@ -319,7 +331,7 @@ your pass.
 - [x] Authenticated declaration-free cold recovery (slice 2b).
 - [x] Authenticated declaration-free pending recovery (slice 2c).
 - [x] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); product and focused main landing accepted.
-- [ ] Usable rollback: [snapshot reader](slices/02e-0-noncreating-snapshot-read.md), [bounded AHE reader](slices/02e-1-bounded-active-generation-read.md), [journal-anchor access](slices/02e-2-bounded-journal-anchor-read.md), protected historical custody/full-profile authenticated data, then mandatory room/lifecycle consumption and role reconciliation.
+- [ ] Usable rollback: [snapshot reader](slices/02e-0-noncreating-snapshot-read.md), [bounded AHE reader](slices/02e-1-bounded-active-generation-read.md), [journal-anchor access](slices/02e-2-bounded-journal-anchor-read.md), [all-target data observation](slices/02e-3-authenticated-closed-cut-data-observation.md), protected historical custody, then mandatory room/lifecycle consumption and role reconciliation.
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
 - [ ] Protected-dependency planner and durable retirement protocol (slices 3–4).

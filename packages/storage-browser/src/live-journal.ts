@@ -1,6 +1,7 @@
 import {
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
+	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalInput,
 	classifyLiveJournalMutationObservation,
 	decideLiveJournalDuplicate,
@@ -9,6 +10,8 @@ import {
 	type InstallLiveJournalGenesisInput,
 	type InstallLiveJournalGenesisResult,
 	type LiveJournalAcceptedRow,
+	type LiveJournalAnchorReadInput,
+	type LiveJournalAnchorReadResult,
 	type LiveJournalFailureKind,
 	type LiveJournalPageInput,
 	type LiveJournalPageResult,
@@ -638,7 +641,7 @@ function appendWriter(database: IDBDatabase, initial: PendingRow): Promise<Write
 /**
  * Creates the strict Browser live-journal capability.
  * @param options - Exact primary IndexedDB name options.
- * @returns A strict six-method live-journal capability.
+ * @returns The strict live-journal capability.
  */
 export async function createBrowserDurableLiveJournalStore(
 	options: BrowserDurableLiveJournalStoreOptions
@@ -868,6 +871,43 @@ export async function createBrowserDurableLiveJournalStore(
 		}) as LiveJournalPageResult;
 	};
 
+	const readAnchorPreimage = async (input: LiveJournalAnchorReadInput): Promise<LiveJournalAnchorReadResult> => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		const captured = captureLiveJournalInput("anchorRead", input);
+		if (!captured.ok) return failed(captured.kind);
+		const selected = captured.value as LiveJournalAnchorReadInput;
+		const unavailableAfterCapture = unavailable();
+		if (unavailableAfterCapture !== undefined) return unavailableAfterCapture;
+		let result: LiveJournalAnchorReadResult;
+		try {
+			const transaction = strictTransaction(database, ["scopes"], "readonly");
+			const request = transaction.objectStore("scopes").get(scopeKey(selected.scope));
+			const observation = requestResult(request).then((raw: unknown): LiveJournalAnchorReadResult => {
+				if (raw === undefined) return Object.freeze({ kind: "missing", ok: true });
+				// IndexedDB has already cloned the whole row. Inspect only required own fields;
+				// unrelated parameter/signature carriers are neither enumerated nor copied here.
+				if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return failed("store-poisoned");
+				const fields: Record<string, unknown> = {};
+				for (const key of ["objectId", "epoch", "anchorDigest", "exactCanonicalAnchorPreimageBytes"]) {
+					const descriptor = Object.getOwnPropertyDescriptor(raw, key);
+					if (descriptor === undefined || !("value" in descriptor) || !descriptor.enumerable)
+						return failed("store-poisoned");
+					fields[key] = descriptor.value;
+				}
+				return captureLiveJournalAnchorReadObservation(selected, {
+					exactCanonicalAnchorPreimageBytes: fields.exactCanonicalAnchorPreimageBytes,
+					scope: { anchorDigest: fields.anchorDigest, epoch: fields.epoch, objectId: fields.objectId },
+				});
+			});
+			[result] = await Promise.all([observation, transactionComplete(transaction)]);
+		} catch {
+			return failed("substrate-failure");
+		}
+		if (!result.ok && result.kind === "store-poisoned") poisoned = true;
+		return result;
+	};
+
 	const close = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
@@ -877,5 +917,13 @@ export async function createBrowserDurableLiveJournalStore(
 		return closePromise;
 	};
 
-	return Object.freeze({ appendAccepted, close, installEpochAnchor, installGenesis, readiness, readPage });
+	return Object.freeze({
+		appendAccepted,
+		close,
+		installEpochAnchor,
+		installGenesis,
+		readAnchorPreimage,
+		readiness,
+		readPage,
+	});
 }
