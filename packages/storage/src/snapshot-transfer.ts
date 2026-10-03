@@ -87,7 +87,29 @@ export interface SnapshotRecoveryDeclarationReader {
 }
 export interface SnapshotRecoveryStore<Receipt extends object>
 	extends SnapshotQuarantineStore<Receipt>,
-		SnapshotRecoveryDeclarationReader {}
+		SnapshotRecoveryDeclarationReader {
+	acquireRecoveryRead(
+		declaration: SnapshotQuarantineDeclaration,
+		options?: Readonly<{ signal?: AbortSignal }>
+	): Promise<SnapshotRecoveryReadAcquisition>;
+}
+export interface SnapshotRecoveryChunkReader {
+	read(
+		descriptor: SnapshotChunkDescriptor,
+		options?: Readonly<{ signal?: AbortSignal }>
+	): Promise<Uint8Array | undefined>;
+	release(): Promise<void>;
+}
+export type SnapshotRecoveryReadAcquisition =
+	| Readonly<{ kind: "missing" }>
+	| Readonly<{
+			kind: "present";
+			declaration: SnapshotQuarantineDeclaration;
+			state: "open" | "verified";
+			retention: SnapshotRetention;
+			expiresAt: number;
+			reader: SnapshotRecoveryChunkReader;
+	  }>;
 export type SnapshotRecoveryDeclarationLookup =
 	| Readonly<{ kind: "missing" }>
 	| Readonly<{
@@ -100,7 +122,7 @@ export type SnapshotRecoveryDeclarationLookup =
 export type SnapshotRetention = "temporary" | "recovery" | "legacy-unclassified";
 export type SnapshotRecoveryInspection =
 	| Readonly<{ kind: "missing" }>
-	| Readonly<{ kind: "present"; status: SnapshotQuarantineStatus }>;
+	| Readonly<{ kind: "present"; status: SnapshotQuarantineStatus & { readonly retention: SnapshotRetention } }>;
 export interface SnapshotRecoveryOwnerStatus {
 	readonly limits: SnapshotRecoveryLimits;
 	readonly recoveryScopes: number;
@@ -234,7 +256,7 @@ function captureScope(value: unknown): SnapshotQuarantineScopeKey {
 	return Object.freeze({ anchor, epoch, manifestDigest, objectId });
 }
 
-function captureDescriptor(value: unknown): SnapshotChunkDescriptor {
+function captureDescriptor(value: unknown, declaration?: SnapshotQuarantineDeclaration): SnapshotChunkDescriptor {
 	if (!exactRecord(value, ["byteLength", "digest", "index"])) {
 		throw failure("malformed-input", "snapshot chunk descriptor is malformed");
 	}
@@ -251,6 +273,11 @@ function captureDescriptor(value: unknown): SnapshotChunkDescriptor {
 	) {
 		throw failure("malformed-input", "snapshot chunk descriptor is malformed");
 	}
+	if (declaration !== undefined) {
+		const expected = declaration.chunks[index];
+		if (expected === undefined || expected.byteLength !== byteLength || expected.digest !== digest)
+			throw failure("malformed-input", "snapshot chunk descriptor is foreign to this reader");
+	}
 	return Object.freeze({ byteLength, digest, index });
 }
 
@@ -261,7 +288,7 @@ function captureDeclaration(value: unknown): CapturedDeclaration {
 	if (!Array.isArray(value.chunks) || value.chunks.length === 0 || value.chunks.length > MAX_CHUNKS) {
 		throw failure("malformed-input", "snapshot quarantine descriptor count is invalid");
 	}
-	const chunks = Object.freeze(value.chunks.map(captureDescriptor));
+	const chunks = Object.freeze(value.chunks.map((descriptor) => captureDescriptor(descriptor)));
 	for (let index = 0; index < chunks.length; index += 1) {
 		if (chunks[index]?.index !== index) throw failure("malformed-input", "snapshot descriptors are not contiguous");
 	}
@@ -322,14 +349,20 @@ type RecoveryMetadata = Readonly<{
 	retention: unknown;
 	expiresAt: unknown;
 }>;
+type RecoveryReadExpectation = Readonly<{
+	declaration: SnapshotQuarantineDeclaration;
+	incarnation?: string;
+}>;
 function validateRecoveryManifest(declaration: SnapshotQuarantineDeclaration): void;
 function validateRecoveryManifest(
 	scope: SnapshotQuarantineScopeKey,
-	metadata: RecoveryMetadata
+	metadata: RecoveryMetadata,
+	read?: RecoveryReadExpectation
 ): Extract<SnapshotRecoveryDeclarationLookup, { kind: "present" }>;
 function validateRecoveryManifest(
 	input: SnapshotQuarantineDeclaration | SnapshotQuarantineScopeKey,
-	metadata?: RecoveryMetadata
+	metadata?: RecoveryMetadata,
+	read?: RecoveryReadExpectation
 ): void | Extract<SnapshotRecoveryDeclarationLookup, { kind: "present" }> {
 	try {
 		const scope =
@@ -411,8 +444,8 @@ function validateRecoveryManifest(
 			})
 		)
 			throw failure("poisoned", "snapshot recovery manifest identity is inconsistent");
-		if (metadata !== undefined)
-			return Object.freeze({
+		if (metadata !== undefined) {
+			const observation = Object.freeze({
 				kind: "present",
 				declaration: Object.freeze({
 					scope: Object.freeze({ ...scope }),
@@ -424,6 +457,10 @@ function validateRecoveryManifest(
 				retention: metadata.retention as SnapshotRetention,
 				expiresAt: metadata.expiresAt as number,
 			});
+			if (read !== undefined)
+				validateRecoveryRead(read.declaration, observation, metadata.incarnation as string, read.incarnation);
+			return observation;
+		}
 	} catch (error) {
 		if (metadata !== undefined) {
 			if (error instanceof QuarantineError) throw error;
@@ -458,6 +495,39 @@ function validateRecoveryChunk(
 	} catch (error) {
 		throw failure("poisoned", "snapshot recovery chunk is invalid", error);
 	}
+}
+function validateRecoveryRead(
+	expected: SnapshotQuarantineDeclaration,
+	observation: Extract<SnapshotRecoveryDeclarationLookup, { kind: "present" }>,
+	actualIncarnation: string,
+	expectedIncarnation?: string
+): asserts observation is Extract<SnapshotRecoveryDeclarationLookup, { kind: "present" }> & {
+	state: "open" | "verified";
+} {
+	if (observation.state === "poisoned") throw failure("poisoned", "snapshot recovery scope is poisoned");
+	if (expectedIncarnation !== undefined && actualIncarnation !== expectedIncarnation)
+		throw failure("stale-scope", "snapshot reader belongs to an earlier incarnation");
+	const actual = observation.declaration;
+	if (
+		actual.scope.objectId !== expected.scope.objectId ||
+		actual.scope.epoch !== expected.scope.epoch ||
+		actual.scope.anchor !== expected.scope.anchor ||
+		actual.scope.manifestDigest !== expected.scope.manifestDigest ||
+		actual.totalBytes !== expected.totalBytes ||
+		actual.exactCanonicalManifestBytes.byteLength !== expected.exactCanonicalManifestBytes.byteLength ||
+		actual.exactCanonicalManifestBytes.some((byte, index) => byte !== expected.exactCanonicalManifestBytes[index]) ||
+		actual.chunks.length !== expected.chunks.length ||
+		actual.chunks.some((chunk, index) => {
+			const descriptor = expected.chunks[index];
+			return (
+				descriptor === undefined ||
+				chunk.index !== descriptor.index ||
+				chunk.byteLength !== descriptor.byteLength ||
+				chunk.digest !== descriptor.digest
+			);
+		})
+	)
+		throw failure("conflict", "snapshot reader declaration conflicts with durable state");
 }
 export const snapshotQuarantineContract = Object.freeze({
 	limits: Object.freeze({

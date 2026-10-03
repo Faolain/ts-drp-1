@@ -38,8 +38,27 @@ approved and root-accepted under the
 [product disposition](../../.logs/bounded-storage-lifecycle/startup-green-review-01/root-disposition.md).
 Its exact focused main checkpoint is accepted under the
 [landing disposition](../../.logs/bounded-storage-lifecycle/startup-green-integration-01/root-disposition.md).
-Separate Codex 6.1 high RED is active for the accepted non-creating
-snapshot reader. Startup now refreshes
+Separate Codex 6.1 high RED for the accepted non-creating snapshot reader is
+frozen and independently accepted under the
+[readiness disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-red-root-audit-01/root-disposition.md).
+The distinct Codex 6.1 high GREEN candidate received a complete separate xhigh
+[required-changes review](../../.logs/bounded-storage-lifecycle/snapshot-reader-green-review-01/public.md).
+The separate focused xhigh
+[B1 disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-b1-review-01/root-disposition.md)
+accepts a reproduced pre-reader navigation boundary, not a product correction.
+Exhaustive uninstrumented original-title partitions now pass at unchanged budgets
+under the [semantic disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-b1-review-01/semantic-root-disposition.md).
+The separately authored outer timeout-cleanup correction now has focused xhigh
+approval and [bounded product acceptance](../../.logs/bounded-storage-lifecycle/snapshot-reader-timeout-cleanup-review-01/root-disposition.md).
+Its exact focused main integration is accepted under the
+[landing disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-green-integration-01/root-disposition.md).
+It reads actual existing bytes through the same readonly owner without
+creating a scope or retention lease. Native behavior and preservation assertions,
+public types and the default product-browser baseline pass. The combined reader
+browser run remains failed on one WebKit title, despite that unchanged case
+passing separately. Navigation-only reproduces the stop without database work;
+underlying cause and historical exact deletion remain unknown. Noncreating reader
+behavior is accepted; usable rollback is not. Startup now refreshes
 actual authority for recovery/retry and authenticates pending or stable successors
 without caller declarations; its previously masked product assertions execute
 and pass. Native and default browser gates pass at unchanged budgets. Focused
@@ -92,17 +111,46 @@ Do not change frozen oracles or repeat unchanged matrices for bookkeeping. Usabl
 is now resliced at a concrete storage prerequisite: the independently accepted
 [non-creating snapshot reader](slices/02e-0-noncreating-snapshot-read.md), under its
 [contract disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
-Reader RED is the primary executable pickup; product implementation still
-requires separate RED readiness and a distinct GREEN author. The independently
+Reader product and focused main landing are accepted; its formerly masked assertions
+execute against changed product. The independently
 accepted [bounded active-generation read](slices/02e-1-bounded-active-generation-read.md)
 may receive tests-only RED in parallel under its
 [contract disposition](../../.logs/bounded-storage-lifecycle/rollback-bounded-read-contract-review-01/root-disposition.md).
+Its frozen tests-only RED received a complete xhigh
+[required-changes readiness review](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-review-01/public.md).
+The same RED author's complete native-record and distinct blob-union corrections
+now have separate focused xhigh approval. The
+[corrected readiness disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-correction-review-01/root-disposition.md)
+accepts R1/R2 closure and allocates the distinct Codex 6.1 high GREEN author.
+That candidate is frozen for a new separate xhigh product review: actual native
+and producer assertions pass; browser evidence is the original full run plus one
+unchanged untraced WebKit title, not a clean aggregate pass.
+An actual ordinary-recovery trace demonstrated a separate certificate-observation
+blind spot: the old predicate ignored paged full-record scans. A narrow separate RED
+[correction disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-certificate-oracle-review-01/root-disposition.md)
+accepts the independently reviewed narrow correction. Both opposite assertions
+execute and pass; no recovery rewrite was authorized.
+Previously masked assertions must execute against changed product; controls
+alone are not product acceptance. Actual producer debt
+corrects the earlier bootstrap-one premise without raising the fixed observer limits.
 Keep one existing storage owner and shared validation law; serialize overlapping
 GREEN owners and integration. Its fixed observer policy permits whole nonpoisoning
 budget refusal without requiring earlier producer redesign. It neither promises
 unconditional inherited/custom-object availability nor waives later all-profile
-maintenance/admission. Then separately prove
-bounded, profile-complete authenticated closed-cut data and the mandatory genuine
+maintenance/admission. The source-only
+[closed-cut authentication architecture](../../.logs/bounded-storage-lifecycle/rollback-data-contract-review-01/root-disposition.md)
+is reviewed, not full-data execution. The separate
+[exact bounded journal-anchor contract](slices/02e-2-bounded-journal-anchor-read.md)
+is independently approved and root-accepted for distinct tests-only RED under its
+[disposition](../../.logs/bounded-storage-lifecycle/rollback-journal-anchor-contract-review-01/root-disposition.md).
+That RED candidate's digest-consistent exact-key scope correction is accepted.
+Its separate xhigh review requires only the concrete getKey observation gap under
+the [narrow correction allocation](../../.logs/bounded-storage-lifecycle/journal-anchor-read-red-review-01/root-disposition.md).
+Focused approval must immediately release distinct GREEN; no unchanged matrices
+are reopened. Separate protected historical custody contract design is active.
+Supported retirement-only non-genesis protection/legacy custody still needs its
+separate contract; reading existing bytes does not establish that guarantee.
+Then separately prove bounded, profile-complete authenticated closed-cut data and the mandatory genuine
 room/lifecycle rollback consumer and registry-role reconciliation. Observation
 alone is not usable rollback. Recipient retention remains a separate destination
 custody/installation seam; none of this authorizes retirement.
@@ -247,7 +295,7 @@ your pass.
 - [x] Authenticated declaration-free cold recovery (slice 2b).
 - [x] Authenticated declaration-free pending recovery (slice 2c).
 - [x] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); product and focused main landing accepted.
-- [ ] Usable rollback: [snapshot reader](slices/02e-0-noncreating-snapshot-read.md), [bounded AHE reader](slices/02e-1-bounded-active-generation-read.md), full-profile authenticated data, then mandatory room/lifecycle consumption and role reconciliation.
+- [ ] Usable rollback: [snapshot reader](slices/02e-0-noncreating-snapshot-read.md), [bounded AHE reader](slices/02e-1-bounded-active-generation-read.md), [journal-anchor access](slices/02e-2-bounded-journal-anchor-read.md), protected historical custody/full-profile authenticated data, then mandatory room/lifecycle consumption and role reconciliation.
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
 - [ ] Protected-dependency planner and durable retirement protocol (slices 3–4).

@@ -106,7 +106,31 @@ export interface SnapshotRecoveryDeclarationReader {
 
 export interface SnapshotRecoveryStore<Receipt extends object>
 	extends SnapshotQuarantineStore<Receipt>,
-		SnapshotRecoveryDeclarationReader {}
+		SnapshotRecoveryDeclarationReader {
+	acquireRecoveryRead(
+		declaration: SnapshotQuarantineDeclaration,
+		options?: Readonly<{ readonly signal?: AbortSignal }>
+	): Promise<SnapshotRecoveryReadAcquisition>;
+}
+
+export type SnapshotRecoveryReadAcquisition =
+	| Readonly<{ kind: "missing" }>
+	| Readonly<{
+			kind: "present";
+			declaration: SnapshotQuarantineDeclaration;
+			state: "open" | "verified";
+			retention: SnapshotRetention;
+			expiresAt: number;
+			reader: SnapshotRecoveryChunkReader;
+	  }>;
+
+export interface SnapshotRecoveryChunkReader {
+	read(
+		descriptor: SnapshotChunkDescriptor,
+		options?: Readonly<{ readonly signal?: AbortSignal }>
+	): Promise<Uint8Array | undefined>;
+	release(): Promise<void>;
+}
 
 export interface SnapshotStreamCompletion {
 	readonly chunkCount: number;

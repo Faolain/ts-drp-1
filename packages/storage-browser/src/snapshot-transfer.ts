@@ -9,6 +9,8 @@ import {
 	type SnapshotQuarantineScopeKey,
 	type SnapshotQuarantineStatus,
 	type SnapshotQuarantineStore,
+	type SnapshotRecoveryChunkReader,
+	type SnapshotRecoveryDeclarationLookup,
 	type SnapshotRecoveryInspection,
 	type SnapshotRecoveryLimits,
 	type SnapshotRecoveryOwnerStatus,
@@ -180,6 +182,16 @@ function selectorRange(scope: SnapshotQuarantineScopeKey): IDBKeyRange {
 	return IDBKeyRange.bound(
 		[scope.objectId, scope.epoch, scope.anchor, ""],
 		[scope.objectId, scope.epoch, scope.anchor, "\uffff"]
+	);
+}
+
+function recoverySelectorRange(scope: SnapshotQuarantineScopeKey): IDBKeyRange {
+	// Include every fourth-key class, even corrupt occupancy that is not a digest string.
+	return IDBKeyRange.bound(
+		[scope.objectId, scope.epoch, scope.anchor],
+		[scope.objectId, scope.epoch, scope.anchor + "\0"],
+		false,
+		true
 	);
 }
 
@@ -634,6 +646,34 @@ export async function createBrowserSnapshotQuarantineStore(
 			),
 		});
 	};
+	const readRecoveryMetadata = async (
+		transaction: IDBTransaction,
+		scope: SnapshotQuarantineScopeKey,
+		read?: Readonly<{ declaration: SnapshotQuarantineDeclaration; incarnation?: string }>
+	): Promise<
+		{ observation: Extract<SnapshotRecoveryDeclarationLookup, { kind: "present" }>; incarnation: string } | undefined
+	> => {
+		const scopes = transaction.objectStore("scopes");
+		let raw: unknown = await requestResult(scopes.get(scopeKey(scope)));
+		if (raw === undefined && read?.incarnation !== undefined)
+			raw = await requestResult(scopes.get(recoverySelectorRange(scope)));
+		if (raw === undefined) return undefined;
+		const row = fromScopeRow(raw);
+		if (
+			row.objectId !== scope.objectId ||
+			row.epoch !== scope.epoch ||
+			row.anchor !== scope.anchor ||
+			typeof row.manifestDigest !== "string" ||
+			!/^[0-9a-f]{64}$/u.test(row.manifestDigest) ||
+			(read?.incarnation === undefined && row.manifestDigest !== scope.manifestDigest)
+		)
+			throw failure("poisoned", "snapshot exact key disagrees with durable metadata");
+		const actualScope = { ...scope, manifestDigest: row.manifestDigest };
+		return {
+			observation: snapshotQuarantineContract.validateRecoveryManifest(actualScope, row, read),
+			incarnation: row.incarnation,
+		};
+	};
 	const lookupRecoveryDeclaration: SnapshotRecoveryStore<SnapshotVerificationReceipt>["lookupRecoveryDeclaration"] = (
 		input,
 		options = {}
@@ -649,32 +689,137 @@ export async function createBrowserSnapshotQuarantineStore(
 					async (transaction) => {
 						throwIfAborted(signal);
 						const scopes = transaction.objectStore("scopes");
-						const raw: unknown = await requestResult(scopes.get(scopeKey(scope)));
-						if (raw === undefined) {
+						const metadata = await readRecoveryMetadata(transaction, scope);
+						if (metadata === undefined) {
 							// Advance the third component, admitting every fourth-key class.
-							const range = IDBKeyRange.bound(
-								[scope.objectId, scope.epoch, scope.anchor],
-								[scope.objectId, scope.epoch, scope.anchor + "\0"],
-								false,
-								true
-							);
+							const range = recoverySelectorRange(scope);
 							if ((await requestResult(scopes.getKey(range))) !== undefined)
 								throw failure("conflict", "snapshot identity is occupied by another digest");
 							return Object.freeze({ kind: "missing" as const });
 						}
-						const row = fromScopeRow(raw);
-						if (
-							row.objectId !== scope.objectId ||
-							row.epoch !== scope.epoch ||
-							row.anchor !== scope.anchor ||
-							row.manifestDigest !== scope.manifestDigest
-						)
-							throw failure("poisoned", "snapshot exact key disagrees with durable metadata");
-						return snapshotQuarantineContract.validateRecoveryManifest(scope, row);
+						return metadata.observation;
 					},
 					{ signal }
 				)
 			);
+		});
+	const acquireRecoveryRead: SnapshotRecoveryStore<SnapshotVerificationReceipt>["acquireRecoveryRead"] = (
+		input,
+		options = {}
+	) =>
+		promiseCapture(() => {
+			const declaration = captureDeclaration(input);
+			snapshotQuarantineContract.validateRecoveryManifest(declaration);
+			const signal = options.signal;
+			throwIfAborted(signal);
+			return schedule(async () => {
+				if (closed) throw failure("closed", "snapshot quarantine store is closed");
+				throwIfAborted(signal);
+				const metadata = await transact(
+					database,
+					"readonly",
+					async (transaction) => {
+						throwIfAborted(signal);
+						const found = await readRecoveryMetadata(transaction, declaration.scope, { declaration });
+						if (found === undefined) {
+							if (
+								(await requestResult(
+									transaction.objectStore("scopes").getKey(recoverySelectorRange(declaration.scope))
+								)) !== undefined
+							)
+								throw failure("conflict", "snapshot identity is occupied by another digest");
+							throwIfAborted(signal);
+							return undefined;
+						}
+						throwIfAborted(signal);
+						return found;
+					},
+					{ signal }
+				);
+				if (metadata === undefined) return Object.freeze({ kind: "missing" as const });
+				let released = false;
+				let drain = Promise.resolve();
+				const ensureReader = (): void => {
+					if (released || closed) throw failure("closed", "snapshot recovery reader is closed");
+				};
+				const reader: SnapshotRecoveryChunkReader = Object.freeze({
+					read: (input: SnapshotChunkDescriptor, options: Readonly<{ signal?: AbortSignal }> = {}) =>
+						promiseCapture(() => {
+							const descriptor = captureDescriptor(input, declaration);
+							const readSignal = options.signal;
+							ensureReader();
+							throwIfAborted(readSignal);
+							const selected = schedule(() => {
+								ensureReader();
+								throwIfAborted(readSignal);
+								return transact(
+									database,
+									"readonly",
+									async (transaction) => {
+										throwIfAborted(readSignal);
+										const current = await readRecoveryMetadata(transaction, declaration.scope, {
+											declaration,
+											incarnation: metadata.incarnation,
+										});
+										if (current === undefined) {
+											throwIfAborted(readSignal);
+											return undefined;
+										}
+										throwIfAborted(readSignal);
+										const raw: unknown = await requestResult(
+											transaction.objectStore("chunks").get(chunkKey(declaration.scope, descriptor.index))
+										);
+										if (raw === undefined) {
+											throwIfAborted(readSignal);
+											return undefined;
+										}
+										// IDB already structured-cloned this native result. Bound it before copying or hashing.
+										if (
+											!exactRecord(raw, [
+												"anchor",
+												"byteLength",
+												"digest",
+												"epoch",
+												"exactBytes",
+												"index",
+												"manifestDigest",
+												"objectId",
+											]) ||
+											raw.objectId !== declaration.scope.objectId ||
+											raw.epoch !== declaration.scope.epoch ||
+											raw.anchor !== declaration.scope.anchor ||
+											raw.manifestDigest !== declaration.scope.manifestDigest ||
+											raw.index !== descriptor.index ||
+											raw.digest !== descriptor.digest ||
+											raw.byteLength !== descriptor.byteLength ||
+											!(raw.exactBytes instanceof Uint8Array) ||
+											raw.exactBytes.byteLength !== descriptor.byteLength
+										)
+											throw failure("poisoned", "snapshot recovery chunk row is corrupt");
+										snapshotQuarantineContract.validateRecoveryChunk(declaration, descriptor, raw.exactBytes);
+										throwIfAborted(readSignal);
+										return new Uint8Array(raw.exactBytes);
+									},
+									{ signal: readSignal }
+								);
+							});
+							drain = selected.then(
+								() => undefined,
+								() => undefined
+							);
+							return selected;
+						}),
+					release: () => {
+						released = true;
+						return drain;
+					},
+				});
+				return Object.freeze({
+					...metadata.observation,
+					state: metadata.observation.state as "open" | "verified",
+					reader,
+				});
+			});
 		});
 	const inspectRecovery: SnapshotQuarantineStore<SnapshotVerificationReceipt>["inspectRecovery"] = (
 		input,
@@ -1005,5 +1150,13 @@ export async function createBrowserSnapshotQuarantineStore(
 		});
 		return closing;
 	};
-	return Object.freeze({ close, inspectRecovery, lookupRecoveryDeclaration, recoveryStatus, openScope, sweepExpired });
+	return Object.freeze({
+		close,
+		inspectRecovery,
+		lookupRecoveryDeclaration,
+		acquireRecoveryRead,
+		recoveryStatus,
+		openScope,
+		sweepExpired,
+	});
 }

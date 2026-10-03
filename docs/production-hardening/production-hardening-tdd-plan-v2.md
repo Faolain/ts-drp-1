@@ -33,6 +33,23 @@ Codex 6.1 at xhigh. Implementation and investigation subagents use Codex 6.1 at
 high. Grok, Kimi and Opus are suspended for new rounds. Preserve historical
 records; older prospective model/effort instructions yield to this override.
 
+Current recovery pickup (2026-10-03): pending recovery and current-floor shipped
+startup are implemented and accepted, including focused main landing. The
+[snapshot reader](../../specs/bounded-storage-lifecycle/slices/02e-0-noncreating-snapshot-read.md)
+implements noncreating byte access on the existing native owners; exhaustive
+uninstrumented original-title semantics, focused timeout-cleanup review and bounded
+product/main acceptance are complete. The separately accepted
+[bounded AHE read contract](../../specs/bounded-storage-lifecycle/slices/02e-1-bounded-active-generation-read.md)
+has accepted corrected tests-only RED readiness and a frozen distinct GREEN
+candidate under independent product review. Previously masked assertions execute
+against changed product; failed aggregate/coverage gates stay qualified.
+Exact journal-anchor RED has one focused getKey observation correction before
+independent approval and immediate distinct GREEN. Full-profile
+data authentication, genuine rollback/registry
+consumption, recipient retention and later lifecycle/endurance gates remain open.
+The live lifecycle handoff and review ledger own current status; older narrative
+below remains qualified history, not instructions to reopen completed reviews.
+
 **The 100-transition diagnostic and follow-up memory attribution are preserved.
 The primary [end-to-end storage investigation](../../specs/grid-memory-production/lifecycle-audit.md)
 finds incomplete history retirement and a required-snapshot expiry availability gap.

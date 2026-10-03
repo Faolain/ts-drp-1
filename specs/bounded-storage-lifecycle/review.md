@@ -103,7 +103,41 @@ the exact [reader contract](slices/02e-0-noncreating-snapshot-read.md) under its
 Same-selector conflict and reader-local queued-close findings were corrected and
 independently checked during that same review; original framing remains preserved.
 Startup product and main landing acceptance are complete. Separate reader RED is
-active; no reader implementation or RED readiness is claimed yet.
+frozen under its [handoff](../../.logs/bounded-storage-lifecycle/snapshot-reader-red-01/handoff.md).
+Independent Codex 6.1 xhigh returned
+[APPROVED, CONTEXT_COMPLETE YES](../../.logs/bounded-storage-lifecycle/snapshot-reader-red-review-01/public.md)
+without remaining findings. Root read the complete verdict/custody and frozen
+oracles, checked source/raw/Git bindings, and accepts tests-only readiness under the
+[disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-red-root-audit-01/root-disposition.md).
+Actual native preconditions pass, but every reader result remains missing-method
+wiring RED; deeper behavior is not claimed. Original runtime generations, unavoidable
+IDB clone, retained warnings, setup failures and the ordinary coverage failure remain
+qualified. The distinct Codex 6.1 high GREEN candidate implements the existing
+shared/native owner seam. Separate xhigh
+[product review](../../.logs/bounded-storage-lifecycle/snapshot-reader-green-review-01/public.md)
+finds no confirmed source defect but requires B1: contextual WebKit cancellation
+and timeout cleanup remain unclassified despite an isolated exact-title pass.
+Root's [bounded follow-up](../../.logs/bounded-storage-lifecycle/snapshot-reader-green-review-01/root-disposition.md)
+keeps frozen oracles and budgets, localizes the failing prefix outside them and
+requires affected uninstrumented product verification before acceptance.
+The separate focused xhigh
+[diagnostic review](../../.logs/bounded-storage-lifecycle/snapshot-reader-b1-review-01/public.md)
+now localizes the reproduced stop before reader invocation, including a database-free
+navigation reproduction; it supports no reader-code fix. Root's
+[bounded disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-b1-review-01/root-disposition.md)
+allocates exhaustive uninstrumented original-title partitions and one separately
+reviewed outer timeout-cleanup proof. The complete original semantic set now passes
+under the [semantic disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-b1-review-01/semantic-root-disposition.md).
+The narrow cleanup correction and positive/actual-timeout controls now have separate
+focused xhigh approval under the [bounded product disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-timeout-cleanup-review-01/root-disposition.md).
+Exact focused main sources, build/static checks, dependency-path localization and
+actual native/three-engine integration positives are accepted under the
+[landing disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-green-integration-01/root-disposition.md).
+Historical exact deletion remains unknown; prospective cleanup does not waive
+the failed default/full contextual run.
+Native and preservation assertions, public types and default product-browser
+behavior pass; global coverage commands and full reader-browser failures remain
+failed and unwaived. No completed review or unchanged matrix is reopened.
 
 The two-closed-cut direction supports further synthesis, not usable rollback
 completion. Bounded AHE selection, older-QC authentication limits, non-settlement
@@ -123,14 +157,88 @@ The same review resolved the unchecked SQLite physical-key allocation and incomp
 IDB malformed-key-prefix census risk. Original proposal/custody bytes remain archived;
 no earlier review was reopened and no runtime was repeated for this source correction.
 
+The separately frozen RED now has a complete xhigh
+[required-changes verdict](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-review-01/public.md).
+R1 requires exact distinct blob-union output; R2 requires complete selected
+metadata equality against actual decoded native records. Root's
+[narrow correction allocation](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-review-01/root-disposition.md)
+preserves original masked runs and requires tiny counterexample controls, not
+another unchanged matrix. Separate focused xhigh
+[APPROVED / R1_CLOSED / R2_CLOSED / RED_READY YES](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-correction-review-01/public.md)
+now accepts the corrected delta. Root's
+[readiness and GREEN allocation](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-correction-review-01/root-disposition.md)
+immediately assigns the distinct Codex 6.1 high product author. Pure controls
+close the demonstrated assertion gaps; actual corrected native/browser/producer
+behavior remains the GREEN gate, not an inherited pass. The earlier review accepts
+actual producer debt as the replacement for the stale bootstrap-one premise;
+the [contract](slices/02e-1-bounded-active-generation-read.md#fixed-entitlement-and-actual-producer-debt)
+owns that corrected rationale. Fixed budgets and later availability obligations
+remain unchanged.
+
+GREEN's actual ordinary recovery trace demonstrated another narrow oracle gap:
+the certificate assertions ignored full generation-record paging because it uses
+LIMIT. A separate RED author owns the [predicate correction](../../.logs/bounded-storage-lifecycle/bounded-active-read-certificate-oracle-root-01/root-allocation.md)
+and tiny controls. The separate focused xhigh approval and
+[root disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-certificate-oracle-review-01/root-disposition.md)
+accept that correction; GREEN copied only the exact authorized postimage. Both
+opposite assertions execute and pass in native and all three browser engines.
+The product candidate is now frozen for a new independent xhigh review. Native
+behavior passes with coverage failure unwaived; browser evidence is the original
+full run plus one unchanged untraced failed-title positive, not a clean aggregate.
+Completed readiness reviews and unchanged matrices stay closed.
+
 This is fixed observer entitlement on the existing store, not producer admission,
 profile-complete historical authentication or usable rollback. Valid over-budget
 objects refuse whole without poisoning, trimming, certificates or cleanup. Native
 readonly/bounded-work evidence, separately reviewed RED, distinct GREEN and product
-acceptance remain required. Snapshot-reader RED proceeds independently; overlapping
+acceptance remain required. Snapshot-reader GREEN proceeds independently; overlapping
 GREEN/integration owners stay serialized. Full-profile closed-ACL and older-QC
 authentication, genuine room rollback/checkpoint promotion/registry roles, later
 sustained admission/maintenance and all golden paths remain mandatory.
+
+## Closed-cut authentication architecture — source-only acceptance
+
+The separate HIGH proposal and independent XHIGH
+[review](../../.logs/bounded-storage-lifecycle/rollback-data-contract-review-01/public.md)
+support the one-owner full application/closed-ACL authentication seam under the
+[root disposition](../../.logs/bounded-storage-lifecycle/rollback-data-contract-review-01/root-disposition.md).
+This is architecture acceptance only. Bounded exact journal-anchor access and
+required retirement-only non-genesis protection/legacy migration custody remain
+separate held prerequisites; opportunistic physical bytes are not protected custody.
+Older signed QC commitment is not erased-trust replay, and the snapshot's successor
+ACL cannot substitute for the closed ACL. Actual selected and journal bytes share
+the unchanged proof budget; G8 refusal is not usable rollback.
+No data RED/GREEN, room rollback, registry reconciliation or product acceptance
+is authorized by this source-only disposition.
+
+## 2e-2 exact journal-anchor contract accepted; implementation remains open
+
+The separate HIGH proposal and independent XHIGH
+[APPROVED review](../../.logs/bounded-storage-lifecycle/rollback-journal-anchor-contract-review-01/public.md)
+establish the narrow [anchor accessor contract](slices/02e-2-bounded-journal-anchor-read.md).
+Root accepts contract readiness and distinct tests-only RED under its
+[disposition](../../.logs/bounded-storage-lifecycle/rollback-journal-anchor-contract-review-01/root-disposition.md).
+Exact-PK absence, captured allowance, intrinsic pre-copy inspection, shared local
+anchor integrity and native readonly projection stay with the existing owners.
+Actual bytes share the unchanged later proof budget; IDB whole-row clone remains
+unavoidably qualified. No signature/parameter/entry copies, new scheduler,
+session/lease, schema or ordinary failure-vocabulary expansion is authorized.
+
+The direct-helper hostile-carrier control and evidence-derived emitted declaration
+pin refresh are required bounded allocation obligations, not broader qualification
+cycles. Separate RED readiness and distinct GREEN/product review still precede
+landing. The separate RED candidate is now frozen, with genuine native setup
+controls and a corrected digest-consistent exact-key scope counterexample; deeper
+accessor assertions remain absent-method masked pending reviewed GREEN.
+Its separate xhigh [required-changes readiness verdict](../../.logs/bounded-storage-lifecycle/journal-anchor-read-red-review-01/public.md)
+accepts the scope correction and identifies only the unobserved getKey range-read
+blind spot. Root's [bounded allocation](../../.logs/bounded-storage-lifecycle/journal-anchor-read-red-review-01/root-disposition.md)
+requires native-preserving observation and one tiny control, not an unchanged
+matrix rerun, before focused review and immediate distinct GREEN.
+Historical protected/legacy custody and both independent authenticated
+digest bindings remain mandatory before full-profile success; missing preimages
+cannot be fabricated. This does not accept usable rollback, room/registry roles,
+recipient retention, retirement, endurance or later golden paths.
 
 ## 2c RED readiness history
 
