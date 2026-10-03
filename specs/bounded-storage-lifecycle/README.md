@@ -2,329 +2,79 @@
 
 ## Next Agent Prompt
 
-Product scope (2026-10-02): proceed **v3-only** for the greenfield product while
-preserving every golden-path requirement. The
-[Phase 6d retirement slice](slices/06d-v3-only-finality-retirement.md) replaces
-enabled old per-vertex BLS finality retention, not current v3 signing,
-certificates or recovery evidence. Audit and disposition remaining consumers
-before removal; an existing activation route is not proof of product necessity.
-Do not invent per-operation quorum receipts. Snapshot schema versions and
-inherited durable recovery data are not obsolete merely because they are labelled
-legacy; preserve their required recovery and migration work.
-The independent xhigh [scope disposition](../../.logs/bounded-storage-lifecycle/v3-only-scope-review-01/root-disposition.md)
-accepts this plan amendment only. The separate
-[shipping ledger disposition](../../.logs/bounded-storage-lifecycle/v3-shipping-capability-review-01/root-disposition.md)
-now retains all app/CLI-RPC/SDK capabilities and accepts one prospective v3 room
-ownership direction, not exact schemas, ports or runtime equivalence. Current-v3
-ACL authorization and wire/durable-data policy remain held before executable retirement.
+Active executable pickup (2026-10-03): fresh distinct Codex 6.1 HIGH tests-only
+RED for [2e-3 actual closed-cut data observation](slices/02e-3-authenticated-closed-cut-data-observation.md).
+The [source contract acceptance](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md)
+and [released allocation](../../.logs/bounded-storage-lifecycle/rollback-data-observation-red-root-01/runtime-allocation.md)
+own its exact private seam, causal groups and unchanged budgets. The isolated
+author starts from journal landing `10dc618b`; product stays unchanged until
+fresh independent XHIGH readiness/root acceptance releases a distinct HIGH GREEN.
+Genuine supported retirement-only genesis and non-genesis signed positives are
+required. Missing private API is wiring RED, not reached deeper product evidence.
+Only the prospectively allocated SQLite metadata mode pin may evolve before GREEN;
+preserve every other frozen assertion and the intentional old mode as history.
 
-Keep the execution order: finish 2c pending recovery, separately reviewed 2d
-declaration-free shipped startup and 2e usable rollback, and recipient snapshot
-retention; then protected-dependency planning, crash-safe retirement, journal and
-current-v3 signing-evidence cleanup, and bounded recovery. Next prove one room
-through at least 100 authenticated transitions with restart/recovery/pruning,
-continued writes, exact state and operation accounting, and bounded storage and
-memory. Existing 0→1→2 controls and the older 100-transition diagnostic are
-partial evidence, not lifecycle acceptance. Preserve stronger existing endurance
-requirements and unchanged budgets. Close every remaining Phase 6 gate, including
-scoped 6d retirement, before Phase 7 archives/paging and full golden-path
-browser/device acceptance. A consumer audit may run now; it does not authorize
-retirement product edits ahead of the current recovery allocation.
+Pending recovery and current-floor shipped startup are implemented and accepted.
+The existing native owners now provide noncreating snapshot bytes, bounded active
+AHE observation and exact bounded journal anchors. Their product and focused MAIN
+landings are accepted; formerly masked assertions execute against changed product.
+The [review ledger](review.md) owns exact dispositions, raw reports and qualifications.
+Those observations do not establish all-profile durable availability or usable
+room rollback. After 2e-3, separately close genuine source/import/destination
+custody, protected roles/fences and mandatory room/lifecycle rollback consumption,
+continued safe issuance/replay and registry reconciliation. Recipient snapshot
+retention remains its own destination installation/custody seam.
 
-Current user review override (2026-10-02): new independent reviews use a separate
-Codex 6.1 at xhigh. Implementation and investigation subagents use Codex 6.1 at
-high. Grok, Kimi and Opus are suspended for new rounds. This supersedes older
-prospective rosters without changing historical verdicts or evidence.
+Prioritize product progress. Once a bounded RED correction is accepted, immediately
+release distinct GREEN within its reviewed allocation and run actual changed-product
+assertions. Additional harness work needs a demonstrated blind spot, instrumentation
+effect or unsafe cleanup. Naming, formatting or custody presentation does not reopen
+closed reviews or justify unchanged full matrices. Preserve all accepted frozen
+oracles, historical readiness/findings, unrelated dirty work and every budget.
+Only separate RED may correct a proven oracle defect. Default coverage, broader
+compiler failures and failed aggregate browser runs remain failed and unwaived;
+successful unchanged title partitions prove semantics, not a clean aggregate or
+default-harness endurance. Historical stall cause/deletion remains unknown where
+the ledger says so. Standalone native success is not a global coverage pass.
 
-Current pickup (2026-10-03): current-floor shipped startup is independently
-approved and root-accepted under the
-[product disposition](../../.logs/bounded-storage-lifecycle/startup-green-review-01/root-disposition.md).
-Its exact focused main checkpoint is accepted under the
-[landing disposition](../../.logs/bounded-storage-lifecycle/startup-green-integration-01/root-disposition.md).
-Separate Codex 6.1 high RED for the accepted non-creating snapshot reader is
-frozen and independently accepted under the
-[readiness disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-red-root-audit-01/root-disposition.md).
-The distinct Codex 6.1 high GREEN candidate received a complete separate xhigh
-[required-changes review](../../.logs/bounded-storage-lifecycle/snapshot-reader-green-review-01/public.md).
-The separate focused xhigh
-[B1 disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-b1-review-01/root-disposition.md)
-accepts a reproduced pre-reader navigation boundary, not a product correction.
-Exhaustive uninstrumented original-title partitions now pass at unchanged budgets
-under the [semantic disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-b1-review-01/semantic-root-disposition.md).
-The separately authored outer timeout-cleanup correction now has focused xhigh
-approval and [bounded product acceptance](../../.logs/bounded-storage-lifecycle/snapshot-reader-timeout-cleanup-review-01/root-disposition.md).
-Its exact focused main integration is accepted under the
-[landing disposition](../../.logs/bounded-storage-lifecycle/snapshot-reader-green-integration-01/root-disposition.md).
-It reads actual existing bytes through the same readonly owner without
-creating a scope or retention lease. Native behavior and preservation assertions,
-public types and the default product-browser baseline pass. The combined reader
-browser run remains failed on one WebKit title, despite that unchanged case
-passing separately. Navigation-only reproduces the stop without database work;
-underlying cause and historical exact deletion remain unknown. Noncreating reader
-behavior is accepted; usable rollback is not. Startup now refreshes
-actual authority for recovery/retry and authenticates pending or stable successors
-without caller declarations; its previously masked product assertions execute
-and pass. Native and default browser gates pass at unchanged budgets. Focused
-unit assertions pass, but their global coverage commands remain failed and
-unwaived. Preserve the separately accepted historical correction, unrelated work
-and closed reviews; exact runtime inheritance does not require repeating unchanged
-matrices. Pending recovery remains committed as `d267b2f4`. Cold recovery and its
-reviewed harness prerequisites remain committed as `b29369df`. The single-API
-[pending-discovery contract](slices/02c-authenticated-pending-discovery.md) is
-accepted for separate RED authoring under the
-[corrected contract disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/root-disposition.md).
-Pending RED readiness is accepted under the
-[GREEN allocation](../../.logs/bounded-storage-lifecycle/pending-native-red-review-06/root-disposition.md).
-The distinct Codex 6.1 high GREEN implementation is now accepted after separate
-Codex 6.1 xhigh approval under the
-[product disposition](../../.logs/bounded-storage-lifecycle/pending-green-review-01/root-disposition.md).
-Actual declaration-free product cases, including the formerly masked assertions,
-and the unchanged default product-browser baseline pass. Exact-byte main integration
-is accepted under the [landing disposition](../../.logs/bounded-storage-lifecycle/pending-green-integration-01/root-disposition.md)
-with affected build/static gates passing and identical runtime bundles. The focused
-checkpoint includes only reviewed sources and canonical handoffs. Preserve unrelated
-dirty work and all budgets; do not repeat unchanged matrices for bookkeeping.
-The broader historical coverage failure remains failed.
-Accepted owner-fault/I/O, divergent-fork, verifier-control and historical findings
-stay closed; diagnostics are not the evidence for product success.
+Product scope is greenfield **v3-only**, preserving every golden-path requirement.
+[Phase 6d](slices/06d-v3-only-finality-retirement.md) retires obsolete per-vertex
+BLS attestations, not current v3 operation signing, certificates, settlement,
+issuance safety or recovery/migration required by durable data. Do not add
+per-operation quorum receipts. The [accepted shipping ledger](../../.logs/bounded-storage-lifecycle/v3-shipping-capability-review-01/root-disposition.md)
+retains chat, additive canvas, grid/zone, CLI/RPC and SDK capabilities and accepts
+one prospective v3 room owner, not exact schemas/ports or runtime equivalence.
+Seeded chat and zone overwrite are not shipping replacements. Separate HIGH
+source-only current-v3 ACL and retired-wire/durable-policy investigations address
+the remaining scope holds; independent XHIGH acceptance is still required.
+They authorize no app port or retirement ahead of the recovery sequence.
 
-Historical RED readiness remains accepted under the
-[historical disposition](../../.logs/bounded-storage-lifecycle/pending-historical-red-review-02/root-disposition.md).
-Its nonexhaustive cleanup evidence remains qualified. Complete byte-identical
-cross-lane static/historical and native verification is audited under the
-[integration disposition](../../.logs/bounded-storage-lifecycle/pending-red-crosslane-root-audit-03/root-disposition.md).
-Those prior RED owner/instrumentation controls were not product acceptance;
-their downstream assertions remained envelope-masked until fresh GREEN.
-Verification without
-promotion is not durable recovery ownership. Preserve candidate-local availability
-filtering and the fully verified fork set; this seam does not remove the room's
-declaration-driven startup selector. The affected control integration is verified
-under the [bounded delta](../../.logs/bounded-storage-lifecycle/pending-red-crosslane-root-audit-04/delta.json),
-without repeating unchanged native or historical matrices. The newer GREEN
-disposition owns implementation acceptance and its fresh behavioral evidence.
+Continue in order: usable rollback and recipient retention; protected-dependency
+planning, crash-safe retirement, journal/current-v3 signing-evidence cleanup and
+bounded recovery; then one room through **at least 100 authenticated transitions**
+with restart/recovery/pruning, continued writes, exact state/operation accounting
+and bounded storage/memory. Preserve stronger thousand-epoch/64-writer obligations.
+Existing 0→1→2 controls and the older 100-transition diagnostic remain partial.
+Close every remaining Phase 6 gate, including scoped 6d, before Phase 7 archives/
+paging and full golden-path browser/device acceptance at the release SHA.
+The [full production-hardening plan](../../docs/production-hardening/production-hardening-tdd-plan-v2.md)
+remains the objective, not a smaller replacement.
 
-The [later recovery reconnaissance](review.md#later-recovery-reconnaissance-planning-only)
-records source-only startup, usable-rollback and recipient-installation
-prerequisites. The [2d shipped startup contract](slices/02d-declaration-free-shipped-startup.md)
-is independently approved and root-accepted under its
-[contract disposition](../../.logs/bounded-storage-lifecycle/startup-selection-contract-review-01/root-disposition.md).
-The frozen causal RED, bounded historical correction and separate xhigh product
-review are complete; the startup product disposition above owns acceptance.
-Do not change frozen oracles or repeat unchanged matrices for bookkeeping. Usable rollback
-is now resliced at a concrete storage prerequisite: the independently accepted
-[non-creating snapshot reader](slices/02e-0-noncreating-snapshot-read.md), under its
-[contract disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
-Reader product and focused main landing are accepted; its formerly masked assertions
-execute against changed product. The independently
-accepted [bounded active-generation read](slices/02e-1-bounded-active-generation-read.md)
-may receive tests-only RED in parallel under its
-[contract disposition](../../.logs/bounded-storage-lifecycle/rollback-bounded-read-contract-review-01/root-disposition.md).
-Its frozen tests-only RED received a complete xhigh
-[required-changes readiness review](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-review-01/public.md).
-The same RED author's complete native-record and distinct blob-union corrections
-now have separate focused xhigh approval. The
-[corrected readiness disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-red-correction-review-01/root-disposition.md)
-accepts R1/R2 closure and allocates the distinct Codex 6.1 high GREEN author.
-That candidate's separate xhigh
-[product review](../../.logs/bounded-storage-lifecycle/bounded-active-read-product-review-01/root-disposition.md)
-confirmed no product-source correction and required only unsafe outer browser
-cleanup to be corrected. The distinct HIGH correction now has focused xhigh
-approval and [bounded product acceptance](../../.logs/bounded-storage-lifecycle/bounded-active-read-cleanup-review-01/root-disposition.md).
-Exact reviewed sources and frozen oracles are integrated on MAIN; affected
-build/static gates, fresh native assertions and proportionate three-engine
-browser verification pass under the
-[landing disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-green-integration-01/root-disposition.md).
-The unchanged global coverage gate remains failed. Original browser evidence
-remains the full run plus one unchanged untraced WebKit title, not a clean aggregate.
-Historical deletion and stall cause stay unknown. Prospective cleanup closes only
-the concrete ownership defect, without rewriting that frozen default run.
-An actual ordinary-recovery trace demonstrated a separate certificate-observation
-blind spot: the old predicate ignored paged full-record scans. A narrow separate RED
-[correction disposition](../../.logs/bounded-storage-lifecycle/bounded-active-read-certificate-oracle-review-01/root-disposition.md)
-accepts the independently reviewed narrow correction. Both opposite assertions
-execute and pass; no recovery rewrite was authorized.
-Previously masked assertions must execute against changed product; controls
-alone are not product acceptance. Actual producer debt
-corrects the earlier bootstrap-one premise without raising the fixed observer limits.
-Keep one existing storage owner and shared validation law; serialize overlapping
-GREEN owners and integration. Its fixed observer policy permits whole nonpoisoning
-budget refusal without requiring earlier producer redesign. It neither promises
-unconditional inherited/custom-object availability nor waives later all-profile
-maintenance/admission. The source-only
-[closed-cut authentication architecture](../../.logs/bounded-storage-lifecycle/rollback-data-contract-review-01/root-disposition.md)
-is reviewed, not full-data execution. The separate
-[exact bounded journal-anchor contract](slices/02e-2-bounded-journal-anchor-read.md)
-is independently approved and root-accepted for distinct tests-only RED under its
-[disposition](../../.logs/bounded-storage-lifecycle/rollback-journal-anchor-contract-review-01/root-disposition.md).
-That RED candidate's digest-consistent exact-key scope correction is accepted.
-Its independently approved getKey correction immediately released distinct GREEN
-under the [readiness disposition](../../.logs/bounded-storage-lifecycle/journal-anchor-read-getkey-correction-review-01/root-disposition.md).
-The existing journal owners now implement exact bounded anchor reads. The first
-changed-product native gate exposed a concrete double-summary fixture error.
-The separate RED author's one-pass correction now has focused xhigh
-[acceptance](../../.logs/bounded-storage-lifecycle/journal-anchor-summary-oracle-review-01/root-disposition.md).
-Fresh changed-product native assertions pass. All original browser semantics
-execute successfully across the combined run and one unchanged exact-title repeat;
-the original WebKit timeout remains failed, with primary cause and historical
-deletion unknown. The separate xhigh
-[product disposition](../../.logs/bounded-storage-lifecycle/journal-anchor-product-review-01/root-disposition.md)
-finds no product/API correction and holds only demonstrated unsafe outer cleanup.
-The distinct HIGH lifetime correction now has separate focused xhigh
-[bounded product acceptance](../../.logs/bounded-storage-lifecycle/journal-anchor-timeout-cleanup-review-01/root-disposition.md).
-Exact reviewed sources and frozen oracles are integrated on MAIN; fresh native
-and proportionate three-engine browser assertions, affected build/static gates
-and real exact deletion before context close pass under the
-[landing disposition](../../.logs/bounded-storage-lifecycle/journal-anchor-green-integration-01/root-disposition.md).
-The failed historical aggregate and ordinary/compiler/coverage gates remain
-qualified, not waived. No budgets or expected assertions changed and no closed
-reviews reopened. The separate
-[historical custody source-law disposition](../../.logs/bounded-storage-lifecycle/rollback-anchor-custody-contract-review-01/root-disposition.md)
-accepts the same-journal preservation direction, not a completed source/import
-guarantee or executable full-data allocation.
-Supported retirement-only non-genesis protection/legacy custody still needs its
-separate contract; reading existing bytes does not establish that guarantee.
-The bounded all-target [data-observation contract](slices/02e-3-authenticated-closed-cut-data-observation.md)
-now has separate HIGH authorship and xhigh
-[source acceptance](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md).
-The journal prerequisite is accepted and integrated. The active pickup is fresh
-distinct tests-only RED for 2e-3, before separate readiness and GREEN. It authenticates actual
-application/closed-ACL bytes, not durable availability, migration or old seal replay.
-Then separately prove profile-complete custody and the mandatory genuine
-room/lifecycle rollback consumer and registry-role reconciliation. Observation
-alone is not usable rollback. Recipient retention remains a separate destination
-custody/installation seam; none of this authorizes retirement.
+New implementation/investigation authors are Codex 6.1 HIGH; each new independent
+reviewer is separate Codex 6.1 XHIGH. No new Kimi, Grok or Opus rounds. Preserve their
+historical verdicts and NO_VERDICT attempts honestly. Build owned dependencies
+before tests, use named strict projects, join genuine admitted native promises and
+reader releases, and keep one existing owner per decision. Verification alone does
+not install durable retention, and a source-only contract is not runtime acceptance.
 
-Status: versioned ownership (1a-0), bounded retention (1a-1), fixture content
-delivery (1b-0), and producer pre-sign retention (1b-1) are accepted, 2026-09-07. The
-[review ledger](review.md) owns qualified verdicts, root dispositions and exact
-evidence. Earlier failed or ineligible attempts remain preserved. Frozen
-contract checkpoints retain their original framing; this handoff owns live
-execution status. Remaining recipient/native integration and long-running
-boundedness remain unaccepted.
-
-The accepted seams form one dependency-complete checkpoint; the
-[commit-boundary audit](review.md#accepted-foundations-checkpoint) separates them
-from unrelated memory diagnostics and native product experiments still in the
-shared worktree. The [producer-only contract](slices/01b-1-producer-presign-retention.md)
-has separate accepted RED/GREEN authors and qualified independent reviews under
-the [joint disposition](../../.logs/bounded-storage-lifecycle/producer-presign-green-reviews-01/root-disposition.json).
-Its [handoff](../../.logs/bounded-storage-lifecycle/producer-presign-green-01/handoff.md)
-owns executed gates; the [ledger](review.md#1b-1-green-implemented-independent-acceptance-pending)
-owns evidence corrections and limits. All review processes are terminal. Retention
-now finishes before creator-close dependence, not merely before a later head swap.
-The existing snapshot owner remains the authority; ordinary adoption/recovery
-verification must not create a permanent pin.
-
-[Declaration discovery](slices/02a-declaration-discovery.md) and its
-[failure-provenance correction](slices/02a-1-failure-provenance.md) are accepted,
-2026-09-10. Separate RED/GREEN authors, bounded corrective reviews and integrated
-parent Grok/Kimi/Opus xhigh reviews are complete. The
-[joint disposition](../../.logs/bounded-storage-lifecycle/declaration-discovery-integrated-green-reviews-01/root-disposition.md)
-and [closure](../../.logs/bounded-storage-lifecycle/declaration-discovery-integrated-green-reviews-01/green-closure.json)
-own exact acceptance, Codex's second opinion and advisory decisions. All review
-processes are terminal. Do not repeat completed reviews or relabel historical
-required changes and NO_VERDICT attempts as earlier approvals.
-
-This capability observes metadata on the existing owner; it neither authenticates
-activation authority nor proves byte availability or installs retention. Preserve
-its same-owner lifecycle, exact-key precedence and bounded non-mutating reads.
-The linked corrective dispositions keep source proof of primitive-piece
-nonretention, empty-input ordering, exact class ownership and whole-decoder
-normalization binding. Runtime traces alone do not prove nonretention.
-
-Default WebKit navigation remains unpassed; authorized exact-title partitions
-establish the complete original semantic set, not default-harness endurance.
-Consumer failures and measured Node-only costs remain qualified in the joint
-disposition. Build-before-test and the distinction between archival RED drivers
-and current GREEN custody remain explicit; frozen historical graph gates cannot
-certify rebuilt product hashes. The preservation inventory is not a staging list
-for unrelated dirty browser/grid experiments.
-
-The corrected separately authored RED for the accepted
-[cold-only 2b contract](slices/02b-authenticated-cold-discovery.md) is accepted,
-2026-09-10. The [joint RED disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-red-reviews-02/root-disposition.md)
-owns qualified Grok/Opus approvals, Kimi's complete approval accepted by explicit
-user direction despite its CLI crash, exact custody and all advisory decisions.
-No Kimi retry was launched. Earlier incomplete verdicts remain historical.
-The identity-preserving observer correction, separate obsolete-roster removal
-and byte-identical standalone-driver relocation are now frozen. Preserve their
-oracles; native port reads precede legacy refusal. This is the historical RED
-checkpoint, not acceptance of subsequently implemented GREEN.
-
-The distinct GREEN author has implemented the exact four-file allocation. Its
-proven corruption-oracle conflict now has an accepted separately authored
-[authentication-oracle correction](../../.logs/bounded-storage-lifecycle/cold-discovery-auth-red-reviews-01/root-disposition.md),
-with qualified Grok and Opus high approvals. The
-[current checkpoint](review.md#2b-green-accepted-commit-boundary-audit-next)
-now accepts cold-only GREEN and closes B1 after qualified Grok and actual
-`claude-phel` Opus HIGH integrated reviews. The
-[joint disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/root-disposition.md)
-owns all advisories and evidence limits. The user
-[authorized the required harness prerequisites](../../.logs/bounded-storage-lifecycle/cold-discovery-green-reviews-03/harness-prerequisite-authority.md)
-after the commit-boundary audit. The isolated candidate is now accepted under the
-[harness disposition](../../.logs/bounded-storage-lifecycle/harness-prerequisite-reviews-01/root-disposition.md)
-after qualified Grok and `claude-phel` Opus HIGH approvals, fresh product51,
-native224 and room8 passes, and focused compile/lint/format checks. Three helper
-JSDoc warnings and the helper's source-only runtime qualification remain explicit.
-The exact 58-file source/test delta excludes unrelated memory/grid diagnostics;
-it and four cold handoffs landed in `b29369df`. The separate pending-recovery
-contract and reviewed GREEN are accepted; follow the current pickup above. Do not repeat
-completed reviews. The earlier compacted Grok attempt remains NO_VERDICT, and
-broader timeout, coverage and compiler failures remain failed. Preserve the
-closure-integrity barrier and accepted frozen oracles. The third contract round's
-[disposition](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-03/root-disposition.md)
-and [closure](../../.logs/bounded-storage-lifecycle/cold-discovery-contract-reviews-03/closure.json)
-own contract acceptance; the newer joint RED disposition authorizes GREEN.
-All review processes are terminal. Follow the explicit
-source-only runner qualification, exact
-[source allocation](../../.logs/bounded-storage-lifecycle/cold-discovery-plan-02/audit.md)
-and preserved native evidence requirements. GREEN must not change frozen tests.
-Its fixture evolution and fresh-process/page evidence must be explicit; the
-existing in-memory "cold" helper is not restart proof. Derive initial object
-selection from captured trusted expected room identity, authenticate the durable
-chain and compare the expected successor before discovery, then derive the
-predecessor snapshot key from the authenticated cut. Keep declaration-taking live
-producer verification narrow. Review public input evolution, failure mapping,
-missing/replaced-byte refusal and historical fixture evolution explicitly; no
-optional discovery method, decorating owner or caller-declaration fallback.
-Pending recovery, shipped startup and usable rollback remain separate seams.
-Neither metadata discovery nor removing a caller parameter establishes bounded
-historical recovery. No later recovery, retirement or production boundedness is
-accepted.
-
-The [review ledger](review.md#2a-declaration-discovery-contract-review) owns prior
-attempts, findings, source-custody qualifications and the user's completed one-off
-Fable trajectory review. Do not repeat those completed reviews or reclassify old
-NO_VERDICT results. Preserve authenticated cold/pending recovery, shipped startup,
-usable rollback and all later slice-2 obligations; metadata discovery is not those
-outcomes.
-
-Keep recipient pinning, pending/rollback dependency protection, reclamation,
-legacy classification and declaration-free recovery separately reviewed. The
-[parent retention obligation](slices/01-recovery-snapshot-retention.md) and
-[native integration RED](evidence.md) remain open. Producer pinning alone cannot
-establish full slice-1 or endurance acceptance.
-
-Preserve all accepted frozen oracles, including the corrective content-delivery
-cases. Only a separate RED author may correct a proven oracle gap, retaining
-old reports and creating new custody; GREEN must not edit those tests. The
-content selector now counts every row in the exact object/epoch prefix, excludes
-neighboring epochs, and returns decoder-owned identity. Native destination
-verification and the delivery-before-floor boundary remain intact.
-
-Use the durable named strict projects. Broader package compiler diagnostics are
-unchanged failures, not green claims; the ledger distinguishes current fixture
-gates from historical native runs. Preserve the earlier grid64 timeout and all
-unchanged workload/memory thresholds. Obtain independent Codex 6.1 xhigh
-contract/RED/GREEN reviews at meaningful checkpoints with terminal evidence
-and explicit dispositions.
-
-The user authorizes production-sensible implementation for thousands of epochs;
-MMORPG, Discord, and short FPS/chess sessions remain the north star. Continue the
-[full production-hardening plan](../../docs/production-hardening/production-hardening-tdd-plan-v2.md),
-not a smaller replacement objective. Do not introduce arbitrary historical
-deletion, weaken rollback or expand budgets. Update this handoff before ending
-your pass.
+Accepted foundations and chronological reviews are archived in the
+[ledger](review.md), [slice contracts](slices/) and their linked root dispositions.
+The current handoff owns live status; frozen checkpoints keep their original
+framing. The [native integration evidence](evidence.md) and
+[parent recipient obligation](slices/01-recovery-snapshot-retention.md) remain open.
+The [native lifecycle investigation](../grid-memory-production/lifecycle-audit.md)
+and all diagnostic artifacts remain historical; production boundedness is unaccepted.
+Continue directly after each focused reviewed commit while any TODO remains.
 
 - [x] Versioned owner and stale-client fence (slice 1a-0).
 - [x] Bounded atomic retention (slice 1a-1).
