@@ -102,14 +102,35 @@ the exact [reader contract](slices/02e-0-noncreating-snapshot-read.md) under its
 [disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
 Same-selector conflict and reader-local queued-close findings were corrected and
 independently checked during that same review; original framing remains preserved.
-Startup product acceptance is complete. Begin separate reader RED after its focused
-main landing; no reader implementation or RED readiness is claimed yet.
+Startup product and main landing acceptance are complete. Separate reader RED is
+active; no reader implementation or RED readiness is claimed yet.
 
 The two-closed-cut direction supports further synthesis, not usable rollback
 completion. Bounded AHE selection, older-QC authentication limits, non-settlement
 historical ACL proof, legacy migration, and genuine room/registry rollback
 consumption remain mandatory. Byte access grants no retention lease or authority
 to lower host, issuance, signing or retirement safety floors.
+
+## 2e-1 bounded native read contract accepted; product remains open
+
+Separate Codex 6.1 high source synthesis and independent Codex 6.1 xhigh
+[APPROVED / CONTEXT_COMPLETE YES](../../.logs/bounded-storage-lifecycle/rollback-bounded-read-contract-review-01/public.md)
+establish the [bounded AHE reader contract](slices/02e-1-bounded-active-generation-read.md).
+Root accepts contract readiness and separate tests-only RED under its
+[disposition](../../.logs/bounded-storage-lifecycle/rollback-bounded-read-contract-review-01/root-disposition.md),
+after full proposal/correction/verdict/custody reads and direct source/archive bindings.
+The same review resolved the unchecked SQLite physical-key allocation and incomplete
+IDB malformed-key-prefix census risk. Original proposal/custody bytes remain archived;
+no earlier review was reopened and no runtime was repeated for this source correction.
+
+This is fixed observer entitlement on the existing store, not producer admission,
+profile-complete historical authentication or usable rollback. Valid over-budget
+objects refuse whole without poisoning, trimming, certificates or cleanup. Native
+readonly/bounded-work evidence, separately reviewed RED, distinct GREEN and product
+acceptance remain required. Snapshot-reader RED proceeds independently; overlapping
+GREEN/integration owners stay serialized. Full-profile closed-ACL and older-QC
+authentication, genuine room rollback/checkpoint promotion/registry roles, later
+sustained admission/maintenance and all golden paths remain mandatory.
 
 ## 2c RED readiness history
 

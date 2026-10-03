@@ -38,7 +38,7 @@ approved and root-accepted under the
 [product disposition](../../.logs/bounded-storage-lifecycle/startup-green-review-01/root-disposition.md).
 Its exact focused main checkpoint is accepted under the
 [landing disposition](../../.logs/bounded-storage-lifecycle/startup-green-integration-01/root-disposition.md).
-Immediately begin separate Codex 6.1 high RED for the accepted non-creating
+Separate Codex 6.1 high RED is active for the accepted non-creating
 snapshot reader. Startup now refreshes
 actual authority for recovery/retry and authenticates pending or stable successors
 without caller declarations; its previously masked product assertions execute
@@ -92,8 +92,16 @@ Do not change frozen oracles or repeat unchanged matrices for bookkeeping. Usabl
 is now resliced at a concrete storage prerequisite: the independently accepted
 [non-creating snapshot reader](slices/02e-0-noncreating-snapshot-read.md), under its
 [contract disposition](../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
-Reader RED is the current executable pickup after the focused startup checkpoint; product implementation still
-requires separate RED readiness and a distinct GREEN author. Then separately prove
+Reader RED is the primary executable pickup; product implementation still
+requires separate RED readiness and a distinct GREEN author. The independently
+accepted [bounded active-generation read](slices/02e-1-bounded-active-generation-read.md)
+may receive tests-only RED in parallel under its
+[contract disposition](../../.logs/bounded-storage-lifecycle/rollback-bounded-read-contract-review-01/root-disposition.md).
+Keep one existing storage owner and shared validation law; serialize overlapping
+GREEN owners and integration. Its fixed observer policy permits whole nonpoisoning
+budget refusal without requiring earlier producer redesign. It neither promises
+unconditional inherited/custom-object availability nor waives later all-profile
+maintenance/admission. Then separately prove
 bounded, profile-complete authenticated closed-cut data and the mandatory genuine
 room/lifecycle rollback consumer and registry-role reconciliation. Observation
 alone is not usable rollback. Recipient retention remains a separate destination
@@ -239,7 +247,7 @@ your pass.
 - [x] Authenticated declaration-free cold recovery (slice 2b).
 - [x] Authenticated declaration-free pending recovery (slice 2c).
 - [x] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); product and focused main landing accepted.
-- [ ] Usable rollback: [reader prerequisite](slices/02e-0-noncreating-snapshot-read.md), bounded authenticated data, then mandatory room/lifecycle consumption and role reconciliation.
+- [ ] Usable rollback: [snapshot reader](slices/02e-0-noncreating-snapshot-read.md), [bounded AHE reader](slices/02e-1-bounded-active-generation-read.md), full-profile authenticated data, then mandatory room/lifecycle consumption and role reconciliation.
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
 - [ ] Protected-dependency planner and durable retirement protocol (slices 3–4).
