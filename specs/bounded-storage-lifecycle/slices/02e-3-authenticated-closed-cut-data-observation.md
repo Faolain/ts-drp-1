@@ -2,8 +2,11 @@
 
 Status: independently reviewed source contract accepted, 2026-10-03, under the
 [root disposition](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md).
-Separate tests-only RED, distinct GREEN and independent product acceptance remain
-required after journal product acceptance/integration. The
+Tests-only RED and its bounded corrections have separate focused readiness
+[acceptance](../../../.logs/bounded-storage-lifecycle/rollback-data-bounded-delta-review-01/root-disposition.md).
+Distinct GREEN is active; changed-product verification, independent product review
+and root integration remain required. Historical native-pressure demand remains
+held, not completed by synthetic production-owner composition. The
 [live handoff](../README.md#next-agent-prompt) owns execution status. This is
 all-target byte authentication, not durable availability or usable room rollback.
 
@@ -25,7 +28,7 @@ alternate storage owner. Its required names are
 `resolveCreatorClosedRollbackDataObservation`. The
 [accepted proposal](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-plan-01/proposal.md#exact-private-seam-and-host-boundary)
 owns their exact prospective interfaces, closed failure union and readonly host
-port. Preserve that contract; these are not implemented exports yet.
+port. Preserve that contract; these are not accepted product exports yet.
 
 Input captures exact object/pin/pinned-genesis trust bytes, admitted catalog/AHE/
 snapshot/journal owner identities, the existing trusted host-floor reader and

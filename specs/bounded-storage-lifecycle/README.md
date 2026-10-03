@@ -2,17 +2,19 @@
 
 ## Next Agent Prompt
 
-Active executable pickup (2026-10-03): fresh distinct Codex 6.1 HIGH tests-only
-RED for [2e-3 actual closed-cut data observation](slices/02e-3-authenticated-closed-cut-data-observation.md).
+Active executable pickup (2026-10-03): distinct Codex 6.1 HIGH GREEN implements
+[2e-3 actual closed-cut data observation](slices/02e-3-authenticated-closed-cut-data-observation.md).
 The [source contract acceptance](../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md)
-and [released allocation](../../.logs/bounded-storage-lifecycle/rollback-data-observation-red-root-01/runtime-allocation.md)
-own its exact private seam, causal groups and unchanged budgets. The isolated
-author starts from journal landing `10dc618b`; product stays unchanged until
-fresh independent XHIGH readiness/root acceptance releases a distinct HIGH GREEN.
-Genuine supported retirement-only genesis and non-genesis signed positives are
-required. Missing private API is wiring RED, not reached deeper product evidence.
-Only the prospectively allocated SQLite metadata mode pin may evolve before GREEN;
-preserve every other frozen assertion and the intentional old mode as history.
+and [bounded RED readiness acceptance](../../.logs/bounded-storage-lifecycle/rollback-data-bounded-delta-review-01/root-disposition.md)
+own its exact private seam, frozen causal controls and unchanged budgets. The
+isolated author starts from journal landing `10dc618b`, imports the original RED,
+corrected shared assertions and reviewed SAME_U complement, and changes only the
+allocated product owners. Previously masked assertions must actually execute and
+pass against changed product, including genuine supported retirement-only genesis
+and non-genesis positives. Separate XHIGH product review and root integration remain
+required. Synthetic accounting composition is not native published pressure; that
+original demand stays held. Preserve the historical original readiness verdict,
+intentional metadata mode and all other frozen evidence.
 
 Pending recovery and current-floor shipped startup are implemented and accepted.
 The existing native owners now provide noncreating snapshot bytes, bounded active

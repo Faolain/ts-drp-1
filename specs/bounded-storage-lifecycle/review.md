@@ -41,7 +41,7 @@ must preserve shipped capability before old live-family refusal. Current-v3
 durable predecessors and original historical source/debt remain protected;
 whole-array rehydration and cursor-memory bounds are not bounded import proof.
 Full-profile custody, planning/fences, genuine consumers and all release gates
-remain open. Active 2e-3 RED and every closed review, budget and failed-gate
+remain open. Active 2e-3 execution and every closed review, budget and failed-gate
 qualification remain unchanged.
 
 ## 2c GREEN and main integration accepted
@@ -285,8 +285,18 @@ is not same-origin rollback detection, cross-store atomicity or durable availabi
 Only the two allocated SQLite metadata calls gain prospective explicit readonly
 mode; separate RED owns their exact old-mode pin evolution and native proof before
 GREEN. The intentional old BEGIN IMMEDIATE semantics remain accepted history.
-Journal product acceptance/main integration is complete; fresh tests-only RED is
-the active pickup before separate readiness and distinct GREEN/product review. No full-data runtime, protected
+Journal product acceptance/main integration is complete. The original RED and its
+historical NO readiness are frozen. Separate bounded corrections close genesis
+snapshot/journal-read and exact snapshot-cause assertion holes; the reviewed SAME_U
+complement exercises one production accounting owner with explicit synthetic
+precharge. Fresh focused XHIGH returns all readiness keys YES without a new required
+correction, accepted under the
+[bounded disposition](../../.logs/bounded-storage-lifecycle/rollback-data-bounded-delta-review-01/root-disposition.md).
+The original native-pressure demand remains held, not waived or completed. Tiny
+outer-input diagnostics remain evidence-only; they do not establish product success.
+Distinct HIGH GREEN is active within the existing allocation and must run every
+previously masked assertion against changed product before separate product review.
+No full-data runtime, protected
 custody, migration, usable room rollback or golden-path acceptance is claimed.
 
 ## 2e-2 exact journal-anchor — product and MAIN landing accepted
