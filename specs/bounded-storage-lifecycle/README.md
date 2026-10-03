@@ -2,6 +2,32 @@
 
 ## Next Agent Prompt
 
+Product scope (2026-10-02): proceed **v3-only** for the greenfield product while
+preserving every golden-path requirement. The
+[Phase 6d retirement slice](slices/06d-v3-only-finality-retirement.md) replaces
+enabled old per-vertex BLS finality retention, not current v3 signing,
+certificates or recovery evidence. Audit and disposition remaining consumers
+before removal; an existing activation route is not proof of product necessity.
+Do not invent per-operation quorum receipts. Snapshot schema versions and
+inherited durable recovery data are not obsolete merely because they are labelled
+legacy; preserve their required recovery and migration work.
+The independent xhigh [scope disposition](../../.logs/bounded-storage-lifecycle/v3-only-scope-review-01/root-disposition.md)
+accepts this plan amendment only. Shipping/capability, current-v3 ACL authorization,
+and wire/durable-data policy remain held before an executable retirement allocation.
+
+Keep the execution order: finish 2c pending recovery, separately reviewed 2d
+declaration-free shipped startup and 2e usable rollback, and recipient snapshot
+retention; then protected-dependency planning, crash-safe retirement, journal and
+current-v3 signing-evidence cleanup, and bounded recovery. Next prove one room
+through at least 100 authenticated transitions with restart/recovery/pruning,
+continued writes, exact state and operation accounting, and bounded storage and
+memory. Existing 0→1→2 controls and the older 100-transition diagnostic are
+partial evidence, not lifecycle acceptance. Preserve stronger existing endurance
+requirements and unchanged budgets. Close every remaining Phase 6 gate, including
+scoped 6d retirement, before Phase 7 archives/paging and full golden-path
+browser/device acceptance. A consumer audit may run now; it does not authorize
+retirement product edits ahead of the current recovery allocation.
+
 Current user review override (2026-10-02): new independent reviews use a separate
 Codex 6.1 at xhigh. Implementation and investigation subagents use Codex 6.1 at
 high. Grok, Kimi and Opus are suspended for new rounds. This supersedes older
@@ -12,14 +38,20 @@ are committed as `b29369df`. The single-API
 [pending-discovery contract](slices/02c-authenticated-pending-discovery.md) is
 accepted for separate RED authoring under the
 [corrected contract disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/root-disposition.md).
-Implement the isolated native and historical tests-only RED allocations, then
-independently review their integrated evidence before assigning distinct GREEN.
+Resume the isolated native tests-only RED allocation from its preserved fixture
+precondition corrections. The historical caller-acquisition cleanup correction
+is accepted for historical RED readiness after root raw-evidence audit and fresh
+independent xhigh approval under the
+[historical disposition](../../.logs/bounded-storage-lifecycle/pending-historical-red-review-02/root-disposition.md).
+Its nonexhaustive cleanup evidence remains qualified. Finish the native freeze
+and independent review, then audit the lanes' cross-lane integration
+before assigning distinct GREEN. Do not change product code to repair RED tests.
 It explicitly preserves candidate-local
 availability filtering and the fully verified fork set; it does not remove the
 room's declaration-driven startup selector. Independent Codex 6.1 xhigh approved
 the amended owner-lifetime, unmasked-probe and historical-cleanup obligations;
-root audited complete custody and managed completion. No pending RED or
-implementation is accepted yet, and GREEN remains held.
+root audited complete custody and managed completion. Overall pending RED and
+implementation remain unaccepted; GREEN remains held.
 
 Status: versioned ownership (1a-0), bounded retention (1a-1), fixture content
 delivery (1b-0), and producer pre-sign retention (1b-1) are accepted, 2026-09-07. The
@@ -166,6 +198,7 @@ your pass.
 - [ ] Journal and signing retirement with stale-writer fences (slices 5–6).
 - [ ] Unified cleanup, admission budgets, bounded recovery work (slices 7–8).
 - [ ] Shipped product profile and fixed-state endurance (slices 9–10).
+- [ ] Scoped old per-vertex finality retirement and shipped activation refusal ([Phase 6d](slices/06d-v3-only-finality-retirement.md)); current-v3 evidence remains protected.
 - [ ] Short-session identity retirement and Discord archive path (slices 11–12).
 - [ ] Full golden-path and release-device acceptance (slice 13).
 
@@ -291,21 +324,21 @@ state. Admission stops if maintenance cannot drain that bounded backlog.
 
 ## Slice graph
 
-| Slice | One question / seam                                                                                            | Depends on                                              | Decisive artifact                                                                                                            |
-| ----- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 1     | Can verified recovery ownership survive transfer expiry? Snapshot lifecycle contract and adoption ordering     | Existing successor fixture; legacy completion after 2–4 | [Native cold-reopen RED/GREEN](slices/01-recovery-snapshot-retention.md), then adapter ownership controls                    |
-| 2     | Can a fresh caller discover the exact snapshot declaration from authenticated recovery identity?               | 1a-1 owner seam                                         | No test-held declaration; current, pending and rollback reopen controls                                                      |
-| 3     | Can the existing cleanup planner derive a complete bounded protected dependency set?                           | 1a-1, 2                                                 | Deterministic current/rollback/pending/shared-dependency oracle, stale-head and missing-byte refusals; no deletion           |
-| 4     | Can one revision/incarnation-bound retirement intent survive every cross-store interruption?                   | 3                                                       | Prepare/commit/drain crash-state contract and transactional stale-writer fences, initially without bulk deletion             |
-| 5     | Can obsolete journal scopes retire without losing replay/issuance dependencies? Journal maintenance capability | 4                                                       | Browser/Node exact census, replay equivalence, stale install/append/read-token controls                                      |
-| 6     | Can detailed signing/evidence history retire without erasing safety memory? Durable signing transaction floor  | 4                                                       | Delayed sign/restore/round-change/dispatch/ack and restart controls after physical deletion                                  |
-| 7     | Can all owners consume one retirement decision? Existing AHE/issuance and snapshot release integration         | 5–6                                                     | Genuine same-room transitions, current plus both rollback recovery, bounded crash-replay progress                            |
-| 8     | Can stalled work remain within admitted budgets? Reservations, bounded scans and maintenance scheduling        | 7                                                       | Quota, suspension, stalled settlement/rounds, transfer churn and bounded recovery working-set controls                       |
-| 9     | Does the shipped invite/open path select supported bounded behavior? Profile compatibility seam                | 8                                                       | Real grid create/join/issue/seal/adopt/reopen without fixture-only profile override; legacy semantics preserved              |
-| 10    | Does fixed-state storage saturate under genuine long-running work?                                             | 9                                                       | Reviewed thousand-epoch freeze and unchanged 64-writer acceptance with exact contribution/state accounting                   |
-| 11    | Can terminal sessions release local state without an unbounded tombstone catalog? Session/custody contract     | 4, 8–9                                                  | Repeated distinct FPS/chess sessions plus delayed old requests and restart negatives                                         |
-| 12    | Can growing chat history leave the hot working set? Genuine archive producer and verified paging               | 7–9; Phase 7 prerequisites                              | Reslice archive-root evolution, segment availability, bounded index/cache, and million-message cold-join evidence separately |
-| 13    | Do all supported product and device claims have exact-release evidence?                                        | 10–12                                                   | Requirement-by-requirement acceptance, real Safari/macOS, iOS Safari and Android Chrome; final review ledger                 |
+| Slice | One question / seam                                                                                            | Depends on                                              | Decisive artifact                                                                                                                                                                  |
+| ----- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | Can verified recovery ownership survive transfer expiry? Snapshot lifecycle contract and adoption ordering     | Existing successor fixture; legacy completion after 2–4 | [Native cold-reopen RED/GREEN](slices/01-recovery-snapshot-retention.md), then adapter ownership controls                                                                          |
+| 2     | Can a fresh caller discover the exact snapshot declaration from authenticated recovery identity?               | 1a-1 owner seam                                         | No test-held declaration; current, pending and rollback reopen controls                                                                                                            |
+| 3     | Can the existing cleanup planner derive a complete bounded protected dependency set?                           | 1a-1, 2                                                 | Deterministic current/rollback/pending/shared-dependency oracle, stale-head and missing-byte refusals; no deletion                                                                 |
+| 4     | Can one revision/incarnation-bound retirement intent survive every cross-store interruption?                   | 3                                                       | Prepare/commit/drain crash-state contract and transactional stale-writer fences, initially without bulk deletion                                                                   |
+| 5     | Can obsolete journal scopes retire without losing replay/issuance dependencies? Journal maintenance capability | 4                                                       | Browser/Node exact census, replay equivalence, stale install/append/read-token controls                                                                                            |
+| 6     | Can detailed signing/evidence history retire without erasing safety memory? Durable signing transaction floor  | 4                                                       | Delayed sign/restore/round-change/dispatch/ack and restart controls after physical deletion                                                                                        |
+| 7     | Can all owners consume one retirement decision? Existing AHE/issuance and snapshot release integration         | 5–6                                                     | Genuine same-room transitions, current plus both rollback recovery, bounded crash-replay progress                                                                                  |
+| 8     | Can stalled work remain within admitted budgets? Reservations, bounded scans and maintenance scheduling        | 7                                                       | Quota, suspension, stalled settlement/rounds, transfer churn and bounded recovery working-set controls                                                                             |
+| 9     | Does the shipped invite/open path select supported bounded v3 behavior? Product profile seam                   | 8                                                       | Real grid create/join/issue/seal/adopt/reopen without fixture-only profile override; no activation of retired per-vertex finality                                                  |
+| 10    | Does fixed-state storage saturate under genuine long-running same-room work?                                   | 9                                                       | At least 100 authenticated transitions with restart/recovery/pruning and continued writes; reviewed thousand-epoch freeze and unchanged 64-writer acceptance with exact accounting |
+| 11    | Can terminal sessions release local state without an unbounded tombstone catalog? Session/custody contract     | 4, 8–9                                                  | Repeated distinct FPS/chess sessions plus delayed old requests and restart negatives                                                                                               |
+| 12    | Can growing chat history leave the hot working set? Genuine archive producer and verified paging               | 7–9; Phase 7 prerequisites                              | Reslice archive-root evolution, segment availability, bounded index/cache, and million-message cold-join evidence separately                                                       |
+| 13    | Do all supported product and device claims have exact-release evidence?                                        | 10–12 and all Phase 6 gates, including 6d               | Requirement-by-requirement acceptance, real Safari/macOS, iOS Safari and Android Chrome; final review ledger                                                                       |
 
 ## Research and alternatives
 
@@ -317,7 +350,7 @@ See [Raft, section 7](https://raft.github.io/raft.pdf).
 
 Remaining fog is intentionally named: safe signing-round compaction versus
 finite-round admission; snapshot promotion versus AHE payload ownership;
-legacy-profile transition versus explicit bounded-mode support; session
+shipped v3-only profile enforcement versus current durable-data migration; session
 namespace retirement without infinite tombstones; and archive-root evolution
 under the existing close contract. Resolve each through a focused reviewed
 contract, not by silently weakening availability, signing safety or history.

@@ -5,7 +5,26 @@ versioned-owner findings are dispositioned in the executable slice. Freeze the
 amended independent RED before assigning its distinct GREEN author; review the
 resulting implementation and these fixes together before accepting the seam.
 
-## 2c pending contract accepted; separate RED next
+## V3-only scope amendment accepted; retirement execution held
+
+The user replaces enabled legacy-finality retention with
+[scoped Phase 6d retirement](slices/06d-v3-only-finality-retirement.md), preserving
+all golden paths, current-v3 signing/certificates/recovery, and migration required
+by current durable data. The [live handoff](README.md#next-agent-prompt) owns
+sequencing; 2c remains the next executable seam and GREEN remains held.
+The separate Codex 6.1 high
+[consumer audit](../../.logs/bounded-storage-lifecycle/v3-only-scope-plan-01/finality-consumer-audit.md)
+is source-only evidence, not removal or shipped activation acceptance.
+Independent Codex 6.1 xhigh returned APPROVED with complete scoped context and
+matching custody. Root read the complete verdict/custody and independently
+checked the inputs, projections and source hashes under the
+[scope disposition](../../.logs/bounded-storage-lifecycle/v3-only-scope-review-01/root-disposition.md).
+Shipping/capability, current-v3 ACL authorization, and wire/durable-data policy
+remain execution holds before retirement RED; no removal allocation or product
+acceptance is granted. Existing history, verdicts and failed gates remain
+unchanged, including the whole historical plan formatter's heap-limit failure.
+
+## 2c historical RED ready; native and combined RED acceptance held
 
 Cold checkpoint `b29369df` remains accepted. The independent Codex 6.1 xhigh
 [baseline review](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-01/public.md)
@@ -19,8 +38,24 @@ returned APPROVED, CONTRACT_READY YES and CONTEXT_COMPLETE YES, without findings
 Root read the complete verdict, audited all packet inputs/excerpts and managed
 completion, and accepted only contract readiness under the
 [new disposition](../../.logs/bounded-storage-lifecycle/pending-discovery-contract-codex-reviews-02/root-disposition.md).
-Native and historical tests-only RED lanes may now proceed independently.
-No pending test or implementation acceptance is claimed; GREEN remains held.
+Native and historical tests-only RED lanes proceed independently. The frozen
+historical lane's independent Codex 6.1 xhigh
+[review](../../.logs/bounded-storage-lifecycle/pending-historical-red-review-01/public.md)
+returned CHANGES_REQUIRED with complete context and matching custody. Root
+confirmed that later fixture construction can strand an earlier successfully
+returned owned snapshot because acquisition precedes the caller cleanup block.
+The [disposition](../../.logs/bounded-storage-lifecycle/pending-historical-red-review-01/root-disposition.md)
+assigned correction and actual multi-fixture failure controls to the same separate
+RED author. Root then audited the complete corrective sources/diffs and raw
+evidence, and fresh independent Codex 6.1 xhigh returned APPROVED,
+HISTORICAL_RED_READY YES and CONTEXT_COMPLETE YES. The
+[corrective disposition](../../.logs/bounded-storage-lifecycle/pending-historical-red-review-02/root-disposition.md)
+accepts historical readiness only and closes H1; H2 nonexhaustive helper-branch
+execution remains qualified. The excluded pre-return frozen-fixture resource
+limitation is not this defect. Preserve the original freeze and failed results.
+The native lane still needs independent review, followed by root cross-lane
+integration before overall RED acceptance. Historical approval is not native,
+combined RED or implementation acceptance; GREEN remains held.
 
 ## 2b GREEN accepted; commit-boundary audit next
 
