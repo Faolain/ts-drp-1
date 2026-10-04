@@ -4,6 +4,198 @@
 	"title": "TS-DRP protocol v3 registry v1 kind schemas",
 	"description": "Review-order schemas for every registered protocol-v3 kind; canonical object encoding orders keys by encoded key bytes.",
 	"$defs": {
+		"promotionDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+		"promotionEpoch": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+		"promotionRef": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["digest", "byteLength"],
+			"properties": {
+				"digest": { "$ref": "#/$defs/promotionDigest" },
+				"byteLength": { "type": "integer", "minimum": 1, "maximum": 65536 }
+			}
+		},
+		"promotionManifestRef": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["digest", "byteLength"],
+			"properties": {
+				"digest": { "$ref": "#/$defs/promotionDigest" },
+				"byteLength": { "type": "integer", "minimum": 1, "maximum": 212387 }
+			}
+		},
+		"promotionRetirementRef": {
+			"type": "array",
+			"minItems": 2,
+			"maxItems": 2,
+			"prefixItems": [{ "const": "drp-creator-issuance-retirement-state" }, { "$ref": "#/$defs/promotionRef" }],
+			"items": false
+		},
+		"promotionAggregateRef": {
+			"type": "array",
+			"minItems": 2,
+			"maxItems": 2,
+			"prefixItems": [{ "const": "drp-creator-author-issuance-frontiers-state" }, { "$ref": "#/$defs/promotionRef" }],
+			"items": false
+		},
+		"promotionSettlementRef": {
+			"type": "array",
+			"minItems": 2,
+			"maxItems": 2,
+			"prefixItems": [{ "const": "drp-creator-author-settlement-state" }, { "$ref": "#/$defs/promotionRef" }],
+			"items": false
+		},
+		"promotionRetirementControls": {
+			"type": "array",
+			"minItems": 1,
+			"maxItems": 1,
+			"prefixItems": [{ "$ref": "#/$defs/promotionRetirementRef" }],
+			"items": false
+		},
+		"promotionAggregateControls": {
+			"type": "array",
+			"minItems": 2,
+			"maxItems": 2,
+			"prefixItems": [{ "$ref": "#/$defs/promotionRetirementRef" }, { "$ref": "#/$defs/promotionAggregateRef" }],
+			"items": false
+		},
+		"promotionSettlementControls": {
+			"type": "array",
+			"minItems": 1,
+			"maxItems": 1,
+			"prefixItems": [{ "$ref": "#/$defs/promotionSettlementRef" }],
+			"items": false
+		},
+		"promotionControls": {
+			"oneOf": [
+				{ "$ref": "#/$defs/promotionRetirementControls" },
+				{ "$ref": "#/$defs/promotionAggregateControls" },
+				{ "$ref": "#/$defs/promotionSettlementControls" }
+			]
+		},
+		"promotionSource": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"closedEpoch",
+				"closedAnchorDigest",
+				"successorEpoch",
+				"successorAnchorDigest",
+				"cutValueDigest",
+				"cutRef",
+				"commitQcRef",
+				"manifestRef",
+				"payloadDigest",
+				"stateDigest",
+				"closedAclDigest",
+				"snapshotAclDigest",
+				"checkpointRepresentation",
+				"checkpointRefs"
+			],
+			"properties": {
+				"closedEpoch": { "$ref": "#/$defs/promotionEpoch" },
+				"successorEpoch": { "$ref": "#/$defs/promotionEpoch" },
+				"closedAnchorDigest": { "$ref": "#/$defs/promotionDigest" },
+				"successorAnchorDigest": { "$ref": "#/$defs/promotionDigest" },
+				"cutValueDigest": { "$ref": "#/$defs/promotionDigest" },
+				"payloadDigest": { "$ref": "#/$defs/promotionDigest" },
+				"stateDigest": { "$ref": "#/$defs/promotionDigest" },
+				"closedAclDigest": { "$ref": "#/$defs/promotionDigest" },
+				"snapshotAclDigest": { "$ref": "#/$defs/promotionDigest" },
+				"cutRef": { "$ref": "#/$defs/promotionRef" },
+				"commitQcRef": { "$ref": "#/$defs/promotionRef" },
+				"manifestRef": { "$ref": "#/$defs/promotionManifestRef" },
+				"checkpointRepresentation": { "enum": ["settlement", "aggregate-retirement", "retirement-only"] },
+				"checkpointRefs": { "$ref": "#/$defs/promotionControls" }
+			},
+			"allOf": [
+				{
+					"if": { "properties": { "checkpointRepresentation": { "const": "settlement" } } },
+					"then": { "properties": { "checkpointRefs": { "$ref": "#/$defs/promotionSettlementControls" } } }
+				},
+				{
+					"if": { "properties": { "checkpointRepresentation": { "const": "aggregate-retirement" } } },
+					"then": { "properties": { "checkpointRefs": { "$ref": "#/$defs/promotionAggregateControls" } } }
+				},
+				{
+					"if": { "properties": { "checkpointRepresentation": { "const": "retirement-only" } } },
+					"then": { "properties": { "checkpointRefs": { "$ref": "#/$defs/promotionRetirementControls" } } }
+				}
+			]
+		},
+		"promotionAggregateFrontiers": {
+			"type": "array",
+			"maxItems": 64,
+			"items": {
+				"type": "array",
+				"minItems": 2,
+				"maxItems": 2,
+				"prefixItems": [
+					{ "$ref": "#/$defs/promotionDigest" },
+					{ "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/promotionEpoch" }] }
+				],
+				"items": false
+			}
+		},
+		"promotionSettlementFrontiers": {
+			"type": "array",
+			"maxItems": 256,
+			"items": {
+				"type": "array",
+				"minItems": 3,
+				"maxItems": 3,
+				"prefixItems": [
+					{ "$ref": "#/$defs/promotionDigest" },
+					{ "$ref": "#/$defs/promotionEpoch" },
+					{ "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/promotionEpoch" }] }
+				],
+				"items": false
+			}
+		},
+		"forwardPromotion": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["kind", "version", "genesisAnchorDigest", "source", "roles", "authorizedSuccessorAclDigest"],
+			"properties": {
+				"kind": { "const": "forward-historical-promotion" },
+				"version": { "const": 1 },
+				"genesisAnchorDigest": { "$ref": "#/$defs/promotionDigest" },
+				"authorizedSuccessorAclDigest": { "$ref": "#/$defs/promotionDigest" },
+				"source": { "$ref": "#/$defs/promotionSource" },
+				"roles": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["selectedSourceCutDigest", "retainedSources", "currentControlRefs", "frontiers"],
+					"properties": {
+						"selectedSourceCutDigest": { "$ref": "#/$defs/promotionDigest" },
+						"retainedSources": { "type": "array", "maxItems": 1, "items": { "$ref": "#/$defs/promotionSource" } },
+						"currentControlRefs": { "$ref": "#/$defs/promotionControls" },
+						"frontiers": {
+							"anyOf": [
+								{ "type": "null" },
+								{ "$ref": "#/$defs/promotionAggregateFrontiers" },
+								{ "$ref": "#/$defs/promotionSettlementFrontiers" }
+							]
+						}
+					},
+					"allOf": [
+						{
+							"if": { "properties": { "currentControlRefs": { "$ref": "#/$defs/promotionSettlementControls" } } },
+							"then": {
+								"properties": {
+									"frontiers": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/promotionSettlementFrontiers" }] }
+								}
+							},
+							"else": {
+								"properties": {
+									"frontiers": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/promotionAggregateFrontiers" }] }
+								}
+							}
+						}
+					]
+				}
+			}
+		},
 		"signerSet": {
 			"type": "object",
 			"additionalProperties": false,
@@ -409,6 +601,11 @@
 					"x-registry-constraints": {
 						"maximumUtf16Units": 128
 					}
+				},
+				"forwardPromotion": {
+					"$ref": "#/$defs/forwardPromotion",
+					"x-registry-type": "forward-promotion",
+					"x-registry-constraints": { "schema": "forwardPromotion", "version": 1 }
 				}
 			}
 		},

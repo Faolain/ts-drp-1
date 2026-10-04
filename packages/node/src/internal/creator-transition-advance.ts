@@ -1,8 +1,29 @@
-import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DetachedClosureCandidate } from "@ts-drp/control-plane";
 import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
 import { inspectBoundedCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-checkpoint-advance";
-import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import { openCreatorCheckpointTrust } from "@ts-drp/protocol-v3/creator-checkpoint";
+import {
+	inspectCreatorClosedCutSuccessorBinding,
+	inspectCreatorHistoricalAnchorEnvelope,
+	openCreatorForwardPromotionSuccessorTrust,
+	openCreatorSuccessorTrust,
+} from "@ts-drp/protocol-v3/creator-close";
+import {
+	captureForwardPromotion,
+	capturePromotionRecord,
+	capturePromotionArray,
+	capturePromotionBytes,
+	capturePromotionRef,
+	type ForwardPromotion,
+	type PromotionSource,
+	type PromotionControlRef,
+} from "@ts-drp/protocol-v3/internal/creator-forward-promotion";
+import { openSealAuthority } from "@ts-drp/protocol-v3/seal";
+import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";
+import { createCreatorClosedRollbackProofAccounting } from "./creator-closed-rollback-data.js";
+import { canonicalCreatorDataRecord, creatorDataDigest, validateCreatorSnapshotData } from "./creator-snapshot-data.js";
 import {
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_GENESIS_SENTINEL,
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
@@ -26,10 +47,15 @@ import {
 	resolveCreatorIssuanceRetirement,
 	type VerifiedCreatorIssuanceRetirement,
 } from "@ts-drp/protocol-v3/creator-issuance-retirement";
-import { type LatchedAclSnapshot, openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
+import {
+	authorizeLatchedApplicationWrite,
+	type LatchedAclSnapshot,
+	openCanonicalLatchedAclSnapshot,
+} from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	digestBlob,
+	AHE_BOUNDED_READ_LIMITS,
 	digestClosure,
 	type GenerationRecord,
 	type GenerationRef,
@@ -428,7 +454,7 @@ export function uniqueCreatorTransitionCandidate(
 	return matches.length === 1 ? matches[0] : undefined;
 }
 
-function failure(reason: string): InspectCreatorTransitionAdvanceResult {
+function failure(reason: string): Readonly<{ ok: false; reason: string }> {
 	return Object.freeze({ ok: false as const, reason });
 }
 
@@ -1253,4 +1279,532 @@ export function inspectCreatorTransitionAdvance(
 	} catch {
 		return failure("TRUST_CLOSURE_INVALID");
 	}
+}
+
+declare const creatorForwardPromotionBrand: unique symbol;
+/** Pure decision custody, distinct from close, live material, trust, and installation. */
+export interface VerifiedCreatorForwardPromotion {
+	readonly [creatorForwardPromotionBrand]: true;
+}
+export interface CreatorForwardPromotionIdentity {
+	readonly objectId: string;
+	readonly genesisAnchorDigest: string;
+	readonly currentEpoch: number;
+	readonly currentAnchorDigest: string;
+	readonly successorEpoch: number;
+	readonly successorAnchorDigest: string;
+	readonly source: PromotionSource;
+	readonly roles: ForwardPromotion["roles"];
+}
+const forwardPromotions = new WeakMap<VerifiedCreatorForwardPromotion, CreatorForwardPromotionIdentity>();
+type PromotionSnapshot = Readonly<{ exactCanonicalManifestBytes: Uint8Array; exactCanonicalPayloadBytes: Uint8Array }>;
+type HistoricalPromotionSnapshot = PromotionSnapshot &
+	Readonly<{
+		closedEpoch: number;
+		originalAnchorEnvelope: null | Readonly<{
+			objectId: string;
+			exactCanonicalAnchorPreimageBytes: Uint8Array;
+			detachedAnchorSignature: Uint8Array;
+			exactCanonicalParametersCarrierBytes: Uint8Array;
+		}>;
+	}>;
+
+function capturePromotionClosure(
+	value: unknown,
+	charge: (bytes: Uint8Array) => boolean
+): CreatorTransitionClosure | undefined {
+	const captured = capturePromotionRecord(value, ["candidates", "closure"]);
+	const candidates = capturePromotionArray(captured?.candidates, AHE_BOUNDED_READ_LIMITS.maxClosureReferences);
+	const refs = capturePromotionArray(captured?.closure, AHE_BOUNDED_READ_LIMITS.maxClosureReferences);
+	if (candidates === undefined || refs === undefined || candidates.length !== refs.length) return undefined;
+	const closure = refs.map((ref) => capturePromotionRef(ref));
+	if (closure.some((ref) => ref === undefined) || new Set(closure.map((ref) => ref?.digest)).size !== closure.length)
+		return undefined;
+	const output: DetachedClosureCandidate[] = [];
+	for (const value of candidates) {
+		const candidate = capturePromotionRecord(value, ["bytes", "ref"]),
+			ref = capturePromotionRef(candidate?.ref);
+		const bytes = capturePromotionBytes(candidate?.bytes, AHE_BOUNDED_READ_LIMITS.maxBlobBytes, charge);
+		if (ref === undefined || bytes === undefined) return undefined;
+		const item = Object.freeze({ bytes, ref: ref as GenerationRef });
+		if (!exactCandidate(item) || !exactCreatorTransitionOccurrence(closure as GenerationRef[], item)) return undefined;
+		output.push(item);
+	}
+	if (new Set(output.map((item) => item.ref.digest)).size !== output.length) return undefined;
+	return Object.freeze({ candidates: Object.freeze(output), closure: Object.freeze(closure as GenerationRef[]) });
+}
+function capturePromotionSnapshot(value: unknown): PromotionSnapshot | undefined {
+	const snapshot = capturePromotionRecord(value, ["exactCanonicalManifestBytes", "exactCanonicalPayloadBytes"]);
+	const manifest = capturePromotionBytes(snapshot?.exactCanonicalManifestBytes, 212_387);
+	const payload = capturePromotionBytes(snapshot?.exactCanonicalPayloadBytes, 268_435_456);
+	return manifest === undefined || payload === undefined
+		? undefined
+		: Object.freeze({ exactCanonicalManifestBytes: manifest, exactCanonicalPayloadBytes: payload });
+}
+function captureHistoricalPromotionSnapshot(
+	value: unknown,
+	charge: (bytes: Uint8Array) => boolean
+): HistoricalPromotionSnapshot | undefined {
+	const captured = capturePromotionRecord(value, [
+		"closedEpoch",
+		"exactCanonicalManifestBytes",
+		"exactCanonicalPayloadBytes",
+		"originalAnchorEnvelope",
+	]);
+	if (
+		captured === undefined ||
+		typeof captured.closedEpoch !== "number" ||
+		!Number.isSafeInteger(captured.closedEpoch) ||
+		captured.closedEpoch < 0
+	)
+		return undefined;
+	const snapshot = capturePromotionSnapshot({
+		exactCanonicalManifestBytes: captured.exactCanonicalManifestBytes,
+		exactCanonicalPayloadBytes: captured.exactCanonicalPayloadBytes,
+	});
+	if (snapshot === undefined) return undefined;
+	let originalAnchorEnvelope: HistoricalPromotionSnapshot["originalAnchorEnvelope"] = null;
+	if (captured.originalAnchorEnvelope !== null) {
+		const envelope = capturePromotionRecord(captured.originalAnchorEnvelope, [
+			"objectId",
+			"exactCanonicalAnchorPreimageBytes",
+			"detachedAnchorSignature",
+			"exactCanonicalParametersCarrierBytes",
+		]);
+		const anchor = capturePromotionBytes(envelope?.exactCanonicalAnchorPreimageBytes, 8192, charge);
+		const signature = capturePromotionBytes(envelope?.detachedAnchorSignature, 64, charge);
+		const parameters = capturePromotionBytes(envelope?.exactCanonicalParametersCarrierBytes, 65_536, charge);
+		if (
+			typeof envelope?.objectId !== "string" ||
+			anchor === undefined ||
+			signature?.byteLength !== 64 ||
+			parameters === undefined
+		)
+			return undefined;
+		originalAnchorEnvelope = Object.freeze({
+			objectId: envelope.objectId,
+			exactCanonicalAnchorPreimageBytes: anchor,
+			detachedAnchorSignature: signature,
+			exactCanonicalParametersCarrierBytes: parameters,
+		});
+	}
+	return Object.freeze({ ...snapshot, closedEpoch: captured.closedEpoch, originalAnchorEnvelope });
+}
+function promotionSnapshotData(
+	snapshot: PromotionSnapshot,
+	cut: Readonly<Record<string, unknown>>,
+	profileId: string
+): ReturnType<typeof validateCreatorSnapshotData> {
+	try {
+		const decoded = decodeSnapshotManifest({
+			exactCanonicalManifestBytes: snapshot.exactCanonicalManifestBytes,
+			expectedManifestDigest: String(cut.snapshotManifestDigest),
+			profile: { maxManifestBytes: 212_387, maxSnapshotBytes: 268_435_456, snapshotChunkBytes: 131_072 },
+		});
+		let offset = 0;
+		for (const chunk of decoded.chunks) {
+			const end = offset + chunk.byteLength;
+			if (
+				end > snapshot.exactCanonicalPayloadBytes.byteLength ||
+				snapshotChunkDigest(chunk.index, snapshot.exactCanonicalPayloadBytes.subarray(offset, end)) !== chunk.digest
+			)
+				return undefined;
+			offset = end;
+		}
+		return offset !== snapshot.exactCanonicalPayloadBytes.byteLength
+			? undefined
+			: validateCreatorSnapshotData(
+					snapshot.exactCanonicalPayloadBytes,
+					snapshot.exactCanonicalManifestBytes,
+					cut,
+					profileId
+				);
+	} catch {
+		return undefined;
+	}
+}
+function promotionControls(
+	evidence: NonNullable<ReturnType<typeof openCreatorTransitionClosedCutEvidence>>
+): readonly PromotionControlRef[] {
+	return Object.freeze(
+		[evidence.settlement, evidence.retirement, evidence.aggregate]
+			.filter((item) => item !== undefined)
+			.map((item) =>
+				Object.freeze([String(record(item!.candidate)?.kind), Object.freeze({ ...item!.candidate.ref })] as const)
+			)
+	);
+}
+function samePromotionValue(left: unknown, right: unknown): boolean {
+	return compareBytes(encodeCanonical(left), encodeCanonical(right)) === 0;
+}
+
+/** Authenticates exact retained history under independent current/pinned custody; performs no I/O or mutation. */
+export function openCreatorForwardPromotion(
+	input: unknown
+): Readonly<{ ok: false; reason: string } | { ok: true; promotion: VerifiedCreatorForwardPromotion }> {
+	try {
+		const captured = capturePromotionRecord(input, [
+			"currentTrust",
+			"exactCanonicalPinnedGenesisTrustStateRecordBytes",
+			"expectedRoomHeadState",
+			"current",
+			"predecessor",
+			"proposed",
+			"currentAclBytes",
+			"authorizedSuccessorAclBytes",
+			"currentCloseSnapshot",
+			"historicalSnapshots",
+		]);
+		if (captured === undefined) return failure("PROMOTION_INPUT_INVALID");
+		const ledger = createCreatorClosedRollbackProofAccounting([]),
+			charge = (bytes: Uint8Array): boolean => ledger.charge(bytes);
+		const current = capturePromotionClosure(captured.current, charge),
+			predecessor = capturePromotionClosure(captured.predecessor, charge),
+			proposed = capturePromotionClosure(captured.proposed, charge);
+		const pinBytes = capturePromotionBytes(captured.exactCanonicalPinnedGenesisTrustStateRecordBytes, 8192, charge);
+		const currentAclBytes = capturePromotionBytes(captured.currentAclBytes, 65_536, charge),
+			successorAclBytes = capturePromotionBytes(captured.authorizedSuccessorAclBytes, 65_536, charge);
+		const closeSnapshot = capturePromotionSnapshot(captured.currentCloseSnapshot);
+		const historicalValues = capturePromotionArray(captured.historicalSnapshots, 2);
+		const histories = historicalValues?.map((value) => captureHistoricalPromotionSnapshot(value, charge));
+		const head = capturePromotionRecord(captured.expectedRoomHeadState, ["stable", "pending"]),
+			stable = capturePromotionRecord(head?.stable, ["objectId", "epoch", "currentAnchorDigest"]);
+		if (
+			current === undefined ||
+			predecessor === undefined ||
+			proposed === undefined ||
+			pinBytes === undefined ||
+			currentAclBytes === undefined ||
+			successorAclBytes === undefined ||
+			closeSnapshot === undefined ||
+			histories === undefined ||
+			histories.some((h) => h === undefined) ||
+			head?.pending !== null ||
+			stable === undefined
+		)
+			return failure("PROMOTION_INPUT_INVALID");
+		const currentTrust = captured.currentTrust as CurrentAnchorTrust;
+		const pinRecord = canonicalCreatorDataRecord(pinBytes);
+		if (
+			pinRecord === undefined ||
+			pinRecord.currentEpoch !== 0 ||
+			typeof pinRecord.objectId !== "string" ||
+			typeof pinRecord.genesisAnchorDigest !== "string"
+		)
+			return failure("PROMOTION_PIN_INVALID");
+		const pin = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: pinBytes,
+			expectedObjectId: pinRecord.objectId,
+			pinnedGenesisAnchorDigest: pinRecord.genesisAnchorDigest,
+		});
+		if (!pin.ok) return failure("PROMOTION_PIN_INVALID");
+		// Genuine current capability is required, not a copied observer fact.
+		const signerSet = canonicalCreatorDataRecord(pinBytes)?.exactCanonicalSignerSetBytes;
+		const signers = signerSet instanceof Uint8Array ? decodeCanonical(signerSet) : undefined;
+		const publicKey =
+			Array.isArray(signers) && typeof signers[0]?.publicKey === "string"
+				? Uint8Array.from(signers[0].publicKey.match(/../gu) ?? [], (part: string) => Number.parseInt(part, 16))
+				: undefined;
+		if (publicKey === undefined || !openSealAuthority({ trust: currentTrust, signerPublicKey: publicKey }).ok)
+			return failure("PROMOTION_CURRENT_UNTRUSTED");
+		if (
+			currentTrust.objectId !== pin.trust.objectId ||
+			currentTrust.genesisAnchorDigest !== pin.trust.genesisAnchorDigest ||
+			currentTrust.profileId !== pin.trust.profileId ||
+			stable.objectId !== currentTrust.objectId ||
+			stable.epoch !== currentTrust.currentEpoch ||
+			stable.currentAnchorDigest !== currentTrust.currentAnchorDigest ||
+			currentTrust.currentEpoch < 1
+		)
+			return failure("PROMOTION_FLOOR_INVALID");
+		const n = currentTrust.currentEpoch;
+		const currentCarrier = uniqueCreatorTransitionCandidate(current.candidates, "drp-anchor-trust-state", n),
+			predecessorCarrier = uniqueCreatorTransitionCandidate(predecessor.candidates, "drp-anchor-trust-state", n - 1);
+		const oldCut = uniqueCreatorTransitionCandidate(current.candidates, "drp-hard-epoch-cut", n - 1),
+			oldQc = uniqueCreatorTransitionCandidate(current.candidates, "drp-seal-qc", n - 1, "commit");
+		if (currentCarrier === undefined || predecessorCarrier === undefined || oldCut === undefined || oldQc === undefined)
+			return failure("PROMOTION_LINEAGE_INVALID");
+		let predecessorTrust = pin.trust;
+		if (n === 1) {
+			if (compareBytes(predecessorCarrier.bytes, pinBytes) !== 0) return failure("PROMOTION_LINEAGE_INVALID");
+			const opened = openCreatorSuccessorTrust({
+				currentTrust: pin.trust,
+				exactCanonicalCutValueBytes: oldCut.bytes,
+				exactCanonicalCommitQcBytes: oldQc.bytes,
+				exactCanonicalTrustStateRecordBytes: currentCarrier.bytes,
+			});
+			if (!opened.ok || opened.trust.currentAnchorDigest !== currentTrust.currentAnchorDigest)
+				return failure("PROMOTION_LINEAGE_INVALID");
+		} else {
+			const opened = openCreatorCheckpointTrust({
+				detachedGenesisSignature: pinRecord.detachedCurrentAnchorSignature,
+				exactCanonicalGenesisAnchorPreimageBytes: pinRecord.exactCanonicalCurrentAnchorPreimageBytes,
+				exactCanonicalPredecessorTrustStateRecordBytes: predecessorCarrier.bytes,
+				exactCanonicalCurrentTrustStateRecordBytes: currentCarrier.bytes,
+				exactCanonicalCutValueBytes: oldCut.bytes,
+				exactCanonicalCommitQcBytes: oldQc.bytes,
+				expectedObjectId: currentTrust.objectId,
+				pinnedGenesisAnchorDigest: currentTrust.genesisAnchorDigest,
+				expectedCurrentHead: {
+					objectId: stable.objectId,
+					epoch: stable.epoch,
+					currentAnchorDigest: stable.currentAnchorDigest,
+				},
+			});
+			if (!opened.ok || opened.currentTrust.profileId !== currentTrust.profileId)
+				return failure("PROMOTION_LINEAGE_INVALID");
+			predecessorTrust = opened.predecessorTrust;
+		}
+		const currentAnchor = canonicalCreatorDataRecord(
+			record(currentCarrier)!.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array
+		);
+		const predecessorAnchor = canonicalCreatorDataRecord(
+			record(predecessorCarrier)!.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array
+		);
+		if (currentAnchor === undefined || predecessorAnchor === undefined) return failure("PROMOTION_LINEAGE_INVALID");
+		const openAcl = (bytes: Uint8Array, digest: string, epoch: number): boolean =>
+			openCanonicalLatchedAclSnapshot({
+				exactCanonicalLatchedAclBytes: bytes,
+				expectedAclDigest: digest,
+				expectedEpoch: epoch,
+				expectedObjectId: currentTrust.objectId,
+				expectedProfileId: currentTrust.profileId,
+			}).ok;
+		const currentAcl = uniqueCreatorTransitionCandidate(current.candidates, "drp-v3-latched-acl", n);
+		if (
+			currentAcl === undefined ||
+			compareBytes(currentAcl.bytes, currentAclBytes) !== 0 ||
+			!openAcl(currentAclBytes, String(currentAnchor.aclDigest), n)
+		)
+			return failure("PROMOTION_ACL_INVALID");
+		const available: PromotionSource[] = [];
+		const availableData: NonNullable<ReturnType<typeof validateCreatorSnapshotData>>[] = [];
+		const availableEvidence: NonNullable<ReturnType<typeof openCreatorTransitionClosedCutEvidence>>[] = [];
+		for (const epoch of n === 1 ? [0] : [n - 1, n - 2]) {
+			const latest = epoch === n - 1,
+				material = latest ? current : predecessor,
+				floorTrust = latest ? currentTrust : predecessorTrust;
+			const evidence = openCreatorTransitionClosedCutEvidence({
+				closure: material,
+				floorTrust,
+				...(latest ? { currentTrust: predecessorTrust } : {}),
+			});
+			if (evidence === undefined) return failure("PROMOTION_SOURCE_INVALID");
+			const binding = inspectCreatorClosedCutSuccessorBinding({
+				successorTrust: floorTrust,
+				exactCanonicalCutValueBytes: evidence.cut.bytes,
+			});
+			const matches = histories.filter((h) => h!.closedEpoch === epoch);
+			const historical = matches[0];
+			if (!binding.ok || matches.length !== 1 || historical === undefined) return failure("PROMOTION_SOURCE_INVALID");
+			let aclDigest = latest ? String(predecessorAnchor.aclDigest) : evidence.currentAclDigest;
+			if (aclDigest === undefined && epoch === 0) {
+				const genesisAnchor = canonicalCreatorDataRecord(
+					pinRecord.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array
+				);
+				if (binding.cut.previousAnchor !== pin.trust.currentAnchorDigest) return failure("PROMOTION_SOURCE_INVALID");
+				aclDigest = String(genesisAnchor?.aclDigest);
+			}
+			if (evidence.representation === "retirement-only" && epoch > 0) {
+				if (historical.originalAnchorEnvelope === null) return failure("PROMOTION_ANCHOR_REQUIRED");
+				const inspected = inspectCreatorHistoricalAnchorEnvelope({
+					successorTrust: floorTrust,
+					envelope: historical.originalAnchorEnvelope,
+				});
+				if (
+					!inspected.ok ||
+					inspected.anchorDigest !== binding.cut.previousAnchor ||
+					(aclDigest !== undefined && aclDigest !== inspected.aclDigest)
+				)
+					return failure("PROMOTION_ANCHOR_INVALID");
+				aclDigest = inspected.aclDigest;
+			} else if (historical.originalAnchorEnvelope !== null) return failure("PROMOTION_ANCHOR_UNEXPECTED");
+			const closedAcl = uniqueCreatorTransitionCandidate(material.candidates, "drp-v3-latched-acl", epoch);
+			const data = promotionSnapshotData(historical, binding.cut, currentTrust.profileId);
+			if (
+				closedAcl === undefined ||
+				aclDigest === undefined ||
+				!openAcl(closedAcl.bytes, aclDigest, epoch) ||
+				data === undefined
+			)
+				return failure("PROMOTION_SNAPSHOT_INVALID");
+			available.push(
+				Object.freeze({
+					closedEpoch: epoch,
+					closedAnchorDigest: String(binding.cut.previousAnchor),
+					successorEpoch: floorTrust.currentEpoch,
+					successorAnchorDigest: floorTrust.currentAnchorDigest,
+					cutValueDigest: creatorDataDigest("ts-drp/hard-epoch-cut/v3", evidence.cut.bytes),
+					cutRef: Object.freeze({ ...evidence.cut.ref }),
+					commitQcRef: Object.freeze({ ...evidence.qc.ref }),
+					manifestRef: Object.freeze({
+						digest: String(binding.cut.snapshotManifestDigest),
+						byteLength: historical.exactCanonicalManifestBytes.byteLength,
+					}),
+					payloadDigest: String(data.manifest.payloadDigest),
+					stateDigest: String(binding.cut.stateDigest),
+					closedAclDigest: aclDigest,
+					snapshotAclDigest: String(binding.cut.aclDigest),
+					checkpointRepresentation: evidence.representation,
+					checkpointRefs: promotionControls(evidence),
+				})
+			);
+			availableData.push(data);
+			availableEvidence.push(evidence);
+		}
+		if (
+			histories.length !== available.length ||
+			compareBytes(availableData[0]!.successorAclBytes, currentAclBytes) !== 0 ||
+			(availableData.length === 2 &&
+				compareBytes(
+					availableData[1]!.successorAclBytes,
+					uniqueCreatorTransitionCandidate(current.candidates, "drp-v3-latched-acl", n - 1)!.bytes
+				) !== 0)
+		)
+			return failure("PROMOTION_SNAPSHOT_CHAIN_INVALID");
+		// Authenticate the existing current control continuity, with the final ACL-bound settlement law.
+		{
+			const continuity: InspectCreatorTransitionAdvanceInput = {
+				current: predecessor,
+				currentTrust: predecessorTrust,
+				proposed: current,
+				successorTrust: currentTrust,
+				proofRefs: [oldCut.ref, oldQc.ref],
+				mode: "verify",
+				settlementAcl: {
+					current: uniqueCreatorTransitionCandidate(current.candidates, "drp-v3-latched-acl", n - 1)!.bytes,
+					successor: currentAclBytes,
+				},
+			};
+			if (settlementProfileFor(currentTrust.profileId) === "v1") {
+				if (authenticatedSettlementPair(continuity) === undefined)
+					return failure("PROMOTION_CURRENT_CONTINUITY_INVALID");
+			} else {
+				const retirement = authenticatedRetirementPair(continuity);
+				if (
+					retirement === undefined ||
+					(availableEvidence[0]!.aggregate !== undefined &&
+						authenticatedAggregatePair(continuity, retirement) === undefined)
+				)
+					return failure("PROMOTION_CURRENT_CONTINUITY_INVALID");
+				// Retirement-only retained evidence is not a new forward-output or pending-policy exception.
+				if (availableEvidence[0]!.aggregate === undefined && aggregateCandidates(predecessor).length !== 0)
+					return failure("PROMOTION_CURRENT_CONTINUITY_INVALID");
+			}
+		}
+		const newCut = uniqueCreatorTransitionCandidate(proposed.candidates, "drp-hard-epoch-cut", n),
+			newQc = uniqueCreatorTransitionCandidate(proposed.candidates, "drp-seal-qc", n, "commit"),
+			nextCarrier = uniqueCreatorTransitionCandidate(proposed.candidates, "drp-anchor-trust-state", n + 1);
+		if (newCut === undefined || newQc === undefined || nextCarrier === undefined)
+			return failure("PROMOTION_PROPOSED_INVALID");
+		const cut = canonicalCreatorDataRecord(newCut.bytes),
+			forward = cut === undefined ? undefined : captureForwardPromotion(cut.forwardPromotion);
+		if (
+			cut === undefined ||
+			forward === undefined ||
+			forward.genesisAnchorDigest !== currentTrust.genesisAnchorDigest ||
+			forward.authorizedSuccessorAclDigest !== cut.aclDigest
+		)
+			return failure("PROMOTION_VALUE_INVALID");
+		const selected = available.find((s) => s.cutValueDigest === forward.source.cutValueDigest);
+		if (
+			selected === undefined ||
+			!samePromotionValue(selected, forward.source) ||
+			!samePromotionValue(
+				available.filter((s) => s !== selected),
+				forward.roles.retainedSources
+			) ||
+			!samePromotionValue(promotionControls(availableEvidence[0]!), forward.roles.currentControlRefs)
+		)
+			return failure("PROMOTION_ROLES_INVALID");
+		const data = promotionSnapshotData(closeSnapshot, cut, currentTrust.profileId);
+		if (
+			data === undefined ||
+			compareBytes(data.successorAclBytes, successorAclBytes) !== 0 ||
+			!openAcl(successorAclBytes, forward.authorizedSuccessorAclDigest, n + 1)
+		)
+			return failure("PROMOTION_CLOSE_SNAPSHOT_INVALID");
+		const successor = openCreatorForwardPromotionSuccessorTrust({
+			currentTrust,
+			exactCanonicalCutValueBytes: newCut.bytes,
+			exactCanonicalCommitQcBytes: newQc.bytes,
+			exactCanonicalTrustStateRecordBytes: nextCarrier.bytes,
+		});
+		if (!successor.ok) return failure(successor.reason);
+		if (
+			!inspectCreatorTransitionAdvance({
+				current,
+				currentTrust,
+				proposed,
+				successorTrust: successor.trust,
+				proofRefs: [newCut.ref, newQc.ref],
+				mode: "verify",
+				settlementAcl: { current: currentAclBytes, successor: successorAclBytes },
+			}).ok
+		)
+			return failure("PROMOTION_CONTINUITY_INVALID");
+		const output = openCreatorTransitionClosedCutEvidence({
+			closure: proposed,
+			currentTrust,
+			floorTrust: successor.trust,
+		});
+		if (
+			output === undefined ||
+			!samePromotionValue(
+				output.settlement?.identity.frontiers ?? output.aggregate?.identity.frontiers ?? null,
+				forward.roles.frontiers
+			)
+		)
+			return failure("PROMOTION_FRONTIERS_INVALID");
+		if (output.aggregate !== undefined) {
+			const authorizedAcl = openCanonicalLatchedAclSnapshot({
+				exactCanonicalLatchedAclBytes: successorAclBytes,
+				expectedAclDigest: forward.authorizedSuccessorAclDigest,
+				expectedEpoch: n + 1,
+				expectedObjectId: currentTrust.objectId,
+				expectedProfileId: currentTrust.profileId,
+			});
+			if (!authorizedAcl.ok) return failure("PROMOTION_FRONTIERS_INVALID");
+			const writers: string[] = [];
+			for (const member of authorizedAcl.snapshot.members) {
+				const authorized = authorizeLatchedApplicationWrite({
+					author: member.author,
+					snapshot: authorizedAcl.snapshot,
+				});
+				if (!authorized.ok) return failure("PROMOTION_FRONTIERS_INVALID");
+				if (authorized.authorized) writers.push(member.author);
+			}
+			if (
+				!samePromotionValue(
+					writers.sort(),
+					output.aggregate.identity.frontiers.map(([author]) => author)
+				)
+			)
+				return failure("PROMOTION_FRONTIERS_INVALID");
+		}
+		const promotion = Object.freeze({}) as VerifiedCreatorForwardPromotion;
+		forwardPromotions.set(
+			promotion,
+			Object.freeze({
+				objectId: currentTrust.objectId,
+				genesisAnchorDigest: currentTrust.genesisAnchorDigest,
+				currentEpoch: n,
+				currentAnchorDigest: currentTrust.currentAnchorDigest,
+				successorEpoch: successor.trust.currentEpoch,
+				successorAnchorDigest: successor.trust.currentAnchorDigest,
+				source: forward.source,
+				roles: forward.roles,
+			})
+		);
+		return Object.freeze({ ok: true, promotion });
+	} catch {
+		return failure("PROMOTION_INPUT_INVALID");
+	}
+}
+
+/** Resolves immutable detached identities only from genuine private decision custody. */
+export function resolveCreatorForwardPromotion(
+	promotion: VerifiedCreatorForwardPromotion
+): CreatorForwardPromotionIdentity | undefined {
+	return forwardPromotions.get(promotion);
 }

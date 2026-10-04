@@ -54,7 +54,7 @@ interface ReferenceResult {
 
 interface RegistryKind {
 	readonly domain: string;
-	readonly fields: readonly { readonly name: string }[];
+	readonly fields: readonly { readonly name: string; readonly required: boolean }[];
 }
 
 interface RegistryV1 {
@@ -165,7 +165,9 @@ describe.sequential("Phase 5e creator-certified close RED", () => {
 			"nextSignerSet",
 			"parameters",
 			"closeReason",
+			"forwardPromotion",
 		]);
+		expect(REGISTRY.kinds.cutValue?.fields.find(({ name }) => name === "forwardPromotion")?.required).toBe(false);
 		expect(REGISTRY.kinds.snapshotManifest?.fields.map(({ name }) => name)).toEqual([
 			"kind",
 			"protocolMajor",

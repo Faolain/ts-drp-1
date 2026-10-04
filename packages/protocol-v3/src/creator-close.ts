@@ -2,6 +2,7 @@ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-
 
 import { type CurrentAnchorTrust, verifyEd25519RegisteredDigest } from "./index.js";
 import type { CreatorAnchorSigningRequest } from "./internal/creator-anchor-signing-request.js";
+import { captureForwardPromotion, creatorCutEffectiveState } from "./internal/creator-forward-promotion.js";
 import {
 	type CreatorAnchorTrustMaterial,
 	mintCreatorAnchorSigningRequest,
@@ -93,6 +94,14 @@ const closeInputFields = Object.freeze([
 
 declare const creatorAnchorPreparationBrand: unique symbol;
 declare const creatorCloseBrand: unique symbol;
+declare const creatorForwardPromotionBrand: unique symbol;
+declare const creatorForwardPromotionAnchorBrand: unique symbol;
+export interface CreatorForwardPromotionPreparation {
+	readonly [creatorForwardPromotionBrand]: true;
+}
+export interface CreatorForwardPromotionAnchorPreparation {
+	readonly [creatorForwardPromotionAnchorBrand]: true;
+}
 
 export interface CreatorAnchorPreparation {
 	readonly [creatorAnchorPreparationBrand]: true;
@@ -103,6 +112,7 @@ export interface VerifiedCreatorClose {
 }
 
 interface CreatorCloseState {
+	readonly promotion: boolean;
 	readonly currentAnchor: Readonly<Record<string, unknown>>;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly exactCanonicalCutValueBytes: Uint8Array;
@@ -111,14 +121,15 @@ interface CreatorCloseState {
 }
 
 interface CreatorPreparationState {
+	readonly promotion: boolean;
 	readonly anchorDigest: string;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
 	readonly material: CreatorAnchorTrustMaterial;
 }
 
-const closeStates = new WeakMap<VerifiedCreatorClose, CreatorCloseState>();
-const preparationStates = new WeakMap<CreatorAnchorPreparation, CreatorPreparationState>();
+const closeStates = new WeakMap<object, CreatorCloseState>();
+const preparationStates = new WeakMap<object, CreatorPreparationState>();
 
 export type CreatorHistoricalAnchorEnvelopeFailureReason =
 	| "MALFORMED_HISTORICAL_ENVELOPE"
@@ -252,7 +263,10 @@ function safeInteger(value: unknown, minimum = 0): value is number {
 function exactCanonicalRecord(bytes: Uint8Array, kind: string): Readonly<Record<string, unknown>> | undefined {
 	try {
 		const decoded = decodeCanonical(bytes);
-		const fields = registry.kinds[kind]?.fields.map(({ name }) => name);
+		const registered = registry.kinds[kind]?.fields;
+		const fields = registered
+			?.filter((field) => field.required || (plainRecord(decoded) && Object.hasOwn(decoded, field.name)))
+			.map(({ name }) => name);
 		if (
 			fields === undefined ||
 			!plainRecord(decoded) ||
@@ -261,6 +275,12 @@ function exactCanonicalRecord(bytes: Uint8Array, kind: string): Readonly<Record<
 		) {
 			return undefined;
 		}
+		if (
+			kind === "cutValue" &&
+			Object.hasOwn(decoded, "forwardPromotion") &&
+			captureForwardPromotion(decoded.forwardPromotion) === undefined
+		)
+			return undefined;
 		return decoded;
 	} catch {
 		return undefined;
@@ -304,20 +324,22 @@ function successorAnchor(
 		profileDigest: currentAnchor.profileDigest,
 		protocolMajor: 3,
 		signerSetDigest: currentAnchor.signerSetDigest,
-		stateDigest: cut.stateDigest,
+		stateDigest: creatorCutEffectiveState(cut),
 	});
 }
 
 function closedCutSuccessorEquation(
 	material: CreatorAnchorTrustMaterial,
 	anchorBytes: Uint8Array,
-	cutBytes: Uint8Array
+	cutBytes: Uint8Array,
+	promotion = false
 ): Readonly<Record<string, unknown>> | undefined {
 	const anchor = exactCanonicalRecord(anchorBytes, "epochAnchor");
 	const cut = exactCanonicalRecord(cutBytes, "cutValue");
 	if (
 		anchor === undefined ||
 		cut === undefined ||
+		Object.hasOwn(cut, "forwardPromotion") !== promotion ||
 		cut.kind !== "drp-hard-epoch-cut" ||
 		cut.protocolMajor !== 3 ||
 		cut.encodingVersion !== "drp-canonical-profile-1" ||
@@ -594,16 +616,30 @@ export function prepareCreatorAnchorSigningRequest(
  * @param input - Genuine current trust plus exact close, snapshot, and policy facts.
  * @returns An opaque verified close and detached CutValue bytes, or a typed failure.
  */
-export function prepareCreatorClose(
-	input: unknown
+function prepareClose(
+	input: unknown,
+	promotion = false
 ): Readonly<
 	| { ok: false; reason: string }
 	| { close: VerifiedCreatorClose; exactCanonicalCutValueBytes: Uint8Array; ok: true; valueDigest: string }
 > {
 	try {
-		if (!plainRecord(input) || !exactKeys(input, closeInputFields)) return failure("CUT_VALUE_MISMATCH");
+		if (
+			!plainRecord(input) ||
+			!exactKeys(input, promotion ? [...closeInputFields, "forwardPromotion"] : closeInputFields)
+		)
+			return failure("CUT_VALUE_MISMATCH");
 		const material = resolveCreatorAnchorTrustMaterial(input.currentTrust as CurrentAnchorTrust);
 		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
+		const forwardPromotion = promotion ? captureForwardPromotion(input.forwardPromotion) : undefined;
+		if (
+			promotion &&
+			(forwardPromotion === undefined ||
+				forwardPromotion.genesisAnchorDigest !== material.genesisAnchorDigest ||
+				forwardPromotion.authorizedSuccessorAclDigest !== input.aclDigest ||
+				![material.currentEpoch - 1, material.currentEpoch - 2].includes(forwardPromotion.source.closedEpoch))
+		)
+			return failure("CUT_VALUE_MISMATCH");
 		const currentAnchor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
 		const manifestBytes = copyBytes(input.exactCanonicalSnapshotManifestBytes, undefined, 212_387);
 		const availabilityBytes = copyBytes(input.exactCanonicalAvailabilityPolicyBytes, undefined, 65_536);
@@ -665,6 +701,7 @@ export function prepareCreatorClose(
 		const parameters = decodeCanonicalValue(parametersBytes);
 		decodeCanonicalValue(availabilityBytes);
 		const exactCanonicalCutValueBytes = encodeCanonical({
+			...(promotion ? { forwardPromotion } : {}),
 			aclDigest: input.aclDigest,
 			archiveIndexRoot: input.archiveIndexRoot,
 			availabilityPolicyDigest: hex(hashDomain("ts-drp/availability-policy/v3", availabilityBytes)),
@@ -688,11 +725,13 @@ export function prepareCreatorClose(
 			snapshotManifestDigest: input.snapshotManifestDigest,
 			stateDigest: input.stateDigest,
 		});
+		if (exactCanonicalCutValueBytes.byteLength > 65_536) return failure("CUT_VALUE_MISMATCH");
 		const valueDigest = hex(hashDomain(registry.kinds.cutValue?.domain ?? "", exactCanonicalCutValueBytes));
 		const close = Object.freeze({}) as VerifiedCreatorClose;
 		closeStates.set(
 			close,
 			Object.freeze({
+				promotion,
 				currentAnchor,
 				currentTrust: input.currentTrust as CurrentAnchorTrust,
 				exactCanonicalCutValueBytes: Uint8Array.from(exactCanonicalCutValueBytes),
@@ -716,7 +755,10 @@ export function prepareCreatorClose(
  * @param input - Opaque close and authority plus exact commit-QC bytes.
  * @returns A fieldless preparation/signing request pair, or a typed failure.
  */
-export function prepareCreatorSuccessor(input: unknown): Readonly<
+function prepareSuccessor(
+	input: unknown,
+	promotion = false
+): Readonly<
 	| { ok: false; reason: string }
 	| {
 			anchorDigest: string;
@@ -727,15 +769,19 @@ export function prepareCreatorSuccessor(input: unknown): Readonly<
 	  }
 > {
 	try {
-		if (!plainRecord(input) || !exactKeys(input, ["authority", "close", "exactCanonicalCommitQcBytes"])) {
+		if (
+			!plainRecord(input) ||
+			!exactKeys(input, ["authority", promotion ? "promotion" : "close", "exactCanonicalCommitQcBytes"])
+		) {
 			return failure("COMMIT_QC_REJECTED");
 		}
-		const close = closeStates.get(input.close as VerifiedCreatorClose);
+		const close = closeStates.get((promotion ? input.promotion : input.close) as object);
 		const identity = resolveSealAuthorityIdentity(input.authority);
 		const commitQcBytes = copyBytes(input.exactCanonicalCommitQcBytes, undefined, 65_536);
 		if (commitQcBytes === undefined || commitQcBytes.byteLength === 0) return failure("COMMIT_QC_REQUIRED");
 		if (
 			close === undefined ||
+			close.promotion !== promotion ||
 			identity === undefined ||
 			identity.anchor !== close.material.currentAnchorDigest ||
 			identity.epoch !== close.material.currentEpoch ||
@@ -762,6 +808,7 @@ export function prepareCreatorSuccessor(input: unknown): Readonly<
 		preparationStates.set(
 			preparation,
 			Object.freeze({
+				promotion,
 				anchorDigest: prepared.anchorDigest,
 				currentTrust: close.currentTrust,
 				exactCanonicalAnchorPreimageBytes: Uint8Array.from(exactCanonicalAnchorPreimageBytes),
@@ -785,8 +832,9 @@ export function prepareCreatorSuccessor(input: unknown): Readonly<
  * @param input - Opaque preparation and detached creator signature.
  * @returns Exact frozen trust-state bytes, or a typed signature failure.
  */
-export function completeCreatorSuccessor(
-	input: unknown
+function completeSuccessor(
+	input: unknown,
+	promotion = false
 ): Readonly<{ exactCanonicalTrustStateRecordBytes: Uint8Array; ok: true } | { ok: false; reason: string }> {
 	try {
 		if (!plainRecord(input) || !exactKeys(input, ["detachedSignature", "preparation"])) {
@@ -794,7 +842,8 @@ export function completeCreatorSuccessor(
 		}
 		const state = preparationStates.get(input.preparation as CreatorAnchorPreparation);
 		const signature = copyBytes(input.detachedSignature, 64, 64);
-		if (state === undefined || signature === undefined) return failure("INVALID_SUCCESSOR_SIGNATURE");
+		if (state === undefined || state.promotion !== promotion || signature === undefined)
+			return failure("INVALID_SUCCESSOR_SIGNATURE");
 		preparationStates.delete(input.preparation as CreatorAnchorPreparation);
 		if (
 			!verifyEd25519RegisteredDigest(
@@ -835,8 +884,9 @@ export function completeCreatorSuccessor(
  * @param input - Current trust plus exact CutValue, commit-QC, and trust-state bytes.
  * @returns A singleton-minted successor trust capability, or a typed rejection.
  */
-export function openCreatorSuccessorTrust(
-	input: unknown
+function openSuccessorTrust(
+	input: unknown,
+	promotion = false
 ): Readonly<{ ok: false; reason: string } | { ok: true; trust: CurrentAnchorTrust }> {
 	try {
 		if (
@@ -903,6 +953,17 @@ export function openCreatorSuccessorTrust(
 		if (cutBytes === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
 		const cut = exactCanonicalRecord(cutBytes, "cutValue");
 		if (cut === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		if (Object.hasOwn(cut, "forwardPromotion") !== promotion) return failure("CERTIFIED_VALUE_MISMATCH");
+		if (promotion) {
+			const forward = captureForwardPromotion(cut.forwardPromotion);
+			if (
+				forward === undefined ||
+				forward.genesisAnchorDigest !== material.genesisAnchorDigest ||
+				forward.authorizedSuccessorAclDigest !== cut.aclDigest ||
+				![material.currentEpoch - 1, material.currentEpoch - 2].includes(forward.source.closedEpoch)
+			)
+				return failure("CERTIFIED_VALUE_MISMATCH");
+		}
 		const opened = openSealAuthority({ signerPublicKey: material.publicKey, trust: currentTrust });
 		if (!opened.ok) return failure("COMMIT_QC_REJECTED");
 		const verified = verifySealQC({ authority: opened.authority, exactCanonicalQcBytes: commitQcBytes });
@@ -913,13 +974,16 @@ export function openCreatorSuccessorTrust(
 		const currentAnchor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
 		if (
 			currentAnchor === undefined ||
+			(promotion &&
+				(cut.blueprintDigest !== currentAnchor.blueprintDigest ||
+					cut.archiveIndexRoot !== currentAnchor.archiveIndexRoot)) ||
 			cut.epoch !== material.currentEpoch ||
 			cut.previousAnchor !== material.currentAnchorDigest ||
 			cut.previousCutDigest !== currentAnchor.cutDigest ||
 			cut.previousHistoryRoot !== currentAnchor.historyRoot ||
 			cut.previousHistorySize !== currentAnchor.historySize ||
 			compareBytes(successorAnchor(currentAnchor, cut), anchorBytes) !== 0 ||
-			closedCutSuccessorEquation(material, anchorBytes, cutBytes) === undefined
+			closedCutSuccessorEquation(material, anchorBytes, cutBytes, promotion) === undefined
 		) {
 			return failure("CERTIFIED_VALUE_MISMATCH");
 		}
@@ -928,4 +992,68 @@ export function openCreatorSuccessorTrust(
 	} catch {
 		return failure("CERTIFIED_VALUE_MISMATCH");
 	}
+}
+
+/** Ordinary close preparation never accepts the promotion variant. */
+export function prepareCreatorClose(input: unknown): ReturnType<typeof prepareClose> {
+	return prepareClose(input);
+}
+/** Ordinary successor preparation consumes ordinary close custody only. */
+export function prepareCreatorSuccessor(input: unknown): ReturnType<typeof prepareSuccessor> {
+	return prepareSuccessor(input);
+}
+/** Completes one ordinary one-use anchor preparation. */
+export function completeCreatorSuccessor(input: unknown): ReturnType<typeof completeSuccessor> {
+	return completeSuccessor(input);
+}
+/** Ordinary trust opening retains its original state equation. */
+export function openCreatorSuccessorTrust(input: unknown): ReturnType<typeof openSuccessorTrust> {
+	return openSuccessorTrust(input);
+}
+/** Authors the whole extended current Cut, not source-authenticated Node authority. */
+export function prepareCreatorForwardPromotion(input: unknown): Readonly<
+	| { ok: false; reason: string }
+	| {
+			ok: true;
+			promotion: CreatorForwardPromotionPreparation;
+			exactCanonicalCutValueBytes: Uint8Array;
+			valueDigest: string;
+	  }
+> {
+	const result = prepareClose(input, true);
+	return result.ok
+		? Object.freeze({
+				ok: true,
+				promotion: result.close as unknown as CreatorForwardPromotionPreparation,
+				exactCanonicalCutValueBytes: result.exactCanonicalCutValueBytes,
+				valueDigest: result.valueDigest,
+			})
+		: result;
+}
+/** Uses the same current QC and governed anchor signing owner with distinct custody. */
+export function prepareCreatorForwardPromotionSuccessor(input: unknown): Readonly<
+	| { ok: false; reason: string }
+	| {
+			ok: true;
+			preparation: CreatorForwardPromotionAnchorPreparation;
+			signingRequest: CreatorAnchorSigningRequest;
+			anchorDigest: string;
+			exactCanonicalAnchorPreimageBytes: Uint8Array;
+	  }
+> {
+	const result = prepareSuccessor(input, true);
+	return result.ok
+		? Object.freeze({
+				...result,
+				preparation: result.preparation as unknown as CreatorForwardPromotionAnchorPreparation,
+			})
+		: result;
+}
+/** Completes only a genuine dedicated one-use promotion preparation. */
+export function completeCreatorForwardPromotionSuccessor(input: unknown): ReturnType<typeof completeSuccessor> {
+	return completeSuccessor(input, true);
+}
+/** Authenticates the whole promotion Cut/QC and effective successor equation. */
+export function openCreatorForwardPromotionSuccessorTrust(input: unknown): ReturnType<typeof openSuccessorTrust> {
+	return openSuccessorTrust(input, true);
 }

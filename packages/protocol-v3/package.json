@@ -78,6 +78,10 @@
 			"types": "./dist/src/internal/seal-authority-identity.d.ts",
 			"import": "./dist/src/internal/seal-authority-identity.js"
 		},
+		"./internal/creator-forward-promotion": {
+			"types": "./dist/src/internal/creator-forward-promotion.d.ts",
+			"import": "./dist/src/internal/creator-forward-promotion.js"
+		},
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",
 			"import": "./dist/src/snapshot-transfer.js"

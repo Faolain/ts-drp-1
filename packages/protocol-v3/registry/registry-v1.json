@@ -475,6 +475,14 @@
 					},
 					"required": true,
 					"sortRule": null
+				},
+				{
+					"name": "forwardPromotion",
+					"type": "forward-promotion",
+					"const": null,
+					"constraints": { "schema": "forwardPromotion", "version": 1 },
+					"required": false,
+					"sortRule": null
 				}
 			],
 			"signedEnvelope": {

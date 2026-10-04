@@ -2,7 +2,32 @@
 
 ## Next Agent Prompt
 
-Active pickup (2026-10-04): the signed historical-anchor mechanism is implemented
+Active pickup (2026-10-04): implement the
+[authorized forward historical promotion](../../.logs/bounded-storage-lifecycle/forward-promotion-authority-01/authorization.md)
+through the existing lifetime owner. The new authenticated
+[decision/representation law](slices/02e-4-authenticated-forward-promotion.md)
+is accepted for causal pure RED. The focused XHIGH review's
+[three causal test gaps](../../.logs/bounded-storage-lifecycle/forward-promotion-red-review-01/root-disposition.md)
+are corrected and [independently released](../../.logs/bounded-storage-lifecycle/forward-promotion-red-correction-review-01/root-disposition.md).
+The pure seam and its focused capture correction are separately XHIGH-accepted;
+[MAIN integration](../../.logs/bounded-storage-lifecycle/forward-promotion-main-01/root-disposition.md)
+passes the frozen authority/capture/ordinary controls without native acceptance. Proceed
+immediately through focused RED/GREEN
+and actual room installation/restart/continued-write gates. Keep exact historical
+checkpoint identity separate from the new operational epoch and monotone safety
+memory. A separate tests-only HIGH author froze the
+[real room-consumer RED](slices/02e-5-room-forward-promotion.md); its focused separate
+XHIGH review is running before distinct runtime HIGH GREEN;
+no runtime/product acceptance follows before its changed-product runs.
+The accepted Node/storage allocations remain closed; review only this
+new authority boundary. Standing authorization also covers authenticated recipient
+installation under the existing trust model: choose conservative protocol/API/schema/
+custody/orchestration contracts, document assumptions and implement with actual
+RED/GREEN. Do not stop for routine technical approval. Genuine requirement conflict,
+security weakening/trust-model change, irreversible user-data operations and external
+permissions/costs remain the only direction gates.
+
+The signed historical-anchor mechanism is implemented
 and [focused MAIN integration accepted](../../.logs/bounded-storage-lifecycle/signed-anchor-mechanism-main-01/root-disposition.md).
 The original product review's native capture/close admission finding is resolved
 by the [separately reviewed lifetime correction](../../.logs/bounded-storage-lifecycle/signed-anchor-close-correction-product-review-01/root-disposition.md).
@@ -52,17 +77,22 @@ unchanged full matrices at any handoff.
 The [room-consumer investigation](../../.logs/bounded-storage-lifecycle/usable-rollback-consumer-investigation-01/proposal.md)
 identifies an actual authority conflict: historical promotion cannot lower the
 committed floor or reactivate Superseded generations under the accepted safety law.
-The intended forward-authorized promotion semantics require user direction before
-changing room authority; this does not block the current Node implementation.
+The user has now selected authenticated forward promotion at a new epoch, with
+exact historical checkpoint and role reconciliation and all safety watermarks
+preserved. The [authorization](../../.logs/bounded-storage-lifecycle/forward-promotion-authority-01/authorization.md)
+governs the changed authority seam; old signatures alone cannot grant it. Preserve
+the original investigation as evidence of why ordinary reopening or app restore
+cannot meet usable rollback. No literal old-epoch or Superseded reactivation follows.
 The [recipient boundary disposition](../../.logs/bounded-storage-lifecycle/recipient-retention-consumer-review-01/root-disposition.md)
 confirms genuine peer byte ingress activates only a non-writing closed replica;
 writable staging instead consumes local-close custody. Establish concrete
 authenticated incoming successor provenance and destination-bound custody before
-allocating that installer. Missing orchestration alone does not require new trust
-policy, but new remote/import/fresh-device authority requires user direction.
+implementing that installer. Missing orchestration alone does not require new trust
+policy. Authenticated installation under the existing trust model is now explicitly
+authorized; changing that trust model still requires direction.
 Neither a transfer receipt nor raw fixture AHE/floor copying supplies that grant.
-These are authority holds, not permission to weaken rollback, fabricate local-close
-facts or relabel closed activation as continued-write acceptance.
+These are concrete custody obligations, not permission to weaken rollback, fabricate
+local-close facts or relabel closed activation as continued-write acceptance.
 
 The [protected-role prerequisite](../../.logs/bounded-storage-lifecycle/protected-role-acquisition-review-01/root-disposition.md)
 is accepted as a conditional current/pending source contract only. Actual snapshot

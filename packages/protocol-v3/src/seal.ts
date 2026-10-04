@@ -1,5 +1,6 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { captureForwardPromotion } from "./internal/creator-forward-promotion.js";
 
 import type { CertifiedAnchorTrust, CurrentAnchorTrust } from "./index.js";
 import {
@@ -235,6 +236,9 @@ function validateRegisteredRecord(kindName: string, value: unknown): value is Re
 				break;
 			case "parameters":
 				if (!validateRegisteredRecord("parameters", candidate)) return false;
+				break;
+			case "forward-promotion":
+				if (captureForwardPromotion(candidate) === undefined) return false;
 				break;
 			case "array<signed-seal-vote>":
 				if (!validateSignedVotes(candidate)) return false;
