@@ -90,12 +90,25 @@ export type CreatorCapturedFloor =
  * @param pin - Captured genesis identity.
  * @returns Detached stable head or a distinct floor refusal.
  */
-export function captureCreatorRoomFloor(value: unknown, objectId: string, pin: string): CreatorCapturedFloor {
+export function captureCreatorRoomHeadState(
+	value: unknown,
+	objectId: string,
+	pin: string
+):
+	| Readonly<{
+			ok: true;
+			state: Readonly<{
+				stable: CreatorExpectedRoomHead;
+				pending: null | Readonly<{ previous: CreatorExpectedRoomHead; next: CreatorExpectedRoomHead }>;
+			}>;
+	  }>
+	| Readonly<{ ok: false; kind: "floor-unavailable" | "floor-invalid"; reason?: "conflict" | "unavailable" }> {
 	try {
 		const failure = (
-			kind: "floor-unavailable" | "floor-invalid" | "floor-pending",
-			reason?: string
-		): CreatorCapturedFloor => Object.freeze({ ok: false, kind, ...(reason === undefined ? {} : { reason }) });
+			kind: "floor-unavailable" | "floor-invalid",
+			reason?: "conflict" | "unavailable"
+		): Extract<ReturnType<typeof captureCreatorRoomHeadState>, { ok: false }> =>
+			Object.freeze({ ok: false, kind, ...(reason === undefined ? {} : { reason }) });
 		const result = exactFloorRecord(value, ["ok", "state"]) ?? exactFloorRecord(value, ["ok", "reason"]);
 		if (result === undefined) return failure("floor-invalid");
 		if (result.ok === false && (result.reason === "conflict" || result.reason === "unavailable"))
@@ -122,10 +135,25 @@ export function captureCreatorRoomFloor(value: unknown, objectId: string, pin: s
 				next.currentAnchorDigest === stable.currentAnchorDigest
 			)
 				return failure("floor-invalid");
-			return failure("floor-pending");
+			return Object.freeze({ ok: true, state: Object.freeze({ stable, pending: Object.freeze({ previous, next }) }) });
 		}
-		return Object.freeze({ ok: true, stable });
+		return Object.freeze({ ok: true, state: Object.freeze({ stable, pending: null }) });
 	} catch {
 		return Object.freeze({ ok: false, kind: "floor-invalid" });
 	}
+}
+
+/**
+ * Preserves the stable-only observer's refusal of a genuine pending host state.
+ * @param value - Actual trusted host result.
+ * @param objectId - Captured object scope.
+ * @param pin - Captured genesis identity.
+ * @returns Stable floor or the original floor refusal.
+ */
+export function captureCreatorRoomFloor(value: unknown, objectId: string, pin: string): CreatorCapturedFloor {
+	const captured = captureCreatorRoomHeadState(value, objectId, pin);
+	if (!captured.ok) return captured;
+	return captured.state.pending === null
+		? Object.freeze({ ok: true, stable: captured.state.stable })
+		: Object.freeze({ ok: false, kind: "floor-pending" });
 }

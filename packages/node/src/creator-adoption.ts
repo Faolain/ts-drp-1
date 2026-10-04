@@ -55,7 +55,10 @@ import {
 	type CreatorSuccessorReopenResult,
 	installCreatorSuccessorReopen,
 } from "./internal/creator-successor-live.js";
-import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";
+import {
+	inspectCreatorAdoptionCandidateLineage,
+	inspectCreatorTransitionAdvance,
+} from "./internal/creator-transition-advance.js";
 
 const PROFILE = Object.freeze({
 	maxManifestBytes: 212_387,
@@ -1300,37 +1303,9 @@ async function authenticatePendingCandidate(
 	objectId: StorageObjectId
 ): Promise<AuthenticatedPendingCandidate | undefined> {
 	try {
-		if (candidate.state !== "Complete" && candidate.state !== "Adopted") return undefined;
-		const proposedHead = presentBase(candidate);
-		const byId = new Map(lineage.map((generation) => [generation.generationId, generation]));
-		if (byId.size !== lineage.length || proposedHead === undefined) return undefined;
-		const proposedGeneration = byId.get(proposedHead.generationId);
-		const currentHead = proposedGeneration === undefined ? undefined : presentBase(proposedGeneration);
-		const currentGeneration = currentHead === undefined ? undefined : byId.get(currentHead.generationId);
-		if (
-			proposedGeneration === undefined ||
-			currentHead === undefined ||
-			currentGeneration === undefined ||
-			currentGeneration.state !== "Superseded" ||
-			(proposedGeneration.state !== "Adopted" && proposedGeneration.state !== "Superseded") ||
-			candidate.baseExpectedHead.kind !== "present" ||
-			proposedGeneration.baseExpectedHead.kind !== "present" ||
-			candidate.objectId !== objectId ||
-			proposedGeneration.objectId !== objectId ||
-			currentGeneration.objectId !== objectId ||
-			proposedHead.revision !== currentHead.revision + 1
-		) {
-			return undefined;
-		}
-		const closureDigest = digestClosure(candidate.closure);
-		if (!closureDigest.ok || candidate.closureDigest !== closureDigest.value) return undefined;
-		const candidateHead: PresentHead = Object.freeze({
-			closureDigest: closureDigest.value,
-			generationId: candidate.generationId,
-			kind: "present",
-			objectId,
-			revision: (proposedHead.revision + 1) as PresentHead["revision"],
-		});
+		const structure = inspectCreatorAdoptionCandidateLineage({ objectId, lineage, candidate });
+		if (structure === undefined) return undefined;
+		const { currentGeneration, proposedGeneration, candidateHead } = structure;
 		const [currentCandidates, proposedCandidates, candidateCandidates] = await Promise.all([
 			loadClosure(input.store, currentGeneration.closure),
 			loadClosure(input.store, proposedGeneration.closure),
@@ -1518,7 +1493,7 @@ async function authenticatePendingCandidate(
 						successor: encodeCanonical(snapshot.payload.acl),
 					},
 				}).ok)
-			? Object.freeze({ closureDigest: closureDigest.value, generation: candidate, head: candidateHead })
+			? Object.freeze({ closureDigest: candidateHead.closureDigest, generation: candidate, head: candidateHead })
 			: undefined;
 	} catch {
 		return undefined;

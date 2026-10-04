@@ -16,18 +16,30 @@ import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3
 import {
 	AHE_BOUNDED_READ_LIMITS,
 	type AheBoundedActiveRead,
+	type AheBoundedRecoveryRoleRead,
+	type AheBoundedRecoveryRoleStore,
 	type AheDurableStore,
 	type GenerationRecord,
 	type GenerationRef,
 	parseStorageObjectId,
+	type PresentHead,
+	type StorageRejectionReason,
 } from "@ts-drp/storage";
 import {
+	type SnapshotChunkDescriptor,
 	snapshotQuarantineContract,
+	type SnapshotQuarantineFailureCode,
+	type SnapshotQuarantineScopeKey,
 	type SnapshotRecoveryStore,
 	type SnapshotVerificationReceipt,
 } from "@ts-drp/storage/snapshot-transfer";
 
-import { captureCreatorRoomFloor, type CreatorExpectedRoomHead, sameCreatorRoomHead } from "./creator-room-head.js";
+import {
+	captureCreatorRoomFloor,
+	captureCreatorRoomHeadState,
+	type CreatorExpectedRoomHead,
+	sameCreatorRoomHead,
+} from "./creator-room-head.js";
 import {
 	canonicalCreatorDataRecord,
 	creatorDataDigest,
@@ -40,6 +52,7 @@ import {
 import {
 	type CreatorTransitionClosure,
 	exactCreatorTransitionOccurrence,
+	inspectCreatorAdoptionCandidateLineage,
 	inspectCreatorTransitionAdvance,
 	openCreatorTransitionClosedCutEvidence,
 	uniqueCreatorTransitionCandidate,
@@ -102,6 +115,92 @@ export interface CreatorClosedRollbackDataInput {
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly signal?: AbortSignal;
 }
+export type CreatorProtectedRecoveryRoleObservation = Readonly<Record<never, never>>;
+export interface CreatorProtectedRecoveryRoleInput {
+	readonly objectId: string;
+	readonly pinnedGenesisAnchorDigest: string;
+	readonly exactCanonicalPinnedGenesisTrustStateRecordBytes: Uint8Array;
+	readonly roomHeadAuthority: CreatorRollbackFloorReader;
+	readonly catalog: TrustedBlueprintCatalog;
+	readonly store: AheBoundedRecoveryRoleStore;
+	readonly snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
+	readonly signal?: AbortSignal;
+}
+export type CreatorProtectedRecoveryRoleFailureKind =
+	| "malformed-input"
+	| "floor-unavailable"
+	| "floor-invalid"
+	| "floor-stale"
+	| "ahe-empty"
+	| "ahe-rejected"
+	| "ahe-stale"
+	| "chain-invalid"
+	| "role-missing"
+	| "role-ambiguous"
+	| "pending-policy-unavailable"
+	| "inherited-scope-unclassified"
+	| "snapshot-unavailable"
+	| "snapshot-not-ready"
+	| "snapshot-invalid"
+	| "blueprint-invalid"
+	| "proof-budget-exceeded"
+	| "aborted"
+	| "release-failed"
+	| "internal-invariant";
+export type CreatorProtectedRecoveryRoleDebt = Readonly<{
+	owner: "floor" | "ahe" | "snapshot";
+	role: "current" | "pending-adoption" | "unclassified";
+	objectId: string;
+	generationId?: string;
+	snapshotScope?: SnapshotQuarantineScopeKey;
+}>;
+export type CreatorProtectedRecoveryRoleCause =
+	| Readonly<{ owner: "ahe"; reason: StorageRejectionReason }>
+	| Readonly<{ owner: "snapshot"; reason: SnapshotQuarantineFailureCode }>
+	| Readonly<{ owner: "floor"; reason: "conflict" | "unavailable" }>
+	| Readonly<{ owner: "role-policy"; reason: "RETIREMENT_ONLY_ADVANCE_UNAVAILABLE" }>;
+export type CreatorProtectedRecoveryRoleResult =
+	| Readonly<{ ok: true; observation: CreatorProtectedRecoveryRoleObservation }>
+	| Readonly<{
+			ok: false;
+			kind: CreatorProtectedRecoveryRoleFailureKind;
+			debt: CreatorProtectedRecoveryRoleDebt;
+			cause?: CreatorProtectedRecoveryRoleCause;
+	  }>;
+export type CreatorProtectedRecoveryRoleIdentity = Readonly<{
+	roomHead: CreatorExpectedRoomHead;
+	profileId: string;
+	generation: Readonly<GenerationRecord & { derivedHead: PresentHead }>;
+	controls: readonly Readonly<{
+		kind: "projection" | "trust" | "cut" | "commit-qc" | "retirement" | "aggregate" | "settlement" | "closed-acl";
+		ref: GenerationRef;
+	}>[];
+	snapshot: null | Readonly<{
+		scope: SnapshotQuarantineScopeKey;
+		manifestByteLength: number;
+		payloadDigest: string;
+		stateDigest: string;
+		closedAclDigest: string;
+		successorAclDigest: string;
+		totalBytes: number;
+		chunks: readonly SnapshotChunkDescriptor[];
+	}>;
+}>;
+export type CreatorProtectedRecoveryRoleSummary = Readonly<{
+	floor: Readonly<{
+		stable: CreatorExpectedRoomHead;
+		pending: null | Readonly<{ previous: CreatorExpectedRoomHead; next: CreatorExpectedRoomHead }>;
+	}>;
+	head: PresentHead;
+	current: CreatorProtectedRecoveryRoleIdentity;
+	pending: null | Readonly<{
+		role: CreatorProtectedRecoveryRoleIdentity;
+		publication: "before-publication" | "already-published";
+	}>;
+	supportGenerations: readonly GenerationRecord[];
+	heldGenerations: readonly GenerationRecord[];
+	currency: "point-observed-no-incarnation";
+}>;
 export type CreatorClosedRollbackDataFailureKind =
 	| "malformed-input"
 	| "floor-unavailable"
@@ -241,16 +340,27 @@ function bindMethod<T extends (...args: never[]) => unknown>(owner: object, name
 	if (typeof method !== "function") throw new TypeError("missing trusted port");
 	return ((...args: never[]) => Reflect.apply(method, owner, args)) as T;
 }
-interface Captured extends CreatorClosedRollbackDataInput {
+interface CapturedSnapshot extends Omit<CreatorClosedRollbackDataInput, "store" | "liveJournalStore"> {
 	readonly floorRead: CreatorRollbackFloorReader["read"];
-	readonly acquire: AheDurableStore["acquireBoundedActiveRead"];
 	readonly lookup: CreatorClosedRollbackDataInput["snapshotStore"]["lookupRecoveryDeclaration"];
 	readonly snapshotAcquire: CreatorClosedRollbackDataInput["snapshotStore"]["acquireRecoveryRead"];
 	readonly readiness: CreatorClosedRollbackDataInput["snapshotStore"]["recoveryStatus"];
-	readonly anchorRead: DurableLiveJournalStore["readAnchorPreimage"];
 	readonly capturedCatalog: TrustedBlueprintCatalog;
 }
-function capture(value: unknown): Captured | undefined {
+interface Captured extends CapturedSnapshot {
+	readonly store: AheDurableStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
+	readonly acquire: AheDurableStore["acquireBoundedActiveRead"];
+	readonly anchorRead: DurableLiveJournalStore["readAnchorPreimage"];
+}
+interface CapturedRole extends CapturedSnapshot {
+	readonly store: AheBoundedRecoveryRoleStore;
+	readonly acquire: AheBoundedRecoveryRoleStore["acquireBoundedRecoveryRoleRead"];
+}
+function captureSnapshot(
+	value: unknown,
+	journal: boolean
+): (CapturedSnapshot & { store: AheDurableStore; liveJournalStore?: DurableLiveJournalStore }) | undefined {
 	try {
 		if (value === null || typeof value !== "object" || ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
 			return undefined;
@@ -262,7 +372,7 @@ function capture(value: unknown): Captured | undefined {
 			"catalog",
 			"store",
 			"snapshotStore",
-			"liveJournalStore",
+			...(journal ? ["liveJournalStore"] : []),
 		];
 		const keys = Reflect.ownKeys(value);
 		if (
@@ -296,12 +406,37 @@ function capture(value: unknown): Captured | undefined {
 			...input,
 			exactCanonicalPinnedGenesisTrustStateRecordBytes: bytes,
 			floorRead: bindMethod<CreatorRollbackFloorReader["read"]>(input.roomHeadAuthority, "read"),
-			acquire: bindMethod<AheDurableStore["acquireBoundedActiveRead"]>(input.store, "acquireBoundedActiveRead"),
 			lookup: bindMethod<Captured["lookup"]>(input.snapshotStore, "lookupRecoveryDeclaration"),
 			snapshotAcquire: bindMethod<Captured["snapshotAcquire"]>(input.snapshotStore, "acquireRecoveryRead"),
 			readiness: bindMethod<Captured["readiness"]>(input.snapshotStore, "recoveryStatus"),
-			anchorRead: bindMethod<Captured["anchorRead"]>(input.liveJournalStore, "readAnchorPreimage"),
 			capturedCatalog: Object.freeze({ resolve: catalogResolve, catalogDigest }) as TrustedBlueprintCatalog,
+		});
+	} catch {
+		return undefined;
+	}
+}
+function capture(value: unknown): Captured | undefined {
+	try {
+		const input = captureSnapshot(value, true);
+		if (input === undefined || input.liveJournalStore === undefined) return undefined;
+		return Object.freeze({
+			...input,
+			liveJournalStore: input.liveJournalStore,
+			acquire: bindMethod<Captured["acquire"]>(input.store, "acquireBoundedActiveRead"),
+			anchorRead: bindMethod<Captured["anchorRead"]>(input.liveJournalStore, "readAnchorPreimage"),
+		});
+	} catch {
+		return undefined;
+	}
+}
+function captureRole(value: unknown): CapturedRole | undefined {
+	try {
+		const input = captureSnapshot(value, false);
+		if (input === undefined) return undefined;
+		return Object.freeze({
+			...input,
+			store: input.store as AheBoundedRecoveryRoleStore,
+			acquire: bindMethod<CapturedRole["acquire"]>(input.store, "acquireBoundedRecoveryRoleRead"),
 		});
 	} catch {
 		return undefined;
@@ -325,7 +460,7 @@ function snapshotCall<T>(call: () => Promise<T>): Promise<T> {
 		throw new Refusal(snapshotFailure(error));
 	});
 }
-function view(reader: AheBoundedActiveRead, index: number): CreatorTransitionClosure {
+function view(reader: Pick<AheBoundedActiveRead, "generations" | "blobs">, index: number): CreatorTransitionClosure {
 	const generation = reader.generations[index];
 	requireLaw(generation !== undefined);
 	const candidates = generation.closure.map((ref) => {
@@ -595,9 +730,15 @@ interface Target {
 	readonly projection: Readonly<Record<string, unknown>>;
 }
 async function readTarget(
-	input: Captured,
+	input: CapturedSnapshot,
 	target: Target
-): Promise<Readonly<{ summary: CutSummary; successorAclBytes: Uint8Array }>> {
+): Promise<
+	Readonly<{
+		summary: CutSummary;
+		successorAclBytes: Uint8Array;
+		snapshot: NonNullable<CreatorProtectedRecoveryRoleIdentity["snapshot"]>;
+	}>
+> {
 	checkAbort(input.signal);
 	const scope = Object.freeze({
 		objectId: input.objectId,
@@ -614,7 +755,13 @@ async function readTarget(
 	if (acquired.kind === "missing") throw new Refusal(failure("snapshot-unavailable"));
 	const release = bindMethod<typeof acquired.reader.release>(acquired.reader, "release");
 	let primary: unknown;
-	let observed: Readonly<{ summary: CutSummary; successorAclBytes: Uint8Array }> | undefined;
+	let observed:
+		| Readonly<{
+				summary: CutSummary;
+				successorAclBytes: Uint8Array;
+				snapshot: NonNullable<CreatorProtectedRecoveryRoleIdentity["snapshot"]>;
+		  }>
+		| undefined;
 	try {
 		const read = bindMethod<typeof acquired.reader.read>(acquired.reader, "read");
 		requireLaw(acquired.state === "verified" && acquired.retention === "recovery", "snapshot-not-ready");
@@ -673,6 +820,16 @@ async function readTarget(
 		);
 		observed = Object.freeze({
 			successorAclBytes: data.successorAclBytes,
+			snapshot: Object.freeze({
+				scope,
+				manifestByteLength: declaration.exactCanonicalManifestBytes.byteLength,
+				payloadDigest: String(data.manifest.payloadDigest),
+				stateDigest: String(target.cut.stateDigest),
+				closedAclDigest: target.closedAclDigest,
+				successorAclDigest: String(target.cut.aclDigest),
+				totalBytes: payload.byteLength,
+				chunks: Object.freeze(decoded.chunks.map((chunk) => Object.freeze({ ...chunk }))),
+			}),
 			summary: Object.freeze({
 				objectId: input.objectId,
 				epoch: scope.epoch,
@@ -1035,6 +1192,605 @@ export async function authenticateCreatorClosedRollbackData(
 	if (isAborted(input.signal)) return failure("aborted");
 	const observation = Object.freeze({});
 	observations.set(observation, facts);
+	return Object.freeze({ ok: true, observation });
+}
+
+type RoleFailure = Extract<CreatorProtectedRecoveryRoleResult, { ok: false }>;
+interface RoleFacts {
+	readonly summary: CreatorProtectedRecoveryRoleSummary;
+	readonly owners: readonly object[];
+	readonly custody: readonly CurrentAnchorTrust[];
+	readonly controls: readonly object[];
+}
+const roleObservations = new WeakMap<CreatorProtectedRecoveryRoleObservation, RoleFacts>();
+/**
+ * Resolves only this module's genuine fieldless role facts, never structural copies.
+ * @param value - Candidate fact.
+ * @returns Frozen detached diagnostics or undefined.
+ */
+export function resolveCreatorProtectedRecoveryRoleObservation(
+	value: unknown
+): CreatorProtectedRecoveryRoleSummary | undefined {
+	return value !== null && typeof value === "object" ? roleObservations.get(value)?.summary : undefined;
+}
+class RoleRefusal {
+	constructor(readonly result: RoleFailure) {}
+}
+function roleFailure(
+	kind: CreatorProtectedRecoveryRoleFailureKind,
+	debt: CreatorProtectedRecoveryRoleDebt,
+	cause?: CreatorProtectedRecoveryRoleCause
+): RoleFailure {
+	return Object.freeze({
+		ok: false,
+		kind,
+		debt: Object.freeze({ ...debt }),
+		...(cause === undefined ? {} : { cause: Object.freeze({ ...cause }) }),
+	});
+}
+function detachedGeneration(generation: GenerationRecord): GenerationRecord {
+	return Object.freeze({
+		...generation,
+		baseExpectedHead: Object.freeze({ ...generation.baseExpectedHead }),
+		closure: Object.freeze(generation.closure.map((ref) => Object.freeze({ ...ref }))),
+	});
+}
+function roleHead(generation: GenerationRecord): PresentHead {
+	return Object.freeze({
+		kind: "present",
+		objectId: generation.objectId,
+		generationId: generation.generationId,
+		closureDigest: generation.closureDigest,
+		revision: ((generation.baseExpectedHead.kind === "present" ? generation.baseExpectedHead.revision : 0) +
+			1) as PresentHead["revision"],
+	});
+}
+function sameRoleHead(left: PresentHead, right: PresentHead): boolean {
+	return (
+		left.objectId === right.objectId &&
+		left.generationId === right.generationId &&
+		left.closureDigest === right.closureDigest &&
+		left.revision === right.revision
+	);
+}
+const roleControlKinds: Readonly<Record<string, CreatorProtectedRecoveryRoleIdentity["controls"][number]["kind"]>> =
+	Object.freeze({
+		"v3-live-generation-1": "projection",
+		"v3-live-generation-2": "projection",
+		"drp-anchor-trust-state": "trust",
+		"drp-hard-epoch-cut": "cut",
+		"drp-seal-qc": "commit-qc",
+		"drp-creator-issuance-retirement-state": "retirement",
+		"drp-creator-author-issuance-frontiers-state": "aggregate",
+		"drp-creator-author-settlement-state": "settlement",
+		"drp-v3-latched-acl": "closed-acl",
+	});
+interface AuthenticatedRole {
+	readonly identity: CreatorProtectedRecoveryRoleIdentity;
+	readonly trust: CurrentAnchorTrust;
+	readonly support: readonly GenerationRecord[];
+	readonly target?: Target;
+	readonly transition?: Parameters<typeof inspectCreatorTransitionAdvance>[0];
+}
+function strictRoleControls(closure: CreatorTransitionClosure, debt: CreatorProtectedRecoveryRoleDebt): void {
+	const counts = new Map<string, number>();
+	for (const candidate of closure.candidates) {
+		const kind = canonicalCreatorDataRecord(candidate.bytes)?.kind;
+		if (typeof kind !== "string" || roleControlKinds[kind] === undefined) continue;
+		const category = roleControlKinds[kind];
+		counts.set(category, (counts.get(category) ?? 0) + 1);
+	}
+	if ([...counts.values()].some((count) => count > 1)) throw new RoleRefusal(roleFailure("role-ambiguous", debt));
+}
+function selectedRoleRows(
+	reader: AheBoundedRecoveryRoleRead,
+	epoch: number,
+	debt: CreatorProtectedRecoveryRoleDebt
+): GenerationRecord[] {
+	const has = (generation: GenerationRecord, kind: string, expectedEpoch: number): boolean =>
+		view(reader, reader.generations.indexOf(generation)).candidates.some((candidate) => {
+			const decoded = canonicalCreatorDataRecord(candidate.bytes);
+			return (
+				decoded?.kind === kind &&
+				(kind === "drp-anchor-trust-state" ? decoded.currentEpoch : decoded.epoch) === expectedEpoch
+			);
+		});
+	const matches = reader.generations.filter((generation) => {
+		if (!["Complete", "Adopted", "Superseded"].includes(generation.state)) return false;
+		const projection = has(generation, epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2", epoch);
+		if (projection && (generation.state === "Complete" || has(generation, "drp-anchor-trust-state", epoch)))
+			return true;
+		if (epoch === 0 || generation.baseExpectedHead.kind !== "present") return false;
+		const proposed = reader.generations.find(
+			(row) =>
+				generation.baseExpectedHead.kind === "present" && row.generationId === generation.baseExpectedHead.generationId
+		);
+		// A recognized publication cannot disappear because its own trust/projection
+		// contradicts its exact raw Q tuple. Authentication follows the whole census.
+		return (
+			proposed !== undefined &&
+			has(proposed, "drp-anchor-trust-state", epoch) &&
+			has(proposed, "drp-hard-epoch-cut", epoch - 1) &&
+			has(proposed, epoch === 1 ? "v3-live-generation-1" : "v3-live-generation-2", epoch - 1)
+		);
+	});
+	if (matches.length > 1) throw new RoleRefusal(roleFailure("role-ambiguous", debt));
+	if (matches.length === 0) throw new RoleRefusal(roleFailure("role-missing", debt));
+	const live = matches[0] as GenerationRecord;
+	if (epoch === 0) return [live];
+	requireLaw(live.baseExpectedHead.kind === "present");
+	// Resolve exact persisted bases, not epoch-near or cryptographic survivors.
+	const q = reader.generations.find(
+		(g) => live.baseExpectedHead.kind === "present" && g.generationId === live.baseExpectedHead.generationId
+	);
+	requireLaw(q !== undefined && q.baseExpectedHead.kind === "present");
+	const p = reader.generations.find(
+		(g) => q.baseExpectedHead.kind === "present" && g.generationId === q.baseExpectedHead.generationId
+	);
+	requireLaw(
+		(p !== undefined && p.state === "Superseded" && q.state === "Superseded") ||
+			(p !== undefined && p.state === "Superseded" && q.state === "Adopted")
+	);
+	requireLaw(p !== undefined && new Set([live.generationId, q.generationId, p.generationId]).size === 3);
+	requireLaw(
+		live.objectId === q.objectId &&
+			q.objectId === p.objectId &&
+			sameRoleHead(live.baseExpectedHead, roleHead(q)) &&
+			q.baseExpectedHead.kind === "present" &&
+			q.baseExpectedHead.objectId === p.objectId &&
+			q.baseExpectedHead.generationId === p.generationId &&
+			q.baseExpectedHead.closureDigest === p.closureDigest &&
+			// Native retained-lineage floors deliberately have no older base.
+			// Their exact revision is witnessed by Q's authenticated persisted base,
+			// not reconstructed as revision one from an absent historical edge.
+			(p.baseExpectedHead.kind === "none" || sameRoleHead(q.baseExpectedHead, roleHead(p)))
+	);
+	return [live, q, p];
+}
+function authenticateRole(
+	input: CapturedRole,
+	reader: AheBoundedRecoveryRoleRead,
+	rows: readonly GenerationRecord[],
+	roomHead: CreatorExpectedRoomHead,
+	pin: CurrentAnchorTrust,
+	pinRecord: Readonly<Record<string, unknown>>,
+	accounting: CreatorClosedRollbackProofAccounting,
+	debt: CreatorProtectedRecoveryRoleDebt
+): AuthenticatedRole {
+	const generation = rows[0] as GenerationRecord;
+	const closures = rows.map((g) => view(reader, reader.generations.indexOf(g)));
+	for (const closure of closures) strictRoleControls(closure, debt);
+	const live = closures[0] as CreatorTransitionClosure;
+	const n = roomHead.epoch;
+	const carrier = unique(live, "drp-anchor-trust-state", n);
+	const projectionCarrier = unique(live, n === 0 ? "v3-live-generation-1" : "v3-live-generation-2", n);
+	const projection = record(projectionCarrier.bytes);
+	let trust = pin;
+	let target: Target | undefined;
+	let transition: Parameters<typeof inspectCreatorTransitionAdvance>[0] | undefined;
+	if (n === 0)
+		requireLaw(
+			compareBytes(carrier.bytes, input.exactCanonicalPinnedGenesisTrustStateRecordBytes) === 0 &&
+				sameCreatorRoomHead(roomHead, pin)
+		);
+	else {
+		const proposed = closures[1] as CreatorTransitionClosure,
+			predecessor = closures[2] as CreatorTransitionClosure;
+		const cut = unique(proposed, "drp-hard-epoch-cut", n - 1),
+			qc = unique(proposed, "drp-seal-qc", n - 1);
+		const predecessorCarrier = unique(predecessor, "drp-anchor-trust-state", n - 1);
+		requireLaw(compareBytes(unique(proposed, "drp-anchor-trust-state", n).bytes, carrier.bytes) === 0);
+		let predecessorTrust = pin;
+		if (n === 1) {
+			requireLaw(compareBytes(predecessorCarrier.bytes, input.exactCanonicalPinnedGenesisTrustStateRecordBytes) === 0);
+			const opened = openCreatorSuccessorTrust({
+				currentTrust: pin,
+				exactCanonicalCommitQcBytes: qc.bytes,
+				exactCanonicalCutValueBytes: cut.bytes,
+				exactCanonicalTrustStateRecordBytes: carrier.bytes,
+			});
+			requireLaw(opened.ok);
+			trust = opened.trust;
+		} else {
+			const opened = openCreatorCheckpointTrust({
+				detachedGenesisSignature: pinRecord.detachedCurrentAnchorSignature,
+				exactCanonicalCommitQcBytes: qc.bytes,
+				exactCanonicalCurrentTrustStateRecordBytes: carrier.bytes,
+				exactCanonicalCutValueBytes: cut.bytes,
+				exactCanonicalGenesisAnchorPreimageBytes: pinRecord.exactCanonicalCurrentAnchorPreimageBytes,
+				exactCanonicalPredecessorTrustStateRecordBytes: predecessorCarrier.bytes,
+				expectedCurrentHead: roomHead,
+				expectedObjectId: input.objectId,
+				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			});
+			requireLaw(opened.ok);
+			trust = opened.currentTrust;
+			predecessorTrust = opened.predecessorTrust;
+		}
+		requireLaw(sameCreatorRoomHead(roomHead, trust));
+		const previousProjection = unique(predecessor, n === 1 ? "v3-live-generation-1" : "v3-live-generation-2", n - 1);
+		requireLaw(
+			creatorSnapshotProjectionAuthorityMatches(
+				record(previousProjection.bytes),
+				anchorOf(record(predecessorCarrier.bytes)),
+				predecessorTrust.currentAnchorDigest
+			)
+		);
+		requireLaw(
+			compareBytes(
+				unique(proposed, n === 1 ? "v3-live-generation-1" : "v3-live-generation-2", n - 1).bytes,
+				previousProjection.bytes
+			) === 0
+		);
+		const closedAcl = unique(live, "drp-v3-latched-acl", n - 1);
+		const expected = [
+			...proposed.closure.filter(
+				(ref) => !(ref.digest === previousProjection.ref.digest && ref.byteLength === previousProjection.ref.byteLength)
+			),
+			projectionCarrier.ref,
+			closedAcl.ref,
+		];
+		const exact = new Map(expected.map((ref) => [ref.digest, ref.byteLength]));
+		requireLaw(
+			exact.size === expected.length &&
+				live.closure.length === exact.size &&
+				live.closure.every((ref) => exact.get(ref.digest) === ref.byteLength)
+		);
+		const evidence = openCreatorTransitionClosedCutEvidence({
+			closure: proposed,
+			floorTrust: trust,
+			currentTrust: predecessorTrust,
+		});
+		requireLaw(evidence !== undefined);
+		const binding = inspectCreatorClosedCutSuccessorBinding({
+			successorTrust: trust,
+			exactCanonicalCutValueBytes: evidence.cut.bytes,
+		});
+		requireLaw(binding.ok);
+		if (debt.role === "pending-adoption" && evidence.representation === "retirement-only")
+			throw new RoleRefusal(
+				roleFailure("pending-policy-unavailable", debt, {
+					owner: "role-policy",
+					reason: "RETIREMENT_ONLY_ADVANCE_UNAVAILABLE",
+				})
+			);
+		transition = {
+			current: predecessor,
+			proposed,
+			currentTrust: predecessorTrust,
+			successorTrust: trust,
+			mode: "verify",
+			proofRefs: [cut.ref, qc.ref],
+		};
+		requireLaw(inspectCreatorTransitionAdvance(transition).ok);
+		const aclDigest = String(anchorOf(record(predecessorCarrier.bytes)).aclDigest);
+		target = {
+			cut: binding.cut,
+			successorAnchor: binding.successorAnchor,
+			successorTrust: trust,
+			evidence,
+			closedAclBytes: closedAcl.bytes,
+			closedAclDigest: aclDigest,
+			projection,
+		};
+	}
+	const anchor = anchorOf(record(carrier.bytes));
+	requireLaw(creatorSnapshotProjectionAuthorityMatches(projection, anchor, trust.currentAnchorDigest));
+	const catalog = creatorSnapshotCatalogIdentity(projection);
+	requireLaw(
+		catalog !== undefined &&
+			verifiedCreatorSnapshotCatalog(input.capturedCatalog, anchor.blueprintDigest, catalog) !== undefined,
+		"blueprint-invalid"
+	);
+	// One ledger borrows the whole native union; these controls share actual bytes by equality.
+	for (const closure of closures)
+		for (const candidate of closure.candidates)
+			if (!accounting.charge(candidate.bytes)) throw new Refusal(failure("proof-budget-exceeded"));
+	const controls = live.candidates.flatMap((candidate) => {
+		const r = canonicalCreatorDataRecord(candidate.bytes),
+			kind = roleControlKinds[String(r?.kind)];
+		return kind === undefined || (r?.kind === "drp-seal-qc" && r.phase !== "commit")
+			? []
+			: [Object.freeze({ kind, ref: Object.freeze({ ...candidate.ref }) })];
+	});
+	return {
+		identity: Object.freeze({
+			roomHead,
+			profileId: trust.profileId,
+			generation: Object.freeze({ ...detachedGeneration(generation), derivedHead: roleHead(generation) }),
+			controls: Object.freeze(controls),
+			snapshot: null,
+		}),
+		trust,
+		support: rows.slice(1),
+		...(target === undefined ? {} : { target, transition }),
+	};
+}
+/**
+ * Observes independent current and pending creator recovery roles at qualified points.
+ * @param input - Closed input with borrowed native owners and genuine genesis pin.
+ * @returns A whole fieldless fact only after actual data, full currency and joined cleanup.
+ */
+export async function observeCreatorProtectedRecoveryRoles(
+	input: CreatorProtectedRecoveryRoleInput
+): Promise<CreatorProtectedRecoveryRoleResult> {
+	const captured = captureRole(input);
+	if (captured === undefined)
+		return roleFailure("malformed-input", { owner: "ahe", role: "unclassified", objectId: "" });
+	let debt: CreatorProtectedRecoveryRoleDebt = { owner: "floor", role: "current", objectId: captured.objectId };
+	let release: AheBoundedRecoveryRoleRead["release"] | undefined;
+	let primary: RoleFailure | undefined;
+	let facts: RoleFacts | undefined;
+	try {
+		checkAbort(captured.signal);
+		const readFloor = async (final = false): Promise<ReturnType<typeof captureCreatorRoomHeadState>> => {
+			let raw: unknown;
+			try {
+				raw = await captured.floorRead({
+					scope: { objectId: captured.objectId, pinnedGenesisAnchorDigest: captured.pinnedGenesisAnchorDigest },
+				});
+			} catch {
+				throw new RoleRefusal(roleFailure(final ? "floor-stale" : "floor-unavailable", debt));
+			}
+			return captureCreatorRoomHeadState(raw, captured.objectId, captured.pinnedGenesisAnchorDigest);
+		};
+		const floor = await readFloor();
+		if (!floor.ok)
+			throw new RoleRefusal(
+				roleFailure(floor.kind, debt, floor.reason === undefined ? undefined : { owner: "floor", reason: floor.reason })
+			);
+		checkAbort(captured.signal);
+		debt = { ...debt, owner: "ahe" };
+		const pin = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: captured.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+			expectedObjectId: captured.objectId,
+			pinnedGenesisAnchorDigest: captured.pinnedGenesisAnchorDigest,
+		});
+		requireLaw(pin.ok && pin.trust.currentEpoch === 0);
+		const objectId = parseStorageObjectId(captured.objectId);
+		requireLaw(objectId.ok, "internal-invariant");
+		const acquired = await captured.acquire({ objectId: objectId.value, limits: AHE_BOUNDED_READ_LIMITS });
+		const aheFailure = (reason: StorageRejectionReason): RoleFailure =>
+			roleFailure(
+				reason === "READ_BUDGET_EXCEEDED"
+					? "proof-budget-exceeded"
+					: reason === "READ_STALE_ROLE_VIEW"
+						? "ahe-stale"
+						: "ahe-rejected",
+				debt,
+				{ owner: "ahe", reason }
+			);
+		if (!acquired.ok) throw new RoleRefusal(aheFailure(acquired.reason));
+		const reader = acquired.value;
+		release = bindMethod<typeof reader.release>(reader, "release");
+		const currency = bindMethod<typeof reader.checkCurrency>(reader, "checkCurrency");
+		if (reader.head.kind !== "present") throw new RoleRefusal(roleFailure("ahe-empty", debt));
+		checkAbort(captured.signal);
+		const accounting = createCreatorClosedRollbackProofAccounting(reader.blobs);
+		const currentRows = selectedRoleRows(reader, floor.state.stable.epoch, debt);
+		const currentGeneration = currentRows[0] as GenerationRecord;
+		let pendingRows: GenerationRecord[] = [];
+		let publication: "before-publication" | "already-published" = "before-publication";
+		if (floor.state.pending === null) {
+			if (currentGeneration.state !== "Adopted" || !sameRoleHead(roleHead(currentGeneration), reader.head))
+				throw new RoleRefusal(roleFailure("role-missing", debt));
+		} else {
+			debt = { owner: "ahe", role: "pending-adoption", objectId: captured.objectId };
+			pendingRows = selectedRoleRows(reader, floor.state.pending.next.epoch, debt);
+			const l = pendingRows[0] as GenerationRecord,
+				q = pendingRows[1] as GenerationRecord;
+			const structure = inspectCreatorAdoptionCandidateLineage({
+				objectId: objectId.value,
+				lineage: reader.generations,
+				candidate: l,
+			});
+			requireLaw(
+				structure !== undefined &&
+					structure.currentGeneration.generationId === currentGeneration.generationId &&
+					currentGeneration.state === "Superseded"
+			);
+			if (l.state === "Complete" && q.state === "Adopted" && sameRoleHead(structure.proposedHead, reader.head))
+				publication = "before-publication";
+			else if (l.state === "Adopted" && q.state === "Superseded" && sameRoleHead(structure.candidateHead, reader.head))
+				publication = "already-published";
+			else throw new RoleRefusal(roleFailure("role-missing", debt));
+		}
+		const used = new Set([...currentRows, ...pendingRows].map((g) => g.generationId));
+		for (const generation of reader.generations)
+			if (generation.state === "Complete" && !used.has(generation.generationId))
+				throw new RoleRefusal(
+					roleFailure("inherited-scope-unclassified", {
+						owner: "ahe",
+						role: "unclassified",
+						objectId: captured.objectId,
+						generationId: generation.generationId,
+					})
+				);
+		const pinRecord = record(captured.exactCanonicalPinnedGenesisTrustStateRecordBytes);
+		debt = { owner: "ahe", role: "current", objectId: captured.objectId, generationId: currentGeneration.generationId };
+		let current = authenticateRole(
+			captured,
+			reader,
+			currentRows,
+			floor.state.stable,
+			pin.trust,
+			pinRecord,
+			accounting,
+			debt
+		);
+		let pending: AuthenticatedRole | undefined;
+		if (floor.state.pending !== null) {
+			debt = {
+				owner: "ahe",
+				role: "pending-adoption",
+				objectId: captured.objectId,
+				generationId: pendingRows[0]?.generationId,
+			};
+			pending = authenticateRole(
+				captured,
+				reader,
+				pendingRows,
+				floor.state.pending.next,
+				pin.trust,
+				pinRecord,
+				accounting,
+				debt
+			);
+		}
+		const roles = [current, ...(pending === undefined ? [] : [pending])];
+		let successorAcl: Uint8Array | undefined;
+		for (let index = 0; index < roles.length; index++) {
+			const role = roles[index] as AuthenticatedRole,
+				target = role.target;
+			if (target === undefined) continue;
+			const scope = Object.freeze({
+				objectId: captured.objectId,
+				epoch: Number(target.cut.epoch),
+				anchor: String(target.cut.previousAnchor),
+				manifestDigest: String(target.cut.snapshotManifestDigest),
+			});
+			debt = {
+				owner: "snapshot",
+				role: index === 0 ? "current" : "pending-adoption",
+				objectId: captured.objectId,
+				generationId: role.identity.generation.generationId,
+				snapshotScope: scope,
+			};
+			checkAbort(captured.signal);
+			requireLaw(
+				(await snapshotCall(() => captured.readiness({ signal: captured.signal }))).migration === "ready",
+				"snapshot-not-ready"
+			);
+			requireLaw(
+				openCanonicalLatchedAclSnapshot({
+					exactCanonicalLatchedAclBytes: target.closedAclBytes,
+					expectedAclDigest: target.closedAclDigest,
+					expectedEpoch: scope.epoch,
+					expectedObjectId: captured.objectId,
+					expectedProfileId: role.trust.profileId,
+				}).ok,
+				"snapshot-invalid"
+			);
+			if (index === 1 && successorAcl !== undefined)
+				requireLaw(compareBytes(successorAcl, target.closedAclBytes) === 0, "snapshot-invalid");
+			const data = await readTarget(captured, target);
+			if (!accounting.charge(data.successorAclBytes)) throw new Refusal(failure("proof-budget-exceeded"));
+			if (settlementProfileFor(role.trust.profileId) === "v1") {
+				requireLaw(
+					role.transition !== undefined &&
+						inspectCreatorTransitionAdvance({
+							...role.transition,
+							settlementAcl: { current: target.closedAclBytes, successor: data.successorAclBytes },
+						}).ok
+				);
+			}
+			successorAcl = data.successorAclBytes;
+			const observed = { ...role, identity: Object.freeze({ ...role.identity, snapshot: data.snapshot }) };
+			roles[index] = observed;
+			if (index === 0) current = observed;
+			else pending = observed;
+		}
+		for (let index = 0; index < roles.length; index++) {
+			const role = roles[index] as AuthenticatedRole,
+				snapshot = role.identity.snapshot;
+			if (snapshot === null) continue;
+			debt = {
+				owner: "snapshot",
+				role: index === 0 ? "current" : "pending-adoption",
+				objectId: captured.objectId,
+				generationId: role.identity.generation.generationId,
+				snapshotScope: snapshot.scope,
+			};
+			checkAbort(captured.signal);
+			const lookup = await snapshotCall(() => captured.lookup(snapshot.scope, { signal: captured.signal }));
+			requireLaw(lookup.kind === "present", "snapshot-unavailable");
+			requireLaw(lookup.state === "verified" && lookup.retention === "recovery", "snapshot-not-ready");
+			requireLaw(
+				lookup.declaration.totalBytes === snapshot.totalBytes &&
+					lookup.declaration.exactCanonicalManifestBytes.byteLength === snapshot.manifestByteLength &&
+					lookup.declaration.chunks.length === snapshot.chunks.length &&
+					lookup.declaration.chunks.every(
+						(chunk, i) =>
+							chunk.index === snapshot.chunks[i]?.index &&
+							chunk.digest === snapshot.chunks[i]?.digest &&
+							chunk.byteLength === snapshot.chunks[i]?.byteLength
+					),
+				"snapshot-invalid"
+			);
+		}
+		if (roles.some((role) => role.target !== undefined))
+			requireLaw(
+				(await snapshotCall(() => captured.readiness({ signal: captured.signal }))).migration === "ready",
+				"snapshot-not-ready"
+			);
+		debt = { owner: "ahe", role: "current", objectId: captured.objectId };
+		checkAbort(captured.signal);
+		const finalCurrency = await currency();
+		if (!finalCurrency.ok) throw new RoleRefusal(aheFailure(finalCurrency.reason));
+		checkAbort(captured.signal);
+		debt = { owner: "floor", role: "current", objectId: captured.objectId };
+		const finalFloor = await readFloor(true);
+		if (!finalFloor.ok || JSON.stringify(finalFloor.state) !== JSON.stringify(floor.state))
+			throw new RoleRefusal(
+				roleFailure(
+					"floor-stale",
+					debt,
+					!finalFloor.ok && finalFloor.reason !== undefined ? { owner: "floor", reason: finalFloor.reason } : undefined
+				)
+			);
+		const support = [
+			...new Map([...current.support, ...(pending?.support ?? [])].map((g) => [g.generationId, g])).values(),
+		];
+		facts = Object.freeze({
+			summary: Object.freeze({
+				floor: floor.state,
+				head: Object.freeze({ ...reader.head }),
+				current: current.identity,
+				pending: pending === undefined ? null : Object.freeze({ role: pending.identity, publication }),
+				supportGenerations: Object.freeze(support.map(detachedGeneration)),
+				heldGenerations: Object.freeze(
+					reader.generations.filter((g) => !used.has(g.generationId)).map(detachedGeneration)
+				),
+				currency: "point-observed-no-incarnation",
+			}),
+			owners: Object.freeze([captured.store, captured.snapshotStore, captured.roomHeadAuthority, captured.catalog]),
+			custody: Object.freeze(roles.map((role) => role.trust)),
+			controls: Object.freeze(
+				roles.flatMap((role) => {
+					const evidence = role.target?.evidence;
+					return evidence === undefined
+						? []
+						: [
+								...(evidence.retirement === undefined ? [] : [evidence.retirement.capability]),
+								...(evidence.settlement === undefined ? [] : [evidence.settlement.capability]),
+								...(evidence.aggregate === undefined ? [] : [evidence.aggregate.capability]),
+							];
+				})
+			),
+		});
+	} catch (error) {
+		if (error instanceof RoleRefusal) primary = error.result;
+		else if (error instanceof Refusal) {
+			const result = error.result;
+			const kind =
+				result.kind === "anchor-invalid" || result.kind === "anchor-unavailable" || result.kind === "floor-pending"
+					? "internal-invariant"
+					: result.kind;
+			primary = roleFailure(kind, debt, result.cause as CreatorProtectedRecoveryRoleCause | undefined);
+		} else primary = roleFailure("internal-invariant", debt);
+	} finally {
+		if (release !== undefined)
+			try {
+				await release();
+			} catch {
+				primary ??= roleFailure("release-failed", debt);
+			}
+	}
+	if (primary !== undefined) return primary;
+	if (facts === undefined) return roleFailure("internal-invariant", debt);
+	if (isAborted(captured.signal)) return roleFailure("aborted", debt);
+	const observation = Object.freeze({});
+	roleObservations.set(observation, facts);
 	return Object.freeze({ ok: true, observation });
 }
 

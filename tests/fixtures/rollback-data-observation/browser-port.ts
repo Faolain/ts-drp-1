@@ -21,6 +21,15 @@ export function browserPort(identity: string): NativePort {
 		journal = identity + "--drp-live-journal-v1",
 		floor = identity + "--host-floor";
 	return {
+		snapshotImage: () =>
+			use(snapshot, async (db) => {
+				const tables = ["owner", "scopes", "chunks"],
+					tx = db.transaction(tables, "readonly"),
+					terminal = done(tx);
+				const rows = await Promise.all(tables.map((table) => request(tx.objectStore(table).getAll())));
+				await terminal;
+				return Object.fromEntries(tables.map((table, i) => [table, rows[i]]));
+			}),
 		image: () =>
 			use(ahe, async (db) => {
 				const tables = ["objects", "generations", "blobs", "promotions"],
@@ -93,6 +102,7 @@ export function browserPort(identity: string): NativePort {
 						scopes.delete(key);
 						chunks.delete(range);
 					} else if (fault === "legacy" || fault === "not-ready") {
+						o.migration = "classification-required";
 						o.legacyUnclassifiedScopes++;
 						o.legacyUnclassifiedContentBytes += r.totalBytes + r.exactCanonicalManifestBytes.length;
 						scopes.put({ ...r, retention: "legacy-unclassified", descriptors: null });
@@ -162,7 +172,11 @@ export function browserPort(identity: string): NativePort {
 				},
 			};
 		},
-		observe: async <T>(call: () => Promise<T>, nativeChunk?: () => void) => {
+		observe: async <T>(
+			call: () => Promise<T>,
+			nativeChunk?: () => void,
+			nativeFailure?: { ready(): boolean; trigger(): void }
+		) => {
 			const transaction = Object.getOwnPropertyDescriptor(IDBDatabase.prototype, "transaction")!,
 				originals = new Map(
 					["get", "getAll", "getAllKeys", "getKey", "openCursor", "openKeyCursor", "put", "add", "delete", "clear"].map(
@@ -171,6 +185,7 @@ export function browserPort(identity: string): NativePort {
 				);
 			const empty = () => ({ modes: [] as string[], terminals: [] as string[], writes: 0, reads: [] as unknown[] });
 			const evidence = { ...empty(), fixture: empty() };
+			let failed = false;
 			Object.defineProperty(IDBDatabase.prototype, "transaction", {
 				...transaction,
 				value: function (this: IDBDatabase, ...args: unknown[]) {
@@ -199,6 +214,11 @@ export function browserPort(identity: string): NativePort {
 								if (r && typeof r === "object")
 									for (const v of Object.values(r)) if (v instanceof Uint8Array) entry.nativeBytes += v.length;
 								if (!fixture && this.name === "chunks" && m === "get" && r) nativeChunk?.();
+								if (nativeFailure?.ready() && !failed && !fixture && this.name === "generations" && m === "get") {
+									failed = true;
+									this.transaction.abort();
+									nativeFailure.trigger();
+								}
 							});
 							native.addEventListener("error", () => (entry.terminal = "error"));
 						}

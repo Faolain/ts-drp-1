@@ -23,6 +23,28 @@ export function nodePort(identity: string): NativePort {
 		journal = join(identity, "journal.sqlite.drp-live-journal-v1.sqlite"),
 		floor = join(identity, "host-floor.sqlite");
 	return {
+		snapshotImage: () =>
+			Promise.resolve(
+				use(snapshot, (db) =>
+					Object.fromEntries(
+						["snapshot_owner_v2", "snapshot_scopes_v2", "snapshot_chunks_v2"].map((table) => [
+							table,
+							db
+								.prepare(
+									"SELECT * FROM " +
+										table +
+										" ORDER BY " +
+										(table === "snapshot_owner_v2"
+											? "id"
+											: table === "snapshot_scopes_v2"
+												? "object_id,epoch,anchor,manifest_digest"
+												: "object_id,epoch,anchor,manifest_digest,chunk_index")
+								)
+								.all(),
+						])
+					)
+				)
+			),
 		image: () =>
 			Promise.resolve(
 				use(
@@ -184,7 +206,11 @@ export function nodePort(identity: string): NativePort {
 				},
 			};
 		},
-		observe: async <T>(call: () => Promise<T>, nativeChunk?: () => void) => {
+		observe: async <T>(
+			call: () => Promise<T>,
+			nativeChunk?: () => void,
+			nativeFailure?: { ready(): boolean; trigger(): void }
+		) => {
 			const prepare = DatabaseSync.prototype.prepare,
 				exec = DatabaseSync.prototype.exec;
 			const originals = new Map(
@@ -194,7 +220,17 @@ export function nodePort(identity: string): NativePort {
 				fixtures = new WeakSet<StatementSync>(),
 				empty = () => ({ modes: [] as string[], terminals: [] as string[], writes: 0, reads: [] as unknown[] });
 			const evidence = { ...empty(), fixture: empty() };
+			let failed = false;
 			DatabaseSync.prototype.prepare = function (sql) {
+				if (nativeFailure?.ready() && !failed && !fixtureDatabases.has(this) && /FROM generations/u.test(sql)) {
+					failed = true;
+					try {
+						Reflect.apply(prepare, this, ["SELECT * FROM role_fixture_missing_native_table"]);
+					} catch (error) {
+						nativeFailure.trigger();
+						throw error;
+					}
+				}
 				const s = Reflect.apply(prepare, this, [sql]);
 				sqls.set(s, sql);
 				if (fixtureDatabases.has(this)) fixtures.add(s);

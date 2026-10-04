@@ -1,0 +1,19 @@
+{
+	"extends": "./tsconfig.api.json",
+	"files": [
+		"role-recovery.ts",
+		"role-node-entry.ts",
+		"role-node-recovery.ts",
+		"role-browser-setup.ts",
+		"role-browser-recovery.ts",
+		"role-assertions.ts",
+		"role-browser-red.pw.ts",
+		"build.ts",
+		"browser-server.ts",
+		"instrument.ts",
+		"playwright.role.config.ts",
+		"vitest.role.config.ts",
+		"../../protected-recovery-role-node-red.test.ts"
+	],
+	"include": []
+}

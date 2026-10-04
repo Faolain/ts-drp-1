@@ -5,6 +5,10 @@ import { createCurrentAnchorTrustStore } from "../../../packages/control-plane/d
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/dist/src/finality.js";
 import { activateCreatorSuccessorAdoption } from "../../../packages/node/dist/src/creator-adoption-activate.js";
 import { commitCreatorSuccessorAdoption } from "../../../packages/node/dist/src/creator-adoption-commit.js";
+import {
+	publishStagedCreatorSuccessorAdoption,
+	stageCreatorSuccessorAdoption,
+} from "../../../packages/node/dist/src/creator-adoption-stage.js";
 import { verifyCreatorSuccessorAdoption } from "../../../packages/node/dist/src/creator-adoption.js";
 import { bindCreatorLiveClose, type CreatorLiveCloseHandle } from "../../../packages/node/dist/src/creator-close.js";
 import {
@@ -41,12 +45,14 @@ import type { NativeOwners } from "../cold-discovery/types.js";
  * @param epochs
  * @param owners
  * @param profileId
+ * @param roleStop
  */
 export async function setup(
 	identity: string,
 	epochs: 0 | 1 | 2 | 3,
 	owners: NativeOwners,
-	profileId: "creator-trusted-v1" | "creator-trusted-settlement-v1"
+	profileId: "creator-trusted-v1" | "creator-trusted-settlement-v1",
+	roleStop?: "before-publication" | "already-published"
 ): Promise<ProducerReport> {
 	const objectIdText = `creator:${digest("ts-drp/cold-fixture-object", new TextEncoder().encode(identity)).slice(0, 32)}`;
 	const parsed = parseStorageObjectId(objectIdText);
@@ -162,6 +168,7 @@ export async function setup(
 	const closeEpochs: number[] = [];
 	const states: number[] = [];
 	let expectedState = 0;
+	let pendingFloor: ProducerReport["floor"] | undefined;
 	try {
 		for (let epoch = 0; epoch < epochs; epoch += 1) {
 			const issued = await plane.issueLocal({
@@ -194,10 +201,33 @@ export async function setup(
 			});
 			if (!close.ok) throw new Error(`SETUP_CLOSE_BIND:${epoch}:${close.reason}`);
 			handles.push(close.handle);
-			await close.handle.close();
+			const previous = plane.currentEphemeralAuthority();
+			const closed = await close.handle.close();
 			const verified = await verifyCreatorSuccessorAdoption({ catalog: app.catalog, handle: close.handle });
 			if (verified.ok !== true)
 				throw new Error(`SETUP_VERIFY:${epoch}:${String(verified.kind)}:${String(verified.detail)}`);
+			if (roleStop && epoch === epochs - 1) {
+				if (!previous || !closed.ok) throw new Error("ROLE_STOP_GENUINE_CLOSE");
+				const staged = await stageCreatorSuccessorAdoption({ handle: close.handle, intent: verified.intent });
+				if (!staged.ok) throw new Error("ROLE_STOP_STAGE");
+				pendingFloor = {
+					stable: { objectId, epoch: previous.epoch, currentAnchorDigest: previous.anchorDigest },
+					pending: {
+						previous: { objectId, epoch: previous.epoch, currentAnchorDigest: previous.anchorDigest },
+						next: { objectId, epoch: closed.successorEpoch, currentAnchorDigest: closed.successorAnchorDigest },
+					},
+				};
+				if (roleStop === "already-published") {
+					const published = await publishStagedCreatorSuccessorAdoption({
+						handle: close.handle,
+						capability: staged.capability,
+					});
+					if (!published.ok) throw new Error("ROLE_STOP_PUBLISH");
+				}
+				expectedState += (epoch + 1) * 11;
+				states.push(expectedState);
+				break;
+			}
 			const committed = await commitCreatorSuccessorAdoption({ handle: close.handle, intent: verified.intent });
 			if (committed.ok !== true) throw new Error(`SETUP_COMMIT:${epoch}:${String(committed.kind)}`);
 			const descriptor = committed.descriptor as Record<string, unknown>;
@@ -224,7 +254,7 @@ export async function setup(
 			closeEpochs.push(epoch);
 		}
 		const authority = plane.currentEphemeralAuthority();
-		if (authority === undefined || authority.epoch !== epochs) throw new Error("SETUP_FINAL_HEAD");
+		if (authority === undefined || (!pendingFloor && authority.epoch !== epochs)) throw new Error("SETUP_FINAL_HEAD");
 		const active = await owners.ahe.recoverActiveGeneration(objectId);
 		if (!active.ok || active.value.kind !== "active") throw new Error("SETUP_ACTIVE_CLOSURE");
 		let cut: Record<string, unknown> | undefined;
@@ -243,7 +273,7 @@ export async function setup(
 				exactCanonicalPinnedGenesisTrustStateRecordBytes: hex(pinTrustBytes),
 				profileId,
 			},
-			floor: {
+			floor: pendingFloor ?? {
 				stable: { objectId, epoch: authority.epoch, currentAnchorDigest: authority.anchorDigest },
 				pending: null,
 			},

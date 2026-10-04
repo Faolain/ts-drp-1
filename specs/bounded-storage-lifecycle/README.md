@@ -16,8 +16,20 @@ empty rows or uncapped populated scan is permitted. Exact-U acquisition still
 conservatively refuses mandatory rereads after exhausting the same ledger;
 inclusive envelope admission and genuine equality-only dedup remain supported.
 
-Begin the separate HIGH tests-only private Node role RED under the
-[accepted conditional allocation](../../.logs/bounded-storage-lifecycle/protected-role-node-allocation-review-01/root-disposition.md).
+The private Node current/pending role observer is implemented, independently
+[product-accepted](../../.logs/bounded-storage-lifecycle/protected-role-node-product-review-01/root-disposition.md)
+and [MAIN integration accepted](../../.logs/bounded-storage-lifecycle/protected-role-node-main-01/root-disposition.md).
+Real selected snapshots and ACLs, full native currency and whole host equality
+precede joined cleanup and the private fieldless fact. A persisted predecessor
+floor is not an invented revision-one head. This is point-observed evidence,
+not a lifetime pin, complete protected union or mutation authority.
+The [accepted allocation](../../.logs/bounded-storage-lifecycle/protected-role-node-allocation-review-01/root-disposition.md)
+stays closed. Actual changed-product SQLite/C/F/W runs own the feedback loop;
+formerly masked assertions execute, including the separately
+[corrected native fixture cases](../../.logs/bounded-storage-lifecycle/protected-role-node-native-red-review-01/root-disposition.md).
+Failed historical campaigns remain failed, with meaningful unaffected partitions
+retained rather than replayed. Continue through all Phase 6 gates and at least
+accomplished Phase 7; no broader completion follows from this Node acceptance.
 Its mechanical storage prerequisite is implemented, independently
 [product-accepted](../../.logs/bounded-storage-lifecycle/protected-role-carrier-product-review-01/root-disposition.md)
 and [MAIN integration accepted](../../.logs/bounded-storage-lifecycle/protected-role-storage-main-01/root-disposition.md).
@@ -32,14 +44,25 @@ execute meaningfully in SQLite/C/F/W; unchanged final assertions are retained,
 not rerun or relabelled as a clean aggregate. All fixed budgets and old reader
 semantics remain intact.
 
-Keep this storage capability frozen while Node authenticates independent current
-and pending roles using actual selected snapshots, ACLs and deferred policy, then
-full AHE currency and the entire actual host state before joined cleanup/private
-fact creation. Obtain focused XHIGH/ROOT RED readiness and immediately assign
-distinct four-owner HIGH GREEN. Mechanical acquisition does not authenticate roles,
-grant policy availability, pin lifetime, complete the protected union or authorize
-deletion. Genuine historical source/destination custody and mandatory room/lifecycle
-consumption remain separate. Do not repeat unchanged full matrices at any handoff.
+Keep the accepted storage and Node capabilities frozen. Mechanical acquisition
+does not grant policy availability, pin lifetime, complete the protected union or
+authorize deletion. Genuine historical source/destination custody and mandatory
+room/lifecycle consumption remain the next separate obligations. Do not repeat
+unchanged full matrices at any handoff.
+The [room-consumer investigation](../../.logs/bounded-storage-lifecycle/usable-rollback-consumer-investigation-01/proposal.md)
+identifies an actual authority conflict: historical promotion cannot lower the
+committed floor or reactivate Superseded generations under the accepted safety law.
+The intended forward-authorized promotion semantics require user direction before
+changing room authority; this does not block the current Node implementation.
+The [recipient boundary disposition](../../.logs/bounded-storage-lifecycle/recipient-retention-consumer-review-01/root-disposition.md)
+confirms genuine peer byte ingress activates only a non-writing closed replica;
+writable staging instead consumes local-close custody. Establish concrete
+authenticated incoming successor provenance and destination-bound custody before
+allocating that installer. Missing orchestration alone does not require new trust
+policy, but new remote/import/fresh-device authority requires user direction.
+Neither a transfer receipt nor raw fixture AHE/floor copying supplies that grant.
+These are authority holds, not permission to weaken rollback, fabricate local-close
+facts or relabel closed activation as continued-write acceptance.
 
 The [protected-role prerequisite](../../.logs/bounded-storage-lifecycle/protected-role-acquisition-review-01/root-disposition.md)
 is accepted as a conditional current/pending source contract only. Actual snapshot

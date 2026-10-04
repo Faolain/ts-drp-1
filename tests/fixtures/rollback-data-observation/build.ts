@@ -24,7 +24,7 @@ for (const name of process.argv.slice(3)) {
 		alias,
 		bundle: true,
 		format: "esm",
-		platform: name.startsWith("browser") ? "browser" : "node",
+		platform: name.includes("browser") ? "browser" : "node",
 		target: "es2022",
 		write: false,
 		metafile: true,
@@ -33,11 +33,12 @@ for (const name of process.argv.slice(3)) {
 					readerInstrumentation(
 						root,
 						join(destination, name + "-reader-observation"),
-						name.startsWith("browser") ? "browser" : "node"
+						name.includes("browser") ? "browser" : "node",
+						name.startsWith("role-")
 					),
 				]
 			: [],
-		banner: name.startsWith("browser")
+		banner: name.includes("browser")
 			? undefined
 			: {
 					js: 'import { createRequire as __fixtureCreateRequire } from "node:module"; const require = __fixtureCreateRequire(import.meta.url);',

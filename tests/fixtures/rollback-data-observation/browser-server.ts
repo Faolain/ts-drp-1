@@ -7,9 +7,11 @@ import { join } from "node:path";
 /**
  * Serve frozen bundles and verify every actual build input before the first page.
  * @param directory
+ * @param role
  */
 export async function browserServer(
-	directory: string
+	directory: string,
+	role = false
 ): Promise<{ origin: string; artifactsSha256: string; close(): Promise<void> }> {
 	const artifactBytes = readFileSync(join(directory, "artifacts.json"));
 	const artifacts = JSON.parse(artifactBytes.toString()) as {
@@ -17,7 +19,11 @@ export async function browserServer(
 	};
 	const hash = (value: Uint8Array): string => createHash("sha256").update(value).digest("hex");
 	const scripts = new Map<string, Uint8Array>();
-	for (const name of ["browser-setup", "browser-recovery", "browser-cleanup"]) {
+	for (const name of [
+		role ? "role-browser-setup" : "browser-setup",
+		role ? "role-browser-recovery" : "browser-recovery",
+		"browser-cleanup",
+	]) {
 		const artifact = artifacts.entries.find((entry) => entry.name === name);
 		assert.ok(artifact);
 		const bytes = readFileSync(artifact.outputPath);
@@ -33,7 +39,9 @@ export async function browserServer(
 		else if (request.url === "/setup" || request.url === "/recovery" || request.url === "/cleanup")
 			response
 				.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" })
-				.end(`<!doctype html><script type="module" src="/browser-${request.url.slice(1)}.mjs"></script>`);
+				.end(
+					`<!doctype html><script type="module" src="/${role && request.url !== "/cleanup" ? "role-" : ""}browser-${request.url.slice(1)}.mjs"></script>`
+				);
 		else response.writeHead(404).end();
 	});
 	await new Promise<void>((resolve, reject) => {

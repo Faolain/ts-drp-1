@@ -81,6 +81,7 @@ export interface NativeImage {
 }
 export interface NativePort {
 	image(): Promise<NativeImage>;
+	snapshotImage(): Promise<unknown>;
 	replace(image: NativeImage): Promise<void>;
 	snapshotFault(fault: Fault, objectId: string, epoch: number): Promise<void>;
 	prepareReplacement(objectId: string, epoch: number): Promise<{ run(): Promise<void>; close(): Promise<void> }>;
@@ -88,5 +89,9 @@ export interface NativePort {
 	journalFault(fault: Fault, objectId: string, epoch: number): Promise<void>;
 	readFloor(): Promise<Floor | null>;
 	writeFloor(floor: Floor): Promise<void>;
-	observe<T>(call: () => Promise<T>, nativeChunk?: () => void): Promise<{ value: T; evidence: unknown }>;
+	observe<T>(
+		call: () => Promise<T>,
+		nativeChunk?: () => void,
+		nativeFailure?: { ready(): boolean; trigger(): void }
+	): Promise<{ value: T; evidence: unknown }>;
 }

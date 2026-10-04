@@ -15,6 +15,7 @@ import {
 	openCreatorAuthorSettlement,
 	resolveCreatorAuthorIssuanceFrontiers,
 	resolveCreatorAuthorSettlement,
+	type VerifiedCreatorAuthorIssuanceFrontiers,
 	type VerifiedCreatorAuthorSettlement,
 } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import {
@@ -27,7 +28,75 @@ import {
 } from "@ts-drp/protocol-v3/creator-issuance-retirement";
 import { type LatchedAclSnapshot, openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
-import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+import {
+	digestBlob,
+	digestClosure,
+	type GenerationRecord,
+	type GenerationRef,
+	type PresentHead,
+	type StorageObjectId,
+} from "@ts-drp/storage";
+
+/**
+ * Shares only structural adoption lineage, never protocol trust or selection policy.
+ * @param input - Physical lineage and candidate from the original owner.
+ * @param input.objectId - Exact object scope.
+ * @param input.lineage - Existing physical lineage.
+ * @param input.candidate - Candidate publication row.
+ * @returns The existing P/Q/L structure or undefined.
+ */
+export function inspectCreatorAdoptionCandidateLineage(input: {
+	objectId: StorageObjectId;
+	lineage: readonly GenerationRecord[];
+	candidate: GenerationRecord;
+}):
+	| Readonly<{
+			currentGeneration: GenerationRecord;
+			proposedGeneration: GenerationRecord;
+			candidateGeneration: GenerationRecord;
+			currentHead: PresentHead;
+			proposedHead: PresentHead;
+			candidateHead: PresentHead;
+	  }>
+	| undefined {
+	const { objectId, lineage, candidate } = input;
+	if (candidate.state !== "Complete" && candidate.state !== "Adopted") return undefined;
+	const proposedHead = candidate.baseExpectedHead.kind === "present" ? candidate.baseExpectedHead : undefined;
+	const byId = new Map(lineage.map((generation) => [generation.generationId, generation]));
+	if (byId.size !== lineage.length || proposedHead === undefined) return undefined;
+	const proposedGeneration = byId.get(proposedHead.generationId);
+	const currentHead =
+		proposedGeneration?.baseExpectedHead.kind === "present" ? proposedGeneration.baseExpectedHead : undefined;
+	const currentGeneration = currentHead === undefined ? undefined : byId.get(currentHead.generationId);
+	if (
+		proposedGeneration === undefined ||
+		currentHead === undefined ||
+		currentGeneration === undefined ||
+		currentGeneration.state !== "Superseded" ||
+		(proposedGeneration.state !== "Adopted" && proposedGeneration.state !== "Superseded") ||
+		candidate.objectId !== objectId ||
+		proposedGeneration.objectId !== objectId ||
+		currentGeneration.objectId !== objectId ||
+		proposedHead.revision !== currentHead.revision + 1
+	)
+		return undefined;
+	const closureDigest = digestClosure(candidate.closure);
+	if (!closureDigest.ok || candidate.closureDigest !== closureDigest.value) return undefined;
+	return Object.freeze({
+		currentGeneration,
+		proposedGeneration,
+		candidateGeneration: candidate,
+		currentHead: Object.freeze({ ...currentHead }),
+		proposedHead: Object.freeze({ ...proposedHead }),
+		candidateHead: Object.freeze({
+			closureDigest: closureDigest.value,
+			generationId: candidate.generationId,
+			kind: "present",
+			objectId,
+			revision: (proposedHead.revision + 1) as PresentHead["revision"],
+		}),
+	});
+}
 
 export interface CreatorTransitionClosure {
 	readonly candidates: readonly DetachedClosureCandidate[];
@@ -510,6 +579,7 @@ export function openCreatorTransitionAggregate(
 	| Readonly<{
 			readonly candidate: DetachedClosureCandidate;
 			readonly identity: CreatorAuthorIssuanceFrontiersIdentity;
+			readonly capability: VerifiedCreatorAuthorIssuanceFrontiers;
 	  }>
 	| undefined {
 	const decodedCut = record(cut);
@@ -552,7 +622,7 @@ export function openCreatorTransitionAggregate(
 		(decodedAcl !== undefined &&
 			(decodedAcl.objectId !== identity.objectId || decodedAcl.epoch !== identity.closedEpoch))
 		? undefined
-		: Object.freeze({ candidate, identity });
+		: Object.freeze({ candidate, identity, capability: opened.capability });
 }
 
 /**
