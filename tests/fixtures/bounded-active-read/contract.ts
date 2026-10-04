@@ -45,14 +45,17 @@ export interface Image {
 }
 export type Edit =
 	| { kind: "head"; record: Uint8Array | null }
-	| { kind: "generation"; generationId: unknown; record: Uint8Array; replaceId?: unknown }
+	| { kind: "generation"; generationId: unknown; record: Uint8Array; replaceId?: unknown; insert?: boolean }
 	| { kind: "delete-generation"; generationId: unknown }
-	| { kind: "blob"; digest: string; bytes: Uint8Array | null }
+	| { kind: "blob"; digest: string; bytes: Uint8Array | null; insert?: boolean }
 	| { kind: "promotion"; generationId: unknown; digest: string; add?: boolean };
 export interface Trace {
 	modes: string[];
 	writes: number;
 	terminals: number;
+	terminalKinds?: string[];
+	transactionStores?: string[][];
+	materialEvents?: string[];
 	reads: {
 		table: string;
 		operation: string;
@@ -68,7 +71,14 @@ export interface Environment {
 	edit(value: Edit): Promise<void>;
 	observe<T>(
 		action: () => Promise<T>,
-		boundary?: (edge: "start" | "terminal") => void
+		boundary?: (edge: "start" | "terminal") => void,
+		nativeHook?: (
+			edge: "request" | "success",
+			table: string,
+			operation: string,
+			interrupt: () => void,
+			key: unknown
+		) => void
 	): Promise<{ value: T; evidence: Trace }>;
 	control(): Promise<Trace>;
 }

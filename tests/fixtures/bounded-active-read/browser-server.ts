@@ -5,7 +5,7 @@ import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 
-export async function buildAssets(): Promise<void> {
+export async function buildAssets(lane: "active" | "role" = "active"): Promise<void> {
 	const root = resolve(import.meta.dirname, "../../.."),
 		destination = process.env.BOUNDED_AHE_ARTIFACTS;
 	if (!destination) throw new Error("new owned artifact directory required");
@@ -25,7 +25,7 @@ export async function buildAssets(): Promise<void> {
 		"v3-live",
 	])
 		alias["@ts-drp/node/" + name] = join(root, "packages/node/src", name + ".ts");
-	for (const name of ["browser", "producer"]) {
+	for (const name of lane === "role" ? ["role-browser"] : ["browser", "producer"]) {
 		const result = await build({
 			entryPoints: [join(import.meta.dirname, name + "-entry.ts")],
 			bundle: true,
@@ -64,21 +64,27 @@ export async function buildAssets(): Promise<void> {
 		);
 	}
 }
-export async function server(): Promise<{ origin: string; close(): Promise<void> }> {
+export async function server(lane: "active" | "role" = "active"): Promise<{ origin: string; close(): Promise<void> }> {
 	const destination = process.env.BOUNDED_AHE_ARTIFACTS;
 	if (!destination) throw new Error("exact prebuilt artifact directory required");
-	const bytes = readFileSync(join(destination, "browser-bundle.mjs")),
-		producer = readFileSync(join(destination, "producer-bundle.mjs"));
+	const bytes = readFileSync(join(destination, lane === "role" ? "role-browser-bundle.mjs" : "browser-bundle.mjs")),
+		producer = lane === "active" ? readFileSync(join(destination, "producer-bundle.mjs")) : undefined;
 	const native = createServer((req, res) => {
-		if (req.url === "/entry.js")
+		if (lane === "role" && req.url === "/role.js")
 			res.writeHead(200, { "content-type": "text/javascript", "cache-control": "no-store" }).end(bytes);
-		else if (req.url === "/producer.js")
+		else if (lane === "role" && req.url === "/role")
+			res
+				.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" })
+				.end("<!doctype html><script type=module src=/role.js></script>");
+		else if (lane === "active" && req.url === "/entry.js")
+			res.writeHead(200, { "content-type": "text/javascript", "cache-control": "no-store" }).end(bytes);
+		else if (lane === "active" && req.url === "/producer.js")
 			res.writeHead(200, { "content-type": "text/javascript", "cache-control": "no-store" }).end(producer);
-		else if (req.url === "/producer")
+		else if (lane === "active" && req.url === "/producer")
 			res
 				.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" })
 				.end("<!doctype html><script type=module src=/producer.js></script>");
-		else if (req.url === "/")
+		else if (lane === "active" && req.url === "/")
 			res
 				.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" })
 				.end("<!doctype html><script type=module src=/entry.js></script>");
@@ -96,3 +102,4 @@ export async function server(): Promise<{ origin: string; close(): Promise<void>
 	};
 }
 if (process.argv[2] === "build") await buildAssets();
+if (process.argv[2] === "build-role") await buildAssets("role");

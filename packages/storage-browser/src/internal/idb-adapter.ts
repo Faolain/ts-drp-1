@@ -2,7 +2,9 @@ import {
 	type ActiveGenerationSnapshot,
 	type AheBoundedReadAcquisition,
 	type AheBoundedReadInput,
-	type AheDurableStore,
+	type AheBoundedRecoveryRoleRead,
+	type AheBoundedRecoveryRoleReadInput,
+	type AheBoundedRecoveryRoleStore,
 	type BlobDigest,
 	type BlobExistencePort,
 	decodeGenerationRecordV1,
@@ -25,12 +27,15 @@ import {
 	boundedActiveReadSteps,
 	boundedHeadSteps,
 	type BoundedReadRequest,
+	boundedRecoveryRoleReadSteps,
 	classifyPersistedState,
 	createBoundedReadAcquisition,
+	createBoundedRecoveryRoleRead,
 	evaluateStorageAdapterCommand,
 	isBoundedReadCorruption,
 	PersistedStorageError,
 	prepareBoundedRead,
+	prepareBoundedRecoveryRoleRead,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
 	storageAdapterClosureVerifier,
@@ -53,7 +58,7 @@ export interface BrowserAheDurableStoreOptions {
 	readonly databaseName: string;
 }
 
-export type BrowserAheDurableStore = AheDurableStore & BlobExistencePort;
+export type BrowserAheDurableStore = AheBoundedRecoveryRoleStore & BlobExistencePort;
 
 type Phase2dMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readGenerationPage" | "readHead">;
 
@@ -228,6 +233,23 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 						ok: true,
 						value: createBoundedReadAcquisition(result.value, (head, released) =>
 							this.runBoundedSteps(boundedHeadSteps(head.objectId), true, released)
+						),
+					}
+		);
+	}
+
+	public acquireBoundedRecoveryRoleRead(
+		input: AheBoundedRecoveryRoleReadInput
+	): Promise<StoreResult<AheBoundedRecoveryRoleRead>> {
+		const prepared = prepareBoundedRecoveryRoleRead(input);
+		if (!prepared.ok) return Promise.resolve(prepared);
+		return this.runBoundedSteps(boundedRecoveryRoleReadSteps(prepared.value), false).then((result) =>
+			!result.ok
+				? result
+				: {
+						ok: true,
+						value: createBoundedRecoveryRoleRead(result.value, (steps, released) =>
+							this.runBoundedSteps(steps, false, released)
 						),
 					}
 		);

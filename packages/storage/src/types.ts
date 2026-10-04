@@ -19,6 +19,7 @@ export type ParseResult<T> =
 export type StorageRejectionReason =
 	| "READ_BUDGET_EXCEEDED"
 	| "READ_STALE_HEAD"
+	| "READ_STALE_ROLE_VIEW"
 	| "READ_RELEASED"
 	| "STORE_CLOSED"
 	| "STORE_POISONED"
@@ -189,4 +190,24 @@ export interface AheDurableStore {
 		readonly generationId: GenerationId;
 	}): Promise<StoreResult<GenerationRecord>>;
 	close(): Promise<void>;
+}
+
+/** Closed mechanical recovery census, without role authentication. */
+export type AheBoundedRecoveryRoleReadInput = Readonly<{
+	objectId: StorageObjectId;
+	limits: AheBoundedReadLimits;
+}>;
+
+export interface AheBoundedRecoveryRoleRead {
+	readonly head: ExpectedHead;
+	readonly generations: readonly GenerationRecord[];
+	readonly blobs: readonly Readonly<{ ref: GenerationRef; bytes: Uint8Array }>[];
+	checkCurrency(): Promise<StoreResult<Readonly<{ kind: "current" }>>>;
+	release(): Promise<void>;
+}
+
+export interface AheBoundedRecoveryRoleStore extends AheDurableStore {
+	acquireBoundedRecoveryRoleRead(
+		input: AheBoundedRecoveryRoleReadInput
+	): Promise<StoreResult<AheBoundedRecoveryRoleRead>>;
 }

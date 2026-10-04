@@ -2,7 +2,7 @@
 
 ## Next Agent Prompt
 
-Active pickup (2026-10-03): the signed historical-anchor mechanism is implemented
+Active pickup (2026-10-04): the signed historical-anchor mechanism is implemented
 and [focused MAIN integration accepted](../../.logs/bounded-storage-lifecycle/signed-anchor-mechanism-main-01/root-disposition.md).
 The original product review's native capture/close admission finding is resolved
 by the [separately reviewed lifetime correction](../../.logs/bounded-storage-lifecycle/signed-anchor-close-correction-product-review-01/root-disposition.md).
@@ -16,18 +16,30 @@ empty rows or uncapped populated scan is permitted. Exact-U acquisition still
 conservatively refuses mandatory rereads after exhausting the same ledger;
 inclusive envelope admission and genuine equality-only dedup remain supported.
 
-Continue with the storage half of the conditional protected-role contract:
-bounded full physical metadata/candidate acquisition, complete same-head currency
-and joined release in the existing native owners. Its isolated source allocation
-is under fresh separate XHIGH review. Accept that focused allocation before
-tests-only HIGH RED, obtain independent RED readiness, then immediately release
-distinct HIGH GREEN and run the actual new assertions. Do not combine private
-Node role authentication, policy availability, protected union or deletion into
-this mechanical storage capability. Preserve old active-reader behavior and every
-fixed budget; no second full-U buffer or invented incarnation witness is allowed.
-Then continue actual current/pending snapshot/ACL authentication, genuine historical
-source/destination custody, complete protected roles and mandatory room/lifecycle
-consumption. Do not repeat unchanged full matrices at any handoff.
+Begin the separate HIGH tests-only private Node role RED under the
+[accepted conditional allocation](../../.logs/bounded-storage-lifecycle/protected-role-node-allocation-review-01/root-disposition.md).
+Its mechanical storage prerequisite is implemented, independently
+[product-accepted](../../.logs/bounded-storage-lifecycle/protected-role-carrier-product-review-01/root-disposition.md)
+and [MAIN integration accepted](../../.logs/bounded-storage-lifecycle/protected-role-storage-main-01/root-disposition.md).
+Existing native owners now provide bounded full physical metadata/candidate
+acquisition, complete same-head currency and joined release. Callback-free intrinsic
+validation observes the same borrowed backing without another retained byte union.
+The original accessor [P1/NO](../../.logs/bounded-storage-lifecycle/protected-role-storage-product-review-01/root-disposition.md)
+and failed runtime evidence remain preserved; the corrected reader resolves it.
+The separately [accepted certificate discriminator](../../.logs/bounded-storage-lifecycle/protected-role-certificate-red-review-01/root-disposition.md)
+recognizes genuine IDB scans in both existing laws. Final affected assertions
+execute meaningfully in SQLite/C/F/W; unchanged final assertions are retained,
+not rerun or relabelled as a clean aggregate. All fixed budgets and old reader
+semantics remain intact.
+
+Keep this storage capability frozen while Node authenticates independent current
+and pending roles using actual selected snapshots, ACLs and deferred policy, then
+full AHE currency and the entire actual host state before joined cleanup/private
+fact creation. Obtain focused XHIGH/ROOT RED readiness and immediately assign
+distinct four-owner HIGH GREEN. Mechanical acquisition does not authenticate roles,
+grant policy availability, pin lifetime, complete the protected union or authorize
+deletion. Genuine historical source/destination custody and mandatory room/lifecycle
+consumption remain separate. Do not repeat unchanged full matrices at any handoff.
 
 The [protected-role prerequisite](../../.logs/bounded-storage-lifecycle/protected-role-acquisition-review-01/root-disposition.md)
 is accepted as a conditional current/pending source contract only. Actual snapshot
@@ -38,8 +50,13 @@ accepted pure forward/ACL-coverage law and genuine pending-material provenance.
 Its [source review](../../.logs/bounded-storage-lifecycle/protected-pending-retirement-policy-review-01/root-disposition.md)
 also holds non-genesis scope for an independent current-role law: unchanged
 current acceptance retains an aggregate that the proposed subcase forbids.
-Historical retirement-only acceptance is not forward-adoption authority. This
-debt is separate from the signed-anchor fix and releases no runtime policy.
+The separately reviewed [joint current/pending candidate](../../.logs/bounded-storage-lifecycle/retirement-only-joint-role-policy-review-01/root-disposition.md)
+addresses that omission conditionally, but releases no executable policy. Genuine
+original aggregate-free pending custody is still unestablished; the new singleton
+candidate also needs separately allocated original older-anchor/ACL custody for
+its deeper window. The prior pending-only finding remains intact. Historical
+retirement-only acceptance is not forward-adoption authority, and these holds do
+not block supported aggregate/settlement or mechanical storage product progress.
 
 [2e-3 actual closed-cut data observation](slices/02e-3-authenticated-closed-cut-data-observation.md)
 is implemented and independently product-reviewed. Previously masked assertions

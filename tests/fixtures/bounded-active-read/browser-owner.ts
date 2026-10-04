@@ -27,18 +27,26 @@ export function environment(name: string): Environment {
 			db.close();
 		}
 	}
-	const observe: Environment["observe"] = async (action, boundary) => {
+	const observe: Environment["observe"] = async (action, boundary, nativeHook) => {
 		const transaction = Object.getOwnPropertyDescriptor(IDBDatabase.prototype, "transaction"),
 			descriptors = new Map<string, PropertyDescriptor>();
 		check(transaction, "native transaction descriptor present");
-		const reads: Trace["reads"] = [];
+		const reads: Trace["reads"] = [],
+			terminalKinds: string[] = [],
+			materialEvents: string[] = [];
 		Object.defineProperty(IDBDatabase.prototype, "transaction", {
 			...transaction,
 			value: function (this: IDBDatabase, ...args: unknown[]): IDBTransaction {
 				const tx = Reflect.apply(transaction.value as (...args: unknown[]) => IDBTransaction, this, args);
 				boundary?.("start");
-				tx.addEventListener("complete", () => boundary?.("terminal"));
-				tx.addEventListener("abort", () => boundary?.("terminal"));
+				tx.addEventListener("complete", () => {
+					terminalKinds.push("complete");
+					boundary?.("terminal");
+				});
+				tx.addEventListener("abort", () => {
+					terminalKinds.push("abort");
+					boundary?.("terminal");
+				});
 				return tx;
 			},
 		});
@@ -51,10 +59,14 @@ export function environment(name: string): Environment {
 				value: function (this: IDBObjectStore, ...args: unknown[]): IDBRequest {
 					const native = Reflect.apply(descriptor.value as (...args: unknown[]) => IDBRequest, this, args),
 						table = this.name;
+					if (table === "blobs" && method === "get") materialEvents.push("request:" + String(args[0]));
+					nativeHook?.("request", table, method, () => this.transaction.abort(), args[0]);
 					const fields: NonNullable<Trace["reads"][number]["fields"]> = [];
 					const entry: Trace["reads"][number] = { table, operation: method, query: args[0], fields };
 					reads.push(entry);
 					native.addEventListener("success", () => {
+						if (table === "blobs" && method === "get") materialEvents.push("success:" + String(args[0]));
+						nativeHook?.("success", table, method, () => this.transaction.abort(), args[0]);
 						const value: unknown = native.result;
 						if (value && typeof value === "object" && !Array.isArray(value)) {
 							for (const [field, bytes] of Object.entries(value))
@@ -83,6 +95,9 @@ export function environment(name: string): Environment {
 					modes: observed.evidence.modes,
 					writes: observed.evidence.writes,
 					terminals: observed.evidence.completes + observed.evidence.aborts,
+					terminalKinds,
+					materialEvents,
+					transactionStores: observed.evidence.transactionStores,
 					reads: observed.evidence.reads.map((read) => {
 						const materialized = reads[next];
 						if (materialized?.table === read.table && materialized.operation === read.operation) {
@@ -128,7 +143,7 @@ export function environment(name: string): Environment {
 					store = tx.objectStore(table);
 				if (value.kind === "head") store.put({ objectId: OBJECT, record: value.record });
 				if (value.kind === "generation") {
-					store.delete([OBJECT, value.generationId] as IDBValidKey[]);
+					if (!value.insert) store.delete([OBJECT, value.generationId] as IDBValidKey[]);
 					store.put({ objectId: OBJECT, generationId: value.replaceId ?? value.generationId, record: value.record });
 				}
 				if (value.kind === "delete-generation") store.delete([OBJECT, value.generationId] as IDBValidKey[]);
@@ -136,7 +151,10 @@ export function environment(name: string): Environment {
 					if (value.bytes === null) store.delete(value.digest);
 					else store.put({ digest: value.digest, bytes: value.bytes });
 				}
-				if (value.kind === "promotion") store.delete([OBJECT, value.generationId, value.digest] as IDBValidKey[]);
+				if (value.kind === "promotion") {
+					if (value.add) store.put({ objectId: OBJECT, generationId: value.generationId, digest: value.digest });
+					else store.delete([OBJECT, value.generationId, value.digest] as IDBValidKey[]);
+				}
 				await completion;
 			}),
 		control: async (): Promise<Trace> =>

@@ -2,7 +2,9 @@ import {
 	type ActiveGenerationSnapshot,
 	type AheBoundedReadAcquisition,
 	type AheBoundedReadInput,
-	type AheDurableStore,
+	type AheBoundedRecoveryRoleRead,
+	type AheBoundedRecoveryRoleReadInput,
+	type AheBoundedRecoveryRoleStore,
 	type BlobDigest,
 	decodeGenerationRecordV1,
 	decodeHeadRecordV1,
@@ -24,12 +26,15 @@ import {
 	boundedHeadSteps,
 	BoundedReadBudgetError,
 	type BoundedReadRequest,
+	boundedRecoveryRoleReadSteps,
 	classifyPersistedState,
 	createBoundedReadAcquisition,
+	createBoundedRecoveryRoleRead,
 	evaluateStorageAdapterCommand,
 	isBoundedReadCorruption,
 	PersistedStorageError,
 	prepareBoundedRead,
+	prepareBoundedRecoveryRoleRead,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
 	storageAdapterClosureVerifier,
@@ -76,7 +81,7 @@ export type SqlitePragma = "foreign_keys" | "integrity_check" | "journal_mode" |
 export type SqliteScaffoldInstrumentation = Readonly<{
 	attemptInvalidForeignKeyInsert(): void;
 	readPragma(pragma: SqlitePragma): unknown;
-	store: AheDurableStore;
+	store: AheBoundedRecoveryRoleStore;
 }>;
 
 const STRICT_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({
@@ -143,7 +148,7 @@ const EXPECTED_FOREIGN_KEY_COLUMNS = Object.freeze({
 	]),
 } as const);
 
-class SqliteAheDurableStore implements AheDurableStore {
+class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
 	private closed = false;
 	private poisoned = false;
@@ -182,6 +187,24 @@ class SqliteAheDurableStore implements AheDurableStore {
 				Promise.resolve(this.runBoundedSteps(boundedHeadSteps(head.objectId), released))
 			),
 		});
+	}
+
+	public acquireBoundedRecoveryRoleRead(
+		input: AheBoundedRecoveryRoleReadInput
+	): Promise<StoreResult<AheBoundedRecoveryRoleRead>> {
+		const prepared = prepareBoundedRecoveryRoleRead(input);
+		if (!prepared.ok) return Promise.resolve(prepared);
+		const result = this.runBoundedSteps(boundedRecoveryRoleReadSteps(prepared.value));
+		return Promise.resolve(
+			!result.ok
+				? result
+				: {
+						ok: true,
+						value: createBoundedRecoveryRoleRead(result.value, (steps, released) =>
+							Promise.resolve(this.runBoundedSteps(steps, released))
+						),
+					}
+		);
 	}
 
 	private runBoundedSteps<T>(
@@ -962,7 +985,7 @@ function freezeRecoverySnapshot(snapshot: ActiveGenerationSnapshot): ActiveGener
 export function createSqliteScaffold(
 	options: SqliteAheDurableStoreOptions,
 	fault?: SqliteMutationFault
-): AheDurableStore {
+): AheBoundedRecoveryRoleStore {
 	return createInstrumentedSqliteScaffold(options, fault).store;
 }
 

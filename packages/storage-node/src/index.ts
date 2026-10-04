@@ -1,4 +1,4 @@
-import type { AheDurableStore } from "@ts-drp/storage";
+import type { AheBoundedRecoveryRoleStore } from "@ts-drp/storage";
 
 import { createSqliteScaffold } from "./internal/create-scaffold.js";
 
@@ -11,6 +11,6 @@ export type SqliteAheDurableStoreOptions = {
  * @param options - File-backed SQLite options.
  * @returns A strict durable-store adapter.
  */
-export function createSqliteAheDurableStore(options: SqliteAheDurableStoreOptions): AheDurableStore {
+export function createSqliteAheDurableStore(options: SqliteAheDurableStoreOptions): AheBoundedRecoveryRoleStore {
 	return createSqliteScaffold(options);
 }

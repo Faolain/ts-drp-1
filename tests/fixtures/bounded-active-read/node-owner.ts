@@ -17,7 +17,7 @@ export function environment(filename: string): Environment {
 			db.close();
 		}
 	}
-	const observe: Environment["observe"] = async (action, boundary) => {
+	const observe: Environment["observe"] = async (action, boundary, nativeHook) => {
 		const exec = DatabaseSync.prototype.exec,
 			prepare = DatabaseSync.prototype.prepare;
 		const members = new Map(
@@ -28,12 +28,16 @@ export function environment(filename: string): Environment {
 			})
 		);
 		const sqls = new WeakMap<StatementSync, string>(),
+			connections = new WeakMap<StatementSync, DatabaseSync>(),
 			calls: { sql: string; operation: string; parameters: unknown[] }[] = [],
-			modes: string[] = [];
+			modes: string[] = [],
+			terminalKinds: string[] = [],
+			materialEvents: string[] = [];
 		let terminals = 0;
 		DatabaseSync.prototype.prepare = function (sql: string): StatementSync {
 			const statement = Reflect.apply(prepare, this, [sql]) as StatementSync;
 			sqls.set(statement, sql);
+			connections.set(statement, this);
 			return statement;
 		};
 		DatabaseSync.prototype.exec = function (sql: string): void {
@@ -43,6 +47,7 @@ export function environment(filename: string): Environment {
 				boundary?.("start");
 			}
 			if (/^\s*(?:COMMIT|ROLLBACK)\b/iu.test(sql)) {
+				terminalKinds.push(sql);
 				terminals++;
 				boundary?.("terminal");
 			}
@@ -51,8 +56,20 @@ export function environment(filename: string): Environment {
 			Object.defineProperty(StatementSync.prototype, name, {
 				...descriptor,
 				value: function (this: StatementSync, ...args: unknown[]): unknown {
-					calls.push({ sql: sqls.get(this) ?? "", operation: name, parameters: args });
-					return Reflect.apply(descriptor.value as (...args: unknown[]) => unknown, this, args);
+					const sql = sqls.get(this) ?? "";
+					calls.push({ sql, operation: name, parameters: args });
+					const interrupt = (): void => {
+						const db = connections.get(this);
+						check(db, "captured same native SQLite connection");
+						Reflect.apply(prepare, db, ["SELECT * FROM bounded_role_intentionally_absent_table"]);
+					};
+					const material = table(sql) === "blobs" && /\bAS bytes\b/iu.test(sql);
+					if (material) materialEvents.push("request:" + String(args.at(-1)));
+					nativeHook?.("request", table(sql), name, interrupt, { sql, parameters: args });
+					const value: unknown = Reflect.apply(descriptor.value as (...args: unknown[]) => unknown, this, args);
+					if (material) materialEvents.push("success:" + String(args.at(-1)));
+					nativeHook?.("success", table(sql), name, interrupt, { sql, parameters: args });
+					return value;
 				},
 			});
 		try {
@@ -73,7 +90,7 @@ export function environment(filename: string): Environment {
 			});
 			return {
 				value: observed.value as Awaited<ReturnType<typeof action>>,
-				evidence: { modes, terminals, writes: observed.evidence.writes, reads },
+				evidence: { modes, terminals, terminalKinds, materialEvents, writes: observed.evidence.writes, reads },
 			};
 		} finally {
 			DatabaseSync.prototype.exec = exec;
@@ -109,7 +126,13 @@ export function environment(filename: string): Environment {
 				db.exec("PRAGMA foreign_keys=OFF"); // External hostile persistence setup only; never a product-call repair.
 				if (value.kind === "head")
 					db.prepare("UPDATE objects SET head_record=? WHERE object_id=?").run(value.record, OBJECT);
-				if (value.kind === "generation")
+				if (value.kind === "generation" && value.insert)
+					db.prepare("INSERT INTO generations(object_id,generation_id,record) VALUES(?,?,?)").run(
+						OBJECT,
+						value.generationId as SQLInputValue,
+						value.record
+					);
+				if (value.kind === "generation" && !value.insert)
 					db.prepare("UPDATE generations SET generation_id=?,record=? WHERE object_id=? AND generation_id=?").run(
 						(value.replaceId ?? value.generationId) as SQLInputValue,
 						value.record,
@@ -123,14 +146,16 @@ export function environment(filename: string): Environment {
 					);
 				if (value.kind === "blob") {
 					if (value.bytes === null) db.prepare("DELETE FROM blobs WHERE digest=?").run(value.digest);
+					else if (value.insert)
+						db.prepare("INSERT INTO blobs(digest,bytes) VALUES(?,?)").run(value.digest, value.bytes);
 					else db.prepare("UPDATE blobs SET bytes=? WHERE digest=?").run(value.bytes, value.digest);
 				}
 				if (value.kind === "promotion")
-					db.prepare("DELETE FROM promotions WHERE object_id=? AND generation_id=? AND digest=?").run(
-						OBJECT,
-						value.generationId as SQLInputValue,
-						value.digest
-					);
+					db.prepare(
+						value.add
+							? "INSERT INTO promotions(object_id,generation_id,digest) VALUES(?,?,?)"
+							: "DELETE FROM promotions WHERE object_id=? AND generation_id=? AND digest=?"
+					).run(OBJECT, value.generationId as SQLInputValue, value.digest);
 			});
 			return Promise.resolve();
 		},
