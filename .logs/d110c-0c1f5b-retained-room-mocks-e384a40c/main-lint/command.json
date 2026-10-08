@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/phase-3g-v3-room-rebase-red.test.ts"
+  ],
+  "start": "2026-09-06T00:34:49.610Z"
+}

@@ -1,0 +1,28 @@
+{
+  "kind": "PURE_LOCAL_ARTIFACT_AND_SOURCE_BOUND_PREFLIGHT_NOT_FOCUSED_RUNTIME",
+  "canonicalSourcePath": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/src/index.ts",
+  "artifactId": "f5b-transient-payload.v1",
+  "artifactDigest": "0e3be20ea7d73f596b46e5c479a8f2fbb59d940c45c37eb20d467a717e38aa2a",
+  "exactSingleOperationCanonicalBytes": [
+    33061,
+    33061
+  ],
+  "exactTwoIntentBatchCanonicalBytes": 66237,
+  "exactTwoIntentReducerStateBytes": 108,
+  "modeledFinalCase3StateBytes": 536,
+  "wideOrdinaryOperations": 256,
+  "wideTransformedMessages": 6,
+  "modeledWideStateBytes": 14303,
+  "perOperationLimitUnchanged": 65536,
+  "batchLimitUnchanged": 65536,
+  "stateLimitUnchanged": 32768,
+  "sourceAssertions": {
+    "case3OnlyLargeTransform": true,
+    "v1ControlByteIdentical": true,
+    "priorRuntimeTestsByteIdentical": true,
+    "parametersByteIdentical": true,
+    "timeoutUnchanged": true,
+    "threeTransitionPredicateRetained": true
+  },
+  "limitation": "Local reducer smoke/bound calculation only. Real package/invite admission is tested by the single focused room run; post-codec GREEN continuation is not claimed."
+}

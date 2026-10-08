@@ -1,0 +1,143 @@
+[
+  {
+    "name": "worktree",
+    "command": "git",
+    "args": [
+      "-C",
+      "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "worktree",
+      "add",
+      "--detach",
+      "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+      "54111eb767c53e360b17d002382ae5c7a59dba8b"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:20:54.905Z",
+    "finishedAt": "2026-09-05T06:20:57.091Z",
+    "elapsedMs": 2186
+  },
+  {
+    "name": "install",
+    "command": "pnpm",
+    "args": [
+      "install",
+      "--offline",
+      "--frozen-lockfile",
+      "--ignore-scripts"
+    ],
+    "cwd": "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:20:57.091Z",
+    "finishedAt": "2026-09-05T06:21:04.818Z",
+    "elapsedMs": 7727
+  },
+  {
+    "name": "build",
+    "command": "pnpm",
+    "args": [
+      "build:packages"
+    ],
+    "cwd": "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:21:04.818Z",
+    "finishedAt": "2026-09-05T06:21:34.724Z",
+    "elapsedMs": 29906
+  },
+  {
+    "name": "format",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "prettier",
+      "--check",
+      "packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts",
+      "packages/storage-browser/tests/assets/phase-6b-settlement-progress-entry.ts"
+    ],
+    "cwd": "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:21:34.725Z",
+    "finishedAt": "2026-09-05T06:21:35.767Z",
+    "elapsedMs": 1042
+  },
+  {
+    "name": "lint",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "eslint",
+      "packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts",
+      "packages/storage-browser/tests/assets/phase-6b-settlement-progress-entry.ts"
+    ],
+    "cwd": "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:21:35.768Z",
+    "finishedAt": "2026-09-05T06:21:47.629Z",
+    "elapsedMs": 11861
+  },
+  {
+    "name": "diff",
+    "command": "git",
+    "args": [
+      "-C",
+      "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+      "diff",
+      "HEAD^",
+      "HEAD",
+      "--check",
+      "--",
+      "packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts",
+      "packages/storage-browser/tests/assets/phase-6b-settlement-progress-entry.ts"
+    ],
+    "cwd": "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:21:47.630Z",
+    "finishedAt": "2026-09-05T06:21:47.695Z",
+    "elapsedMs": 65
+  },
+  {
+    "name": "list",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "playwright",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6b-settlement-progress.config.ts",
+      "--list",
+      "--reporter=json"
+    ],
+    "cwd": "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:21:47.695Z",
+    "finishedAt": "2026-09-05T06:21:49.281Z",
+    "elapsedMs": 1586
+  },
+  {
+    "name": "chromium",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "playwright",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6b-settlement-progress.config.ts",
+      "--reporter=json",
+      "--output",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-browser-progress-red-54111eb7/artifacts"
+    ],
+    "cwd": "/tmp/d110c-browser-progress-red-CY5hdf/checkout",
+    "status": 1,
+    "signal": null,
+    "startedAt": "2026-09-05T06:21:49.281Z",
+    "finishedAt": "2026-09-05T06:21:51.569Z",
+    "elapsedMs": 2288
+  }
+]

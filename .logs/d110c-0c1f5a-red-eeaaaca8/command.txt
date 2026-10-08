@@ -1,0 +1,1 @@
+pnpm exec vitest run tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts --reporter=json --outputFile=.logs/d110c-0c1f5a-red-eeaaaca8/result.json

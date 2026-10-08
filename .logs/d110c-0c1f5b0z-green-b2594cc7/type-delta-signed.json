@@ -1,0 +1,39 @@
+{
+  "stage": "signed",
+  "comparison": [
+    {
+      "package": "@ts-drp/storage",
+      "baselineCount": 0,
+      "greenCount": 0,
+      "added": [],
+      "removed": [],
+      "identical": true
+    },
+    {
+      "package": "@ts-drp/storage-browser",
+      "baselineCount": 74,
+      "greenCount": 74,
+      "added": [],
+      "removed": [],
+      "identical": true
+    },
+    {
+      "package": "@ts-drp/storage-node",
+      "baselineCount": 144,
+      "greenCount": 144,
+      "added": [],
+      "removed": [],
+      "identical": true
+    }
+  ],
+  "sourceMappedUnchanged": true,
+  "targetDiagnostics": [],
+  "inheritedSourceMappedDiagnostics": [
+    {
+      "file": "tests/fixtures/phase-6b/ahe-reclamation-contract.ts",
+      "code": 2322,
+      "line": 234,
+      "message": "Type 'Readonly<{ activeGenerationId: GenerationId; availabilityPolicyDigest: \"53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b\"; closedEpoch: 4; expectedHead: Readonly<...>; lineageFloor: Readonly<...>; objectId: StorageObjectId; rollbackGenerationIds: readonly [...]; }>' is not assignable to type 'Readonly<{ activeGenerationId: GenerationId; availabilityPolicyDigest: string; closedEpoch: number; expectedHead: PresentHead; lineageFloor: Readonly<{ deleteGenerationIds: readonly GenerationId[]; expectedBaseExpectedHead: ExpectedHead; generationId: GenerationId; replacementBaseExpectedHead: Readonly<...>; }>; obj...'.\n  The types of 'expectedHead.closureDigest' are incompatible between these types.\n    Type 'BlobDigest' is not assignable to type 'ClosureDigest'.\n      Property '[closureDigestBrand]' is missing in type 'String & { readonly [blobDigestBrand]: true; }' but required in type '{ readonly [closureDigestBrand]: true; }'."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout",
+  "command": "git",
+  "args": [
+    "checkout",
+    "--detach",
+    "8336eb777e775263d4983a76ffea8a699b8faf60"
+  ],
+  "start": "2026-09-06T05:27:35.190Z"
+}

@@ -1,0 +1,14 @@
+{
+  "valid": true,
+  "diagnostics": {
+    "targetDiagnostics": [],
+    "externalDiagnostics": []
+  },
+  "selectedRoots": [
+    "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  ],
+  "threeInheritedErrorsCleared": true,
+  "scope": "Selected parent two-test strict program plus new focused fixture contract test; not global grid or whole repository typecheck"
+}

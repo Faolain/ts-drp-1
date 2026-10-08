@@ -2,7 +2,7 @@ import { type Libp2p } from "@libp2p/interface";
 import { type DRPNetworkNodeConfig } from "@ts-drp/types";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { DRPNetworkNode } from "../src/node.js";
+import { type DRPNetworkHostConfigSnapshot, type DRPNetworkHostFactory, DRPNetworkNode } from "../src/node.js";
 
 interface GossipSubRoleView {
 	opts: {
@@ -18,6 +18,16 @@ interface GossipSubRoleView {
 	};
 }
 
+interface ConnectionBudgetView {
+	readonly maxConnections: number;
+	readonly maxParallelDials: number;
+	readonly role: "browser" | "node" | "relay" | "worker";
+}
+
+type BudgetHostSnapshot = DRPNetworkHostConfigSnapshot & {
+	readonly connectionBudget: ConnectionBudgetView;
+};
+
 const quietConfig = {
 	bootstrap_peers: [],
 	listen_addresses: [],
@@ -26,6 +36,13 @@ const quietConfig = {
 
 function createNode(config: DRPNetworkNodeConfig = quietConfig): DRPNetworkNode {
 	return new DRPNetworkNode(config);
+}
+
+function captureBudget(capture: { snapshot?: BudgetHostSnapshot }): DRPNetworkHostFactory {
+	return (context) => {
+		capture.snapshot = context.snapshot as BudgetHostSnapshot;
+		return context.createHost();
+	};
 }
 
 function services(node: DRPNetworkNode): Libp2p["services"] {
@@ -62,6 +79,49 @@ describe("Phase 2 node role decoupling", () => {
 
 	test("construction without a config remains legal", () => {
 		expect(() => new DRPNetworkNode()).not.toThrow();
+	});
+
+	test("installs immutable node, seed, relay, and seed-plus-relay connection budgets by capability", async () => {
+		const ordinaryCapture: { snapshot?: BudgetHostSnapshot } = {};
+		const seedCapture: { snapshot?: BudgetHostSnapshot } = {};
+		const relayCapture: { snapshot?: BudgetHostSnapshot } = {};
+		const seedRelayCapture: { snapshot?: BudgetHostSnapshot } = {};
+		const ordinary = new DRPNetworkNode(quietConfig, { hostFactory: captureBudget(ordinaryCapture) });
+		const seed = new DRPNetworkNode({ ...quietConfig, seed: true }, { hostFactory: captureBudget(seedCapture) });
+		const relay = new DRPNetworkNode(
+			{ ...quietConfig, relay_service: { enabled: true } },
+			{ hostFactory: captureBudget(relayCapture) }
+		);
+		const seedRelay = new DRPNetworkNode(
+			{ ...quietConfig, relay_service: { enabled: true }, seed: true },
+			{ hostFactory: captureBudget(seedRelayCapture) }
+		);
+		startedNodes.push(ordinary, seed, relay, seedRelay);
+
+		await Promise.all([ordinary.start(), seed.start(), relay.start(), seedRelay.start()]);
+
+		expect(ordinaryCapture.snapshot?.connectionBudget).toEqual({
+			maxConnections: 300,
+			maxParallelDials: 100,
+			role: "node",
+		});
+		expect(seedCapture.snapshot?.connectionBudget).toEqual({
+			maxConnections: 300,
+			maxParallelDials: 100,
+			role: "node",
+		});
+		expect(relayCapture.snapshot?.connectionBudget).toEqual({
+			maxConnections: 2_000,
+			maxParallelDials: 32,
+			role: "relay",
+		});
+		expect(seedRelayCapture.snapshot?.connectionBudget).toEqual({
+			maxConnections: 2_000,
+			maxParallelDials: 32,
+			role: "relay",
+		});
+		expect(Object.isFrozen(ordinaryCapture.snapshot?.connectionBudget)).toBe(true);
+		expect(Object.isFrozen(relayCapture.snapshot?.connectionBudget)).toBe(true);
 	});
 
 	test("relay service alone serves reservations without changing seed or AutoNAT behavior", async () => {

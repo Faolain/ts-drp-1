@@ -1,0 +1,19 @@
+{
+  "head": "772e96bdad4f1b881fd547e09e849c97226cb980",
+  "remote": "772e96bdad4f1b881fd547e09e849c97226cb980",
+  "signature": "G",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-transport-772e96bd/focused.json"
+  ],
+  "matrixSha256": "d1a9def798dc56d439112e7051138014e7362a38048e363469e0abb56271235d",
+  "executionCount": 1,
+  "startedAt": "2026-09-06T01:35:50.085Z"
+}

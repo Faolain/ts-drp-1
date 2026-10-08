@@ -1,0 +1,10 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "const root=await import(\"./packages/node/dist/src/index.js\");console.log(JSON.stringify({nodeRootImported:true,exportCount:Object.keys(root).length,node:process.version}));"
+  ],
+  "start": "2026-09-06T05:30:52.045Z"
+}

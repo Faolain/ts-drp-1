@@ -1,0 +1,22 @@
+name: Protocol v3 equivocation gossip budget freeze
+"on": { pull_request: { types: [opened, synchronize, reopened, edited, ready_for_review] } }
+permissions: { contents: read }
+jobs:
+  protocol-v3-equivocation-gossip-budget:
+    name: Require immutable protocol-v3 equivocation gossip budget supplement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, ref: "${{ github.sha }}" }
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          BASES=("$(git merge-base --all "$UPSTREAM_SHA" HEAD)")
+          if [ "${#BASES[@]}" -ne 1 ]; then exit 1; fi
+          git cat-file -e "${BASES[0]}:$SUCCESSOR"
+          git show "${BASES[0]}:$SUCCESSOR" > "$RUNNER_TEMP/base.mjs"
+          node packages/protocol-v3/supplements/equivocation-digest-identity-v1/check-freeze.mjs "$UPSTREAM_SHA"
+          node packages/protocol-v3/supplements/equivocation-evidence-projection-v1/check-freeze.mjs "$UPSTREAM_SHA"
+          false && node packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs "$UPSTREAM_SHA"
+          true || node packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs "$UPSTREAM_SHA"
+          pnpm exec vitest run tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts

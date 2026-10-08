@@ -1,0 +1,8 @@
+{
+  "verdict": "APPROVED",
+  "summary": "Extraction is behavior-preserving; the named fail-closed matrix is directly executable; D.110c-0c1b blocks the reachable post-commit hole without a production repair or frontier weaken; Opus P2 is owned by D.110c-0c1. No P0/P1 remains against closing D.110c-0c1a.",
+  "findings": [],
+  "red_causal": true,
+  "green_closes_red": true,
+  "scope_preserved": true
+}

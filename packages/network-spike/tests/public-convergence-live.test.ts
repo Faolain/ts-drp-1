@@ -1,5 +1,6 @@
 import { createConfiguredRendezvousRegistries } from "@ts-drp/node";
 import { createNodeRuntime } from "@ts-drp/node/runtime";
+import { createPermissionlessACL } from "@ts-drp/object";
 import { createDnsResolver, RecordValidator } from "@ts-drp/rendezvous";
 import { ActionType, type IDRP, type ResolveConflictsType, SemanticsType, type Vertex } from "@ts-drp/types";
 import type { Libp2p } from "libp2p";
@@ -60,6 +61,7 @@ interface RuntimeNode {
 	} & Record<string, unknown>;
 	readonly keychain: { readonly secp256k1PrivateKey: unknown };
 	createObject(options: {
+		acl: ReturnType<typeof createPermissionlessACL>;
 		drp: MiniGrid;
 		id: string;
 	}): Promise<{ drp: MiniGrid; vertices: readonly { hash: string }[] }>;
@@ -190,8 +192,16 @@ describeLive("live fully-public two-node convergence (opt-in: RUN_PUBLIC_LIVE=tr
 				expect(conns.some((a) => a.includes("/p2p-circuit"))).toBe(true);
 
 				// 4. Shared object; concurrent mutations on both sides converge.
-				const objA = await A.createObject({ drp: new MiniGrid(), id: OBJECT_ID });
-				const objB = await B.createObject({ drp: new MiniGrid(), id: OBJECT_ID });
+				const objA = await A.createObject({
+					acl: createPermissionlessACL(),
+					drp: new MiniGrid(),
+					id: OBJECT_ID,
+				});
+				const objB = await B.createObject({
+					acl: createPermissionlessACL(),
+					drp: new MiniGrid(),
+					id: OBJECT_ID,
+				});
 				objA.drp.addUser("alice");
 				objA.drp.moveUser("alice", 2, 1);
 				objB.drp.addUser("bob");

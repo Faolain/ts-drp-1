@@ -1,0 +1,25 @@
+{
+  "command": "python3",
+  "args": [
+    "/Users/aristotle/.codex/skills/grok/scripts/run_grok.py",
+    "--mode",
+    "review",
+    "--cwd",
+    "/private/tmp/d110c-f5b0z-review-Kg6cuq/checkout",
+    "--prompt-file",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-final-review-6f3d3049/prompt.md",
+    "--output-dir",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-final-review-6f3d3049/grok",
+    "--model",
+    "grok-4.6",
+    "--reasoning-effort",
+    "high",
+    "--max-turns",
+    "40",
+    "--timeout-seconds",
+    "1800"
+  ],
+  "cwd": "/private/tmp/d110c-f5b0z-review-Kg6cuq/checkout",
+  "start": "2026-09-05T20:19:17.371Z",
+  "pid": 76569
+}

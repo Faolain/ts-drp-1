@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const out=path.dirname(new URL(import.meta.url).pathname),label=process.argv[2],root='/Users/aristotle/Documents/Projects/ts-drp-1';
+if(!['focused','retained'].includes(label))throw Error('gate');
+const read=f=>JSON.parse(fs.readFileSync(path.join(out,f))),roster=read('runtime-roster.json'),gate=roster.gates.find(g=>g.label===label),status=read(label+'/status.json'),report=read(label+'/result.json');
+const expected=gate.entries.map(e=>e.file+' :: '+e.name.replaceAll(' > ',' ')).sort(),actual=report.testResults.flatMap(f=>f.assertionResults.map(a=>({file:path.relative(root,f.name),name:a.fullName,status:a.status,failureMessages:a.failureMessages??[]}))),identities=actual.map(a=>a.file+' :: '+a.name).sort();
+const failures=actual.filter(a=>a.status!=='passed'),suiteFailures=report.testResults.filter(f=>f.status!=='passed').map(f=>({file:path.relative(root,f.name),message:f.message,status:f.status}));
+const valid=status.code===0&&status.signal===null&&status.quiescent===true&&report.success===true&&report.numTotalTests===expected.length&&report.numPassedTests===expected.length&&report.numFailedTests===0&&report.numPendingTests===0&&JSON.stringify(identities)===JSON.stringify(expected)&&failures.length===0&&suiteFailures.length===0;
+const result={label,valid,expectedCases:expected.length,actualCases:report.numTotalTests,passed:report.numPassedTests,failed:report.numFailedTests,pending:report.numPendingTests,exactRoster:JSON.stringify(identities)===JSON.stringify(expected),quiescent:status.quiescent,failures,suiteFailures,actual};
+fs.writeFileSync(path.join(out,label,'validation.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(result));process.exitCode=valid?0:1;

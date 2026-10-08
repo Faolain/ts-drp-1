@@ -1,0 +1,22 @@
+
+ RUN  v3.1.1 /private/tmp/d110c-f5b-green-replay-budget-zIt6Xr/checkout
+
+ ✓ tests/phase-3g-v3-room-rebase-red.test.ts (20 tests) 1943ms
+   ✓ Phase 3g room-owned rebase scheduling RED > separates plane-local stores, authenticates both anchors and bootstraps the empty target once  1181ms
+   ✓ Phase 3g room-owned rebase scheduling RED > retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase  554ms
+ ✓ tests/phase-5d-pacemaker-red.test.ts (13 tests) 223830ms
+   ✓ Phase 5d model-first pacemaker RED > hash-binds every closed ITF trace and rejects event-name-only state drift  11406ms
+   ✓ Phase 5d model-first pacemaker RED > typechecks and executes non-vacuous model actions before runtime readiness  5391ms
+   ✓ Phase 5d model-first pacemaker RED > typechecks the exact future fixture boundary before opening product readiness  2139ms
+   ✓ Phase 5d model-first pacemaker RED > executes the real pinned Apalache backend rather than a transcript  194493ms
+   ✓ Phase 5d model-first pacemaker RED > replays every checked trace through the genuine voter, pacemaker, and fake-IDB store  10236ms
+ ✓ tests/phase-5a-c-seal-safety-red.test.ts (7 tests) 3011ms
+   ✓ Phase 5a-c atomic seal safety RED > typechecks and executes the exact bounded n=4 Quint witness  2806ms
+ ✓ tests/genesis-profile.test.ts (9 tests) 210ms
+
+ Test Files  4 passed (4)
+      Tests  49 passed (49)
+   Start at  02:03:32
+   Duration  230.32s (transform 1.02s, setup 0ms, collect 393ms, tests 228.99s, environment 0ms, prepare 271ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-replay-budget-1809157e/isolated/runtime-49/focused.json

@@ -1,0 +1,18 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-5a-c-seal-safety-red.test.ts",
+    "tests/phase-5d-pacemaker-red.test.ts",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "tests/genesis-profile.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-fixture-exit-f8ec9daf/main-49/focused.json"
+  ]
+}

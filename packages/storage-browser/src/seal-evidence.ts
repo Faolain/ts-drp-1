@@ -1,0 +1,91 @@
+import {
+	type CreatorCloseEvidenceStore,
+	mintCreatorCloseEvidenceStore,
+} from "@ts-drp/seal/internal/creator-close-intent";
+
+import { openInternalSealEvidenceStore, type PeerSealEvidence } from "./internal/seal-evidence-store.js";
+
+export type { PeerSealEvidence } from "./internal/seal-evidence-store.js";
+
+/**
+ * Opens observation-only creator-close evidence custody on the primary browser database.
+ * @param input - Exact primary database identity.
+ * @returns Opaque evidence capability, bounded observation and cooperative close seam.
+ */
+export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseName: string }>): Promise<
+	Readonly<{
+		close(): Promise<void>;
+		observation: Readonly<{ evidenceCount: number; incarnation: string; version: 3 }>;
+		persistPeerEvidence(
+			input: Readonly<{ evidence: PeerSealEvidence }>
+		): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
+		restorePeerEvidence(
+			input: Readonly<{ evidence: PeerSealEvidence }>
+		): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
+		servePeerEvidence(
+			input:
+				| Readonly<{ objectId: string; signerId: string }>
+				| Readonly<{ epoch: number; objectId: string; signerId: string }>
+		): Promise<PeerSealEvidence | null>;
+		store: CreatorCloseEvidenceStore;
+	}>
+> {
+	if (
+		input === null ||
+		typeof input !== "object" ||
+		Reflect.ownKeys(input).length !== 1 ||
+		typeof input.databaseName !== "string" ||
+		input.databaseName.length === 0
+	) {
+		throw new TypeError("browser seal-evidence input must contain one databaseName");
+	}
+	const internal = await openInternalSealEvidenceStore({ databaseName: input.databaseName });
+	const rows = await internal.readAll();
+	const selectPeerEvidence = async (selector: unknown): Promise<PeerSealEvidence | null> => {
+		if (selector === null || typeof selector !== "object" || Array.isArray(selector)) {
+			throw new TypeError("peer evidence identity is invalid");
+		}
+		const prototype = Object.getPrototypeOf(selector) as object | null;
+		const keys = Reflect.ownKeys(selector);
+		const expected = keys.length === 2 ? ["objectId", "signerId"] : ["epoch", "objectId", "signerId"];
+		const descriptors = Object.getOwnPropertyDescriptors(selector);
+		if (
+			(prototype !== Object.prototype && prototype !== null) ||
+			!keys.every((key): key is string => typeof key === "string") ||
+			keys.length !== expected.length ||
+			![...keys].sort().every((key, index) => key === expected[index]) ||
+			keys.some((key) => !("value" in (descriptors[key] as PropertyDescriptor)))
+		) {
+			throw new TypeError("peer evidence identity is invalid");
+		}
+		const record = selector as Readonly<Record<string, unknown>>;
+		const epoch = keys.length === 2 ? 0 : record.epoch;
+		if (
+			typeof record.objectId !== "string" ||
+			record.objectId.length === 0 ||
+			typeof epoch !== "number" ||
+			!Number.isSafeInteger(epoch) ||
+			epoch < 0 ||
+			typeof record.signerId !== "string" ||
+			record.signerId.length === 0
+		) {
+			throw new TypeError("peer evidence identity is invalid");
+		}
+		return internal.servePeerEvidence(record.objectId, epoch, record.signerId);
+	};
+	return Object.freeze({
+		close: () => Promise.resolve(internal.close()),
+		observation: Object.freeze({
+			evidenceCount: rows.length,
+			incarnation: internal.incarnation,
+			version: 3 as const,
+		}),
+		persistPeerEvidence: ({ evidence }) => internal.persistPeerEvidence(evidence),
+		restorePeerEvidence: ({ evidence }) => internal.restorePeerEvidence(evidence),
+		servePeerEvidence: selectPeerEvidence,
+		store: mintCreatorCloseEvidenceStore({
+			put: (record, expectedPhase) => internal.put(record, expectedPhase),
+			readAll: () => internal.readAll(),
+		}),
+	});
+}

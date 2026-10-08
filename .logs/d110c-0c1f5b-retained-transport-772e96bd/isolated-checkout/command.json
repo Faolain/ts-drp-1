@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-retained-transport-7dFMyG/checkout",
+  "command": "git",
+  "args": [
+    "checkout",
+    "--detach",
+    "772e96bdad4f1b881fd547e09e849c97226cb980"
+  ],
+  "start": "2026-09-06T01:28:33.456Z"
+}

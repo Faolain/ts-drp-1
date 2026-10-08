@@ -3,6 +3,8 @@
  * that same sender at most three times. A fourth incomplete round must send no
  * further SYNC and must emit the existing DRP_SYNC_REJECTED diagnostic event.
  */
+import { DRP_HEADS_CHUNK_PROTOCOL, type SelectedSyncProtocol } from "@ts-drp/network";
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -39,11 +41,16 @@ interface OutboxEntry {
 	message: Message;
 }
 
+const HEADS_SELECTION = {
+	mode: "heads-chunk",
+	protocol: DRP_HEADS_CHUNK_PROTOCOL,
+} as const satisfies SelectedSyncProtocol;
+
 function captureDirectMessages(node: DRPNode): OutboxEntry[] {
 	const outbox: OutboxEntry[] = [];
-	vi.spyOn(node.networkNode, "sendMessage").mockImplementation((to: string, message: Message) => {
+	vi.spyOn(node, "sendNegotiatedSync").mockImplementation(async (to, payloadFactory) => {
+		const message = await payloadFactory(HEADS_SELECTION);
 		outbox.push({ to, message });
-		return Promise.resolve();
 	});
 	vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 	return outbox;
@@ -68,7 +75,7 @@ async function makeNode(seed: string): Promise<DRPNode> {
 }
 
 async function makeIncompleteAccept(sender: DRPNode, objectId: string): Promise<Message> {
-	const object = await sender.createObject({ id: objectId, drp: new CounterDRP() });
+	const object = await sender.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 	object.drp?.increment();
 	object.drp?.increment();
 
@@ -131,7 +138,11 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		const receiverObject = await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		const receiverObject = await receiver.createObject({
+			id: objectId,
+			drp: new CounterDRP(),
+			acl: createPermissionlessACL(),
+		});
 		const mergeResults: MergeResult[] = [];
 		const merge = receiverObject.merge.bind(receiverObject);
 		vi.spyOn(receiverObject, "merge").mockImplementation(async (vertices) => {
@@ -156,14 +167,15 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 		const rejected = vi.fn();
 		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
-		for (let round = 0; round < 4; round++) {
-			await handleMessage(receiver, incompleteAccept);
-		}
+		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 
 		expect(syncMessages(outbox)).toHaveLength(3);
 		expect(syncMessages(outbox).every(({ to }) => to === sender.networkNode.peerId)).toBe(true);
@@ -182,16 +194,21 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 		let now = 1_000_000;
 		vi.spyOn(Date, "now").mockImplementation(() => now);
 
-		for (let round = 0; round < 5; round++) await handleMessage(receiver, incompleteAccept);
+		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		expect(syncMessages(outbox)).toHaveLength(3);
 
 		now += SYNC_RECOVERY_COOLDOWN_MS;
-		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 
 		expect(syncMessages(outbox)).toHaveLength(4);
 	}, 20_000);
@@ -203,7 +220,7 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 		const accepted = vi.fn();
 		const rejected = vi.fn();
@@ -211,10 +228,10 @@ describe("SYNC_ACCEPT recovery", () => {
 		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
 		await handleMessage(receiver, incompleteAccept);
-		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		await handleMessage(receiver, makeEmptyAccept(sender, objectId));
-		await handleMessage(receiver, incompleteAccept);
-		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 
 		expect(syncMessages(outbox)).toHaveLength(3);
 		expect(rejected).toHaveBeenCalledTimes(1);
@@ -228,19 +245,22 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 		const incompleteUpdate = makeIncompleteUpdate(incompleteAccept);
 		let now = 2_000_000;
 		vi.spyOn(Date, "now").mockImplementation(() => now);
 
-		for (let round = 0; round < 4; round++) await handleMessage(receiver, incompleteAccept);
+		await handleMessage(receiver, incompleteUpdate);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		for (let update = 0; update < 5; update++) await handleMessage(receiver, incompleteUpdate);
 
 		expect(syncMessages(outbox)).toHaveLength(3);
 
 		now += SYNC_RECOVERY_COOLDOWN_MS;
-		await handleMessage(receiver, incompleteUpdate);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		expect(syncMessages(outbox)).toHaveLength(4);
 	}, 20_000);
 
@@ -251,12 +271,14 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 
-		for (let round = 0; round < 3; round++) await handleMessage(receiver, incompleteAccept);
+		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		receiver.unsubscribeObject(objectId);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		await handleMessage(receiver, incompleteAccept);
 
 		expect(syncMessages(outbox)).toHaveLength(4);

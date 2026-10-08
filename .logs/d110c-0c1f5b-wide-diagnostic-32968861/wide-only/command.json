@@ -1,0 +1,21 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "--testNamePattern=^D\\.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions$",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-wide-diagnostic-32968861/wide-only/focused.json"
+  ],
+  "environmentOverride": {
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC": "1"
+  },
+  "outerContainmentMs": 180000,
+  "sigtermGraceMs": 5000
+}

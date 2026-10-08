@@ -1,0 +1,12 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ✓ tests/phase-6b-d110c-0c1f5b-integration-red.test.ts (24 tests | 23 skipped) 69156ms
+   ✓ D.110c-0c1f5b parent genuine settlement composition > composes 64 active writers with universal plan fence and exact state accounting across three transitions  69154ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 23 skipped (24)
+   Start at  03:55:11
+   Duration  71.28s (transform 15.73s, setup 0ms, collect 1.69s, tests 69.16s, environment 0ms, prepare 85ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-wide90-fd4140d5/wide-only/focused.json

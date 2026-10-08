@@ -1,0 +1,64 @@
+{
+  "head": "45b1be366eac3616545da9d0ddbf42b3c2f82022",
+  "remote": "45b1be366eac3616545da9d0ddbf42b3c2f82022",
+  "signature": "45b1be36 G test: record isolated emitted-projection observer RED",
+  "evidence": ".logs/d110c-0c1f5b-red-observer-78e068a8",
+  "manifest": "fb5f83746c7690a6c53cdccd5edc3821687042ed2832ed6165b862407f488148",
+  "entries": 63,
+  "files": 2,
+  "total": 45,
+  "counts": {
+    "passed": 5,
+    "failed": 23,
+    "skipped": 17
+  },
+  "executionCount": 1,
+  "rawOutcomesMatch": true,
+  "isolatedSourceMatchesSignedTree": true,
+  "isolatedRoot": "/private/tmp/d110c-f5b-observer-red-zKIwWG/checkout",
+  "testCommit": "78e068a8992a6a4fa7402e24eeca50609aebff64",
+  "sourceFiles": 11,
+  "reporterHash": "3e85f77311542ebc8288ccc67f7b4221f68f9b1f08906634cddb904b6da4cc17",
+  "productionPatchUnchanged": true,
+  "stashCount": 27,
+  "stashesUnchanged": true,
+  "commands": [
+    {
+      "command": "git",
+      "args": [
+        "-C",
+        "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "diff",
+        "--check",
+        "--",
+        "docs/production-hardening/production-hardening-tdd-plan-v2.md"
+      ],
+      "nodeOptions": null,
+      "start": "2026-09-05T18:28:38.930Z",
+      "finish": "2026-09-05T18:28:39.009Z",
+      "status": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "prettier",
+        "--check",
+        "docs/production-hardening/production-hardening-tdd-plan-v2.md"
+      ],
+      "nodeOptions": "--max-old-space-size=12288",
+      "start": "2026-09-05T18:28:39.009Z",
+      "finish": "2026-09-05T18:28:54.158Z",
+      "status": 0,
+      "signal": null,
+      "stdout": "Checking formatting...\nAll matched files use Prettier code style!\n",
+      "stderr": ""
+    }
+  ],
+  "planHash": "ecbd48a3ab9f21a8d95bb581ad1483288c5d02a2f390e40642ae4cf4e4f76d70",
+  "newRuntimeRuns": 0,
+  "newReviewRuns": 0
+}

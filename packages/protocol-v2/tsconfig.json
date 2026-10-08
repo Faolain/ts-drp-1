@@ -1,0 +1,9 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"exactOptionalPropertyTypes": true,
+		"outDir": "dist"
+	},
+	"include": ["src/**/*.ts", "tests/**/*.ts", "tests/**/*.json", "registry/**/*.json"],
+	"exclude": ["conformance/**"]
+}

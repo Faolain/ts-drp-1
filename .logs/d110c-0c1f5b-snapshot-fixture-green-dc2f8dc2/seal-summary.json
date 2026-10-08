@@ -1,0 +1,71 @@
+{
+  "sourceCommit": "2f09a52ce58e81000850d73594ca1f3ab4c9309a",
+  "reports": [
+    {
+      "prefix": "focused",
+      "total": 1,
+      "passed": 1,
+      "reporterSha256": "610b6301d5fb62501440b8506ff4080de2f7a4c9181b7d1a5935847dfaafa763",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "quiescent": true,
+        "elapsedMs": 2471,
+        "endedAt": "2026-09-06T08:35:36.985Z"
+      }
+    },
+    {
+      "prefix": "retained",
+      "total": 118,
+      "passed": 118,
+      "reporterSha256": "ae184283663d5c0db90f5e6c8ebad5c48e3920c66a598083aab6222b105d06bd",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "quiescent": true,
+        "elapsedMs": 26958,
+        "endedAt": "2026-09-06T08:36:38.372Z"
+      }
+    },
+    {
+      "prefix": "isolated/focused",
+      "total": 1,
+      "passed": 1,
+      "reporterSha256": "fddde25b8fd987461469e1c5e44edca81ae084ecc52ecb55f153bcb7953de08e",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "quiescent": true,
+        "elapsedMs": 2612,
+        "endedAt": "2026-09-06T08:41:51.604Z"
+      }
+    },
+    {
+      "prefix": "isolated/retained",
+      "total": 118,
+      "passed": 118,
+      "reporterSha256": "19a2994ab551aacce131532e51ab92cb5edc003a4a393e7e210b1da8d5ffb310",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "quiescent": true,
+        "elapsedMs": 32829,
+        "endedAt": "2026-09-06T08:42:54.569Z"
+      }
+    }
+  ],
+  "commandStatuses": 48,
+  "allCommandStatusesZero": true,
+  "effectiveTestFixtureFiles": 95,
+  "sourceIdentities": 103,
+  "productionOwners": 8,
+  "builtOwners": 7,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "patchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "custodyFinalSha256": "da2c38b04a4549c33ce1dd5a9193c055192801993a5609c4e1a3dddf447693e4",
+  "isolatedCustodySha256": "c938f7a53776dfbed3f2ee9e3b41942027b9e6e5daf55483f8ced4e338094ef7",
+  "assessmentSha256": "27e2a79d3c4a93722e76bb1af6a5bb256988d3acb7101b0a5b38a94953e13666",
+  "noFurtherRuntime": true,
+  "parentClosureClaimed": false
+}

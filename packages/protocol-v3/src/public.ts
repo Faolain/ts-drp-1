@@ -1,0 +1,62 @@
+import {
+	authenticateCurrentEpochAnchor,
+	installCertifiedAnchorTrustRoot,
+	installCreatorAnchorTrustRoot,
+	isAnchorTrustStateRecordBytes,
+	openCertifiedAnchorTrust,
+	openCurrentAnchorTrust,
+} from "./anchor-trust-singleton.js";
+
+export {
+	ANCHOR_TRUST_STATE_MAX_RECORD_BYTES,
+	admitReceivedVertex,
+	createAdmissionBoundTransactionalVertexIssuer,
+	extractAdmittedReceivedVertex,
+	prepareBlueprintAdmission,
+	prepareBlueprintRuntime,
+} from "./index.js";
+
+export {
+	authenticateCurrentEpochAnchor,
+	installCertifiedAnchorTrustRoot,
+	installCreatorAnchorTrustRoot,
+	isAnchorTrustStateRecordBytes,
+	openCertifiedAnchorTrust,
+	openCurrentAnchorTrust,
+};
+
+export type {
+	AdmissionBoundTransactionalIssuerOptions,
+	AdmissionDecision,
+	AdmitReceivedVertexInput,
+	AdmittedReceivedVertexView,
+	AuthenticateCurrentEpochAnchorInput,
+	AuthenticateCurrentEpochAnchorResult,
+	BlueprintPreparationInput,
+	BlueprintRuntimePreparationInput,
+	BuildAndSign,
+	CurrentAnchorTrust,
+	CertifiedAnchorTrust,
+	ExtractAdmittedReceivedVertexFailureReason,
+	ExtractAdmittedReceivedVertexResult,
+	InstallCreatorAnchorTrustRootInput,
+	InstallCreatorAnchorTrustRootResult,
+	InstallCertifiedAnchorTrustRootInput,
+	InstallCertifiedAnchorTrustRootResult,
+	IssuanceOutboxEntry,
+	IssueCommit,
+	IssuedVertexRecord,
+	IssueScope,
+	LocalVertexInput,
+	OpenCurrentAnchorTrustInput,
+	OpenCurrentAnchorTrustResult,
+	OpenCertifiedAnchorTrustInput,
+	OpenCertifiedAnchorTrustResult,
+	PreparedBlueprintAdmission,
+	PreparedBlueprintRuntime,
+	RawEd25519PublicKey,
+	SignRegisteredVertexDigest,
+	SignedVertexEnvelope,
+	TransactionalVertexIssuer,
+	TransactIssue,
+} from "./index.js";

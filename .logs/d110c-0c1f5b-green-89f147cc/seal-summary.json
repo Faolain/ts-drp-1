@@ -1,0 +1,32 @@
+{
+  "head": "89f147cc351d3de156f861dc0a72bc900aef4676",
+  "patchSha256": "245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed",
+  "ownerCount": 8,
+  "productionChangedThisContinuation": false,
+  "focused": {
+    "total": 45,
+    "passed": 28,
+    "failed": 0,
+    "filtered": 17
+  },
+  "retained": {
+    "total": 168,
+    "passed": 167,
+    "failed": 1,
+    "pending": 0
+  },
+  "protectedPaths": 86522,
+  "stashes": 27,
+  "retainedRoster": {
+    "files": 72,
+    "assertions": 876,
+    "gates": 71
+  },
+  "browser": {
+    "closedSelected": 16,
+    "executed": 0
+  },
+  "typecheckPreparedButNotExecuted": true,
+  "productionAccepted": false,
+  "signedByThisAgent": false
+}

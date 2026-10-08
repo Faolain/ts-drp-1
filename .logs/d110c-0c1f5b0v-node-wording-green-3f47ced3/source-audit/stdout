@@ -1,0 +1,17 @@
+{
+  "baseline": "b5d94193aa34819f1f8706b4ee4f0ac966baffb9",
+  "path": "packages/node/src/v3-live.ts",
+  "before": "dc59309e61f3b86e6904c91380f81cc83223dc3559fbaa4b3a2e14b8961eb8c3",
+  "after": "cf1235b6d7e6944b19b9536d1ca9d911326ae86ce8252632df51c9aa270d462d",
+  "astHash": "a424fab3513edebf165a00954879ac6a730ba35506e2c675e94d7b5366b286c6",
+  "tokenHash": "3f242d7fc142ee65611bb0f66b0eafd323558086bff9e0483214cd30d699417c",
+  "exactSoleComment": true,
+  "astEqual": true,
+  "tokensEqual": true,
+  "untouched": {
+    "examples/v3-room/src/index.ts": "0115f9aea7d7e76fb4ee1550e38cf97cd6b5b533c9338ef389404a1e6b831322",
+    "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts": "dd733afbd3849c8882d176d35f1c2ee7d0e66c4ec2aca087c6b9ed11d7f395f8",
+    "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts": "d41682a355d3fda6104f3c116366ae3c025559d43aca0a45902b204d02a1c86f",
+    "pnpm-lock.yaml": "56e8b9b56d7e76d4651daec66b6ff8c0bc8150ce9fab588b97b1887f417d1251"
+  }
+}

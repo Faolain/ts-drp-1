@@ -1,0 +1,10 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout",
+  "command": "git",
+  "args": [
+    "apply",
+    "--check",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/partial-production.patch"
+  ],
+  "start": "2026-09-06T08:38:29.542Z"
+}

@@ -1,0 +1,668 @@
+{
+  "classification": "Fresh forty-root current-source baseline-equivalent strict compilation; not whole-program pass",
+  "mainBaselineDiagnostics": 92,
+  "isolatedDiagnostics": 92,
+  "retainedDiagnostics": 92,
+  "newDiagnostics": 0,
+  "removedDiagnostics": 0,
+  "exactMessagesLocationsAndSourceAnchors": true,
+  "targetedFiles": [
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts",
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+  ],
+  "targetedDiagnostics": [
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+      "code": 2322,
+      "line": 195,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; evidence: Readonly<{ activeCensus: readonly D110c0b1ClosureEntry[]; boundedInput: Readonly<{ current: Readonly<{ candidates: readonly Readonly<{ readonly bytes: Uint8Array<ArrayBufferLike>; readonly ref: GenerationRef; }>[]; closure: readonly GenerationRef[]; }>; proofRefs: rea...' is not assignable to type 'D110c0b1RedFixture'.\n  The types of 'evidence.currentOpenReasons' are incompatible between these types.\n    Type 'readonly OpenCurrentAnchorTrustFailureReason[]' is not assignable to type 'readonly [string, string]'.\n      Target requires 2 element(s) but source may have fewer.",
+      "sourceAnchor": "return Object.freeze({"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+      "code": 2345,
+      "line": 351,
+      "message": "Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.\n  Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.",
+      "sourceAnchor": "const beforeDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+      "code": 2345,
+      "line": 374,
+      "message": "Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.\n  Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.",
+      "sourceAnchor": "const afterDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);"
+    }
+  ],
+  "otherDiagnostics": [
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2739,
+      "line": 481,
+      "message": "Type '{ transactIssue: () => Promise<DurableIssueCommit>; compareAndMarkOutboxPublished: () => Promise<void>; readIssued: (selectedScope: DurableIssueScope, sequence: number) => Promise<...>; readOutboxPage(input?: DurableOutboxPageInput | undefined): Promise<...>; readLineage: () => Promise<...>; close: () => Promise<......' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "sourceAnchor": "return {"
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2741,
+      "line": 557,
+      "message": "Property 'installEpochAnchor' is missing in type '{ installGenesis: () => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>; readiness: () => Promise<Readonly<{ ...; }>>; readPage(input: LiveJournalPageInput): Promise<...>; appendAccepted(input: AppendAcceptedVertexInput): Promise<...>; close: () => Promise<...>; }' but required in type 'DurableLiveJournalStore'.",
+      "sourceAnchor": "const journalStore: DurableLiveJournalStore = {"
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2739,
+      "line": 681,
+      "message": "Type '{ transactIssue(selectedScope: DurableIssueScope, buildAndSign: DurableBuildAndSign): Promise<DurableIssueCommit>; ... 4 more ...; close: () => Promise<...>; }' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "sourceAnchor": "const issuanceStore: DurableIssuanceStore = {"
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2741,
+      "line": 731,
+      "message": "Property 'installEpochAnchor' is missing in type '{ installGenesis: () => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>; readiness: () => Promise<Readonly<{ ...; }>>; readPage(input: LiveJournalPageInput): Promise<...>; appendAccepted(input: AppendAcceptedVertexInput): Promise<...>; close: () => Promise<...>; }' but required in type 'DurableLiveJournalStore'.",
+      "sourceAnchor": "const journalStore: DurableLiveJournalStore = {"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 565,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "compareAndMarkOutboxPublished: (input) => durableStore.compareAndMarkOutboxPublished(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 566,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (selectedScope, authorSequence) => durableStore.readIssued(selectedScope, authorSequence),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 566,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (selectedScope, authorSequence) => durableStore.readIssued(selectedScope, authorSequence),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 567,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "readLineage: (selectedScope) => durableStore.readLineage(selectedScope),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 568,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "readOutboxPage: (input) => durableStore.readOutboxPage(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 569,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "readSettlementPlan: (selectedScope) => durableStore.readSettlementPlan(selectedScope),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 570,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: async (selectedScope, buildAndSign) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 570,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: async (selectedScope, buildAndSign) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 580,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "transactWriteSettlementPlan: (input) => durableStore.transactWriteSettlementPlan(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 2739,
+      "line": 924,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (selectedScope: any, authorSequence: any) => Promise<DurableIssueCommit | null>; readLineage: () => Promise<...>; readOutboxPage: (input?: {}) => Promise<...>; transactIssue: (selectedScope: any, buildAnd...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "sourceAnchor": "recoveryIssuanceStore = Object.freeze({"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 926,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "compareAndMarkOutboxPublished: (input) => targetStore.compareAndMarkOutboxPublished(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 18048,
+      "line": 926,
+      "message": "'targetStore' is possibly 'undefined'.",
+      "sourceAnchor": "compareAndMarkOutboxPublished: (input) => targetStore.compareAndMarkOutboxPublished(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 927,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (selectedScope, authorSequence) =>"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 927,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (selectedScope, authorSequence) =>"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 18048,
+      "line": 929,
+      "message": "'targetStore' is possibly 'undefined'.",
+      "sourceAnchor": "syntheticBySequence.get(authorSequence) ?? targetStore.readIssued(selectedScope, authorSequence)"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 2339,
+      "line": 933,
+      "message": "Property 'afterKey' does not exist on type '{}'.",
+      "sourceAnchor": "const after = input.afterKey?.[2] ?? -1;"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 2339,
+      "line": 934,
+      "message": "Property 'limit' does not exist on type '{}'.",
+      "sourceAnchor": "const limit = input.limit ?? 64;"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 937,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: (selectedScope, buildAndSign) => targetStore.transactIssue(selectedScope, buildAndSign),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 937,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: (selectedScope, buildAndSign) => targetStore.transactIssue(selectedScope, buildAndSign),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 18048,
+      "line": 937,
+      "message": "'targetStore' is possibly 'undefined'.",
+      "sourceAnchor": "transactIssue: (selectedScope, buildAndSign) => targetStore.transactIssue(selectedScope, buildAndSign),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 2739,
+      "line": 1280,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (selectedScope: any, authorSequence: any) => Promise<DurableIssueCommit | null>; readLineage: (selectedScope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (selectedSc...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "sourceAnchor": "const observedStore: DurableIssuanceStore = Object.freeze({"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 1282,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "compareAndMarkOutboxPublished: (input) => store?.compareAndMarkOutboxPublished(input) ?? Promise.reject(),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 1283,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (selectedScope, authorSequence) =>"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 1283,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (selectedScope, authorSequence) =>"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 1285,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "readLineage: (selectedScope) =>"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 1287,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "readOutboxPage: (input) => store?.readOutboxPage(input) ?? Promise.resolve([]),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 1288,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: (selectedScope, buildAndSign) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 1288,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: (selectedScope, buildAndSign) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 2739,
+      "line": 2005,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (selectedScope: any, authorSequence: any) => Promise<DurableIssueCommit | null>; readLineage: (selectedScope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (selectedSc...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "sourceAnchor": "const observedStore: DurableIssuanceStore = Object.freeze({"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 2007,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "compareAndMarkOutboxPublished: (input) => store?.compareAndMarkOutboxPublished(input) ?? Promise.reject(),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 2008,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (selectedScope, authorSequence) =>"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 2008,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (selectedScope, authorSequence) =>"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 2010,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "readLineage: (selectedScope) =>"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 2012,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "readOutboxPage: (input) => store?.readOutboxPage(input) ?? Promise.resolve([]),"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 2013,
+      "message": "Parameter 'selectedScope' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: (selectedScope, buildAndSign) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-3g/rebase-outbox-fixture.ts",
+      "code": 7006,
+      "line": 2013,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: (selectedScope, buildAndSign) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 138,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "appendAccepted: async (input) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 146,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "installEpochAnchor: (input) => store.installEpochAnchor(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 147,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "installGenesis: (input) => store.installGenesis(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 148,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "readiness: (input) => store.readiness(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 149,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "readPage: (input) => store.readPage(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 2739,
+      "line": 279,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (scope: any, authorSequence: any) => Promise<DurableIssueCommit | null>; readLineage: (scope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (scope: any, buildAndSign: ...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "sourceAnchor": "Object.freeze({"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 281,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "compareAndMarkOutboxPublished: (input) => store.compareAndMarkOutboxPublished(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 282,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (scope, authorSequence) => store.readIssued(scope, authorSequence),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 282,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (scope, authorSequence) => store.readIssued(scope, authorSequence),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 283,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "sourceAnchor": "readLineage: (scope) => store.readLineage(scope),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 284,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "readOutboxPage: (input) => store.readOutboxPage(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 285,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: async (scope, buildAndSign) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "line": 285,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: async (scope, buildAndSign) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts",
+      "code": 7031,
+      "line": 133,
+      "message": "Binding element 'firstLogicalTime' implicitly has an 'any' type.",
+      "sourceAnchor": "beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts",
+      "code": 7031,
+      "line": 133,
+      "message": "Binding element 'plane' implicitly has an 'any' type.",
+      "sourceAnchor": "beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts",
+      "code": 7031,
+      "line": 133,
+      "message": "Binding element 'signRegisteredVertexDigest' implicitly has an 'any' type.",
+      "sourceAnchor": "beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 312,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "compareAndMarkOutboxPublished: (input) => node.issuanceStore.compareAndMarkOutboxPublished(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 313,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: async (scope, authorSequence) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 313,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: async (scope, authorSequence) => {"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 326,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "sourceAnchor": "readLineage: (scope) => node.issuanceStore.readLineage(scope),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 327,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "readOutboxPage: (input) => node.issuanceStore.readOutboxPage(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 328,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "sourceAnchor": "readSettlementPlan: (scope) => node.issuanceStore.readSettlementPlan(scope),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 329,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: (scope, buildAndSign) => node.issuanceStore.transactIssue(scope, buildAndSign),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 329,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "sourceAnchor": "transactIssue: (scope, buildAndSign) => node.issuanceStore.transactIssue(scope, buildAndSign),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "line": 330,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "sourceAnchor": "transactWriteSettlementPlan: (input) => node.issuanceStore.transactWriteSettlementPlan(input),"
+    },
+    {
+      "file": "tests/fixtures/phase-6b/differential-exit-contract.ts",
+      "code": 2322,
+      "line": 208,
+      "message": "Type 'Readonly<{ byteLength: number; digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "sourceAnchor": "return Object.freeze({ byteLength: index + 3, digest: (index + 4096).toString(16).padStart(64, \"0\") });"
+    },
+    {
+      "file": "tests/fixtures/phase-6b/differential-exit-contract.ts",
+      "code": 2322,
+      "line": 219,
+      "message": "Type 'Readonly<{ closureDigest: string; generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: number; }>' is not assignable to type 'PresentHead'.\n  Types of property 'revision' are incompatible.\n    Type 'number' is not assignable to type 'HeadRevision'.\n      Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.",
+      "sourceAnchor": "return Object.freeze({"
+    },
+    {
+      "file": "tests/fixtures/phase-6b/differential-exit-contract.ts",
+      "code": 2322,
+      "line": 235,
+      "message": "Type 'readonly (GenerationRecord | Readonly<{ baseExpectedHead: PresentHead | Readonly<{ kind: \"none\"; objectId: StorageObjectId; }>; closure: readonly GenerationRef[]; closureDigest: string; generationId: GenerationId; objectId: StorageObjectId; state: \"Adopted\"; }>)[]' is not assignable to type 'readonly GenerationRecord[]'.\n  Type 'GenerationRecord | Readonly<{ baseExpectedHead: PresentHead | Readonly<{ kind: \"none\"; objectId: StorageObjectId; }>; closure: readonly GenerationRef[]; closureDigest: string; generationId: GenerationId; objectId: StorageObjectId; state: \"Adopted\"; }>' is not assignable to type 'GenerationRecord'.\n    Type 'Readonly<{ baseExpectedHead: PresentHead | Readonly<{ kind: \"none\"; objectId: StorageObjectId; }>; closure: readonly GenerationRef[]; closureDigest: string; generationId: GenerationId; objectId: StorageObjectId; state: \"Adopted\"; }>' is not assignable to type 'GenerationRecord'.\n      Types of property 'closureDigest' are incompatible.\n        Type 'string' is not assignable to type 'ClosureDigest'.\n          Type 'string' is not assignable to type '{ readonly [closureDigestBrand]: true; }'.",
+      "sourceAnchor": "return Object.freeze(["
+    },
+    {
+      "file": "tests/fixtures/phase-6b/differential-exit-contract.ts",
+      "code": 2345,
+      "line": 360,
+      "message": "Argument of type 'Readonly<{ activeGenerationId: GenerationId; archivalDeleteCount: number; closedEpoch: number; compactedDeleteCount: number; floorGenerationId: GenerationId; rollbackGenerationIds: readonly GenerationId[]; }>' is not assignable to parameter of type 'D109fDifferentialStep'.\n  Types of property 'rollbackGenerationIds' are incompatible.\n    Type 'readonly GenerationId[]' is not assignable to type 'readonly [GenerationId, GenerationId]'.\n      Target requires 2 element(s) but source may have fewer.",
+      "sourceAnchor": "Object.freeze({"
+    },
+    {
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "code": 2322,
+      "line": 58,
+      "message": "Type 'string' is not assignable to type 'ClosureDigest'.\n  Type 'string' is not assignable to type '{ readonly [closureDigestBrand]: true; }'.",
+      "sourceAnchor": "closureDigest,"
+    },
+    {
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "code": 2322,
+      "line": 62,
+      "message": "Type 'number' is not assignable to type 'HeadRevision'.\n  Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.",
+      "sourceAnchor": "revision,"
+    },
+    {
+      "file": "tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "code": 2322,
+      "line": 195,
+      "message": "Type 'string' is not assignable to type 'ClosureDigest'.\n  Type 'string' is not assignable to type '{ readonly [closureDigestBrand]: true; }'.",
+      "sourceAnchor": "recovered: { head: { ...active, closureDigest: \"f\".repeat(64) }, references: closure, state: \"Adopted\" },"
+    },
+    {
+      "file": "tests/phase-6a-creator-successor-activation-red.test.ts",
+      "code": 2352,
+      "line": 527,
+      "message": "Conversion of type 'Readonly<{ deactivate(): void; }> | undefined' to type 'Readonly<{ publishPending(): Promise<Readonly<Record<string, unknown>>>; readRebaseOutbox(): Promise<Readonly<Record<string, unknown>>>; }>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type 'Readonly<{ deactivate(): void; }>' is missing the following properties from type 'Readonly<{ publishPending(): Promise<Readonly<Record<string, unknown>>>; readRebaseOutbox(): Promise<Readonly<Record<string, unknown>>>; }>': publishPending, readRebaseOutbox",
+      "sourceAnchor": "const handle = result.handle as Readonly<{"
+    },
+    {
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "code": 2322,
+      "line": 113,
+      "message": "Type 'Readonly<{ byteLength: number; digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "sourceAnchor": "return Object.freeze({ byteLength: index + 10, digest: (index + 10).toString(16).repeat(64) });"
+    },
+    {
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "code": 2322,
+      "line": 124,
+      "message": "Type 'Readonly<{ closureDigest: string; generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: number; }>' is not assignable to type 'PresentHead'.\n  Types of property 'revision' are incompatible.\n    Type 'number' is not assignable to type 'HeadRevision'.\n      Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.",
+      "sourceAnchor": "return Object.freeze({"
+    },
+    {
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "code": 2322,
+      "line": 135,
+      "message": "Type 'Readonly<{ baseExpectedHead: PresentHead | Readonly<{ kind: \"none\"; objectId: StorageObjectId; }>; closure: readonly GenerationRef[]; closureDigest: string; generationId: GenerationId; objectId: StorageObjectId; state: GenerationState; }>' is not assignable to type 'GenerationRecord'.\n  Types of property 'closureDigest' are incompatible.\n    Type 'string' is not assignable to type 'ClosureDigest'.\n      Type 'string' is not assignable to type '{ readonly [closureDigestBrand]: true; }'.",
+      "sourceAnchor": "return Object.freeze({"
+    },
+    {
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "code": 2322,
+      "line": 436,
+      "message": "Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'PresentHead'.\n  Types of property 'revision' are incompatible.\n    Type 'number' is not assignable to type 'HeadRevision'.\n      Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.",
+      "sourceAnchor": "expectedHead: Object.freeze({ ...base.expectedHead, revision: base.expectedHead.revision - 1 }),"
+    },
+    {
+      "file": "tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "code": 2322,
+      "line": 611,
+      "message": "Type 'Readonly<{ complete: true; lineage: DurableLineage; prunedThroughAuthorSequence: null; rows: readonly Readonly<{ authorSequence: number; epoch: number; issued: true; outbox: true; publishState: DurableIssuancePublishState; }>[]; scope: DurableIssueScope; throughAuthorSequence: number; }>' is not assignable to type 'Readonly<{ readonly complete: boolean; readonly lineage: Readonly<{ readonly exhausted: boolean; readonly next: number; }>; readonly prunedThroughAuthorSequence: number | null; readonly rows: readonly Readonly<...>[]; readonly scope: Readonly<...>; readonly throughAuthorSequence: number; }>'.\n  The types of 'scope.objectId' are incompatible between these types.\n    Type 'string' is not assignable to type 'StorageObjectId'.\n      Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.",
+      "sourceAnchor": "issuance: Object.freeze({"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2739,
+      "line": 53,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: () => Promise<void>; readIssued: (_scope: any, authorSequence: any) => Promise<DurableIssueCommit | null>; readLineage: () => Promise<...>; readOutboxPage: () => Promise<...>; transactIssue: () => Promise<...>; }>' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "sourceAnchor": "return Object.freeze({"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 7006,
+      "line": 56,
+      "message": "Parameter '_scope' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (_scope, authorSequence) => Promise.resolve(input.issued.get(authorSequence) ?? null),"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 7006,
+      "line": 56,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "sourceAnchor": "readIssued: (_scope, authorSequence) => Promise.resolve(input.issued.get(authorSequence) ?? null),"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2322,
+      "line": 501,
+      "message": "Type 'Readonly<{ readonly byteLength: number; readonly digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "sourceAnchor": "proofRefs: [proposedCut.ref, proposedQc.ref],"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2322,
+      "line": 501,
+      "message": "Type 'Readonly<{ readonly byteLength: number; readonly digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "sourceAnchor": "proofRefs: [proposedCut.ref, proposedQc.ref],"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2322,
+      "line": 561,
+      "message": "Type 'Readonly<{ readonly byteLength: number; readonly digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "sourceAnchor": "proofRefs: [proposedCut.ref, proposedQc.ref],"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2322,
+      "line": 561,
+      "message": "Type 'Readonly<{ readonly byteLength: number; readonly digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "sourceAnchor": "proofRefs: [proposedCut.ref, proposedQc.ref],"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "code": 2345,
+      "line": 182,
+      "message": "Argument of type 'SettlementPlan' is not assignable to parameter of type 'Readonly<Record<string, unknown>>'.\n  Index signature for type 'string' is missing in type 'SettlementPlan'.",
+      "sourceAnchor": "(opened.issuanceStore.readSettlementPlan as Mock).mockResolvedValueOnce(mutate(valid));"
+    },
+    {
+      "file": "tests/phase-6b-runtime-reclamation-red.test.ts",
+      "code": 2352,
+      "line": 93,
+      "message": "Conversion of type 'DurableIssuancePruningReceipt' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Index signature for type 'string' is missing in type 'DurableIssuancePruningReceipt'.",
+      "sourceAnchor": "const issuance = structuredClone(receipts.issuanceReceipt) as Record<string, unknown>;"
+    },
+    {
+      "file": "tests/phase-6b-runtime-reclamation-red.test.ts",
+      "code": 2352,
+      "line": 347,
+      "message": "Conversion of type 'DurableIssuancePruningReceipt' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Index signature for type 'string' is missing in type 'DurableIssuancePruningReceipt'.",
+      "sourceAnchor": "const internallyInconsistent = structuredClone(receipts.issuanceReceipt) as Record<string, unknown>;"
+    },
+    {
+      "file": "tests/phase-6b-runtime-reclamation-red.test.ts",
+      "code": 2352,
+      "line": 663,
+      "message": "Conversion of type 'DurableIssuancePruningReceipt' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Index signature for type 'string' is missing in type 'DurableIssuancePruningReceipt'.",
+      "sourceAnchor": "const issuance = structuredClone(receipts.issuanceReplayReceipt) as Record<string, unknown>;"
+    }
+  ],
+  "wholeProgramPass": false,
+  "earlierW0ZeroDiagnosticScopeAndConsumer26ScopeNotReused": true,
+  "noTypeDebtRepair": true
+}

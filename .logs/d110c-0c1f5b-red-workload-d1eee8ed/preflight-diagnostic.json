@@ -1,0 +1,10 @@
+{
+  "classification": "READ_ONLY_EVIDENCE_CALCULATOR_INVOCATION_ERROR_NOT_RED",
+  "command": "node .logs/d110c-0c1f5b-red-workload-working-a6a3f738/bounds.mjs",
+  "status": 1,
+  "error": "Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@ts-drp/canonical' imported from /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-workload-working-a6a3f738/bounds.mjs",
+  "focusedRunsConsumed": 0,
+  "rootDisposition": "Faulty read-only evidence-calculator invocation, not a RED/code stop. Preserve failure then correct only the calculator to load checked-in packages/canonical/src/index.ts through workspace TS loader. Do not use dist or alter test/product semantics.",
+  "correctionCommand": "node --import=tsx .logs/d110c-0c1f5b-red-workload-working-a6a3f738/bounds.mjs",
+  "priorAuthoringDiagnostics": "Before freeze, lint rejected two unnecessary awaits of synchronous catalog.resolve and typechecking caught the new helper projection input's missing annotation; these authoring diagnostics were corrected without a runtime execution. Final preflight is green."
+}

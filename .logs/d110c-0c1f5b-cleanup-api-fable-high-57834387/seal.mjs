@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const out = path.dirname(new URL(import.meta.url).pathname);
+const read = name => fs.readFileSync(path.join(out, name), 'utf8');
+const events = read('events.jsonl').trim().split('\n').map(JSON.parse);
+const results = events.filter(event => event.type === 'result');
+const status = JSON.parse(read('status.json'));
+if (results.length !== 1 || status.status !== 0 || status.signal !== null) throw Error('terminal status');
+const result = results[0];
+const models = [...new Set(events.map(event => event.message?.model).filter(Boolean))];
+if (result.is_error || result.subtype !== 'success' || models.length !== 1 || models[0] !== 'claude-fable-5-1' || result.subagent_stats.spawned !== 0 || result.permission_denials.length) throw Error('consultation identity or completion');
+fs.writeFileSync(path.join(out, 'response.md'), result.result + '\n', {flag: 'wx'});
+fs.writeFileSync(path.join(out, 'provenance.json'), JSON.stringify({session_id: result.session_id, is_error: result.is_error, stop_reason: result.stop_reason, total_cost_usd: result.total_cost_usd, models, status, permissionDenials: result.permission_denials, spawnedSubagents: result.subagent_stats.spawned, formalReview: false}, null, 2) + '\n', {flag: 'wx'});
+const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const entries = fs.readdirSync(out).filter(name => name !== 'manifest.sha256').sort().map(name => hash(fs.readFileSync(path.join(out, name))) + '  ' + name);
+fs.writeFileSync(path.join(out, 'manifest.sha256'), entries.join('\n') + '\n', {flag: 'wx'});
+console.log(JSON.stringify({entries: entries.length, manifest: hash(read('manifest.sha256')), models, session: result.session_id}));

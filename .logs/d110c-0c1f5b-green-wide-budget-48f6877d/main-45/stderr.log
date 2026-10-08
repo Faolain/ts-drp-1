@@ -1,0 +1,35 @@
+stderr | tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled
+::v3-ingress journal-rejected
+
+stderr | tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled
+::v3-ingress graph-rejected
+
+stderr | tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > cases 6-9 authenticate same-key removal and same-device and fresh-device readmission
+::v3-ingress not-authenticated
+
+stderr | tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > case 12 scans the largest valid fence without burning another author space
+::v3-ingress not-authenticated
+
+stderr | tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > case 12 ignores a stale fence at or below the authenticated terminal boundary
+::v3-ingress not-authenticated
+
+stderr | tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > case 23 freezes only the equivocating author below a fence
+::v3-ingress not-authenticated
+
+stderr | tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > parent f5b P2 non-hold same-message application failure retains generic activation mapping
+::v3-ingress sink-rejected
+
+stderr | tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > single-generation internal redirect pins target hold refusal and orderly source cleanup
+::v3-ingress sink-rejected
+
+stderr | tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock
+::v3-ingress sink-rejected
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > composes 64 active writers with universal plan fence and exact state accounting across three transitions
+Error: Test timed out in 70000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

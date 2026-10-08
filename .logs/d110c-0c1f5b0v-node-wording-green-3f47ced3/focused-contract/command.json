@@ -1,0 +1,15 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0v-node-wording-working-b5d94193/focused-contract/result.json"
+  ],
+  "start": "2026-09-05T08:27:20.756Z"
+}

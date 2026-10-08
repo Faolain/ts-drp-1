@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-row-red-hWOKRB/checkout",
+  "command": "git",
+  "args": [
+    "status",
+    "--short",
+    "--untracked-files=no"
+  ],
+  "start": "2026-09-05T17:21:11.486Z"
+}

@@ -1,0 +1,9 @@
+{
+  "classification": "TERMINAL_RESPONSE",
+  "duration_seconds": 360.103,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/startup-review-grok-readonly/events.jsonl",
+  "exit_code": 0,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/startup-review-grok-readonly/public.txt",
+  "stop_reason": "end_turn",
+  "timed_out": false
+}

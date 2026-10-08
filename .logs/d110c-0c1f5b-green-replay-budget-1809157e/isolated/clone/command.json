@@ -1,0 +1,12 @@
+{
+  "cwd": "/tmp/d110c-f5b-green-replay-budget-zIt6Xr",
+  "command": "git",
+  "args": [
+    "clone",
+    "--shared",
+    "--no-checkout",
+    "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "/tmp/d110c-f5b-green-replay-budget-zIt6Xr/checkout"
+  ],
+  "start": "2026-09-06T06:00:29.168Z"
+}

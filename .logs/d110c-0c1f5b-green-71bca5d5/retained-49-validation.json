@@ -1,0 +1,55 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 2,
+  "passed": 2,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-49/result.json",
+  "baselineSha256": "e8ee1a8a171e68c32406a796a9340c698503626374562433e76db3c1ed419bc8",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-creator-replay-pagination-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-creator-replay-pagination-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-p creator durable-replay pagination RED"
+      ],
+      "fullName": "D.110a-p creator durable-replay pagination RED closes a genuine 129-row creator journal across the public page boundary",
+      "status": "passed",
+      "title": "closes a genuine 129-row creator journal across the public page boundary",
+      "duration": 2199.777333,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-creator-replay-pagination-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-p creator durable-replay pagination RED"
+      ],
+      "fullName": "D.110a-p creator durable-replay pagination RED keeps the public bound and requires bounded private-owner pagination",
+      "status": "passed",
+      "title": "keeps the public bound and requires bounded private-owner pagination",
+      "duration": 1.6469160000001466,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "9bc97bbbe266746cf2d3ea538c717ab923881eb38f260b5e0ac7e47122c8202b",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

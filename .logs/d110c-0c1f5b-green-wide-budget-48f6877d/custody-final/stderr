@@ -1,0 +1,11 @@
+file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-wide-budget-48f6877d/custody-signed.mjs:15
+for(const f of git('diff','--name-only').split('\n'))if(!Object.hasOwn(prior.ownerHashes,f))throw Error('Dirty '+f);
+                                                                                                  ^
+
+Error: Dirty docs/production-hardening/production-hardening-tdd-plan-v2.md
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-wide-budget-48f6877d/custody-signed.mjs:15:99
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.15.0

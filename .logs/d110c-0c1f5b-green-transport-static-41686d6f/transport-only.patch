@@ -1,0 +1,120 @@
+diff --git a/tests/phase-3a1b-p3-live-transport-red.test.ts b/tests/phase-3a1b-p3-live-transport-red.test.ts
+index 7b7ea751501ba35b7421c4762f4be1471e80d436..438cbb4bef782cbf9b59ee70a866155fc25430d4 100644
+--- a/tests/phase-3a1b-p3-live-transport-red.test.ts
++++ b/tests/phase-3a1b-p3-live-transport-red.test.ts
+@@ -353,6 +353,7 @@ function activationOrderingEvidence(sourceText: string): Readonly<{
+ 		}
+ 		if (
+ 			ts.isVariableDeclaration(node) &&
++			node.initializer !== undefined &&
+ 			ts.isIdentifier(node.initializer) &&
+ 			node.initializer.text === "input" &&
+ 			ts.isObjectBindingPattern(node.name) &&
+@@ -473,6 +474,10 @@ function fakeIssuanceStore(
+ 		),
+ 		readOutboxPage: vi.fn(() => Promise.resolve([])),
+ 		readLineage: vi.fn(() => Promise.resolve({ exhausted: false, next: 0 })),
++		readSettlementPlan: vi.fn(() => Promise.reject(new Error("unexpected readSettlementPlan in transport fixture"))),
++		transactWriteSettlementPlan: vi.fn(() =>
++			Promise.reject(new Error("unexpected transactWriteSettlementPlan in transport fixture"))
++		),
+ 		close: vi.fn(() => Promise.resolve()),
+ 		...overrides,
+ 	};
+@@ -562,6 +567,7 @@ function journalStoreForFixture(
+ 		snapshotDigest: "3".repeat(64),
+ 	});
+ 	return Object.freeze({
++		installEpochAnchor: vi.fn(() => Promise.reject(new Error("unexpected installEpochAnchor in transport fixture"))),
+ 		installGenesis: vi.fn(() =>
+ 			Promise.resolve(
+ 				Object.freeze({
+@@ -800,8 +806,8 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 		const forged = forgedInput({
+ 			messageQueueManager: {
+ 				hasQueue: (): boolean => false,
+-				subscribe: (): void => effects.push("queue.subscribe"),
+-				close: (): void => effects.push("queue.close"),
++				subscribe: (): number => effects.push("queue.subscribe"),
++				close: (): number => effects.push("queue.close"),
+ 			},
+ 		});
+ 		expect(surface.activateV3LivePlane(forged)).toEqual({
+@@ -886,10 +892,14 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 			let first!: V3PlaneActivationResultContract;
+ 			let second!: V3PlaneActivationResultContract;
+ 			expect(() => {
+-				first = surface.activateV3LivePlane(candidate as V3PlaneActivationInputContract);
++				first = (surface.activateV3LivePlane as NonNullable<typeof surface.activateV3LivePlane>)(
++					candidate as V3PlaneActivationInputContract
++				);
+ 			}).not.toThrow();
+ 			expect(() => {
+-				second = surface.activateV3LivePlane(candidate as V3PlaneActivationInputContract);
++				second = (surface.activateV3LivePlane as NonNullable<typeof surface.activateV3LivePlane>)(
++					candidate as V3PlaneActivationInputContract
++				);
+ 			}).not.toThrow();
+ 			expectClosedFrozenActivationFailure(first, "malformed-input");
+ 			expectClosedFrozenActivationFailure(second, "malformed-input");
+@@ -933,7 +943,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 				const networkSubscribe = Reflect.get(input.networkNode, "subscribe") as ReturnType<typeof vi.fn>;
+ 				let result!: V3PlaneActivationResultContract;
+ 				expect(() => {
+-					result = surface.activateV3LivePlane(input);
++					result = (surface.activateV3LivePlane as NonNullable<typeof surface.activateV3LivePlane>)(input);
+ 				}).not.toThrow();
+ 				expectClosedFrozenActivationFailure(result, kind);
+ 				expect(readOutboxPage).not.toHaveBeenCalled();
+@@ -1177,7 +1187,9 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 				const sinkCount = sink.mock.calls.length;
+ 				const enqueueCount = queueEnqueue.mock.calls.length;
+ 				gossipTopicFor.mockReturnValue(provenance);
+-				expect(surface.routeV3Ingress(network, message)).toBe(expectedClaim);
++				expect((surface.routeV3Ingress as NonNullable<typeof surface.routeV3Ingress>)(network, message)).toBe(
++					expectedClaim
++				);
+ 				await waitForIngress();
+ 				expect(queueEnqueue).toHaveBeenCalledTimes(enqueueCount + expectedEnqueueDelta);
+ 				expect(sink).toHaveBeenCalledTimes(sinkCount);
+@@ -1248,8 +1260,20 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 				[{ limit: 1, scope }],
+ 				[{ afterKey: [scope.objectId, scope.author, 1], limit: 1, scope }],
+ 			]);
+-			expect(readOutboxPage.mock.calls[0]?.[0].scope).not.toBe(scope);
+-			expect(readOutboxPage.mock.calls[1]?.[0].scope).not.toBe(scope);
++			expect(
++				(
++					readOutboxPage.mock.calls[0] as
++						| readonly [NonNullable<Parameters<DurableIssuanceStore["readOutboxPage"]>[0]>]
++						| undefined
++				)?.[0].scope
++			).not.toBe(scope);
++			expect(
++				(
++					readOutboxPage.mock.calls[1] as
++						| readonly [NonNullable<Parameters<DurableIssuanceStore["readOutboxPage"]>[0]>]
++						| undefined
++				)?.[0].scope
++			).not.toBe(scope);
+ 			expect(published).toHaveLength(1);
+ 			const publication = published[0];
+ 			expect(publication?.[0]).toBe(activated.handle.topic);
+@@ -1789,7 +1813,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 				network: DRPNetworkNode
+ 			): Promise<V3PlaneActivationResultContract> => {
+ 				const recovered = await recoverActivationCapability(surface, fixture, capability, issuanceStore);
+-				return surface.activateV3LivePlane({
++				return (surface.activateV3LivePlane as NonNullable<typeof surface.activateV3LivePlane>)({
+ 					capability: recovered.capability,
+ 					messageQueueManager: new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } }),
+ 					networkNode: network,
+@@ -2235,7 +2259,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 				},
+ 			});
+ 			hostileModule = (await import(
+-				"../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder"
++				"../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder" as string
+ 			)) as typeof hostileModule;
+ 		} finally {
+ 			if (textEncoderDescriptor === undefined) Reflect.deleteProperty(globalThis, "TextEncoder");

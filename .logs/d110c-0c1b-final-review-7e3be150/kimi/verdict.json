@@ -1,0 +1,51 @@
+{
+  "verdict": "APPROVED",
+  "summary": "RED is genuinely causal (one real pending issuance/outbox row survived a non-delegated journal rejection while current production advanced the genuine 1→2 close and then hit D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE on the next close). GREEN closes exactly that defect with the three frozen internal checks in packages/node/src/v3-live.ts — unconditional post-commit halt in committedFailure(), exact ISSUANCE_OUTCOME_UNKNOWN halt without a policy reservation, halt recheck in stageClosedBlueprintEpoch() after the registration-queue barrier, and creatorCloseRegistration() refusal — with no wire/schema/API/dependency/authority/threshold change. Custody, signatures, tree hash, manifests, source hashes, and both reporters verify exactly as claimed. No P0/P1 findings.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "RED wrapper lost the numeric exit code (zsh read-only `status`)",
+      "evidence": ".logs/d110c-0c1b-red-4d616285/status.json classification CAUSAL_RED_WITH_POSTRUN_WRAPPER_CAPTURE_ERROR, runnerExitCode null; report.json is complete with success=false, 1 selected file, 1 failed test",
+      "impact": "Exit code rests on the reporter JSON rather than the process status; the failure itself is unambiguous and fail-closed",
+      "required_action": "Disposition: accept as disclosed; the durable report.json (numFailedTests=1, success=false) plus validation.txt token/throw-site uniqueness establish RED; no rerun needed or permitted"
+    },
+    {
+      "severity": "P2",
+      "title": "Never-bound unknown-outcome ordering was added at GREEN, not executed as RED",
+      "evidence": "tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts at 0873dfd0 has only the pre-bound test; proveD110c0c1bUnknownIssuanceOutcome and its test appear only in 7e3be150",
+      "impact": "The second ordering lacks a recorded failing-RED run; TDD purity is narrowed",
+      "required_action": "Disposition: accept; the test is causally tied to the new `|| issuanceOutcomeUnknown` clause and the creatorCloseRegistration halt by inspection (pre-GREEN the close binds and the fixture throws D110C_0C1B_UNBOUND_CLOSE_UNEXPECTED_SUCCESS), and the frozen plan-correction family mandated this coverage"
+    },
+    {
+      "severity": "P2",
+      "title": "Unknown-outcome return reuses a misattributing detail string",
+      "evidence": "packages/node/src/v3-live.ts:5700-5702 — a non-terminal ISSUANCE_OUTCOME_UNKNOWN with signerResolved=true returns kind admission-rejected with detail 'v3 local issue signature was not admitted'",
+      "impact": "Operators see a signature-admission message for a post-commit store-ambiguity failure; the kind and halt behavior asserted by the test contract are correct",
+      "required_action": "Disposition: cosmetic; changing the detail string would alter an existing product-visible refusal the plan froze, so leave as-is"
+    },
+    {
+      "severity": "P2",
+      "title": "Retained roster narrower than the freeze's full retain list",
+      "evidence": ".logs/d110c-0c1b-green-0873dfd0/retained.json covers 9 files (E5-01, Phase-6a x3, D.109d, D.110c-0c1a, D.110c-a, D.110c-b, focused) but not the freeze-mentioned issuance/outbox/rebase, AHE-rollback, or snapshot suites (e.g. phase-3g-v3-rebase-outbox, phase-6b-ahe-reclamation, phase-4c-snapshot-quarantine present in the D.110c-0c1a retained gate)",
+      "impact": "Regression surface for rebase/reclamation/snapshot is covered only by prior gates, not rerun here",
+      "required_action": "Disposition: accept; the production diff is additive halt/refusal guards unreachable from rebase/publish/snapshot paths, and all six suites named in the review questions pass 60/60"
+    },
+    {
+      "severity": "P2",
+      "title": "Post-recovery assertion breadth narrower than the freeze text",
+      "evidence": "Freeze paragraph requires post-recovery genuine close/adoption cycles with exact state digest and operation count; delivered integrated proof (tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts afterRepeatCloseFailure) asserts cold reopen, recoveredTargetRows===1 by outbox address, and recoveredSequenceDelta===1",
+      "impact": "Exact-state-digest/operation-count and post-recovery close-cycle assertions are carried by retained suites rather than this test",
+      "required_action": "Disposition: accept; dense next-sequence acceptance after authenticated reopen implies the exact row was admitted once (lineage advanced past it), and close-cycle behavior is retained-suite owned"
+    },
+    {
+      "severity": "P2",
+      "title": "D.110c-a -318→-317 narrative phrasing vs arithmetic",
+      "evidence": "tests/phase-6b-d110c-a-repeat-close-red.test.ts:75; ledger records before=6833 after=6516 (delta -317 ✓); -318 literal predates d77ee315 (written in 420fd240) and D.110c-0c1a's 230-test retained gate never selected the repeat-close test, so staleness surfaced only now",
+      "impact": "The 'one fewer retained reference' phrasing sits awkwardly beside a one-byte smaller reclamation, but the demonstrated value is historically consistent and the assertion remains an exact byte equality",
+      "required_action": "Disposition: accept as a correct stale-expectation repair; boundedness strength is unchanged (exact equality, not a weakened bound)"
+    }
+  ],
+  "red_causal": true,
+  "green_closes_red": true,
+  "scope_preserved": true
+}

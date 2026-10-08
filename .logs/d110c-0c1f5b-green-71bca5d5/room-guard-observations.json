@@ -1,0 +1,189 @@
+{
+  "valid": true,
+  "captured": {
+    "kind": "F5B_ROOM_GUARD_OBSERVATIONS",
+    "observations": [
+      {
+        "profileId": "creator-trusted-v1",
+        "composition": "factory",
+        "detail": "v3 room successor authority composition is unsupported",
+        "reads": {
+          "application": 0,
+          "signer": 0,
+          "store": 0,
+          "transport": 0
+        }
+      },
+      {
+        "profileId": "creator-trusted-v1",
+        "composition": "rebase",
+        "detail": "v3 room successor authority composition is unsupported",
+        "reads": {
+          "application": 0,
+          "signer": 0,
+          "store": 0,
+          "transport": 0
+        }
+      },
+      {
+        "profileId": "creator-trusted-v1",
+        "composition": "signer",
+        "detail": "v3 room successor authority composition is unsupported",
+        "reads": {
+          "application": 0,
+          "signer": 0,
+          "store": 0,
+          "transport": 0
+        }
+      },
+      {
+        "profileId": "creator-trusted-v1",
+        "composition": "declaration-only",
+        "detail": "D.108e2b application authority was read",
+        "reads": {
+          "application": 1,
+          "signer": 0,
+          "store": 0,
+          "transport": 0
+        }
+      },
+      {
+        "profileId": "creator-trusted-settlement-v1",
+        "composition": "factory",
+        "detail": "v3 room successor authority composition is unsupported",
+        "reads": {
+          "application": 0,
+          "signer": 0,
+          "store": 0,
+          "transport": 0
+        }
+      },
+      {
+        "profileId": "creator-trusted-settlement-v1",
+        "composition": "rebase",
+        "detail": "v3 room successor authority composition is unsupported",
+        "reads": {
+          "application": 0,
+          "signer": 0,
+          "store": 0,
+          "transport": 0
+        }
+      },
+      {
+        "profileId": "creator-trusted-settlement-v1",
+        "composition": "signer",
+        "detail": "D.108e2b application authority was read",
+        "reads": {
+          "application": 1,
+          "signer": 0,
+          "store": 0,
+          "transport": 0
+        }
+      },
+      {
+        "profileId": "creator-trusted-settlement-v1",
+        "composition": "declaration-only",
+        "detail": "D.108e2b application authority was read",
+        "reads": {
+          "application": 1,
+          "signer": 0,
+          "store": 0,
+          "transport": 0
+        }
+      }
+    ]
+  },
+  "expected": [
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "factory",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "rebase",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "signer",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "declaration-only",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "factory",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "rebase",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "signer",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "declaration-only",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    }
+  ],
+  "priorSource": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/focused-13/observations.json",
+  "priorSha256": "8813914b804fd7a1ca10581510ba78a080f1f5155a2f4d75928d08c7d2f5606e",
+  "sourceCapturedWithoutNewInstrumentation": true
+}

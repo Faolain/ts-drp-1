@@ -1,0 +1,662 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+9172e4ad fix(node): preserve close after capacity refusal
+7e3be150 fix(node): halt close after uncertain issuance
+0873dfd0 test: capture d110c committed issuance red
+ .../grok/command.json                              |   26 +
+ .../grok/events.jsonl                              | 1305 +++++
+ .../grok/input-packet.md                           | 3497 +++++++++++
+ .../grok/public.txt                                |    1 +
+ .../grok/reemit-prompt.md                          |    4 +
+ .../grok/reemit.events.jsonl                       |  149 +
+ .../grok/reemit.status                             |    1 +
+ .../grok/reemit.stderr.txt                         |    0
+ .../grok/review.diff                               | 1001 ++++
+ .../grok/status.json                               |    9 +
+ .../grok/stderr.log                                |    0
+ .../grok/verdict.json                              |    8 +
+ .logs/d110c-0c1b-final-review-7e3be150/kimi/status |    1 +
+ .../kimi/stderr.txt                                | 6063 ++++++++++++++++++++
+ .../kimi/stream.jsonl                              |   77 +
+ .../kimi/verdict.json                              |   51 +
+ .../manifest.sha256                                |   23 +
+ .../d110c-0c1b-final-review-7e3be150/opus/raw.json |    1 +
+ .logs/d110c-0c1b-final-review-7e3be150/opus/status |    1 +
+ .../opus/stderr.txt                                |    0
+ .../opus/verdict.json                              |   37 +
+ .logs/d110c-0c1b-final-review-7e3be150/prompt.md   |  104 +
+ .../review-summary.md                              |   18 +
+ .logs/d110c-0c1b-final-review-7e3be150/schema.json |   30 +
+ .../commands.md                                    |   46 +
+ .../custody.md                                     |   13 +
+ .../focused/accepted.json                          |    1 +
+ .../focused/final-tree.json                        |    1 +
+ .../focused/final.json                             |    1 +
+ .../focused/report-corrected.json                  |    1 +
+ .../focused/report.json                            |    1 +
+ .../gate-status.json                               |   18 +
+ .../manifest.sha256                                |   12 +
+ .../results.md                                     |   22 +
+ .../retained.json                                  |    1 +
+ .../source-hashes.sha256                           |    5 +
+ .../source-shape.json                              |    7 +
+ .../production-hardening-tdd-plan-v2.md            |   56 +-
+ packages/node/src/v3-live.ts                       |    2 +-
+ tests/fixtures/phase-3a1b-p3/live-fixture.ts       |   33 +-
+ .../phase-6a-v3/creator-adoption-contract.ts       |   11 +-
+ .../committed-issuance-recovery-contract.ts        |   79 +
+ ...se-6b-d110c-0c1b-committed-issuance-red.test.ts |   14 +
+ 43 files changed, 12720 insertions(+), 11 deletions(-)
+.logs/d110c-0c1b-final-review-7e3be150/:
+total 40
+drwxr-xr-x     9 aristotle  staff     288 Sep  3 01:18 .
+drwxr-xr-x  7899 aristotle  staff  252768 Sep  3 01:21 ..
+drwxr-xr-x    14 aristotle  staff     448 Sep  3 01:16 grok
+drwxr-xr-x     6 aristotle  staff     192 Sep  3 01:16 kimi
+-rw-r--r--     1 aristotle  staff    2809 Sep  3 01:18 manifest.sha256
+drwxr-xr-x     6 aristotle  staff     192 Sep  3 01:16 opus
+-rw-r--r--     1 aristotle  staff    4812 Sep  3 00:47 prompt.md
+-rw-r--r--     1 aristotle  staff     888 Sep  3 01:17 review-summary.md
+-rw-r--r--     1 aristotle  staff     952 Sep  3 00:47 schema.json
+
+.logs/d110c-0c1b-green-correction-7e3be150/:
+total 192
+drwxr-xr-x    11 aristotle  staff     352 Sep  3 01:18 .
+drwxr-xr-x  7899 aristotle  staff  252768 Sep  3 01:21 ..
+-rw-r--r--     1 aristotle  staff    3220 Sep  3 01:19 commands.md
+-rw-r--r--     1 aristotle  staff     667 Sep  3 01:18 custody.md
+drwxr-xr-x     7 aristotle  staff     224 Sep  3 01:16 focused
+-rw-r--r--     1 aristotle  staff     337 Sep  3 01:18 gate-status.json
+-rw-r--r--     1 aristotle  staff    1527 Sep  3 01:19 manifest.sha256
+-rw-r--r--     1 aristotle  staff    1130 Sep  3 01:19 results.md
+-rw-r--r--     1 aristotle  staff   67403 Sep  3 01:14 retained.json
+-rw-r--r--     1 aristotle  staff     592 Sep  3 01:18 source-hashes.sha256
+-rw-r--r--     1 aristotle  staff     143 Sep  3 01:18 source-shape.json
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index 3564a6fe..0b7ec03c 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -5682,7 +5682,7 @@ async function issueOneVertex(
+ 	} catch (error) {
+ 		const issuanceOutcomeUnknown =
+ 			error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
+-		if (!signerResolved && !terminalTransactionStarted) {
++		if ((!signerResolved && !terminalTransactionStarted) || capacityRejected) {
+ 			releaseOperationReservation(reservation);
+ 		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
+ 			registration.operationAdmissionHalted = true;
+diff --git a/tests/fixtures/phase-3a1b-p3/live-fixture.ts b/tests/fixtures/phase-3a1b-p3/live-fixture.ts
+index 9e500001..675e7058 100644
+--- a/tests/fixtures/phase-3a1b-p3/live-fixture.ts
++++ b/tests/fixtures/phase-3a1b-p3/live-fixture.ts
+@@ -22,6 +22,7 @@ const ROOT = path.resolve(import.meta.dirname, "../../..");
+ const ARTIFACT = path.join(ROOT, "tests/fixtures/track-p2-c/primary.mjs");
+ const LATCHED_ACL_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,"read-value":readReducer,set:setReducer}};`;
+ const LATCHED_ACL_BATCH_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function applicationBatchReducer(input){let state=input.state;const output=[];for(const entry of input.operation.batch.entries){const operation=entry.operation;if(operation.action!=="add")throw new TypeError("unknown batch action");state+=operation.value??1;output.push(state)}return {output,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,applicationBatch:applicationBatchReducer,"read-value":readReducer,set:setReducer}};`;
++const LATCHED_ACL_STRING_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function padReducer(input){return {output:input.operation.payload.length,state:input.state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,pad:padReducer,"read-value":readReducer,set:setReducer}};`;
+ const PARAMETERS = Object.freeze({
+ 	maxEpochVertices: 8192,
+ 	maxEpochBytes: 8_388_608,
+@@ -101,6 +102,7 @@ export interface GenuinePreparedV3FixtureOptions {
+ 	readonly exactCanonicalInitialStateBytes?: Uint8Array;
+ 	readonly latchedAclGroups?: readonly ("admin" | "finality" | "referee" | "writer")[];
+ 	readonly latchedAclVersion?: 1 | 2;
++	readonly stringPayloadOperation?: boolean;
+ 	readonly objectId?: string;
+ 	readonly createSqliteAheDurableStore?: CreateSqliteAheDurableStoreForFixture;
+ 	readonly prepareV3LiveGeneration?: PrepareV3LiveGenerationForFixture;
+@@ -121,16 +123,22 @@ function lowerHex(bytes: Uint8Array): string {
+ 
+ function blueprintFixture(
+ 	authorizationMode: "latched-acl" | "legacy-author-list",
+-	applicationBatch: boolean
++	applicationBatch: boolean,
++	stringPayloadOperation: boolean
+ ): BlueprintFixture {
+-	if (applicationBatch && authorizationMode !== "latched-acl") {
+-		throw new TypeError("application batch fixture requires latched ACL");
++	if ((applicationBatch || stringPayloadOperation) && authorizationMode !== "latched-acl") {
++		throw new TypeError("extended operation fixture requires latched ACL");
++	}
++	if (applicationBatch && stringPayloadOperation) {
++		throw new TypeError("extended operation fixture modes are mutually exclusive");
+ 	}
+ 	const exactArtifactBytes = new TextEncoder().encode(
+ 		authorizationMode === "latched-acl"
+ 			? applicationBatch
+ 				? LATCHED_ACL_BATCH_ARTIFACT_SOURCE
+-				: LATCHED_ACL_ARTIFACT_SOURCE
++				: stringPayloadOperation
++					? LATCHED_ACL_STRING_ARTIFACT_SOURCE
++					: LATCHED_ACL_ARTIFACT_SOURCE
+ 			: readFileSync(ARTIFACT, "utf8")
+ 	);
+ 	const artifactDigest = lowerHex(hashDomain(packageGolden.artifactDigestDomain, exactArtifactBytes));
+@@ -154,6 +162,17 @@ function blueprintFixture(
+ 								name: "acl",
+ 							}),
+ 							packageGolden.package.manifest.operations[0],
++							...(stringPayloadOperation
++								? [
++										Object.freeze({
++											argumentSchema: Object.freeze({
++												fields: Object.freeze([Object.freeze({ name: "payload", required: true, type: "string" })]),
++												kind: "closed-record",
++											}),
++											name: "pad",
++										}),
++									]
++								: []),
+ 							...(applicationBatch
+ 								? [
+ 										Object.freeze({
+@@ -235,7 +254,11 @@ export async function createGenuinePreparedV3Fixture(
+ 	const store = options.storeDecorator?.(backendStore) ?? backendStore;
+ 	try {
+ 		const authorizationMode = options.authorizationMode ?? "legacy-author-list";
+-		const fixture = blueprintFixture(authorizationMode, options.applicationBatch === true);
++		const fixture = blueprintFixture(
++			authorizationMode,
++			options.applicationBatch === true,
++			options.stringPayloadOperation === true
++		);
+ 		const anchorPrivateKeySeedHex = options.anchorPrivateKeySeedHex ?? contract.privateKeySeedHex;
+ 		const objectIdValue = options.objectId ?? `creator:${"a".repeat(32)}`;
+ 		const base = makeCreatorMaterial({ objectId: objectIdValue, privateKeySeedHex: anchorPrivateKeySeedHex });
+diff --git a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+index 40fb31f5..3d77d493 100644
+--- a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+@@ -55,6 +55,7 @@ import type {
+ 	routeV3Ingress,
+ 	V3AdmittedVertexSink,
+ 	V3LocalIssueInput,
++	V3OperationAdmissionPolicy,
+ 	V3PlaneHandle,
+ } from "../../../packages/node/src/v3-live.js";
+ import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
+@@ -404,10 +405,12 @@ export interface GenuineCreatorAdoptionFixtureOptions {
+ 	): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
+ 	decorateIssuanceStore?(store: DurableIssuanceStore): DurableIssuanceStore;
+ 	decorateLiveJournalStore?(store: DurableLiveJournalStore): DurableLiveJournalStore;
++	readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
+ 	readonly establishedPeerPrivateKeySeedHex?: string;
+ 	readonly modules?: GenuineCreatorAdoptionFixtureModules;
+ 	readonly objectId?: string;
+ 	readonly stageAclChange?: boolean;
++	readonly stringPayloadOperation?: boolean;
+ 	readonly successorAclGroups?: Readonly<Record<string, readonly ("admin" | "finality" | "writer")[]>>;
+ }
+ 
+@@ -729,7 +732,8 @@ async function recoverWithDurableStores(
+ 	controls: GenuineCreatorAdoptionFixture["controls"],
+ 	modules: GenuineCreatorAdoptionFixtureModules,
+ 	decorateIssuanceStore?: (store: DurableIssuanceStore) => DurableIssuanceStore,
+-	decorateLiveJournalStore?: (store: DurableLiveJournalStore) => DurableLiveJournalStore
++	decorateLiveJournalStore?: (store: DurableLiveJournalStore) => DurableLiveJournalStore,
++	operationAdmissionPolicy?: V3OperationAdmissionPolicy
+ ): Promise<
+ 	Readonly<{
+ 		readonly capability: RecoveredV3Live;
+@@ -830,6 +834,7 @@ async function recoverWithDurableStores(
+ 			issuanceScope: scope,
+ 			issuanceStore,
+ 			liveJournalStore: journal,
++			...(operationAdmissionPolicy === undefined ? {} : { operationAdmissionPolicy }),
+ 		});
+ 		if (!recovered.ok) throw new TypeError(`D.108b durable recovery failed: ${recovered.kind}`);
+ 		return Object.freeze({
+@@ -1063,6 +1068,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		historyRoot: emptyHistoryRoot,
+ 		historySize: 0,
+ 		...(options.objectId === undefined ? {} : { objectId: options.objectId }),
++		...(options.stringPayloadOperation === undefined ? {} : { stringPayloadOperation: options.stringPayloadOperation }),
+ 		createSqliteAheDurableStore: modules.createSqliteAheDurableStore,
+ 		prepareV3LiveGeneration: modules.prepareV3LiveGeneration,
+ 		storeDecorator: (backend) => {
+@@ -1086,7 +1092,8 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		controls,
+ 		modules,
+ 		options.decorateIssuanceStore,
+-		options.decorateLiveJournalStore
++		options.decorateLiveJournalStore,
++		options.operationAdmissionPolicy
+ 	);
+ 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
+ 	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);
+diff --git a/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts b/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+index 9bb67ebf..a56f6ded 100644
+--- a/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
++++ b/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+@@ -6,6 +6,7 @@ import {
+ 	D110C_0C1B_PREBOUND_REFUSAL,
+ 	D110C_0C1B_UNBOUND_REFUSAL,
+ 	proveD110c0c1bCommittedIssuanceRecovery,
++	proveD110c0c1bPreDurableCapacityRelease,
+ 	proveD110c0c1bUnknownIssuanceOutcome,
+ } from "./fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.js";
+ 
+@@ -38,4 +39,17 @@ describe("D.110c-0c1b committed-issuance recovery-required RED", () => {
+ 			transactDelegated: true,
+ 		});
+ 	});
++
++	it("releases a pre-durable byte-capacity reservation and preserves genuine close", async () => {
++		Object.defineProperty(navigator, "storage", {
++			configurable: true,
++			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
++		});
++		await expect(proveD110c0c1bPreDurableCapacityRelease()).resolves.toEqual({
++			closeAdvanced: true,
++			issueKind: "graph-rejected",
++			reservationCommitted: false,
++			reservationReleased: true,
++		});
++	});
+ });
+diff --git a/tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts b/tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+index 65727a4e..beb66b7c 100644
+--- a/tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+@@ -8,6 +8,7 @@ import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
+ // eslint-disable-next-line import/no-unresolved -- Workspace subpath resolves after the required package build.
+ import { CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE } from "@ts-drp/protocol-v3/creator-issuance-retirement";
+ 
++import { openGenuineCreatorAdoptionFixture } from "../phase-6a-v3/creator-adoption-contract.js";
+ import {
+ 	type D110cARepeatCloseFixture,
+ 	openD110cARepeatCloseFixture,
+@@ -50,6 +51,13 @@ export interface D110c0c1bUnknownOutcomeEvidence {
+ 	readonly transactDelegated: true;
+ }
+ 
++export interface D110c0c1bCapacityEvidence {
++	readonly closeAdvanced: true;
++	readonly issueKind: "graph-rejected";
++	readonly reservationCommitted: false;
++	readonly reservationReleased: true;
++}
++
+ function deferred(): Deferred {
+ 	let resolvePromise!: () => void;
+ 	const promise = new Promise<void>((resolve) => {
+@@ -315,3 +323,74 @@ export async function proveD110c0c1bUnknownIssuanceOutcome(): Promise<D110c0c1bU
+ 		});
+ 	}
+ }
++
++/**
++ * Proves that the issue path's own byte-capacity refusal is definitely
++ * pre-durable: its policy reservation is released and the genuine creator
++ * close remains available.
++ * @returns Exact capacity-refusal and successful-close evidence.
++ */
++export async function proveD110c0c1bPreDurableCapacityRelease(): Promise<D110c0c1bCapacityEvidence> {
++	let targetCommitted = false;
++	let targetReleased = false;
++	let issue: Readonly<Record<string, unknown>> | undefined;
++	const operationAdmissionPolicy = Object.freeze({
++		reserve(operation: Readonly<Record<string, unknown>>) {
++			const target = operation.action === "pad";
++			return Object.freeze({
++				commit(): "committed" {
++					if (target) targetCommitted = true;
++					return "committed";
++				},
++				kind: "fresh" as const,
++				release(): void {
++					if (target) targetReleased = true;
++				},
++			});
++		},
++	});
++	const fixture = await openGenuineCreatorAdoptionFixture({
++		beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {
++			const retry = await plane.issueLocal({
++				operations: Object.freeze([
++					Object.freeze({
++						logicalTime: firstLogicalTime,
++						operation: Object.freeze({ action: "add", value: 31 }),
++					}),
++				]),
++				signRegisteredVertexDigest,
++			});
++			if (retry.ok !== true) throw new TypeError("D110C_0C1B_PRE_DURABLE_CAPACITY_RETRY_FAILED");
++			issue = await plane.issueLocal({
++				operations: Object.freeze([
++					Object.freeze({
++						logicalTime: firstLogicalTime + 1,
++						operation: Object.freeze({ action: "pad", payload: "x".repeat(8_388_608) }),
++					}),
++				]),
++				signRegisteredVertexDigest,
++			});
++			return Object.freeze({ authorSequence: retry.authorSequence, digest: retry.digest });
++		},
++		operationAdmissionPolicy,
++		stringPayloadOperation: true,
++	});
++	try {
++		if (issue?.ok !== false || issue.kind !== "graph-rejected") {
++			throw new TypeError(`D110C_CAP_ISSUE:${String(issue?.kind)}:${String(issue?.detail)}`);
++		}
++		if (!targetReleased) throw new TypeError("D110C_CAP_NOT_RELEASED");
++		if (targetCommitted) throw new TypeError("D110C_CAP_COMMITTED");
++		if (fixture.evidence.closeResult.ok !== true || fixture.evidence.closeResult.successorEpoch !== 1) {
++			throw new TypeError("D110C_CAP_CLOSE_FAILED");
++		}
++		return Object.freeze({
++			closeAdvanced: true as const,
++			issueKind: "graph-rejected" as const,
++			reservationCommitted: false as const,
++			reservationReleased: true as const,
++		});
++	} finally {
++		await fixture.close();
++	}
++}
+		) {
+			return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
+		}
+		sourceOperations.add(entry.operation);
+		const operation = detachedCanonicalOperation(entry.operation);
+		if (operation === undefined) {
+			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+		}
+		const action = Reflect.get(operation, "action");
+		if (typeof action !== "string") {
+			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+		}
+		if (
+			action === APPLICATION_BATCH_ACTION ||
+			action === "causalJoin" ||
+			(values.length > 1 && (action === "acl" || action === "join"))
+		) {
+			return localIssueFailure("authorization-rejected", "v3 local issue operation is reserved to the node");
+		}
+		if (typeof Reflect.get(payload.runtime.reducers, action) !== "function") {
+			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+		}
+		priorLogicalTime = entry.logicalTime as number;
+		operations.push(ObjectFreeze({ logicalTime: priorLogicalTime, operation }));
+	}
+	return ObjectFreeze({
+		operations: ObjectFreeze(operations),
+		signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
+	});
+}
+
+async function issueOneVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	dependencies: readonly string[],
+	logicalTime: number,
+	operation: Readonly<Record<string, unknown>>,
+	requireTerminalAuthorization = false
+): Promise<InternalLocalIssueResult> {
+	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+	if (registration.operationAdmissionHalted) {
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	}
+	if (registration.index.size >= registration.payload.parameters.maxEpochVertices) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	if (dependencies.length === 0 || dependencies.length > registration.payload.parameters.maxDependencies) {
+		return localIssueFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
+	const scope = copiedScope(registration.issuanceScope);
+	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
+		return localIssueFailure("authorization-rejected", "v3 local issue scope is invalid");
+	}
+	const authorized = resolveV3AuthorizedAuthor(registration.authorization, scope.author);
+	if (authorized === undefined) {
+		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
+	}
+	const proposedAcl = aclOperation(scope.author, "0".repeat(64), operation);
+	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)) {
+		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
+	const reservation = reserveOperation(registration.operationAdmissionPolicy, operation);
+	if (reservation === null) {
+		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
+	}
+
+	let commit: unknown;
+	let capacityRejected = false;
+	let signerResolved = false;
+	let terminalTransactionStarted = false;
+	try {
+		const issuer = createAdmissionBoundTransactionalVertexIssuer({
+			author: scope.author,
+			preparedBlueprintAdmission: registration.payload.admission,
+			publicKey: authorized,
+			signRegisteredVertexDigest: async (digest) => {
+				const signature = await input.signRegisteredVertexDigest(digest);
+				signerResolved = true;
+				return signature;
+			},
+			transactIssue: async (selectedScope, buildAndSign) => {
+				const commitOutsideTransaction = async (authorSequence: number): Promise<unknown> => {
+					const candidateCommit = await buildAndSign(authorSequence);
+					const candidateRow = outboxRowSnapshot(
+						ObjectFreeze({ commit: candidateCommit, publishState: "pending" as const }),
+						selectedScope
+					);
+					if (
+						candidateRow !== undefined &&
+						!hasGraphCapacity(registration, candidateRow.canonicalPreimageBytes.byteLength)
+					) {
+						capacityRejected = true;
+						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					return candidateCommit;
+				};
+				if (requireTerminalAuthorization) {
+					const lineage = await registration.issuanceStore.readLineage(selectedScope);
+					if (!NumberIsSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
+						throw new TypeError("v3 terminal issuance lineage is unavailable");
+					}
+					const expectedSequence = lineage.next;
+					const candidate = await commitOutsideTransaction(expectedSequence);
+					terminalTransactionStarted = true;
+					return registration.issuanceStore.transactIssue(selectedScope, (authorSequence) => {
+						if (authorSequence !== expectedSequence) {
+							throw new TypeError("v3 terminal issuance lineage changed");
+						}
+						return Promise.resolve(candidate as never);
+					});
+				}
+				return registration.issuanceStore.transactIssue(selectedScope, commitOutsideTransaction as never);
+			},
+		});
+		commit = await issuer.issue({
+			anchor: registration.payload.provenance.anchorDigest,
+			dependencies,
+			epoch: registration.payload.provenance.epoch,
+			logicalTime,
+			objectId: registration.payload.provenance.objectId,
+			operation,
+		});
+	} catch (error) {
+		const issuanceOutcomeUnknown =
+			error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
+		if ((!signerResolved && !terminalTransactionStarted) || capacityRejected) {
+			releaseOperationReservation(reservation);
+		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
+			registration.operationAdmissionHalted = true;
+		}
+		if (requireTerminalAuthorization && terminalTransactionStarted) {
+			return internalLocalIssueFailure(
+				"issuance-rejected",
+				"v3 terminal issue transaction outcome is unknown",
+				"outcome-unknown"
+			);
+		}
+		return capacityRejected
+			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+			: signerResolved
+				? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
+				: localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
+	}
+	const committedFailure = (
+		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+		detail: string
+	): InternalLocalIssueResult => {
+		registration.operationAdmissionHalted = true;
+		return requireTerminalAuthorization
+			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
+			: localIssueFailure(kind, detail);
+	};
+	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
+	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
+
+	let authenticated: AuthenticatedRecoveryVertex | undefined;
+	try {
+		authenticated = authenticateRecoveryVertex(
+			registration.payload,
+			registration.authorization,
+			row.canonicalPreimageBytes,
+gpg: Signature made Thu Sep  3 01:20:26 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+9172e4adf60108b4c195c20ce61a7c67d2d8266d G Faolain <Faolain@users.noreply.github.com>
+ .../production-hardening-tdd-plan-v2.md            | 56 ++++++++++++++++++++--
+ 1 file changed, 53 insertions(+), 3 deletions(-)
+<class 'dict'>
+['numTotalTestSuites', 'numPassedTestSuites', 'numFailedTestSuites', 'numPendingTestSuites', 'numTotalTests', 'numPassedTests', 'numFailedTests', 'numPendingTests', 'numTodoTests', 'snapshot', 'startTime', 'success', 'testResults']
+success: True total: 174 passed: 174 failed: 0 pending: 0
+result entries: 16
+phase-6b-ahe-reclamation-red.test.ts
+phase-6b-issuance-retention-red.test.ts
+e5-01-v3-operation-admission-red.test.ts
+phase-3a1b-p2-outbox-publication-contract.test.ts
+phase-3g-v3-rebase-outbox-red.test.ts
+phase-4b-v3-live-snapshot-composition-red.test.ts
+phase-6a-creator-adoption-commit-red.test.ts
+phase-6a-creator-successor-activation-red.test.ts
+phase-6a-creator-successor-epoch-red.test.ts
+phase-6b-ahe-reclamation-red.test.ts
+phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+phase-6b-d110c-a-repeat-close-red.test.ts
+phase-6b-d110c-b-hot-adoption.test.ts
+phase-6b-issuance-retention-red.test.ts
+phase-6b-runtime-reclamation-red.test.ts
+success: True total: 3 passed: 3 failed: 0
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+  passed refuses a pre-bound close after a durable issue is omitted from live admission
+  passed halts a no-policy plane when the real issuance commit has an unknown return outcome
+  passed releases a pre-durable byte-capacity reservation and preserves genuine close
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 7f7a42fc..2323f626 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -96203,9 +96203,10 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
+ 
+ ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
+ 
+-**Status: bounded source/architecture audit, plan confirmation, and causal RED
+-are complete; GREEN is implemented and locally verified, with its signed
+-checkpoint and final Grok/Kimi/Opus review next.** Owner: the
++**Status: bounded source/architecture audit, plan confirmation, causal RED,
++initial GREEN, and the final-review P1 correction are complete and locally
++verified; the correction's signed checkpoint and one permitted confirmation
++are next.** Owner: the
+ post-`transactIssue()` outcome window in
+ `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
+ admission, restart recovery of pending issuance/outbox rows, and the close-time
+@@ -96434,6 +96435,55 @@ collaboration subagent ran. Sign and push this GREEN checkpoint, then run the
+ single governing Grok/Kimi/Opus plan→RED→GREEN review. Only P0/P1 findings
+ block closure.
+ 
++That review inspected signed/pushed GREEN
++`7e3be150bdfd75683aa4473c947758f79c1b1fce`. Grok 4.6/high and direct Kimi
++K3 with the exact 100-step control approved with no P0/P1; Opus xhigh found two
++P1s. First, the new close refusal exposed an inherited classification error:
++the issue path's own `capacityRejected` arm occurs after signing but before any
++issuance-store commit, so a configured admission-policy reservation was marked
++recovery-required and could prevent the ordinary capacity-triggered close.
++Second, the accepted nine-file retained command omitted five test owners named
++by the frozen plan. Both findings are accepted and corrected narrowly. The
++review's P2 findings remain nonblocking and are dispositioned without expanding
++this slice: preserve the disclosed RED wrapper result; preserve existing
++product-visible error detail; carry broader post-recovery close/state proof in
++D.110c-0c1/0c and retained lifecycle owners; and retain structural proof of the
++nondelegated journal fault rather than adding another product seam.
++
++The production correction changes only the catch classification: exact
++`capacityRejected` now releases the operation-policy reservation as definitely
++pre-durable and does not set the recovery-required halt. A tests-only
++closed-schema `pad` operation creates a valid canonical candidate larger than
++the fixed supported epoch-byte ceiling; the genuine predecessor first accepts
++a normal operation, then rejects the oversized candidate with existing
++`graph-rejected`, observes reservation release without commit, and completes
++the real creator close to epoch 1. The final focused file passes 3/3. The
++expanded retained command selects the original nine files plus
++`phase-3g-v3-rebase-outbox-red`,
++`phase-3a1b-p2-outbox-publication-contract`,
++`phase-6b-issuance-retention-red`, `phase-6b-ahe-reclamation-red`, and
++`phase-4b-v3-live-snapshot-composition-red`; it passes 174/174 with zero
++failed/pending tests. Vitest reports the two subprocess-owned retention files
++twice in its result array, but the command selects exactly fourteen paths.
++ESLint, Prettier, diff check, Node build, and the Node no-emit typecheck pass.
++Early diagnostic runs are retained honestly: one used a nonexistent root
++Vitest config and selected no test; subsequent runs exposed first missing
++`navigator.storage` setup, then an invalid extra operation field, then the
++unsupported attempt to vary the pinned parameter profile. Those tests-only
++approaches were removed; no product result is inferred from them. The accepted
++correction evidence is under
++`.logs/d110c-0c1b-green-correction-7e3be150/`; its current validating
++self-excluding manifest SHA-256 is
++`2ad41d49ce9fec3c3d84a0017cff3f2f6cb2f2eeea210acbc628c07839b5dfe4`.
++The initial final-review evidence is under
++`.logs/d110c-0c1b-final-review-7e3be150/`; its current validating
++self-excluding manifest SHA-256 is
++`405a6094347e47b1a536627865a03cacbb160d26b7ff94ad9977187ac5430d7e`.
++Because the accepted P1 changes
++executable classification, the signed/pushed correction receives exactly one
++Grok/Kimi/Opus confirmation; it is not a new review slice or a recursive prose
++review.
++
+ The complete confirmation evidence is retained under
+ `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+ self-excluding manifest SHA-256 is
+9172e4adf60108b4c195c20ce61a7c67d2d8266d
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+?? .logs/d108e4ab-campaign/
+?? .logs/d108e4ab-freeze/
+?? .logs/d108e4ab-plan-review/
+?? .logs/d108e4ac-green-review-correction/
+?? .logs/d108e4ac-green-review/
+?? .logs/d108e4ac-green/
+?? .logs/d108e4ac-plan-review/
+?? .logs/d108e4ac-red-review/
+?? .logs/d108e4ac-red/
+?? .logs/d108e4ad-campaign/
+458a2619995ef63774943a0ccfa17a04bc774072c861ef576f13c289b98c85bd  packages/node/src/v3-live.ts
+34e015ed01ba017cd5ec0ef6b0892d4d8251a552e1e04e0b00cc73434f76aca2  tests/fixtures/phase-3a1b-p3/live-fixture.ts
+b7fc7cee26395afe90e2fca595842424416b0e8d024ff799a65c92752c325232  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+8f8d59395a48b339ebbf129bfde28396335e397c48f590270c7a3af6e32857a8  tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+150b3d01e56131c30d4697bfbe7cb9a9191d0a344b079605c3a053152e5e5ff5  tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+(node:82175) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts (3 tests) 957ms
+   ✓ D.110c-0c1b committed-issuance recovery-required RED > refuses a pre-bound close after a durable issue is omitted from live admission  449ms
+   ✓ D.110c-0c1b committed-issuance recovery-required RED > releases a pre-durable byte-capacity reservation and preserves genuine close  307ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  01:26:30
+   Duration  2.03s (transform 762ms, setup 0ms, collect 840ms, tests 957ms, environment 0ms, prepare 48ms)
+

@@ -1,0 +1,291 @@
+{
+  "classification": "REJECTED_MATRIX_STOPPED_NO_RERUN",
+  "executionCount": 1,
+  "head": "c1d04d31149cd4ed1e8631203213df99852036a2",
+  "runnerStatus": 1,
+  "total": 43,
+  "selected": 26,
+  "failed": 23,
+  "passed": 3,
+  "intentionallyFiltered": 17,
+  "topLevel": [],
+  "violations": [
+    {
+      "reason": "Unexpected selected matrix",
+      "expected": {
+        "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "name": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+        "expectedStatus": "failed",
+        "token": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+      },
+      "actual": {
+        "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "name": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+        "status": "failed",
+        "duration": 34.95929100000012,
+        "failureMessages": [
+          "TypeError: canonical value exceeds item limit\n    at Reader.countItems (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:317:19)\n    at decodeCollection (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:366:12)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:478:21)\n    at decodeCollection (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:349:25)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:478:21)\n    at decodeCollection (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:376:22)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:478:21)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at migrationInviteAuthority (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1421:14)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1647:26)"
+        ],
+        "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+      }
+    }
+  ],
+  "outcomes": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition retains checkpoint-terminal open progress through cold recovery across three transitions",
+      "status": "failed",
+      "duration": 433.40654199999994,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1974:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+      "status": "failed",
+      "duration": 34.95929100000012,
+      "failureMessages": [
+        "TypeError: canonical value exceeds item limit\n    at Reader.countItems (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:317:19)\n    at decodeCollection (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:366:12)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:478:21)\n    at decodeCollection (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:349:25)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:478:21)\n    at decodeCollection (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:376:22)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:478:21)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at migrationInviteAuthority (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1421:14)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1647:26)"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+      "status": "failed",
+      "duration": 292.6826669999998,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at delayedDependency (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:925:2)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+      "status": "failed",
+      "duration": 282.67208299999993,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at sameKeyReentry (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1690:3)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+      "status": "failed",
+      "duration": 260.52195900000015,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at manualReviewHold (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1766:2)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 12 scans the largest valid fence without burning another author space",
+      "status": "failed",
+      "duration": 249.98750000000018,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at creatorFenceScan (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1846:2)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 12 ignores a stale fence at or below the authenticated terminal boundary",
+      "status": "failed",
+      "duration": 245.5424579999999,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at creatorFenceScan (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1846:2)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 23 freezes only the equivocating author below a fence",
+      "status": "failed",
+      "duration": 246.14466700000003,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at creatorFenceScan (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1846:2)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve unpublished-fence custody",
+      "status": "failed",
+      "duration": 260.7212920000002,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at delayedPublication (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:998:59)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-replacement custody",
+      "status": "failed",
+      "duration": 246.16850000000022,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at delayedPublication (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:998:59)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-fence custody",
+      "status": "failed",
+      "duration": 234.82795799999985,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at delayedPublication (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:998:59)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 17 closes an authenticated null-boundary member without a fence or slot zero",
+      "status": "failed",
+      "duration": 231.94920900000034,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at nullBoundaryClose (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:976:2)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 19-21 retain displaced control and sole plan completion ownership",
+      "status": "failed",
+      "duration": 289.57716600000003,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedControls (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1618:2)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 24a rejects a stale local head without regressing the authenticated floor",
+      "status": "failed",
+      "duration": 250.60183299999971,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at staleLocalHead (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1155:39)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=false",
+      "status": "failed",
+      "duration": 237.6461250000002,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at ambiguousPlanIssue (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1056:47)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=true",
+      "status": "failed",
+      "duration": 237.39375000000018,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at ambiguousPlanIssue (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1056:47)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=false",
+      "status": "failed",
+      "duration": 238.76020900000003,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at ambiguousPlanIssue (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1056:47)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=true",
+      "status": "failed",
+      "duration": 237.91058299999986,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at ambiguousPlanIssue (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1056:47)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+      "status": "failed",
+      "duration": 240.8885419999997,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at displacedFixture (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:892:2)\n    at ambiguousPlanIssue (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1056:47)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 13 prunes only beyond the fully retained authenticated rollback window",
+      "status": "failed",
+      "duration": 227.49625000000015,
+      "failureMessages": [
+        "Error: F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production\n    at Object.close (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:703:11)\n    at positiveAuthenticatedPruning (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1540:3)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 17 retains the exact legacy v1 reentry guard source custody",
+      "status": "passed",
+      "duration": 1.007499999999709,
+      "failureMessages": [],
+      "expectedToken": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+      "status": "passed",
+      "duration": 1478.0388329999996,
+      "failureMessages": [],
+      "expectedToken": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 non-hold same-message application failure retains generic activation mapping",
+      "status": "failed",
+      "duration": 509.22133299999996,
+      "failureMessages": [
+        "AssertionError: F5B_P2_PRIVATE_HOLD_PROVENANCE_REQUIRED: expected TypeError: v3 room settlement plan requir… to deeply equal TypeError: v3 room migration activation f…\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:544:60\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_P2_PRIVATE_HOLD_PROVENANCE_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for issue",
+      "status": "passed",
+      "duration": 559.7052919999999,
+      "failureMessages": [],
+      "expectedToken": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for rehearse",
+      "status": "failed",
+      "duration": 552.1174999999998,
+      "failureMessages": [
+        "AssertionError: F5B_P2_CLOSED_PRECEDENCE_REHEARSE_REQUIRED: expected TypeError: v3 room settlement plan requir… to deeply equal TypeError: v3 room session is closed\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:575:98\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_P2_CLOSED_PRECEDENCE_REHEARSE_REQUIRED"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for activate",
+      "status": "failed",
+      "duration": 535.9067909999999,
+      "failureMessages": [
+        "AssertionError: F5B_P2_CLOSED_PRECEDENCE_ACTIVATE_REQUIRED: expected TypeError: v3 room settlement plan requir… to deeply equal TypeError: v3 room session is closed\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:575:98\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "expectedToken": "F5B_P2_CLOSED_PRECEDENCE_ACTIVATE_REQUIRED"
+    }
+  ],
+  "finishedAt": "2026-09-05T15:02:40.992Z",
+  "warning": "No production GREEN, post-codec continuation, complete 64-writer transition or long-horizon completion is claimed."
+}

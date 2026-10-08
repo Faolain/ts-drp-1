@@ -1,0 +1,14 @@
+tests_commit=4543b9575add610532142f80d90fbf00886972db
+tests_signature=G
+remote=4543b9575add610532142f80d90fbf00886972db
+stashes=27
+tracked_status_lines_before_evidence=0
+changed_test_paths=1
+production_changes=0
+red_exit=1
+red_counts=14/13/1/0
+red_top_level_errors=0
+red_reporter_sha256=b79b3016eb6bbdb12dcf4a7ebe381e4492771575fa6447512035a51c28c9e954
+prettier=0
+eslint=0
+diff_check=0

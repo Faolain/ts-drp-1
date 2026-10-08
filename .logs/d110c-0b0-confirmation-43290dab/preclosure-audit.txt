@@ -1,0 +1,41 @@
+confirmation_commit=43290dabd06d796758e8da577a53e0c1bb8b303b
+origin_commit=43290dabd06d796758e8da577a53e0c1bb8b303b
+clean_checkout=/tmp/ts-drp-d110c-confirm.LkksN5/repository
+clean_checkout_head=43290dabd06d796758e8da577a53e0c1bb8b303b
+clean_checkout_status_begin
+clean_checkout_status_end
+signature_begin
+gpg: Signature made Wed Sep  2 07:28:35 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+signature_end
+correction_paths_begin
+.logs/d110c-0b0-correction-213850db/SHA256SUMS
+.logs/d110c-0b0-correction-213850db/browser-final.json
+.logs/d110c-0b0-correction-213850db/correction-ledger.md
+.logs/d110c-0b0-correction-213850db/retained-final.json
+.logs/d110c-0b0-final-review-213850db/grok/command.json
+.logs/d110c-0b0-final-review-213850db/grok/events.jsonl
+.logs/d110c-0b0-final-review-213850db/grok/input-packet.md
+.logs/d110c-0b0-final-review-213850db/grok/public.txt
+.logs/d110c-0b0-final-review-213850db/grok/review.diff
+.logs/d110c-0b0-final-review-213850db/grok/status.json
+.logs/d110c-0b0-final-review-213850db/kimi.status
+.logs/d110c-0b0-final-review-213850db/kimi.stderr
+.logs/d110c-0b0-final-review-213850db/kimi.stream.jsonl
+.logs/d110c-0b0-final-review-213850db/opus.status
+.logs/d110c-0b0-final-review-213850db/opus.stderr
+.logs/d110c-0b0-final-review-213850db/opus.stream.jsonl
+.logs/d110c-0b0-final-review-213850db/review-prompt.md
+docs/production-hardening/production-hardening-tdd-plan-v2.md
+examples/v3-room/src/index.ts
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+tests/phase-3a1b-d9346-room-semantics-red.test.ts
+correction_paths_end
+stash_count=27
+protected_present=.agents
+protected_present=.claude
+protected_present=.pnpm-store
+tracked_status_begin
+tracked_status_end

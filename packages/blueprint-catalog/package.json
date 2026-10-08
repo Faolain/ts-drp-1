@@ -1,0 +1,37 @@
+{
+	"name": "@ts-drp/blueprint-catalog",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"test": "vitest run --config vitest.config.mts --passWithNoTests",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/errors": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0",
+		"es-module-lexer": "1.6.0"
+	}
+}

@@ -1,0 +1,33 @@
+{
+  "redCommit": "3a9e9329091b713022b2b36d371d1eb887633b6e",
+  "branch": "codex/phase3a1b-p6-golden-path",
+  "focusedRunsAtThisCommit": 1,
+  "focusedRunsAtIntermediate6610eec4": 0,
+  "focused": {
+    "command": "pnpm exec vitest run tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --reporter=json --outputFile=.logs/d110c-0c1f5b-red-3a9e9329/focused.json",
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "exitCode": 1,
+    "stdout": "JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-3a9e9329/focused.json\n",
+    "passedTests": 1,
+    "failedTests": 1,
+    "failureToken": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED",
+    "underlyingReason": "creator close actor failed: CERTIFIED_VALUE_MISMATCH",
+    "correctedCausalMatrixMatched": true,
+    "completeParentMatrixClaimed": false
+  },
+  "static": [
+    { "command": "pnpm exec eslint tests/phase-6b-d110c-0c1f5b-integration-red.test.ts", "exitCode": 0 },
+    { "command": "pnpm exec prettier --check tests/phase-6b-d110c-0c1f5b-integration-red.test.ts", "exitCode": 0 },
+    { "command": "git diff --check", "exitCode": 0 },
+    { "command": "pnpm exec vitest list tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --json", "exitCode": 0, "listedTests": 2 },
+    { "command": "git verify-commit HEAD", "exitCode": 0, "signingKey": "55E22F154FBAF8C84F378304761B99CEA81C6289" }
+  ],
+  "testSourceSha256": "ea664e60cb805eb1304b41ad198705e422e0da2cd0b6e9b72179415b6928b37e",
+  "focusedJsonSha256": "7cd59ad677bf73ccf6698942b98966ca91ee8043515e4d4063ad464c2cbc1569",
+  "trackedWorktreeCleanAtExecution": true,
+  "headEqualsUpstreamAtExecution": true,
+  "stashCountBeforeAndAfter": 27,
+  "productionEdits": false,
+  "reviewersInvoked": false,
+  "longWorkloadsRun": false
+}

@@ -1,0 +1,32 @@
+{
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "w0GreenOwners": [
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+    "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts",
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts"
+  ],
+  "retainedConsumerRedAndGreenOwners": [
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+  ],
+  "sourceHashes": {
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts": "8108ebe74f1cb31d2508bf0b80ad8ed79a5b79135f6a8e1cde7e6e7d96fe959b",
+    "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts": "da69a0229a1ffbaea8bcbbf20e99dd9f37baf745c0a097f20e39f327738e3630",
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts": "ae458ee7ec3bb031cf9fb05d65dbe95dffb48b08243b9fe7531738821105376b",
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "3c80b45a20d41a8044406270ffcee5ed954271ce9debfac71b25df778ad120fc",
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts": "f3d177abf638aa1711c4f63ebfe37e5196f98c5aefda6a59041e5c802e1d5de9",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "67be57e7ad5f72335c8e89b770a031960bf48b636594ec52e3b6c3adbb2db717",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts": "5f0803176121ef6af6d3bf250fb992ab6bca3801b0e770cc2aa04b53b59be266",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts": "5f7db7d9539acabefcdbd842f5833f5e41f790349f56c5045aa785b0ffdac1de",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "2944cdce0fd0ab8a1e1c0318e1bdc49522ac8ff678696a6a0a118f247739e00b"
+  },
+  "w0GreenPatch": "w0-green.patch",
+  "w0GreenPatchSha256": "6c002d98eb4764ebe9b153c9e52dba4adac47e48ff31f5134f08b15fa7dddf0a",
+  "consumerGreenPatch": "../d110c-w0-retained-consumer-green-7c19a479/green.patch",
+  "consumerGreenPatchSha256": "54baa695c170ae83431fee7b4478e1ced4227dc62fab7043b53fef95c594df8a",
+  "note": "Source capture only. Formal review is not released; the final prompt must add completed isolation evidence and the current plan checkpoint."
+}

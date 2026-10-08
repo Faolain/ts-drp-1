@@ -1,0 +1,28 @@
+# Consolidated fixture-exit GREEN: main-stage handoff
+
+The sole combined retained command passes all 49 cases in the exact four files: room-rebase20, pacemaker13, seal-safety7 and genesis9. There are no failed/skipped assertions, suite messages, testExecError or reported top-level errors; stderr is empty. Complete file/title/ancestor/fullName multisets match the frozen evidence, with genesis's previously missing historical raw report honestly replaced only by its signed-source-derived expected names, not an invented old report. Current raw reporter SHA256 is `e1aff50cad1e9daf31537ab39ccfa8f1286992b54a0a9b4fc2164ca2779a8a91`.
+
+The actual combined strict compiler exits 1 with exactly the unchanged grid authority-composition TS2345 diagnostic. All nine fixture diagnostics are removed; the separate exact matrix validator exits 0. This is not a whole-program typecheck pass. The grid owner remains in the same four-root program/options and its full message, location, owner, token and source line equal the accepted RED. The program retains 1,309 actual sources, 1,771 reads, 3,083 module resolutions and 37 type references. No diagnostic is hidden or excluded, and no compiler rerun occurred.
+
+## Exact source changes and equivalence
+
+Signed/pushed RED and the same-batch amendment are `f8ec9daf82c230b48ef615073979dcab7b14f149`; the 52-entry RED manifest is `d76cc65d165eda9f115e724e25a6ea490d5d4c4bf1f6a9d91e81722076300c99`. The original ten-row compiler1 and failed eight-row matrix1 remain immutable. Before edits, frozen-scope.json verifies all six RED snapshots and records the three original annotation spans plus the two prospectively authorized new spans.
+
+Exactly four files changed, totaling 20 insertions and seven deletions:
+
+- tests/fixtures/phase-3b-v3/certified-genesis-contract.ts: installInput has an independent anonymous readonly structural return for its exact four Uint8Array fields and digest string. Its body, copies and freeze are unchanged.
+- tests/phase-3g-v3-room-rebase-red.test.ts: both callback row types expose the existing readonly operation record. Runtime callbacks, authenticatedBase, rejects and carriers are unchanged.
+- tests/genesis-profile.test.ts: the single existing public-key verification argument decodes the same canonical hexadecimal key with Uint8Array.from(Buffer.from(row.publicKey, "hex")). The exact signature, message, zip215:false and true assertion remain. This one argument is an explicit runtime representation repair, not a type-only claim.
+- tests/phase-5d-pacemaker-red.test.ts: only the detached structuredClone(trace) gets an Omit<ItfTrace, "states"> view with a mutable array of the complete existing ItfTrace["states"][number] element type. Shared trace types/parser remain untouched; clone isolation, durableRevision:-1 and TRACE_STATE_MISMATCH are exact.
+
+equivalence.json validates the precise five spans, restores every other source token and proves identical emitted JavaScript outside the single genesis key conversion. All 274 captured assertion predicates remain exact except that explicit argument representation; the whole affected assertion is not falsely described as byte-identical. The two unchanged consumer files and all other effective retained/shared sources remain hash-identical. No helper, production import, API, authority, export-roster adjustment or new runtime instrumentation was added. Exact-owner lint, format and diff checks all exit 0.
+
+The existing witnesses were not removed or reduced: pacemaker13 passes in 226,461ms, including its real pinned Apalache test in 196,899ms, existing Quint/model actions, exact fixture boundary and genuine voter/pacemaker/fake-IDB trace replay. Seal-safety's existing bounded n=4 Quint witness also runs and passes. All original limits and negative assertions remain unchanged. No additional formal workload or runtime repetition was introduced.
+
+## Custody, diagnostic disclosure and next handoff
+
+Before/after custody preserves eight pending production owners and patch `6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb`, seven built artifacts, 27 stashes, 86,522 protected paths and complete referenced immutable manifests. The effective test/shared map explicitly merges the previous 81 entries with the six consumer identities, deduplicating to 85 entries and applying only the four authorized file hashes. custody-after.json is the next main baseline. Six before/after snapshots and fixture-only.patch reconstruct the changes without copying or changing the existing parent production patch.
+
+A read-only process check mistakenly used broad PID/comm output; macOS mutable process titles appeared in tool output. Those unrelated values were not written or copied into evidence. Root acknowledged the diagnostic mistake; the recorded replacement uses numeric candidate PIDs/status and task-cwd classification only, with zero competing task runtimes. Unrelated processes do not block. No source edit, compiler repetition or runtime failure resulted. No other failed GREEN diagnostic recorder occurred; the compiler's sole exit1 is the explicitly retained grid diagnostic, not an infrastructure failure.
+
+This main evidence is intentionally unsealed pending root's source signing and the required fresh isolated validation. No agent commit, plan edit, isolation, browser, parent45/full inventory, reviewer or campaign ran. The separate grid-authority issue, four still-recorded original runtime failures and parent combined/browser/current-byte integration/isolated/final-review obligations remain open. This is one consolidated compatible fixture batch, not a new per-diagnostic slice or parent closure.

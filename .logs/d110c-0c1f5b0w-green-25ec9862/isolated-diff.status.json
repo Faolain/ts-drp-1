@@ -1,0 +1,14 @@
+{
+  "executable": "git",
+  "args": [
+    "-C",
+    "/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+    "diff",
+    "--check"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:15:41.299Z",
+  "finished": "2026-09-05T14:15:41.429Z",
+  "status": 0,
+  "signal": null
+}

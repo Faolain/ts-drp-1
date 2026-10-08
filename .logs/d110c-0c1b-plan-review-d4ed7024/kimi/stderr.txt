@@ -1,0 +1,86 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+d4ed7024 docs: freeze D110c issuance reconciliation plan
+90a06a1a docs: close D110c issuance retirement prerequisite
+7414fa6b test: close D110c retirement review findings
+d4ed70242c9f21cfb24e1d5c6b1c9c6216096616
+audit.md
+commands.md
+manifest.sha256
+source-hashes.sha256
+    7557 packages/node/src/v3-live.ts
+e5-01-v3-operation-admission-red.test.ts
+e5-01-zone-prejournal-admission.pw.ts
+outcome-commit-e5-01-policy-red.test.ts
+phase-6b-d110c-0a-authority-red.test.ts
+phase-6b-d110c-0a-browser-custody-red.test.ts
+phase-6b-d110c-0b0-floor-red.test.ts
+phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+phase-6b-d110c-0b1-boundaries.test.ts
+phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+phase-6b-d110c-a-repeat-close-red.test.ts
+phase-6b-d110c-b-hot-adoption.test.ts
+phase-5e-creator-close-red.test.ts
+phase-5e-creator-live-close-red.test.ts
+phase-6a-creator-adoption-commit-red.test.ts
+phase-6a-creator-adoption-red.test.ts
+phase-6b-d110c-a-repeat-close-red.test.ts
+phase-6b-d110c-b-hot-adoption.test.ts
+b48d37e683b51441de39aeeec57c27a0c19f82f8
+## codex/phase3a1b-p6-golden-path...origin/codex/phase3a1b-p6-golden-path
+?? .agents/
+d4ed70242c9f21cfb24e1d5c6b1c9c6216096616 761B99CEA81C6289 G
+ae29cf014642db3e2a0f7b39b343ddcfc31823db197625efd8981bf7368058bd  ./audit.md
+da2958f0f6049e598df865be1724260b82451d4e8f233f00241b62b6d04c0b0a  ./commands.md
+56bee1af6ac57ee2cf6a1efa6b96f8e6bcb7ca30ba57f1679bdb51d48ca8e7c2  ./source-hashes.sha256
+# D.110c-0c1b source-audit commands
+
+- `git rev-parse HEAD HEAD^{tree}`
+- `rg -n 'issueOneVertex|committedFailure|operationAdmissionHalted|appendAccepted|recoverV3LiveReplica|stageClosedBlueprintEpoch|stageBlueprintEpoch|creatorCloseRegistration' packages/node/src/v3-live.ts packages/node/src/creator-close.ts tests`
+- bounded `sed`/`nl` inspection of `v3-live.ts` issue, recovery, queue, fold and creator-close owner ranges
+- inspection of `tests/e5-01-v3-operation-admission-red.test.ts` and `tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts`
+- `shasum -a 256` over the six exact inspected owner/contract/test files into `source-hashes.sha256`
+- `shasum -a 256 -c .logs/d110c-0c1b-source-audit-90a06a1a/source-hashes.sha256`
+- `NODE_OPTIONS=--max-old-space-size=8192 pnpm exec prettier --check docs/production-hardening/production-hardening-tdd-plan-v2.md`
+- `git diff --check -- docs/production-hardening/production-hardening-tdd-plan-v2.md`
+
+This checkpoint is read-only architecture evidence plus plan text. It runs no
+test, preflight, campaign, D.110a invocation, or production edit.
+./audit.md: OK
+./commands.md: OK
+./source-hashes.sha256: OK
+packages/issuance-store/src/types.ts: FAILED open or read
+shasum: packages/live-journal/src/types.ts: No such file or directory
+packages/live-journal/src/types.ts: FAILED open or read
+shasum: tests/e5-01-v3-operation-admission-red.test.ts: No such file or directory
+tests/e5-01-v3-operation-admission-red.test.ts: FAILED open or read
+shasum: tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts: No such file or directory
+tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts: FAILED open or read
+shasum: WARNING: 6 listed files could not be read
+348de941b3783f23c03d8cf2f0e9a5de7e2ab8dcbd994ca017e2f8b5fe6e9469  -
+packages/node/src/v3-live.ts: OK
+packages/node/src/creator-close.ts: OK
+packages/issuance-store/src/types.ts: OK
+packages/live-journal/src/types.ts: OK
+tests/e5-01-v3-operation-admission-red.test.ts: OK
+tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts: OK
+69a8134fe8ad895f388dc93d02bdafc2b216b35f1cd5d06b597fab2d59487f19  packages/node/src/v3-live.ts
+4abdb8bf3dfcfa85e1b5320615928b19709fe9706bad8b509f12d59881225dcd  packages/node/src/creator-close.ts
+405ad160cf0bdb2ef6fb33dda81910f0435450fb7bb7ed85362ccd8605cdbf12  packages/issuance-store/src/types.ts
+c5f67bcc4415bd991954aa7a85ccea203cc67ca23df208681e064a6719e238d7  packages/live-journal/src/types.ts
+0f64058530c2462b043c6855eb2a4b1f18ece7dfa431a9d5f3c0e822a03201ec  tests/e5-01-v3-operation-admission-red.test.ts
+aa94101ea888c3f691d11be2d5ba869eaa715631b5276eaa1f800b4aa811c528  tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+ .logs/d110c-0c1b-source-audit-90a06a1a/audit.md    | 115 ++++++++++++++++++
+ .logs/d110c-0c1b-source-audit-90a06a1a/commands.md |  13 +++
+ .../manifest.sha256                                |   3 +
+ .../source-hashes.sha256                           |   6 +
+ .../production-hardening-tdd-plan-v2.md            | 129 +++++++++++++++------
+ 5 files changed, 229 insertions(+), 37 deletions(-)
+100644 blob 074c1151ac8c8f29b0bdd464b582064abe13d402	.logs/d110c-0c1b-source-audit-90a06a1a/audit.md
+100644 blob f3de79b5bcd0147bd0418be7158fad96f3f4b16a	.logs/d110c-0c1b-source-audit-90a06a1a/commands.md
+100644 blob 873a74f4c570b185dbad613caf71395df23470ee	.logs/d110c-0c1b-source-audit-90a06a1a/manifest.sha256
+100644 blob 5699d53a56ab092e653a43c1d4ef5d99b85c0054	.logs/d110c-0c1b-source-audit-90a06a1a/source-hashes.sha256
+be35e1db9f01bfe09cf9293e513967547db59edc5562f9eb588e3920b8827220  -
+48309c9c5ea98d4bdbd0e44ab1b05ab4fab5a375d8f091548e7adc2a260361fe  manifest.sha256
+a031fb6d2e7090991e84076d794b9115f2418d57c74da2a6619c201c7a52a541  -
+grep: ../../../docs/production-hardening/production-hardening-tdd-plan-v2.md: No such file or directory

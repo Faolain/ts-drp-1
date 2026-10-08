@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b-green-adoption-static-Eqj4VS/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-06T03:58:58.443Z"
+}

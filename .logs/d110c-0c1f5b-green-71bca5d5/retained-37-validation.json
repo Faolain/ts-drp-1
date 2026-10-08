@@ -1,0 +1,143 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 9,
+  "passed": 9,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-37/result.json",
+  "baselineSha256": "4299f82ac300e92f6b6cca4eee8017faa756230b0a4dbd0b5f434371cb291a79",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED pins one backend-neutral resource contract and exact physical schemas",
+      "status": "passed",
+      "title": "pins one backend-neutral resource contract and exact physical schemas",
+      "duration": 2.2205419999999947,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED keeps the independent missing-set and retention oracle non-prefix and boundary-exact",
+      "status": "passed",
+      "title": "keeps the independent missing-set and retention oracle non-prefix and boundary-exact",
+      "duration": 14.279750000000007,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED pins one closed failure taxonomy used by the causal backend cases",
+      "status": "passed",
+      "title": "pins one closed failure taxonomy used by the causal backend cases",
+      "duration": 0.1315829999999778,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED binds the signed 4c-a predecessor and leaves package roots outside the new authority graph",
+      "status": "passed",
+      "title": "binds the signed 4c-a predecessor and leaves package roots outside the new authority graph",
+      "duration": 50.66558399999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED has exactly one readiness failure for the four missing non-root owners",
+      "status": "passed",
+      "title": "has exactly one readiness failure for the four missing non-root owners",
+      "duration": 0.08100000000001728,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED",
+        "dormant GREEN receipt and public-surface contract"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED dormant GREEN receipt and public-surface contract adds only the four explicit non-root runtime surfaces and exact future types",
+      "status": "passed",
+      "title": "adds only the four explicit non-root runtime surfaces and exact future types",
+      "duration": 1789.455208,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED",
+        "dormant GREEN receipt and public-surface contract"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED dormant GREEN receipt and public-surface contract mints only after genuine 4c-a completion and rejects forged, foreign, wrong-scope and replayed receipts",
+      "status": "passed",
+      "title": "mints only after genuine 4c-a completion and rejects forged, foreign, wrong-scope and replayed receipts",
+      "duration": 18.61129200000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED",
+        "dormant GREEN receipt and public-surface contract"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED dormant GREEN receipt and public-surface contract never mints a receipt for missing or corrupt genuine source bytes",
+      "status": "passed",
+      "title": "never mints a receipt for missing or corrupt genuine source bytes",
+      "duration": 11.388042000000041,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED",
+        "dormant GREEN receipt and public-surface contract"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED dormant GREEN receipt and public-surface contract binds the aborting port to the exact quarantine receiver without widening signed 4c-a",
+      "status": "passed",
+      "title": "binds the aborting port to the exact quarantine receiver without widening signed 4c-a",
+      "duration": 5.714292000000114,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "a2d5f3fb4569c8fa9f52200901b3768d4223aea5076e79acd2e529a440d2e170",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

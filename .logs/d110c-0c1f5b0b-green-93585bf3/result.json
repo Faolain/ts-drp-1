@@ -1,0 +1,58 @@
+{
+	"recordId": "D.110c-0c1f5b0b",
+	"checkpoint": "GREEN",
+	"commit": "93585bf3ba62ae662c2963fd13be2ee051451fa2",
+	"parent": "504ca351653701af9dd45ad99f725307994c8e1f",
+	"signature": "G",
+	"changedPathCount": 5,
+	"focused": {
+		"selectedFiles": 1,
+		"selectedTests": 27,
+		"passed": 27,
+		"failed": 0,
+		"skipped": 0,
+		"coverageEnabled": false,
+		"processExit": 0
+	},
+	"retained": {
+		"selectedTests": 87,
+		"passed": 87,
+		"failed": 0,
+		"skipped": 0,
+		"processExit": 0
+	},
+	"builds": {
+		"protocolV3Build": "passed",
+		"protocolV3Typecheck": "passed",
+		"protocolV3PublicPackageSmoke": "passed",
+		"nodeBuild": "passed"
+	},
+	"static": {
+		"exactEslint": "passed",
+		"exactPrettier": "passed",
+		"diffCheck": "passed"
+	},
+	"isolated": {
+		"offlineFrozenInstall": "passed",
+		"dependencyBuild": "passed",
+		"focusedTests": "27/27 passed",
+		"publicExportSmoke": "passed",
+		"builtInternalVerifierImport": "passed",
+		"builtNodeImport": "passed"
+	},
+	"isolatedSetupDiagnostics": [
+		"unbuilt storage-browser fixture dependency produced zero collected tests",
+		"after storage-browser build, unbuilt storage-node fixture dependency produced 12 load failures",
+		"explicit storage-browser and storage-node dependency builds resolved both diagnostics before the accepted 27/27 run"
+	],
+	"evidenceCapture": {
+		"focusedReporter": "1 file, 27/27 passed",
+		"retainedReporter": "6 files, 87/87 passed"
+	},
+	"inheritedNodeTypecheck": "same failures reproduced at untouched parent 504ca351",
+	"rootPublicExportChanged": false,
+	"wireOrProtobufChanged": false,
+	"cryptographyChanged": false,
+	"dependencyChanged": false,
+	"stopRuleTriggered": false
+}

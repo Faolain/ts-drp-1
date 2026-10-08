@@ -1,0 +1,19 @@
+{
+  "pass": true,
+  "testsOnly": [
+    "tests/fixtures/phase-6b-d110c-0c1f5b0w/manual-review-probe.ts",
+    "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  ],
+  "tokens": [
+    "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG",
+    "D110C_F5B0W_MANUAL_REVIEW_CLOSE_HANG",
+    "creator close actor failed: CERTIFIED_VALUE_MISMATCH",
+    "singleGeneration: true"
+  ],
+  "microtaskBound": 256,
+  "productionHoldPresent": true,
+  "fixturePlanWriteOwner": "await real.transactWriteSettlementPlan(input)",
+  "staticTypecheckScope": "exact changed test entrypoints with package-export source mapping; baseline diagnostic delta"
+}

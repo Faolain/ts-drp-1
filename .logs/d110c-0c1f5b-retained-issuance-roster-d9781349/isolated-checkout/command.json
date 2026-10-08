@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-retained-issuance-roster-Dx9Pzl/checkout",
+  "command": "git",
+  "args": [
+    "checkout",
+    "--detach",
+    "d97813494f06a0c0913ac1a7b2f7760ed67bf2a8"
+  ],
+  "start": "2026-09-06T00:51:22.918Z"
+}

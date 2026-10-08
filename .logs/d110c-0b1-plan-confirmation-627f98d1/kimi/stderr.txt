@@ -1,0 +1,803 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+627f98d1 docs(d110c-0b1): correct bounded checkpoint contract
+22ee1c59 docs(d110c-0b1): freeze bounded checkpoint plan
+80b2e65b docs(d110c-b): record green confirmation
+ .../correction-ledger.md                           |   47 +
+ .../grok/command.json                              |   26 +
+ .../grok/events.jsonl                              | 2155 ++++++++++++
+ .../grok/input-packet.md                           | 3424 ++++++++++++++++++++
+ .../d110c-0b1-plan-review-22ee1c59/grok/public.txt |   44 +
+ .../grok/review.diff                               |  256 ++
+ .../grok/status.json                               |    9 +
+ .../d110c-0b1-plan-review-22ee1c59/grok/stderr.log |    0
+ .../d110c-0b1-plan-review-22ee1c59/kimi/stderr.txt | 1120 +++++++
+ .../kimi/stream.jsonl                              |   45 +
+ .logs/d110c-0b1-plan-review-22ee1c59/opus/raw.json |    1 +
+ .../d110c-0b1-plan-review-22ee1c59/opus/stderr.txt |    0
+ .logs/d110c-0b1-plan-review-22ee1c59/prompt.md     |   50 +
+ .../production-hardening-tdd-plan-v2.md            |  189 +-
+ 14 files changed, 7318 insertions(+), 48 deletions(-)
+.logs/d110c-0b1-plan-correction-22ee1c59/:
+correction-ledger.md
+
+.logs/d110c-0b1-plan-review-22ee1c59/:
+grok
+kimi
+opus
+prompt.md
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 9e3dc347..f4f18419 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -94678,11 +94678,11 @@ closure.
+ 
+ ##### D.110c-0b1 bounded checkpoint opener and control-proof compaction plan
+ 
+-**Status: bounded plan and source audit; no RED or production edit yet.** This
++**Status: bounded plan review correction; no RED or production edit yet.** This
+ is the next executable D.110c slice after the closed D.110c-b checkpoint. Its
+ owner is the accepted non-root protocol-v3 creator-checkpoint boundary, the
+ accepted non-root control-plane bounded-advance boundary, and their existing
+-Node creator-close/cold-reopen/pending-recovery consumers. Its deadline is
++Node creator-close, hot-adoption/commit, and cold-reopen consumers. Its deadline is
+ GREEN before D.110c-0c and D.110c-c RED. It does not reopen 0b0, 0a, a, or b;
+ change the v1 trust record, wire format, authority, floor, rollback count,
+ archive law, dependency set, threshold, root export roster, or product API; or
+@@ -94713,6 +94713,9 @@ coherent missing path rather than a second lifecycle defect:
+   `v3-live-generation-1` followed by `v3-live-generation-2`, and use literal
+   epoch-0/epoch-1 ACL checks. Those branches therefore fail on a genuine active
+   epoch-2 room even though D.110c-b has already authenticated and activated it.
++  Only active cold reopen is generalized in 0b1. The pending-recovery pin is a
++  source-audit fact and remains the causal RED owned by D.110c-0c; 0b1 preserves
++  its current 0→1 behavior rather than landing an unexercised epoch≥2 branch.
+ - `packages/node/src/internal/creator-room-head.ts` and the accepted 0b0 room
+   authority already own exact copied `(objectId, epoch, currentAnchorDigest)`
+   validation. The checkpoint opener consumes that authenticated value; it does
+@@ -94730,11 +94733,16 @@ bounded closure advance; the existing predicate remains the exact 0→1
+ compatibility path. Node continues to own storage lineage and product
+ composition, and its existing room-head owner remains the sole local floor
+ shape/oracle. An unexported singleton-registry mint callback may be added inside
+-protocol-v3 only so the reviewed opener can materialize the already-verified
+-epoch-(N-1) capability; it is not a parallel public opener, naked authority
+-constructor, test hook, or root export. The two duplicated cold/pending
+-epoch-0/1 branches must consume one shared internal checkpoint-verification
+-helper rather than retain divergent authentication copies.
++protocol-v3 as `mintCreatorAnchorTrustCheckpointPredecessor` only so the
++reviewed opener can materialize the already-verified epoch-(N-1) capability.
++`openCreatorCheckpointTrust` is its only caller, and an unreturned capability
++becomes unreachable on any later failure; it is not a parallel public opener,
++naked authority constructor, test hook, or root export. One Node-private
++`inspectCreatorTransitionAdvance` helper owns epoch selection and retiring-ref
++derivation for close, hot verify, commit, and cold reopen, instead of four
++callers duplicating the bounded/unbounded branch. Pending recovery continues to
++use its existing first-transition classifier until D.110c-0c exercises and
++generalizes it.
+ 
+ The public compatibility boundary is frozen as follows.
+ 
+@@ -94753,26 +94761,45 @@ The public compatibility boundary is frozen as follows.
+    both creator signatures; requires exact predecessor/current consecutive
+    epochs and the previous-anchor link; then reuses the existing one-step
+    creator successor/QC verification for the supplied current CutValue/QC. It
+-   returns only the current `CurrentAnchorTrust`. Its exact failure roster is
++   returns only the bounded predecessor/current opaque trust pair described
++   below. Its exact failure roster is
+    `malformed-input`, `genesis-rejected`, `predecessor-rejected`,
+    `current-rejected`, `lineage-invalid`, `commit-qc-rejected`, and
+-   `expected-head-mismatch`. No transient genesis/predecessor capability is
+-   returned, no predecessor's older QC is read, and no self-selected floor is
+-   accepted.
++   `expected-head-mismatch`, and `custody-unavailable`. On success it returns
++   exactly `{currentTrust,ok,predecessorTrust}`: the two opaque capabilities
++   that the existing `CreatorSuccessorLiveMaterial` consumer must authenticate
++   both generations. It returns no genesis capability, record bytes, key, or
++   authority constructor; no predecessor's older QC is read; and no
++   self-selected floor is accepted. This success-pair correction supersedes
++   only 0b0b's earlier current-only output sentence prospectively because the
++   signed source review demonstrated that `v3-live.ts` genuinely consumes the
++   predecessor capability through `authenticateCurrentEpochAnchor()`.
++   `creator-checkpoint.ts` imports `anchor-trust-singleton.js` directly so a
++   standalone built-package subpath import installs the genuine custody before
++   calling the private minter; runtime-identity tests prove that exact import
++   path and forbid a type-only/uninitialized subpath.
+ 2. `@ts-drp/control-plane/creator-trust-checkpoint-advance` exports exactly
+    `inspectBoundedCreatorTrustAdvance` and its directly required types. Its
+-   exact input keys are `current`, `proofRefs`, `proposed`, and
+-   `retiringProofRefs`. `proofRefs` and `retiringProofRefs` are each the exact
+-   ordered `[CutValue ref, commit-QC ref]` tuple. The current candidates—not the
+-   caller's labels—must decode the retiring tuple as exactly one current
+-   `drp-hard-epoch-cut` and one commit-phase `drp-seal-qc`; the proposed
+-   candidates must authenticate the exact new pair. The accepted closure is
+-   current minus exactly one current trust ref and the exact retiring pair,
++   exact input keys are `current`, `proofRefs`, `proposed`,
++   `retiringPredecessorAclRef`, and `retiringProofRefs`. `proofRefs` and
++   `retiringProofRefs` are each the exact ordered `[CutValue ref, commit-QC
++ref]` tuple. The current candidates—not the caller's labels—must decode the
++   retiring tuple as exactly one `drp-hard-epoch-cut` and one commit-phase
++   `drp-seal-qc` at `currentEpoch - 1`, and must decode the one retiring
++   predecessor ACL as the exact canonical `drp-v3-latched-acl` for the same
++   object and epoch. The proposed candidates must authenticate the exact new
++   pair at `currentEpoch`. The accepted closure is current minus exactly one
++   current trust ref, the retiring proof pair, and the retiring predecessor ACL,
+    plus exactly one successor trust ref and the new pair, preserving every
+-   other ref byte-for-byte. It reuses the existing successor-binding rules and
+-   adds only `RETIRING_PROOF_REFS_INVALID` to the existing exact rejection
+-   roster. Missing, duplicate, wrong-kind, wrong-phase, wrong-epoch,
+-   substituted, still-retained, or extra-deleted refs fail closed.
++   other ref byte-for-byte. Adoption then replaces the predecessor live
++   projection and inserts exactly the current epoch's one predecessor ACL. It
++   reuses the existing successor-binding rules and adds
++   `RETIRING_PROOF_REFS_INVALID` and
++   `RETIRING_PREDECESSOR_ACL_INVALID` to the existing exact rejection roster.
++   Missing, duplicate, wrong-kind, wrong-phase, wrong-epoch, cross-object,
++   substituted, still-retained, or extra-deleted refs fail closed. This ACL
++   correction closes the reviewed linear-growth defect; it does not authorize
++   D.110c-c physical generation deletion.
+ 
+ The deterministic tests-only RED is one signed/pushed checkpoint owned by
+ `tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts` and
+@@ -94783,13 +94810,16 @@ record, anchor, CutValue, QC, generation, floor, or projection. One exact
+ focused Vitest invocation selects three tests in one file, once, with coverage
+ disabled and JSON reporting:
+ 
+-1. the genuine 0→1→2 room supplies genesis invite bytes, epoch-1 predecessor,
+-   epoch-2 current record, exact 1→2 CutValue/QC, and the authenticated epoch-2
+-   floor; absence of the reviewed protocol seam yields only
+-   `D110C_0B1_CHECKPOINT_OPENER_MISSING`;
++1. the genuine 0→1→2 room first proves behaviorally that the current epoch-0
++   opener rejects the epoch-1 and epoch-2 records with exact
++   `trust-state-inconsistent` and that the one-step opener has no retained
++   admissible predecessor capability after hot-owner teardown. It then supplies
++   genesis invite bytes, epoch-1 predecessor, epoch-2 current record, exact
++   1→2 CutValue/QC, and the authenticated epoch-2 floor; absence of the reviewed
++   protocol seam yields only `D110C_0B1_CHECKPOINT_OPENER_MISSING`;
+ 2. the same genuine closure proves the existing advance retains the 0→1 proof
+-   pair and grows, while absence of the reviewed bounded predicate yields only
+-   `D110C_0B1_BOUNDED_ADVANCE_MISSING`; and
++   pair and epoch-0 predecessor ACL and grows, while absence of the reviewed
++   bounded predicate yields only `D110C_0B1_BOUNDED_ADVANCE_MISSING`; and
+ 3. after terminalizing the hot owner, the real installed Node cold-reopen owner
+    receives that room's actual durable inputs and fails before returning
+    epoch-2 material, yielding only `D110C_0B1_COLD_REOPEN_EPOCH_PINNED`.
+@@ -94800,7 +94830,7 @@ the demonstrated prior-pair retention and epoch literal/source predicates, and
+ an otherwise unchanged durable head/floor. Any earlier seal, close, adoption,
+ snapshot, storage, floor, or fixture failure stops and reslices from that owner.
+ The signed RED records reporter JSON, stdout/stderr/status, current/proposed
+-closure refs and decoded kind census, exact head revisions, changed paths,
++closure refs and decoded kind/epoch census, exact head revisions, changed paths,
+ source hashes, and a validating self-excluding manifest. The final GREEN review
+ must inspect this RED causality; no separate full three-model RED review runs
+ under the governing prospective review policy.
+@@ -94813,41 +94843,60 @@ non-root subpaths, their package export-map entries, and the minimum private
+ protocol-v3 singleton-custody callback needed by the checkpoint opener. Keep
+ root exports and all current APIs exact. Unit controls authenticate a genuine
+ epoch-2 checkpoint from the pinned genesis carrier plus only its immediate
+-predecessor/current pair; prove no N-2 record/QC is read; and cover every
++predecessor/current pair; return exactly the genuine predecessor/current opaque
++capability pair; prove no N-2 record/QC is read; prove standalone built-subpath
++singleton initialization; and cover every
+ genesis, carrier, signature, room, epoch, link, CutValue, QC, expected-head,
+-ambiguity, replay, fork, skipped-epoch, and stale-floor mutant with the frozen
+-reason roster. Bounded-advance controls prove the exact retiring/new pair,
+-byte-for-byte preservation of unrelated refs, constant closure count after the
+-first transition, and all omission/substitution/duplication/wrong-kind/
+-wrong-phase/still-retained/extra-deletion mutants. The exact two boundary tests
+-run once after this batch.
++custody-unavailable, ambiguity, replay, fork, skipped-epoch, and stale-floor
++mutant with the frozen reason roster. Bounded-advance controls prove the exact
++retiring/new proof epochs, exact stale predecessor-ACL retirement,
++byte-for-byte preservation of unrelated refs, constant post-adoption closure
++count after the first transition, and all omission/substitution/duplication/
++wrong-kind/wrong-phase/wrong-epoch/cross-object/still-retained/extra-deletion
++mutants. The exact two boundary tests run once after this batch.
+ 
+ **Batch 2 — Node composition and genuine cold reopen.** For epoch 0→1,
+ `creator-close.ts` and adoption retain the existing successor opener and
+ unbounded compatibility predicate byte-for-byte. For every epoch N≥1 close,
+-Node derives the unique authenticated prior CutValue/commit-QC pair from the
+-current candidates, builds the bounded proposed closure, and requires the new
+-predicate before staging. Cold reopen and pending recovery share one
+-epoch-relative verifier: epoch 1 retains the existing genesis/one-step path;
+-epoch N≥2 consumes the reviewed checkpoint opener, the independently captured
+-expected room head, the older/floor immediate-predecessor closure, and the
+-newer current/adoption closure. Projection and ACL checks derive exact
++Node derives the unique authenticated prior CutValue/commit-QC pair and stale
++predecessor ACL from the current candidates, builds the bounded proposed
++closure, and requires the new predicate before staging. The one private
++`inspectCreatorTransitionAdvance` classifier is also used by hot adoption's
++`verifyChain`, creator-adoption commit, and active cold reopen for every N≥1
++current→proposed pair; only 0→1 continues to call
++`inspectCreatorTrustAdvance`. Cold reopen at epoch 1 retains the existing
++genesis/one-step path. Cold reopen at epoch N≥2 consumes the reviewed
++checkpoint opener's authenticated predecessor/current pair, the independently
++captured expected room head, the older/floor immediate-predecessor closure, and
++the newer current/adoption closure. Projection and ACL checks derive exact
+ predecessor/current epochs instead of using 0/1 literals. The verifier never
+ walks N-2 state, chooses a largest stored epoch, or activates/deletes before
+ checkpoint, snapshot, manifest, ACL, recovery, and floor verification.
++Pending-adoption recovery remains byte-compatible for 0→1 and does not gain an
++epoch≥2 success path here. D.110c-0c's first causal RED must terminate a genuine
++epoch≥1 close before adoption and prove that exact pending branch remains
++unavailable before it is generalized and restart-tested.
+ 
+ The full focused GREEN runs once after Batch 2 and must prove: a genuine room
+ cold reopens at epoch 2 after 0→1, restart-equivalent owner teardown, and 1→2;
+ the reopened room has exact state, semantic digest, ACL/writer authority,
+ anchor, history root/size, archive root, snapshot/manifest, journal, operation
+ accounting, issuance continuity, and successful issue/publish; the active epoch-2
+-closure contains only the 1→2 CutValue/QC, while the older/floor rollback
+-generation still contains the epoch-1 trust immediately before reclamation;
++closure has the exact five-kind census of one current trust, one 1→2 CutValue,
++one 1→2 commit QC, one epoch-2 live projection, and one epoch-1 predecessor ACL,
++with no epoch-0 CutValue, QC, or ACL; the older/floor rollback generation still
++contains the epoch-1 trust immediately before reclamation;
+ there are exactly two AHE head advances with exact revision deltas for each
+ transition; stale/forked floors and every frozen adversarial mutant fail before
+-activation or deletion; and active/control closure counts and bytes are equal
+-at epochs 1 and 2 apart from explicitly enumerated bounded projection/content
+-differences. No GREEN claim includes pruning or a third transition.
++activation or deletion; and active/control closure ref count and decoded-kind
++multiset are exactly equal at epochs 1 and 2. The evidence enumerates every
++per-kind ref and byte length and the exact epoch-1→epoch-2 deltas; bytes may
++differ only within the fixed existing schemas for successor trust, CutValue,
++QC, live projection, and predecessor ACL. No journal, bootstrap, registration,
++metadata, sibling store, or qualitative “content difference” may absorb another
++control item. D.110c-d later proves the same fixed census and per-kind ceilings
++across ≥100 transitions. No GREEN claim includes physical pruning, pending
++restart success, or a third transition.
+ 
+ After the focused GREEN, the retained gate runs once and includes the complete
+ D.110c-0b1 file; D.110c-0b0 floor/stage/recovery; protocol-v3 creator trust and
+@@ -94873,6 +94922,50 @@ RED closure, fixed-creator authority integrity, bounded control ownership,
+ compatibility, retained behavior, and evidence custody. No Fable or
+ collaboration subagent is invoked.
+ 
++The first bounded plan review inspected signed/pushed commit
++`22ee1c59b3163e4f5b23c5cb299570cdeda08a03`, tree
++`dbe24f09507aa59c4f6e9d46829ad53f3500aaf9`, from
++`.logs/d110c-0b1-plan-review-22ee1c59/`. Prompt SHA-256 is
++`cc60165ab248ef116b700004c88ef22136dfec3d34728459ba8baaa6a2b1b211`.
++Grok 4.6/high session `01a0639a-57a5-7c41-b048-bbbe265cc1df` ended
++normally after 600.123 seconds with `stop_reason=end_turn`, no timeout or
++cancellation. Its strict runner honestly classified leading inspection prose
++as `NO_VERDICT`; the embedded terminal object was `CHANGES_REQUIRED`, P0=0,
++P1=1, P2=3. Event, public, and status SHA-256 values are
++`63a497775892d995b520a1393a1df5dffeeb3fedfe05df7f8e60fd9577f0b3d9`,
++`468c4177732a8d10554e3836292e54e5bb296ed0f481482bf06bdd3df9c1b8e5`,
++and `39b0369eaba277284ce20874eab7c4d58dbfdb00db2378cc84cd44bbf547a68e`.
++Direct `kimi-code/k3` session
++`session_427fa052-3c94-4fda-9d8f-784e03bc7c53`, with
++`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, returned schema-clean `APPROVED`, P0=0,
++P1=0, P2=2; stream and stderr SHA-256 values are
++`645b6b8467dcf4646d3fc728ddd14ad9f0034568aef2345bac831c5982e1e344`
++and `dd61ac99b20dcf6091345b05451cb77c69db4c43b0ee6b5d11705be5613a0dbb`.
++Opus xhigh session `f6bb7cfd-ac15-491d-9da1-91e819a6f608` ended normally,
++spawned zero subagents, and returned `CHANGES_REQUIRED`, P0=0/P1=2/P2=3;
++raw-result SHA-256 is
++`2f2031592ef05ca662fb18f8dfca84e20562967319f0960d8187b0e0c9cae38f`.
++
++The material union is accepted in one correction. Grok proved that every
++downstream N≥1 classifier would reject the bounded staged closure unless it,
++not only close staging, uses the new predicate. Opus proved that the active
++closure also accumulates one epoch-tagged predecessor ACL and that the existing
++live-material consumer requires a genuine predecessor trust capability. The
++correction above therefore names one shared Node classifier for close, hot
++verify, commit, and cold reopen; retires the exact stale predecessor ACL with
++the stale proof pair; and returns the bounded authenticated
++predecessor/current capability pair. The correction also adopts the P2 union:
++exact retiring/new proof epochs, a named sole-caller private minter, standalone
++subpath singleton initialization, a behavioral opener RED before the missing-
++seam token, a closed five-kind census with exact per-kind byte deltas, and an
++explicit D.110c-0c owner for the still-unproven epoch≥2 pending-recovery path.
++No finding changes the fixed creator, v1 wire, floor authority, rollback count,
++dependency, threshold, product API, pruning authority, or campaign boundary.
++Because the accepted correction changes the public success output and bounded
++retirement contract, one confirmation of the signed/pushed correction is
++required. The completed first sessions are not relaunched or relabelled, and
++no closure prose receives recursive review.
++
+ The four prerequisite decisions, including the newly demonstrated 0b0
+ freshness-floor authority question, are reviewed before their production edits;
+ each executable sub-slice receives its own bounded causal RED and GREEN. The
+{"duration_api_ms":555564,"stop_reason":"end_turn","session_id":"f6bb7cfd-ac15-491d-9da1-91e819a6f608","total_cost_usd":4.133594,"usage":{"input_tokens":62,"cache_creation_input_tokens":156182,"cache_read_input_tokens":2951828,"output_tokens":43735,"output_tokens_details":{"thinking_tokens":33491},"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":156182,"ephemeral_5m_input_tokens":0},"inference_geo":"not_available","iterations":[{"input_tokens":2,"output_tokens":9731,"cache_read_input_tokens":160471,"cache_creation_input_tokens":4662,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":4662},"type":"message"}],"speed":"standard"},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":2070,"outputTokens":21,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"webSearchRequests":0,"costUSD":0.002175,"contextWindow":200000,"maxOutputTokens":32000,"thinkingTokens":0,"canonicalModel":"claude-haiku-4-5","provider":"firstParty","costBasis":"list"},"claude-opus-5":{"inputTokens":62,"outputTokens":43735,"cacheReadInputTokens":2951828,"cacheCreationInputTokens":156182,"webSearchRequests":0,"costUSD":4.131419,"contextWindow":1000000,"maxOutputTokens":64000,"thinkingTokens":33491,"canonicalModel":"claude-opus-5","provider":"firstParty","costBasis":"list"}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","fast_mode_disabled_reason":"sdk_opt_in_required","subagent_stats":{"spawned":0,"requested":{"background":0,"foreground":0,"unset":0},"started_in_background":0,"max_depth":0,"spawned_by_subagents":0,"completed":0,"failed":0,"killed":{"parent":0,"user":0,"system":0},"refused":{"depth_limit":0,"concurrency_limit":0,"budget":0},"by_type":{}},"is_error":false,"num_turns":44,"subtype":"success","api_error_status":null,"result":"```json\n{\n  \"verdict\": \"CHANGES_REQUIRED\",\n  \"summary\": \"The plan's architecture is coherent and its two-boundary coupling is genuinely causal: openCreatorSuccessorTrust (packages/protocol-v3/src/creator-close.ts:559-639) already enforces the one-step epoch+1, previous-anchor-derivation and commit-QC checks the checkpoint opener would reuse, openCurrentAnchorTrust rejects any record with currentEpoch !== 0 (packages/protocol-v3/src/index.ts:1438) so the epoch-0 pin in cold reopen is a real defect, and the bounded advance is actually required for epoch-2 cold reopen because uniqueCandidateByKind(proposedCandidates, 'drp-hard-epoch-cut') (packages/node/src/creator-adoption.ts:974) becomes ambiguous once two cut records accumulate. Two P1 defects block RED. (1) The frozen bounded-advance contract preserves 'every other ref byte-for-byte', but the adoption owner adds the predecessor latched-ACL ref every transition (packages/node/src/creator-adoption.ts:650-665, creator-adoption-commit.ts:339-352) and the latched-ACL record carries an epoch field (packages/protocol-v3/src/latched-acl.ts:7,43
+
+   12938 .logs/d110c-0b1-plan-review-22ee1c59/opus/raw.json
+      45 .logs/d110c-0b1-plan-review-22ee1c59/kimi/stream.jsonl
+```json
+{
+  "verdict": "CHANGES_REQUIRED",
+  "summary": "The plan's architecture is coherent and its two-boundary coupling is genuinely causal: openCreatorSuccessorTrust (packages/protocol-v3/src/creator-close.ts:559-639) already enforces the one-step epoch+1, previous-anchor-derivation and commit-QC checks the checkpoint opener would reuse, openCurrentAnchorTrust rejects any record with currentEpoch !== 0 (packages/protocol-v3/src/index.ts:1438) so the epoch-0 pin in cold reopen is a real defect, and the bounded advance is actually required for epoch-2 cold reopen because uniqueCandidateByKind(proposedCandidates, 'drp-hard-epoch-cut') (packages/node/src/creator-adoption.ts:974) becomes ambiguous once two cut records accumulate. Two P1 defects block RED. (1) The frozen bounded-advance contract preserves 'every other ref byte-for-byte', but the adoption owner adds the predecessor latched-ACL ref every transition (packages/node/src/creator-adoption.ts:650-665, creator-adoption-commit.ts:339-352) and the latched-ACL record carries an epoch field (packages/protocol-v3/src/latched-acl.ts:7,435-440), so acl_N-1 is always a new blob; the epoch-1 closure is 5 refs and the bounded epoch-2 closure is 6, making the GREEN 'counts and bytes are equal at epochs 1 and 2' predicate false and its escape clause a place linear control growth can hide. (2) The opener is frozen to return only the current CurrentAnchorTrust and explicitly no predecessor capability, but the Node consumer requires a genuine epoch-(N-1) capability: CreatorSuccessorLiveMaterial.predecessor.trust (packages/node/src/internal/creator-successor-live.ts:23,36) is fed to authenticateCurrentEpochAnchor via prepareExistingCreatorGeneration (packages/node/src/v3-live.ts:1886-1890, 7310-7313), which resolves singleton custody and cannot be satisfied from record bytes; today that capability comes from openCurrentAnchorTrust (creator-adoption.ts:984,1125), which is epoch-0-only, and no retained epoch-(N-2) evidence exists to mint it another way. Scope is otherwise preserved: no new wire record, authority, threshold, dependency, root export or pruning behavior is required, staging already supports ref removal (packages/node/src/creator-close.ts:342-378), and the two-advance/three-generation retention mapping is correct (close +1 and adoption +1 revision; closed-epoch-cleanup.ts:280-297 retains active plus exactly two Superseded parents, so the immediate-predecessor generation carrying trust_N-1 is retained at every epoch).",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Bounded advance does not make the active closure constant; per-epoch latched-ACL ref accumulates and is preserved by contract",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94848,
+      "evidence": "The frozen predicate accepts 'current minus exactly one current trust ref and the exact retiring pair, plus exactly one successor trust ref and the new pair, preserving every other ref byte-for-byte' (line 94770-94772), so no ACL ref may retire. But every adoption adds the predecessor latched-ACL ref if absent: packages/node/src/creator-adoption.ts:650-665 and packages/node/src/creator-adoption-commit.ts:339-352 compute predecessorAclRef from facts.exactCanonicalLatchedAclBytes (the current-epoch ACL supplied at packages/node/src/creator-close.ts:625) and append it when not already retained, and packages/node/src/creator-adoption.ts:665 hard-requires its presence. The latched-ACL snapshot record contains an 'epoch' field (packages/protocol-v3/src/latched-acl.ts:7, incremented at 435-440 and pinned by openCanonicalLatchedAclSnapshot at 225), so acl_0 and acl_1 are necessarily distinct blobs; cold reopen further depends on acl_N-1 being retained (packages/node/src/creator-adoption.ts:1073-1091). Tracing the genuine room: epoch-0 closure is exactly 2 refs {trust_0, proj_0} (packages/node/src/v3-live.ts:2356-2374), epoch-1 closure is 5 {trust_1, cut_01, qc_01, proj_1, acl_0}, and the bounded epoch-2 closure is 6 {trust_2, cut_12, qc_12, proj_2, acl_0, acl_1}. The plan's GREEN predicate 'active/control closure counts and bytes are equal at epochs 1 and 2' is therefore false, and the qualifier 'apart from explicitly enumerated bounded projection/content differences' does not enumerate the ACL ref while being broad enough to absorb one accumulating blob per epoch forever.",
+      "required_action": "Before RED, replace the equality claim with the exact enumerated epoch-2 closure composition (naming the retained epoch-1 latched-ACL ref and the stale epoch-0 ACL ref as a +1 delta), state explicitly that the bounded predicate reduces per-transition growth from +3 to +1 rather than achieving constancy, and assign a named owner (D.110c-c cleanup/pruning or the D.110c-d bounded census) for stale latched-ACL retirement. Do not accept any GREEN wording whose difference clause is open-ended."
+    },
+    {
+      "severity": "P1",
+      "title": "Opener output roster cannot supply the epoch-(N-1) capability the Node cold-reopen consumer requires",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94756,
+      "evidence": "Frozen boundary 1 states the opener 'returns only the current CurrentAnchorTrust' and that 'No transient genesis/predecessor capability is returned', and Batch 2 (line 94831-94834) says epoch N>=2 cold reopen 'consumes the reviewed checkpoint opener'. But the cold-reopen owner must populate CreatorSuccessorLiveMaterial.predecessor.trust, typed CurrentAnchorTrust (packages/node/src/internal/creator-successor-live.ts:23,36); packages/node/src/creator-adoption.ts:1125 fills it today from openCurrentAnchorTrust, which is epoch-0-only (packages/protocol-v3/src/index.ts:1438 rejects currentEpoch !== 0). That value is not decorative: packages/node/src/v3-live.ts:7310-7313 calls prepareExistingCreatorGeneration(material.predecessor, material), which at v3-live.ts:1886-1890 passes generation.trust to authenticateCurrentEpochAnchor, a singleton-custody-bound capability check (packages/protocol-v3/src/internal/seal-authority-custody.ts:86-88) that returns 'untrusted-context' for anything not minted into the private WeakMap. No epoch-(N-2) record survives the three-generation retention window (packages/node/src/internal/closed-epoch-cleanup.ts:280-297), so the predecessor capability cannot be minted by a second checkpoint-opener call either. As written, Batch 2's epoch-2 cold reopen cannot reach activation and the GREEN roster at line 94839-94843 is unreachable.",
+      "required_action": "Stop and correct the frozen public boundary before RED: either authorize the opener to return the authenticated immediate-predecessor capability alongside the current one (with its own review of the widened authority surface and a matching Batch-1 mutant roster), or name the exact alternative Node/v3-live owner change that supplies material.predecessor.trust at epoch N>=2 and reslice it explicitly. Do not leave this to implementation discovery."
+    },
+    {
+      "severity": "P2",
+      "title": "RED test 1's terminal signal is packaging absence rather than a behavioral defect",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94786,
+      "evidence": "Test 2 pairs its missing-module token with a behavioral assertion ('proves the existing advance retains the 0->1 proof pair and grows') and test 3 is fully behavioral (the installed cold-reopen owner fails on real durable inputs). Test 1 has no behavioral counterpart: with no './creator-checkpoint' entry in packages/protocol-v3/package.json the import itself fails, so D110C_0B1_CHECKPOINT_OPENER_MISSING is emitted by module resolution, not by a proven inability to authenticate epoch 2.",
+      "required_action": "Owner: the RED author, before the RED checkpoint. Add one behavioral assertion to test 1 on the same genuine epoch-2 material - e.g. openCurrentAnchorTrust on the epoch-2 record rejects with trust-state-inconsistent and openCreatorSuccessorTrust has no admissible predecessor capability - so the missing-seam token is corroborated by a current-source defect."
+    },
+    {
+      "severity": "P2",
+      "title": "No failure reason or import-identity requirement for uninstalled singleton custody on the new subpath",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94741,
+      "evidence": "The custody callbacks are installed only as a side effect of loading packages/protocol-v3/src/anchor-trust-singleton.ts (lines 10-15), and packages/protocol-v3/src/creator-close.ts imports index.js type-only (line 4), so a consumer importing only the new '@ts-drp/protocol-v3/creator-checkpoint' subpath would see creatorResolver/minter undefined (packages/protocol-v3/src/internal/seal-authority-custody.ts:41-42,86-88,97-107). The frozen roster - malformed-input, genesis-rejected, predecessor-rejected, current-rejected, lineage-invalid, commit-qc-rejected, expected-head-mismatch - has no reason for uninstalled custody, so this collapses into a misleading authentication rejection.",
+      "required_action": "Owner: the Batch-1 implementer. Either pin the subpath to load the singleton module for its side effect and assert that under the plan's existing runtime import-identity gate, or add one explicit roster reason for unavailable custody and a Batch-1 control that exercises it."
+    },
+    {
+      "severity": "P2",
+      "title": "Batch 2 changes the epoch>=2 pending-recovery authentication branch with no 0b1 control proving it",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94831,
+      "evidence": "Batch 2 requires cold reopen and pending recovery to 'share one epoch-relative verifier', which rewrites the pending path's epoch pins at packages/node/src/creator-adoption.ts:1259-1337 (v3-live-generation-1 selection, openCurrentAnchorTrust, currentEpoch: 0, successorEpoch: 1) and its activation swapHead at line 1449. The GREEN roster (lines 94839-94850) proves only cold reopen at epoch 2; the plan assigns pending-adoption restart to D.110c-0c, so the new epoch>=2 pending branch would land in production unexercised at its new epoch.",
+      "required_action": "Owner: D.110c-0c. Record explicitly in the plan that the epoch>=2 pending branch is unproven until 0c, and require 0c's first RED to target that exact branch; alternatively add one 0b1 GREEN assertion that pending recovery at epoch 2 fails closed rather than mis-activating."
+    }
+  ],
+  "plan_causal": false,
+  "scope_preserved": true,
+  "red_ready": false,
+  "blocking_union_closed": false
+}
+```
+	generation: CreatorSuccessorGenerationMaterial,
+	material: CreatorSuccessorLiveMaterial
+): Promise<PreparedV3Live | undefined> {
+	try {
+		const parsedObjectId = parseStorageObjectId(generation.head.objectId);
+		if (!parsedObjectId.ok || generation.trust.objectId !== parsedObjectId.value) return undefined;
+		const authenticated = authenticateCurrentEpochAnchor({
+			detachedSignature: generation.detachedAnchorSignature,
+			exactCanonicalAnchorPreimageBytes: generation.exactCanonicalAnchorPreimageBytes,
+			trust: generation.trust,
+		});
+		const provenance = snapshotAuthenticatedProvenance(authenticated, parsedObjectId.value);
+		if (
+			provenance === undefined ||
+			provenance.anchorDigest !== generation.trust.currentAnchorDigest ||
+			generation.trust.genesisAnchorDigest !== material.pinnedGenesisAnchorDigest
+	): Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }> =>
+		ObjectFreeze({ detail, kind, ok: false as const });
+	try {
+		const transportHandoff = creatorSuccessorTransportHandoff(material, bindings);
+		const [predecessorValidation, predecessorSource, successor, successorIssuanceAuthority] = await Promise.all([
+			prepareExistingCreatorGeneration(material.predecessor, material),
+			prepareExistingCreatorGeneration(material.predecessor, material),
+			prepareExistingCreatorGeneration(material.successor, material),
+			prepareExistingCreatorGeneration(material.successor, material),
+		]);
+		if (
+			predecessorValidation === undefined ||
+		});
+		if (predecessors.length !== 1) return undefined;
+		const predecessorLiveRef = predecessors[0]?.ref;
+		if (predecessorLiveRef === undefined) return undefined;
+		const projectionDigest = digestBlob(exactCanonicalProjectionBytes);
+		if (!projectionDigest.ok) return undefined;
+		const projectionRef = Object.freeze({
+			byteLength: exactCanonicalProjectionBytes.byteLength,
+			digest: projectionDigest.value,
+		});
+		const predecessorAclDigest = digestBlob(facts.exactCanonicalLatchedAclBytes);
+		if (!predecessorAclDigest.ok) return undefined;
+		const predecessorAclRef = Object.freeze({
+			byteLength: facts.exactCanonicalLatchedAclBytes.byteLength,
+			digest: predecessorAclDigest.value,
+		});
+		const retained = facts.proposedReferences.filter((candidate) => !sameRef(candidate, predecessorLiveRef));
+		const candidateReferences = Object.freeze(
+			[
+				...retained,
+				projectionRef,
+				...(retained.some((candidate) => sameRef(candidate, predecessorAclRef)) ? [] : [predecessorAclRef]),
+			].sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
+		);
+		if (
+			!candidateReferences.some((candidate) => sameRef(candidate, predecessorAclRef)) ||
+			new Set(candidateReferences.map(({ digest }) => digest)).size !== candidateReferences.length
+		) {
+			return undefined;
+		}
+		const random = new Uint8Array(32);
+		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+		const successorProjection = uniqueCandidateByKind(activeCandidates, "v3-live-generation-2");
+		const currentTrustCandidate = uniqueCandidateByKind(currentCandidates, "drp-anchor-trust-state");
+		const successorTrustCandidate = uniqueCandidateByKind(proposedCandidates, "drp-anchor-trust-state");
+		const cutCandidate = uniqueCandidateByKind(proposedCandidates, "drp-hard-epoch-cut");
+		if (
+			currentProjection === undefined ||
+			successorProjection === undefined ||
+			currentTrustCandidate === undefined ||
+			successorTrustCandidate === undefined ||
+			cutCandidate === undefined
+		) {
+			return coldFailure("chain-invalid", "creator successor authenticated closure is incomplete");
+		}
+		const openedCurrent = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
+			expectedObjectId: objectId,
+			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+		});
+		if (!openedCurrent.ok) return coldFailure("chain-invalid", "creator genesis trust is invalid");
+		const qcs = proposedCandidates.flatMap((candidate) =>
+				detachedAnchorSignature: Uint8Array.from(currentTrustRecord.detachedCurrentAnchorSignature),
+				exactCanonicalAnchorPreimageBytes: Uint8Array.from(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
+				exactCanonicalProjectionBytes: Uint8Array.from(currentProjection.bytes),
+				head: currentHead,
+				references: Object.freeze(currentGeneration.closure.map((ref) => Object.freeze({ ...ref }))),
+				trust: openedCurrent.trust,
+				trustRef: Object.freeze({ ...currentTrustCandidate.ref }),
+			}),
+			predecessorExactCanonicalLatchedAclBytes,
+			snapshotPayloadDigest: String(snapshot.manifest.payloadDigest),
+			stateDigest: String(snapshot.manifest.stateDigest),
+import { createAnchorTrustApi } from "./index.js";
+import {
+	certifiedSealAuthorityResolver,
+	creatorAnchorTrustResolver,
+	creatorAnchorTrustSuccessorMinter,
+	installCertifiedSealAuthorityResolver,
+	installCreatorAnchorTrustCustody,
+} from "./internal/seal-authority-custody.js";
+
+const anchorTrustApi = createAnchorTrustApi();
+installCertifiedSealAuthorityResolver(anchorTrustApi[certifiedSealAuthorityResolver]);
+installCreatorAnchorTrustCustody(
+	anchorTrustApi[creatorAnchorTrustResolver],
+	anchorTrustApi[creatorAnchorTrustSuccessorMinter]
+);
+
+export const {
+	authenticateCurrentEpochAnchor,
+	installCertifiedAnchorTrustRoot,
+	installCreatorAnchorTrustRoot,
+	detachedSuccessorAnchorSignature: Uint8Array
+) => CurrentAnchorTrust | undefined;
+
+let creatorResolver: CreatorAnchorTrustResolver | undefined;
+let creatorSuccessorMinter: CreatorAnchorTrustSuccessorMinter | undefined;
+const creatorAnchorRequestDigests = new WeakMap<CreatorAnchorSigningRequest, Uint8Array>();
+
+/**
+ * @returns Detached immutable material, or undefined for foreign custody.
+ */
+export function resolveCreatorAnchorTrustMaterial(trust: CurrentAnchorTrust): CreatorAnchorTrustMaterial | undefined {
+	return creatorResolver?.(trust);
+}
+
+/**
+				!DIGEST_HEX.test(record.genesisAnchorDigest) ||
+				!isSafeNonnegative(record.currentEpoch) ||
+				!DIGEST_HEX.test(record.currentAnchorDigest) ||
+				record.quorum !== 1 ||
+				carriers === undefined ||
+				carriers.quorum !== 1 ||
+				!carriers.signerSetMatchesProfile ||
+				record.currentAnchorDigest !== record.genesisAnchorDigest ||
+				record.currentEpoch !== 0 ||
+				anchor.objectId !== record.objectId ||
+				anchor.epoch !== record.currentEpoch ||
+				anchor.historySize !== 0 ||
+				anchor.previousAnchor !== ZERO_DIGEST ||
+				anchor.cutDigest !== ZERO_DIGEST ||
+				anchorDigest !== record.currentAnchorDigest ||
+				bytesToHex(hashDomain(SIGNER_SET_DIGEST_DOMAIN, signerSetBytes)) !== anchor.signerSetDigest ||
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+
+const AUTHOR = /^[0-9a-f]{64}$/u;
+const OBJECT_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
+const GROUPS_V1 = ["admin", "finality", "writer"] as const;
+const GROUPS_V2 = ["admin", "finality", "referee", "writer"] as const;
+const SNAPSHOT_KEYS = ["epoch", "kind", "members", "objectId", "permissionless", "version"] as const;
+const MEMBER_KEYS = ["author", "finalityKey", "groups"] as const;
+const AUTHORITY_INPUT_KEYS = ["author", "snapshot"] as const;
+const STAGE_INPUT_KEYS = ["operations", "snapshot"] as const;
+const SIGNER_INPUT_KEYS = ["snapshot"] as const;
+const GRANT_REVOKE_KEYS = ["actor", "group", "kind", "target"] as const;
+			return Object.freeze({ ok: false, reason: "malformed-input" });
+		}
+		const snapshot = copySnapshot(decoded);
+		if (
+			snapshot === undefined ||
+			snapshot.epoch !== record.expectedEpoch ||
+			snapshot.objectId !== record.expectedObjectId ||
+			lowerHex(hashDomain("ts-drp/latched-acl/v3", exactBytes)) !== record.expectedAclDigest
+		) {
+			return Object.freeze({ ok: false, reason: "snapshot-mismatch" });
+		}
+			const index = operations.findIndex((operation) => operation.kind === "revoke" && operation.group === "admin");
+			return failedStage(Math.max(0, index), "last-admin");
+		}
+		if (snapshot.epoch === Number.MAX_SAFE_INTEGER) {
+			return failedStage(0, "operation-invalid");
+		}
+		return Object.freeze({
+			next: Object.freeze({
+				epoch: snapshot.epoch + 1,
+				kind: "drp-v3-latched-acl",
+				members: frozenMembers,
+packages/node/src/creator-adoption-commit.ts:2:import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
+packages/node/src/creator-adoption-commit.ts:390:	return inspectCreatorTrustAdvance({
+packages/node/src/creator-adoption.ts:5:import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
+packages/node/src/creator-adoption.ts:357:	const advance = inspectCreatorTrustAdvance({
+packages/node/src/creator-adoption.ts:1005:			!inspectCreatorTrustAdvance({
+packages/node/src/creator-adoption.ts:1297:			!inspectCreatorTrustAdvance({
+packages/node/src/creator-close.ts:8:import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
+packages/node/src/creator-close.ts:586:					const advance = inspectCreatorTrustAdvance({
+packages/control-plane/src/creator-trust-advance.ts:153:export function inspectCreatorTrustAdvance(input: InspectCreatorTrustAdvanceInput): CreatorTrustAdvanceResult {
+		!validClosure(active)
+	) {
+		return Object.freeze({ kind: "invalid" as const });
+	}
+	if (active.baseExpectedHead.kind !== "present") return Object.freeze({ kind: "insufficient" as const });
+	const first = generations.byId.get(active.baseExpectedHead.generationId);
+	if (first === undefined) return Object.freeze({ kind: "insufficient" as const });
+	if (first.baseExpectedHead.kind !== "present") return Object.freeze({ kind: "insufficient" as const });
+	const second = generations.byId.get(first.baseExpectedHead.generationId);
+	if (second === undefined) return Object.freeze({ kind: "insufficient" as const });
+	if (
+		new Set([active.generationId, first.generationId, second.generationId]).size !== 3 ||
+		first.state !== "Superseded" ||
+		second.state !== "Superseded" ||
+		!validClosure(first) ||
+		!validClosure(second) ||
+		!parentMatches(active, first, activeHead.revision) ||
+		!parentMatches(first, second, active.baseExpectedHead.revision)
+	) {
+		return Object.freeze({ kind: "invalid" as const });
+	}
+
+	const retained = new Set([active.generationId, first.generationId, second.generationId]);
+	const prefix: CopiedGeneration[] = [];
+	const visited = new Set<GenerationId>();
+	let expectedRevision = first.baseExpectedHead.revision;
+1:		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+15:		const openedCurrent = openCurrentAnchorTrust({
+66:			currentEpoch: 0,
+74:			currentProjectionKind: "v3-live-generation-1",
+79:			successorEpoch: 1,
+	const projectionRef = Object.freeze({
+		byteLength: material.exactCanonicalProjectionBytes.byteLength,
+		digest: digest.value,
+	});
+	const predecessorAclDigest = digestBlob(material.activation.predecessorExactCanonicalLatchedAclBytes);
+	if (!predecessorAclDigest.ok) return undefined;
+	const predecessorAclRef = Object.freeze({
+		byteLength: material.activation.predecessorExactCanonicalLatchedAclBytes.byteLength,
+		digest: predecessorAclDigest.value,
+	});
+	const retained = material.pendingReferences.filter((ref) => !sameRef(ref, material.predecessorLiveRef));
+	const derived = Object.freeze(
+		[
+			...retained,
+			projectionRef,
+			...(retained.some((ref) => sameRef(ref, predecessorAclRef)) ? [] : [predecessorAclRef]),
+		].sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
+	);
+	return material.pendingReferences.filter((ref) => sameRef(ref, material.predecessorLiveRef)).length === 1 &&
+		new Set(derived.map(({ digest: value }) => value)).size === derived.length &&
+		sameClosure(derived, material.candidateReferences)
+		opened.trust.currentAnchorDigest !== facts.closeResult.successorAnchorDigest ||
+		opened.trust.currentEpoch !== facts.closeResult.successorEpoch
+	) {
+		return false;
+	}
+	return inspectCreatorTrustAdvance({
+		current: { candidates: currentCandidates, closure: facts.currentReferences },
+		proofRefs: [facts.closeResult.cutValueRef, facts.closeResult.commitQcRef],
+		proposed: { candidates: pendingCandidates, closure: facts.proposedReferences },
+	}).ok;
+}
+627f98d118fa22e935f31023171d38c6075e3bc0
+20f41aaf2adccd2029649aaece9d728ef2ff61e9
+627f98d118fa22e935f31023171d38c6075e3bc0
+20f41aaf2adccd2029649aaece9d728ef2ff61e9
+761B99CEA81C6289? Faolain <Faolain@users.noreply.github.com>? G
+signer-check
+tree 20f41aaf2adccd2029649aaece9d728ef2ff61e9
+parent 22ee1c59b3163e4f5b23c5cb299570cdeda08a03
+author Faolain <Faolain@users.noreply.github.com> 1788378482 -0400
+committer Faolain <Faolain@users.noreply.github.com> 1788378482 -0400
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ iQIzBAABCAAdFiEEVeIvFU+6+MhPN4MEdhuZzqgcYokFAmqYfXIACgkQdhuZzqgc
+ YomcyQ/+OneohFYjl54Smp8joGPc0qx1PJ8yKtIlrpbAc7gS06SzQ+UOwcLqUise
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+17:	| Readonly<{ readonly ok: false; readonly reason: CreatorTrustAdvanceRejection }>;
+43:function rejected(reason: CreatorTrustAdvanceRejection): CreatorTrustAdvanceResult {
+44:	return Object.freeze({ ok: false as const, reason });
+203:function successorAnchor(
+473:		const exactCanonicalAnchorPreimageBytes = successorAnchor(close.currentAnchor, cut);
+559:export function openCreatorSuccessorTrust(
+635:		if (currentAnchor === undefined || compareBytes(successorAnchor(currentAnchor, cut), anchorBytes) !== 0) {
+8:export type CreatorTrustAdvanceRejection =
+17:	| Readonly<{ readonly ok: false; readonly reason: CreatorTrustAdvanceRejection }>;
+43:function rejected(reason: CreatorTrustAdvanceRejection): CreatorTrustAdvanceResult {
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+import type { GenerationRef } from "@ts-drp/storage";
+
+import { type DetachedClosureCandidate, inspectTrustClosure } from "./anchor-trust.js";
+
+const DIGEST_HEX = /^[0-9a-f]{64}$/u;
+
+export type CreatorTrustAdvanceRejection =
+	| "BYTE_REPLAY"
+	| "EPOCH_EQUIVOCATION"
+	| "EPOCH_GAP"
+	| "ROLLBACK"
+	| "TRUST_CLOSURE_INVALID";
+
+export type CreatorTrustAdvanceResult =
+	| Readonly<{ readonly kind: "successor"; readonly ok: true }>
+	| Readonly<{ readonly ok: false; readonly reason: CreatorTrustAdvanceRejection }>;
+
+export interface DetachedTrustClosure {
+	readonly candidates: readonly DetachedClosureCandidate[];
+	readonly closure: readonly GenerationRef[];
+}
+
+export interface InspectCreatorTrustAdvanceInput {
+	readonly current: DetachedTrustClosure;
+	readonly proofRefs: readonly GenerationRef[];
+	readonly proposed: DetachedTrustClosure;
+}
+
+interface TrustRecord extends Readonly<Record<string, unknown>> {
+	readonly currentAnchorDigest: string;
+	readonly currentEpoch: number;
+	readonly exactCanonicalCurrentAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly genesisAnchorDigest: string;
+	readonly objectId: string;
+	readonly profileId: string;
+	readonly quorum: number;
+	readonly version: number;
+}
+
+function rejected(reason: CreatorTrustAdvanceRejection): CreatorTrustAdvanceResult {
+	return Object.freeze({ ok: false as const, reason });
+}
+packages/protocol-v3/src/index.ts:190:	| "trust-state-inconsistent";
+packages/protocol-v3/src/index.ts:243:	| "trust-state-inconsistent"
+packages/protocol-v3/src/index.ts:1237:			if (!validation.ok) return anchorTrustFailure("trust-state-inconsistent");
+packages/protocol-v3/src/index.ts:1248:				return anchorTrustFailure("trust-state-inconsistent");
+packages/protocol-v3/src/index.ts:1423:				return anchorTrustFailure("trust-state-inconsistent");
+22:): Readonly<{ ok: false; reason: string } | { ok: true; trust: CurrentAnchorTrust }> {
+3:): Readonly<{ ok: false; reason: string } | { ok: true; trust: CurrentAnchorTrust }> {
+export function openCreatorSuccessorTrust(
+	input: unknown
+): Readonly<{ ok: false; reason: string } | { ok: true; trust: CurrentAnchorTrust }> {
+	try {
+		if (
+			!plainRecord(input) ||
+			!exactKeys(input, [
+				"currentTrust",
+				"exactCanonicalCommitQcBytes",
+				"exactCanonicalCutValueBytes",
+				"exactCanonicalTrustStateRecordBytes",
+			])
+		) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		const currentTrust = input.currentTrust as CurrentAnchorTrust;
+		const material = resolveCreatorAnchorTrustMaterial(currentTrust);
+		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
+		const recordBytes = copyBytes(input.exactCanonicalTrustStateRecordBytes, undefined, 8192);
+		if (recordBytes === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const decodedRecord = decodeCanonicalValue(recordBytes);
+		if (!plainRecord(decodedRecord) || !exactKeys(decodedRecord, trustRecordFields)) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		if (decodedRecord.version !== 1) return failure("UNSUPPORTED_TRUST_STATE_VERSION");
+		const anchorBytes = copyBytes(decodedRecord.exactCanonicalCurrentAnchorPreimageBytes, undefined, 65_536);
+		const signature = copyBytes(decodedRecord.detachedCurrentAnchorSignature, 64, 64);
+		const profileBytes = copyBytes(decodedRecord.exactCanonicalProfileBytes, undefined, 65_536);
+		const signerSetBytes = copyBytes(decodedRecord.exactCanonicalSignerSetBytes, undefined, 65_536);
+		const anchor = anchorBytes === undefined ? undefined : exactCanonicalRecord(anchorBytes, "epochAnchor");
+		if (
+			anchorBytes === undefined ||
+			signature === undefined ||
+			profileBytes === undefined ||
+			signerSetBytes === undefined ||
+			anchor === undefined ||
+			decodedRecord.kind !== "drp-anchor-trust-state" ||
+			decodedRecord.objectId !== material.objectId ||
+			decodedRecord.genesisAnchorDigest !== material.genesisAnchorDigest ||
+			decodedRecord.profileId !== "creator-trusted-v1" ||
+			decodedRecord.quorum !== 1 ||
+			compareBytes(profileBytes, material.exactCanonicalProfileBytes) !== 0 ||
+			compareBytes(signerSetBytes, material.exactCanonicalSignerSetBytes) !== 0
+		) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		const anchorDigestBytes = hashDomain(registry.kinds.epochAnchor?.domain ?? "", anchorBytes);
+		const anchorDigest = hex(anchorDigestBytes);
+		if (
+			decodedRecord.currentAnchorDigest !== anchorDigest ||
+			decodedRecord.currentEpoch !== anchor.epoch ||
+			anchor.objectId !== material.objectId ||
+			!ed25519.verify(signature, anchorDigestBytes, material.publicKey, { zip215: false })
+		) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		if ((anchor.epoch as number) > material.currentEpoch + 1) return failure("EPOCH_GAP");
+		if ((anchor.epoch as number) === material.currentEpoch && anchorDigest !== material.currentAnchorDigest) {
+			return failure("EPOCH_EQUIVOCATION");
+		}
+		if ((anchor.epoch as number) !== material.currentEpoch + 1) return failure("CERTIFIED_VALUE_MISMATCH");
+
+		const cutBytes = copyBytes(input.exactCanonicalCutValueBytes, undefined, 65_536);
+		const commitQcBytes = copyBytes(input.exactCanonicalCommitQcBytes, undefined, 65_536);
+		if (commitQcBytes === undefined || commitQcBytes.byteLength === 0) return failure("COMMIT_QC_REQUIRED");
+		if (cutBytes === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const cut = exactCanonicalRecord(cutBytes, "cutValue");
+		if (cut === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const opened = openSealAuthority({ signerPublicKey: material.publicKey, trust: currentTrust });
+		if (!opened.ok) return failure("COMMIT_QC_REJECTED");
+		const verified = verifySealQC({ authority: opened.authority, exactCanonicalQcBytes: commitQcBytes });
+		if (!verified.ok) return failure("COMMIT_QC_REJECTED");
+		if (verified.phase !== "commit") return failure("COMMIT_QC_REQUIRED");
+		const valueDigest = hex(hashDomain(registry.kinds.cutValue?.domain ?? "", cutBytes));
+		if (verified.valueDigest !== valueDigest) return failure("CERTIFIED_VALUE_MISMATCH");
+		const currentAnchor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
+		if (currentAnchor === undefined || compareBytes(successorAnchor(currentAnchor, cut), anchorBytes) !== 0) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		const trust = mintCreatorAnchorTrustSuccessor(currentTrust, anchorBytes, signature);
+		return trust === undefined ? failure("CERTIFIED_VALUE_MISMATCH") : Object.freeze({ ok: true as const, trust });
+	} catch {
+		return failure("CERTIFIED_VALUE_MISMATCH");
+	}
+}
+{
+  "verdict": "APPROVED",
+  "summary": "Reviewed signed/pushed plan-only commit 22ee1c59 (HEAD; docs + audit ledger, 231 insertions, zero production/test edits). Every load-bearing audit claim verified against source: openCurrentAnchorTrust is genuinely epoch-0-only (packages/protocol-v3/src/index.ts:1437-1438 rejects currentEpoch !== 0 and non-genesis anchor digests); openCreatorSuccessorTrust mints only from genuine predecessor custody (packages/protocol-v3/src/creator-close.ts:559-642, gated by the install-once singleton WeakMap custody in internal/seal-authority-custody.ts:70-110, so the planned unexported mint callback follows an existing pattern and is not a naked authority constructor); inspectCreatorTrustAdvance has no retiring-proof input and forces +2 refs per transition (packages/control-plane/src/creator-trust-advance.ts:88-99); Node's creator-close.ts stages exactly that additive closure; both cold reopen and pending recovery carry the literal 0/1 pins the plan enumerates (creator-adoption.ts:867,970-1060,1259-1337); closed-epoch-cleanup retains exactly two Superseded rollback generations with the older as floor (internal/closed-epoch-cleanup.ts:280-341), so the epoch-1 trust record survives in the floor generation as the checkpoint opener's predecessor carrier while older pairs leave the active closure — the two-head-advance/two-rollback-generation mapping is correct. The opener design (genesis pin + fixed creator carriers + standalone predecessor signature/link verification + reused one-step QC + independent expectedCurrentHead from the 0b0 room-head owner) authenticates epoch N without N-2 evidence; the bounded predicate's current-candidates-decoded retiring tuple with exact set arithmetic makes control closure constant-bounded and fail-closed. RED's three-token matrix maps to three genuine, distinct defects; fixture constraints forbid authored authority. Scope is preserved: non-root subpaths follow existing precedent (protocol-v3 ./creator-close, control-plane ./creator-trust-advance), no root export, wire, authority, dependency, pruning, or third transition is introduced. Two non-blocking P2 exactness observations recorded.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Batch 2 does not name the adoption-side bounded-predicate call sites",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94825,
+      "evidence": "Batch 2 assigns the new predicate only to the close path ('requires the new predicate before staging'). A bounded staged closure (current − trust − retiring pair + successor + new pair) is rejected by the existing unbounded predicate, whose exactCombinedClosure requires the retiring pair to remain present (packages/control-plane/src/creator-trust-advance.ts:88-99,161-167). The audit itself censuses 8 unbounded-advance use lines (creator-adoption.ts ×4 incl. the hot verifyChain call at line 357 and the cold/pending calls near 1006/1295, creator-adoption-commit.ts ×2, creator-close.ts ×2); those N≥1 classification sites must switch to inspectBoundedCreatorTrustAdvance or genuine epoch-2 adoption/cold-reopen cannot pass. The 'for epoch 0→1 ... retain byte-for-byte' clause implies the complement but never says it.",
+      "required_action": "Owner: plan editor. Disposition: non-blocking clarification in the RED/GREEN checkpoint — state in one sentence that hot adoption (verifyCreatorSuccessorAdoption/verifyChain), creator-adoption-commit, and the shared cold/pending epoch-relative verifier classify N≥1 advances via inspectBoundedCreatorTrustAdvance, retaining inspectCreatorTrustAdvance only for the 0→1 compatibility path."
+    },
+    {
+      "severity": "P2",
+      "title": "Byte-equality gate hedge is open-ended",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94849,
+      "evidence": "GREEN requires 'active/control closure counts and bytes are equal at epochs 1 and 2 apart from explicitly enumerated bounded projection/content differences.' Projections embed per-epoch growing content (compactHistory, historyRoot/historySize, epoch — creator-adoption.ts:584-616), so byte equality can never literally hold and an unquantified 'content differences' enumeration could mask trust-control drift in bytes.",
+      "required_action": "Owner: D.110c-0b1 GREEN reviewer. Disposition: require the signed GREEN evidence manifest to enumerate each differing ref with per-ref byte deltas plus the decoded kind census (extending the RED census requirement), keeping closure-count equality exact rather than accepting a qualitative enumeration."
+    }
+  ],
+  "plan_causal": true,
+  "scope_preserved": true,
+  "red_ready": true,
+  "blocking_union_closed": true
+}
+---

@@ -1,0 +1,17 @@
+record=D.110c-0c1f5b0b
+checkpoint=final-tests-only-RED-source-identity-correction
+commit=4e8cfb972c983914b17aa72c09030b050c269123
+tree=9698fc3d74ab4f0fe2f5dd92a18b1833e1bb3bfc
+parent=d40e5a98ffcc8735f1303b3e36bdb84b5c4abc1f
+signature=G
+remote_ref=origin/codex/phase3a1b-p6-golden-path
+remote_value_at_capture=4e8cfb972c983914b17aa72c09030b050c269123
+rejected_green=93585bf3ba62ae662c2963fd13be2ee051451fa2
+prior_red_evidence=d40e5a98ffcc8735f1303b3e36bdb84b5c4abc1f
+stashes=27
+protected_.agents=present-unmodified
+protected_.claude=present-unmodified
+protected_skills-lock.json=present-unmodified
+production_paths_changed=0
+plan_paths_changed=0
+combined_test_invocations=1

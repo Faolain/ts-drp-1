@@ -1,0 +1,60 @@
+{
+	"profileId": "blueprint-work-budget-v1",
+	"blueprintDigestDomain": "ts-drp/blueprint-admission/v3",
+	"implementationModule": "../packages/protocol-v3/src/public.ts",
+	"controlledModule": "tests/fixtures/phase-0p2-v3/controlled-blueprint-operation-budget.ts",
+	"conformanceDirectory": "../packages/protocol-v3/conformance/blueprint-operation-budget-v1",
+	"workflow": ".github/workflows/protocol-v3-blueprint-operation-budget.yml",
+	"operationLimit": 100,
+	"privateKeySeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+	"vertex": {
+		"anchor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"author": "phase-0p2-author",
+		"authorSequence": 7,
+		"dependencies": ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+		"epoch": 11,
+		"logicalTime": 19,
+		"objectId": "phase-0p2-object"
+	},
+	"protectedArtifactSha256": {
+		"packages/protocol-v3/registry/registry-v1.json": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9",
+		"packages/protocol-v3/registry/registry-v1.schema.json": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc",
+		"packages/protocol-v3/conformance/vectors/registry-v1.json": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741",
+		"packages/protocol-v3/conformance/regenerated-reference/reference.mjs": "0a7b199eec2f1a950d4b91d9041e382f02983e2d601a530de60e7311309ce84a",
+		"packages/protocol-v3/conformance/freeze-policy-v3.json": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3",
+		"packages/protocol-v3/supplements/blueprint-work-budget-v1/freeze-policy.json": "33caa960baba11f41b5e7032773638655804d9be991288872bdecfb533bb11e1",
+		"packages/protocol-v2/registry/field-registry.json": "d073c5b01dc31c121de5fcd0925697a8a3f0839bf9fcf2c7ddde15489b49f724",
+		"packages/protocol-v2/tests/fixtures/golden-vectors/registry-v5.json": "2635989755ac300c1643f327ee7278d7aa0c72c67310b80ef56bb1eabe42b13e",
+		"packages/protocol-v2/conformance/ahe-reference/src/protocol.js": "8681b6d1ad9b68d2fb12170aa804bf76a0f24c9345748dc32c269275b73f4b92",
+		"packages/protocol-v2/conformance/freeze-policy.json": "e291babe6069f004a61378e9cf98a9984f3edbe0391b7674ea57a19c7db25e04"
+	},
+	"budgetedPackage": {
+		"kind": "drp-blueprint-admission-package",
+		"protocolMajor": 3,
+		"schemaVersion": 1,
+		"implementation": {
+			"artifactDigest": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+			"artifactId": "@example/phase-0p2-blueprint@1.0.0",
+			"runtimeProfile": "ecmascript-2024-sync-v1"
+		},
+		"manifest": {
+			"schemaVersion": 2,
+			"operationDiscriminator": "action",
+			"workBudgetProfile": "blueprint-work-budget-v1",
+			"operations": [
+				{
+					"name": "append",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{ "name": "nested", "required": false, "type": "canonical-object" },
+							{ "name": "requestOrdinal", "required": false, "type": "safe-integer" },
+							{ "name": "value", "required": false, "type": "string" }
+						]
+					},
+					"maxCanonicalOperationBytes": 100
+				}
+			]
+		}
+	}
+}

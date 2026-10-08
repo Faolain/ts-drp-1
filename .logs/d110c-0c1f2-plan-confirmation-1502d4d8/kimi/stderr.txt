@@ -1,0 +1,167 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+1502d4d8 docs: reslice bounded frontier encoding
+5e017067 docs: freeze multi-author frontier prerequisite
+244c935f docs: close successor projection checkpoint
+5e017067 docs: freeze multi-author frontier prerequisite
+244c935f docs: close successor projection checkpoint
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+1502d4d81e1769a75bc3c416937b53e57dc3390b
+.logs/d110c-0c1f-source-audit-244c935f/:
+total 80
+drwxr-xr-x     8 aristotle  staff     256 Sep  3 09:17 .
+drwxr-xr-x  7961 aristotle  staff  254752 Sep  3 10:22 ..
+-rw-r--r--     1 aristotle  staff     414 Sep  3 09:17 SHA256SUMS
+-rw-r--r--     1 aristotle  staff    7378 Sep  3 09:16 audit.md
+-rw-r--r--     1 aristotle  staff    1128 Sep  3 09:17 commands.md
+-rw-r--r--     1 aristotle  staff     692 Sep  3 09:15 source-anchor.txt
+-rw-r--r--     1 aristotle  staff     911 Sep  3 09:15 source-hashes.txt
+-rw-r--r--     1 aristotle  staff   12351 Sep  3 09:15 source-seams.txt
+
+.logs/d110c-0c1f1-plan-review-5e017067/:
+total 24
+drwxr-xr-x     7 aristotle  staff     224 Sep  3 09:19 .
+drwxr-xr-x  7961 aristotle  staff  254752 Sep  3 10:22 ..
+drwxr-xr-x    17 aristotle  staff     544 Sep  3 09:41 grok
+drwxr-xr-x     8 aristotle  staff     256 Sep  3 09:37 kimi
+drwxr-xr-x    11 aristotle  staff     352 Sep  3 09:37 opus
+-rw-r--r--     1 aristotle  staff    5552 Sep  3 09:19 prompt.md
+-rw-r--r--     1 aristotle  staff     934 Sep  3 09:19 schema.json
+
+.logs/d110c-0c1f1-plan-review-5e017067/kimi/:
+total 592
+drwxr-xr-x  8 aristotle  staff     256 Sep  3 09:37 .
+drwxr-xr-x  7 aristotle  staff     224 Sep  3 09:19 ..
+-rw-r--r--  1 aristotle  staff       2 Sep  3 09:37 reemit.status.txt
+-rw-r--r--  1 aristotle  staff     149 Sep  3 09:36 reemit.stderr.txt
+-rw-r--r--  1 aristotle  staff   12369 Sep  3 09:37 reemit.stream.jsonl
+-rw-r--r--  1 aristotle  staff       2 Sep  3 09:35 status.txt
+-rw-r--r--  1 aristotle  staff    3093 Sep  3 09:32 stderr.txt
+-rw-r--r--  1 aristotle  staff  262802 Sep  3 09:35 stream.jsonl
+
+.logs/d110c-0c1f2-plan-correction-5e017067/:
+total 160
+drwxr-xr-x    20 aristotle  staff     640 Sep  3 10:21 .
+drwxr-xr-x  7961 aristotle  staff  254752 Sep  3 10:22 ..
+-rw-r--r--     1 aristotle  staff    1357 Sep  3 10:21 SHA256SUMS
+-rw-r--r--     1 aristotle  staff    2483 Sep  3 10:19 commands.md
+-rw-r--r--     1 aristotle  staff     638 Sep  3 10:20 custody.txt
+-rw-r--r--     1 aristotle  staff       0 Sep  3 10:20 diff-check.txt
+-rw-r--r--     1 aristotle  staff    2030 Sep  3 10:20 json-validation.txt
+-rw-r--r--     1 aristotle  staff     365 Sep  3 10:22 manifest-validation.txt
+-rw-r--r--     1 aristotle  staff   22075 Sep  3 10:21 plan.diff
+-rw-r--r--     1 aristotle  staff       0 Sep  3 10:20 ports.txt
+-rw-r--r--     1 aristotle  staff    1075 Sep  3 10:21 predicates.md
+-rw-r--r--     1 aristotle  staff       0 Sep  3 10:20 prettier.stderr.txt
+-rw-r--r--     1 aristotle  staff      66 Sep  3 10:20 prettier.stdout.txt
+-rw-r--r--     1 aristotle  staff    2069 Sep  3 10:20 processes.txt
+-rw-r--r--     1 aristotle  staff     878 Sep  3 10:20 review-evidence-hashes.txt
+-rw-r--r--     1 aristotle  staff    1032 Sep  3 10:19 review-summary.json
+-rw-r--r--     1 aristotle  staff     496 Sep  3 10:21 signed-push.txt
+-rw-r--r--     1 aristotle  staff     134 Sep  3 10:20 size-probe-execution.json
+-rw-r--r--     1 aristotle  staff     797 Sep  3 10:19 size-probe.json
+-rw-r--r--     1 aristotle  staff     828 Sep  3 10:20 source-shape.txt
+./commands.md: OK
+./custody.txt: OK
+./diff-check.txt: OK
+./json-validation.txt: OK
+./plan.diff: OK
+./ports.txt: OK
+./predicates.md: OK
+./prettier.stderr.txt: OK
+./prettier.stdout.txt: OK
+./processes.txt: OK
+./review-evidence-hashes.txt: OK
+./review-summary.json: OK
+./signed-push.txt: OK
+./size-probe-execution.json: OK
+./size-probe.json: OK
+./source-shape.txt: OK
+./audit.md: OK
+./commands.md: OK
+./source-anchor.txt: OK
+./source-hashes.txt: OK
+./source-seams.txt: OK
+{
+ "verdict": "CHANGES_REQUIRED",
+ "summary": "Reviewed the D.110c-0c1f1 bounded multi-author issuance-frontier carrier plan at signed/pushed 5e0170670973f4920731a6d418436c9b4ae971ff against closure anchor 244c935f9e715236e9f2c2783f3bb6bee24706e1. Audit evidence integrity confirmed: SHA256SUMS validates 5/5 and all seven pinned source files hash identically to source-hashes.txt at the reviewed tree. The selected family is fundamentally sound: deriving cumulative dense per-author frontiers from the authenticated current-epoch close graph plus a prior creator-signed vector needs no remote durable store or online writer; the preimage binds genesis, closed/successor trust, both ACL digests, cut/QC, snapshot, and prior aggregate without circularity, skipped-epoch, stale-replay, or fork-acceptance holes; one legacy plus one aggregate is constant-bounded; the 8,192-byte cap is plausibly tight and correctly gated on a maximum-shape encoder test; reuse of the opaque one-use creator-retirement signing request preserves domain/authority isolation (the new domain ts-drp/creator-author-issuance-frontiers/v1 separates digests, cross-type dispatch is already adversarially covered); the two-layer RED fails for the intended absent-carrier reason with correct noncausal-stop guards; no O(epoch)/O(lifetime-author) dependency is added to ordinary cold reopen; and pending/published custody, gap handling, exact-byte checks, the combined scan ceiling, and two rollback generations remain fail-closed. Three P1 exactness defects block RED: the captured close graph lacks the per-row fields the derivation requires and the capture-side change has no declared owner; the successor writer-set rule is undefined under permissionless ACL semantics; and aggregate 0-to-1 initialization in a creator-only legacy room leaves creator seeding and dual-carrier precedence unspecified. Three P2s take owners and dispositions without recursive review. Corrections are plan-exactness fixes within the selected family, not scope expansion.",
+ "findings": [
+  {
+   "severity": "P1",
+   "title": "The authenticated close graph does not retain per-row author/sequence/signature, and the capture-side change has no declared owner",
+   "evidence": "The plan requires every graph row to retain exact object, author, epoch, anchor, signature, digest, and admission identity. The actual capture is captureCloseGraph() (packages/node/src/v3-live.ts:7297) returning Map<string, EpochVertex>, and packages/compaction/src/types.ts:2 EpochVertex carries only anchor/dependencies/epoch/hash/kind/objectId/operation \u2014 no author, authorSequence, signature, or preimage bytes. The existing single-author boundary derivation (packages/node/src/internal/creator-issuance-retirement-boundary.ts:103-128) obtains those fields from the close owner's local issuance store, which demonstrably does not exist for remote writers. Enriching registration.applicationVertices / retainApplicationVertex (v3-live.ts:5210,5403), copyApplicationVertices (v3-live.ts:1523), captureCloseGraph (v3-live.ts:7297), or the compaction EpochVertex type falls outside the declared owner (creator-close.ts graph/ACL frontier derivation and AHE candidate staging; v3-live.ts opening, selected-author capability, recovery/publication/rebase classification, and combined logical-scan accounting).",
+   "impact": "The frontier derivation for remote writers is unimplementable as captured, and under this repository's exact-owner discipline (D.110c-0c1d was stopped and resliced over two predicates outside a frozen owner list) GREEN would hit the stop-and-reslice rule mid-implementation and the exact-owner diff gate would fail. The plan is not a deterministic implementable contract.",
+   "required_action": "Name the capture-side owner explicitly in the plan: the v3-live applicationVertices vertex view (retainApplicationVertex / copyApplicationVertices / captureCloseGraph) extended so each retained close-graph row carries exact author, authorSequence, signature, and canonical preimage identity, plus any packages/compaction type change if EpochVertex is extended rather than wrapped \u2014 or demonstrate an existing authenticated per-row source inside the already-named owners. Because this changes declared owner/scope, it consumes the plan's one material confirmation."
+  },
+  {
+   "severity": "P1",
+   "title": "'Successor ACL writer set' is undefined under permissionless ACL semantics, admitting two materially different implementations",
+   "evidence": "The plan freezes 'the vector must equal the authenticated successor ACL's writer set exactly' without defining the derivation. Under permissionless snapshots, staged writer-group grant/revoke operations are rejected as operation-invalid (packages/protocol-v3/src/latched-acl.ts:401-403) while authorizeLatchedApplicationWrite authorizes every member (latched-acl.ts:336); envelope authority still requires membership (v3-live.ts:3371 via authorizeLatchedEnvelopeAuthor). Reading 'writer set' as members-holding-the-writer-group yields an empty or genesis-artifact vector in permissionless rooms; reading it as all write-authorized members works and stays bounded by the 64-member cap.",
+   "impact": "The members-with-writer-group reading silently denies a frontier to every actual writer including the creator in permissionless rooms \u2014 a regression against the v1 record, which covers the creator independent of group \u2014 and fails the exact multi-author rooms this carrier exists for. The RED fixture's second writer and every GREEN frontier-exactness assertion depend on which rule is meant, so the contract is not deterministic. The plan is also silent on authorized non-writer members (e.g., admin-only authors) whose admitted ACL-operation vertices occupy graph sequence slots.",
+   "required_action": "Pin the exact rule: the vector equals the successor snapshot's write-authorized member set under that snapshot's permissionless flag (authorizeLatchedApplicationWrite semantics), author-sorted, at most 64; state explicitly that non-write-authorized members with admitted graph rows receive no frontier and fail closed by design; add a permissionless two-writer case to the GREEN functional gate and a wrong-permissionless-derivation mutant."
+  },
+  {
+   "severity": "P1",
+   "title": "Aggregate 0-to-1 initialization in a creator-only legacy room leaves the creator's seeding and dual-carrier precedence unspecified",
+   "evidence": "At first aggregate initialization in an epoch >=1 creator-only room that has just granted a second zero-lineage writer, the creator is neither a 'continuing' writer (no prior aggregate vector exists) nor a 'genuinely new' writer (nonzero lineage; an authenticated v1 frontier exists in the coexisting legacy record). The plan states continuing boundaries start from the prior authenticated vector and new writers start at null/sequence zero, but does not state whether the creator's first aggregate entry seeds from the opened v1 admittedAuthorSequence or from null, nor which carrier authenticates the creator's historical rows while exactly one legacy record and one aggregate coexist. The fresh-room GREEN gate never exercises this path.",
+   "impact": "If the creator seeds at null and the private classifier ever prefers the aggregate, the creator's pre-aggregate rows lose historical coverage and the creator's own cold reopen regresses; if classification stays on the v1 record, the aggregate's creator entry can never advance (its current-epoch graph prefix starts above sequence zero), contradicting the monotonic-advance law the mutants must prove. This is the primary real adoption path for existing rooms, and the deterministic migration/refusal contract has a hole exactly there.",
+   "required_action": "State the deterministic initialization law: at aggregate 0-to-1, an entry seeds from the opened legacy v1 frontier when one authenticates that author, otherwise from null with the contiguous-from-zero rule; any other successor writer whose graph prefix starts above zero (evidence of pre-aggregate non-creator issuance) refuses initialization with D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED; and pin classifier precedence per author (aggregate entry when seeded or non-null, else legacy v1 capability) when both carriers coexist."
+  },
+  {
+   "severity": "P2",
+   "title": "Refusal-token ambiguity and unpinned detection point for quiescent legacy writers",
+   "evidence": "A legacy writer with no current-epoch rows leaves no trace in the bounded close graph, so close-time D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED detection covers only currently writing authors; for a quiescent legacy writer the refusal can only surface at its reopen, where its local signature (nonzero local lineage plus null/absent aggregate entry) is identical to the D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED case. The plan names both exact tokens but no deterministic precedence or detection seam distinguishing them.",
+   "impact": "Both cases fail closed, so there is no safety hole, but the exact-token acceptance assertions in RED/GREEN are not yet deterministic at this seam.",
+   "required_action": "Owner: protocol-v3 carrier opener plus the Node private selected-author recovery consumer. Disposition: define the deterministic precedence/detection rule (e.g., presence in a prior in-window vector versus never-frontiered) in the GREEN specification; verified by the final plan-to-RED-to-GREEN review without recursive prose review."
+  },
+  {
+   "severity": "P2",
+   "title": "No stated fallback if the maximum-shape encoding test exceeds 8,192 bytes",
+   "evidence": "Worst-shape estimate (64 entries at roughly 100 bytes each plus about 1.0-1.3 KB of fixed digests/refs and an up-to-256-character objectId) lands around 7.4-7.7 KB \u2014 plausible but tight. The plan correctly gates GREEN on the deterministic maximum-shape encoder test, and the parent audit (.logs/d110c-0c1f-source-audit-244c935f/audit.md) names reconsideration of the family, but the 0c1f1 section itself states no stop/reslice fallback if the test fails.",
+   "impact": "If the test fails, implementers have no in-plan instruction and could be tempted to shrink entry fidelity or raise the scannable ceiling instead of reslicing.",
+   "required_action": "Owner: D.110c-0c1f1 plan owner. Disposition: add one sentence \u2014 if the maximum-shape test fails, stop before RED and reslice rather than reducing entry fidelity or raising the 8,192-byte ceiling; dispose at the same confirmation as the P1 corrections."
+  },
+  {
+   "severity": "P2",
+   "title": "Rollback-window wording overstates how long a removed author's frontier survives",
+   "evidence": "Because each close replaces exactly one prior aggregate and the new vector equals the successor writer set, a removed author's entry disappears from the vector at the first aggregate after removal \u2014 not when its frontier 'leaves the rollback window' as the plan states. Same-key re-add after even one epoch of absence therefore hits the reentry refusal.",
+   "impact": "Fail-closed and safe \u2014 single-generation rollback is unaffected because the removed author's closing-epoch rows are current-epoch rather than historical on that reopen \u2014 but the plan's stated rule does not match the deterministic mechanism, so RED/GREEN would otherwise assert the wrong boundary.",
+   "required_action": "Owner: creator-close.ts graph/ACL frontier derivation. Disposition: correct the wording to the vector-membership rule and add a remove-then-readd-next-epoch refusal case to the GREEN adversarial roster; dispose without recursive review."
+  }
+ ],
+ "plan_sufficient": false,
+ "red_causal": true,
+ "scope_preserved": true
+}
+commit 1502d4d81e1769a75bc3c416937b53e57dc3390b
+gpg: Signature made Thu Sep  3 10:21:24 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Thu Sep 3 10:21:24 2026 -0400
+
+    docs: reslice bounded frontier encoding
+---
+  origin/codex/phase3a1b-p6-golden-path
+---
+ .../production-hardening-tdd-plan-v2.md            | 251 ++++++++++++++++-----
+ 1 file changed, 196 insertions(+), 55 deletions(-)
+5195ada283c910dd05bcc6820ac504afa8be6610a11a56cbc000804aeff1336d  packages/protocol-v3/src/creator-issuance-retirement.ts
+a3eb74544c9839649e6dc85326d64c55bbd83bdbd2f83e6874b829649980abb7  packages/protocol-v3/src/latched-acl.ts
+dc87cdf7cab66218b37d2ff23a01845837080b0b67ed3be5b447d898d8e17860  packages/node/src/internal/creator-issuance-retirement-boundary.ts
+5ab6b625225532caded761880b30b3d6db5172359893bbcb55ff7a8a054f0803  packages/node/src/internal/creator-transition-advance.ts
+4abdb8bf3dfcfa85e1b5320615928b19709fe9706bad8b509f12d59881225dcd  packages/node/src/creator-close.ts
+bcead2ddb4c91400d24ee28deb849f8e9b25ef6b4db99819cf1dba060400c049  packages/node/src/v3-live.ts
+405ad160cf0bdb2ef6fb33dda81910f0435450fb7bb7ed85362ccd8605cdbf12  packages/issuance-store/src/types.ts
+3288161de5cd7a64803bd839ca0d5daddd56dfb08bd71e8249f8df356521b223  packages/compaction/src/types.ts
+60bb6880461a1914957fec106ccb14c41c97b45b7a67bd8d03aa979afd3ad32b  packages/node/src/creator-adoption.ts
+     403 packages/protocol-v3/src/creator-issuance-retirement.ts
+     355 packages/node/src/internal/creator-transition-advance.ts
+     134 packages/node/src/internal/creator-issuance-retirement-boundary.ts
+     904 packages/node/src/creator-close.ts
+      96 packages/issuance-store/src/types.ts
+     566 packages/canonical/src/index.ts
+    2458 total

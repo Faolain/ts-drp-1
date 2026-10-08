@@ -1,0 +1,47 @@
+{
+  "classification": "ACCEPTED_RETAINED_SETTLEMENT_CODEC_BASELINE",
+  "executionCount": 1,
+  "head": "de961884d9d3204f2c67561e96434995c6f0fafe",
+  "runnerStatus": 0,
+  "signal": null,
+  "total": 4,
+  "passed": 4,
+  "failed": 0,
+  "intentionallyFiltered": 0,
+  "topLevel": [],
+  "violations": [],
+  "outcomes": [
+    {
+      "file": "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0a final-review corrective RED > installs and reopens genuine settlement-profile trust without rewriting its profile, then settles with successor floor trust",
+      "status": "passed",
+      "duration": 19.70920799999999,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0a final-review corrective RED > normalizes exactly one settlement checkpoint and no legacy carriers while retaining legacy cardinalities",
+      "status": "passed",
+      "duration": 51.95845800000001,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0a final-review corrective RED > uses the settlement author-authorization ceiling for 256 authors while preserving legacy byte and author caps",
+      "status": "passed",
+      "duration": 86.3989580000001,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0a final-review corrective RED > binds genesis advance to the exported settlement sentinel and retains settled-v1 digest adjacency",
+      "status": "passed",
+      "duration": 1.1626250000000482,
+      "failureMessages": []
+    }
+  ],
+  "finishedAt": "2026-09-06T01:14:35.155Z",
+  "notNewCausalRed": true,
+  "noParentRuntimeRun": true,
+  "pendingGreenGateStillRequired": true
+}

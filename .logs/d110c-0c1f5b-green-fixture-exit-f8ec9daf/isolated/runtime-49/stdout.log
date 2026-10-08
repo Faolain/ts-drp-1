@@ -1,0 +1,32 @@
+
+ RUN  v3.1.1 /private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout
+
+ ✓ tests/phase-3g-v3-room-rebase-red.test.ts (20 tests) 2016ms
+   ✓ Phase 3g room-owned rebase scheduling RED > separates plane-local stores, authenticates both anchors and bootstraps the empty target once  1186ms
+   ✓ Phase 3g room-owned rebase scheduling RED > retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase  594ms
+ ❯ tests/phase-5d-pacemaker-red.test.ts (13 tests | 1 failed) 216808ms
+   ✓ Phase 5d model-first pacemaker RED > pins the governed profile, exact runtime boundary, and causal mutant roster 2ms
+   ✓ Phase 5d model-first pacemaker RED > causally rejects every named pacemaker mutant 15ms
+   ✓ Phase 5d model-first pacemaker RED > authenticates the frozen proposal, leader vote, QCs and round-change evidence independently 46ms
+   ✓ Phase 5d model-first pacemaker RED > hash-binds every closed ITF trace and rejects event-name-only state drift  11973ms
+   ✓ Phase 5d model-first pacemaker RED > typechecks and executes non-vacuous model actions before runtime readiness  5765ms
+   ✓ Phase 5d model-first pacemaker RED > typechecks the exact future fixture boundary before opening product readiness  2120ms
+   ✓ Phase 5d model-first pacemaker RED > executes the real pinned Apalache backend rather than a transcript  185790ms
+   ✓ Phase 5d model-first pacemaker RED > runs a real fake-indexeddb additive schema-v3 control before runtime readiness 11ms
+   ✓ Phase 5d model-first pacemaker RED > keeps canonical CutValue and registered vote identities independently recomputable 11ms
+   ✓ Phase 5d model-first pacemaker RED > [RED readiness] requires the complete nine-owner pacemaker runtime graph 0ms
+   ✓ Phase 5d model-first pacemaker RED > binds runtime exports to the governed timeout and UTF-8 leader profile 128ms
+   ✓ Phase 5d model-first pacemaker RED > keeps registered protocol verification as the sole proposal and round-change authority 3ms
+   × Phase 5d model-first pacemaker RED > replays every checked trace through the genuine voter, pacemaker, and fake-IDB store 10928ms
+     → Test timed out in 10000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ✓ tests/phase-5a-c-seal-safety-red.test.ts (7 tests) 2810ms
+   ✓ Phase 5a-c atomic seal safety RED > typechecks and executes the exact bounded n=4 Quint witness  2593ms
+ ✓ tests/genesis-profile.test.ts (9 tests) 289ms
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 48 passed (49)
+   Start at  01:31:57
+   Duration  223.21s (transform 1.07s, setup 0ms, collect 440ms, tests 221.92s, environment 0ms, prepare 243ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-fixture-exit-f8ec9daf/isolated/runtime-49/focused.json

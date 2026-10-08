@@ -1,0 +1,55 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 2,
+  "passed": 2,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-15/result.json",
+  "baselineSha256": "c7a3ac52190f271e00591fdff3750541c600431438ba6535c57ea7e6e0080fdb",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts",
+      "ancestorTitles": [
+        "D.93.36 authorized durable recovery RED"
+      ],
+      "fullName": "D.93.36 authorized durable recovery RED recovers one genuine local commit before any live effect",
+      "status": "passed",
+      "title": "recovers one genuine local commit before any live effect",
+      "duration": 1156.5554590000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts",
+      "ancestorTitles": [
+        "D.93.36 authorized durable recovery RED"
+      ],
+      "fullName": "D.93.36 authorized durable recovery RED replays the complete local issuance outbox in dependency order",
+      "status": "passed",
+      "title": "replays the complete local issuance outbox in dependency order",
+      "duration": 98.48225000000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "bd696eb90fe38002a55a877367dd68e99467ea0e5452a61c6af23ea737b3bde9",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

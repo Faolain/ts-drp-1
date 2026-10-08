@@ -1,0 +1,186 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "playwright.phase-6a-creator-successor-product.config.ts",
+      "--project=chromium",
+      "--grep",
+      "D\\.110c-b advances",
+      "--reporter=json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": true,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 600000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6a-creator-successor-product.pw.ts",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 737,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"activationCount\": 2,\u001b[22m\n\u001b[2m    \"closeBindCount\": 2,\u001b[22m\n\u001b[2m    \"closeBindFailureCount\": 0,\u001b[22m\n\u001b[32m-   \"predecessorDeactivateCount\": 2,\u001b[39m\n\u001b[31m+   \"predecessorDeactivateCount\": 1,\u001b[39m\n\u001b[2m  }\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"activationCount\": 2,\u001b[22m\n\u001b[2m    \"closeBindCount\": 2,\u001b[22m\n\u001b[2m    \"closeBindFailureCount\": 0,\u001b[22m\n\u001b[32m-   \"predecessorDeactivateCount\": 2,\u001b[39m\n\u001b[31m+   \"predecessorDeactivateCount\": 1,\u001b[39m\n\u001b[2m  }\u001b[22m\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2219:93",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 93,
+                      "line": 2219
+                    },
+                    "snippet": "  2217 | \t\t\t)\n  2218 | \t\t).toBe(true);\n> 2219 | \t\texpect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({\n       | \t\t                                                                                          ^\n  2220 | \t\t\tactivationCount: 2,\n  2221 | \t\t\tcloseBindCount: 2,\n  2222 | \t\t\tcloseBindFailureCount: 0,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 93,
+                        "line": 2219
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"activationCount\": 2,\u001b[22m\n\u001b[2m    \"closeBindCount\": 2,\u001b[22m\n\u001b[2m    \"closeBindFailureCount\": 0,\u001b[22m\n\u001b[32m-   \"predecessorDeactivateCount\": 2,\u001b[39m\n\u001b[31m+   \"predecessorDeactivateCount\": 1,\u001b[39m\n\u001b[2m  }\u001b[22m\n\n  2217 | \t\t\t)\n  2218 | \t\t).toBe(true);\n> 2219 | \t\texpect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({\n       | \t\t                                                                                          ^\n  2220 | \t\t\tactivationCount: 2,\n  2221 | \t\t\tcloseBindCount: 2,\n  2222 | \t\t\tcloseBindFailureCount: 0,\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2219:93"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:43:31.711Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-67281-binds-epoch-2-close-custody-chromium/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-67281-binds-epoch-2-close-custody-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 93,
+                    "line": 2219
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-65b35a71ef81040e746e",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2143,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-02T18:43:30.848Z",
+    "duration": 2422.1020000000003,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

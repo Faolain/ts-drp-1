@@ -1,0 +1,123 @@
+{
+  "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+  "sha256": "9195a3da58cb31e269fe3ad2d2d1378e40d81bf3271a80dd4949ee7fa72f743c",
+  "bytes": 104887,
+  "compilerInputExact": true,
+  "compilerDiagnostics": 0,
+  "lintErrors": 7,
+  "lintRule": "@typescript-eslint/no-non-null-assertion",
+  "disposition": "Paused for root prospective syntax amendment; no source edit, compiler repeat, runtime, controls or whole-root seal in this capture.",
+  "commands": {
+    "custody-before": {
+      "command": {
+        "cwd": "node",
+        "command": ".logs/d110c-0c1f5b-green-transport-static-41686d6f/custody.mjs",
+        "args": [
+          "before"
+        ],
+        "start": "2026-09-06T04:35:23.623Z"
+      },
+      "status": {
+        "code": -2,
+        "signal": null,
+        "spawnError": "Error: spawn .logs/d110c-0c1f5b-green-transport-static-41686d6f/custody.mjs ENOENT",
+        "start": "2026-09-06T04:35:23.623Z",
+        "finish": "2026-09-06T04:35:23.627Z"
+      }
+    },
+    "custody-before-corrected": {
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": "node",
+        "args": [
+          ".logs/d110c-0c1f5b-green-transport-static-41686d6f/custody.mjs",
+          "before"
+        ],
+        "start": "2026-09-06T04:35:38.238Z"
+      },
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T04:35:38.238Z",
+        "finish": "2026-09-06T04:35:41.844Z",
+        "pid": 15018
+      }
+    },
+    "format": {
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": "pnpm",
+        "args": [
+          "exec",
+          "prettier",
+          "--check",
+          "tests/phase-3a1b-p3-live-transport-red.test.ts"
+        ],
+        "start": "2026-09-06T04:36:25.681Z"
+      },
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T04:36:25.681Z",
+        "finish": "2026-09-06T04:36:26.625Z",
+        "pid": 15783
+      }
+    },
+    "lint": {
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": "pnpm",
+        "args": [
+          "exec",
+          "eslint",
+          "tests/phase-3a1b-p3-live-transport-red.test.ts"
+        ],
+        "start": "2026-09-06T04:36:26.725Z"
+      },
+      "status": {
+        "code": 1,
+        "signal": null,
+        "start": "2026-09-06T04:36:26.725Z",
+        "finish": "2026-09-06T04:36:58.064Z",
+        "pid": 15852
+      }
+    },
+    "diff": {
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": "git",
+        "args": [
+          "diff",
+          "--check",
+          "--",
+          "tests/phase-3a1b-p3-live-transport-red.test.ts"
+        ],
+        "start": "2026-09-06T04:36:27.948Z"
+      },
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T04:36:27.948Z",
+        "finish": "2026-09-06T04:36:27.981Z",
+        "pid": 15923
+      }
+    },
+    "compiler-green": {
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": "node",
+        "args": [
+          ".logs/d110c-0c1f5b-green-transport-static-41686d6f/compiler.mjs"
+        ],
+        "start": "2026-09-06T04:36:58.175Z"
+      },
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T04:36:58.175Z",
+        "finish": "2026-09-06T04:37:03.377Z",
+        "pid": 16357
+      }
+    }
+  }
+}

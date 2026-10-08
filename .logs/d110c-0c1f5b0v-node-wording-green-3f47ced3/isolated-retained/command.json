@@ -1,0 +1,20 @@
+{
+  "cwd": "/tmp/d110c-f5b0v-green-LLxy4p/checkout",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "tests/phase-3a1b-d9336-authorized-recovery-red.test.ts",
+    "tests/phase-6a-creator-successor-activation-red.test.ts",
+    "tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+    "tests/phase-6a-creator-successor-epoch-red.test.ts",
+    "tests/phase-6b-d110c-b-hot-adoption.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0v-node-wording-working-b5d94193/isolated-retained/result.json"
+  ],
+  "start": "2026-09-05T08:33:58.247Z"
+}

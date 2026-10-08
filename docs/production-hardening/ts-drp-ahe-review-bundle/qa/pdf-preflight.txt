@@ -1,0 +1,6 @@
+PDF: /mnt/data/aec_review/report/ts-drp-history-at-scale-review.pdf
+Pages: 19
+Encrypted: False
+Openable (PyMuPDF): True
+Likely scanned: False
+XFA present: False

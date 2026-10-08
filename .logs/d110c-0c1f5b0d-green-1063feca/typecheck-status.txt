@@ -1,0 +1,4 @@
+issuance-store=0
+storage-browser=1
+storage-node=1
+node=1

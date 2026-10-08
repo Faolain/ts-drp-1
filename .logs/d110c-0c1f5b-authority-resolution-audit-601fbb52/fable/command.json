@@ -1,0 +1,14 @@
+{
+  "command": [
+    "zsh",
+    "-f",
+    "-c",
+    "alias claude-phel='CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude'\neval 'claude-phel -p --restricted --strict-mcp-config --tools Read,Glob,Grep --allowedTools Read,Glob,Grep --model \"claude-fable-5-1[1m]\" --effort high --output-format stream-json --verbose'"
+  ],
+  "head": "601fbb52c7377f1f2783539eae55b1e478c82451",
+  "start": "2026-09-06T09:14:19.362Z",
+  "pid": 53255,
+  "prompt": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-authority-resolution-audit-601fbb52/fable-prompt.md",
+  "mode": "read-only API consultation",
+  "authorization": "User standing API-consult instruction and current full grid-composition authorization"
+}

@@ -1,0 +1,11 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ✓ tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts (1 test) 146ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  04:35:35
+   Duration  1.23s (transform 540ms, setup 0ms, collect 820ms, tests 146ms, environment 0ms, prepare 53ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-green-dc2f8dc2/focused/result.json

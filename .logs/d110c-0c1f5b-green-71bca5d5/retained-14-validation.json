@@ -1,0 +1,43 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-14/result.json",
+  "baselineSha256": "87ceccd53d85442f282d55dae0808c90c81f30b9f1591a9c7acb9d6b6395b2ff",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3f-c-v3-room-batching-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3f-c-v3-room-batching-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3f-c shared-room batch measurement"
+      ],
+      "fullName": "Phase 3f-c shared-room batch measurement measures one, two, sixteen, and seventeen captured requests at the genuine signing boundary",
+      "status": "passed",
+      "title": "measures one, two, sixteen, and seventeen captured requests at the genuine signing boundary",
+      "duration": 352.24374999999986,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "2ba32368c98ad9e1f2af920d30d61be8a39a055bd5185e83155296956186ea24",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

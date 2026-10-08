@@ -1,0 +1,60 @@
+{
+  "verdict": "BLOCK",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [
+    {
+      "id": "P1-genesis-sentinel-not-enforced",
+      "finding": "The bounded advance predicate's genesis branch never anchors adjacency to the genesis sentinel. The accepted design (design.md:115) requires the predicate to enforce 'Adjacency (genesis sentinel or exactly one adjacent settled-v1)'; the settled-v1 arm correctly pins priorCheckpointDigest === predecessor.candidateDigest (creator-transition-advance.ts:180-181), and both legacy carriers pin their genesis sentinels exactly (creator-transition-advance.ts:508 and :578), but the settlement genesis arm accepts ANY 64-hex priorCheckpointDigest with priorCheckpointKind 'genesis' at closedEpoch 0. The exported CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL is referenced nowhere in packages or tests, and the corrected RED actively pins the loose behavior: the genesis fixture uses 'f'.repeat(64) and expects ok:true, with no mutation case covering a non-sentinel genesis digest. Because the opener is deliberately shape-only on predecessor fields, this predicate is the sole enforcement point, so the checkpoint chain root is left unanchored and the signed executable contract now entrenches the deviation for every later slice.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:159-170 (genesis branch omits the sentinel check); packages/protocol-v3/src/creator-author-issuance-frontiers.ts:444 (dead sentinel export); tests/d110c-0c1f5b0a-settlement-codec-red.test.ts:563-569 (non-sentinel 'f'*64 pinned as accepted); .logs/d110c-0c1f5b0r-design-3a156aca/design.md:115",
+      "requiredFix": "In inspectCreatorAuthorSettlementAdvance's predecessor===null branch, additionally require Reflect.get(proposed,'priorCheckpointDigest') === CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL (imported from the settlement codec). Update the RED genesis fixture to use the real sentinel, add a mutation case rejecting a non-sentinel genesis digest, and pin the sentinel's exact hex value in the focused suite."
+    }
+  ],
+  "p2": [
+    {
+      "id": "P2-profile-uninstantiable",
+      "finding": "CurrentAnchorTrust.profileId remains the literal 'creator-trusted-v1' and the root trust install/open paths hard-reject any other profileId (CREATOR_PROFILE comparisons), so creator-trusted-settlement-v1 cannot be installed or opened in production; the settlement-accepting branches added in v3-live.ts:1432, creator-close.ts:211, control-plane and the room are currently reachable only via the test's custody mock. Consistent with codec-slice scoping, but no named slice owns the widening.",
+      "evidence": "packages/protocol-v3/src/index.ts:135, :1335, :1423",
+      "owner": "f5b (creator settlement integration) via plan v2",
+      "disposition": "Name the slice that widens installCreatorAnchorTrustRoot/openCurrentAnchorTrust and the CurrentAnchorTrust.profileId type to admit creator-trusted-settlement-v1 before f5b GREEN; until then the new consumers are inert forward wiring."
+    },
+    {
+      "id": "P2-tautology-guard",
+      "finding": "SETTLEMENT_PROFILE is a module-load constant that is always 'v1', so the guard 'SETTLEMENT_PROFILE !== \"v1\"' in inspectCreatorAuthorSettlementAdvance is dead and cannot gate on any real input; the predicate receives no profile input, so the gate expresses intent without effect.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:60, :128",
+      "owner": "f5b (predicate wiring)",
+      "disposition": "When the predicate is wired into inspectCreatorTransitionAdvance, either gate it on the profile carried by the authenticated trust/closure input or delete the constant-folded guard."
+    },
+    {
+      "id": "P2-byte-measurement-divergence",
+      "finding": "Three different max-width 256-triple measurements are on record: design.md:73 says 23,937 bytes, plan v2 (0c1k W1 measurement table) says 23,106, and the executable pin asserts 23,450. All are under the 32,768 ceiling so correctness is unaffected, but the docs now disagree with the pinned value.",
+      "evidence": "tests/d110c-0c1f5b0a-settlement-codec-red.test.ts:656; .logs/d110c-0c1f5b0r-design-3a156aca/design.md:73; docs/production-hardening/production-hardening-tdd-plan-v2.md (W1 measurement table)",
+      "owner": "plan v2 maintainer",
+      "disposition": "Annotate which fixture shape each number measures (the test uses a 256-char objectId and max-safe-integer epochs/historySize/ref byteLength) or drop the stale estimates; no code change."
+    },
+    {
+      "id": "P2-fence-codec-unreachable",
+      "finding": "AUTHOR_FENCE_ACTION and openAuthorFenceOperation are exported from protocol-v3/src/index.ts, which has no package-exports subpath, and public.ts was deliberately left untouched, so the standalone fence codec is unreachable to other packages. The enforcement halves (blueprint reservation inside prepareBlueprintAdmission, invalid-fence rejection inside authenticateReceivedVertex) are live through existing entry points; only the accessor is dead. Per design, Node recognizes the fence by its action data property and may never need this accessor.",
+      "evidence": "packages/protocol-v3/src/index.ts:2224, :2769-2826; packages/protocol-v3/package.json exports map (no ./index subpath); packages/protocol-v3/src/public.ts (unchanged)",
+      "owner": "f5b0b (Node fence issuer)",
+      "disposition": "At f5b0b, either consume openAuthorFenceOperation via a deliberate export (subpath, not root API) or remove it if Node-side action-property recognition suffices; do not leave a permanently dead export."
+    },
+    {
+      "id": "P2-legacy-literal-comparisons-remain",
+      "finding": "The design's compatibility section says 'No site compares the profile string directly', yet legacy-record codecs keep direct 'creator-trusted-v1' comparisons (protocol-v3/src/creator-close.ts:276 and :598, creator-checkpoint.ts:144, plus the CREATOR_PROFILE sites in index.ts). This is fail-closed and arguably correct because the settlement profile emits no retirement/aggregate/certified-creator records, but it is an unrecorded exception to the design sentence.",
+      "evidence": "packages/protocol-v3/src/creator-close.ts:276; packages/protocol-v3/src/creator-checkpoint.ts:144; packages/protocol-v3/src/index.ts:1335,:1423",
+      "owner": "f5b via plan v2",
+      "disposition": "Record in plan v2 that these legacy-record codecs stay pinned to creator-trusted-v1 by intent (the settlement profile never produces those carriers), or route them through settlementProfileFor when f5b wires the profile end-to-end."
+    }
+  ],
+  "notes": [
+    "RED causality verified structurally and by evidence: at 62f164b6 all 10 tests fail through explicit unavailable-fallback markers or legacy-codec fallbacks that cannot satisfy the new assertions (triple frontier, 32,768 ceiling, settlement kind, frontierFor/frontierCount, advance predicate, predicate consumers, same-anchor rule); result.json records 10 failed / 0 passed, causal:true, no module-resolution or fixture self-failure. The 62f164b6 correction fixed two genuine fixture defects (wrong-signer helper asserting its own success; advance-fixture frontier authors not matching the fixture ACL members) without weakening any assertion.",
+    "GREEN scope matches design slice 1 exactly: fence codec + global blueprint reservation + received-vertex invalid-fence rejection (index.ts), settlement checkpoint codec with triple frontier, successor-key signing, floor-only verification, no current-key comparison (the frontiers.ts:278/:399 checks were not carried over), shape-only predecessor validation, frontierFor/frontierCount, 256-cap under 32,768 bytes with 257/32,769 rejection, ACL v3 constants (cap 256, 65,536 ceiling, decode {65536,4,8192}) gated on settlementProfileFor, author-authorization cap 256 under the same predicate, one predicate with exactly the seven design-enumerated consumers, and the same-anchor equivocation refusal.",
+    "Signature trust is sound: prepare binds the successor public key into one-shot WeakMap custody and complete verifies against it; open verifies against the successor floor key only, with exactKeys rejecting any currentTrust input; ed25519 zip215:false matches existing codec practice; all outputs are detached frozen copies and getter/prototype/hole attacks are rejected via own-property descriptor checks.",
+    "Package graph stays acyclic: the only new edge is the declared protocol-v2 -> protocol-v3 workspace link (3-line lockfile change); protocol-v3 has no protocol-v2 dependency; settlement-profile.ts re-exporting from index.ts creates no runtime cycle because index.ts imports neither latched-acl.ts nor creator-author-issuance-frontiers.ts and seal-authority-custody's index import is type-only. No root public API (public.ts), wire envelope, protobuf, or crypto dependency changed.",
+    "Legacy compatibility preserved at GREEN: legacy frontiers codec (64-cap, 8,192 ceiling) untouched; latched-acl v1/v2 limits and 65-member rejection unchanged at 5bf45aab (the later maxItems 512->2048 change is the separately authorized 0c1k W0 correction 909f4f5c, not this diff); registry v1/delegated/attested branches byte-identical; all widened profile checks retain creator-trusted-v1 acceptance unchanged.",
+    "Commits after GREEN up to the evidence commit (6cc120eb, 0508133f, 9fad8a59, 8860b432) are test/fixture-only and belong to the parallel f5b0s/0c1k-W0 slices; they do not alter the reviewed production diff. GREEN evidence retained batches (44/31/21/25/16) all pass; inherited Phase-6a and 0b1 failures are baseline-confirmed and unchanged.",
+    "inspectCreatorAuthorSettlementAdvance otherwise implements the ACL transition law correctly: vector equals successor ACL membership exactly, added members (absent from current ACL) get admissionEpoch === successorEpoch with terminalThrough null, retained members copy admissionEpoch unchanged with monotone terminalThrough (null->n allowed, n->null/lower rejected), removed members dropped, genesis members get admissionEpoch 0, and settled-v1 adjacency (digest linkage, closedEpoch/successorEpoch chaining) is enforced."
+  ]
+}

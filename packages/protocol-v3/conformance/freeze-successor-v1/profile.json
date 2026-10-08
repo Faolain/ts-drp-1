@@ -1,0 +1,23 @@
+{
+	"schemaVersion": "ts-drp-protocol-v3-freeze-successor-profile-v3",
+	"rootCheckers": [
+		{
+			"id": "protocol-v2-root",
+			"checker": "packages/protocol-v2/scripts/check-protocol-freeze.mjs",
+			"checkerObject": "970d088bd99c2512be1d48530492df23f9666b0c",
+			"checkerSha256": "d6900fd1a1b871a537dd7be0eefff7e3143a63f89dbe1bcedcb946273ee8f3d7",
+			"base": "47426ab440f90253befbd42bace934159584e756",
+			"environment": "PROTOCOL_FREEZE_REPOSITORY_ROOT",
+			"stdout": "protocol freeze policy passed (47426ab440f9..working-tree)\n"
+		},
+		{
+			"id": "protocol-v3-root",
+			"checker": "packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+			"checkerObject": "7215d582baff73d2d45b1a5db5691bf274081235",
+			"checkerSha256": "0c54c747ca375591d7783b553ef8993d4d3f4932a831377bee3b7415345549de",
+			"base": "aaebf1de3dc198d396296d43a6afb03cb1ac984e",
+			"environment": "PROTOCOL_V3_FREEZE_REPOSITORY_ROOT",
+			"stdout": "protocol-v3 freeze policy passed (aaebf1de3dc1..working-tree)\n"
+		}
+	]
+}

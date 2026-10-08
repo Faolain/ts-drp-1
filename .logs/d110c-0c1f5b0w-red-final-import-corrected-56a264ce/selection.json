@@ -1,0 +1,25 @@
+{
+  "parent": "56a264ce1c6888e317a04d9435ef8c4f34b72d2d",
+  "changed": [
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  ],
+  "selected": [
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts"
+  ],
+  "selectedCount": 219,
+  "passed": 156,
+  "failed": 63,
+  "skipped": 0,
+  "exactMatrixSha256": "76643d0012301bc1d99e469d9a90a03032f89f17501c5725f03797ffd0bcd348",
+  "soleExecution": true,
+  "noCampaign": true,
+  "noRerunOnMismatch": true,
+  "frozenAt": "2026-09-05T13:53:18.084Z"
+}

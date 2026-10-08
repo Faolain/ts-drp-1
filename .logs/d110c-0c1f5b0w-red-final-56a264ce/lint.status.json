@@ -1,0 +1,13 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T13:50:35.902Z",
+  "finished": "2026-09-05T13:50:52.405Z",
+  "status": 1,
+  "signal": null
+}

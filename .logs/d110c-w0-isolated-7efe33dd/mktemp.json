@@ -1,0 +1,11 @@
+{
+  "command": [
+    "mktemp",
+    "-d",
+    "/private/tmp/d110c-w0-isolated-XXXXXX"
+  ],
+  "budgetMs": 5000,
+  "elapsedMs": 71,
+  "code": 0,
+  "temp": "/private/tmp/d110c-w0-isolated-qA7HqL"
+}

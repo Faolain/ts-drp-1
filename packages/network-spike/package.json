@@ -101,6 +101,7 @@
 		"@ts-drp/network": "workspace:*",
 		"@ts-drp/node": "workspace:*",
 		"@ts-drp/membership": "workspace:*",
+		"@ts-drp/object": "workspace:*",
 		"@ts-drp/relay-policy": "workspace:*",
 		"@ts-drp/rendezvous": "workspace:*",
 		"@ts-drp/routing-browser": "workspace:*",

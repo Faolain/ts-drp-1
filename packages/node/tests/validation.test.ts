@@ -1,3 +1,4 @@
+import { createPermissionlessACL } from "@ts-drp/object";
 import { Message, MessageType } from "@ts-drp/types";
 import { afterEach } from "node:test";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -29,7 +30,7 @@ describe("Creating object validation tests", () => {
 	});
 
 	test("Should be able to create object with a valid id", async () => {
-		const dprObject = await node2.createObject({ id: "object1" });
+		const dprObject = await node2.createObject({ id: "object1", acl: createPermissionlessACL() });
 		expect(dprObject.id).toBe("object1");
 	});
 
@@ -40,6 +41,7 @@ describe("Creating object validation tests", () => {
 	test("Should not able to create object and sync with an empty peerId", async () => {
 		await expect(
 			node2.createObject({
+				acl: createPermissionlessACL(),
 				id: "object1",
 				sync: {
 					enabled: true,

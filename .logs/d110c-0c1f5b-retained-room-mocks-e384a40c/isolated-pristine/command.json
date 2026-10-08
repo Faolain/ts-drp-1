@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-retained-room-mocks-2C1IwR/checkout",
+  "command": "git",
+  "args": [
+    "status",
+    "--short",
+    "--untracked-files=no"
+  ],
+  "start": "2026-09-06T00:33:46.490Z"
+}

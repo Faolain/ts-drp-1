@@ -1,0 +1,34 @@
+{
+  "classification": "ACCEPTED_RETAINED_TRANSPORT_NATIVE_BASELINE",
+  "artifacts": {
+    "node-datachannel-v0.32.3-napi-v8-darwin-arm64.tar.gz": {
+      "sha256": "69fbffdacb9abda2a76809693443328b6aad71af25947e0733913340365f4da8",
+      "bytes": 3588950,
+      "originalAndRetainedMatch": true
+    },
+    "node_datachannel.node": {
+      "sha256": "1d4f814bede82a5412b19e8973e44eb484d504acc52f17796e90add75dc9ac80",
+      "bytes": 8638072,
+      "originalAndRetainedMatch": true
+    }
+  },
+  "installerInputsUnchanged": true,
+  "stoppedCheckout": {
+    "root": "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout",
+    "sourcesAndRuntimesUnchanged": true,
+    "nativeBinaryStillAbsent": true
+  },
+  "reporterSha256": "8e4e4556cdedd86d5de3194e8f7630a85e6de92c02fdec3ae0410e9e4085029e",
+  "total": 24,
+  "passed": 24,
+  "failed": 0,
+  "skipped": 0,
+  "executionCount": 1,
+  "topLevel": [],
+  "stderr": "(node:15198) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+  "typecheckPassed": false,
+  "inheritedTargetDiagnostics": 13,
+  "externalDiagnostics": 0,
+  "rootAcceptancePending": true,
+  "separateParentGreenPending": true
+}

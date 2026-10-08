@@ -1,0 +1,10 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"exactOptionalPropertyTypes": true,
+		"outDir": "dist"
+	},
+	"include": ["src/**/*.js"]
+}

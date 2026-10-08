@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "diff-tree",
+    "--no-commit-id",
+    "--name-only",
+    "-r",
+    "6f3d3049942c29f547f5cefdda628a3a01078077"
+  ],
+  "start": "2026-09-05T20:04:19.708Z"
+}

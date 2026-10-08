@@ -1,0 +1,26 @@
+{
+	"record": "D.110c-0c1f5b0d-corrective",
+	"reslice": "adab0f56428bf0290a4437c83083db18e17eb2dc",
+	"red": "0cafd35762a8a1c3c5767c89227f9f42c5e89729",
+	"green": "292fc14f15a27befcd782a0eddf9aed23551619c",
+	"greenSignature": "G",
+	"pushed": true,
+	"focused": { "files": 1, "passed": 12, "failed": 0, "skipped": 0 },
+	"browser": { "expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0 },
+	"retainedCore": { "files": 7, "passed": 136, "failed": 0, "skipped": 0 },
+	"retainedSettlementRecovery": { "files": 10, "passed": 124, "failed": 0, "skipped": 0 },
+	"isolatedFocused": { "files": 1, "passed": 12, "failed": 0, "skipped": 0 },
+	"isolatedRetained": { "files": 7, "passed": 136, "failed": 0, "skipped": 0 },
+	"builds": {
+		"issuanceStore": "pass",
+		"storageBrowser": "pass",
+		"storageNode": "pass"
+	},
+	"typechecks": {
+		"issuanceStore": "pass",
+		"storageBrowser": "inherited-test-fixture-diagnostics",
+		"storageNode": "inherited-test-root-diagnostics"
+	},
+	"stopRuleFired": false,
+	"productionReachabilityClaimed": false
+}

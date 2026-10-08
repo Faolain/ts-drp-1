@@ -1,0 +1,29 @@
+
+ RUN  v3.1.1 /private/tmp/d110c-f5b-red-room-guard-reporters-L8TTrA/checkout
+
+stdout | tests/phase-6a-creator-successor-product-red.test.ts > classifies complete legacy and settlement successor compositions before reading room authorities
+{"kind":"F5B_ROOM_GUARD_OBSERVATIONS","observations":[{"profileId":"creator-trusted-v1","composition":"factory","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"rebase","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"signer","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"declaration-only","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"factory","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"rebase","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"signer","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"declaration-only","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}}]}
+
+ ❯ tests/phase-6a-creator-successor-product-red.test.ts (13 tests | 2 failed) 679ms
+   ✓ D.108d2 public return AST oracle > accepts private computations and primitive comparisons without confusing operand names with returned authority 23ms
+   ✓ D.108d2 public return AST oracle > rejects exact sensitive properties and values on exported returned shapes 15ms
+   ✓ D.108d2 public return AST oracle > tracks the returned operands of assignment, comma and logical assignment expressions 6ms
+   ✓ D.108d2 public return AST oracle > follows local returned aliases, helpers, methods, export aliases and global product surfaces 5ms
+   ✓ D.108e2b creator successor room lifetime RED > freezes exactly five RED owners, one GREEN owner and seven browser behaviors 10ms
+   ✓ D.108e2b creator successor room lifetime RED > pins the exact seven-key successor authority and rejects pre-successor or widened values 0ms
+   ✓ D.108e2b creator successor room lifetime RED > keeps node-root and chat authority closed while assigning the room as sole node consumer 156ms
+   ✓ D.108e2b creator successor room lifetime RED > runs all product behaviors without a source-pattern readiness gate 0ms
+   × D.108e2b creator successor room lifetime RED > rejects only unsupported cold successor compositions before reading room authorities 10ms
+     → expected [ { …(3) }, { …(3) }, { …(3) } ] to deeply equal [ { …(3) }, { …(3) }, { …(3) } ]
+   ✓ D.108e3 room lifetime transition RED > freezes four test owners, one room GREEN owner and twelve causal browser behaviors 1ms
+   ✓ D.108e5 bounded redirected lifetime RED > bounds migration activation bytes before constructing the call-time owner 124ms
+   ✓ D.108e5 bounded redirected lifetime RED > bounds every migration invite encode before copying caller-controlled bodies 280ms
+   × classifies complete legacy and settlement successor compositions before reading room authorities 46ms
+     → F5B_ROOM_GUARD_PROFILE_AUTHORITY_READ_ORDER: expected [ { …(4) }, { …(4) }, { …(4) }, …(5) ] to deeply equal [ { …(4) }, { …(4) }, { …(4) }, …(5) ]
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 11 passed (13)
+   Start at  22:55:58
+   Duration  2.72s (transform 830ms, setup 0ms, collect 1.83s, tests 679ms, environment 0ms, prepare 48ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-room-guard-reporters-5f6fb6c0/focused.json

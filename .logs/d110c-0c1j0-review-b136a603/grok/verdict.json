@@ -1,0 +1,31 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-INVITE-CONSUME-UNTESTED",
+      "finding": "Focused tests only exercise createV3RoomCreatorInviteMaterial; they never encode/decode an invite or open a session. Both genesis boundaries do share assertSupportedGenesisLineagePolicy, so reserved modes are rejected and explicit fixed-creator is accepted at decodeCreatorInvite, but that consume path is implementation-only coverage.",
+      "evidence": "tests/d110c-0c1j0-lineage-policy-red.test.ts:119",
+      "owner": "D.110c-0c1j-0 test follow-up",
+      "disposition": "Add encodeCreatorInvite/decodeCreatorInvite cases at the v3-room boundary. Do not treat live createV3RoomSession success as this slice; Node acceptedParameterDigest remains D.110c-0c1j proper."
+    },
+    {
+      "id": "P2-V5-MINT-FREEZE-PINS",
+      "finding": "Registry version stays 5 and parameters-baseline is intact, but field-registry.json and registry-v5.json were rewritten. Existing v5 mint SHA-256 pins still quote the pre-lineagePolicy hashes, so reference-regeneration, regen-lock provenance, formal variable-map, and protocol-v3-anchor-trust hash controls are stale. GREEN named this freeze/migration debt and did not claim the mint ratchet was resatisfied.",
+      "evidence": "packages/protocol-v2/tests/reference-regeneration.test.ts:259",
+      "owner": "D.110c-0c1j proper",
+      "disposition": "Disposition the protocol-v2 freeze/migration boundary when a registryVersion or lock rewrite is selected. Do not bump registryVersion in this reservation slice."
+    }
+  ],
+  "notes": [
+    "RED 507e5541 is tests-only and causal: 1/5 passed (old-decoder present-key rejection), 4/5 failed because lineagePolicy was absent; omitted-key bytes/digest/anchor controls are inside the failing field-presence test.",
+    "Grammar matches the plan: mode fixed-creator|ephemeral-chain|durable-pinned|durable-recursive; maximumEpochs null or nonnegative safe integer and non-null only for ephemeral-chain; allowedUpgrade none|recursive-v1; recursiveVerificationKeyId string|null, never bytes; extra/missing keys fail closed.",
+    "Omitted lineagePolicy keeps canonical hex 0807050d6d6178…808010, v3 parameters digest cd31923f…, registry-preimage digest 26af70b1…, and pinned genesis da25ccd1…; explicit fixed-creator is a distinct digest and is accepted at material creation.",
+    "Reserved modes are codec-valid and rejected at create and decodeCreatorInvite with D110C_LINEAGE_POLICY_UNSUPPORTED. Grid/v3-chat inherit that helper and do not fork genesis policy.",
+    "Legacy parameters-baseline vector is unchanged; companion parameters-lineagePolicy-fixed-creator/coverage vector is additive. Required-field omission still throws per vector; optional coverage is a separate covers list. registryVersion remains 5.",
+    "No protocol-v3/Node/public-export/crypto/dependency widening found. GREEN does not claim live Node accepts explicit-present parameters; acceptedParameterDigest is still the seven-field v3 schema and is owned by D.110c-0c1j proper."
+  ]
+}

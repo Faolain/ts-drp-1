@@ -1,0 +1,54 @@
+{
+  "valid": true,
+  "head": "248f40d05f2c4686699fa012eb5f82b57f4938f6",
+  "signature": "G",
+  "originExact": true,
+  "schemaValid": true,
+  "blockingUnion": [],
+  "p2": [
+    {
+      "reviewer": "fable",
+      "owner": "root",
+      "disposition": "Accepted: RED whitespace summary undercount already fully disclosed in plan; preserve sealed root. Future sealers enumerate actual staged raw-log exceptions."
+    }
+  ],
+  "grok": {
+    "sessionId": "01a075eb-db93-7812-adfd-d5522384226c",
+    "modelStop": "end_turn",
+    "modelExit": 0,
+    "wrapperStatus": "NO_VERDICT",
+    "correctedClassification": "TERMINAL_SCHEMA_PASS",
+    "reason": "Wrapper run_grok.py:207 recognizes only prose markers VERDICT:/READY_TO_SIGN:/FINAL:/RESULT:, not the requested JSON schema. Actual explicit JSON validates; no cancellation, timeout, missing verdict or rerun.",
+    "tools": [
+      "read_file",
+      "grep",
+      "list_dir"
+    ]
+  },
+  "sol": {
+    "sessionId": "01a075eb-d846-7f73-bd90-b604ea7a89c2",
+    "terminal": "turn.completed"
+  },
+  "fable": {
+    "sessionId": "41d055de-b6e5-4fea-8674-67ae84d3937d",
+    "is_error": false,
+    "stop_reason": "end_turn",
+    "total_cost_usd": 6.14571725,
+    "tools": [
+      "Grep",
+      "Glob",
+      "Read"
+    ]
+  },
+  "sourceUnchanged": true,
+  "productionOwners": 8,
+  "builtOwners": 7,
+  "testFixtureIdentities": 95,
+  "patchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "priorEvidenceRevalidated": true,
+  "batchReady": true,
+  "parentReady": false,
+  "noRuntimeExecuted": true
+}

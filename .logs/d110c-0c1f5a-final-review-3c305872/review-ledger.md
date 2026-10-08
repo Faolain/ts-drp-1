@@ -1,0 +1,11 @@
+# D.110c-0c1f5a final review ledger
+
+- Review anchor: signed/pushed `3c305872fbee759b1b6386c10a1d1ebbde3dd6e6`, tree `a65781dcafb3941a2dda924aad6f60e78f0bc84b`.
+- Grok 4.6/high: exact session `01a0694a-8769-7e92-9c14-10a40505a473`, `APPROVED`, P0/P1/P2 `0/0/3`. The bounded runner completed normally (`exit_code: 0`, `stop_reason: end_turn`, no timeout) but classified `NO_VERDICT` because the complete schema-valid verdict appeared as fenced public text rather than a terminal structured event. The same session performed one schema-only re-emission without reinspection and emitted the unchanged structured verdict.
+- Direct Kimi K3, 100-step cap: exact session `session_96c604b1-fd7b-4149-af66-1c18ca71ab02`, `APPROVED`, P0/P1/P2 `0/0/3`. One same-session schema-only re-emission corrected presentation only.
+- Opus xhigh: exact session `a1430b93-04b9-4d22-acca-633fffbe1637`, `APPROVED`, P0/P1/P2 `0/0/5`.
+- Blocking union: zero. Every reviewer set RED causality, GREEN closure, scope preservation, retained behavior, evidence sufficiency, and f5a closability true.
+- P2 disposition: owned in the plan without reopening production GREEN. The next f5a fixture edit owns unaffected-writer and mixed-anomaly assertions; concurrent use or the next edit of `routeRegisteredVertex()` owns shared restore custody; the next f2 fixture edit owns code-unit ordering; reuse of the immutable GREEN validator owns a valid function-end assertion; f5b owns the genesis absent-prior reachability and shared `(author, sequence)` settlement questions.
+- The first combined Prettier check exhausted its default Node heap while parsing the approximately 100,000-line plan. That diagnostic did not identify a formatting defect. The same read-only check completed with `NODE_OPTIONS=--max-old-space-size=8192`; after formatting the two newly authored review files, every selected file passed.
+- No reviewer was relaunched. Grok and Kimi continuations used their exact sessions solely to emit the already-completed judgments through the required schema channel.
+- No Fable run, collaboration subagent, long campaign, D.110a invocation, product edit, dependency change, threshold change, or wire/API change was performed by this review checkpoint.

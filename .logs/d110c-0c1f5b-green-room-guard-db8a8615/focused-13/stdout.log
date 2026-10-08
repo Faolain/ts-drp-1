@@ -1,0 +1,16 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+stdout | tests/phase-6a-creator-successor-product-red.test.ts > classifies complete legacy and settlement successor compositions before reading room authorities
+{"kind":"F5B_ROOM_GUARD_OBSERVATIONS","observations":[{"profileId":"creator-trusted-v1","composition":"factory","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"rebase","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"signer","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"declaration-only","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"factory","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"rebase","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"signer","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"declaration-only","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}}]}
+
+ ✓ tests/phase-6a-creator-successor-product-red.test.ts (13 tests) 1050ms
+   ✓ D.108e5 bounded redirected lifetime RED > bounds migration activation bytes before constructing the call-time owner  344ms
+   ✓ D.108e5 bounded redirected lifetime RED > bounds every migration invite encode before copying caller-controlled bodies  346ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  23:11:48
+   Duration  4.07s (transform 1.41s, setup 0ms, collect 2.68s, tests 1.05s, environment 0ms, prepare 71ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/focused-13/focused.json

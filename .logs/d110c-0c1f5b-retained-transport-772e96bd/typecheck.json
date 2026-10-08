@@ -1,0 +1,83 @@
+{
+  "targetDiagnostics": [
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2345,
+      "line": 356,
+      "message": "Argument of type 'Expression | undefined' is not assignable to parameter of type 'Node'.\n  Type 'undefined' is not assignable to type 'Node'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2322,
+      "line": 461,
+      "message": "Type '{ transactIssue: DurableTransactIssue; compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) => Promise<void>; ... 5 more ...; close: () => Promise<void>; }' is not assignable to type 'DurableIssuanceStore'.\n  Types of property 'readSettlementPlan' are incompatible.\n    Type '((scope: DurableIssueScope) => Promise<SettlementPlan | null>) | undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'.\n      Type 'undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2741,
+      "line": 564,
+      "message": "Property 'installEpochAnchor' is missing in type 'Readonly<{ installGenesis: Mock<() => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>>; readiness: Mock<...>; readPage: Mock<...>; appendAccepted: Mock<...>; close: Mock<...>; }>' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2322,
+      "line": 803,
+      "message": "Type 'number' is not assignable to type 'void'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2322,
+      "line": 804,
+      "message": "Type 'number' is not assignable to type 'void'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2722,
+      "line": 889,
+      "message": "Cannot invoke an object which is possibly 'undefined'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2722,
+      "line": 892,
+      "message": "Cannot invoke an object which is possibly 'undefined'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2722,
+      "line": 936,
+      "message": "Cannot invoke an object which is possibly 'undefined'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2722,
+      "line": 1180,
+      "message": "Cannot invoke an object which is possibly 'undefined'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2532,
+      "line": 1251,
+      "message": "Object is possibly 'undefined'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2532,
+      "line": 1252,
+      "message": "Object is possibly 'undefined'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2722,
+      "line": 1792,
+      "message": "Cannot invoke an object which is possibly 'undefined'."
+    },
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2307,
+      "line": 2238,
+      "message": "Cannot find module '../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder' or its corresponding type declarations."
+    }
+  ],
+  "externalDiagnostics": []
+}

@@ -1,0 +1,30 @@
+(node:95977) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts > D.110c-0c1f5b live snapshot fixture contract > rejects unsupported epoch-anchor installation without mutating genuine epoch-zero recovery bindings
+AssertionError: F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION: expected { kind: 'missing-required-rejection' } to deeply equal { Object (kind, error, ...) }
+
+- Expected
++ Received
+
+  {
+-   "error": Error {
+-     "message": "unexpected installEpochAnchor in live snapshot fixture",
+-   },
+-   "isExactError": true,
+-   "kind": "asynchronous-rejection",
++   "kind": "missing-required-rejection",
+  }
+
+ ❯ tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts:95:92
+     93|     expect(recovered).toMatchObject({ ok: true });
+     94| 
+     95|     expect(observation, "F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECT…
+       |                                                                                            ^
+     96|      kind: "asynchronous-rejection",
+     97|      error: new Error("unexpected installEpochAnchor in live snapshot …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

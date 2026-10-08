@@ -1,0 +1,63 @@
+{
+  "sourceCommit": "fb3c5c599b8c50db55fcf361ea465531fbc90b2b",
+  "sourceSignature": "G",
+  "vitest": {
+    "files": 2,
+    "tests": 35,
+    "passed": 12,
+    "failed": 23,
+    "unexpectedFailures": 0,
+    "failedTitles": [
+      "codec accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks",
+      "codec pins 16 as accepted and 17 as rejected without treating 17 as a settlement source",
+      "codec accepts only the exact five-key progress effect and copies its digest",
+      "codec validates a progress effect as a closed commit instead of failing on a future export",
+      "memory atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "browser atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "node atomically records a partial chunk, then only the final chunk projects replacementSequence",
+      "memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+      "memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+      "store uses exact error ownership for malformed commits, stale progress and corrupt stored values",
+      "store round-trips nested progress through browser structured clone and Node JSON without changing schemas",
+      "browser reopens before/after partial and final chunks without losing exact progress",
+      "node reopens before/after partial and final chunks without losing exact progress",
+      "Node refuses malformed and stale progress before signing, while a valid exact prefix issues",
+      "source shape pins progress owners without confusing a diagnostic with runtime proof",
+      "room upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks",
+      "room resumes a durable partial prefix with strict logical-time continuity and no replay",
+      "room fails closed on rederived digest mismatch without issuing or downgrading open progress",
+      "room keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close"
+    ],
+    "passedControls": [
+      "legacy four-key entry, two-key effect and one-chunk path remain exact",
+      "malformed progress vectors remain rejected",
+      "real Node byte ceiling returns nonmutating split-required",
+      "all nine retained f5b0c room settlement tests pass"
+    ]
+  },
+  "chromium": {
+    "files": 1,
+    "tests": 1,
+    "passed": 0,
+    "failed": 1,
+    "actual": {
+      "accepted": false,
+      "errorCode": "ISSUANCE_INVALID_ARGUMENT",
+      "plan": null
+    },
+    "unexpectedFailures": 0
+  },
+  "static": {
+    "eslint": 0,
+    "prettier": 0,
+    "diffCheck": 0,
+    "testList": 0
+  },
+  "stashes": 27,
+  "productionPathsChanged": 0,
+  "planPathsChanged": 0
+}

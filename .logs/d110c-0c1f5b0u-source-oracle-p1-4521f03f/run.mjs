@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync, lstatSync, readlinkSync } from "node:fs";
+import { join } from "node:path";
+const root = import.meta.dirname, repo = "/Users/aristotle/Documents/Projects/ts-drp-1";
+const git = args => execFileSync("git", ["-C", repo, ...args]).toString();
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+const before = JSON.parse(readFileSync(join(root, "main-before.json"), "utf8"));
+const commit = git(["rev-parse", "HEAD"]).trim();
+assert.ok(commit.startsWith("4521f03f"));
+assert.equal(git(["show", "-s", "--format=%G?", commit]).trim(), "G");
+assert.equal(git(["rev-parse", "origin/codex/phase3a1b-p6-golden-path"]).trim(), commit);
+assert.equal(git(["status", "--porcelain=v1", "--untracked-files=no"]), "");
+const owners = ["tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts", "tests/phase-6a-creator-successor-product-red.test.ts"];
+const records = [];
+function run(name, bin, args) {
+  const startedAt = new Date().toISOString();
+  console.log("START " + name);
+  const result = spawnSync(bin, args, { cwd: repo, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  for (const stream of ["stdout", "stderr"]) writeFileSync(join(root, `${name}.${stream}`), result[stream] ?? "", { flag: "wx" });
+  records.push({ name, bin, args, cwd: repo, status: result.status, signal: result.signal, startedAt, finishedAt: new Date().toISOString() });
+  writeFileSync(join(root, "commands.json"), JSON.stringify(records, null, 2) + "\n");
+  console.log("END " + name + ": " + result.status);
+  assert.equal(result.status, 0);
+}
+run("format", "pnpm", ["exec", "prettier", "--check", ...owners]);
+run("lint", "pnpm", ["exec", "eslint", ...owners]);
+run("diff", "git", ["-C", repo, "diff", `${commit}^`, commit, "--check", "--", ...owners]);
+const selection = "D\\.108d2 public return AST oracle|keeps node-root and chat authority closed while assigning the room as sole node consumer";
+run("list", "pnpm", ["exec", "vitest", "list", owners[1], "-t", selection]);
+run("green", "pnpm", ["exec", "vitest", "run", owners[1], "-t", selection, "--no-file-parallelism", "--coverage.enabled=false", "--reporter=json", "--outputFile=" + join(root, "green-reporter.json")]);
+const protectedEntries = Object.fromEntries(Object.keys(before.protectedEntries).map(path => {
+  const full = join(repo, path), stat = lstatSync(full);
+  return [path, stat.isSymbolicLink() ? { kind: "symlink", target: readlinkSync(full) } : stat.isDirectory() ? { kind: "directory" } : { kind: "file", sha256: hash(readFileSync(full)) }];
+}));
+assert.deepEqual(protectedEntries, before.protectedEntries);
+const stashHash = hash(git(["stash", "list", "--format=%H"]));
+assert.equal(stashHash, before.stashHash);
+assert.equal(git(["status", "--porcelain=v1", "--untracked-files=no"]), "");
+writeFileSync(join(root, "main-after.json"), JSON.stringify({ commit, signature: "G", pushedRef: commit, trackedStatus: "", stashHash, stashCount: before.stashCount, protectedEntries, ownerHashes: Object.fromEntries(owners.map(path => [path, hash(readFileSync(join(repo, path)))])) }, null, 2) + "\n", { flag: "wx" });

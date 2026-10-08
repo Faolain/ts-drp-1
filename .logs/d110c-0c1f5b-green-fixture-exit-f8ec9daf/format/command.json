@@ -1,0 +1,14 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "tests/genesis-profile.test.ts",
+    "tests/phase-5d-pacemaker-red.test.ts"
+  ],
+  "start": "2026-09-06T05:15:44.413Z"
+}

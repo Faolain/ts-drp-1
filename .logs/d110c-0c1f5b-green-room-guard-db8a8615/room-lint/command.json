@@ -1,0 +1,11 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "eslint",
+    "examples/v3-room/src/index.ts"
+  ],
+  "startedAt": "2026-09-06T03:07:05.338Z",
+  "recorderPid": 7972
+}

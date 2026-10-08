@@ -1,0 +1,31 @@
+{
+  "stage": "preflight",
+  "head": "689c69487d28cfdeae62a32ae4b56db36b037c60",
+  "signature": "G",
+  "productionFiles": [
+    "examples/v3-room/src/index.ts",
+    "packages/node/src/creator-adoption.ts",
+    "packages/node/src/creator-close.ts",
+    "packages/node/src/internal/creator-transition-advance.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/protocol-v3/src/creator-checkpoint.ts",
+    "packages/protocol-v3/src/creator-close.ts"
+  ],
+  "productionHashes": {
+    "examples/v3-room/src/index.ts": "243d280b22f7aad3967e1a10aa82ffde3be8178b27d2cc23c8d03e5fc0f32cec",
+    "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+    "packages/node/src/creator-close.ts": "834b7877493d5feb3e883cb1e1de81211c64fa8d4d6b2fb6a6fdeb11c5532323",
+    "packages/node/src/internal/creator-transition-advance.ts": "19589ad05bf641e67a4e95ceb8d0bdd72b04fe7c90f1df47a132ab436cd03636",
+    "packages/node/src/v3-live.ts": "7683af0af26e29ab3186256dac377e0d7db3e0e70214dac21d60a4e0f4a0ddc3",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+    "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c"
+  },
+  "partialPatchSha256": "bde7705eaa3152f2e54440553b819c0d7df4bbbce8978603b8b4d683c2aed5de",
+  "stashesSha256": "b426dba61f4f05787e77e297b02dd2ed84ef692908df757777f0c328c1d0e9c3",
+  "stashCount": 27,
+  "case25Only": true,
+  "testSha256": "6f50397e323cd486c5cfdac46c8523b9aa06e4dae647f2f8e1256e80489c0bbf",
+  "staged": "",
+  "status": "M examples/v3-room/src/index.ts\n M packages/node/src/creator-adoption.ts\n M packages/node/src/creator-close.ts\n M packages/node/src/internal/creator-transition-advance.ts\n M packages/node/src/v3-live.ts\n M packages/protocol-v3/src/creator-checkpoint.ts\n M packages/protocol-v3/src/creator-close.ts",
+  "stoppedManifestSha256": "f8104d640f96c23fb6d8c0d3b42aa414bd62bd13b35bd6244bee9d75945b83c2"
+}

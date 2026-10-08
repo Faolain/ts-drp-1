@@ -1,0 +1,43 @@
+{
+  "baseline": ".logs/d110c-0c1f5b-green-ab98cce6/runtime-test-custody-after.json",
+  "built": {
+    "packages/node/dist/src/creator-adoption.js": {
+      "sha256": "44559605273ea6041fdd4914718d0cc333b27015295bb2071833f7591cca8f75",
+      "unchanged": true
+    },
+    "packages/node/dist/src/creator-close.js": {
+      "sha256": "3c42db2f87ee886011995658b7eb6fcc32bb0bf7202962968c06a17a1b183bfa",
+      "unchanged": true
+    },
+    "packages/node/dist/src/internal/creator-transition-advance.js": {
+      "sha256": "7871bb884c24de439d64eab857b48ceadb818e8c306adfafab2ef9453a396e56",
+      "unchanged": true
+    },
+    "packages/node/dist/src/v3-live.js": {
+      "sha256": "f961b54184a531512663401baeee967b6df9a0d2a55641ecb134daf52b60fae8",
+      "unchanged": true
+    },
+    "packages/protocol-v3/dist/src/creator-checkpoint.js": {
+      "sha256": "930a2dfa5bfc6d1ec42fcbfcdfb455067cd57df064e60f306cb66ed6f05f09cf",
+      "unchanged": true
+    },
+    "packages/protocol-v3/dist/src/creator-close.js": {
+      "sha256": "e96ceda06c43fc984b27fb98ccdb3090408ea1f9fed32bbb9e8631cc4cb8b431",
+      "unchanged": true
+    },
+    "packages/node/dist/src/internal/closed-epoch-cleanup.js": {
+      "sha256": "36be6a0e7979b0a64dec3e6ab509ee7d47fcb7beb5386d2ec2d3ef13508aecda",
+      "unchanged": true
+    }
+  },
+  "allSevenUnchanged": true,
+  "reporterSha256": "c81abe8cf1c3e24b41f619ef2c3b68fc8301c26f112e58bf40d3af482d1c32a4",
+  "success": true,
+  "total": 10,
+  "passed": 10,
+  "failed": 0,
+  "pending": 0,
+  "topLevel": [],
+  "stderrEmpty": true,
+  "diagnosticNote": "One read-only metadata inspection initially requested absent green-ab98cce6/signed-source-custody.json (ENOENT). A bounded rg listing located the existing runtime-test-custody-after.json; no source edit, build or runtime repetition resulted."
+}

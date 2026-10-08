@@ -1,0 +1,8 @@
+.logs/d110c-0c-red-corrected-7d5624aa/command.txt: OK
+.logs/d110c-0c-red-corrected-7d5624aa/comparison-audit.command.txt: OK
+.logs/d110c-0c-red-corrected-7d5624aa/comparison-audit.json: OK
+.logs/d110c-0c-red-corrected-7d5624aa/comparison-audit.mjs: OK
+.logs/d110c-0c-red-corrected-7d5624aa/comparison-audit.status: OK
+.logs/d110c-0c-red-corrected-7d5624aa/playwright.json: OK
+.logs/d110c-0c-red-corrected-7d5624aa/playwright.status: OK
+.logs/d110c-0c-red-corrected-7d5624aa/rejected-ledger.md: OK

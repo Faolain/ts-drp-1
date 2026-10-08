@@ -1,0 +1,63 @@
+{
+  "verdict": "BLOCK",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [
+    {
+      "id": "P1-1",
+      "finding": "The signed GREEN production commit 9fef8d24 widened DurableIssuanceStore to eight methods but left the packages/node facade (declared return type DurableIssuanceStore, ObjectFreeze literal) with only six, so packages/node could not typecheck at the GREEN commit or at the evidence commit 9b10bf5e; the readSettlementPlan/transactWriteSettlementPlan passthroughs arrived only in the later out-of-slice commit 0d6e38c2 ('fix(node): enforce writer capacity invariants'). The recorded GREEN gates build/typecheck only issuance-store, storage-browser and storage-node, so the dependent-package break was invisible to the gate set. Current files are correct, so this is an evidence-integrity/gate-coverage defect, not a live code defect.",
+      "evidence": "packages/node/src/v3-live.ts:4878 (passthrough exists only at HEAD; absent at 9fef8d24, added by 0d6e38c2 per git log -S); .logs/d110c-0c1f5b0s-green-9fef8d24/commands.md (gates limited to three storage packages)",
+      "requiredFix": "Amend the f5b0s GREEN evidence to record the packages/node facade break and its repair commit 0d6e38c2, and add a workspace-wide (at minimum packages/node) static typecheck to the slice's required gate set so a signed GREEN cannot ship an uncompilable workspace."
+    },
+    {
+      "id": "P1-2",
+      "finding": "The browser v1→v2 migration success path is untested. openIssuanceDatabase's upgradeneeded oldVersion===1 branch (verify the three v1 stores' exact key paths, then create settlementPlans) is exercised by no test: the focused suite covers only fresh v2 creation, and the retained browser suite covers only rejection of a wrong-shaped v1 database. No test opens a well-formed v1 adapter-derived database through the adapter to prove in-place upgrade with row preservation. The node side covers both v1→v3 (retained phase-6b retention test) and v2→v3 (focused suite) with row-preservation assertions, so this is an asymmetric gap on exactly the 'safe v1 migration' item this review is required to verify.",
+      "evidence": "packages/storage-browser/src/internal/browser-issuance-store.ts:1229-1257; tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts:552-566 (fresh-only); packages/storage-browser/tests/assets/phase-2l-b-browser-issuance-entry.ts:190-231 (rejection-only control)",
+      "requiredFix": "Add a browser case that raw-creates the exact v1 three-store adapter-derived database with committed rows, opens it via createBrowserDurableIssuanceStore, and asserts version 2, the exact four-store set with settlementPlans keyed [objectId, author], preserved rows, and a null settlement plan."
+    }
+  ],
+  "p2": [
+    {
+      "id": "P2-1",
+      "finding": "transactWriteSettlementPlan validates/captures input before the availability check in all three adapters, while transactIssue and readIssued check close/poison first; a poisoned or closed store given a malformed plan reports ISSUANCE_INVALID_ARGUMENT instead of the latched poison/closed failure.",
+      "evidence": "packages/issuance-store/src/conformance.ts:256-260; packages/storage-node/src/internal/node-issuance-store.ts:595-603; packages/storage-browser/src/internal/browser-issuance-store.ts:483-488",
+      "owner": "issuance-store maintainers",
+      "disposition": "Align ordering (availability first) with the other seven methods or record the divergence as intentional."
+    },
+    {
+      "id": "P2-2",
+      "finding": "The ambiguous-outcome readback vectors exercise only the committed branch (lost receipt after commit); the 'neither row nor link' outcome and the half-link corruption latch in #assertPlanEffectReadback are never fault-injected, so the symmetric latch is unproven.",
+      "evidence": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts:466-503; packages/storage-browser/src/internal/browser-issuance-store.ts:940-955; packages/storage-node/src/internal/node-issuance-store.ts:1025-1049",
+      "owner": "production-hardening",
+      "disposition": "Extend the phase-2l death-campaign edges to plan-link writes, or accept the gap with a recorded rationale."
+    },
+    {
+      "id": "P2-3",
+      "finding": "Stored-corruption latching for settlement plans (malformed entries_json or malformed native plan row → ISSUANCE_RECOVERY_CORRUPT poison on read/transact/prune) is implemented in all three adapters but untested; the corrupt-plan-refusal vector covers hostile write input only.",
+      "evidence": "packages/storage-node/src/internal/node-issuance-store.ts:371-405 (copySettlementPlanRow); tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts:505-526",
+      "owner": "production-hardening",
+      "disposition": "Add per-adapter stored-corruption cases asserting the poison latch and subsequent refusal."
+    },
+    {
+      "id": "P2-4",
+      "finding": "The prune gate is tested only in the refusal direction; no case proves pruning succeeds once the referencing entry is linked. The fence-atomic-link test uses an empty-entries plan, so the normal drain order (fence issued with unlinked non-manual-review entries present) is also unexercised.",
+      "evidence": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts:528-550 and :369-385",
+      "owner": "production-hardening",
+      "disposition": "Add the positive prune case and a fence-with-unlinked-entries case."
+    },
+    {
+      "id": "P2-5",
+      "finding": "The store-level fence refusal on any manual-review entry exceeds the written store contract, which names only 'fails if already set' for fence (manual-review fence refusal is a Node-level drain rule). The behavior matches the accepted RED case 5 and is consistent across all three adapters, so this is a design-text reconciliation, not a behavior defect.",
+      "evidence": "packages/issuance-store/src/contract.ts (applySettlementPlanEffect fence branch); .logs/d110c-0c1f5b0r-design-3a156aca/design.md:276-281",
+      "owner": "design author",
+      "disposition": "Amend the contract sentence in the design to name the store-level manual-review refusal, or record the deviation in the slice evidence."
+    }
+  ],
+  "notes": [
+    "RED is causal: focused failures trace to the absent native plan methods, the commit-grammar rejection of planEffect, the ungated prune and the old schemas; retained failures trace to the old six-method/three-store/v2-table implementation. The pre-acceptance correction b207e40e strengthened the rejection assertions (captures full pre-issue state instead of asserting a fixed empty state), not weakened them.",
+    "The GREEN-era test corrections are genuine harness fixes: 6cc120eb replaced a multiline regex that over-counted nested transactWriteSettlementPlan input fields with an exact AST member-set comparison against PHASE_3A1B_P2_METHODS (strictly stronger) and awaited the child process.send callback before disconnect (race fix, assertions unchanged); 0508133f restored the raw native v1 control expectation while keeping the adapter-derived v2/four-store expectation (the control database is never adapter-opened).",
+    "Verified against the design contract: exact SettlementPlan/SettlementPlanEntry types and the optional planEffect key on DurableIssueCommit; the exact-key commit validator widened only for planEffect with fail-closed validation; revision CAS with enforced next-revision chaining in all three adapters; planEffect applied atomically inside the single strict four-store IndexedDB transaction and inside BEGIN IMMEDIATE on node; absent-plan, fence-already-set, manual-review, absent-entry and already-linked refusals leave lineage/issued/plan untouched; ambiguous readback latches corruption on any row/link asymmetry; the prune gate refuses unlinked referenced rows in memory, browser and node; detachment of plans and digests on write and read; browser keeps the stable derived name with version 2 and an exact fourth settlementPlans store; node migrates v1 and v2 in place to user_version 3 with an exact settlement_plans DDL and fail-closed drift rejection; node:sqlite runs with setReadBigInts(false) so the changes===1 CAS checks are sound; no transactAdvanceLineage exists anywhere.",
+    "Scope preserved: the GREEN production commit 9fef8d24 touches only packages/issuance-store, packages/storage-browser and packages/storage-node; the packages/node facade passthroughs arrived in the later, separately scoped 0d6e38c2 (see P1-1). Focused 45/45 and retained 78/78 plus 11/11 browser results are recorded in .logs/d110c-0c1f5b0s-green-9fef8d24/result.json; per instructions I did not rerun them."
+  ]
+}

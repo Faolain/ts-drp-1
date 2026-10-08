@@ -1,0 +1,22 @@
+{
+	"profileId": "equivocation-evidence-projection-v1",
+	"baseProfileId": "equivocation-digest-identity-v1",
+	"proofDomain": "ts-drp/equivocation-proof/v1",
+	"projection": {
+		"identity": "structured-slot-and-canonical-unordered-distinct-digest-pair",
+		"proofBodyCopies": 0,
+		"payloadOutboxCopies": 0
+	},
+	"reconstruction": {
+		"carrier": "current-authenticated-persisted-witnesses",
+		"resolver": "authoritative-author-key-resolver",
+		"result": "canonical-equivocation-digest-identity-v1-proof"
+	},
+	"retention": {
+		"amendsBasePersistence": false,
+		"globalEvidenceBoundClaimed": false,
+		"proofBodiesPersist": true,
+		"witnessesPersist": true,
+		"newlyPersistedProofIdsMeaning": "unchanged-exactly-once-for-conforming-0o-a-state"
+	}
+}

@@ -1,0 +1,187 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 13,
+  "passed": 13,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-89f147cc/retained-06/result.json",
+  "baselineSha256": "ad2349e0955f2fdb6bae5d6d1905adc1a47db4cf88d4b9922296fcc14cc6f33f",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] preserves legacy causalJoin reservation, sink delivery, and blueprint fold membership",
+      "status": "passed",
+      "title": "[RED] preserves legacy causalJoin reservation, sink delivery, and blueprint fold membership",
+      "duration": 173.25041699999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress",
+      "status": "passed",
+      "title": "[control] preserves causalJoin ABI refusal on local generation and genuine signed ingress",
+      "duration": 303.33787499999994,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] preserves legacy join structural retirement without exposing an application intent",
+      "status": "passed",
+      "title": "[RED] preserves legacy join structural retirement without exposing an application intent",
+      "duration": 144.94429100000025,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [control] keeps settlement join control-only",
+      "status": "passed",
+      "title": "[control] keeps settlement join control-only",
+      "duration": 108.96745899999996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] surfaces an ordinary same-store non-creator sequence-zero row: legacy pending",
+      "status": "passed",
+      "title": "[RED] surfaces an ordinary same-store non-creator sequence-zero row: legacy pending",
+      "duration": 162.08220800000026,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] surfaces an ordinary same-store non-creator sequence-zero row: settlement published",
+      "status": "passed",
+      "title": "[RED] surfaces an ordinary same-store non-creator sequence-zero row: settlement published",
+      "duration": 125.52779099999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [control] excludes an authenticated activation vertex while surfacing later source work",
+      "status": "passed",
+      "title": "[control] excludes an authenticated activation vertex while surfacing later source work",
+      "duration": 192.98195799999985,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] refuses a settlement issued/outbox mismatch with the existing corruption classification",
+      "status": "passed",
+      "title": "[RED] refuses a settlement issued/outbox mismatch with the existing corruption classification",
+      "duration": 49.10770900000034,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] latches terminal state when the terminal transaction outcome is unknown",
+      "status": "passed",
+      "title": "[RED] latches terminal state when the terminal transaction outcome is unknown",
+      "duration": 60.2599580000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit",
+      "status": "passed",
+      "title": "[RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit",
+      "duration": 40.41229199999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] returns a typed failure for a malformed durable settlement plan: non-array entries",
+      "status": "passed",
+      "title": "[RED] returns a typed failure for a malformed durable settlement plan: non-array entries",
+      "duration": 34.597083999999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] returns a typed failure for a malformed durable settlement plan: throwing entries accessor",
+      "status": "passed",
+      "title": "[RED] returns a typed failure for a malformed durable settlement plan: throwing entries accessor",
+      "duration": 37.41062499999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] returns a typed failure for a malformed durable settlement plan: top-level extra key",
+      "status": "passed",
+      "title": "[RED] returns a typed failure for a malformed durable settlement plan: top-level extra key",
+      "duration": 36.07600000000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "1ba638ea84fb745330bfaed5d7094d4ab47dd98b3d29e854c799a639f2cbf36a",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

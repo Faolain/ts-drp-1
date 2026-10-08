@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync,spawnSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),room='examples/v3-room/src/index.ts',read=n=>JSON.parse(fs.readFileSync(path.join(out,n))),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),before=fs.readFileSync(path.join(out,'room-before.ts'),'utf8'),after=fs.readFileSync(path.join(root,room),'utf8'),start='async function createV3RoomSessionOwned<',end='\tconst sourceInvite = input.rebaseSourceInvite;',normal='\tif (\n\t\tinput.createOperationAdmissionPolicy !== undefined &&\n\t\ttypeof input.createOperationAdmissionPolicy !== "function"';
+if(before.slice(0,before.indexOf(start))!==after.slice(0,after.indexOf(start))||before.slice(before.indexOf(end,before.indexOf(start)))!==after.slice(after.indexOf(end,after.indexOf(start))))throw Error('Outside constructor-prefix change');
+const oldPrefix=before.slice(before.indexOf(start),before.indexOf(end,before.indexOf(start))),newPrefix=after.slice(after.indexOf(start),after.indexOf(end,after.indexOf(start)));
+if(oldPrefix.slice(oldPrefix.indexOf(normal),oldPrefix.indexOf('\tconst invite ='))!==newPrefix.slice(newPrefix.indexOf(normal),newPrefix.indexOf('\tconst { invite, material, settlementProfile }')))throw Error('Nonpair normal validation drift');
+for(const value of ['decodeCreatorInvite(invite)','decodeCanonical(material.exactCanonicalProfileBytes','settlementProfileFor(profileId)'])if(newPrefix.split(value).length!==2)throw Error('Duplicated capture owner '+value);
+if(newPrefix.includes('creator-trusted-')||newPrefix.indexOf('composition is unsupported')>newPrefix.indexOf('input.application.bootstrapOperation')||!newPrefix.includes('capturedInvite ?? captureInvite(input.creatorInvite)'))throw Error('Guard/profile/reuse shape');
+const baseline=read('custody-before.json'),ownerHashes=Object.fromEntries(Object.keys(baseline.ownerHashes).map(f=>[f,hash(fs.readFileSync(path.join(root,f)))]));
+for(const[f,h]of Object.entries(baseline.ownerHashes))if(f!==room&&ownerHashes[f]!==h)throw Error('Other owner drift '+f);
+for(const[f,h]of Object.entries(baseline.testHashes))if(hash(fs.readFileSync(path.join(root,f)))!==h)throw Error('Test drift '+f);
+for(const[f,h]of Object.entries(baseline.built))if(hash(fs.readFileSync(path.join(root,f)))!==h)throw Error('Built drift '+f);
+const diff=spawnSync('git',['diff','--no-index','--',path.join(out,'room-before.ts'),path.join(root,room)],{cwd:root,encoding:'utf8'});if(diff.status!==1)throw Error('Missing room delta');fs.writeFileSync(path.join(out,'room-only-final.patch'),diff.stdout,{flag:'wx'});
+const patch=execFileSync('git',['-C',root,'diff','--binary','--full-index','--',...Object.keys(ownerHashes)]);
+fs.writeFileSync(path.join(out,'source-check-final.json'),JSON.stringify({valid:true,onlyChangedOwner:room,onlyConstructorPrefix:true,downstreamAuthenticationByteIdentical:true,nonpairValidationByteIdentical:true,singleInviteCaptureOwner:true,ownerHashes,built:baseline.built,testHashes:baseline.testHashes,roomOnlyPatchSha256:hash(diff.stdout),roomDiffCommand:diff.spawnargs??['git','diff','--no-index','--','room-before.ts',room],roomDiffStatus:diff.status,roomDiffStderr:diff.stderr,parentPatchSha256:hash(patch)},null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({valid:true,ownerHashes,patchSha256:hash(patch)}));

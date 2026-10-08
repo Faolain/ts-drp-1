@@ -1,0 +1,16 @@
+{
+  "valid": true,
+  "files": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "beforeSha256": "c63f9cb4c8bfda07a631de56382180147af01e9c062b7099a39a4632d9f16f0e",
+      "afterSha256": "1bbc6ea643867d0ed890d1cef4ca2cf9edb3e9b2bbc7f5cc9462ba99e13c450e"
+    }
+  ],
+  "callbackBodySha256": "0003ed91240734eafb114c9aa160bc8c4f66f5153084ea7fab480b53974c17f9",
+  "callbackByteIdentical": true,
+  "wholeFileRestoredByOnlyTwoExactReplacements": true,
+  "soleExecutableDelta": "Selected registration 70_000 -> 90_000",
+  "soleNonExecutableDelta": "Adjacent authorized 70s -> authorized 90s comment",
+  "allAssertionsWorkloadAndProductTimersUnchanged": true
+}

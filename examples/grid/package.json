@@ -13,10 +13,14 @@
 		"start": "vite preview --host --port 5173"
 	},
 	"dependencies": {
+		"@ts-drp/canonical": "0.11.0",
 		"@ts-drp/example-browser-network": "workspace:*",
+		"@ts-drp/example-v3-room": "workspace:*",
+		"@ts-drp/ephemeral": "workspace:*",
 		"@ts-drp/network": "0.11.0",
 		"@ts-drp/node": "0.11.0",
 		"@ts-drp/object": "0.11.0",
+		"@ts-drp/outcome-commit": "workspace:*",
 		"@ts-drp/relay-policy": "0.11.0",
 		"@ts-drp/rendezvous": "0.11.0",
 		"@ts-drp/routing-browser": "0.11.0",

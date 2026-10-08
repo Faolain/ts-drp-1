@@ -1,0 +1,25 @@
+{
+  "baseline": "c938038298b912875f2a8e7b717256fb34370df6",
+  "results": [
+    {
+      "path": "examples/v3-room/src/index.ts",
+      "before": "fd4907fd75cba96cc23c9e00e5c2e39de06b22a19a302788ea2da393c4fbfcf9",
+      "after": "0115f9aea7d7e76fb4ee1550e38cf97cd6b5b533c9338ef389404a1e6b831322",
+      "astHash": "26a060b64678811c58f12bdea6fd9eef4597d9d3b73f4dfcfff7ee95db71ed88",
+      "tokenHash": "d1e095f2a798d2facae237849b7516688172159e73186fea32ad3b62dd77c7df",
+      "astEqual": true,
+      "tokenEqual": true,
+      "soleExactComment": true
+    },
+    {
+      "path": "packages/node/src/v3-live.ts",
+      "before": "61ef1d5c79ffbe615dad6ca6fc207bae842f9b4cab1eeececafe36e33e70c210",
+      "after": "dc59309e61f3b86e6904c91380f81cc83223dc3559fbaa4b3a2e14b8961eb8c3",
+      "astHash": "a424fab3513edebf165a00954879ac6a730ba35506e2c675e94d7b5366b286c6",
+      "tokenHash": "3f242d7fc142ee65611bb0f66b0eafd323558086bff9e0483214cd30d699417c",
+      "astEqual": true,
+      "tokenEqual": true,
+      "soleExactComment": true
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Scope: 2 of 48 workspace projects
+packages/issuance-store build$ tsc -b tsconfig.build.json
+packages/issuance-store build: Done
+examples/v3-room build$ tsc --noEmit -p tsconfig.build.json
+examples/v3-room build: Done

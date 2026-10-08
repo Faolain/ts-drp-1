@@ -1,0 +1,303 @@
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 76725521..1b850c63 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -95687,15 +95687,19 @@ The decision matrix therefore rejects four incomplete constructions:
+ 4. retaining all prior anchors, ACLs, cuts, or QCs violates the O(1)-in-epoch
+    control-state law.
+ 
+-The selected family is one **creator-signed cumulative issuance-retirement
+-checkpoint**, stored as exactly one replaceable AHE closure candidate. It is
++The selected family is one **creator-signed cumulative issuance-admission
++checkpoint for later retirement**, stored as exactly one replaceable AHE
++closure candidate. It is
+ authenticated by the stable `creator-trusted-v1` finality key already rooted in
+ the pinned genesis, binds the current local creator issuance scope to the
+ authenticated successor checkpoint, and directly attests the inclusive
+-resolved author-sequence frontier. It neither trusts the database watermark nor
+-requires replay of an old authority chain. This selection is creator-only: a
+-future rotating signer or independently reopening non-creator writer requires
+-its own reviewed authority design and is not silently claimed here.
++historically admitted author-sequence frontier. It does **not** attest that
++every covered outbox row is already published or prunable: those remain
++separate live outbox and D.109/D.110c-c gates. It neither trusts the database
++watermark nor requires replay of an old authority chain. This selection is
++creator-only and per-author: a future rotating signer, independently reopening
++non-creator writer, or room with additional issuance authors requires its own
++reviewed authority design and is not silently claimed here.
+ 
+ The exact canonical
+ `drp-creator-issuance-retirement-state` v1 record is signed over domain
+@@ -95706,10 +95710,20 @@ The exact canonical
+ - closed/current epoch and anchor plus successor epoch and anchor;
+ - the exact cut-value digest, commit-QC ref, and snapshot-manifest digest;
+ - the prior retirement-candidate digest or the frozen genesis sentinel;
+-- prior inclusive resolved author sequence, nullable only for initialization;
++- prior inclusive admitted author sequence, nullable only for initialization;
+   and
+-- new inclusive resolved author sequence plus the exact observed issuance
+-  lineage `{ exhausted, next }` from which it is derived.
++- new inclusive admitted author sequence plus the exact observed issuance
++  lineage `{ exhausted, next }` against which the bounded derivation is
++  checked.
++
++The genesis sentinel is the lowercase hex result of
++`hashDomain("ts-drp/creator-issuance-retirement/genesis/v1",
++encodeCanonical({ kind: "drp-creator-issuance-retirement-genesis", version: 1
++}))`, exposed only as
++`CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL`. Initialization requires that
++sentinel plus a nullable prior boundary; later records require the exact prior
++candidate digest plus a non-null prior boundary. The two forms are never
++interchangeable.
+ 
+ The initial and advancing rules are exact. A fresh room emits its first
+ checkpoint during 0→1 close while its genuine epoch-0 close graph, durable
+@@ -95725,48 +95739,77 @@ genesis signer; the prior digest is used to enforce transition continuity while
+ both adjacent closures exist, not to create an O(N) proof chain.
+ 
+ Minting starts from the authenticated prior checkpoint and exact issuance
+-scope. It reads the lineage and every address strictly above the prior boundary
+-through `lineage.exhausted ? lineage.next : lineage.next - 1`. Every new address
+-must be dense and increasing and have one byte-identical issued/outbox pair, a
+-canonical vertex, valid author signature, exact current room/anchor/epoch,
+-`published` state, and a digest present in both the captured close graph and
+-sealed durable replay. Missing, duplicate, pending, malformed, substituted,
+-cross-scope, non-current, or non-member rows refuse signing. The successor
+-anchor, Cut/QC, and snapshot identities are fixed before completing the
+-deterministic Ed25519 signature. A close with no newly issued address carries
+-the prior sequence forward while rebinding it to the new successor checkpoint.
++scope. The captured close graph and sealed durable replay—not a store-supplied
++numeric tip—provide the bounded candidate set. At most
++`maxEpochVertices + 1` paged issued/outbox observations are permitted. The new
++inclusive boundary is the largest dense prefix, strictly above the prior
++boundary, whose addresses each have one byte-identical issued/outbox pair, a
++canonical vertex, valid author signature, exact current room/anchor/epoch, and
++a digest present in both the captured close graph and sealed durable replay.
++The observed lineage is a consistency upper bound, never authority and never
++an iteration range. An exhausted lineage refuses once with
++`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`; no loop approaches
++`Number.MAX_SAFE_INTEGER`. Fresh 0→1 initialization requires the genuine
++pinned-genesis sequence-0 row in the epoch-0 graph/replay and therefore emits
++boundary `0`; an empty initialization refuses rather than encoding `-1`.
++
++An issued address that is not admitted may truncate only the unclaimed suffix.
++A hole, duplicate, substitution, cross-scope row, or later admitted address
++after a missing/nonmember address would skip an ordinal and therefore refuses
++signing. A `pending` row that **is** authenticated in the close graph/replay is
++included in the admitted frontier and does not block close. The checkpoint
++authenticates that row's historical room membership but does not call it
++published or prunable. A close with no newly admitted address carries the prior
++boundary forward while rebinding it to the new successor checkpoint. The
++successor anchor, Cut/QC, and snapshot identities are fixed before completing
++the deterministic Ed25519 signature.
+ 
+ Cold reopen never trusts this record merely because storage returned it. The
+ opener consumes pinned-genesis-derived creator trust plus the independently
+ authenticated room floor, verifies the exact signature and all scope/head/
+ Cut/QC/snapshot fields, and requires the one candidate selected from the
+-bounded active closure. Missing, duplicate, stale, future, cross-room,
+-cross-author, forked, malformed, or nonmonotonic candidates fail closed. An
+-authenticated boundary permits old-address classification only at or below its
+-inclusive sequence. The wrapper still requires exact issued/outbox equality,
+-canonical object/author/sequence, a valid author signature, and `published`
+-state; the creator checkpoint, not the row's claimed old anchor or database
+-watermark, supplies the authority that the address is resolved. Rows above the
+-boundary retain existing current/displaced admission and offline/rebase
+-custody. One combined per-scan `maxEpochVertices` counter bounds all hidden
+-rows.
+-
+-Physical pruning remains an execution mechanism owned by D.109/D.110c-c. It may
++bounded active closure. Its `successorEpoch`/anchor must equal the independently
++authenticated current room floor; its closed/current epoch/anchor identifies
++the retained immediate predecessor. Cold reopen rejects missing, duplicate,
++future, cross-room, cross-author, wrong-floor, forked, or malformed candidates.
++Prior-digest and monotonic-boundary continuity are transition-time checks while
++both adjacent closures exist; cold-reopen freshness reduces to the accepted
++D.110c-0b0 floor authority and the record's successor binding.
++
++An authenticated boundary permits old-address **admission authentication**
++only at or below its inclusive sequence. The future D.110c-0c1 wrapper still
++requires exact issued/outbox equality, canonical object/author/sequence, and a
++valid author signature. A covered `published` row may be hidden from ordinary
++outbox traversal; a covered `pending` row must remain visible to existing
++offline/rebase custody and is neither hidden nor prune-eligible. Thus the
++checkpoint, not the row's claimed old anchor or database watermark, supplies
++historical admission authority without converting an unpublished row into a
++published one. Rows above the boundary retain existing current/displaced
++admission. One combined per-scan `maxEpochVertices` counter bounds all rows
++classified through the new capability.
++
++Physical pruning remains an execution mechanism owned by D.109/D.110c-c. The
++existing D.109d law at `packages/node/src/v3-live.ts:2845` requires
++`prunedThroughAuthorSequence === displacedIssuanceBoundary`; D.110c-0c1 and
++D.110c-c must explicitly reconcile that immediate-predecessor boundary with the
++new authenticated admitted frontier before any deletion. Pruning may
+ run only after verified adoption, authenticated floor commit, snapshot
+ availability, two complete rollback generations, outbox completion, and exact
+ retirement-checkpoint agreement. Refusal or crash may retain certified rows;
+ neither can advance the certificate, remove an uncertified address, or report a
+ partial deletion as complete.
+ 
+-This design introduces a protocol-v3 control-record/registry contract and a new
++This design introduces a protocol-v3 signed control-record contract and a new
+ protocol-owned finality signing request. That is a material high-risk
+ compatibility boundary. It does not require a new cryptographic primitive,
+-dependency, epoch-anchor/Cut field, product API, or issuance database schema:
+-the signed record is one bounded AHE closure blob and reuses existing Ed25519,
+-the existing creator finality signer, exact AHE blob/ref storage, and current
+-room-floor authority. Per the stop rule, no production implementation begins
+-inside D.110c-0c1. The new prerequisite below owns that contract first. The
+-audit evidence is
++dependency, registry-v1/normative wire-table edit, epoch-anchor/Cut field,
++product API, or issuance database schema: like the existing anchor-trust and
++latched-ACL control records, the signed record uses a source-owned canonical
++domain constant. It is one bounded AHE closure blob and reuses existing
++Ed25519, the existing creator finality signer, exact AHE blob/ref storage, and
++current room-floor authority. Per the stop rule, no production implementation
++begins inside D.110c-0c1. The new prerequisite below owns that contract first.
++The audit evidence is
+ `.logs/d110c-0c1-architecture-audit-d6f5de26/`; its validated nine-source hash
+ inventory is inside the root and its four-entry self-excluding manifest
+ SHA-256 is
+@@ -95774,11 +95817,20 @@ SHA-256 is
+ 
+ ###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
+ 
+-**Status: plan review required; no production implementation authorized.**
+-Owner: protocol-v3 creator retirement record/opener and one-use signing request,
+-keychain finality signing dispatch, the creator-close row/graph/replay capture,
+-the shared creator transition classifier's exact-one replacement law, and
+-pending/reopen AHE closure preservation. Deadline: GREEN before D.110c-0c1 may
++**Status: P0/P1 plan corrections frozen; one material confirmation required;
++RED and production implementation remain unauthorized.** Owner: protocol-v3
++creator retirement record/opener and one-use signing request, keychain finality
++signing dispatch, the creator-close row/graph/replay capture, the Node-private
++`inspectCreatorTransitionAdvance()` exact-one normalization law across all
++stage/adoption/cold-reopen/pending-resume consumers, and pending/reopen AHE
++closure preservation. The underlying control-plane trust predicates remain
++unchanged: the Node-private wrapper strips and verifies exactly the permitted
++retirement candidate delta before invoking them, then returns the original
++accepted proposal. Candidate authenticity is not delegated to this structural
++normalization: every stage/verify consumer must first open the exact candidate
++against pinned-genesis creator trust and its independently authenticated
++current/successor floor, then pass that selected pair to the wrapper. Deadline:
++GREEN before D.110c-0c1 may
+ change `creatorFilteredIssuanceStore()`, before D.110c-0c may claim its
+ same-process epoch-3 reopen, and before D.110c-c/d or Phase 7 consumes repeated
+ epochs.
+@@ -95790,39 +95842,60 @@ issuance lineage and published bootstrap row exist, and terminates only with
+ `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`. A second product-shaped row
+ extends the lineage before close and must leave the same exact causal failure;
+ no fixture writes a carrier or mutates the AHE closure. The RED evidence records
+-the exact row keys/digests, lineage, graph membership, durable-replay result,
+-cut/QC/snapshot/successor identities, selected closure, one-test/one-file
+-listing, reporter counts, and the complete token. Any earlier close failure,
+-different missing candidate, or hidden source mutation stops the slice.
++and **asserts** the exact dense row keys/digests, issued/outbox byte equality,
++lineage, graph membership, durable-replay membership, and exact
++cut/QC/snapshot/successor identities before inspecting the selected closure.
++It records the one-test/one-file listing, reporter counts, and complete token.
++Any earlier close failure, different missing candidate, incomplete mint input,
++or hidden source mutation stops the slice.
+ 
+ GREEN implements only the reviewed carrier prerequisite:
+ 
+-1. add the exact registry kind, canonical capture, prepare/complete/open APIs,
+-   opaque verified capability, and one-use domain-separated signing request;
++1. add the exact source-owned control-record kind/domain constant, canonical
++   capture, prepare/complete/open APIs, opaque verified capability, frozen
++   domain-separated genesis prior-digest sentinel, and one-use signing request;
++   do not edit `registry-v1.json` or its normative wire table;
+ 2. extend finality-key custody only with the matching protocol-owned request;
+    arbitrary-digest signing remains impossible;
+-3. derive the dense published boundary through genuine creator close graph,
+-   issuance, and durable-replay owners before producing the successor-bound
+-   record;
+-4. stage exactly one signed record in the proposed AHE closure, preserve it
++3. derive the bounded dense admitted boundary through genuine creator close
++   graph, issuance, and durable-replay owners before producing the
++   successor-bound record; pending admitted rows are covered but remain pending,
++   while empty initialization and exhausted lineage refuse without an unbounded
++   scan;
++4. make the Node-private transition wrapper accept only these normalized laws:
++   epoch-0 initialization adds exactly one record and N≥1 replaces exactly one
++   prior record with exactly one successor. It removes those exact candidates
++   from detached current/proposed inputs before calling the unchanged existing
++   control-plane predicate, rejects every other added/dropped/unknown candidate
++   with the existing reason, and applies identically in stage and all three
++   verify-mode consumers;
++5. stage exactly one signed record in the proposed AHE closure, preserve it
+    through pending process death, and replace the adjacent predecessor record
+-   with no third live copy or uncounted sibling state;
+-5. enforce fresh 0→1 initialization, ordinary monotonic advance,
++   with no third active/pending copy or uncounted sibling state;
++6. enforce fresh 0→1 initialization, ordinary monotonic advance,
+    same-boundary advance, and inherited epoch≥1 missing-record refusal pending
+    a separately reviewed migration;
+    and
+-6. expose no filter/skip decision yet. D.110c-0c1 remains the sole consumer
++7. expose no filter/skip decision yet. D.110c-0c1 remains the sole consumer
+    that classifies old addresses from the verified capability.
+ 
+ Adversarial GREEN rows cover wrong creator signer, altered signature/preimage,
+ wrong object/genesis/author/current or successor head, wrong Cut/QC/snapshot,
+ stale prior digest, decreased or jumped sequence, inconsistent exhausted/next,
+ missing/duplicate record, duplicate/gapped issued address, issued/outbox
+-substitution, pending row, valid same-room fork, graph/replay omission,
+-post-capture mutation, ambiguous persistence, and replay after candidate
+-replacement. The closure census proves exactly one active retirement candidate,
+-at most one adjacent predecessor during atomic advance, and constant bytes with
+-epoch count for fixed scope/field sizes.
++substitution, pending admitted row, issued-but-unadmitted suffix, admitted row
++after a gap, valid same-room fork, graph/replay omission, post-capture mutation,
++ambiguous persistence, wrong/null genesis sentinel use, empty initialization,
++exhausted lineage single refusal, canonical record above the 8,192-byte
++scannable bound, consumed-signing-request reuse, cross-request-type dispatch,
++pending-floor stable/candidate selection, and replay after candidate
++replacement. The closure census proves exactly one retirement candidate in the
++active closure and at most one adjacent candidate in the staged/pending
++generation. Older records in the two retained rollback generations are counted
++separately as bounded rollback state, never opener authority; no third
++active/pending copy or uncounted sibling exists. Each record is at most 8,192
++bytes and active control bytes remain constant with epoch count for fixed
++scope/field sizes.
+ 
+ Focused protocol/keychain/control-plane/Node tests run once for RED and once for
+ GREEN. GREEN then retains creator close/seal/QC, 0b0/0b1 checkpoint opening and
+@@ -95846,6 +95919,36 @@ epoch-anchor/Cut wire change, public product API, new dependency, or different
+ authority assumption, stop and reslice that demonstrated requirement rather
+ than widening 0c1a. No Fable or collaboration subagent runs.
+ 
++The plan review of signed/pushed commit
++`fc384d1fe3d503bb9e3706e97bf62bea39fe8a7c` returned
++`CHANGES_REQUIRED` from all three reviewers. Grok's initial 24-turn request was
++service-cancelled without a verdict at 720.291 seconds and was therefore
++recorded honestly as `NO_VERDICT`; exact session
++`01a0649a-9cee-7dd1-8241-41f673464078` was resumed once and emitted the terminal
++review. Grok and Kimi each found the pending-row/empty-or-exhausted-lineage
++contradiction. Opus independently found those issues, the closure predicate's
++exact-delta conflict, and the cross-epoch pending-row pin. The blocking union is
++closed prospectively in this corrected text by authenticating admitted history
++independently from publish/prune state, deriving only from a bounded graph/replay
++candidate set, refusing exhausted lineage without numeric traversal, and
++normalizing the exact one-candidate delta in the Node-private wrapper before
++the unchanged control-plane predicates run. Because these corrections change
++the carrier's executable semantics, one material confirmation remains required
++before RED.
++
++All P2 findings have explicit disposition here: the prior-digest sentinel and
++8,192-byte limit are frozen; opener transition checks are separated from
++cold-floor checks; the census distinguishes active/pending from retained
++rollback generations; RED asserts rather than merely records mint inputs;
++registry-v1 remains unchanged; D.109d boundary reconciliation stays owned by
++D.110c-0c1/c; creator-only means one issuance author; and the combined future
++scan ceiling receives retained counter checks. The audit root itself remains
++immutable. Its broad sentence about later registered-view scans is narrowed
++prospectively: the demonstrated seam and this prerequisite cover recovery and
++bind-time filtered views; post-activation raw-store publication/rebase behavior
++is retained and must not be relabelled as already filtered. Complete raw review
++evidence is under `.logs/d110c-0c1a-plan-review-fc384d1f/`.
++
+ The complete confirmation evidence is retained under
+ `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+ self-excluding manifest SHA-256 is

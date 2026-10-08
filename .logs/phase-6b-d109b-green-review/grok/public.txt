@@ -1,0 +1,70 @@
+I'll start with the accepted D.109b plan, RED/GREEN commits, and evidence, then inspect the issuance/planner/storage contracts against the ten adjudication items.The review skill’s write/spawn path is out of scope here; I’ll inspect the plan, RED/GREEN evidence, and issuance contracts directly.Next I’ll inspect the GREEN diff and the issuance/maintenance owners against the frozen contracts.The core owners are in place; I’ll read the shared maintenance, Node/browser adapters, and planner next.I’ll now inspect Node schema migration/pruning and the browser IDB transaction path.# D.109b GREEN implementation review
+
+Reviewed signed HEAD `529367b154ffd3fb66bf31a6cfedb4a0d9b73746` against immutable RED parent `db84a1addf28e655f7b5850fd540c4b9b6f5ca48` and plan anchors `fe934eae…` / `433f11af…` / `5bd4fe84…`. No other final-review output was used.
+
+## 1. RED causality
+
+RED focused Vitest is 93 selected-or-skipped: **10 passed, 12 failed, 71 skipped**. The 12 failures are the frozen missing owners, not fixture/build/resolution errors:
+
+- error registry missing `ISSUANCE_RECORD_PRUNED`
+- missing `./maintenance` and `./issuance-maintenance` package exports
+- planner positive path refusing `D109A_OUTBOX_INCOMPLETE` because lineage/watermark were not copied yet
+- `D109B_SHARED_MAINTENANCE_MISSING` and `D109B_NODE_MAINTENANCE_MISSING`
+
+Authoritative Chromium RED is one `D109B_BROWSER_MAINTENANCE_MISSING` failure. GREEN implements those nine owners plus directly affected manifests/expectations. Native-mutant and migration assertions that were skipped at RED are executed at GREEN and are documented as GREEN acceptance coverage, not retroactive RED execution.
+
+## 2. Facade and capability isolation
+
+`DurableIssuanceStore` remains the existing six methods in `packages/issuance-store/src/types.ts`. Ordinary factories stay one each (`issuance.ts`). Package roots do not re-export maintenance. Resolvers are exact `WeakMap` identity:
+
+- `resolveEphemeralDurableIssuancePruningMaintenance`
+- `resolveNodeDurableIssuancePruningMaintenance`
+- `resolveBrowserDurableIssuancePruningMaintenance`
+
+Copies, proxies, and cross-backend facades resolve to `undefined`. Chromium proves `facadeKeys` are exactly the six ordinary methods.
+
+## 3–4. One-owner prune, watermark, receipts
+
+Shared / Node / browser all: validate+copy input first; reread lineage and inclusive watermark in one write transaction; require exact expected state except the specified lost-receipt no-op (`current watermark === through` and lineage match, even if expected watermark is stale/null); page 64-row proofs; require paired equal digests, exact scope/ordinal, consumed end, `epoch === closedEpoch`, and `published`; then delete only `[from, through]` and advance the watermark atomically. Mutants (malformed, one-sided, digest mismatch, gap, pending, wrong-epoch, count mismatch) roll back with zero durable writes. Receipts/errors are detached and frozen; pruned evidence exposes only `code`, caller `scope`, and `authorSequence`.
+
+Null watermark never satisfies `seq <= W`. Page edges 64/65/128/129 delete the full selected prefix.
+
+## 5. Node schema v2
+
+Same `.drp-issuance-v1.sqlite` file. Admission `BEGIN IMMEDIATE`, reread version/catalog, exact v1 catalog migrates only `lineages` with `NULL` watermark, verifies v2, commits. Evidence: inode continuity, row preservation, injected INSERT fault rollback to v1, two racing v1 openers → one v2, unknown version/catalog unrepaired, stale two-handle watermark CAS, six SIGKILL edges old XOR complete-new (`after-commit` only is new).
+
+## 6. Browser IDB v1
+
+Name suffix `--drp-issuance-v1`, version 1 unchanged. Legacy four-member lineage is null watermark; fifth member is written only at prune and preserved on later `transactIssue`. Eleven genuine IDB mutants refuse with zero pruning writes. Identity/refusal/later-epoch matrix matches Node/shared.
+
+## 7. Terminal polarity
+
+`readIssued` of consumed absence at/below watermark returns `null`. Late exact and wrong-digest ack both return non-poisoning `ISSUANCE_RECORD_PRUNED` (no digest compare). Consumed absence above watermark, and any surviving row at/below watermark, latch `ISSUANCE_RECOVERY_CORRUPT`. Never-issued remains `null` / `ISSUANCE_INVALID_ARGUMENT`.
+
+## 8. Planner continuation
+
+`planClosedEpochCleanup` now requires `lineage` and `prunedThroughAuthorSequence`. Rows are exactly `W+1..through`, or empty iff `W === through`. Gaps, rows `<= W`, and `W > through` remain `D109A_OUTBOX_INCOMPLETE`. Earlier D.109a refusal precedence is retained.
+
+## 9. Evidence
+
+Internally consistent with the documented honest corrections:
+
+- focused Vitest **45/45** (3 files)
+- focused Chromium **4/4**
+- retained Vitest **183/183** (22 files)
+- Phase-2l browser lifecycle/death **8/8**
+- Phase-2l parity **3/3**
+- initial Phase-2l Vitest **88/90** only from stale v1 `user_version` pins; p2 **9/10** only from the terminal-hash pin; zsh `path` diagnostic is not a product failure
+- self-excluding green manifest (14 hashed files, not itself)
+
+## 10. Scope
+
+GREEN touches the frozen issuance/maintenance/planner owners, package export maps, directly affected retained pins, evidence, and the plan checkpoint. No node-handle, protocol, snapshot, scheduler, campaign, or D.109c work.
+
+No demonstrated P0/P1: nothing shown authorizes unsafe deletion, misclassifies durable state, exposes pruning authority, or falsifies RED→GREEN causality.
+
+VERDICT: APPROVED
+
+P0_P1_UNION: none
+
+D109B_MAY_CLOSE: yes

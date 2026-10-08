@@ -1,0 +1,11 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": { "composite": false, "noEmit": true, "rootDir": "../../..", "target": "ES2023" },
+	"files": [
+		"canonical-controls.ts",
+		"vitest.config.mts",
+		"vitest.workspace.ts",
+		"../../snapshot-declaration-provenance-controls.test.ts"
+	],
+	"include": []
+}

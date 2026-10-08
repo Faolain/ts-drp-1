@@ -1,0 +1,158 @@
+[
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED batches sixteen compatible rebases behind one target signature",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED closes one source exactly once after every child has a terminal outcome",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+    "status": "failed",
+    "errors": [
+      "AssertionError: expected [Function] to throw error including 'issuance-rejected' but got 'truncated canonical value'"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED fails unknown policy and unstable transform identity before target issuance",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED keeps a failed source completion pending and retries it on reopen",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED keeps a recovered projection-rejected replacement and its source pending without reissue",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED keeps a transformed source pending when the product projection rejects its replacement",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED keeps the reserved terminal activation outside the real chat and zone displacement policies",
+    "status": "passed",
+    "errors": []
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED keeps the source pending and terminally exposes target issue or publication failure",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED orders exact rebase and transform inputs while expire and held review perform no issue",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED preserves published source work and completes pending work only after target acceptance",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED refuses a foreign-author displaced intent before signing or issuing",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+    "status": "passed",
+    "errors": []
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+    "status": "failed",
+    "errors": [
+      "AssertionError: expected [Function] to throw error including 'readiness' but got 'truncated canonical value'"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED sorts displaced pages before assigning fresh target logical times",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED splits seventeen compatible rebases into sixteen plus one",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  },
+  {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "title": "Phase 3g room-owned rebase scheduling RED suppresses an accepted exact identity before issue and rejects changed bytes",
+    "status": "failed",
+    "errors": [
+      "TypeError: truncated canonical value"
+    ]
+  }
+]

@@ -1,0 +1,139 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 9,
+  "passed": 9,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-36/result.json",
+  "baselineSha256": "7a51e8abbffb72f7a9fa4d474738fcf558db0e6e1e3b2d0189cd5ec7288b5b55",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED freezes exactly ten RED and four GREEN owners",
+      "status": "passed",
+      "title": "freezes exactly ten RED and four GREEN owners",
+      "duration": 3.42841599999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED freezes the closed public contract and finite fault vocabulary",
+      "status": "passed",
+      "title": "freezes the closed public contract and finite fault vocabulary",
+      "duration": 0.7804589999999507,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED constructs one sorted generation-2 replacement without a manifest ref",
+      "status": "passed",
+      "title": "constructs one sorted generation-2 replacement without a manifest ref",
+      "duration": 1.3012919999999895,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED classifies exact active-new independently of a retrying generation id",
+      "status": "passed",
+      "title": "classifies exact active-new independently of a retrying generation id",
+      "duration": 1.0670829999999114,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED keeps root/product/transport/issuance/activation owners outside the GREEN roster",
+      "status": "passed",
+      "title": "keeps root/product/transport/issuance/activation owners outside the GREEN roster",
+      "duration": 1.6850839999999607,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED [RED readiness] requires all four candidate owners and the non-root package export",
+      "status": "passed",
+      "title": "[RED readiness] requires all four candidate owners and the non-root package export",
+      "duration": 0.09199999999998454,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED consumes only a genuine owner-bound intent and commits one exact successor",
+      "status": "passed",
+      "title": "consumes only a genuine owner-bound intent and commits one exact successor",
+      "duration": 686.4355,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED accepts a byte-identical second intent without a second head swap",
+      "status": "passed",
+      "title": "accepts a byte-identical second intent without a second head swap",
+      "duration": 229.19729099999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts",
+      "ancestorTitles": [
+        "D.108c one-CAS creator adoption RED"
+      ],
+      "fullName": "D.108c one-CAS creator adoption RED reopens pending-old or exact active-new at every logical request fault",
+      "status": "passed",
+      "title": "reopens pending-old or exact active-new at every logical request fault",
+      "duration": 5223.137333000001,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "94b25079d59cd2848d0ac7e9a155571a7143a17c3c7adb66cb00770b61fd3d34",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

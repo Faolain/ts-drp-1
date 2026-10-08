@@ -1,0 +1,19 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/canonical": ["packages/canonical/src/index.ts"],
+			"@ts-drp/issuance-store": ["packages/issuance-store/src/index.ts"],
+			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
+			"@ts-drp/storage-browser/issuance": ["packages/storage-browser/src/issuance.ts"],
+			"@ts-drp/storage-node/issuance": ["packages/storage-node/src/issuance.ts"]
+		},
+		"types": ["node"]
+	},
+	"include": ["type-assignability.ts"]
+}

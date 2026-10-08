@@ -1,0 +1,149 @@
+{
+  "records": [
+    {
+      "file": "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+      "beforeSha256": "2486ee5e05f9f6cfcda21e7c268145a4ed16c23b768ada0b6783bd37673255a0",
+      "afterSha256": "3c80b45a20d41a8044406270ffcee5ed954271ce9debfac71b25df778ad120fc",
+      "normalizedSha256": "61acac94014fce691c4d56f3b6261276a6e599c813788ebb0f2dbdb3848f56c3",
+      "baselineNormalizedSha256": "61acac94014fce691c4d56f3b6261276a6e599c813788ebb0f2dbdb3848f56c3",
+      "equal": true,
+      "reversals": [
+        {
+          "reason": "Spread genuine raw public store before unchanged six overrides",
+          "removedSha256": "e682cc6ba60f809c330d563373ad1f201247ee53a196f6986d0104a6f8e4799e",
+          "restoredSha256": "65c8704bfa9f202a8fba3eb3a99c0956233b3a93fe9846ddc8c001187c075c65"
+        }
+      ]
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+      "beforeSha256": "44dc8f6ab301bbb2474a5e058e69e55546d99e6182e87a83e47958c7b64fcef5",
+      "afterSha256": "67be57e7ad5f72335c8e89b770a031960bf48b636594ec52e3b6c3adbb2db717",
+      "normalizedSha256": "6968f92faf91354484d37721f0549c258279c5787ce8b2354f948f705c333144",
+      "baselineNormalizedSha256": "6968f92faf91354484d37721f0549c258279c5787ce8b2354f948f705c333144",
+      "equal": true,
+      "reversals": [
+        {
+          "reason": "Existing full-transition authority or protocol-kind import",
+          "removedSha256": "15358db42181515986aae7f3336306c91fa8a71be3e6a21a662796df45ca7dab",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Existing full-transition authority or protocol-kind import",
+          "removedSha256": "d13ff70b361adc33ae6abb8bf8c028299f3b7a210d4fcaafa1a1323e795f6cd3",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Promote existing checkpoint type import to genuine opener import",
+          "removedSha256": "741d71f94925125f78cb2c37235efce104b8e365aef222e5d6318ab67d316904",
+          "restoredSha256": "778ee930d924db472bf37d512c7b51a4890dcae908fa951993936c807e99d20d"
+        },
+        {
+          "reason": "Existing full-transition authority or protocol-kind import",
+          "removedSha256": "ee6631cafb68994cfa13d7676441c84fe353faa8142f3a021b30c5973743c504",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Full-closure authentication and exact reference projection: checkpointInput",
+          "removedSha256": "ea9e99e14de138bf406152763feb2d8c2e0f9098b4940e1540168e74b19ef091",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Full-closure authentication and exact reference projection: checkpoint",
+          "removedSha256": "675c9bbc67492fb5078f62383c54bd1378ffe2f371ea980d3ae2f80bf85986ab",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Full-closure authentication and exact reference projection: transition",
+          "removedSha256": "d91524e192b3e026dee871e1ca2adef45c8102319d96e2c12e5df7a17519dbdc",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Full-closure authentication and exact reference projection: authenticatedControlRefs",
+          "removedSha256": "9d093f19bdc40a50c3f075cf8eab4c69f86cc4e3a26e1c12406371885cfb6481",
+          "restoredSha256": "43ac71dfe9d9b50a5ee0674d794aaed61e76965e1f9ab2389a314d0b47c8eada"
+        },
+        {
+          "reason": "Full-closure authentication and exact reference projection: isAuthenticatedControlRef",
+          "removedSha256": "9c7f31ba876c2362a45ab8ab689003d7056822e7d24651bc5d10dc993b2012d0",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Require genuine checkpoint success before projection",
+          "removedSha256": "ee53a91ea5ab3a56b35e3b4557973803c9c724c9bef868128799eeb978a75251",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Require genuine transition success before projection",
+          "removedSha256": "ca2aa25b5084f95f8fdaadf0b674178aeffc243260eecec76e62e6b27c42a0a6",
+          "restoredSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "reason": "Project authenticated exact digest/length reference pairs: boundedReferences",
+          "removedSha256": "fdaa6bfe0cd7123135543ad5a102bdbccc212b6c4680b7a3ad832853765eda7a",
+          "restoredSha256": "511c5b6b9eea8bfd85a1ae9524f6aabb0491a9c3e878c7ef0bc35e549f68eb10"
+        },
+        {
+          "reason": "Project authenticated exact digest/length reference pairs: boundedCandidates",
+          "removedSha256": "b1ba0fedf4a80ba5fe8e72b4e1ffd2e0a2063e8195826c26dd11068db4e42905",
+          "restoredSha256": "6dadf41cf7532c13f14503429559f9b7d45477edfb2e32e67760241c7b377ef9"
+        },
+        {
+          "reason": "Project authenticated exact digest/length reference pairs: boundedCurrentReferences",
+          "removedSha256": "a4073a5156582fc0bdcb3f9e14e936b9e1be53ad66d16312a598cd911bea53d6",
+          "restoredSha256": "dd99f84e8b7dc45fb571099b67df572b84f7c5c8441312e54904459516d25d52"
+        },
+        {
+          "reason": "Project authenticated exact digest/length reference pairs: boundedCurrentCandidates",
+          "removedSha256": "f87d9d569d77d780aad8e5e8767172af22283bc7484063bd09a2d3cfe9d05b46",
+          "restoredSha256": "d46e00da93d24ef9f1f8d3d303e7525eb34be17071712b347a589ddaa583a58a"
+        },
+        {
+          "reason": "Reuse one exact checkpoint input for opener and evidence",
+          "removedSha256": "3e017806e38d1eafd76cf02895fa85e4fccf738d56b1ea4f009033fc57bb9d8f",
+          "restoredSha256": "147752fd1b12dcbccd81870beea2d60cc6b4d6699743fe3f5ff5b44a89e8006e"
+        }
+      ]
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+      "beforeSha256": "99e97911dada4795819dca5423f4d6bd4b851de6ee17b8e077c1766a8d6c01d8",
+      "afterSha256": "2944cdce0fd0ab8a1e1c0318e1bdc49522ac8ff678696a6a0a118f247739e00b",
+      "normalizedSha256": "f6c0070410732790004dada46bd806493f16b541c6b3284aeb6d66b304808b2f",
+      "baselineNormalizedSha256": "f6c0070410732790004dada46bd806493f16b541c6b3284aeb6d66b304808b2f",
+      "equal": true,
+      "reversals": [
+        {
+          "reason": "Current-successor bootstrap availability guard",
+          "removedSha256": "0695eef3b33df0915c86966664a9c221d4ca6cd1412f6186687ee423ec50a94a",
+          "restoredSha256": "7c5aa1930035799081cce99ccee86d7c65064b0dba0f6d2a40c845aa527af4b7"
+        },
+        {
+          "reason": "Epoch-two bootstrap availability guard",
+          "removedSha256": "a3300f454294d7a7c6f3a01fd437c7222b9f13073b467f2628fe219aa02bd183",
+          "restoredSha256": "04ff9ea6bd4af44e7327d7646b83d15d7288dbfe311467a45a6f9e5bc328c6bb"
+        },
+        {
+          "reason": "Detached original bootstrap at indentation 5",
+          "removedSha256": "daf24b8757007650ef8e5d73417382294be3f49a4a7d9fbd82526ff6744b5368",
+          "restoredSha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "reason": "Detached original bootstrap at indentation 6",
+          "removedSha256": "1772a7ddc03ff94f8ee07e41174f234fba08583f625c22215e7073ed357aff73",
+          "restoredSha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ]
+    }
+  ],
+  "normalizedAstEquivalentOutsideEnumeratedGreenHunks": true,
+  "childSixOverridesByteIdentical": true,
+  "sameStoreShapeByteIdentical": true,
+  "bothOriginalColdInputExpressionsUnchangedExceptDetachedPins": true,
+  "originalBootstrapDerivationAndSameInputObserversByteIdentical": true,
+  "fullDurableEvidenceAndRedAssertionsPreserved": true,
+  "oneCheckpointInputOwner": true,
+  "genuineFullTransitionVerifierBeforeExactRefProjection": true,
+  "testExecutions": 0,
+  "productionEdits": 0
+}

@@ -1,0 +1,416 @@
+{
+  "targetDiagnostics": [],
+  "externalDiagnostics": [
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 595,
+      "column": 21,
+      "length": 5,
+      "start": 23446,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 597,
+      "column": 24,
+      "length": 5,
+      "start": 23576,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 598,
+      "column": 23,
+      "length": 5,
+      "start": 23679,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'digest' implicitly has an 'any' type.",
+      "line": 599,
+      "column": 19,
+      "length": 6,
+      "start": 23776,
+      "token": "digest"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 607,
+      "column": 22,
+      "length": 5,
+      "start": 24225,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 608,
+      "column": 19,
+      "length": 5,
+      "start": 24320,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 609,
+      "column": 30,
+      "length": 5,
+      "start": 24420,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ baseExpectedHead: Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>; ... 4 more ...; state: GenerationState; }>' is not assignable to type 'GenerationRecord'.\n  Types of property 'baseExpectedHead' are incompatible.\n    Type 'Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>' is not assignable to type 'ExpectedHead'.\n      Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'ExpectedHead'.\n        Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'PresentHead'.\n          Types of property 'revision' are incompatible.\n            Type 'number' is not assignable to type 'HeadRevision'.\n              Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.",
+      "line": 627,
+      "column": 5,
+      "length": 18,
+      "start": 25372,
+      "token": "generations[index]"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type.",
+      "line": 639,
+      "column": 20,
+      "length": 8,
+      "start": 25778,
+      "token": "objectId"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type.",
+      "line": 644,
+      "column": 35,
+      "length": 8,
+      "start": 26003,
+      "token": "objectId"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 696,
+      "column": 14,
+      "length": 5,
+      "start": 28147,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'declaration' implicitly has an 'any' type.",
+      "line": 707,
+      "column": 21,
+      "length": 11,
+      "start": 28575,
+      "token": "declaration"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type.",
+      "line": 707,
+      "column": 34,
+      "length": 7,
+      "start": 28588,
+      "token": "options"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 712,
+      "column": 14,
+      "length": 8,
+      "start": 28852,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'receipt' implicitly has an 'any' type.",
+      "line": 713,
+      "column": 16,
+      "length": 7,
+      "start": 28904,
+      "token": "receipt"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 713,
+      "column": 25,
+      "length": 8,
+      "start": 28913,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 714,
+      "column": 22,
+      "length": 8,
+      "start": 28982,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type.",
+      "line": 717,
+      "column": 14,
+      "length": 8,
+      "start": 29100,
+      "token": "selected"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'signal' implicitly has an 'any' type.",
+      "line": 719,
+      "column": 11,
+      "length": 6,
+      "start": 29191,
+      "token": "signal"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type.",
+      "line": 723,
+      "column": 21,
+      "length": 10,
+      "start": 29350,
+      "token": "descriptor"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type.",
+      "line": 733,
+      "column": 16,
+      "length": 10,
+      "start": 29949,
+      "token": "descriptor"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'bytes' implicitly has an 'any' type.",
+      "line": 733,
+      "column": 28,
+      "length": 5,
+      "start": 29961,
+      "token": "bytes"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type.",
+      "line": 740,
+      "column": 18,
+      "length": 7,
+      "start": 30078,
+      "token": "options"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2739,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (scope: any, sequence: any) => Promise<DurableIssueCommit | null>; readLineage: (scope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (scope: any, buildAndSign: any) =...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "line": 803,
+      "column": 8,
+      "length": 17,
+      "start": 32661,
+      "token": "baseIssuanceStore"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 805,
+      "column": 35,
+      "length": 5,
+      "start": 32794,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 806,
+      "column": 22,
+      "length": 5,
+      "start": 32880,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'sequence' implicitly has an 'any' type.",
+      "line": 806,
+      "column": 29,
+      "length": 8,
+      "start": 32887,
+      "token": "sequence"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 811,
+      "column": 23,
+      "length": 5,
+      "start": 33147,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 816,
+      "column": 26,
+      "length": 5,
+      "start": 33368,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "line": 823,
+      "column": 19,
+      "length": 5,
+      "start": 33635,
+      "token": "scope"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "line": 823,
+      "column": 26,
+      "length": 12,
+      "start": 33642,
+      "token": "buildAndSign"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 827,
+      "column": 20,
+      "length": 5,
+      "start": 33886,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 829,
+      "column": 24,
+      "length": 5,
+      "start": 33988,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 830,
+      "column": 20,
+      "length": 5,
+      "start": 34055,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 831,
+      "column": 15,
+      "length": 5,
+      "start": 34113,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "line": 832,
+      "column": 20,
+      "length": 5,
+      "start": 34171,
+      "token": "input"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'text' does not exist on type 'Expression'.",
+      "line": 235,
+      "column": 100,
+      "length": 4,
+      "start": 9082,
+      "token": "text"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 597,
+      "column": 27,
+      "length": 12,
+      "start": 24950,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 598,
+      "column": 27,
+      "length": 12,
+      "start": 25005,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 599,
+      "column": 43,
+      "length": 12,
+      "start": 25080,
+      "token": "declarations"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "code": 2339,
+      "message": "Property 'declarations' does not exist on type 'ForInitializer'.\n  Property 'declarations' does not exist on type 'Expression'.",
+      "line": 600,
+      "column": 27,
+      "length": 12,
+      "start": 25131,
+      "token": "declarations"
+    }
+  ],
+  "typecheckPassed": false
+}

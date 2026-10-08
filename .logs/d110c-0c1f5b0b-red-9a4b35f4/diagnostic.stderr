@@ -1,0 +1,74 @@
+(node:61188) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:61187) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a published same-key displaced row under settlement
+D110C_DIAG_SETTLEMENT_PUBLISHED [{"kind":"displaced","ok":true,"source":{"author":"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664","authorSequence":0,"intents":[{"logicalTime":1,"operation":{"value":0,"action":"add"},"operationCount":1,"operationIndex":0}],"vertexDigest":"03b0c525861a30fcc33f8aed71488eda9f7db758889f2ec2e562a29399ca6ca9"}},{"kind":"displaced","ok":true,"source":{"author":"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664","authorSequence":1,"intents":[{"logicalTime":3,"operation":{"value":1,"action":"add"},"operationCount":1,"operationIndex":0}],"vertexDigest":"cdff0040e53146bcd1a10f4b21968e1146bca7b3e990adac4765862318b6e1f0"}}]
+
+stderr | tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy join as an application-visible displaced operation
+D110C_DIAG_LEGACY_JOIN [{"kind":"displaced","ok":true,"source":{"author":"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664","authorSequence":1,"intents":[],"vertexDigest":"d0587ad95273c7e79e3690e26767e5eb5520347bd0b9d8f387808d8e15681d0e"}},{"kind":"empty","ok":true}]
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy join as an application-visible displaced operation
+AssertionError: expected { kind: 'displaced', ok: true, …(1) } to match object { kind: 'displaced', ok: true, …(1) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "kind": "displaced",
+    "ok": true,
+    "source": {
+      "authorSequence": 1,
+-     "intents": [
+-       ObjectContaining {
+-         "operation": {
+-           "action": "join",
+-           "clientId": "phase-3g-displaced-client",
+-         },
+-       },
+-     ],
++     "intents": [],
+    },
+  }
+
+ ❯ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts:57:31
+     55|   const result = await runSharedPlaneScenario({ rebaseReadLimit: 2, so…
+     56|   console.error("D110C_DIAG_LEGACY_JOIN", JSON.stringify(result.rebase…
+     57|   expect(result.rebaseOutbox).toMatchObject({
+       |                               ^
+     58|    kind: "displaced",
+     59|    ok: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a published same-key displaced row under settlement
+AssertionError: expected { kind: 'displaced', ok: true, …(1) } to match object { kind: 'displaced', ok: true, …(1) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "kind": "displaced",
+    "ok": true,
+    "source": {
+      "authorSequence": 0,
+-     "publishState": "published",
+      "vertexDigest": "03b0c525861a30fcc33f8aed71488eda9f7db758889f2ec2e562a29399ca6ca9",
+    },
+  }
+
+ ❯ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts:307:36
+    305|   console.error("D110C_DIAG_SETTLEMENT_PUBLISHED", JSON.stringify(resu…
+    306|   expect(result.recovery).toMatchObject({ ok: true });
+    307|   expect(result.rebaseOutboxes[0]).toMatchObject({
+       |                                    ^
+    308|    kind: "displaced",
+    309|    ok: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

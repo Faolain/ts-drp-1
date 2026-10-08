@@ -1,0 +1,43 @@
+{
+	"recordId": "D.110c-0c1f5b0b",
+	"checkpoint": "RED",
+	"commit": "882a3dc1de1a550003b0e105fbbb89444e915b2e",
+	"signature": "G",
+	"remoteRef": "origin/codex/phase3a1b-p6-golden-path",
+	"changedPathCount": 5,
+	"productionPathCount": 0,
+	"semanticRun": {
+		"selectedFiles": 1,
+		"selectedTests": 27,
+		"passed": 6,
+		"failed": 21,
+		"skipped": 0,
+		"unexpected": 0,
+		"durationSeconds": 5.06
+	},
+	"isolatedRun": {
+		"selectedFiles": 1,
+		"selectedTests": 27,
+		"passed": 6,
+		"failed": 21,
+		"skipped": 0,
+		"unexpected": 0,
+		"durationSeconds": 4.9,
+		"offlineFrozenInstall": "passed",
+		"packageBuild": "passed"
+	},
+	"evidenceCaptureRun": {
+		"selectedFiles": 1,
+		"selectedTests": 27,
+		"passed": 6,
+		"failed": 21,
+		"skipped": 0,
+		"reporter": "json",
+		"processExit": 1,
+		"expectedRedExit": true
+	},
+	"causal": true,
+	"missingImportExportModuleFailure": false,
+	"fixtureFailure": false,
+	"stopRuleTriggered": false
+}

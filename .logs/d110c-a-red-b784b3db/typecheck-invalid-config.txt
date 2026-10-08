@@ -1,0 +1,12 @@
+command=pnpm exec tsc --project tests/fixtures/phase-6b-d110c-a/tsconfig.json --pretty false
+status=2
+classification=INVALID_TEST_CONFIGURATION
+detail=The private config accidentally enabled exactOptionalPropertyTypes although packages/node does not. These eight unrelated v3-live diagnostics are not product failures; the config was corrected before the accepted RED type command.
+packages/node/src/v3-live.ts(3112,5): error TS2412: Type 'undefined' is not assignable to type 'BlueprintStateMachine' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+packages/node/src/v3-live.ts(3113,5): error TS2412: Type 'undefined' is not assignable to type 'V3BlueprintLiveHandle' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+packages/node/src/v3-live.ts(3119,4): error TS2412: Type 'undefined' is not assignable to type 'V3DisplacedSourceAuthority' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+packages/node/src/v3-live.ts(3120,4): error TS2412: Type 'undefined' is not assignable to type 'number' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+packages/node/src/v3-live.ts(3123,4): error TS2412: Type 'undefined' is not assignable to type 'WeakRef<V3PlaneRegistration>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+packages/node/src/v3-live.ts(3126,4): error TS2412: Type 'undefined' is not assignable to type 'WeakRef<object>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+packages/node/src/v3-live.ts(7141,4): error TS2375: Type '{ active: true; applicationAuthors: Map<string, string>; applicationCharges: Map<string, number>; applicationVertices: Map<string, EpochVertex>; authorization: V3LiveAuthorization; ... 39 more ...; gate: undefined; }' is not assignable to type 'V3PlaneRegistration' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+packages/node/src/v3-live.ts(7314,3): error TS2412: Type 'WeakRef<object> | undefined' is not assignable to type 'WeakRef<object>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.

@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "mktemp",
+  "args": [
+    "-d",
+    "/tmp/d110c-f5b-snapshot-fixture-green-XXXXXX"
+  ],
+  "start": "2026-09-06T08:37:10.518Z"
+}

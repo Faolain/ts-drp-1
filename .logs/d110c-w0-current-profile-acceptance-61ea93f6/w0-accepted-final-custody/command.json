@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import fs from\"node:fs\";import{execFileSync}from\"node:child_process\";import crypto from\"node:crypto\";import assert from\"node:assert/strict\";const c=JSON.parse(fs.readFileSync(\".logs/d110c-w0-isolated-7efe33dd/custody-before.json\")),s=JSON.parse(fs.readFileSync(\".logs/d110c-w0-final-review-7efe33dd/public/source-capture.json\")),f=JSON.parse(fs.readFileSync(\".logs/d110c-w0-final-review-7efe33dd/public/review-freeze.json\")),h=x=>crypto.createHash(\"sha256\").update(x).digest(\"hex\");for(const[p,v]of Object.entries({...c.sources,...c.built}))assert.equal(h(fs.readFileSync(p)),v,p);assert.equal(h(execFileSync(\"git\",[\"diff\",\"--cached\",\"--binary\",\"--full-index\",\"--\",...s.w0GreenOwners])),s.w0GreenPatchSha256);const dirty=execFileSync(\"git\",[\"diff\",\"--name-only\"],{encoding:\"utf8\"}).trim().split(\"\\n\").sort();assert.deepEqual(dirty,c.dirty.filter(p=>!s.w0GreenOwners.includes(p)));assert.equal(execFileSync(\"git\",[\"stash\",\"list\",\"--format=%H %gd %gs\"],{encoding:\"utf8\"}).trim(),f.stashes);for(const p of f.protectedPaths)assert.ok(fs.existsSync(p),p);console.log(JSON.stringify({reviewedSourceExact:true,pendingProductionOwners:dirty,productionOverlaySha256:h(execFileSync(\"git\",[\"diff\",\"--binary\",\"--full-index\"])),builtExact:7,stashesExact:27,protectedPaths:f.protectedPaths.length}));"
+  ],
+  "start": "2026-09-06T12:39:59.824Z"
+}

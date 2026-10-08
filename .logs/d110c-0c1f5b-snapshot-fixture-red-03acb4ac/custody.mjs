@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),stage=process.argv[2];
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),read=f=>fs.readFileSync(path.join(root,f)),json=f=>JSON.parse(read(f));
+const git=(...a)=>execFileSync('git',a,{cwd:root,encoding:'utf8',maxBuffer:128*1024*1024}).trim();
+const prior=json('.logs/d110c-0c1f5b-green-wide90-fd4140d5/custody-final.json'),original=json('.logs/d110c-0c1f5b-green-57834387/custody-before.json');
+const head=git('rev-parse','HEAD'),signature=git('log','-1','--format=%G?'),branch=git('branch','--show-current');
+if(signature!=='G'||branch!=='codex/phase3a1b-p6-golden-path')throw Error('Signed branch identity');
+if(stage==='before'&&head!=='03acb4ac1135e81a16cf1067e18f75a5c6079dfb')throw Error('Freeze identity');
+for(const map of [prior.ownerHashes,prior.built,prior.testHashes])for(const[f,d]of Object.entries(map))if(hash(read(f))!==d)throw Error('Custody drift '+f);
+const patch=execFileSync('git',['diff','--binary','--full-index','--',...Object.keys(prior.ownerHashes)],{cwd:root,maxBuffer:128*1024*1024});if(hash(patch)!==prior.patchSha256)throw Error('Patch drift');
+if(git('stash','list','--format=%H %gd %gs')!==original.stashes.trim())throw Error('Stashes');
+for(const f of original.untracked)if(!fs.existsSync(path.join(root,f)))throw Error('Protected missing '+f);
+const manifests={...prior.manifests,'.logs/d110c-0c1f5b-green-wide90-fd4140d5':hash(read('.logs/d110c-0c1f5b-green-wide90-fd4140d5/manifest.sha256'))};
+for(const[dir,d]of Object.entries(manifests)){const m=read(dir+'/manifest.sha256');if(hash(m)!==d)throw Error('Manifest drift');for(const line of m.toString().trim().split('\n')){const[,h,f]=line.match(/^([a-f0-9]{64})\s+(.+)$/u);if(hash(read(f.startsWith('.logs/')?f:dir+'/'+f))!==h)throw Error('Evidence drift '+f)}}
+const target='tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts';
+if(stage==='before'&&fs.existsSync(path.join(root,target)))throw Error('New test already exists');
+const data={stage,head,signature,branch,ownerHashes:prior.ownerHashes,built:prior.built,testHashes:prior.testHashes,supplementalTestHash:fs.existsSync(path.join(root,target))?hash(read(target)):null,patchSha256:hash(patch),stashCount:27,stashesSha256:hash(original.stashes),protectedPaths:original.untracked.length,allProtectedPathsExist:true,manifests,trackedStatus:git('status','--short','--untracked-files=no')};
+fs.writeFileSync(path.join(out,'custody-'+stage+'.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({stage,owners:Object.keys(prior.ownerHashes).length,built:Object.keys(prior.built).length,retained:Object.keys(prior.testHashes).length,protected:original.untracked.length,stashes:27,patchSha256:data.patchSha256}));

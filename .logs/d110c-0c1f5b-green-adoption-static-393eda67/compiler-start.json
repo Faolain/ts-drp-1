@@ -1,0 +1,15 @@
+{
+  "startedAt": "2026-09-06T03:47:13.416Z",
+  "pid": 59373,
+  "root": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "files": [
+    "tests/phase-6a-creator-successor-product-red.test.ts"
+  ],
+  "compilerVersion": "5.8.2",
+  "nodeVersion": "v22.15.0",
+  "nodeExecutable": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "programExecutions": 1,
+  "effectiveOptionsExactlyAccepted": true,
+  "acceptedDiagnosticFile": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/typecheck-final.json",
+  "acceptedSha256": "215f8bb0e4ae4ac43e9b0cb2bb9a0c6e0de8c7d7ab0a79f5d37efce56058d137"
+}

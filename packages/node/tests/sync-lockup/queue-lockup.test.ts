@@ -1,4 +1,6 @@
+import { SetDRP } from "@ts-drp/blueprints";
 import { MessageQueueManager } from "@ts-drp/message-queue";
+import { createPermissionlessACL, DRPObject } from "@ts-drp/object";
 import { type IDRP, type IDRPObject, IntervalRunnerState, Message, MessageType } from "@ts-drp/types";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -38,7 +40,7 @@ describe("DRPNode lifecycle restoration", () => {
 		const node = makeNode("restart-lockup");
 		nodes.push(node);
 		await node.start();
-		await node.createObject({ id: objectId });
+		await node.createObject({ id: objectId, acl: createPermissionlessACL() });
 
 		const objectHandler = vi.fn<(message: Message) => void>();
 		const discoveryHandler = vi.fn<(message: Message) => void>();
@@ -74,7 +76,7 @@ describe("DRPNode lifecycle restoration", () => {
 		const node = makeNode("stop-start-lockup");
 		nodes.push(node);
 		await node.start();
-		await node.createObject({ id: objectId });
+		await node.createObject({ id: objectId, acl: createPermissionlessACL() });
 		const handler = vi.fn<(message: Message) => void>();
 		node.messageQueueManager.subscribe(objectId, handler);
 
@@ -94,7 +96,7 @@ describe("DRPNode lifecycle restoration", () => {
 		const node = makeNode("resubscribe-lockup");
 		nodes.push(node);
 		await node.start();
-		const object = await node.createObject({ id: objectId });
+		const object = await node.createObject({ id: objectId, acl: createPermissionlessACL() });
 		node.unsubscribeObject(objectId);
 
 		node.subscribeObject(object);
@@ -108,6 +110,82 @@ describe("DRPNode lifecycle restoration", () => {
 });
 
 describe("DRPNode object subscription capacity", () => {
+	test("removes the genuine object observer across unsubscribe and installs one observer on re-subscribe", () => {
+		const node = new DRPNode({ log_config: { level: "silent" } });
+		const object = new DRPObject({
+			acl: createPermissionlessACL(),
+			drp: new SetDRP<number>(),
+			id: "observer-lifecycle-object",
+			peerId: node.networkNode.peerId,
+		});
+		const independentObserver = vi.fn();
+		const releaseIndependentObserver = object.subscribe(independentObserver) as unknown;
+		const survivingObserver = vi.fn();
+		const releaseSurvivingObserver = object.subscribe(survivingObserver) as unknown;
+		const originalSubscribe = object.subscribe.bind(object);
+		const retainedDisposers: ReturnType<typeof vi.fn>[] = [];
+		vi.spyOn(object, "subscribe").mockImplementation((callback) => {
+			const release = originalSubscribe(callback) as unknown;
+			const retainedDisposer = vi.fn(() => {
+				if (typeof release === "function") release();
+			});
+			retainedDisposers.push(retainedDisposer);
+			return retainedDisposer;
+		});
+		const put = vi.spyOn(node, "put");
+		vi.spyOn(node.networkNode, "subscribe").mockImplementation(() => undefined);
+		vi.spyOn(node.networkNode, "unsubscribe").mockImplementation(() => undefined);
+		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
+
+		try {
+			node.subscribeObject(object);
+			object.drp?.add(1);
+			expect(put).toHaveBeenCalledTimes(1);
+			expect(independentObserver).toHaveBeenCalledTimes(1);
+			expect(survivingObserver).toHaveBeenCalledTimes(1);
+			put.mockClear();
+
+			node.unsubscribeObject(object.id);
+			node.unsubscribeObject(object.id);
+			expect(retainedDisposers).toHaveLength(1);
+			expect(retainedDisposers[0]).toHaveBeenCalledTimes(1);
+			object.drp?.add(2);
+			expect(put).not.toHaveBeenCalled();
+			expect(independentObserver).toHaveBeenCalledTimes(2);
+			expect(survivingObserver).toHaveBeenCalledTimes(2);
+
+			node.subscribeObject(object);
+			object.drp?.add(3);
+			expect(put).toHaveBeenCalledTimes(1);
+			expect(independentObserver).toHaveBeenCalledTimes(3);
+			expect(survivingObserver).toHaveBeenCalledTimes(3);
+			put.mockClear();
+
+			node.unsubscribeObject(object.id);
+			expect(retainedDisposers).toHaveLength(2);
+			expect(retainedDisposers[0]).toHaveBeenCalledTimes(1);
+			expect(retainedDisposers[1]).toHaveBeenCalledTimes(1);
+			object.drp?.add(4);
+			expect(put).not.toHaveBeenCalled();
+			expect(independentObserver).toHaveBeenCalledTimes(4);
+			expect(survivingObserver).toHaveBeenCalledTimes(4);
+
+			expect(releaseIndependentObserver).toBeTypeOf("function");
+			if (typeof releaseIndependentObserver === "function") {
+				releaseIndependentObserver();
+				releaseIndependentObserver();
+			}
+			object.drp?.add(5);
+			expect(put).not.toHaveBeenCalled();
+			expect(independentObserver).toHaveBeenCalledTimes(4);
+			expect(survivingObserver).toHaveBeenCalledTimes(5);
+		} finally {
+			if (typeof releaseIndependentObserver === "function") releaseIndependentObserver();
+			if (typeof releaseSurvivingObserver === "function") releaseSurvivingObserver();
+			node.messageQueueManager.closeAll();
+		}
+	});
+
 	test("surfaces queue exhaustion before subscribing the object or its gossip topic", () => {
 		const node = new DRPNode({ log_config: { level: "silent" } });
 		node.messageQueueManager = new MessageQueueManager<Message>({
@@ -144,7 +222,7 @@ describe("DRPNode object subscription capacity", () => {
 		} as unknown as IDRPObject<IDRP>;
 		const validObject = {
 			id: "valid-object",
-			subscribe: vi.fn(),
+			subscribe: vi.fn(() => (): void => undefined),
 		} as unknown as IDRPObject<IDRP>;
 		vi.spyOn(node.networkNode, "subscribe").mockImplementation(() => undefined);
 

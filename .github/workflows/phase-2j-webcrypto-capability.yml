@@ -1,0 +1,45 @@
+name: Phase 2j WebCrypto capability
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  webcrypto-capability:
+    name: Five-project WebCrypto capability evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Establish the setup-owned run UUID
+        run: node --input-type=module -e 'process.stdout.write(`PHASE_2J_RUN_UUID=${crypto.randomUUID()}\n`)' >> "$GITHUB_ENV"
+      - name: Run the Phase 2j config directly
+        run: pnpm exec playwright test --config playwright.platform-capability.config.ts
+      - name: Consume the exact current passing aggregate
+        run: |
+          test -f test-results/phase-2j/webcrypto-capability-matrix.json
+          echo "PHASE_2J_CHECKOUT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          PHASE_2J_CHECKOUT_SHA="$(git rev-parse HEAD)" pnpm tsx tests/platform/phase-2j-consume-current.ts
+      - name: Upload stable matrix, run evidence and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-2j-webcrypto-capability
+          if-no-files-found: error
+          path: |
+            test-results/phase-2j/webcrypto-capability-matrix.json
+            test-results/phase-2j/phase-2j/**
+            test-results/phase-2j/playwright/**

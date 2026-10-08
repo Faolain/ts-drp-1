@@ -1,0 +1,20 @@
+{
+  "initial": {
+    "recorder": "fixture-validation.mjs",
+    "status": "fixture-validation/status.json",
+    "exitCode": 1,
+    "cause": "Direct Vite ssrLoadModule bare canonical specifier omitted the test importer; ERR_LOAD_URL occurred before fixture helper execution.",
+    "sourceFailure": false,
+    "testExecutionConsumed": false,
+    "preservedUnchanged": true
+  },
+  "rootAuthorization": "Approved narrow diagnostic-only correction: resolve canonical/noble through the existing Vite config with the exact signed test importer and SSR mode, then load resolved IDs. Preserve original recorder and streams; use fresh distinct names.",
+  "correction": {
+    "recorder": "fixture-validation-corrected.mjs",
+    "resolvedIdentities": "fixture-resolved-identities.json",
+    "configUnchanged": true,
+    "sourceAndTestsUnchanged": true,
+    "initialRecorderNotRerun": true
+  },
+  "notCausalRed": true
+}

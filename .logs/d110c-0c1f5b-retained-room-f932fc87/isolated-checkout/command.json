@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-retained-room-hsBT3J/checkout",
+  "command": "git",
+  "args": [
+    "checkout",
+    "--detach",
+    "f932fc87cab77e22b2d3994b8af288e9e491547a"
+  ],
+  "start": "2026-09-06T00:15:52.765Z"
+}

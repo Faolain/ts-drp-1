@@ -1,0 +1,4 @@
+b207416587d65e3f7ebab4d20a98b26e13363c93036d59a60f39fa6c22979442  tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+dfd66fb7bf7cc3e63af2a8676b81c98d4f22c0b78e0fb28018f259b7d7b14d19  tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+25ebbfa061de68b6aae2af2eda0528419679427802cd7b517c110556f496bc42  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+9a345a4c83efcbe3e3796b248423e35f471669dad5dc15a01fd6615ceacdf2c0  tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts

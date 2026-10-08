@@ -1,0 +1,7 @@
+prior_reporter_sha256_prefix=701e9dc
+prior_reporter_identity=coordinator-supplied
+disposition=superseded
+reason=the prior expectation omitted the established singleton operationCount and operationIndex fields
+immutable_prior_result_changed=no
+replacement_reporter_sha256=b79b3016eb6bbdb12dcf4a7ebe381e4492771575fa6447512035a51c28c9e954
+replacement_matrix=14 selected / 13 passed / 1 causal failure / 0 skipped

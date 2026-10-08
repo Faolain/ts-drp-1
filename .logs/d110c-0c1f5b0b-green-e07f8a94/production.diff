@@ -1,0 +1,121 @@
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index 0b4587fa..cbd8c9cc 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -16,8 +16,9 @@ import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/con
+-import type {
+-	DurableBuildAndSign,
+-	DurableIssuanceOutboxRecord,
+-	DurableIssuanceStore,
+-	DurableIssueCommit,
+-	DurableIssueScope,
+-	DurableOutboxPageInput,
+-	DurableOutboxPublicationTransitionInput,
++import {
++	copySettlementPlan,
++	type DurableBuildAndSign,
++	type DurableIssuanceOutboxRecord,
++	type DurableIssuanceStore,
++	type DurableIssueCommit,
++	type DurableIssueScope,
++	type DurableOutboxPageInput,
++	type DurableOutboxPublicationTransitionInput,
+@@ -3501 +3502,2 @@ function isAuthorFenceOperation(value: unknown): boolean {
+-function isControlOperation(value: unknown): boolean {
++function isControlOperation(value: unknown, profileId: string): boolean {
++	if (settlementProfileFor(profileId) !== "v1") return false;
+@@ -3908 +3910,4 @@ async function handleV3Ingress(
+-	const controlOperation = isControlOperation(authenticated.vertex.operation);
++	const controlOperation = isControlOperation(
++		authenticated.vertex.operation,
++		registration.payload.trust.trust.profileId
++	);
+@@ -5535 +5540 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+-					(!isControlOperation(authenticated.vertex.operation) &&
++					(!isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId) &&
+@@ -5583 +5588 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+-				const controlOperation = isControlOperation(authenticated.vertex.operation);
++				const controlOperation = isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId);
+@@ -5614 +5619,3 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+-				if (isControlOperation(authenticated.vertex.operation)) controlVertices.add(authenticated.digest);
++				if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
++					controlVertices.add(authenticated.digest);
++				}
+@@ -5648,17 +5655,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+-			let issuedRow = row;
+-			if (settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+-				// Legacy recovery retains the defensive issued/outbox cross-read byte-for-byte.
+-				let issuedCommit: unknown;
+-				try {
+-					issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
+-				} catch {
+-					return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
+-				}
+-				const matched = outboxRowSnapshot(
+-					ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+-					selectedScope
+-				);
+-				if (matched === undefined || !matchingOutboxRows(row, matched)) {
+-					return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
+-				}
+-				issuedRow = matched;
++			let issuedCommit: unknown;
++			try {
++				issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
++			} catch {
++				return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
++			}
++			const issuedRow = outboxRowSnapshot(
++				ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
++				selectedScope
++			);
++			if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) {
++				return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
+@@ -5712 +5714 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+-					(isControlOperation(displacedOperation) || displacedAction === "acl");
++					(isControlOperation(displacedOperation, payload.trust.trust.profileId) || displacedAction === "acl");
+@@ -5739 +5741 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+-			const controlOperation = isControlOperation(authenticated.vertex.operation);
++			const controlOperation = isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId);
+@@ -5834 +5836,3 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
+-				if (isControlOperation(authenticated.vertex.operation)) controlVertices.add(authenticated.digest);
++				if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
++					controlVertices.add(authenticated.digest);
++				}
+@@ -6297 +6301 @@ async function issueOneVertex(
+-	const controlOperation = isControlOperation(operation);
++	const controlOperation = isControlOperation(operation, registration.payload.trust.trust.profileId);
+@@ -6427,3 +6430,0 @@ async function issueOneVertex(
+-		if (issuanceOutcomeUnknown) {
+-			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
+-		}
+@@ -6436,0 +6438,3 @@ async function issueOneVertex(
++		if (issuanceOutcomeUnknown) {
++			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
++		}
+@@ -6593 +6597,4 @@ async function issueAuthorFence(
+-		plan = await registration.issuanceStore.readSettlementPlan(registration.issuanceScope);
++		plan = copySettlementPlan(
++			await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
++			registration.issuanceScope
++		);
+@@ -6599 +6606 @@ async function issueAuthorFence(
+-		plan === null ||
++		plan === undefined ||
+@@ -6763 +6770,2 @@ function validRebaseRow(registration: V3PlaneRegistration, classified: Classifie
+-		(isControlOperation(operation) || Reflect.get(operation, "action") === "acl");
++		(isControlOperation(operation, registration.payload.trust.trust.profileId) ||
++			Reflect.get(operation, "action") === "acl");
+@@ -6791 +6799 @@ function rebaseIntents(
+-		isControlOperation(sourceOperation) ||
++		isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
+@@ -6794 +6802,3 @@ function rebaseIntents(
+-			settlementProfileFor(payload.trust.trust.profileId) !== "v1")
++			settlementProfileFor(payload.trust.trust.profileId) !== "v1" &&
++			action !== "causalJoin" &&
++			action !== "join")
+@@ -6944,2 +6954,2 @@ async function readRebaseOutbox(
+-					(classified.row.authorSequence === 0 ||
+-						(crossSource !== undefined && classified.authenticated.digest === crossSource.activationVertexDigest))
++					((crossSource !== undefined && classified.row.authorSequence === 0) ||
++						classified.authenticated.digest === registration.displacedSource?.activationVertexDigest)

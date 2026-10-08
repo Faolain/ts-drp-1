@@ -1,0 +1,2574 @@
+{
+  "status": "design-candidate-not-implementation-release",
+  "inspectedHead": "343473f96243885d379da28a0f62c53bc03984ac",
+  "policyInputs": [
+    {
+      "id": "root",
+      "file": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+      "field": "protectedPaths",
+      "sha256": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3",
+      "entryCount": 47
+    },
+    {
+      "id": "historical-successor",
+      "file": "packages/protocol-v3/conformance/freeze-successor-v1/freeze-policy.json",
+      "field": "protectedArtifacts",
+      "sha256": "0ef117a35ab6ff272824e0845e45194474fa5fe3a10dd44b15cc974e74c95d4c",
+      "entryCount": 62
+    },
+    {
+      "id": "ed25519",
+      "file": "packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json",
+      "field": "protectedArtifacts",
+      "sha256": "d7ad1f6442b04cdfeb993cecd0e96435c27149b175071a019ee60456b27de6e0",
+      "entryCount": 8
+    },
+    {
+      "id": "blueprint-artifact",
+      "file": "packages/protocol-v3/conformance/freeze-policy-blueprint-artifact-profile-v1.json",
+      "field": "protectedArtifacts",
+      "sha256": "4adaa86780c04e7813dbe0ba90c646b60791d097988004d4cc16a7c92dbbe550",
+      "entryCount": 11
+    },
+    {
+      "id": "seal",
+      "file": "packages/protocol-v3/supplements/seal-digest-identity-v1/freeze-policy.json",
+      "field": "protectedArtifacts",
+      "sha256": "23beca246b94f6f5f56b236a60129eac656f2f6da53b04acaf595d451c23d37f",
+      "entryCount": 9
+    },
+    {
+      "id": "pacemaker",
+      "file": "packages/protocol-v3/supplements/pacemaker-profile-v1/freeze-policy.json",
+      "field": "protectedArtifacts",
+      "sha256": "3a16a89f389839fff6aa08651d4cf2925efabeb6f7af734ef5c1179dcef75374",
+      "entryCount": 9
+    },
+    {
+      "id": "author-authorization",
+      "file": "packages/protocol-v3/supplements/author-authorization-v1/freeze-policy.json",
+      "field": "protectedArtifacts",
+      "sha256": "f759e46080f837b97e47825f22cb35fb3e51cb92cc7e35cdd9ac6da9f1ea5e2e",
+      "entryCount": 7
+    }
+  ],
+  "semanticSourcePaths": [
+    ".github/workflows/protocol-v3-author-authorization.yml",
+    ".github/workflows/protocol-v3-blueprint-artifact-profile.yml",
+    ".github/workflows/protocol-v3-blueprint-operation-budget.yml",
+    ".github/workflows/protocol-v3-blueprint-work-budget.yml",
+    ".github/workflows/protocol-v3-ed25519-profile.yml",
+    ".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+    ".github/workflows/protocol-v3-equivocation-author-projection.yml",
+    ".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+    ".github/workflows/protocol-v3-pacemaker-profile.yml",
+    ".github/workflows/protocol-v3-registry.yml",
+    ".github/workflows/protocol-v3-seal-digest-identity.yml",
+    ".github/workflows/test.yml",
+    "CODEOWNERS",
+    "packages/protocol-v3/conformance/freeze-policy-v3.json",
+    "packages/protocol-v3/conformance/reference-regen.lock.json",
+    "packages/protocol-v3/conformance/reference.lock.json",
+    "packages/protocol-v3/registry/registry-v1.json",
+    "packages/protocol-v3/registry/registry-v1.schema.json",
+    "vite.config.mts",
+    "vitest.workspace.ts"
+  ],
+  "affectedCurrentTestFiles": [
+    "tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+    "tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+    "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+    "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+    "tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+    "tests/protocol-v3-freeze-governance-n1prime-e.test.ts",
+    "tests/protocol-v3-freeze-governance-n1prime-e2.test.ts",
+    "tests/protocol-v3-freeze-governance-n1prime-e3.test.ts",
+    "tests/protocol-v3-freeze-governance-n1prime-e4.test.ts",
+    "tests/protocol-v3-freeze-successor-v1-red.test.ts",
+    "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+    "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+    "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+    "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+    "tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+    "tests/phase-5a-seal-digest-law-red.test.ts",
+    "tests/phase-5d-pacemaker-law-red.test.ts",
+    "tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts",
+    "tests/protocol-v3-anchor-trust-3a0.test.ts",
+    "tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+    "tests/protocol-v3-blueprint-runtime-0j-b.test.ts",
+    "tests/protocol-v3-current-epoch-author-authorization-p6-red.test.ts"
+  ],
+  "proposedNewRedFiles": [
+    "tests/protocol-v3-current-registry-contract-d110c-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-registry-current/current-registry-contract.json",
+    "tests/fixtures/phase-6b-d110c-registry-current/parameters-oracle.mjs",
+    "tests/fixtures/phase-6b-d110c-registry-current/current-routing.ts",
+    "tests/fixtures/phase-6b-d110c-registry-current/current-snapshot.ts"
+  ],
+  "records": [
+    {
+      "file": ".github/CODEOWNERS",
+      "classification": "required-absent",
+      "inheritedOwners": [
+        "root"
+      ]
+    },
+    {
+      "file": ".github/workflows/protocol-v3-author-authorization.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "author-authorization",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "a8cf8477a1088bdaa5fc66c7d587d2dc3888a60d1ca9be8def0b68d448150e18"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-blueprint-artifact-profile.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "blueprint-artifact",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "82230a6369408949b00c47d28799e18206d4822b8d98f5e90226829a3d0996f3"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-blueprint-operation-budget.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "5d4486410822ff562b8c8947070bf483185480a8552a31eb1eda3e4cd2e8028f"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-blueprint-work-budget.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "e04163d043bbb9da943e0cdca507728a6960600faa5bb534437db6763dd12c6c"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-ed25519-profile.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "ed25519",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "e343d76a83fa6a0b8d08d9aeeff3256e240f0c684fb0bee3638f7485591d183a"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "b443e20eafb2f9a69bff6106fa4c522b2a8dfecfc5ae62f74ccf420d13589f65"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-equivocation-author-projection.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "159f6b3caf99390d41841eab952bb8b64da626fe92d689e4140561693d18c101"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "079ff21dd370ff857a686c4dd65a3b3d07f32efb7a8eca1f8596ef1d1346eec5"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-pacemaker-profile.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "pacemaker",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "632230e0b735609a07a1f6477a5a2b77a91284a57a50c1e25470e796ba959ef6"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-registry.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "72aceb0841aa329763c648b9f633ac26593429ba2080ce2a7ca6ae155035ffd3"
+    },
+    {
+      "file": ".github/workflows/protocol-v3-seal-digest-identity.yml",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "seal",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "1f36bb5813e645e329a0530e0ce6bc9b30f75ba494fc01d9b7bf2347dc0ce784"
+    },
+    {
+      "file": ".github/workflows/test.yml",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "d9291e5966bed8887b86edb998f9745b221decf0040ac4754d290f3131fa44f3"
+    },
+    {
+      "file": "CODEOWNERS",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "4fcd586a5a0cb1501df2bbf7b8e2882be98903b085e9735e5cbe1e8ae7fc8f15"
+    },
+    {
+      "file": "docs/CODEOWNERS",
+      "classification": "required-absent",
+      "inheritedOwners": [
+        "root"
+      ]
+    },
+    {
+      "file": "docs/protocol/amendments-v3.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508"
+    },
+    {
+      "file": "docs/protocol/attested-hard-epochs-v5.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8"
+    },
+    {
+      "file": "docs/protocol/blueprint-artifact-profile-v3.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "blueprint-artifact"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "9ab7cf506591047ccbc85eeacc25008b88d873ded30278ca849783e50ea29034"
+    },
+    {
+      "file": "docs/protocol/blueprint-artifact-profile-v3.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "blueprint-artifact"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "cf39631756c9766d956112098970478e59c8ecb712634438b35cdd69330bbd53"
+    },
+    {
+      "file": "docs/protocol/canonical-tag-codec-v1.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e"
+    },
+    {
+      "file": "docs/protocol/canonical-tag-codec-v1.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036"
+    },
+    {
+      "file": "docs/protocol/ed25519-acceptance-profile-v3.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "ed25519"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "36a65af5e3788c68483c360b831e132d24e4ef38ab8c121fd077a0232285c6e3"
+    },
+    {
+      "file": "docs/protocol/ed25519-acceptance-profile-v3.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "ed25519"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "fcbdee7a1597c1e6d212a4e83b074fff52a0ec62693d512513e4ffc2ad093bc5"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/blueprint-operation-budget-v1/check-freeze.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f8e6d0f552f2f311a8a7d6e8e560243557e5204faa9f119e21c880ad74a6009b"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/blueprint-operation-budget-v1/freeze-policy.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "01dfe6dd16c7b651be0eb56340986302c6aa20bd51bc14e1271e54051ed589c0"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/blueprint-operation-budget-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "978797b08311955ebcd73579f22bbb2866a62f0441213d235f490d24e8cb9b88"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/blueprint-operation-budget-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "da05fee8420376abf6ccd7781fa8eb0be4395f9415e36edc2c31a944d6958e5f"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/freeze-policy-blueprint-artifact-profile-v1.json",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "blueprint-artifact",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "4adaa86780c04e7813dbe0ba90c646b60791d097988004d4cc16a7c92dbbe550"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "ed25519",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "d7ad1f6442b04cdfeb993cecd0e96435c27149b175071a019ee60456b27de6e0"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f42dff9a16a32d35ec11ea6cd07059912c61bf8677e53084675a9564df3558b7"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/freeze-successor-v1/freeze-policy.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "0ef117a35ab6ff272824e0845e45194474fa5fe3a10dd44b15cc974e74c95d4c"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/freeze-successor-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "ceae3be2b43facbf1001d8892931c9c2ca78123be5214bf6c394acfada6a682c"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/freeze-successor-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "7b760cb271c6fd9b0392a36365c9c1a5a2d8be2ac0cb3a763525bb53cf2fc2bb"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/original-reference/provenance.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "8b5e24c89dd32735ad95ca2a10a98e80dd2bb2623e0188b1355b51076bc90bc3"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/original-reference/reference.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "abb01f2f061b20428e1c412793380a0baf468bf9397c7ec2952a902f2aaf7bdc"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/reference-regen.lock.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "c4d5d54b08f1c4c45395c8250b4e84f582a0924fb964c53f188fedb0b05b0292"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/reference.lock.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "596bd935f060a3fdcbd9fe2e2c5cb12f18897c5f13ed01cd5de35b35dd9e0664"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/regenerated-reference/provenance.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "1ea3a9e0da6d6df667101e7e8c5e208b6eca45da6954cbfaf9da1cef6e50eae4"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/regenerated-reference/reference.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "0a7b199eec2f1a950d4b91d9041e382f02983e2d601a530de60e7311309ce84a"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/vectors/registry-v1.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741"
+    },
+    {
+      "file": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038"
+    },
+    {
+      "file": "packages/protocol-v3/formal/registry-model-signoff.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749"
+    },
+    {
+      "file": "packages/protocol-v3/formal/registry-signed-envelope-variables.qnt",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f6dede1370a40a37d2dca526a27f3dc5c6884c9b8c23390da3372977c2bcef13"
+    },
+    {
+      "file": "packages/protocol-v3/formal/signed-field-derivation.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346"
+    },
+    {
+      "file": "packages/protocol-v3/registry/registry-v1.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "663281a11da08d99e4a751ed3f439c1562a49d3b70ab21b34de50959bf47c190"
+    },
+    {
+      "file": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "file": "packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "blueprint-artifact",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "2d6423f70322f2b22698d1fb15af352f03f88f48ac3174de7f593f196ec9831d"
+    },
+    {
+      "file": "packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "ed25519",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "137f058914d284f891a8f77d31f51c1ce74ff6c38c49969aec82c306eb1b445d"
+    },
+    {
+      "file": "packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "0c54c747ca375591d7783b553ef8993d4d3f4932a831377bee3b7415345549de"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "author-authorization",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "3c68aca24bf5076fd148f6f783c176780cd0a0e6384ff7a612fc7eddbec31683"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/author-authorization-v1/freeze-policy.json",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "author-authorization",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f759e46080f837b97e47825f22cb35fb3e51cb92cc7e35cdd9ac6da9f1ea5e2e"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/author-authorization-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "author-authorization"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "70fe330d9ae61e3e90d8d6500f61503ac502ee66efbf049e793dd3625b548362"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/author-authorization-v1/schema.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "author-authorization"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "1abb2e8dced225024fcfaff446685ffe99d578d34b22f12c012c5a7198ac72a5"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/author-authorization-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "author-authorization"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "a1d11a41c7d55eaaafa19e27abad533817fb52b48f5eee9168bf3e3dee790c2d"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/author-authorization-v1/vectors.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "author-authorization"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f97da5ee18998e808da1133223f442302e71c40f0dee95948e1b30f9ba24972b"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/blueprint-artifact-profile-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "blueprint-artifact"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "288ff9f264cddcad35d19c358f2c0ca4519ba45ebc371b160dbfa74f26f9bd83"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/blueprint-work-budget-v1/check-freeze.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "886b4255634abd4b262bb5e5f7b8574f39945f844d890d04ecd02e8e62c9dad0"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/blueprint-work-budget-v1/freeze-policy.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "33caa960baba11f41b5e7032773638655804d9be991288872bdecfb533bb11e1"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/blueprint-work-budget-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "4f222a168d2592f40e3b6416ceae359488cc79689b051afbf78dcece3b4fe20c"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/blueprint-work-budget-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "e67c3f26db9f29dc7da61adb7dc1df50cf23a656b599ad0367cf31a2febad2ac"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "ed25519"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "31975a9ef6d16e9cdd836fe9b87b2b369aab0ede69e1d6763a8f75ad46bafc56"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-acl-reputation-v1/check-freeze.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "7f351f3007941432a7fb401d0edc4d84c9eae774c2fbae6069673096922d9ad6"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-acl-reputation-v1/freeze-policy.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "8af65c7445e65d9b1a44a5d6cc0948747fa067e39dadd415aebb4d4edd25d4ed"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-acl-reputation-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "cf7bab5fb8ca441f1b18693cc73f7c6133ba75c31c2d46f907b577a0c084e8a3"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-acl-reputation-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "46817b87543b5f8106b1ff4365d3b33ce779315b630be485b363411f9ce957eb"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-author-projection-v1/check-freeze.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "04584062721a8707e4bf1d9069ee4456241f911ba624a8096b1c1859535b982c"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-author-projection-v1/freeze-policy.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "ccf31a35a19605eb71c6def08da5a4f74f0a793ab288dff5e32618d9eeaebf52"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-author-projection-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "d146df4b1b7d2066014cb4d14118238cd7e40e1a9af4cd9e53f93f98c3e86e64"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-author-projection-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "a6ffbfff8dd70870d01858f1823bfcc5c90cbbb8f9cd7f6f8a30793b1f573bf0"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-gossip-budget-v1/check-freeze.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "a993595e7f1f7f3be2f20cb7879a49ae4b187250d56427c1e86482f6ee95285b"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-gossip-budget-v1/freeze-policy.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "860e8a1c13ec0cb5d9eba0398462afbb7da39607f7a73a9f9fd02856ea7875dd"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-gossip-budget-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "1fab00024d118b5e8b91d8de336a70e1eafc085890fcf27d69b80d2d071d3a09"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/equivocation-gossip-budget-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "ec757262934bf3d290d46a3490549ee3014fc334ef53c85e1e4a9589c2025f28"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/pacemaker-profile-v1/check-freeze.mjs",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "pacemaker",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100755"
+      },
+      "sha256": "298c235167f6ee8cacfbcecbd244f9e5c8e5edd64b9f72a89566b0e8c9893d64"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/pacemaker-profile-v1/freeze-policy.json",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "pacemaker",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "3a16a89f389839fff6aa08651d4cf2925efabeb6f7af734ef5c1179dcef75374"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/pacemaker-profile-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "pacemaker"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "a3db1f1bbffc19c1339f14a520c373966958bf6ad5cddca7104ff1a0e707a28e"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/pacemaker-profile-v1/schema.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "pacemaker"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "445d7f74a0a7cef6e602d92671e12f1f9e5abf7d07fdbd0f1ebaef8bd059d38d"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/pacemaker-profile-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "pacemaker"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "09c195481e1faba36ed0fdbdbf9935f4eac47e1ae4a5d2fb51c69b34850e5c1d"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/pacemaker-profile-v1/vectors.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "pacemaker"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "09086c6019e336452080e02035a09893e5445fa3dff171c0fe29ba62ab9d6336"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "seal",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "c47f95489fb9da1c3a4ad3b1b2f51bfaecac2367a3120bab40840d4c15344894"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/seal-digest-identity-v1/freeze-policy.json",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "seal",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "23beca246b94f6f5f56b236a60129eac656f2f6da53b04acaf595d451c23d37f"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/seal-digest-identity-v1/profile.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "seal"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "130e7322def1dd5f7e0caae9d77c7f7875a0e682f22f8ab025ab6c8e02f28bcf"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/seal-digest-identity-v1/schema.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "seal"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "81ec693a6ec6c6a397b89a52163ac4984787eb263f3af8351a956b999b1c0c20"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/seal-digest-identity-v1/spec.md",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "seal"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "9b4da9bbfdbf2b81c5b621312415b9a693a77828a53746bd4a1cd6707e2dc0bd"
+    },
+    {
+      "file": "packages/protocol-v3/supplements/seal-digest-identity-v1/vectors.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "seal"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "394e838d75362aec66c65ddd5466639aec2afea07f331f919843157fd8a5c461"
+    },
+    {
+      "file": "tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "ed25519"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "42baf0e200234eedf31bd0e16f4e23f55a463b3a50578b13e168c929ce9f29a2"
+    },
+    {
+      "file": "tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "blueprint-artifact"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "61e6267c7ea773a52d5cfa6c735eddcdaaf8dcccce90e460938d0617fdf8029f"
+    },
+    {
+      "file": "tests/fixtures/phase-0j-b-v3/chat-blueprint.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "blueprint-artifact"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "69f15bd856d2aeb2970db15252ab2718fe00b1469f14dab90c91b5347cef758c"
+    },
+    {
+      "file": "tests/fixtures/phase-0j-b-v3/public-entry-type-audit.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "blueprint-artifact"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "16bb7100eef78791d6cf440dc122c8a7688cf166cd1afb5079f424c45d72c180"
+    },
+    {
+      "file": "tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "blueprint-artifact"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "43e3bd46979761347514c75f80e28e6b15692aede6dfd71bdf8bbcb202f9e88a"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b1b-v3/author-projection-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "e6c77f1a54a23a3ee3fc24898a87b8c4c2be4e09c0155528203b6c78ec3265df"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b1b-v3/built-package-type-audit.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "028806ff82b8d5f42589f2ed5949017aeb4deaf2131fef78fee550e124420d37"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b1b-v3/controlled-author-projection.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "689fba68e3659433055117ccb711ac956dbef809e4f95c7904248686f4b65f05"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b1b-v3/public-entry-type-audit.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "16d4cb6e38f772888af2d25fa9b56c804187f835298016b052e9d6d15688238f"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b1b-v3/public-export-contract.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f4b2cc126c207af6af2f511f520e4515f8be0556e52f0988ef520622d70e8bc0"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b1b-v3/public-reexport-mutant.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "2c6cbfd45387e4de80ef41b7204b7d3ffae7747c6e8e686c14ad559084ffb76d"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b1b-v3/tsconfig.built-package-audit.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "8f7c2315e97d06d97d0ca2ebb86769fab2d21d3353f25f48a9c429f4fef7f51f"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b1b-v3/tsconfig.public-entry-audit.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "0420a3ea15b79d2196dc26fa14747bc7473e080fb687fc39fa6ef5f1dd44238b"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b2-v3/built-package-type-audit.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "4c1cd62ee1670ea3acf5f1a0d3cc047298fc0c3fb952fe838b90d0bf8dc69833"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b2-v3/controlled-gossip-budget.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "606b73eb153c60f00f33356d0ee56fe48da49ac0328703a2df8aaea39b5ee005"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "6b22b4e442ece82cf61aac6ef303aec7e3b74ba14a601b8f22c33769670d443f"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b2-v3/public-entry-type-audit.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f8d5d25cb10510cdd679f434a1e24bb63ef533e54af4d0b060c5c95d473e25f6"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b2-v3/public-export-contract.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "3d0a2375dd2b44bd61bb3457649bc32574fc42e28eb2110707646df93a2204da"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b2-v3/public-reexport-mutant.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "70c4a77458c679fcd763aa08fc145132b90f60b890d53a60cd06f574089abde3"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b2-v3/tsconfig.built-package-audit.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "7ea43d75df9a125d828f1a48cbea5a7f250f87e3bef4afb7066d3561ed5d5f6d"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b2-v3/tsconfig.public-entry-audit.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "6a22c3a47f085257a6441c46f8a28b6b0bf967bf88ad974f802556605d8832f0"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b3-v3/acl-reputation-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "24333df238b9a4dd97b4ab031176a31301a9c6b5661fcaa9051896245451c376"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b3-v3/built-package-type-audit.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "c28ab4d2c6967ac1613424b1017c3ae26fd22844dbd1a92e03aec6fc1b23a09f"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b3-v3/controlled-acl-reputation.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "84a048b6d91a2d1ebe60eb2c6ef9f2d985a6c5c869161dc20c68ba4f9d4eaa97"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b3-v3/public-entry-type-audit.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "ef7db1624547befd05a012a4d2de9fb1ace3d2ac1854f015919335b970aef9b4"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "8265759189086bab8dd39fa711acb35daa04c9730473c328366f44072a98abae"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b3-v3/public-reexport-mutant.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "2d7f5f83e45136ee92b33c68f4e22f23604a196f42033baff49178d420b5d678"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b3-v3/tsconfig.built-package-audit.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "91cefa1fc53375117c05c69c9340d5cb727d9da0c88fbc4208939a0248e8b5a2"
+    },
+    {
+      "file": "tests/fixtures/phase-0o-b3-v3/tsconfig.public-entry-audit.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "c076cff3e73d6a80d343d8cf4515718fbf4ac5c671f7a55b2960261f3668ad4a"
+    },
+    {
+      "file": "tests/fixtures/phase-0p0-v3/blueprint-work-budget-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "429ea85669724509dccfa28700e2ce73d4bfb4e295aec2f4860d583bafa5e596"
+    },
+    {
+      "file": "tests/fixtures/phase-0p0-v3/controlled-blueprint-work-budget.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "d65128587626ae5c143cd8763924f87d124560b34143df21899d492ad580356b"
+    },
+    {
+      "file": "tests/fixtures/phase-0p2-v3/blueprint-operation-budget-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "ea2e2daa9befef4af83cf3834acf996599800adbc7c3d611995c3e47e54835a3"
+    },
+    {
+      "file": "tests/fixtures/phase-0p2-v3/controlled-blueprint-operation-budget.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "historical-successor"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "59b2064fa9e43b55a0da20c079cd2571f8fcbb457c0c98c1ee2f2f19235dc810"
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p6/author-authorization-freeze-harness.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f8c58637e0377106c787166d1e81761c46fb81152937b40cd50213f3524488fc"
+    },
+    {
+      "file": "tests/fixtures/phase-3a1b-p6/author-authorization-governance-analyzer.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "1874548620a00178b1cccd3d99468613cfab2413fcc01de941a51278577ebdd1"
+    },
+    {
+      "file": "tests/fixtures/phase-5-v3/seal-digest-law-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "seal"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "5b810d74587065706f50bb337763b8bb66649c56746bd4da45e73976b4324462"
+    },
+    {
+      "file": "tests/fixtures/phase-5d-v3/pacemaker-law-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "pacemaker"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "0e5e9a9625a91041619cbb4c06cb2cd7cb0a266de0a6855ad0431f001a675761"
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-registry-current/current-registry-contract.json",
+      "classification": "proposed-new-red",
+      "inheritedOwners": [
+        "new-red"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      }
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-registry-current/current-routing.ts",
+      "classification": "proposed-new-red",
+      "inheritedOwners": [
+        "new-red"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      }
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-registry-current/current-snapshot.ts",
+      "classification": "proposed-new-red",
+      "inheritedOwners": [
+        "new-red"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      }
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-registry-current/parameters-oracle.mjs",
+      "classification": "proposed-new-red",
+      "inheritedOwners": [
+        "new-red"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      }
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-a/formal-action-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "474c83e7a3f130504e8dedc8ceb0843ee3413ca56c27003a354f6088b0f41dcf"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-b/registry-spec-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "0f8e1d62a7eb75961addc07fcc32a6c228ca2c432a3bbafd11478c828c2fc324"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-b2a/canonical-grammar-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "fd921870b36ddab56987b8bc21cc0ad9599884b43364ba45c10a9e1ba365c0cf"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-b2b/codec-grammar-decision-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "51848429253440aa103e8b45d942975f8e029df18a3cc5f25c1df2b4c9da5c16"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-c-exhaustion/paired-issuance-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "793da47de639ba3d40a205aab301e0b8b2a456347ded7b3d7a3c4bf3159dcd77"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-c/reference-vector-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "1f84788cad31a3fd737cf55d5da053748ea4e997bd4c5dbf4cf50fa568816840"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-c2/independent-reference-vector-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "17e22228adc677f9287ced3610211b21ec926e7647b1179574f2299359ccca62"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-d/regenerated-reference-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f46c4ee3be04f4b0a53d4180322c1e8f4ad201d280ef4f2c5f0beb0bdfd1ab83"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-d2/blocker-remediation-inputs.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "54c4193a03ee2d2b792d340e0128dd5de4721c7d25f69f4cffb640e86b94261f"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "3a6933294e6f760d7c9e24a84e162dc418ddba0039de9a5095c36ac2729ecccb"
+    },
+    {
+      "file": "tests/fixtures/phase-n1prime-e4/root-test-lifecycle-contract.json",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "95e3aabeab12edae583f3d80fb3c8565735279f59e37e100e6ec884ca10997d4"
+    },
+    {
+      "file": "tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "81d9486e46fbc9705c86dbbc0234e1b3bb7308eb5628d6395104b7205336679f"
+    },
+    {
+      "file": "tests/phase-5a-seal-digest-law-red.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "seal",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "97d93f91020a26f6707b4eae4d35dbcf7e4420e040c3bc9ac89e9d2a086d9d72"
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-law-red.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "pacemaker",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "da0e65c5940e9c0bbf9451367db9a037f42623b88ca37747dbcbb0dc909c2beb"
+    },
+    {
+      "file": "tests/protocol-v3-anchor-trust-3a0.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "b78cdc898583c07d134e486f978cede8165e37090ead15d47a2000f4bb8f5f82"
+    },
+    {
+      "file": "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "b8ed689a0a1e19a03a18c3f881a303bf9e404f82791dcf45de07d038dd36db94"
+    },
+    {
+      "file": "tests/protocol-v3-blueprint-runtime-0j-b.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "blueprint-artifact",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "40c7d5c5bbea476a4f7ccec919db6c89b677d31e46173afcd52f4ec8dd82a5d1"
+    },
+    {
+      "file": "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f0302a29aaaee273b76584818374f5c44bb8a2a7b9fbc9be15cc7f16dd1e20d6"
+    },
+    {
+      "file": "tests/protocol-v3-canonical-grammar-n1prime-b2a.test.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f2f25dd9ae70971ffe920c0ab653e46b15f090d8b4fe5a6ba4e9157abe4aed89"
+    },
+    {
+      "file": "tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "6f69554debf9caa8f30273324cc223631d70f6d76534be2b0d4e33281ce57b1e"
+    },
+    {
+      "file": "tests/protocol-v3-current-epoch-author-authorization-p6-red.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f73b1e505ebb254beb0a9c2bb9e2d428f5c85cf5b28a598037c543ddbff9298c"
+    },
+    {
+      "file": "tests/protocol-v3-current-registry-contract-d110c-red.test.ts",
+      "classification": "proposed-new-red",
+      "inheritedOwners": [
+        "new-red"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      }
+    },
+    {
+      "file": "tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "ed25519",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "26c24d2fc3ac38ee55ca0f092d855a434382230825341cd6380fb1cd332dc938"
+    },
+    {
+      "file": "tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "bf8422db05abfa4e80398c125282b44cce1af658ba920bc04ac178338ecf3afa"
+    },
+    {
+      "file": "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "bc2534255d02952c6b50b807c5edbdda9964fb92fad07595fc180d153f4f0587"
+    },
+    {
+      "file": "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "historical-successor",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "a9c6b38c471365ef03246a36e21e3d3ef8ca197a51f45f1d22fe558aae71310a"
+    },
+    {
+      "file": "tests/protocol-v3-formal-action-model-n1prime-a.test.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "affc5e439220e8ac6353c0795f591da3946a6aeb37d69a71a05763f229f34f6d"
+    },
+    {
+      "file": "tests/protocol-v3-freeze-governance-n1prime-e.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "9455c3a01fb5480ab88d76445432d97d3c38ee4648cc26a75324efa17bc2196f"
+    },
+    {
+      "file": "tests/protocol-v3-freeze-governance-n1prime-e2.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f6d5c6ca350466bdb76e9b1b3c820e8ed2302f8e28b0486582195efdd97adfac"
+    },
+    {
+      "file": "tests/protocol-v3-freeze-governance-n1prime-e3.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "a41642cfd43a111345e088b646d9977304c2e4d06a2198ecadd3583997dc2e12"
+    },
+    {
+      "file": "tests/protocol-v3-freeze-governance-n1prime-e4.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "5fdaa2b9eff5f98e21823e91fd0ca4be4fd409051df43658da22373c5d398d1c"
+    },
+    {
+      "file": "tests/protocol-v3-freeze-successor-v1-red.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "b6267841c549c3f71103a4776cd2595c9d874e21bab517117c3af9c7fc24de9b"
+    },
+    {
+      "file": "tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "10f1f8b502cb599da6350cc13192e8fbe407710698c187e26ffe2e84d47374a2"
+    },
+    {
+      "file": "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "d1d4751ccdb8db0e8dbd11e7e353727cdd3a6ef3c739a4a6e1680c16bf1a9b12"
+    },
+    {
+      "file": "tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "root"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "23c5f1eb8d87f9fa9a758670216430d1bc96b8aaa6b4912a4d53690a1f9ae1b1"
+    },
+    {
+      "file": "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "d2026fc81c98c709da7ca0dc94d20cd05b56a5e871b35f6e715aec63920fd407"
+    },
+    {
+      "file": "tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "c07b64dfaa6e5f40095773f5e81c8847c2a736af5a8c365937db80ef3a77926f"
+    },
+    {
+      "file": "tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+      "classification": "editable-current-owner",
+      "inheritedOwners": [
+        "root",
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "380cce1ad170422be6cab1c3ba316341b63700da2e9ef0588eed6f54897b4022"
+    },
+    {
+      "file": "vite.config.mts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "6c15cd76cf3197d8f08608f28909731d55b7f07a661fada577aaecbe4b81c610"
+    },
+    {
+      "file": "vitest.workspace.ts",
+      "classification": "preserved-input",
+      "inheritedOwners": [
+        "current-contract"
+      ],
+      "fileEntry": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "sha256": "f173d90cf413d1fb2d160b097bc5d3fd242afe5dd21930702fc3b1632a1ef413"
+    }
+  ],
+  "historicalRecordsWhoseLiveTargetsChange": [
+    {
+      "document": "tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json",
+      "location": "/governance/immutableArtifactSha256/packages/protocol-v3/conformance/freeze-policy-v3.json",
+      "target": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+      "historicalSha256": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3"
+    },
+    {
+      "document": "tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json",
+      "location": "/governance/immutableArtifactSha256/packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+      "target": "packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+      "historicalSha256": "0c54c747ca375591d7783b553ef8993d4d3f4932a831377bee3b7415345549de"
+    },
+    {
+      "document": "tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json",
+      "location": "/governance/immutableArtifactSha256/packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json",
+      "target": "packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json",
+      "historicalSha256": "d7ad1f6442b04cdfeb993cecd0e96435c27149b175071a019ee60456b27de6e0"
+    },
+    {
+      "document": "tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json",
+      "location": "/governance/immutableArtifactSha256/packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs",
+      "target": "packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs",
+      "historicalSha256": "137f058914d284f891a8f77d31f51c1ce74ff6c38c49969aec82c306eb1b445d"
+    },
+    {
+      "document": "tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json",
+      "location": "/governance/immutableArtifactSha256/tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+      "target": "tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+      "historicalSha256": "26c24d2fc3ac38ee55ca0f092d855a434382230825341cd6380fb1cd332dc938"
+    },
+    {
+      "document": "tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json",
+      "location": "/baseArtifactSha256/.github/workflows/protocol-v3-equivocation-author-projection.yml",
+      "target": ".github/workflows/protocol-v3-equivocation-author-projection.yml",
+      "historicalSha256": "200d32a57906bbdeecd61929d67854b363daac64d0ecf41ad81cc2ff9b4185f8"
+    },
+    {
+      "document": "tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json",
+      "location": "/baseArtifactSha256/tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+      "target": "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+      "historicalSha256": "1a89654947396489ac110803ceab611756a4ae9c05059ee8450ed38c273fc517"
+    },
+    {
+      "document": "tests/fixtures/phase-0p0-v3/blueprint-work-budget-contract.json",
+      "location": "/protectedArtifactSha256/packages/protocol-v3/registry/registry-v1.json",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    },
+    {
+      "document": "tests/fixtures/phase-0p0-v3/blueprint-work-budget-contract.json",
+      "location": "/protectedArtifactSha256/packages/protocol-v3/registry/registry-v1.schema.json",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-0p2-v3/blueprint-operation-budget-contract.json",
+      "location": "/protectedArtifactSha256/packages/protocol-v3/registry/registry-v1.json",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    },
+    {
+      "document": "tests/fixtures/phase-0p2-v3/blueprint-operation-budget-contract.json",
+      "location": "/protectedArtifactSha256/packages/protocol-v3/registry/registry-v1.schema.json",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-0p2-v3/blueprint-operation-budget-contract.json",
+      "location": "/protectedArtifactSha256/packages/protocol-v3/conformance/freeze-policy-v3.json",
+      "target": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+      "historicalSha256": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3"
+    },
+    {
+      "document": "tests/fixtures/phase-5-v3/seal-digest-law-contract.json",
+      "location": "/baseTupleSha256/packages/protocol-v3/registry/registry-v1.json",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    },
+    {
+      "document": "tests/fixtures/phase-5-v3/seal-digest-law-contract.json",
+      "location": "/baseTupleSha256/packages/protocol-v3/registry/registry-v1.schema.json",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-5d-v3/pacemaker-law-contract.json",
+      "location": "/baseTupleSha256/packages/protocol-v3/registry/registry-v1.json",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    },
+    {
+      "document": "tests/fixtures/phase-5d-v3/pacemaker-law-contract.json",
+      "location": "/baseTupleSha256/packages/protocol-v3/registry/registry-v1.schema.json",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-5d-v3/pacemaker-law-contract.json",
+      "location": "/baseTupleSha256/packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs",
+      "target": "packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs",
+      "historicalSha256": "c47f95489fb9da1c3a4ad3b1b2f51bfaecac2367a3120bab40840d4c15344894"
+    },
+    {
+      "document": "tests/fixtures/phase-5d-v3/pacemaker-law-contract.json",
+      "location": "/baseTupleSha256/packages/protocol-v3/supplements/seal-digest-identity-v1/freeze-policy.json",
+      "target": "packages/protocol-v3/supplements/seal-digest-identity-v1/freeze-policy.json",
+      "historicalSha256": "23beca246b94f6f5f56b236a60129eac656f2f6da53b04acaf595d451c23d37f"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-b2b/codec-grammar-decision-contract.json",
+      "location": "/signoff/unchangedReviewedHashes/packages/protocol-v3/registry/registry-v1.schema.json",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-b2b/codec-grammar-decision-contract.json",
+      "location": "/preGreenTargetHashes/packages/protocol-v3/registry/registry-v1.json",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "7d8ecd8f7ab373018bff7200ba1c287dd3964735c8290491fa4f8a552cf22b9a"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-b2b/codec-grammar-decision-contract.json",
+      "location": "/protectedArtifacts/tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+      "target": "tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+      "historicalSha256": "380cce1ad170422be6cab1c3ba316341b63700da2e9ef0588eed6f54897b4022"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-b2b/codec-grammar-decision-contract.json",
+      "location": "/protectedArtifacts/packages/protocol-v3/registry/registry-v1.schema.json",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-c-exhaustion/paired-issuance-contract.json",
+      "location": "/immutableArtifacts/correctedC2Test",
+      "target": "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "historicalSha256": "d1d4751ccdb8db0e8dbd11e7e353727cdd3a6ef3c739a4a6e1680c16bf1a9b12"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-c/reference-vector-contract.json",
+      "location": "/acceptedInputs/registry",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "7d8ecd8f7ab373018bff7200ba1c287dd3964735c8290491fa4f8a552cf22b9a"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-c/reference-vector-contract.json",
+      "location": "/acceptedInputs/schema",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-c2/independent-reference-vector-contract.json",
+      "location": "/acceptedInputs/registry",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-c2/independent-reference-vector-contract.json",
+      "location": "/acceptedInputs/schema",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-d/regenerated-reference-contract.json",
+      "location": "/acceptedInputs/registry",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-d/regenerated-reference-contract.json",
+      "location": "/acceptedInputs/schema",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-d/regenerated-reference-contract.json",
+      "location": "/acceptedInputs/correctedC2Red",
+      "target": "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "historicalSha256": "d1d4751ccdb8db0e8dbd11e7e353727cdd3a6ef3c739a4a6e1680c16bf1a9b12"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-d2/blocker-remediation-inputs.json",
+      "location": "/immutableArtifacts/phaseDRed",
+      "target": "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+      "historicalSha256": "d2026fc81c98c709da7ca0dc94d20cd05b56a5e871b35f6e715aec63920fd407"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-d2/blocker-remediation-inputs.json",
+      "location": "/immutableArtifacts/registry",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "location": "/immutableSuccessorInputs/packages/protocol-v3/registry/registry-v1.json",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "location": "/immutableSuccessorInputs/packages/protocol-v3/registry/registry-v1.schema.json",
+      "target": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "historicalSha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "location": "/immutableSuccessorInputs/tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+      "target": "tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts",
+      "historicalSha256": "6f69554debf9caa8f30273324cc223631d70f6d76534be2b0d4e33281ce57b1e"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "location": "/immutableSuccessorInputs/tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "target": "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "historicalSha256": "d1d4751ccdb8db0e8dbd11e7e353727cdd3a6ef3c739a4a6e1680c16bf1a9b12"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "location": "/immutableSuccessorInputs/tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+      "target": "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+      "historicalSha256": "d2026fc81c98c709da7ca0dc94d20cd05b56a5e871b35f6e715aec63920fd407"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "location": "/immutableSuccessorInputs/tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+      "target": "tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts",
+      "historicalSha256": "c07b64dfaa6e5f40095773f5e81c8847c2a736af5a8c365937db80ef3a77926f"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "location": "/immutableSuccessorInputs/tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+      "target": "tests/protocol-v3-registry-spec-n1prime-b.test.ts",
+      "historicalSha256": "380cce1ad170422be6cab1c3ba316341b63700da2e9ef0588eed6f54897b4022"
+    },
+    {
+      "document": "tests/fixtures/phase-n1prime-e/freeze-governance-contract.json",
+      "location": "/referenceBindings/registry",
+      "target": "packages/protocol-v3/registry/registry-v1.json",
+      "historicalSha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+    }
+  ],
+  "verificationOnlyV2Closure": {
+    "policy": "packages/protocol-v2/conformance/freeze-policy.json",
+    "policySha256": "e291babe6069f004a61378e9cf98a9984f3edbe0391b7674ea57a19c7db25e04",
+    "patterns": [
+      "packages/protocol-v2/conformance/ahe-reference/src/**",
+      "packages/protocol-v2/conformance/reference.lock.json",
+      "packages/protocol-v2/conformance/ahe-reference-regen/**",
+      "packages/protocol-v2/conformance/reference-regen.lock.json",
+      "packages/protocol-v2/tests/fixtures/golden-vectors/**",
+      "packages/protocol-v2/registry/**",
+      "packages/protocol-v2/scripts/check-protocol-freeze.mjs",
+      "packages/protocol-v2/conformance/freeze-policy.json",
+      "docs/production-hardening/ts-drp-ahe-review-bundle/SHA256SUMS.txt",
+      ".github/CODEOWNERS",
+      "docs/CODEOWNERS",
+      "CODEOWNERS",
+      ".github/workflows/protocol-v2-registry.yml"
+    ],
+    "files": {
+      ".github/workflows/protocol-v2-registry.yml": "a07c1dd2983429fcfdb5e99e76265bdbbcae09211623b980d48943b889315afa",
+      "CODEOWNERS": "4fcd586a5a0cb1501df2bbf7b8e2882be98903b085e9735e5cbe1e8ae7fc8f15",
+      "docs/production-hardening/ts-drp-ahe-review-bundle/SHA256SUMS.txt": "45918a71e43b7e3426c8ad4a679d40cf3e0db85565771591f5123028c2bb434f",
+      "packages/protocol-v2/conformance/ahe-reference-regen/README.md": "f56ee060be379e31d524d06554fbb10e86da9d339c30be8570d29d184ed7184c",
+      "packages/protocol-v2/conformance/ahe-reference-regen/package.json": "b39d107ae901c6f6f79ba1d38862ee1d28236d28f197c4576d414542127df16d",
+      "packages/protocol-v2/conformance/ahe-reference-regen/src/bytes.js": "8bdcb50cf86592225a1427dd829f83910dc5dbbaf138647173851129ac8665eb",
+      "packages/protocol-v2/conformance/ahe-reference-regen/src/canonical.js": "425d03ebc8a1a8a635842e0b56e310157801aa4895c739b4909a57516e1f5208",
+      "packages/protocol-v2/conformance/ahe-reference-regen/src/hash.js": "fba709e311c372a24650b1a1bde3fdd7cf0eb547f789be6ef07236d4c82f30aa",
+      "packages/protocol-v2/conformance/ahe-reference-regen/src/registry.js": "fe4c1293d86b34058c13886d9813d6e059ac51192fc0839ef25decf0156c1b81",
+      "packages/protocol-v2/conformance/ahe-reference/src/admission.js": "63af415cd0b78512247fd43df32fa98d1459614a48270997f619ba28e20fb3f8",
+      "packages/protocol-v2/conformance/ahe-reference/src/archive.js": "f373d778a428c3a8ea91894337fead422c7f58444a2f8cd0a680c9222ff9db64",
+      "packages/protocol-v2/conformance/ahe-reference/src/canonical.js": "daa0cda2893c4301b0271a47cb45ed2568f77bda0bce7502f0de756d0a678ca5",
+      "packages/protocol-v2/conformance/ahe-reference/src/ct-merkle.js": "7333eccf9f8b3a49279cdfbd513ac806fa623830efb5ec3fb60a1b9d7a08b355",
+      "packages/protocol-v2/conformance/ahe-reference/src/fold.js": "369a84682a7003bfd90e25ca4b0bd203c3b0a38c80a9772e825bca23723f746c",
+      "packages/protocol-v2/conformance/ahe-reference/src/hash.js": "6cd4059d02ef09dfc80423ae6eec57917449ebd8be1b06141387ea23154ef637",
+      "packages/protocol-v2/conformance/ahe-reference/src/indexeddb-store.js": "d9bcac07f77f7beb4d4c6252dfcf067e42b36763a31a64465b71bd3426674561",
+      "packages/protocol-v2/conformance/ahe-reference/src/linearize.js": "ee5a41ce44700fa8329883fb63414ec81e0873335f6cbfebc47e6af0e2c69bf9",
+      "packages/protocol-v2/conformance/ahe-reference/src/protocol.js": "8681b6d1ad9b68d2fb12170aa804bf76a0f24c9345748dc32c269275b73f4b92",
+      "packages/protocol-v2/conformance/ahe-reference/src/runtime.js": "97c46b0e8fc58a2e539bd89b29104f238ca2ee226b2deb5efac7dba1e1ba6e77",
+      "packages/protocol-v2/conformance/ahe-reference/src/seal.js": "b39cb31e6e6bc8f742515588ee7a877749dfb3302d4542fd1c34539ac64c94ca",
+      "packages/protocol-v2/conformance/ahe-reference/src/snapshot.js": "637ca79f89ed6f187442c199730758f0123069441790fb99c402c34b105b9507",
+      "packages/protocol-v2/conformance/ahe-reference/src/state.js": "dfbd8ebffe1e05fa32bc3b84af73594af54781e05a91b405dff50895c284e2ca",
+      "packages/protocol-v2/conformance/freeze-policy.json": "e291babe6069f004a61378e9cf98a9984f3edbe0391b7674ea57a19c7db25e04",
+      "packages/protocol-v2/conformance/reference-regen.lock.json": "511c9aff8a0144b3642f3e771ebf4c2178137fcfc90e224ba48b9d58c8a3e755",
+      "packages/protocol-v2/conformance/reference.lock.json": "ada22a8aa8c5e190e41d5cd8de84ed288d5a0047b10ef579602c28e50f294ffd",
+      "packages/protocol-v2/registry/field-registry.json": "8a2a57fdea17fca694d6d7ed20456f6410dd9ef3103a0b3db7ab0c890caa2964",
+      "packages/protocol-v2/scripts/check-protocol-freeze.mjs": "d6900fd1a1b871a537dd7be0eefff7e3143a63f89dbe1bcedcb946273ee8f3d7",
+      "packages/protocol-v2/tests/fixtures/golden-vectors/registry-v5.json": "d1736af86e2fcfeaf169a5b7a3965ecc485825c0debde82799d84b2981ce8f21"
+    },
+    "fileEntries": {
+      ".github/workflows/protocol-v2-registry.yml": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "CODEOWNERS": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "docs/production-hardening/ts-drp-ahe-review-bundle/SHA256SUMS.txt": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference-regen/README.md": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference-regen/package.json": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference-regen/src/bytes.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference-regen/src/canonical.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference-regen/src/hash.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference-regen/src/registry.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/admission.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/archive.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/canonical.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/ct-merkle.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/fold.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/hash.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/indexeddb-store.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/linearize.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/protocol.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/runtime.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/seal.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/snapshot.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/ahe-reference/src/state.js": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/freeze-policy.json": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/reference-regen.lock.json": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/conformance/reference.lock.json": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/registry/field-registry.json": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/scripts/check-protocol-freeze.mjs": {
+        "type": "blob",
+        "mode": "100644"
+      },
+      "packages/protocol-v2/tests/fixtures/golden-vectors/registry-v5.json": {
+        "type": "blob",
+        "mode": "100644"
+      }
+    },
+    "requiredAbsent": [
+      ".github/CODEOWNERS",
+      "docs/CODEOWNERS"
+    ],
+    "scope": "Unchanged current v2 closure copied into fresh controlled repositories so the actual retained v2 checker executes; not a v3 amendment owner or historical reconstruction"
+  },
+  "limits": [
+    "Union of the seven explicitly selected existing policy inventories plus reviewed current helpers, tests and source-binding roles; not a claim to govern every protocol subsystem.",
+    "Preserved-input means byte preservation; the owner map explains whether it is current semantic data or historical evidence. No preserved fixture attestation is restamped.",
+    "These are baseline inspection hashes, not future GREEN pins. No source, policy or workflow was modified or executed."
+  ]
+}

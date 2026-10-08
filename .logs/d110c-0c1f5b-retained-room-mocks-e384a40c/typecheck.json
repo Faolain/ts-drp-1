@@ -1,0 +1,30 @@
+{
+  "targetDiagnostics": [
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "code": 2345,
+      "line": 1199,
+      "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "code": 2345,
+      "line": 1199,
+      "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "code": 2345,
+      "line": 1258,
+      "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+    }
+  ],
+  "externalDiagnostics": [
+    {
+      "file": "examples/grid/src/v3-zone.ts",
+      "code": 2345,
+      "line": 638,
+      "message": "Argument of type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' is not assignable to parameter of type 'CreateV3RoomSessionInput<ZoneProjection>'.\n  Property 'roomHeadAuthority' is missing in type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' but required in type 'CreateV3RoomSessionInput<ZoneProjection>'."
+    }
+  ]
+}

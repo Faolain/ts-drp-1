@@ -1,0 +1,187 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 13,
+  "passed": 13,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-35/result.json",
+  "baselineSha256": "fbdaf89fcad983ce8697a07e0e13838e5f625d458b7eb7c83187a688115a1af0",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED freezes the exact tests-only and GREEN owner rosters",
+      "status": "passed",
+      "title": "freezes the exact tests-only and GREEN owner rosters",
+      "duration": 1.2322500000000218,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED freezes the exact v3-live-generation-2 grammar and compact-history carrier",
+      "status": "passed",
+      "title": "freezes the exact v3-live-generation-2 grammar and compact-history carrier",
+      "duration": 1.1492909999999483,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED enumerates every registered CutValue field and every cross-owner causal mutant",
+      "status": "passed",
+      "title": "enumerates every registered CutValue field and every cross-owner causal mutant",
+      "duration": 0.7579160000000229,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED pins owner-bound one-use intent behavior independently of serialization",
+      "status": "passed",
+      "title": "pins owner-bound one-use intent behavior independently of serialization",
+      "duration": 0.1743340000000444,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership",
+      "status": "passed",
+      "title": "forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership",
+      "duration": 2.105000000000018,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED executes every CutValue mutant against the genuine certified successor chain",
+      "status": "passed",
+      "title": "executes every CutValue mutant against the genuine certified successor chain",
+      "duration": 82.73645799999986,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants",
+      "status": "passed",
+      "title": "executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants",
+      "duration": 18.783332999999857,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED executes predecessor-lineage, close-order and append-only history mutants",
+      "status": "passed",
+      "title": "executes predecessor-lineage, close-order and append-only history mutants",
+      "duration": 0.5134170000001177,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED replays the genuine durable journal/issuance pair and rejects missing local-issued custody",
+      "status": "passed",
+      "title": "replays the genuine durable journal/issuance pair and rejects missing local-issued custody",
+      "duration": 0.7779160000000047,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED executes manifest, chunk, payload, catalog and artifact cross-pair mutants",
+      "status": "passed",
+      "title": "executes manifest, chunk, payload, catalog and artifact cross-pair mutants",
+      "duration": 2.6173330000001442,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED detects a durable vertex appended after the sealed journal snapshot",
+      "status": "passed",
+      "title": "detects a durable vertex appended after the sealed journal snapshot",
+      "duration": 2.2630420000000413,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED derives the exact canonical generation-2 projection and reopens its compact history",
+      "status": "passed",
+      "title": "derives the exact canonical generation-2 projection and reopens its compact history",
+      "duration": 3.795457999999826,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts",
+      "ancestorTitles": [
+        "D.108b read-only creator-successor adoption RED"
+      ],
+      "fullName": "D.108b read-only creator-successor adoption RED has one composite readiness gate for the genuine future verifier",
+      "status": "passed",
+      "title": "has one composite readiness gate for the genuine future verifier",
+      "duration": 469.57674999999995,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "df1709535eb3bad10ff7f6f140df4722aad250b9c6805e6bd8e226067129e818",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

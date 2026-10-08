@@ -1,0 +1,13 @@
+808d2e254f7d3b3ee7234a87458186511e25e77c7befc3bda2068f69e2a62346  docs/production-hardening/production-hardening-tdd-plan-v2.md
+8847c091b3497e9de8593da800c6389180b73333441d25cf4f403810fd1ab3b4  examples/v3-room/src/index.ts
+c9cd1eff2d3ea364e9fff40c5111f4e3dfee9a31ce79609d12df5a09c1aa1b0c  packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+bd2a4c7c06aee07fb65d9e2fb92a20a2ab1098a8e37d8ef3e645c9663a0be403  packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+92160b216879ece384d7f176aa3772cb7277d60c55965d01c30238f1c2d18d82  tests/phase-3a1b-d9346-room-semantics-red.test.ts
+e8380857332bf88cf12af8dcc439823fe2e479e0140a62bcc091f0f2a80f6388  .logs/d110c-0b0-correction-213850db/correction-ledger.md
+21f678717aa4772fa75bc6ebea57eff409a6fb1da8bb8860cad901b65a702fcd  .logs/d110c-0b0-final-review-213850db/review-prompt.md
+447b2b575e3c546bf226500a08e1e3755d6952521bd0c533089582883c40af67  .logs/d110c-0b0-final-review-213850db/grok/status.json
+7f6bf593b8fb15e807d88a33c26f25df677eb25015fc49d7a73d9b50ef2cbc5b  .logs/d110c-0b0-final-review-213850db/grok/public.txt
+1d81743f00f9e76b402a62a47bb564c87f57a9fbd0545d94b84b291e2f1bff44  .logs/d110c-0b0-final-review-213850db/kimi.stream.jsonl
+44b6e8441dbe80a6e205a2d3f18bbf2c4164e840c334ff561ba705861d24c431  .logs/d110c-0b0-final-review-213850db/opus.stream.jsonl
+762e8c5ba2150f0887bd7ef68f13117ef5d890107afb1b1ba4dc193911cee647  .logs/d110c-0b0-correction-213850db/browser-final.json
+fa4afc2b6d0f3934f4902e1aeb41c0d4ea68ceb75d03b35f8468d618dc75ee42  .logs/d110c-0b0-correction-213850db/retained-final.json

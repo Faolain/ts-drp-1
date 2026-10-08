@@ -1,0 +1,32 @@
+{
+  "valid": true,
+  "sourceSha256": "6368a03369061aab9859160eb888cdbb0ee50012eaa55ee12e719fb95ee7511c",
+  "configSha256": "6c15cd76cf3197d8f08608f28909731d55b7f07a661fada577aaecbe4b81c610",
+  "viteVersion": "6.3.4",
+  "queriedId": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/v3-topic.ts?d108e2c-hostile-text-encoder",
+  "plainId": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/v3-topic.ts",
+  "separateIdentity": true,
+  "hostileDynamicImportRestorationAssertionOrder": {
+    "hostile": 100523,
+    "dynamic": 100711,
+    "literal": 100780,
+    "restore": 100818,
+    "restoreDescriptor": 100934,
+    "assertion": 101057
+  },
+  "transformSha256": "8c0e01b7dabccd734c295e2724e107fbabe2da71eb96a884e792106605f93f0f",
+  "actualWorkspaceConfig": true,
+  "noModuleEvaluation": true,
+  "noListeningServer": true,
+  "noWorkloadExecution": true,
+  "diagnosticOnlyServerOptions": {
+    "middlewareMode": true,
+    "hmr": false,
+    "watch": null,
+    "appType": "custom",
+    "optimizeDeps": {
+      "noDiscovery": true,
+      "include": []
+    }
+  }
+}

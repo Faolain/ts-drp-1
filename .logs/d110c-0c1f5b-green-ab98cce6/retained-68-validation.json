@@ -1,0 +1,102 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 7,
+  "passed": 7,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED has one causal readiness failure for the absent snapshot activation and export surfaces",
+      "status": "passed",
+      "title": "has one causal readiness failure for the absent snapshot activation and export surfaces",
+      "duration": 0.5890839999999571,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED keeps package roots free of runtime/machine/snapshot authority and the v3-live roster unchanged",
+      "status": "passed",
+      "title": "keeps package roots free of runtime/machine/snapshot authority and the v3-live roster unchanged",
+      "duration": 101.96637499999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition exports the adopted epoch, matches independent D.99 reconstruction, and activates a third replica",
+      "status": "passed",
+      "title": "exports the adopted epoch, matches independent D.99 reconstruction, and activates a third replica",
+      "duration": 74.36462499999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition rejects live export before adoption, after deactivation, and from author-list authority while invalid next-ACL operations fail before retention",
+      "status": "passed",
+      "title": "rejects live export before adoption, after deactivation, and from author-list authority while invalid next-ACL operations fail before retention",
+      "duration": 100.49541700000009,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition fails closed on digest, identity, ACL, schema, oversize, and unsafe carriers before registration effects",
+      "status": "passed",
+      "title": "fails closed on digest, identity, ACL, schema, oversize, and unsafe carriers before registration effects",
+      "duration": 459.41016700000023,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition consumes the recovered capability once after snapshot success or failure",
+      "status": "passed",
+      "title": "consumes the recovered capability once after snapshot success or failure",
+      "duration": 62.39850000000024,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition installs an already folded snapshot handle that rejects every effect-bearing method",
+      "status": "passed",
+      "title": "installs an already folded snapshot handle that rejects every effect-bearing method",
+      "duration": 61.14166699999987,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

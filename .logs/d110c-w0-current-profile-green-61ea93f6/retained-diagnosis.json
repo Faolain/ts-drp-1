@@ -1,0 +1,30 @@
+{
+  "runtimeAdded": 0,
+  "sourceHashes": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "754606d13a3f9961680172b4be38cab96f366860fe8f9fcd8974871a58d7d8b5",
+    "packages/storage-node/src/internal/node-issuance-store.ts": "ae169091ee9f1e1c4265e4075dee1ab46ddadb0623e8ead2ede0f8250ef8c01a",
+    "packages/storage-node/dist/src/internal/node-issuance-store.js": "38db316d18f7b63737aa0677055d824231f26cc8ad63302a1ba724fe93b578d6",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "9ab132da3829e2e97c94bcf62c9f31d1ecd0edd6ebdd06d243226c0ef613c787",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "65f304e0455f7eacf47da66635532bbbd4753d354c1e3abad3b3853edc37db58",
+    "packages/control-plane/src/creator-trust-checkpoint-advance.ts": "147b11a7862eb011d617bda74c6d0327e0ea7861e9299f61c3defc9bcea09e2a",
+    "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+    "packages/node/src/creator-adoption-activate.ts": "145caf12e72af3567e30e740f09cb162392a0120734fbd5d5843ca1b920c9fd7"
+  },
+  "storeShape": {
+    "observed": false,
+    "meaning": "Runtime realStore.boundedStoreShape was false; materialized row counts 8193/8195 and maximum page128 matched.",
+    "sourceCause": "Child sameStoreShape requires identical own-key count/order. boundedRecoveryStore exposes six old methods; the genuine current source and built store also expose readSettlementPlan and transactWriteSettlementPlan.",
+    "ownersUnchangedByW0": true
+  },
+  "boundedCheckpoint": {
+    "runtimeFailures": [
+      "TRUST_CLOSURE_INVALID on two bounded advance assertions",
+      "coldReopen ok:false"
+    ],
+    "sourceClue": "The bounded fixture strips issuance-retirement records while the older bounded advance requires exact retained-closure equality and delegates inspectCreatorTrustAdvance; exact rejection predicate remains root-owned diagnosis, not established by this source clue.",
+    "coldSource": "repeat-close-contract.ts captureD110c0b1RedMaterial invokes source creator-adoption-activate.ts",
+    "noUnmeasuredFinalMaterialClaimed": true
+  },
+  "defaultPath": "Shared fixture omission is exact-byte equivalent after reversing only the optional selector additions; no causal baseline runtime was re-executed.",
+  "disposition": "Required retained gate is FAILED. Do not call W0 batch accepted or commit source as complete. Root owns explicit reslicing; no widening of the three W0 owners."
+}

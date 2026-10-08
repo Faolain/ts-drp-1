@@ -1,0 +1,340 @@
+{
+  "head": "b75e75ed8a0cc944139929c501eea684cde4e715",
+  "gates": [
+    {
+      "label": "focused-13",
+      "files": [
+        "tests/phase-6a-creator-successor-product-red.test.ts"
+      ],
+      "total": 13,
+      "entries": [
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108d2 public return AST oracle > accepts private computations and primitive comparisons without confusing operand names with returned authority",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108d2 public return AST oracle > rejects exact sensitive properties and values on exported returned shapes",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108d2 public return AST oracle > tracks the returned operands of assignment, comma and logical assignment expressions",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108d2 public return AST oracle > follows local returned aliases, helpers, methods, export aliases and global product surfaces",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108e2b creator successor room lifetime RED > freezes exactly five RED owners, one GREEN owner and seven browser behaviors",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108e2b creator successor room lifetime RED > pins the exact seven-key successor authority and rejects pre-successor or widened values",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108e2b creator successor room lifetime RED > keeps node-root and chat authority closed while assigning the room as sole node consumer",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108e2b creator successor room lifetime RED > runs all product behaviors without a source-pattern readiness gate",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108e2b creator successor room lifetime RED > rejects only unsupported cold successor compositions before reading room authorities",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108e3 room lifetime transition RED > freezes four test owners, one room GREEN owner and twelve causal browser behaviors",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108e5 bounded redirected lifetime RED > bounds migration activation bytes before constructing the call-time owner",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "D.108e5 bounded redirected lifetime RED > bounds every migration invite encode before copying caller-controlled bodies",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+          "name": "classifies complete legacy and settlement successor compositions before reading room authorities",
+          "expectedStatus": "passed"
+        }
+      ],
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/phase-6a-creator-successor-product-red.test.ts",
+        "--no-file-parallelism",
+        "--coverage.enabled=false",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/focused-13/focused.json"
+      ]
+    },
+    {
+      "label": "bootstrap-3",
+      "files": [
+        "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts"
+      ],
+      "total": 3,
+      "entries": [
+        {
+          "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+          "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > accepts only the four frozen recovery key combinations",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+          "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > rejects malformed bounded policy bytes before consuming the prepared capability",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+          "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > freezes the one shared exact predicate and its custody boundaries",
+          "expectedStatus": "passed"
+        }
+      ],
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+        "--no-file-parallelism",
+        "--coverage.enabled=false",
+        "--reporter=json",
+        "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/bootstrap-3/focused.json"
+      ]
+    },
+    {
+      "label": "rebase-20",
+      "files": [
+        "tests/phase-3g-v3-room-rebase-red.test.ts"
+      ],
+      "total": 20,
+      "entries": [
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > orders exact rebase and transform inputs while expire and held review perform no issue",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > closes one source exactly once after every child has a terminal outcome",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > preserves published source work and completes pending work only after target acceptance",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > batches sixteen compatible rebases behind one target signature",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > splits seventeen compatible rebases into sixteen plus one",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > refuses a foreign-author displaced intent before signing or issuing",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > sorts displaced pages before assigning fresh target logical times",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > suppresses an accepted exact identity before issue and rejects changed bytes",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > keeps the source pending and terminally exposes target issue or publication failure",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > keeps a failed source completion pending and retries it on reopen",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > fails unknown policy and unstable transform identity before target issuance",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > keeps a transformed source pending when the product projection rejects its replacement",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > keeps a recovered projection-rejected replacement and its source pending without reissue",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+          "expectedStatus": "passed"
+        },
+        {
+          "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "name": "Phase 3g room-owned rebase scheduling RED > keeps the reserved terminal activation outside the real chat and zone displacement policies",
+          "expectedStatus": "passed"
+        }
+      ],
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "--no-file-parallelism",
+        "--coverage.enabled=false",
+        "--reporter=json",
+        "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/rebase-20/focused.json"
+      ]
+    }
+  ],
+  "expectedObservations": [
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "factory",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "rebase",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "signer",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "declaration-only",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "factory",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "rebase",
+      "detail": "v3 room successor authority composition is unsupported",
+      "reads": {
+        "application": 0,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "signer",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "declaration-only",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      }
+    }
+  ],
+  "sourceCheckSha256": "7780c719327ddde6dcff97dbdbb1cb6493afeada90b080c1cd2825439290589a",
+  "collectionRepeated": false,
+  "supersedes": "runtime-roster.json",
+  "reason": "Explicit private return annotation formatting only; all frozen commands and selections unchanged."
+}

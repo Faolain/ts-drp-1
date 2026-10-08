@@ -1,0 +1,17 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"target": "ES2022"
+	},
+	"include": [
+		"*.ts",
+		"../../../tests/journal-anchor-read-*-red.test.ts",
+		"../../../packages/storage-browser/tests/journal-anchor-read-red.pw.ts",
+		"../../../packages/storage-browser/playwright.journal-anchor-read.config.ts"
+	],
+	"exclude": ["public-api.ts"]
+}

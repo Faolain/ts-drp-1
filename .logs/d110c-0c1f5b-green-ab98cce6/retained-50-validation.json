@@ -1,0 +1,64 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 4,
+  "passed": 4,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/protocol-v3-creator-author-issuance-frontiers.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f2 creator author-issuance frontier carrier"
+      ],
+      "fullName": "D.110c-0c1f2 creator author-issuance frontier carrier reproduces the exact legal maximum tuple shape below the unchanged ceiling",
+      "status": "passed",
+      "title": "reproduces the exact legal maximum tuple shape below the unchanged ceiling",
+      "duration": 1.902084000000059,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f2 creator author-issuance frontier carrier"
+      ],
+      "fullName": "D.110c-0c1f2 creator author-issuance frontier carrier round-trips the genuine creator-signed carrier and consumes preparation once",
+      "status": "passed",
+      "title": "round-trips the genuine creator-signed carrier and consumes preparation once",
+      "duration": 554.9469579999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f2 creator author-issuance frontier carrier"
+      ],
+      "fullName": "D.110c-0c1f2 creator author-issuance frontier carrier rejects every malformed tuple/vector form and permits an exact empty writer set",
+      "status": "passed",
+      "title": "rejects every malformed tuple/vector form and permits an exact empty writer set",
+      "duration": 136.300708,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f2 creator author-issuance frontier carrier"
+      ],
+      "fullName": "D.110c-0c1f2 creator author-issuance frontier carrier fails closed for every authenticated field, tuple, signature, and size substitution",
+      "status": "passed",
+      "title": "fails closed for every authenticated field, tuple, signature, and size substitution",
+      "duration": 148.0122080000001,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

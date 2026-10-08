@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "properties": {
+    "verdict": { "type": "string", "enum": ["APPROVED", "CHANGES_REQUIRED"] },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "title": { "type": "string" },
+          "path": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "evidence": { "type": "string" },
+          "required_action": { "type": "string" }
+        },
+        "required": ["severity", "title", "path", "line", "evidence", "required_action"],
+        "additionalProperties": false
+      }
+    },
+    "audit_correct": { "type": "boolean" },
+    "design_sufficient": { "type": "boolean" },
+    "red_causal_and_feasible": { "type": "boolean" },
+    "scope_preserved": { "type": "boolean" },
+    "blocking_union_closed": { "type": "boolean" },
+    "next_state": { "type": "string", "enum": ["D110C_0C_RED_AUTHORIZED", "D110C_0C_PLAN_CORRECTION_REQUIRED"] }
+  },
+  "required": ["verdict", "summary", "findings", "audit_correct", "design_sufficient", "red_causal_and_feasible", "scope_preserved", "blocking_union_closed", "next_state"],
+  "additionalProperties": false
+}

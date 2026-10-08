@@ -1,0 +1,25 @@
+{
+	"schemaVersion": "ts-drp-blueprint-work-budget-freeze-v1",
+	"profile": "blueprint-work-budget-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/protocol-v3-blueprint-work-budget.yml",
+	"protectedArtifacts": [
+		"packages/protocol-v3/supplements/blueprint-work-budget-v1/check-freeze.mjs",
+		"packages/protocol-v3/supplements/blueprint-work-budget-v1/freeze-policy.json",
+		"packages/protocol-v3/supplements/blueprint-work-budget-v1/profile.json",
+		"packages/protocol-v3/supplements/blueprint-work-budget-v1/spec.md",
+		".github/workflows/protocol-v3-blueprint-work-budget.yml",
+		"tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+		"tests/fixtures/phase-0p0-v3/blueprint-work-budget-contract.json",
+		"tests/fixtures/phase-0p0-v3/controlled-blueprint-work-budget.ts"
+	],
+	"checkerSha256": "886b4255634abd4b262bb5e5f7b8574f39945f844d890d04ecd02e8e62c9dad0",
+	"artifactSha256": {
+		"packages/protocol-v3/supplements/blueprint-work-budget-v1/profile.json": "4f222a168d2592f40e3b6416ceae359488cc79689b051afbf78dcece3b4fe20c",
+		"packages/protocol-v3/supplements/blueprint-work-budget-v1/spec.md": "e67c3f26db9f29dc7da61adb7dc1df50cf23a656b599ad0367cf31a2febad2ac",
+		".github/workflows/protocol-v3-blueprint-work-budget.yml": "85ebf9c8ba12675d7686f7e353640b6be385dfe07663208f3d521c39b6a72997",
+		"tests/protocol-v3-blueprint-work-budget-0p0.test.ts": "a364bde5a7d1be9b2dc04e6a022b400dfdfb71a756ec528b192a5a7898a7c371",
+		"tests/fixtures/phase-0p0-v3/blueprint-work-budget-contract.json": "429ea85669724509dccfa28700e2ce73d4bfb4e295aec2f4860d583bafa5e596",
+		"tests/fixtures/phase-0p0-v3/controlled-blueprint-work-budget.ts": "d65128587626ae5c143cd8763924f87d124560b34143df21899d492ad580356b"
+	}
+}

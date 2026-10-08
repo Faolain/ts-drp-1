@@ -1,0 +1,11 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import fs from \"node:fs\";import path from \"node:path\";import {execFileSync} from \"node:child_process\";const root=process.argv[1];for(const name of fs.readdirSync(root)){if(name.endsWith(\".mjs\"))execFileSync(process.execPath,[\"--check\",path.join(root,name)]);if(/\\.(mjs|md)$/u.test(name)){const s=fs.readFileSync(path.join(root,name),\"utf8\");if(/\\n\\s*\\n$/u.test(s)||s.split(\"\\n\").some(l=>/[\\t ]$/u.test(l)))throw Error(\"Evidence whitespace \"+name);}}execFileSync(\"git\",[\"diff\",\"--check\"],{stdio:\"inherit\"});console.log(\"Authored syntax, whitespace and working diff checks passed\");",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-room-guard-reporters-5f6fb6c0"
+  ],
+  "start": "2026-09-06T02:57:27.986Z"
+}

@@ -1,0 +1,6 @@
+Grok summary 04a1c56508e108215f02f59f813a15fdc13f1129efb4b046261d29d30b15a491 /Users/aristotle/.grok/sessions/%2FUsers%2Faristotle%2FDocuments%2FProjects%2Fts-drp-1/01a06843-5bb3-7102-8434-e3d6282eafce/summary.json
+Grok events 94d360f27038f211125d73320b928d8ede20c70fdca5e7b76af174feb43280e4 /Users/aristotle/.grok/sessions/%2FUsers%2Faristotle%2FDocuments%2FProjects%2Fts-drp-1/01a06843-5bb3-7102-8434-e3d6282eafce/events.jsonl
+Grok updates 820291f829055f66ccaf84f6b2714f1b81a2d712eeff36131f74121bab39dcc8 /Users/aristotle/.grok/sessions/%2FUsers%2Faristotle%2FDocuments%2FProjects%2Fts-drp-1/01a06843-5bb3-7102-8434-e3d6282eafce/updates.jsonl
+Kimi wire 88418ee264290d84148459345b90db44e590e5d58be17236e89a15fb1c2fb4bc /Users/aristotle/.kimi-code/sessions/wd_ts-drp-1_cd3f86280794/session_2fd7efbd-c126-42d5-8bef-835bb338fe37/agents/main/wire.jsonl
+Kimi state 8438bd1989a2fcab5f212eaeae2ce94d7196ea9015ef1111ba4b7a3cd22587f1 /Users/aristotle/.kimi-code/sessions/wd_ts-drp-1_cd3f86280794/session_2fd7efbd-c126-42d5-8bef-835bb338fe37/state.json
+Opus transcript 43005c8cb55f44236c4c6a1442570a8a05947007369d64e0f9d6df0e407edd2a /Users/aristotle/.claude-phel/projects/-Users-aristotle-Documents-Projects-ts-drp-1/0ce5164c-a3ef-4e88-8c95-8395ecd424e0.jsonl

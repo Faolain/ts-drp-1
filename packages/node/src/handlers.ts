@@ -1,119 +1,229 @@
-import { publicKeyFromRaw } from "@libp2p/crypto/keys";
-import { peerIdFromPublicKey } from "@libp2p/peer-id";
-import { sha256 } from "@noble/hashes/sha2";
-import { Signature } from "@noble/secp256k1";
 import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
+import { directSyncProtocolFor, type SelectedSyncProtocol } from "@ts-drp/network";
+import {
+	AdoptionCommitExhaustedError,
+	ApplyInvariantError,
+	authenticateVertices,
+	HashGraph,
+	mergeAuthenticatedVertices,
+	readAuthenticatedClockPending,
+} from "@ts-drp/object";
+import { wasAuthenticatedHashCommitted } from "@ts-drp/object/internal/authenticated-commit";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
-	type AggregatedAttestation,
+	type ApplyResult,
 	Attestation,
 	AttestationUpdate,
+	DRPStateOtherTheWire,
 	FetchState,
 	FetchStateResponse,
 	type IDRP,
 	type IDRPObject,
+	type IFinalityStore,
 	Message,
 	MessageType,
 	NodeEventName,
 	Sync,
 	SyncAccept,
+	SyncReject,
 	Update,
 	type Vertex,
 } from "@ts-drp/types";
 import { isPromise } from "@ts-drp/utils";
-import { serializeDRPState } from "@ts-drp/utils/serialization";
 import { MessageSchema } from "@ts-drp/validation/message";
 
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
+import { sendSyncObject } from "./operations.js";
+import { buildSyncResponseChunksForVertices, readUsefulSyncDelta } from "./sync-codec.js";
+import {
+	advertisedTheseHeads,
+	completePresentExactRequests,
+	queueExactRequests,
+	recordBranchCuts,
+	recordSharedHeads,
+} from "./sync-state.js";
+import { signGeneratedVertices } from "./vertex-egress.js";
+
+export { signGeneratedVertices } from "./vertex-egress.js";
+
+export { SYNC_RECOVERY_COOLDOWN_MS } from "./sync-state.js";
 
 const metrics = new OpentelemetryMetrics("@ts-drp/node/handlers");
 
 interface HandleParams {
 	node: DRPNode;
 	message: Message;
+	syncSelection?: SelectedSyncProtocol;
 }
 
 interface IHandlerStrategy {
 	(handleParams: HandleParams): Promise<void> | void;
 }
 
-const MAX_SYNC_RECOVERY_RETRIES = 3;
-export const SYNC_RECOVERY_COOLDOWN_MS = 30_000;
-
-interface SyncRecoveryEpisode {
-	retries?: number;
-	cooldownUntil?: number;
+interface HandlerRegistryEntry {
+	handler: IHandlerStrategy;
+	vertexIngress: false | typeof authenticateVertices;
 }
 
-// SYNC/SYNC_ACCEPT have no correlation id, so stale accepts from the same peer
-// necessarily share the current (objectId, sender) recovery episode budget.
-const syncRecoveryEpisodes = new WeakMap<DRPNode, Map<string, SyncRecoveryEpisode>>();
+type AuthenticatedClockPendingMergeOutcome = Awaited<ReturnType<typeof mergeAuthenticatedVertices>>;
 
-function recoveryKey(objectId: string, sender: string): string {
-	return JSON.stringify([objectId, sender]);
+const MAX_UPDATE_VERTICES = 32;
+const MAX_INVALID_VERTICES_PER_PEER = 10_000;
+const MAX_INVALID_PEER_BUDGETS = 256;
+const CANONICAL_VERTEX_HASH = /^[0-9a-f]{64}$/;
+
+function queueWireExactRequests(node: DRPNode, objectId: string, peerId: string, hashes: readonly string[]): boolean {
+	const canonicalHashes = hashes.filter((hash) => CANONICAL_VERTEX_HASH.test(hash));
+	return canonicalHashes.length !== 0 && queueExactRequests(node, objectId, peerId, canonicalHashes);
+}
+
+function legacyFinalityStore<T extends IDRP>(object: IDRPObject<T>): IFinalityStore | undefined {
+	if (object.replicaMode === "observer") return undefined;
+	const finalityStore = object.finalityStore;
+	return finalityStore.enabled === false ? undefined : finalityStore;
+}
+
+interface InvalidPeerBudget {
+	exhausted: boolean;
+	invalidOccurrences: number;
+}
+
+const invalidPeerBudgets = new WeakMap<DRPNode, Map<string, InvalidPeerBudget>>();
+
+function disconnectInvalidPeer(node: DRPNode, sender: string): void {
+	void node.networkNode.disconnect(sender).catch((error: unknown) => {
+		log.error("::messageHandler: Failed to disconnect invalid peer", error);
+	});
+}
+
+function isInvalidPeerExhausted(node: DRPNode, sender: string): boolean {
+	return invalidPeerBudgets.get(node)?.get(sender)?.exhausted === true;
+}
+
+function accountInvalidVertices(node: DRPNode, sender: string, invalidOccurrences: number): boolean {
+	const budgets = invalidPeerBudgets.get(node) ?? new Map<string, InvalidPeerBudget>();
+	const existing = budgets.get(sender);
+	if (existing?.exhausted === true) return true;
+	if (invalidOccurrences === 0) return false;
+
+	if (existing === undefined && budgets.size >= MAX_INVALID_PEER_BUDGETS) {
+		// Remembering overflow identities would move the unbounded sender-key surface.
+		// Drop this invalid offer, disconnect, and leave valid traffic ledger-free.
+		disconnectInvalidPeer(node, sender);
+		return true;
+	}
+
+	const total = Math.min(MAX_INVALID_VERTICES_PER_PEER, (existing?.invalidOccurrences ?? 0) + invalidOccurrences);
+	const exhausted = total >= MAX_INVALID_VERTICES_PER_PEER;
+	budgets.set(sender, { exhausted, invalidOccurrences: total });
+	invalidPeerBudgets.set(node, budgets);
+	if (exhausted) disconnectInvalidPeer(node, sender);
+	return exhausted;
 }
 
 /**
- * Clear all recovery episodes associated with one object subscription.
- * @param node - Node whose recovery state should be cleared
- * @param objectId - Object subscription being removed
+ * Clear node-lifetime invalid-peer accounting after the node has stopped.
+ * @param node - Node whose invalid-peer accounting has ended
  */
-export function clearSyncRecoveryEpisodes(node: DRPNode, objectId: string): void {
-	const episodes = syncRecoveryEpisodes.get(node);
-	if (!episodes) return;
-
-	for (const key of episodes.keys()) {
-		const [episodeObjectId] = JSON.parse(key) as [string, string];
-		if (episodeObjectId === objectId) episodes.delete(key);
-	}
-	if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
+export function clearInvalidPeerBudgets(node: DRPNode): void {
+	invalidPeerBudgets.delete(node);
 }
 
-async function recoverMissingSync(node: DRPNode, objectId: string, sender: string, missing: string[]): Promise<void> {
-	const key = recoveryKey(objectId, sender);
-	const episodes = syncRecoveryEpisodes.get(node) ?? new Map<string, SyncRecoveryEpisode>();
-	const episode = episodes.get(key);
-
-	if (missing.length === 0) {
-		episodes.delete(key);
-		if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
-		return;
+function rejectedBoundaryResult(error: unknown): ApplyResult | undefined {
+	if (error instanceof AdoptionCommitExhaustedError || error instanceof ApplyInvariantError) {
+		return error.partialResult;
 	}
-
-	if (episode?.cooldownUntil !== undefined) {
-		if (Date.now() < episode.cooldownUntil) return;
-		episodes.delete(key);
-	}
-
-	const retryCount = episodes.get(key)?.retries ?? 0;
-	if (retryCount >= MAX_SYNC_RECOVERY_RETRIES) {
-		episodes.set(key, { cooldownUntil: Date.now() + SYNC_RECOVERY_COOLDOWN_MS });
-		syncRecoveryEpisodes.set(node, episodes);
-		node.safeDispatchEvent(NodeEventName.DRP_SYNC_REJECTED, {
-			detail: { id: objectId, peerId: sender, retries: retryCount },
-		});
-		return;
-	}
-
-	episodes.set(key, { retries: retryCount + 1 });
-	syncRecoveryEpisodes.set(node, episodes);
-	await node.syncObject(objectId, sender);
+	return undefined;
 }
 
-const messageHandlers: Record<MessageType, IHandlerStrategy | undefined> = {
+function trueMissingHashes(missing: readonly string[], clockPending: readonly string[]): string[] {
+	if (clockPending.length === 0) return [...missing];
+	const pending = new Set(clockPending);
+	return missing.filter((hash) => !pending.has(hash));
+}
+
+function exactMissingDependencies<T extends IDRP>(
+	object: IDRPObject<T>,
+	offered: readonly Vertex[],
+	missingOffers: readonly string[]
+): string[] {
+	const offeredByHash = new Map(offered.map((vertex) => [vertex.hash, vertex]));
+	const requested = new Set<string>();
+	const visited = new Set<string>();
+	const visit = (hash: string): void => {
+		if (object.getVertex(hash) !== undefined || visited.has(hash)) return;
+		visited.add(hash);
+		const vertex = offeredByHash.get(hash);
+		if (vertex === undefined) {
+			requested.add(hash);
+			return;
+		}
+		for (const dependency of vertex.dependencies) visit(dependency);
+	};
+	for (const hash of missingOffers) visit(hash);
+	return [...requested];
+}
+
+async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
+	node: DRPNode,
+	object: IDRPObject<T>,
+	sender: string,
+	vertices: Vertex[]
+): Promise<{ exhausted: boolean; outcome: AuthenticatedClockPendingMergeOutcome }> {
+	try {
+		const outcome = await mergeAuthenticatedVertices(object, vertices);
+		return {
+			exhausted: accountInvalidVertices(node, sender, outcome.result[2].length),
+			outcome,
+		};
+	} catch (error) {
+		const partialResult = rejectedBoundaryResult(error);
+		if (partialResult === undefined) throw error;
+		const exhausted = accountInvalidVertices(node, sender, partialResult.invalid.length);
+		const rawMissing = trueMissingHashes(partialResult.missing, readAuthenticatedClockPending(error));
+		const authenticatedHashes = new Set(authenticateVertices(vertices).map(({ hash }) => hash));
+		completePresentExactRequests(
+			node,
+			object.id,
+			sender,
+			(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash),
+			(hash) => wasAuthenticatedHashCommitted(error, hash)
+		);
+		const missing = exactMissingDependencies(object, vertices, rawMissing);
+
+		if (!exhausted && missing.length !== 0 && queueWireExactRequests(node, object.id, sender, missing)) {
+			try {
+				await node.syncObject(object.id, sender);
+			} catch (recoveryError) {
+				log.error("::messageHandler: Rejected-boundary recovery failed", recoveryError);
+			}
+		}
+		try {
+			node.put(object.id, object);
+		} catch (persistenceError) {
+			log.error("::messageHandler: Rejected-boundary persistence failed", persistenceError);
+		}
+		throw error;
+	}
+}
+
+export const messageHandlers: Record<MessageType, HandlerRegistryEntry | undefined> = {
 	[MessageType.MESSAGE_TYPE_UNSPECIFIED]: undefined,
-	[MessageType.MESSAGE_TYPE_FETCH_STATE]: fetchStateHandler,
-	[MessageType.MESSAGE_TYPE_FETCH_STATE_RESPONSE]: fetchStateResponseHandler,
-	[MessageType.MESSAGE_TYPE_UPDATE]: updateHandler,
-	[MessageType.MESSAGE_TYPE_SYNC]: syncHandler,
-	[MessageType.MESSAGE_TYPE_SYNC_ACCEPT]: syncAcceptHandler,
-	[MessageType.MESSAGE_TYPE_SYNC_REJECT]: syncRejectHandler,
-	[MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE]: attestationUpdateHandler,
-	[MessageType.MESSAGE_TYPE_DRP_DISCOVERY]: drpDiscoveryHandler,
-	[MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE]: ({ node, message }) =>
-		node.handleDiscoveryResponse(message.sender, message),
+	[MessageType.MESSAGE_TYPE_FETCH_STATE]: { handler: fetchStateHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_FETCH_STATE_RESPONSE]: { handler: fetchStateResponseHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_UPDATE]: { handler: updateHandler, vertexIngress: authenticateVertices },
+	[MessageType.MESSAGE_TYPE_SYNC]: { handler: syncHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_SYNC_ACCEPT]: { handler: syncAcceptHandler, vertexIngress: authenticateVertices },
+	[MessageType.MESSAGE_TYPE_SYNC_REJECT]: { handler: syncRejectHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE]: { handler: attestationUpdateHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_DRP_DISCOVERY]: { handler: drpDiscoveryHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE]: {
+		handler: ({ node, message }) => node.handleDiscoveryResponse(message.sender, message),
+		vertexIngress: false,
+	},
 	[MessageType.MESSAGE_TYPE_CUSTOM]: undefined,
+	[MessageType.MESSAGE_TYPE_V3_ENVELOPE]: undefined,
 	[MessageType.UNRECOGNIZED]: undefined,
 };
 
@@ -121,21 +231,26 @@ const messageHandlers: Record<MessageType, IHandlerStrategy | undefined> = {
  * Handle message and run the handler
  * @param node - The DRP node instance handling the request
  * @param message - The incoming message
+ * @param syncSelection - Explicit selected-stream truth for trusted in-process callers
  */
-export async function handleMessage(node: DRPNode, message: Message): Promise<void> {
+export async function handleMessage(
+	node: DRPNode,
+	message: Message,
+	syncSelection: SelectedSyncProtocol | undefined = directSyncProtocolFor(message)
+): Promise<void> {
+	if (isInvalidPeerExhausted(node, message.sender)) return;
 	const validation = MessageSchema.safeParse(message);
 	if (!validation.success) {
 		log.error(`::messageHandler: Invalid message format ${validation.error.message}`);
 		return;
 	}
 	const validatedMessage = validation.data;
-
-	const handler = messageHandlers[validatedMessage.type];
-	if (!handler) {
+	const entry = messageHandlers[validatedMessage.type];
+	if (!entry) {
 		log.error("::messageHandler: Invalid operation");
 		return;
 	}
-	const result = handler({ node, message: validatedMessage });
+	const result = entry.handler({ node, message: validatedMessage, syncSelection });
 	if (isPromise(result)) {
 		await result;
 	}
@@ -150,13 +265,16 @@ function fetchStateHandler({ node, message }: HandleParams): ReturnType<IHandler
 		return;
 	}
 
-	const [aclState, drpState] = drpObject.getStates(fetchState.vertexHash);
+	const [aclState, drpState] =
+		fetchState.vertexHash === HashGraph.rootHash
+			? drpObject.getSerializedStates(fetchState.vertexHash)
+			: [undefined, undefined];
 	const response = FetchStateResponse.create({
 		vertexHash: fetchState.vertexHash,
-		// Preserve an explicit protobuf miss for pruned/nonexistent snapshots.
+		// Preserve explicit absence for cost-gated non-root requests and unavailable snapshots.
 		// Serializing undefined would manufacture a present-but-empty state.
-		aclState: aclState === undefined ? undefined : serializeDRPState(aclState),
-		drpState: drpState === undefined ? undefined : serializeDRPState(drpState),
+		aclState: aclState === undefined ? undefined : DRPStateOtherTheWire.decode(aclState),
+		drpState: drpState === undefined ? undefined : DRPStateOtherTheWire.decode(drpState),
 	});
 
 	const messageFetchStateResponse = Message.create({
@@ -217,9 +335,11 @@ function attestationUpdateHandler({ node, message }: HandleParams): ReturnType<I
 		log.error("::attestationUpdateHandler: Object not found");
 		return;
 	}
+	const finalityStore = legacyFinalityStore(object);
+	if (finalityStore === undefined) return;
 
 	if (object.acl.query_isFinalitySigner(sender)) {
-		object.finalityStore.addSignatures(sender, attestationUpdate.attestations);
+		finalityStore.addSignatures(sender, attestationUpdate.attestations);
 		node.safeDispatchEvent(NodeEventName.DRP_ATTESTATION_UPDATE, {
 			detail: {
 				id: object.id,
@@ -249,29 +369,46 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 	const { sender, data } = message;
 
 	const updateMessage = Update.decode(data);
+	if (updateMessage.vertices.length > MAX_UPDATE_VERTICES) {
+		log.error("::updateHandler: Too many vertices");
+		return;
+	}
 	const object = node.get(message.objectId);
 	if (!object) {
 		log.error("::updateHandler: Object not found");
 		return;
 	}
 
-	const verifiedVertices = authenticateIncomingVertices(object, updateMessage.vertices);
+	const governedOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
+	const mergeOutcome = governedOutcome.outcome;
+	const authenticatedHashes = new Set(mergeOutcome.authenticatedHashes);
+	const committedHashes = new Set(mergeOutcome.committed.map(({ hash }) => hash));
+	completePresentExactRequests(
+		node,
+		object.id,
+		sender,
+		(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash),
+		(hash) => committedHashes.has(hash)
+	);
+	const missing = exactMissingDependencies(
+		object,
+		updateMessage.vertices,
+		trueMissingHashes(mergeOutcome.result[1], mergeOutcome.clockPending)
+	);
+	const appliedVertices = [...mergeOutcome.committed];
 
-	const [, missing] = await object.merge(verifiedVertices);
-	const presentHashes = new Set(object.vertices.map((vertex) => vertex.hash));
-	const appliedVertices = verifiedVertices.filter((vertex) => presentHashes.has(vertex.hash));
-
-	if (appliedVertices.length !== 0) {
+	const finalityStore = appliedVertices.length === 0 ? undefined : legacyFinalityStore(object);
+	if (finalityStore !== undefined) {
 		// add their signatures — only if the sender is a finality signer on the LIVE
 		// ACL. Mirrors attestationUpdateHandler; without this gate a non-signer could
 		// piggyback forged attestations on an UPDATE and have them counted toward
 		// finality (finality-integrity bypass).
 		if (object.acl.query_isFinalitySigner(sender)) {
-			object.finalityStore.addSignatures(sender, updateMessage.attestations);
+			finalityStore.addSignatures(sender, updateMessage.attestations);
 		}
 
 		// add my signatures
-		const attestations = signFinalityVertices(node, object, appliedVertices);
+		const attestations = signFinalityVerticesWithStore(node, finalityStore, appliedVertices);
 
 		if (attestations.length !== 0) {
 			// broadcast the attestations
@@ -292,8 +429,14 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 		}
 	}
 
-	if (missing.length !== 0) {
-		await recoverMissingSync(node, message.objectId, sender, missing);
+	// The merge may have committed valid siblings before this batch exhausted the
+	// peer. Publish those commits normally; only attacker-driven recovery stops.
+	if (
+		!governedOutcome.exhausted &&
+		missing.length !== 0 &&
+		queueWireExactRequests(node, message.objectId, sender, missing)
+	) {
+		await node.syncObject(message.objectId, sender);
 	}
 
 	node.put(object.id, object);
@@ -321,22 +464,143 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
  * @returns A promise that resolves when the sync response is sent
  * @throws {Error} If the stream is undefined or if the object is not found
  */
-async function syncHandler({ node, message }: HandleParams): Promise<void> {
-	const { sender, data } = message;
-	// (might send reject) <- TODO: when should we reject?
-	const syncMessage = Sync.decode(data);
+async function syncHandler(params: HandleParams): Promise<void> {
+	const syncMessage = Sync.decode(params.message.data);
+	const selected = params.syncSelection;
+	if (
+		selected?.mode === "fallback" ||
+		(selected === undefined &&
+			syncMessage.heads.length === 0 &&
+			syncMessage.sharedHeads.length === 0 &&
+			syncMessage.requestedHashes.length === 0)
+	) {
+		await fullInventorySyncHandler(params, syncMessage);
+		return;
+	}
+	await headsSyncHandler(params, syncMessage);
+}
+
+async function sendHistoryUnavailable(
+	node: DRPNode,
+	objectId: string,
+	sender: string,
+	missingHashes: readonly string[]
+): Promise<void> {
+	const rejection = Message.create({
+		sender: node.networkNode.peerId,
+		type: MessageType.MESSAGE_TYPE_SYNC_REJECT,
+		data: SyncReject.encode(
+			SyncReject.create({ missingHashes: [...missingHashes], reason: "history-unavailable" })
+		).finish(),
+		objectId,
+	});
+	await node.sendNegotiatedSyncResponse(sender, rejection);
+}
+
+async function headsSyncHandler({ node, message }: HandleParams, syncMessage: Sync): Promise<void> {
+	const { sender } = message;
 	const object = node.get(message.objectId);
 	if (!object) {
 		log.error("::syncHandler: Object not found");
 		return;
 	}
 
-	await signGeneratedVertices(node, object.vertices);
+	const localHeads = object.getHistoryHeads();
+	const knownRemoteHeads = syncMessage.heads.filter((hash) => object.getVertex(hash) !== undefined);
+	const unknownRemoteHeads = syncMessage.heads.filter((hash) => object.getVertex(hash) === undefined);
+	const verifiedSharedHeads = syncMessage.sharedHeads.filter((hash) => object.getVertex(hash) !== undefined);
+	if (knownRemoteHeads.length !== 0) {
+		recordSharedHeads(node, object.id, sender, knownRemoteHeads);
+	}
+	recordBranchCuts(
+		node,
+		object.id,
+		sender,
+		verifiedSharedHeads.filter((hash) => !knownRemoteHeads.includes(hash))
+	);
 
-	const requested: Set<Vertex> = new Set(object.vertices);
+	const delta = readUsefulSyncDelta(
+		object,
+		localHeads,
+		knownRemoteHeads,
+		verifiedSharedHeads,
+		syncMessage.requestedHashes,
+		unknownRemoteHeads.length === 0
+	);
+	if (delta.status === "history-unavailable") {
+		await sendHistoryUnavailable(node, object.id, sender, delta.missingHashes);
+		return;
+	}
+
+	const exactRead = object.readHistory(syncMessage.requestedHashes);
+	if (exactRead.status === "history-unavailable") {
+		await sendHistoryUnavailable(node, object.id, sender, exactRead.missingHashes);
+		return;
+	}
+	const exact = exactRead.status === "available" ? exactRead.vertices : [];
+	const selectedByHash = new Map<string, Vertex>();
+	for (const vertex of delta.status === "available" ? delta.vertices : []) selectedByHash.set(vertex.hash, vertex);
+	for (const vertex of exact) selectedByHash.set(vertex.hash, vertex);
+	const selected = [...selectedByHash.values()];
+
+	if (selected.length !== 0) {
+		const responses = await buildSyncResponseChunksForVertices(node, object, selected);
+		for (const response of responses) await node.sendNegotiatedSyncResponse(sender, response);
+	}
+
+	const queuedUnknown = queueWireExactRequests(node, object.id, sender, unknownRemoteHeads);
+	const isReciprocalProof = advertisedTheseHeads(node, object.id, sender, syncMessage.heads);
+	const shouldReciprocate =
+		syncMessage.heads.length !== 0 && unknownRemoteHeads.length === 0 && selected.length === 0 && !isReciprocalProof;
+	if (queuedUnknown) {
+		await node.syncObject(object.id, sender);
+	} else if (shouldReciprocate) {
+		await sendSyncObject(node, object.id, sender, "inbound-reciprocity");
+	}
+}
+
+async function fullInventorySyncHandler({ node, message }: HandleParams, syncMessage: Sync): Promise<void> {
+	const { sender } = message;
+	// (might send reject) <- TODO: when should we reject?
+	const object = node.get(message.objectId);
+	if (!object) {
+		log.error("::syncHandler: Object not found");
+		return;
+	}
+	if (object.historyStorage === "compact") {
+		const remoteHashes = new Set(syncMessage.vertexHashes);
+		const availableHashes = new Set(object.historyInventory.availablePayloadHashes);
+		const unavailableHashes = object.historyInventory.knownHashes.filter(
+			(hash) => !remoteHashes.has(hash) && !availableHashes.has(hash)
+		);
+		if (unavailableHashes.length !== 0) {
+			const rejection = Message.create({
+				sender: node.networkNode.peerId,
+				type: MessageType.MESSAGE_TYPE_SYNC_REJECT,
+				data: SyncReject.encode(
+					SyncReject.create({ missingHashes: unavailableHashes, reason: "history-unavailable" })
+				).finish(),
+				objectId: object.id,
+			});
+			node.sendNegotiatedSyncResponse(sender, rejection).catch((error) => {
+				log.error("::syncHandler: Error sending history-unavailable rejection", error);
+			});
+			return;
+		}
+	}
+
+	const localVertices = object.vertices;
+
+	const requested: Set<Vertex> = new Set(localVertices);
+	const localVerticesByHash = new Map<string, Vertex>();
+	// Reverse fill preserves Array.find's first match when duplicate hashes are present.
+	for (let index = localVertices.length - 1; index >= 0; index--) {
+		const vertex = localVertices[index];
+		localVerticesByHash.set(vertex.hash, vertex);
+	}
 	const requesting: string[] = [];
 	for (const h of syncMessage.vertexHashes) {
-		const vertex = object.vertices.find((v) => v.hash === h);
+		const vertex = localVerticesByHash.get(h);
 		if (vertex) {
 			requested.delete(vertex);
 		} else {
@@ -346,30 +610,14 @@ async function syncHandler({ node, message }: HandleParams): Promise<void> {
 
 	if (requested.size === 0 && requesting.length === 0) return;
 
-	const attestations = getAttestations(object, [...requested]);
-
-	const messageSyncAccept = Message.create({
-		sender: node.networkNode.peerId,
-		type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
-		// add data here
-		data: SyncAccept.encode(
-			SyncAccept.create({
-				requested: [...requested],
-				attestations,
-				requesting,
-			})
-		).finish(),
-		objectId: object.id,
-	});
-
-	node.networkNode.sendMessage(sender, messageSyncAccept).catch((e) => {
-		log.error("::syncHandler: Error sending message", e);
-	});
+	const responses = await buildSyncResponseChunksForVertices(node, object, [...requested], requesting);
+	for (const response of responses) await node.sendNegotiatedSyncResponse(sender, response);
+	const sentRequested = responses.flatMap((response) => SyncAccept.decode(response.data).requested);
 
 	node.safeDispatchEvent(NodeEventName.DRP_SYNC, {
 		detail: {
 			id: object.id,
-			requested,
+			requested: new Set(sentRequested),
 			requesting,
 		},
 	});
@@ -379,8 +627,8 @@ async function syncHandler({ node, message }: HandleParams): Promise<void> {
   data: { id: string, operations: {nonce: string, fn: string, args: string[] }[] }
   operations array contain the full remote operations array
 */
-async function syncAcceptHandler({ node, message }: HandleParams): Promise<void> {
-	if (!isTracingEnabled()) return syncAcceptHandlerUntraced({ node, message });
+async function syncAcceptHandler(params: HandleParams): Promise<void> {
+	if (!isTracingEnabled()) return syncAcceptHandlerUntraced(params);
 
 	return metrics.traceFunc(
 		"node.syncAcceptHandler",
@@ -389,10 +637,10 @@ async function syncAcceptHandler({ node, message }: HandleParams): Promise<void>
 			span.setAttribute("drp.object.id", candidate.objectId);
 			span.setAttribute("drp.message.sender", candidate.sender);
 		}
-	)({ node, message });
+	)(params);
 }
 
-async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promise<void> {
+async function syncAcceptHandlerUntraced({ node, message, syncSelection }: HandleParams): Promise<void> {
 	const { data, sender } = message;
 	const syncAcceptMessage = SyncAccept.decode(data);
 	const object = node.get(message.objectId);
@@ -401,72 +649,137 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		return;
 	}
 
-	const verifiedVertices = authenticateIncomingVertices(object, syncAcceptMessage.requested);
-
-	const mergeRan = verifiedVertices.length !== 0;
+	let mergeRan = false;
+	let appliedProgress = false;
+	let committedVertices: readonly Vertex[] = [];
+	let rawMissing: string[] = [];
 	let missing: string[] = [];
-	if (mergeRan) {
-		[, missing] = await object.merge(verifiedVertices);
-		object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
-		node.put(object.id, object);
-		await recoverMissingSync(node, object.id, sender, missing);
+	let suppressMissingRecovery = false;
+	const finalityStore = legacyFinalityStore(object);
+	const headsMode = syncSelection?.mode === "heads-chunk";
+	const preMergeHeads = headsMode ? new Set(object.getHistoryHeads()) : new Set<string>();
+	const preExistingOfferedVertices = headsMode
+		? syncAcceptMessage.requested.flatMap((vertex) => {
+				const stored = object.getVertex(vertex.hash);
+				return stored === undefined ? [] : [stored];
+			})
+		: [];
+	const preExistingDependencies = headsMode
+		? new Set(
+				syncAcceptMessage.requested.flatMap(({ dependencies }) =>
+					dependencies.filter((hash) => object.getVertex(hash) !== undefined)
+				)
+			)
+		: new Set<string>();
+	if (syncAcceptMessage.requested.length !== 0) {
+		const governedOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, syncAcceptMessage.requested);
+		const mergeOutcome = governedOutcome.outcome;
+		suppressMissingRecovery = governedOutcome.exhausted;
+		mergeRan = mergeOutcome.hasTrustedOrAuthenticatedOffers;
+		appliedProgress = mergeOutcome.committed.length !== 0;
+		committedVertices = mergeOutcome.committed;
+		rawMissing = mergeOutcome.result[1];
+		const authenticatedHashes = new Set(mergeOutcome.authenticatedHashes);
+		const committedHashes = new Set(mergeOutcome.committed.map(({ hash }) => hash));
+		completePresentExactRequests(
+			node,
+			object.id,
+			sender,
+			(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash),
+			(hash) => committedHashes.has(hash)
+		);
+		missing = exactMissingDependencies(
+			object,
+			syncAcceptMessage.requested,
+			trueMissingHashes(rawMissing, mergeOutcome.clockPending)
+		);
+		if (mergeRan && finalityStore !== undefined) {
+			finalityStore.mergeSignatures(syncAcceptMessage.attestations);
+		}
+		if (mergeRan) {
+			node.put(object.id, object);
+			if (
+				!suppressMissingRecovery &&
+				missing.length !== 0 &&
+				queueWireExactRequests(node, object.id, sender, missing)
+			) {
+				await node.syncObject(object.id, sender);
+			}
+		}
+		const canonicalOffered = new Map(
+			committedVertices.length === 0
+				? []
+				: [...preExistingOfferedVertices, ...committedVertices].map((vertex) => [vertex.hash, vertex] as const)
+		);
+		const committedBoundaryDependencies = [...canonicalOffered.values()].flatMap(({ dependencies }) =>
+			dependencies.filter(
+				(hash) => preExistingDependencies.has(hash) && !canonicalOffered.has(hash) && !preMergeHeads.has(hash)
+			)
+		);
+		recordBranchCuts(node, object.id, sender, committedBoundaryDependencies);
 	}
 
-	await signGeneratedVertices(node, object.vertices);
-	const addedAttestations = signFinalityVertices(node, object, object.vertices);
-	if (addedAttestations.length !== 0) {
-		// Vertices learned through sync must still propagate our finality
-		// signatures; otherwise a sync that front-runs the gossip UPDATE would
-		// strand these attestations on this replica.
-		const attestationUpdate = Message.create({
-			sender: node.networkNode.peerId,
-			type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
-			data: AttestationUpdate.encode(AttestationUpdate.create({ attestations: addedAttestations })).finish(),
-			objectId: object.id,
-		});
-		node.networkNode.broadcastMessage(object.id, attestationUpdate).catch((e) => {
-			log.error("::syncAcceptHandler: Error broadcasting attestations", e);
-		});
+	if (!headsMode) await signGeneratedVertices(node, object.vertices);
+	if (finalityStore !== undefined) {
+		const finalityVertices = headsMode ? [...committedVertices] : object.vertices;
+		const addedAttestations = signFinalityVerticesWithStore(node, finalityStore, finalityVertices);
+		if (addedAttestations.length !== 0) {
+			// Vertices learned through sync must still propagate our finality
+			// signatures; otherwise a sync that front-runs the gossip UPDATE would
+			// strand these attestations on this replica.
+			const attestationUpdate = Message.create({
+				sender: node.networkNode.peerId,
+				type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
+				data: AttestationUpdate.encode(AttestationUpdate.create({ attestations: addedAttestations })).finish(),
+				objectId: object.id,
+			});
+			node.networkNode.broadcastMessage(object.id, attestationUpdate).catch((e) => {
+				log.error("::syncAcceptHandler: Error broadcasting attestations", e);
+			});
+		}
 	}
 
-	if (mergeRan && missing.length === 0) {
+	if (!suppressMissingRecovery && appliedProgress && rawMissing.length === 0) {
 		node.safeDispatchEvent(NodeEventName.DRP_SYNC_ACCEPTED, {
 			detail: { id: object.id },
 		});
 	}
 
 	// send missing vertices
-	const requested: Vertex[] = [];
-	for (const h of syncAcceptMessage.requesting) {
-		const vertex = object.vertices.find((v) => v.hash === h);
-		if (vertex) {
-			requested.push(vertex);
-		}
+	const historyRead =
+		object.historyStorage === "compact"
+			? object.readHistory(syncAcceptMessage.requesting)
+			: {
+					status: "available" as const,
+					vertices: syncAcceptMessage.requesting.flatMap((hash) => {
+						const vertex = object.getVertex(hash);
+						return vertex === undefined ? [] : [vertex];
+					}),
+				};
+	if (historyRead.status === "history-unavailable") {
+		const rejection = Message.create({
+			sender: node.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_SYNC_REJECT,
+			data: SyncReject.encode(
+				SyncReject.create({ missingHashes: [...historyRead.missingHashes], reason: "history-unavailable" })
+			).finish(),
+			objectId: object.id,
+		});
+		node.sendNegotiatedSyncResponse(sender, rejection).catch((error) => {
+			log.error("::syncAcceptHandler: Error sending history-unavailable rejection", error);
+		});
+		return;
 	}
+	const requested: Vertex[] = historyRead.status === "available" ? [...historyRead.vertices] : [];
 
 	if (requested.length === 0) return;
-
-	const attestations = getAttestations(object, requested);
-
-	const messageSyncAccept = Message.create({
-		sender: node.networkNode.peerId,
-		type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
-		data: SyncAccept.encode(
-			SyncAccept.create({
-				requested,
-				attestations,
-				requesting: [],
-			})
-		).finish(),
-		objectId: object.id,
-	});
-	node.networkNode.sendMessage(sender, messageSyncAccept).catch((e) => {
-		log.error("::syncAcceptHandler: Error sending message", e);
-	});
+	const responses = await buildSyncResponseChunksForVertices(node, object, requested);
+	for (const response of responses) await node.sendNegotiatedSyncResponse(sender, response);
+	const sentRequested = responses.flatMap((response) => SyncAccept.decode(response.data).requested);
 	node.safeDispatchEvent(NodeEventName.DRP_SYNC_MISSING, {
 		detail: {
 			id: object.id,
-			requested,
+			requested: sentRequested,
 			requesting: [],
 		},
 	});
@@ -534,26 +847,6 @@ export function drpObjectChangesHandler<T extends IDRP>(
 }
 
 /**
- * Sign generated vertices.
- * @param node - The DRP node instance handling the request
- * @param vertices - The vertices to sign
- */
-export async function signGeneratedVertices(node: DRPNode, vertices: Vertex[]): Promise<void> {
-	const signPromises = vertices.map(async (vertex) => {
-		if (vertex.peerId !== node.networkNode.peerId || vertex.signature.length !== 0) {
-			return;
-		}
-		try {
-			vertex.signature = await node.keychain.signWithSecp256k1(vertex.hash);
-		} catch (error) {
-			log.error("::signGeneratedVertices: Error signing vertex:", vertex.hash, error);
-		}
-	});
-
-	await Promise.all(signPromises);
-}
-
-/**
  * Sign vertices for finality.
  * @param node - The DRP node instance handling the request
  * @param obj - The object that changed
@@ -565,32 +858,32 @@ export function signFinalityVertices<T extends IDRP>(
 	obj: IDRPObject<T>,
 	vertices: Vertex[]
 ): Attestation[] {
-	const attestations = generateAttestations(node, obj, vertices);
-	return obj.finalityStore.addSignatures(node.networkNode.peerId, attestations, false);
+	const finalityStore = legacyFinalityStore(obj);
+	return finalityStore === undefined ? [] : signFinalityVerticesWithStore(node, finalityStore, vertices);
 }
 
-function generateAttestations<T extends IDRP>(node: DRPNode, object: IDRPObject<T>, vertices: Vertex[]): Attestation[] {
+function signFinalityVerticesWithStore(
+	node: DRPNode,
+	finalityStore: IFinalityStore,
+	vertices: Vertex[]
+): Attestation[] {
+	const attestations = generateAttestations(node, finalityStore, vertices);
+	return finalityStore.addSignatures(node.networkNode.peerId, attestations, false);
+}
+
+function generateAttestations(node: DRPNode, finalityStore: IFinalityStore, vertices: Vertex[]): Attestation[] {
 	// Two condition:
 	// - The node can sign the vertex
 	// - The node hasn't signed for the vertex
 	const goodVertices = vertices.filter(
 		(v) =>
-			object.finalityStore.canSign(node.networkNode.peerId, v.hash) &&
-			!object.finalityStore.signed(node.networkNode.peerId, v.hash)
+			finalityStore.canSign(node.networkNode.peerId, v.hash) && !finalityStore.signed(node.networkNode.peerId, v.hash)
 	);
 	return goodVertices.map((v) =>
 		Attestation.create({
 			data: v.hash,
 			signature: node.keychain.signWithBls(v.hash),
 		})
-	);
-}
-
-function getAttestations<T extends IDRP>(object: IDRPObject<T>, vertices: Vertex[]): AggregatedAttestation[] {
-	return (
-		vertices
-			.map((v) => object.finalityStore.getAttestation(v.hash))
-			.filter((a): a is AggregatedAttestation => a !== undefined) ?? []
 	);
 }
 
@@ -615,7 +908,7 @@ export function authenticateIncomingVertices<T extends IDRP>(
 	_object: IDRPObject<T>,
 	incomingVertices: Vertex[]
 ): Vertex[] {
-	return verifyACLIncomingVertices(incomingVertices);
+	return authenticateVertices(incomingVertices);
 }
 
 /**
@@ -624,28 +917,5 @@ export function authenticateIncomingVertices<T extends IDRP>(
  * @returns The verified vertices
  */
 export function verifyACLIncomingVertices(incomingVertices: Vertex[]): Vertex[] {
-	const verifiedVertices = incomingVertices
-		.map((vertex) => {
-			if (vertex.signature.length === 0) {
-				return null;
-			}
-
-			try {
-				const hashData = sha256.create().update(vertex.hash).digest();
-				const recovery = vertex.signature[0];
-				const compactSignature = vertex.signature.slice(1);
-				const signatureWithRecovery = Signature.fromCompact(compactSignature).addRecoveryBit(recovery);
-				const rawSecp256k1PublicKey = signatureWithRecovery.recoverPublicKey(hashData).toRawBytes(true);
-				const secp256k1PublicKey = publicKeyFromRaw(rawSecp256k1PublicKey);
-				const expectedPeerId = peerIdFromPublicKey(secp256k1PublicKey).toString();
-				const isValid = expectedPeerId === vertex.peerId;
-				return isValid ? vertex : null;
-			} catch (error) {
-				console.error("Error verifying signature:", error);
-				return null;
-			}
-		})
-		.filter((vertex: Vertex | null): vertex is Vertex => vertex !== null);
-
-	return verifiedVertices;
+	return authenticateVertices(incomingVertices);
 }

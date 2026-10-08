@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "prettier",
+    "--check",
+    "examples/v3-room/src/index.ts"
+  ],
+  "startedAt": "2026-09-06T03:08:01.449Z",
+  "recorderPid": 10224
+}

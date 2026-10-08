@@ -1,0 +1,13 @@
+{
+  "head": "8d81c8f47b9f5df0ff4e67caa01ae6f4008db707",
+  "signature": "G",
+  "sourcePatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "frozenInputCount": 3020,
+  "allFrozenInputsExact": true,
+  "inheritedManifestCount": 46,
+  "sealedEntries": 5214,
+  "allSealedEntriesExact": true,
+  "indexEmpty": true,
+  "stashesExact": true,
+  "protectedPathsPresent": 86522
+}

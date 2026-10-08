@@ -1,0 +1,31 @@
+{
+	"schemaVersion": "ts-drp-equivocation-digest-identity-freeze-v1",
+	"profile": "equivocation-digest-identity-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/protocol-v3-equivocation-digest-identity.yml",
+	"frozenD37": {
+		"modelSha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038",
+		"testSha256": "affc5e439220e8ac6353c0795f591da3946a6aeb37d69a71a05763f229f34f6d",
+		"fixtureSha256": "474c83e7a3f130504e8dedc8ceb0843ee3413ca56c27003a354f6088b0f41dcf",
+		"derivationSha256": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346"
+	},
+	"protectedArtifacts": [
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/check-freeze.mjs",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/equivocation-digest-identity.qnt",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/freeze-policy.json",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/profile.json",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/spec.md",
+		".github/workflows/protocol-v3-equivocation-digest-identity.yml",
+		"tests/protocol-v3-equivocation-0o.test.ts",
+		"tests/fixtures/phase-0o-v3/equivocation-contract.json"
+	],
+	"checkerSha256": "99077789ba33c3ab074d860332a71d67cacefc1ffd2c3e86f852176c15e81a57",
+	"artifactSha256": {
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/equivocation-digest-identity.qnt": "653d5f4c459a3380744ee155b21985dfa005144a09e43fafec425ca0a99cee2d",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/profile.json": "542a28c5d858d346a61d08da0b89ecc1ce3526ecf923f237b3e2e53ac9877fb6",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/spec.md": "44ea9cb169db2e9c0628fda1bd7b25c6519c0e7fdcca9c6436fe14d482026abb",
+		".github/workflows/protocol-v3-equivocation-digest-identity.yml": "e4ea99b91077baa0d4578fbea15107cd0103d989a283fb01c4dc95acefdf2c0a",
+		"tests/protocol-v3-equivocation-0o.test.ts": "5a3066fe2dce562c547a66834435dab162a91c42414b4c1c4a099cb8f6c73198",
+		"tests/fixtures/phase-0o-v3/equivocation-contract.json": "d4063a6c008dba96c1b8428779b91c1fb838d8e8d40ba3cce2b23db89615d642"
+	}
+}

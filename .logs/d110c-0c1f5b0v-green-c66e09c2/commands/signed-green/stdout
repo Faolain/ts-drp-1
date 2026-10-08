@@ -1,0 +1,16 @@
+commit c66e09c2937eaf54853340a8c4c0907c0c986162
+gpg: Signature made Sat Sep  5 03:53:01 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Sat Sep 5 03:53:01 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Sat Sep 5 03:53:01 2026 -0400
+
+    test(hardening): clarify replayable recovery notifications
+
+ examples/v3-room/src/index.ts                      |   5 +
+ packages/node/src/v3-live.ts                       |   5 +
+ ...-6b-d110c-0c1f5b0u-successor-replay-red.test.ts |  52 +++++++++-
+ ...ase-6b-d110c-0c1f5b0v-callback-contract.test.ts | 105 +++++++++++++++++++++
+ 4 files changed, 163 insertions(+), 4 deletions(-)

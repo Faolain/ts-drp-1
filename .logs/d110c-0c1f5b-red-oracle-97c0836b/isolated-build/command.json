@@ -1,0 +1,8 @@
+{
+  "cwd": "/tmp/d110c-f5b-oracle-red-DlOSng/checkout",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-05T17:44:38.881Z"
+}

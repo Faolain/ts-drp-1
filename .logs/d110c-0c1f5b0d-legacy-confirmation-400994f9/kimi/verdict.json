@@ -1,0 +1,13 @@
+{
+  "verdict": "PASS",
+  "summary": "Both P1s from rejected confirmation 508d700a are closed. RED 7d037ed8 is tests-only (one file) and causal: AST selection of exactly one top-level countHistoricalIssuanceRow, transpiled and executed with real Set/count state; focused run 19 tests, 18 pass, sole failure carries D110C_0C1F5B0D_LEGACY_HISTORICAL_SCAN_EXCEEDS_ONE_EPOCH_WINDOW with 8,192 distinct accepted, idempotent duplicate accounting, and live *3 body wrongly accepting row 8,193. The three invalid oracles (comment-only invocation, legacy-cap substring prohibition, 3x regex pin) are deleted and retained totals recalculated to 134/122 rather than 136/124. GREEN b384c7d9 is exactly one line in packages/node/src/v3-live.ts restoring the one-window predicate; RED tests byte-identical through HEAD 400994f9. All gates green including isolated checkout, and the typecheck baseline hash a5fd26b3... independently reproduces as identical. Parent f5b retains every genuine-lifecycle gate; rejected browser/small-limit attempts are recorded only as rejected diagnostics. Prior P2 dispositions hold with correct owners; none elevated.",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 0,
+  "findings": [],
+  "p1s_closed": true,
+  "causal_red_confirmed": true,
+  "scope_preserved": true,
+  "evidence_sufficient": true,
+  "parent_gates_preserved": true
+}

@@ -1,0 +1,15 @@
+{
+  "backendCeiling": { "failed": 0, "passed": 12, "skipped": 0, "total": 12 },
+  "browser": { "expected": 1, "flaky": 0, "skipped": 0, "unexpected": 0 },
+  "focused": { "failed": 0, "passed": 19, "skipped": 0, "total": 19 },
+  "greenCommit": "b384c7d9bdb3b3b3f5fa5b7de05cbafb3da7f4af",
+  "isolated": {
+    "focused": { "failed": 0, "passed": 19, "total": 19 },
+    "retainedSettlement": { "failed": 0, "passed": 122, "total": 122 },
+    "retainedStore": { "failed": 0, "passed": 134, "total": 134 }
+  },
+  "retainedSettlement": { "failed": 0, "passed": 122, "skipped": 0, "total": 122 },
+  "retainedStore": { "failed": 0, "passed": 134, "skipped": 0, "total": 134 },
+  "scope": "creator-trusted-v1 legacy historical issuance scan cap only"
+}
+

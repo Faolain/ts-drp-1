@@ -1,0 +1,60 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-1",
+      "finding": "inspectCreatorAuthorSettlementAdvance has no production caller; the genesis-sentinel, admissionEpoch-copy and terminalThrough-monotonicity laws it now enforces are reachable only from tests. prepareCreatorAuthorSettlement likewise has no producer, and frontierFor/frontierCount have no consumer outside protocol-v3.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:128",
+      "owner": "f5b0b / f5b integration slices",
+      "disposition": "Already declared deferred in .logs/d110c-0c1f5b0a-corrective-green-b926a606/results.md:12; carry as an explicit wiring obligation of the next slice's RED rather than a codec-slice defect."
+    },
+    {
+      "id": "P2-2",
+      "finding": "The settlement branch of authenticatedSettlementPair for currentTrust.currentEpoch > 0 (settled-v1 predecessor open, current latched-ACL digest derivation, priorCheckpointDigest === current.ref.digest) is unexercised by the 14-test focused contract; every corrective case runs epoch 0 -> 1, so only the genesis arm is executed end to end.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:743",
+      "owner": "f5b0b",
+      "disposition": "Cover the epoch>=1 adjacency arm in the integration RED before the close path depends on it."
+    },
+    {
+      "id": "P2-3",
+      "finding": "Corrective GREEN evidence elides both retained test selections as \"<retained trust/authorization/ACL/equivocation selection>\" and \"<retained closure/0c1a/5e/6a selection>\", so the 117-passed / four-inherited-failures and 26-passed claims are not reproducible and cannot be checked against P1-A.",
+      "evidence": ".logs/d110c-0c1f5b0a-corrective-green-b926a606/commands.md:13",
+      "owner": "f5b0a evidence owner",
+      "disposition": "Enumerate the exact test paths for both retained batches and re-record."
+    },
+    {
+      "id": "P2-4",
+      "finding": "The author-authorization carrier is decoded by decodeExact, which calls decodeCanonical with no maxBytes/maxDepth/maxItems; the settlement profile raises only the pre-check ceiling from 8,192 to 65,536 bytes, so an 8x larger untrusted input now reaches a default-limit decoder. The latched-ACL open path by contrast passes explicit settlement limits.",
+      "evidence": "packages/protocol-v3/src/index.ts:721",
+      "owner": "D.110c-0c1k stage W0",
+      "disposition": "Bring the author-authorization decode limits to parity with latched-acl.ts:246 ({maxBytes: 65_536, maxDepth: 4, maxItems: 8_192}) under the settlement predicate."
+    },
+    {
+      "id": "P2-5",
+      "finding": "protocol-v2 gained a workspace dependency on protocol-v3 (with matching pnpm-lock and vite alias entries) so registry.ts can call settlementProfileFor, inverting the v2/v3 layering. No external dependency, protobuf, wire field or new cryptography was added.",
+      "evidence": "packages/protocol-v2/package.json:40",
+      "owner": "f5b0a",
+      "disposition": "Design-authorized (registry.ts is a named settlementProfileFor consumer); record the layering edge so a later profile decomposition can move the predicate to a shared leaf package."
+    },
+    {
+      "id": "P2-6",
+      "finding": "openCanonicalLatchedAclSnapshot enforces (snapshot.version === 3) !== (settlementProfile === \"v1\") as a biconditional, so a settlement-profile room may never open a version-1 or version-2 ACL snapshot. The design states version 3 is accepted only under the profile; it does not state that versions 1 and 2 become unopenable under it.",
+      "evidence": "packages/protocol-v3/src/latched-acl.ts:259",
+      "owner": "f5b0b",
+      "disposition": "Confirm the biconditional is intended (settlement rooms are version-3 only from genesis) or relax to a one-way implication."
+    }
+  ],
+  "notes": [
+    "P1-A is closed at the root cause, not papered over. a7a643ce deletes the snapshotGroupsForVersion indirection and the full-tuple carve-out; copySnapshot now selects its group vocabulary with groupsForVersion(version) (packages/protocol-v3/src/latched-acl.ts:150), so a version-1 carrier is again closed over GROUPS_V1 and no v1 member may carry \"referee\" in any combination. Grep confirms no dangling snapshotGroupsForVersion reference survives; freezeMembers was reverted to groupsForVersion at :403.",
+    "The corrective ACL test now matches production. tests/protocol-v3-latched-acl-referee-successor-red.test.ts:125 opens a v1 snapshot whose sole admin carries [admin,finality,referee,writer]: groupsForSnapshot is GROUPS_V1 (length 3), so selected.groups.length > groupsForSnapshot.length rejects at latched-acl.ts:162 before the membership loop, copySnapshot returns undefined and open yields {ok:false, reason:\"snapshot-mismatch\"} exactly as asserted. Line 121 (v1 member with groups [\"referee\"]) is rejected at :171 by vocabulary. Line 120 (open(V1)) and the version-2 counterpart at :203 are unaffected because groupsForVersion(2) and (3) still return GROUPS_V2.",
+    "The cross-binary divergence that made P1-A blocking is gone: an older GROUPS_V1 binary and current source now agree on the validity of identical canonical v1 ACL bytes.",
+    "No collateral loss from the W0 revert. The version-3 member cap (latched-acl.ts:145), the openedSnapshots/membersByAuthor lookup, MAX_CANONICAL_ITEMS/SETTLEMENT_MAX_CANONICAL_ITEMS and the settlement decode limits at :242-247 are all retained; only the v1 vocabulary widening was withdrawn. The shared fixture stays v1-safe (tests/fixtures/phase-3a1b-p3/live-fixture.ts:317, :322 default to the three-group tuple), so f511a18b's fixture edit and its assertion are now mutually consistent.",
+    "The four original blockers remain closed and untouched by a7a643ce: the trust profile union at packages/protocol-v3/src/index.ts:135, the 64/256 author cap at :786, the settlement authorization ceiling at :1572, and the genesis sentinel binding at packages/node/src/internal/creator-transition-advance.ts:167, with authenticatedSettlementPair/currentAnchorAclDigest intact at :694/:286.",
+    "Two bookkeeping observations, neither blocking and neither added to the preserved P2 set: no .logs evidence directory exists for a7a643ce (the W0 corrective GREEN is verifiable from source but has no recorded command/result manifest under this record), and P2-6's anchor line has shifted from latched-acl.ts:259 to :254 after the revert — the finding itself is unchanged.",
+    "Bash was unavailable this turn, so this confirmation is a static read of current source, the corrective test and the shared fixture; no test, build or git command was executed. Every claim above is anchored to a line read directly."
+  ]
+}

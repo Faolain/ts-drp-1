@@ -1,0 +1,355 @@
+{
+  "head": "b75e75ed8a0cc944139929c501eea684cde4e715",
+  "roomSourceSha256": "391177c10e5e20568bec216f18b3d26db6345a3bc2f8399409dbca52c5135252",
+  "beforePatchSha256": "245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed",
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "gates": [
+    {
+      "label": "focused-13",
+      "total": 13,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "reporterSha256": "78a2d9c146d96dc727da0b141114551f7b727c544d0b99f1b9e69c59b16ffdc7"
+    },
+    {
+      "label": "bootstrap-3",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "reporterSha256": "be2a22117b9335bbf1f0f608b8c9b7fb128413f284ab476f4bdb9aea5fdad7ef"
+    },
+    {
+      "label": "rebase-20",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "reporterSha256": "362885fd24450d17f1721b27801433346eccd778ba075b03edd92ad96e4508c8"
+    }
+  ],
+  "exactEightObservations": true,
+  "otherSevenSourcesUnchanged": true,
+  "sevenRuntimesUnchanged": true,
+  "tests": 79,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "typecheckPassed": false,
+  "productionDiagnostics": 0,
+  "targetDiagnostics": 0,
+  "inheritedExternalDiagnostics": 41,
+  "commands": [
+    {
+      "label": "bootstrap-3",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+          "--no-file-parallelism",
+          "--coverage.enabled=false",
+          "--reporter=json",
+          "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/bootstrap-3/focused.json"
+        ]
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:12:08.723Z"
+      }
+    },
+    {
+      "label": "focused-13",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "tests/phase-6a-creator-successor-product-red.test.ts",
+          "--no-file-parallelism",
+          "--coverage.enabled=false",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/focused-13/focused.json"
+        ]
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:11:53.033Z"
+      }
+    },
+    {
+      "label": "rebase-20",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "tests/phase-3g-v3-room-rebase-red.test.ts",
+          "--no-file-parallelism",
+          "--coverage.enabled=false",
+          "--reporter=json",
+          "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/rebase-20/focused.json"
+        ]
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:12:23.109Z"
+      }
+    },
+    {
+      "label": "room-diff-check",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "git",
+          "diff",
+          "--check",
+          "--",
+          "examples/v3-room/src/index.ts"
+        ],
+        "startedAt": "2026-09-06T03:09:02.897Z",
+        "recorderPid": 13982
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:09:02.952Z"
+      }
+    },
+    {
+      "label": "room-diff-check-final",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "git",
+          "diff",
+          "--check",
+          "--",
+          "examples/v3-room/src/index.ts"
+        ],
+        "startedAt": "2026-09-06T03:10:55.900Z",
+        "recorderPid": 17524
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:10:55.938Z"
+      }
+    },
+    {
+      "label": "room-format",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "prettier",
+          "--check",
+          "examples/v3-room/src/index.ts"
+        ],
+        "startedAt": "2026-09-06T03:07:24.741Z",
+        "recorderPid": 8499
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:07:25.855Z"
+      }
+    },
+    {
+      "label": "room-format-corrected",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "prettier",
+          "--check",
+          "examples/v3-room/src/index.ts"
+        ],
+        "startedAt": "2026-09-06T03:08:01.449Z",
+        "recorderPid": 10224
+      },
+      "status": {
+        "status": 1,
+        "signal": null,
+        "endedAt": "2026-09-06T03:08:02.757Z"
+      }
+    },
+    {
+      "label": "room-format-final",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "prettier",
+          "--check",
+          "examples/v3-room/src/index.ts"
+        ],
+        "startedAt": "2026-09-06T03:10:52.874Z",
+        "recorderPid": 17176
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:10:53.919Z"
+      }
+    },
+    {
+      "label": "room-lint",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "eslint",
+          "examples/v3-room/src/index.ts"
+        ],
+        "startedAt": "2026-09-06T03:07:05.338Z",
+        "recorderPid": 7972
+      },
+      "status": {
+        "status": 1,
+        "signal": null,
+        "endedAt": "2026-09-06T03:07:30.894Z"
+      }
+    },
+    {
+      "label": "room-lint-corrected",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "eslint",
+          "examples/v3-room/src/index.ts"
+        ],
+        "startedAt": "2026-09-06T03:08:00.263Z",
+        "recorderPid": 10137
+      },
+      "status": {
+        "status": 1,
+        "signal": null,
+        "endedAt": "2026-09-06T03:08:27.279Z"
+      }
+    },
+    {
+      "label": "room-lint-final",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "pnpm",
+          "exec",
+          "eslint",
+          "examples/v3-room/src/index.ts"
+        ],
+        "startedAt": "2026-09-06T03:10:51.659Z",
+        "recorderPid": 17088
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:11:12.317Z"
+      }
+    },
+    {
+      "label": "room-source-check",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "node",
+          ".logs/d110c-0c1f5b-green-room-guard-db8a8615/source-check.mjs"
+        ],
+        "startedAt": "2026-09-06T03:09:02.414Z",
+        "recorderPid": 13901
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:09:02.715Z"
+      }
+    },
+    {
+      "label": "room-source-check-final",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "node",
+          ".logs/d110c-0c1f5b-green-room-guard-db8a8615/source-check-final.mjs"
+        ],
+        "startedAt": "2026-09-06T03:10:55.425Z",
+        "recorderPid": 17406
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:10:55.706Z"
+      }
+    },
+    {
+      "label": "room-typecheck",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "node",
+          ".logs/d110c-0c1f5b-green-room-guard-db8a8615/typecheck.mjs"
+        ],
+        "startedAt": "2026-09-06T03:07:25.930Z",
+        "recorderPid": 8606
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:07:36.963Z"
+      }
+    },
+    {
+      "label": "room-typecheck-annotated",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "node",
+          ".logs/d110c-0c1f5b-green-room-guard-db8a8615/typecheck-annotated.mjs"
+        ],
+        "startedAt": "2026-09-06T03:09:01.135Z",
+        "recorderPid": 13840
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:09:09.876Z"
+      }
+    },
+    {
+      "label": "room-typecheck-final",
+      "command": {
+        "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "command": [
+          "node",
+          ".logs/d110c-0c1f5b-green-room-guard-db8a8615/typecheck-final.mjs"
+        ],
+        "startedAt": "2026-09-06T03:10:54.011Z",
+        "recorderPid": 17300
+      },
+      "status": {
+        "status": 0,
+        "signal": null,
+        "endedAt": "2026-09-06T03:11:03.480Z"
+      }
+    }
+  ],
+  "productionCommitted": false,
+  "parentClosed": false
+}

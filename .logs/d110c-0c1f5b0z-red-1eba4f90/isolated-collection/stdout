@@ -1,0 +1,66 @@
+[
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 01 real browser facade resolves the exact existing backend capability",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 02 real SQLite facade resolves the exact existing backend capability",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 03 memory copied proxy and foreign facades do not inherit discovery",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 04 first bind wins through both backends and refuses same and different second capabilities",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 05 duplicate internal backend registration preserves both first resolver identities",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 06 fresh native ESM instances share exact bindings in one global",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 07 incompatible preoccupied registry value fails closed",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 08 preoccupied accessor is not invoked and import fails closed",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 09 mutable configurable preoccupied descriptor fails closed",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 10 discovered browser maintenance preserves closed refusal",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 11 discovered browser maintenance preserves poisoned refusal",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 12 discovered SQLite maintenance preserves closed refusal",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 13 discovered SQLite maintenance preserves poisoned refusal",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 14 registration and discovery preserve facade keys without additional store IO",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 15 legacy backend resolvers stay backend specific and reject foreign identities",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery > 16 compatibility custody preserves interfaces roots manifests constructors and mutation bodies",
+    "file": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout/tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts"
+  }
+]

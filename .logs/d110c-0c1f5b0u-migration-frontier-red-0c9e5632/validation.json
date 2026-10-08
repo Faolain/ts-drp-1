@@ -1,0 +1,23 @@
+{
+  "status": "CAUSAL_MIGRATION_RECOVERY_RED_NOT_GREEN",
+  "sourceCommit": "0c9e56321ea770259c90afe0e2d99d3569320ea7",
+  "selectedFiles": 1,
+  "selectedTests": 1,
+  "failed": 1,
+  "passed": 0,
+  "skipped": 8,
+  "focusedInvocationCount": 1,
+  "completeSoftFailureCount": 4,
+  "tokens": [
+    "D110C_0C1F5B0U_QUEUED_ISSUE_NOT_RECOVERED",
+    "D110C_0C1F5B0U_MIGRATION_DID_NOT_RESUME",
+    "D110C_0C1F5B0U_MIGRATION_ACTIVATION_BOUNDARY_DIFFERS",
+    "D110C_0C1F5B0U_MIGRATION_FRONTIER_CAUSE_DIFFERS"
+  ],
+  "unexpectedFailureCount": 0,
+  "atMostOneOwnerAndCloseToZeroPassed": true,
+  "intendedLaterFrontierNotReachedByPreGreen": true,
+  "historicalOverlayHash": "1239cf2d5fbbc6e40eebdae4365ba7b8843af1d22586851548a1f995025684c9",
+  "preservedMainGreenHash": "4296998368a87e11c7be6fcc8da05583c37d485c96b8f7b1917dd500a7839f61",
+  "stashCount": 27
+}

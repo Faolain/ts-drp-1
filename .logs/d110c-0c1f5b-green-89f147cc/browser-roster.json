@@ -1,0 +1,380 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "playwright",
+    "test",
+    "--config=/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+    "--project=chromium",
+    "--grep-invert=D\\.110c-0c resumes a genuine epoch-3 pending adoption after both process-death orderings",
+    "--reporter=json",
+    "--output=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-89f147cc/browser-closed-artifacts"
+  ],
+  "expectedCount": 16,
+  "selectedTitles": [
+    "pins the exact successor product browser inventory",
+    "D.110c-0c1e same-author first-successor cold reopen preserves successor-era issuance",
+    "hot creator adoption exposes oracle authority and issues through the replacement handle",
+    "established peer cold reopen accepts the genuine epoch-one live operation",
+    "fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+    "D.110c-0b0 provider crash and classification matrix fails closed",
+    "concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping",
+    "close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup",
+    "cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown",
+    "redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding",
+    "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+    "D.110c-0c1g preserves authenticated projection base across a stable epoch-2 successor reopen",
+    "D.110c-0c1c cold reopens a stable adopted epoch-2 successor",
+    "D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated historical issuance",
+    "D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen",
+    "D.110c-0c1f2 non-creator writer requires an authenticated historical frontier"
+  ],
+  "excludedTitle": "D.110c-0c resumes a genuine epoch-3 pending adoption after both process-death orderings",
+  "reason": "Unclosed process-death campaign; only closed lifecycle/adoption/recovery controls selected",
+  "sourceHashes": {
+    "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts": "c516cf631da3070da662170224b46202d58788e19daadba8f3371e004b0f7567",
+    "packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts": "987aeddb160b0b9b7164247128d14b8c9f45ca435d6f67d3824dbf4da6db1c7b"
+  },
+  "originalCollection": [
+    {
+      "title": "pins the exact successor product browser inventory",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-bcbf67211ecdcae2eb77",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 970,
+      "column": 1
+    },
+    {
+      "title": "D.110c-0c1e same-author first-successor cold reopen preserves successor-era issuance",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-1fb0c73ca2534af34a86",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 988,
+      "column": 1
+    },
+    {
+      "title": "hot creator adoption exposes oracle authority and issues through the replacement handle",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-fd63c0351ae8178a6bfc",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 1046,
+      "column": 1
+    },
+    {
+      "title": "established peer cold reopen accepts the genuine epoch-one live operation",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-0842f3ce0df07c33f2b0",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 1079,
+      "column": 1
+    },
+    {
+      "title": "fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-09be0c1adb493b71cf4c",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 1126,
+      "column": 1
+    },
+    {
+      "title": "D.110c-0b0 provider crash and classification matrix fails closed",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-2d01a2ea6eab0a63cc3a",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 1215,
+      "column": 1
+    },
+    {
+      "title": "concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-e0b772cb00263741868b",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 1321,
+      "column": 1
+    },
+    {
+      "title": "close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-12113dd827941ad4bb97",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 1467,
+      "column": 1
+    },
+    {
+      "title": "cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-b0b403e0de960b7bae9d",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 1609,
+      "column": 1
+    },
+    {
+      "title": "redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-549b5865ba131d783198",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 2320,
+      "column": 1
+    },
+    {
+      "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-65b35a71ef81040e746e",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 2455,
+      "column": 1
+    },
+    {
+      "title": "D.110c-0c1g preserves authenticated projection base across a stable epoch-2 successor reopen",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-3e1ee16b3b9d6a5ed9c3",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 2615,
+      "column": 1
+    },
+    {
+      "title": "D.110c-0c1c cold reopens a stable adopted epoch-2 successor",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-e88afe9c87e7d2bfb761",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 2719,
+      "column": 1
+    },
+    {
+      "title": "D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated historical issuance",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-92cff29c751fa6f032db",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 2836,
+      "column": 1
+    },
+    {
+      "title": "D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-38a08726d8f148169a3d",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 3045,
+      "column": 1
+    },
+    {
+      "title": "D.110c-0c1f2 non-creator writer requires an authenticated historical frontier",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-0b643455daa45fd96b4e",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 3271,
+      "column": 1
+    },
+    {
+      "title": "D.110c-0c resumes a genuine epoch-3 pending adoption after both process-death orderings",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 90000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [],
+          "status": "skipped"
+        }
+      ],
+      "id": "a27ca8e8a7840963c3e5-e99a4d9510329364f8e1",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "line": 3593,
+      "column": 1
+    }
+  ]
+}

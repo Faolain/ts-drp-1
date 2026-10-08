@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawn} from 'node:child_process';
+const out=path.dirname(new URL(import.meta.url).pathname),[label,cwd,command,...args]=process.argv.slice(2);
+if(!label||!cwd||!command)throw Error('Required label, cwd and command');
+const dir=path.join(out,label);fs.mkdirSync(dir);
+const start=new Date().toISOString();
+fs.writeFileSync(path.join(dir,'command.json'),JSON.stringify({cwd,command,args,start},null,2)+'\n',{flag:'wx'});
+const stdout=fs.openSync(path.join(dir,'stdout.log'),'wx'),stderr=fs.openSync(path.join(dir,'stderr.log'),'wx');
+const child=spawn(command,args,{cwd,stdio:['ignore',stdout,stderr]});
+console.log(JSON.stringify({label,pid:child.pid,start}));
+const result=await new Promise(resolve=>{child.on('error',error=>resolve({code:null,signal:null,error:String(error)}));child.on('close',(code,signal)=>resolve({code,signal}));});
+fs.closeSync(stdout);fs.closeSync(stderr);
+const status={...result,pid:child.pid,start,finish:new Date().toISOString()};
+fs.writeFileSync(path.join(dir,'status.json'),JSON.stringify(status,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({label,...status}));process.exitCode=result.code??1;

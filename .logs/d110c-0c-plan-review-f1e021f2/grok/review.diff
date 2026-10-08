@@ -1,0 +1,326 @@
+commit f1e021f283048e8e80771fa62347902c94a40227
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Wed Sep 2 17:45:50 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Wed Sep 2 17:45:50 2026 -0400
+
+    test: plan D.110c-0c pending restart recovery
+
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/audit.md b/.logs/d110c-0c-plan-audit-ff1a9807/audit.md
+new file mode 100644
+index 00000000..1d00b862
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/audit.md
+@@ -0,0 +1,44 @@
++# D.110c-0c bounded source audit
++
++Base: signed/pushed D.110c-0b1 closure
++`ff1a9807528b1f29c8d1f381f0c093baf5a5d506`.
++
++The existing public subpath is sufficient. It captures exactly eleven existing
++inputs and delegates to one private owner. The room product already supplies
++the authenticated stable/pending room-head pair, pinned-genesis carriers,
++snapshot owners, and AHE store; it publishes the AHE candidate before committing
++the pending room-head floor and invokes active cold reopen only afterward.
++
++The source-pinned defect is internal to
++`authenticatePendingCandidate()` in `packages/node/src/creator-adoption.ts`:
++
++- lines 1305-1306 hard-code the current/successor projection kinds;
++- lines 1319-1324 use the genesis-only current-trust opener;
++- lines 1343-1347 use the additive first-transition closure predicate;
++- lines 1357-1361 require the supplied genesis carrier to equal the current
++  trust record; and
++- lines 1370, 1378, and 1383 hard-code epochs/projection to 0→1.
++
++The surrounding candidate state, exact generation lineage, closure digest,
++fork classification, deterministic selection, CAS, and authenticated reread
++are already epoch-neutral. D.110c-0b1 supplies the N≥1 checkpoint opener and
++shared bounded verification classifier. The existing expected previous/next
++room heads supply the independent authenticated floor. No new API, root export,
++wire/schema, dependency, or authority carrier is indicated.
++
++The existing browser product harness already owns deterministic old-AHE and
++new-AHE failure seams (`failBeforePublication` and one-shot room-head commit
++failure). D.110c-0c must exercise them only after genuine 0→1→2 product work and
++must replace the older same-realm unreachable-object approximation with a
++persistent-profile browser-process restart for its new epoch-2→3 cases.
++
++The final-review P2 audit also confirms that
++`creatorFilteredIssuanceStore()` currently declares both counters outside
++`readOutboxPage()` and permits each class its own `maxEpochVertices` allowance.
++D.110c-0c records that exact fail-closed debt without mixing it into the pending
++resume repair. D.110c-c owns the narrow per-scan/combined-bound correction and
++general retirement of arbitrary intermediate issuance rows before D.110c-d.
++
++The executable audit is retained verbatim as `source-audit.mjs`; its output is
++`source-audit.json`. Production edits remain prohibited until the signed plan's
++Grok/Kimi/Opus blocking union is empty.
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/manifest-validation.status b/.logs/d110c-0c-plan-audit-ff1a9807/manifest-validation.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/manifest-validation.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/manifest-validation.txt b/.logs/d110c-0c-plan-audit-ff1a9807/manifest-validation.txt
+new file mode 100644
+index 00000000..83ed935a
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/manifest-validation.txt
+@@ -0,0 +1,6 @@
++.logs/d110c-0c-plan-audit-ff1a9807/audit.md: OK
++.logs/d110c-0c-plan-audit-ff1a9807/source-audit.command: OK
++.logs/d110c-0c-plan-audit-ff1a9807/source-audit.json: OK
++.logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs: OK
++.logs/d110c-0c-plan-audit-ff1a9807/source-audit.status: OK
++.logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt: OK
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/manifest.sha256 b/.logs/d110c-0c-plan-audit-ff1a9807/manifest.sha256
+new file mode 100644
+index 00000000..17b5db57
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/manifest.sha256
+@@ -0,0 +1,6 @@
++0e92246f40461eba4065a99c0874c84b88b44692382c99f676790a7fe5e157ad  .logs/d110c-0c-plan-audit-ff1a9807/audit.md
++3d3e4726682c9c70635c25289f18191e8a987f579bf6955238d76d332d7fd1a5  .logs/d110c-0c-plan-audit-ff1a9807/source-audit.command
++96ed951a51bbcbd217dc9303959298d56f224f0c2533f0454a8a43dcd8139b01  .logs/d110c-0c-plan-audit-ff1a9807/source-audit.json
++4d0c599ed7138a9219f3974fdfb3c3fdf519a5a48950c5c5c9b0b576d745ea30  .logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c-plan-audit-ff1a9807/source-audit.status
++f5bf57963d804914b22ccb5652dcc093cadc6c0bc843742c76683cb11a7c766f  .logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.command b/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.command
+new file mode 100644
+index 00000000..5a266c81
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.command
+@@ -0,0 +1 @@
++node .logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs > .logs/d110c-0c-plan-audit-ff1a9807/source-audit.json
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.json b/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.json
+new file mode 100644
+index 00000000..20d34950
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.json
+@@ -0,0 +1,19 @@
++{
++	"base": "ff1a9807528b1f29c8d1f381f0c093baf5a5d506",
++	"checks": {
++		"additivePendingClassifierPinned": true,
++		"combinedIssuanceCeilingAbsent": true,
++		"existingPublicRecoveryExport": true,
++		"genesisCarrierEqualityPinned": true,
++		"genesisCurrentOpenerPinned": true,
++		"oldAndNewAheFaultSeams": true,
++		"pendingChainEpochsPinned": true,
++		"pendingProjectionPinned": true,
++		"publicRecoveryInputKeyCount": true,
++		"roomCommitsFloorAfterPendingRecovery": true,
++		"roomUsesExistingRecovery": true,
++		"scanCountersOutsideRead": true,
++		"sharedCheckpointOpenerAvailable": true,
++		"sharedTransitionClassifierAvailable": true
++	}
++}
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs b/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs
+new file mode 100644
+index 00000000..c70b5720
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs
+@@ -0,0 +1,43 @@
++import { readFileSync } from "node:fs";
++
++const read = (path) => readFileSync(path, "utf8");
++const adoption = read("packages/node/src/creator-adoption.ts");
++const publicRecovery = read("packages/node/src/creator-adoption-recover.ts");
++const room = read("examples/v3-room/src/index.ts");
++const live = read("packages/node/src/v3-live.ts");
++const browserFixture = read("packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts");
++const packageJson = JSON.parse(read("packages/node/package.json"));
++
++const checks = Object.freeze({
++	additivePendingClassifierPinned: adoption.includes("!inspectCreatorTrustAdvance({"),
++	combinedIssuanceCeilingAbsent:
++		live.includes("skipped > filterPayload.parameters.maxEpochVertices") &&
++		live.includes("skippedGenesis > filterPayload.parameters.maxEpochVertices"),
++	existingPublicRecoveryExport: Object.hasOwn(packageJson.exports, "./creator-adoption-recover"),
++	genesisCarrierEqualityPinned:
++		adoption.includes("input.exactCanonicalAnchorPreimageBytes,") &&
++		adoption.includes("currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes"),
++	genesisCurrentOpenerPinned: adoption.includes("const openedCurrent = openCurrentAnchorTrust({"),
++	oldAndNewAheFaultSeams:
++		browserFixture.includes('failBeforePublication: ordering === "old-ahe"') &&
++		browserFixture.includes('control.fault = "commit-unavailable-once"'),
++	pendingChainEpochsPinned: adoption.includes("currentEpoch: 0,") && adoption.includes("successorEpoch: 1,"),
++	pendingProjectionPinned:
++		adoption.includes('uniqueCandidateByKind(currentCandidates, "v3-live-generation-1")') &&
++		adoption.includes('currentProjectionKind: "v3-live-generation-1"'),
++	publicRecoveryInputKeyCount: (publicRecovery.match(/^\s*"[A-Za-z].*",$/gmu) ?? []).length === 11,
++	roomCommitsFloorAfterPendingRecovery:
++		room.indexOf("const recoveredPending = await recoverPendingCreatorSuccessorAdoption") <
++		room.indexOf("openedRoomHeadState = await commitRoomHeadAdvance", room.indexOf("const recoveredPending")),
++	roomUsesExistingRecovery: room.includes("recoverPendingCreatorSuccessorAdoption({"),
++	scanCountersOutsideRead:
++		live.indexOf("let skipped = 0;") < live.indexOf("readOutboxPage: async") &&
++		live.indexOf("let skippedGenesis = 0;") < live.indexOf("readOutboxPage: async"),
++	sharedCheckpointOpenerAvailable: adoption.includes('from "@ts-drp/protocol-v3/creator-checkpoint"'),
++	sharedTransitionClassifierAvailable: adoption.includes('from "./internal/creator-transition-advance.js"'),
++});
++
++if (Object.values(checks).some((value) => value !== true)) {
++	throw new TypeError(`D110C_0C_SOURCE_AUDIT_FAILED:${JSON.stringify(checks)}`);
++}
++process.stdout.write(`${JSON.stringify({ base: "ff1a9807528b1f29c8d1f381f0c093baf5a5d506", checks }, null, 2)}\n`);
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.status b/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/source-audit.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt b/.logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt
+new file mode 100644
+index 00000000..9325ceaf
+--- /dev/null
++++ b/.logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt
+@@ -0,0 +1,11 @@
++base=ff1a9807528b1f29c8d1f381f0c093baf5a5d506
++remote_base=ff1a9807528b1f29c8d1f381f0c093baf5a5d506
++stash_count=27
++protected_.agents=present
++protected_.claude=present
++protected_.pnpm-store=present
++d110a_invocations=0
++long_campaign_invocations=0
++fable_invocations=0
++collaboration_subagents=0
++production_edits=0
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index efcf5ff0..2a54f2f9 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -95198,6 +95198,127 @@ post-commit signature plus pushed-ref identity in its evidence root. These
+ items do not weaken this slice's genuine two-transition acceptance, authorize a
+ third transition or campaign, or reopen its immutable RED/GREEN evidence.
+ 
++##### D.110c-0c durable pending-adoption resume plan
++
++**Status: bounded source audit complete; plan review pending.** Owner:
++`packages/node/src/creator-adoption.ts` pending-candidate authentication and
++recovery kernel, the already exported
++`@ts-drp/node/creator-adoption-recover` capture boundary, the existing private
++epoch-relative transition classifier, and the existing v3-room room-head/AHE/
++snapshot composition. Storage-browser persistent-profile restart tests own the
++causal fault and restart harness. Deadline: signed GREEN before D.110c-c RED and
++before any post-close or pre-adoption restart acceptance. This slice does not
++reopen 0b0a/0b1, add another recovery entry, activate a pending head, authorize
++cleanup/pruning or a third completed hot transition, change wire/schema/root
++exports/dependencies/authority/floor/rollback/thresholds, or run a campaign.
++
++The audit at signed/pushed 0b1 closure `ff1a9807` corrects the umbrella's old
++pre-0b0a premise: a genuine public recovery entry now exists and is already
++composed by v3-room. `recoverPendingCreatorSuccessorAdoption()` has an exact
++eleven-key input and delegates to one private installed owner. On reopen,
++v3-room obtains the exact stable/pending pair from the authenticated room-head
++owner, asks the recovery owner to publish the AHE candidate, commits the
++room-head advance only after that success, and only then calls the separately
++authenticated active cold-reopen path. Therefore no public entry, new
++authority carrier, or schema change is justified by the source audit.
++
++The demonstrated missing seam is narrower. `authenticatePendingCandidate()`
++still selects current projection kind `v3-live-generation-1`, opens the current
++trust with the genesis-only `openCurrentAnchorTrust()`, uses the one-transition
++`inspectCreatorTrustAdvance()`, requires the input genesis preimage/signature to
++equal the current trust record, and writes literal chain epochs 0 and 1. Those
++checks correctly preserve 0→1 compatibility but reject a genuine bounded
++epoch-2→3 pending candidate before the existing deterministic candidate/fork/
++CAS recovery logic can run. The accepted 0b1 checkpoint opener and shared
++`inspectCreatorTransitionAdvance(..., mode: "verify")` are the exact existing
++seams needed for N≥1; the authenticated expected previous/next room heads are
++the independent floor inputs. A RED that demonstrates a different missing
++authority, a public/API/schema need, or inability to preserve the 0→1 bytes
++stops production work and reslices.
++
++The deterministic RED is tests-only and runs once after this plan review. A
++Chromium persistent-profile fixture uses the real product room to complete
++epoch 0→1 and 1→2 with issue/publish work, closes epoch 2, and begins the real
++staged adoption. It uses the already retained `failBeforePublication` and
++one-shot room-head commit fault seams in separate old-AHE/new-AHE cases to stop
++after the authenticated pending floor and durable candidate exist but before
++the pair is jointly committed. The browser context is then terminated without
++graceful room cleanup, removing all in-memory handles/WeakMaps; the same browser
++profile and origin are reopened from the durable databases and exact snapshot
++declaration. Every semantic precondition is serialized before the terminal
++assertion: stable epoch 2, pending next epoch 3, genuine Cut/QC/trust/projection,
++expected AHE ordering, unchanged application state, and zero activation before
++recovery. Current production must return the exact room-level pending-invalid
++or recovery-unavailable classification, after which RED throws only
++`D110C_0C_PENDING_EPOCH3_RESUME_MISSING`. The focused reporter must select
++exactly the two orderings in one file, with two intended failures, no retained
++campaign title, no top-level error, and the complete token exactly twice.
++
++GREEN changes only the internal pending authenticator. For expected predecessor
++epoch 0 it preserves the present projection selection, genesis opener,
++one-step successor opener, input-carrier equality, additive transition
++predicate, and chain fields. For expected predecessor epoch N≥1 it:
++
++1. selects the current projection with the existing epoch-relative projection
++   helper and the successor projection at N+1;
++2. supplies the input's pinned-genesis preimage/signature, the exact current and
++   successor trust records, exact new Cut/QC, object id, and independently
++   authenticated expected-next head to `openCreatorCheckpointTrust()`;
++3. requires the returned predecessor and current opaque trusts to equal the
++   expected previous and next room heads exactly;
++4. verifies the current→proposed closure with the shared bounded classifier in
++   `verify` mode, without reconstructing or retaining an older proof chain;
++5. derives the chain epochs and projection kind from those authenticated
++   values, then reuses the existing snapshot, catalog, parameters, ACL,
++   generation-lineage, fork-selection, CAS-reread, and room-head commit logic;
++   and
++6. returns only the existing non-activating published-head result. Active
++   custody is still created solely by the later cold-reopen owner against the
++   committed room-head floor.
++
++The GREEN persistent-profile gate must pass both crash orderings, prove exactly
++one recovery CAS where needed, clear the pending floor only after authenticated
++AHE publication, cold reopen epoch 3, issue and publish genuine post-restart
++work, and compare an independently derived message/state digest, history root/
++size, ACL/writer authority, anchor lineage, snapshot/manifest identities,
++journal counts, and operation accounting against the pre-crash oracle. It also
++repeats the retained 0→1 pending-recovery matrix byte-for-byte and covers
++malformed heads, wrong previous/next epoch or anchor, stale floor/head, complete
++older generation, skipped epoch, same-epoch fork, cross-object/genesis,
++substituted trust/Cut/QC/projection/snapshot, missing/duplicate candidates,
++incomplete writes, lost CAS response, true fork, and already-active idempotence.
++Every failure occurs before room-head commit or activation; an ambiguous write
++is decided only by authenticated reread.
++
++The 0b1 P2 union is an explicit retained obligation rather than hidden scope.
++This slice records, but does not mix into its causal production repair, that
++`creatorFilteredIssuanceStore` counters are wrapper-lifetime rather than
++per-scan and currently permit two separately bounded row classes. D.110c-c owns
++the narrow deterministic RED/GREEN that scopes them per scan, freezes one
++combined `maxEpochVertices` hidden-row ceiling, and proves unresolved old or
++intermediate issuance/outbox work cannot be erased or silently treated as
++published before cleanup. General physical retirement of arbitrary
++intermediate-epoch issuance rows remains D.110c-c, before D.110c-d's ≥100
++transitions. D.110c-0c retains the current fail-closed behavior and makes no
++`v3-live.ts` counter/filter change. Its GREEN evidence serializes the
++independent post-reopen oracle and retains every audit script literally plus
++post-commit signature/pushed-ref identity.
++
++Focused GREEN runs once, followed by the exact retained 0b0a, 0b1, D.110c-a/b,
++Phase-6a adoption/reopen, issuance/outbox, room-head, snapshot-substitution,
++cleanup/rollback/availability, and storage-browser restart roster. Exact-owner
++lint/format/diff, Node/storage-browser builds and production-source typechecks,
++one-test/file listing, source/export/runtime shape, protected paths, all 27
++stashes, process/port predicates, hashes, and a self-excluding manifest are
++mandatory. RED and GREEN evidence are signed and pushed. As a high-risk
++production-lifecycle restart slice, the bounded plan receives one
++Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh review before RED; the
++signed GREEN receives the governing final plan→RED→GREEN review. Only P0/P1
++blocks, and no Fable or collaboration subagent is invoked. The literal source
++audit and its six-entry self-excluding manifest are retained under
++`.logs/d110c-0c-plan-audit-ff1a9807/`; the validating manifest SHA-256 is
++`ae081775672303cb5a7fc740d6759710ba7b6d0d26034ad27f78203871f090fd`.
++
+ The four prerequisite decisions, including the newly demonstrated 0b0
+ freshness-floor authority question, are reviewed before their production edits;
+ each executable sub-slice receives its own bounded causal RED and GREEN. The

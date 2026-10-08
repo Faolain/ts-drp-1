@@ -1,0 +1,13 @@
+{
+	"extends": "../producer-presign-retention/tsconfig.json",
+	"compilerOptions": { "target": "ES2022", "allowImportingTsExtensions": true },
+	"files": [
+		"owned-snapshot.ts",
+		"../../pending-historical-owned-snapshot.test.ts",
+		"../../phase-6b-d110c-0b0a-staged-handoff-red.test.ts",
+		"../../cold-discovery-room-callsite.test.ts",
+		"vitest.config.mts",
+		"vitest.workspace.ts"
+	],
+	"include": []
+}

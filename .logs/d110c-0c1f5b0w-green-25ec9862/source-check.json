@@ -1,0 +1,23 @@
+{
+  "anchor": "25ec98628eba5d348086ba18d6481544803e03c9",
+  "shape": [
+    {
+      "path": "examples/v3-room/src/index.ts",
+      "sha256": "e75a9edac9a8d13d4fdb9062003fde84b03d5120d3b18416af8fc9395b39e028",
+      "unchangedExports": true
+    },
+    {
+      "path": "packages/issuance-store/src/contract.ts",
+      "sha256": "2e2d160f7e59d643d01fb4d10e321c573ace252bef43040156ff26d92e837042",
+      "unchangedExports": true
+    }
+  ],
+  "checks": {
+    "exactPaths": true,
+    "exportShape": true,
+    "noLifetimeHold": true,
+    "holdBeforeFence": true,
+    "noWireOrTimeoutChange": true,
+    "testsUnchanged": true
+  }
+}

@@ -1,0 +1,6 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts
+  1550:78  error  Missing return type on function  @typescript-eslint/explicit-function-return-type
+
+✖ 1 problem (1 error, 0 warnings)
+

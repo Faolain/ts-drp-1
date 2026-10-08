@@ -130,6 +130,8 @@ function nodeConfig(): DRPNodeConfig {
 function fakeNetwork(connect: ReturnType<typeof vi.fn>): DRPNetworkNode {
 	return {
 		broadcastMessage: vi.fn((): Promise<void> => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		changeTopicScoreParams: vi.fn(),
 		connect,
 		connectToBootstraps: vi.fn((): Promise<void> => Promise.resolve()),

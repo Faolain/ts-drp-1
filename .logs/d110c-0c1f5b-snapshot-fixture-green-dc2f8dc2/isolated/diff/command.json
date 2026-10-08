@@ -1,0 +1,11 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout",
+  "command": "git",
+  "args": [
+    "diff",
+    "--check",
+    "--",
+    "tests/fixtures/phase-4b-v3/live-snapshot.ts"
+  ],
+  "start": "2026-09-06T08:41:01.784Z"
+}

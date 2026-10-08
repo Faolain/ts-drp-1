@@ -1,0 +1,15 @@
+{
+	"extends": "./tsconfig.json",
+	"files": [
+		"role-contract.ts",
+		"role-node-child.ts",
+		"role-browser-entry.ts",
+		"node-owner.ts",
+		"browser-owner.ts",
+		"browser-server.ts",
+		"../../../packages/storage-node/tests/bounded-recovery-role-read-red.test.ts",
+		"../../../packages/storage-browser/tests/bounded-recovery-role-read-red.pw.ts",
+		"../../../packages/storage-browser/playwright.bounded-recovery-role-read-red.config.ts"
+	],
+	"include": []
+}

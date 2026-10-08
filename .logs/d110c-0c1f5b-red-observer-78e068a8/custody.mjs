@@ -1,0 +1,51 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import ts from 'typescript';
+const root=process.cwd(),out=path.dirname(new URL(import.meta.url).pathname),stage=process.argv[2];
+const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
+const git=(...args)=>execFileSync('git',args,{encoding:'utf8'}).trim();
+const initial=JSON.parse(fs.readFileSync('.logs/d110c-0c1f5b-red-oracle-97c0836b/custody-before.json','utf8'));
+for(const [file,digest]of Object.entries(initial.productionHashes))if(hash(fs.readFileSync(file))!==digest)throw Error('Production drift: '+file);
+const stopped=JSON.parse(fs.readFileSync('.logs/d110c-0c1f5b-green-f031b166/custody-after.json','utf8'));
+if(git('stash','list','--format=%H %gd %s')!==stopped.stashes.trim())throw Error('Stash drift');
+const file='tests/phase-6b-d110c-0c1f5b-integration-red.test.ts';
+const base=execFileSync('git',['show',`b2f79baf:${file}`],{encoding:'utf8'}),current=fs.readFileSync(file,'utf8');
+const functions=text=>{
+ const source=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
+ return new Map(source.statements.filter(ts.isFunctionDeclaration).map(row=>[row.name.text,row.getText(source)]));
+};
+const before=functions(base),after=functions(current),protectedFunctions=[];
+for(const [name,text]of before)if(name!=='openRoom'){
+ if(after.get(name)!==text)throw Error('Unrelated function changed: '+name);
+ protectedFunctions.push({name,sha256:hash(text)});
+}
+const immutableFiles=['tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts','tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts','tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts'];
+const retainedHashes=Object.fromEntries(immutableFiles.map(name=>{
+ const bytes=fs.readFileSync(name),prior=execFileSync('git',['show',`b2f79baf:${name}`]);
+ if(!bytes.equals(prior))throw Error('Retained source changed: '+name);
+ return [name,hash(bytes)];
+}));
+const boundary='describe("D.110c-0c1f5b parent genuine settlement composition", () => {';
+const oldTests=base.slice(base.indexOf(boundary)),newTests=current.slice(current.indexOf(boundary));
+const oldStart='\t\tconst beforeRestartState = productState(writer).slice();';
+const newStart='\t\tconst failedOwner = writer.room;';
+const commonTail='\t\texpect(\n\t\t\townCommits(writer).filter((row) => row.authorSequence === prefixSequence),';
+if(oldTests.slice(0,oldTests.indexOf(oldStart))!==newTests.slice(0,newTests.indexOf(newStart))||oldTests.slice(oldTests.indexOf(commonTail))!==newTests.slice(newTests.indexOf(commonTail)))throw Error('Segmented/pure/sibling assertions drifted');
+const slice=newTests.slice(newTests.indexOf(newStart),newTests.indexOf(commonTail));
+if(/productState\(writer\)/u.test(current)||!slice.includes('expect(() => failedOwner.projection(), "F5B_C03_FAILED_PREFIX_OWNER_PROJECTION_REMAINS_TERMINAL").toThrow()')||!slice.includes('expect(() => writer.room.projection(), "F5B_C03_FAILED_RESTART_OWNER_PROJECTION_REMAINS_TERMINAL").toThrow()'))throw Error('Obsolete reads/terminal controls');
+if((slice.match(/fixture\.emittedProjection\(writer\)/gu)??[]).length!==2||!slice.includes('beforeRestartProjection.generation + 1')||!slice.includes('afterRestartProjection.bytes'))throw Error('Generation/state oracle missing');
+const observer=current.slice(current.indexOf('\tconst observeProjection ='),current.indexOf('\tconst emittedProjection ='));
+const callback=observer.slice(observer.indexOf('\t\treturn (projection) => {'));
+if(!observer.includes('generation: (emitted.get(databaseName)?.generation ?? 0) + 1, emissions: 0')||!observer.includes('emitted.set(databaseName, cell)')||callback.includes('emitted.get')||callback.includes('emitted.set')||callback.includes('catch')||callback.includes('structuredClone')||!callback.includes('migration.canonicalStateBytes(projection)')||!callback.includes('cell.bytes = new Uint8Array(bytes)'))throw Error('Callback identity/brand/copy/cell contract');
+if(!current.includes('transientPayload ? observeProjection(databaseName, application) : () => undefined')||!current.includes('transientPayload ? observeProjection(peer.databaseName, application) : reopenInput.onProjection'))throw Error('Sibling callback behavior drifted');
+const reader=current.slice(current.indexOf('\tconst emittedProjection ='),current.indexOf('\tconst send ='));
+if(!reader.includes('required(emitted.get(peer.databaseName))')||!reader.includes('.toBe(peer.room)')||!reader.includes('.toBeGreaterThan(0)')||!reader.includes('required(cell.bytes)'))throw Error('Owner-generation fallback possible');
+const room=fs.readFileSync('examples/v3-room/src/index.ts','utf8');
+const commit=room.slice(room.indexOf('\tconst commit = async'),room.indexOf('\tconst acceptedOperationSnapshot ='));
+if(!(commit.indexOf('input.onProjection(candidate.projection)')<commit.indexOf('acceptedVertices.set(identity, vertex)')&&commit.indexOf('acceptedVertices.set(identity, vertex)')<commit.indexOf('projection = candidate.projection')))throw Error('Callback sequencing differs');
+const runtime=fs.readFileSync(immutableFiles[0],'utf8');
+if(!runtime.includes('expect(() => reopened.projection()).toThrow("v3 room settlement plan source differs")')||!runtime.includes('expect(() => fixture.target.projection()).toThrow()'))throw Error('Retained terminal controls absent');
+fs.writeFileSync(path.join(out,`custody-${stage}.json`),JSON.stringify({stage,head:git('rev-parse','HEAD'),signature:git('log','-1','--format=%G?'),productionHashes:initial.productionHashes,productionPreserved:true,stashCount:27,stashesSha256:hash(stopped.stashes),protectedFunctions,retainedHashes,obsoleteGetterReads:0,explicitTerminalThrows:2,ownerGenerationWithoutFallback:true,case3OnlyObserver:true,exactValueBeforeByteCopy:true,callbackPrecedesFinalCommitAssignment:true,segmentedWorkloadAndSiblingAssertionsUnchanged:true,status:git('status','--short','--untracked-files=no')},null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({stage,productionPreserved:true,stashCount:27,protectedFunctions:protectedFunctions.length,obsoleteGetterReads:0,explicitTerminalThrows:2,ownerGenerationWithoutFallback:true}));

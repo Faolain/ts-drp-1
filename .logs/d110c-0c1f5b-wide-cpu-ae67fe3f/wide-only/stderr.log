@@ -1,0 +1,8 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > composes 64 active writers with universal plan fence and exact state accounting across three transitions
+Error: Test timed out in 70000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

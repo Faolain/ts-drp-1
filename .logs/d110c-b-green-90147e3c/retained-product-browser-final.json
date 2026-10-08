@@ -1,0 +1,1239 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+      "--reporter=json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": true,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 600000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6a-creator-successor-product.pw.ts",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "pins the exact successor product browser inventory",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:16.939Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-bcbf67211ecdcae2eb77",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 697,
+          "column": 1
+        },
+        {
+          "title": "hot creator adoption exposes oracle authority and issues through the replacement handle",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 633,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:18.096Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-fd63c0351ae8178a6bfc",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 715,
+          "column": 1
+        },
+        {
+          "title": "established peer cold reopen accepts the genuine epoch-one live operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 184,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:18.735Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-0842f3ce0df07c33f2b0",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 748,
+          "column": 1
+        },
+        {
+          "title": "fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 875,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:18.923Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-09be0c1adb493b71cf4c",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 776,
+          "column": 1
+        },
+        {
+          "title": "D.110c-0b0 provider crash and classification matrix fails closed",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2214,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:19.805Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-2d01a2ea6eab0a63cc3a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 865,
+          "column": 1
+        },
+        {
+          "title": "concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 733,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:22.031Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-e0b772cb00263741868b",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 971,
+          "column": 1
+        },
+        {
+          "title": "close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 554,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:22.769Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-12113dd827941ad4bb97",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1117,
+          "column": 1
+        },
+        {
+          "title": "cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9675,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:23.329Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-b0b403e0de960b7bae9d",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1259,
+          "column": 1
+        },
+        {
+          "title": "redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5896,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n    at runRedirectOrdering (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2024:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2047:28",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 5,
+                      "line": 2024
+                    },
+                    "snippet": "  2022 | \t\tawait expect\n  2023 | \t\t\t.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))\n> 2024 | \t\t\t.toBe(1);\n       | \t\t\t ^\n  2025 | \t\tawait settleBrowserTurns(context.page);\n  2026 | \t\tconst laterSettledAtVerification = await context.page.evaluate(\n  2027 | \t\t\t(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 5,
+                        "line": 2024
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n\n  2022 | \t\tawait expect\n  2023 | \t\t\t.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))\n> 2024 | \t\t\t.toBe(1);\n       | \t\t\t ^\n  2025 | \t\tawait settleBrowserTurns(context.page);\n  2026 | \t\tconst laterSettledAtVerification = await context.page.evaluate(\n  2027 | \t\t\t(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),\n    at runRedirectOrdering (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2024:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2047:28"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:33.012Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-b8b51-d-before-call-time-encoding-chromium/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-b8b51-d-before-call-time-encoding-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 5,
+                    "line": 2024
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-549b5865ba131d783198",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1970,
+          "column": 1
+        },
+        {
+          "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:39.057Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-65b35a71ef81040e746e",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2073,
+          "column": 1
+        },
+        {
+          "title": "pins the exact successor product browser inventory",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:40.590Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-32a439432e3d27e20f3a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 697,
+          "column": 1
+        },
+        {
+          "title": "hot creator adoption exposes oracle authority and issues through the replacement handle",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3046,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:45.857Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-db5b5cddd7d18d305471",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 715,
+          "column": 1
+        },
+        {
+          "title": "established peer cold reopen accepts the genuine epoch-one live operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 376,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:48.910Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-7dfd248bf8ac55c9a555",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 748,
+          "column": 1
+        },
+        {
+          "title": "fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1089,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:49.295Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-668b2062b6425bafc6b5",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 776,
+          "column": 1
+        },
+        {
+          "title": "D.110c-0b0 provider crash and classification matrix fails closed",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20059,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:51:50.391Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-038da193a0b1f0b6779a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 865,
+          "column": 1
+        },
+        {
+          "title": "concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5624,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:10.456Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-503b42acf5fdb870d665",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 971,
+          "column": 1
+        },
+        {
+          "title": "close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4475,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:16.091Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-3ecf967c98c448cb7223",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1117,
+          "column": 1
+        },
+        {
+          "title": "cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 19543,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:20.573Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-15c215a977ac6c1c781d",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1259,
+          "column": 1
+        },
+        {
+          "title": "redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 6103,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n    at runRedirectOrdering (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2024:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2047:28",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 5,
+                      "line": 2024
+                    },
+                    "snippet": "  2022 | \t\tawait expect\n  2023 | \t\t\t.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))\n> 2024 | \t\t\t.toBe(1);\n       | \t\t\t ^\n  2025 | \t\tawait settleBrowserTurns(context.page);\n  2026 | \t\tconst laterSettledAtVerification = await context.page.evaluate(\n  2027 | \t\t\t(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 5,
+                        "line": 2024
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n\n  2022 | \t\tawait expect\n  2023 | \t\t\t.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))\n> 2024 | \t\t\t.toBe(1);\n       | \t\t\t ^\n  2025 | \t\tawait settleBrowserTurns(context.page);\n  2026 | \t\tconst laterSettledAtVerification = await context.page.evaluate(\n  2027 | \t\t\t(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),\n    at runRedirectOrdering (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2024:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2047:28"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:40.124Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-b8b51-d-before-call-time-encoding-firefox/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-b8b51-d-before-call-time-encoding-firefox/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 5,
+                    "line": 2024
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-14e7476702251cef621a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1970,
+          "column": 1
+        },
+        {
+          "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:46.512Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-bb3c185a49bae316d081",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2073,
+          "column": 1
+        },
+        {
+          "title": "pins the exact successor product browser inventory",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:47.074Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-7445009cfb28cfeae0db",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 697,
+          "column": 1
+        },
+        {
+          "title": "hot creator adoption exposes oracle authority and issues through the replacement handle",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 734,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:48.979Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-3c5c04bbd883d472ecbb",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 715,
+          "column": 1
+        },
+        {
+          "title": "established peer cold reopen accepts the genuine epoch-one live operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 204,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:49.719Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-4eff6a378c5deddb15a2",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 748,
+          "column": 1
+        },
+        {
+          "title": "fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 427,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:49.927Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-ab6d52bf5012cecedc3a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 776,
+          "column": 1
+        },
+        {
+          "title": "D.110c-0b0 provider crash and classification matrix fails closed",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2489,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:50.360Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-d46b26d48387bacddab7",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 865,
+          "column": 1
+        },
+        {
+          "title": "concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 755,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:52.856Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-da84d1cfaa8825adc099",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 971,
+          "column": 1
+        },
+        {
+          "title": "close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 522,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:53.616Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-e2931f3c2f062f5b8be8",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1117,
+          "column": 1
+        },
+        {
+          "title": "cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12682,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:52:54.143Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-e46ceb5420b971cd0fec",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1259,
+          "column": 1
+        },
+        {
+          "title": "redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 6106,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n    at runRedirectOrdering (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2024:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2047:28",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 5,
+                      "line": 2024
+                    },
+                    "snippet": "  2022 | \t\tawait expect\n  2023 | \t\t\t.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))\n> 2024 | \t\t\t.toBe(1);\n       | \t\t\t ^\n  2025 | \t\tawait settleBrowserTurns(context.page);\n  2026 | \t\tconst laterSettledAtVerification = await context.page.evaluate(\n  2027 | \t\t\t(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 5,
+                        "line": 2024
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n\n  2022 | \t\tawait expect\n  2023 | \t\t\t.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))\n> 2024 | \t\t\t.toBe(1);\n       | \t\t\t ^\n  2025 | \t\tawait settleBrowserTurns(context.page);\n  2026 | \t\tconst laterSettledAtVerification = await context.page.evaluate(\n  2027 | \t\t\t(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),\n    at runRedirectOrdering (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2024:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2047:28"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:53:06.830Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-b8b51-d-before-call-time-encoding-webkit/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-b8b51-d-before-call-time-encoding-webkit/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 5,
+                    "line": 2024
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-f204ea405cdc4af4639b",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1970,
+          "column": 1
+        },
+        {
+          "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T17:53:13.042Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-16f3ebf634db74927251",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2073,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-02T17:51:15.725Z",
+    "duration": 117332.26299999999,
+    "expected": 24,
+    "skipped": 3,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "sameThreeOwners": true,
+  "noProductionEdit": true,
+  "noWorkloadOrThresholdChanges": true,
+  "helperByteEquivalentAfterReversingOnlyEnumeratedCorrection": true,
+  "testByteEquivalentAfterReversingOnlySettlementApplicationDeliveryExpectation": true,
+  "sharedSeamUnchanged": true,
+  "corrections": [
+    "Record settlement fence original signed input before existing unchecked ingress",
+    "Use already-planned dependent sequence-one add as application-delivery barrier",
+    "Observe fence application-delivery after existing offender adds",
+    "Expect no fence application delivery in settlement"
+  ],
+  "before": {
+    "fixture": "91673e736b6687570657d0f62acb17b9ea19f3795d077b445bba5098f451e078",
+    "test": "ff73a48eca28e3e8590a44b40790bcecc5d0bc25dcce3aabc0ca10d17ca4e4c1",
+    "shared": "8108ebe74f1cb31d2508bf0b80ad8ed79a5b79135f6a8e1cde7e6e7d96fe959b"
+  },
+  "after": {
+    "fixture": "da69a0229a1ffbaea8bcbbf20e99dd9f37baf745c0a097f20e39f327738e3630",
+    "test": "ae458ee7ec3bb031cf9fb05d65dbe95dffb48b08243b9fe7531738821105376b",
+    "shared": "8108ebe74f1cb31d2508bf0b80ad8ed79a5b79135f6a8e1cde7e6e7d96fe959b"
+  },
+  "testExecutions": 0
+}

@@ -1,0 +1,19 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "-t",
+    "case 17|case 12 scans|keeps the genuine v1",
+    "--reporter=json",
+    "--outputFile=.logs/d110c-0c1f5b-green-79743f98/iteration-2-tests.json"
+  ],
+  "startedAt": "2026-09-05T15:30:14.383Z",
+  "endedAt": "2026-09-05T15:30:22.264Z",
+  "status": 1,
+  "signal": null,
+  "stdout": "JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-79743f98/iteration-2-tests.json\n",
+  "stderr": ""
+}

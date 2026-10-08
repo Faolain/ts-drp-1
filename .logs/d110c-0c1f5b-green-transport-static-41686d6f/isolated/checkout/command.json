@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-green-transport-static-z5iavL/checkout",
+  "command": "git",
+  "args": [
+    "checkout",
+    "--detach",
+    "c5b5f36a3d3201633ae7bab1d9959ab52fa14526"
+  ],
+  "start": "2026-09-06T04:50:10.947Z"
+}

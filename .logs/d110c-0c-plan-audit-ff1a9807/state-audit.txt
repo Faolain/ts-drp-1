@@ -1,0 +1,11 @@
+base=ff1a9807528b1f29c8d1f381f0c093baf5a5d506
+remote_base=ff1a9807528b1f29c8d1f381f0c093baf5a5d506
+stash_count=27
+protected_.agents=present
+protected_.claude=present
+protected_.pnpm-store=present
+d110a_invocations=0
+long_campaign_invocations=0
+fable_invocations=0
+collaboration_subagents=0
+production_edits=0

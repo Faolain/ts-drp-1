@@ -1,0 +1,230 @@
+{
+	"schemaVersion": "protocol-v3-regenerated-reference-provenance-v1",
+	"author": {
+		"agentId": "phase-n1prime-d-regenerated-reference-green-codex-high",
+		"didNotAuthorOriginalReference": true,
+		"didNotAuthorRed": true,
+		"readOnlyNormativeTupleGrammarAndNeutralContract": true,
+		"readNoOriginalPredecessorOrTypescriptSource": true,
+		"readNoVectorOutputs": true,
+		"willNotAuthorTypescriptPort": true
+	},
+	"remediationAuthor": {
+		"agentId": "phase-n1prime-d2-third-independent-remediation-green-codex-high",
+		"role": "third-independent-remediation-author",
+		"didNotAuthorOriginalReference": true,
+		"didNotAuthorRegeneratedReferenceFirstPass": true,
+		"didNotAuthorPhaseDRed": true,
+		"didNotAuthorPhaseD2Red": true,
+		"didNotAuthorReplacementVectors": true,
+		"didNotAuthorPredecessorOrTypescriptImplementation": true,
+		"willNotAuthorTypescriptPort": true
+	},
+	"originalExecution": {
+		"firstExecutedAt": "2026-07-28T06:01:39.000Z",
+		"sourceAndProvenanceFixedAt": "2026-07-28T06:00:20.000Z",
+		"sourceFixedBeforeOriginalExecution": true
+	},
+	"source": {
+		"path": "packages/protocol-v3/conformance/regenerated-reference/reference.mjs",
+		"sha256": "0a7b199eec2f1a950d4b91d9041e382f02983e2d601a530de60e7311309ce84a"
+	},
+	"d2RemediationFreeze": {
+		"fixedAt": "2026-07-28T07:37:19.000Z",
+		"sourceSha256": "0a7b199eec2f1a950d4b91d9041e382f02983e2d601a530de60e7311309ce84a",
+		"predecessor": {
+			"sourceSha256": "a81a0248032494b3abfb13f5201201ffd8d4b7577a1275b08ad682c110017580",
+			"provenanceSha256": "7172f6dcb35280c666dcee0c0e58d00af9f7a73e99b75c4a4411b8f885affa77"
+		},
+		"frozenRedInputs": {
+			"d2TestSha256": "04c7cbb6f2ccafd58d96cb5b3fd09a77e1ebab83abd2da13a9f92f7e4fffeb3e",
+			"d2FixtureSha256": "ee9d160ccdb646f558ceebaf1aaf0a88296c66332d502f383aa1fdec5b28ee20",
+			"d2RedLedgerSha256": "277f2e38ab4bb8ba04c32dda512403828580956cf8403fcd78d938f90e7d871d"
+		},
+		"reasons": [
+			"reject a caller candidate whose authorSequence is not the selected next ordinal without state change or digest, sign, or publication work",
+			"reject absent, noncanonical, or mismatched Ed25519 public/private key material before issuance work",
+			"enforce canonical lowercase even-length hexadecimal on neutral *Hex transport fields",
+			"verify strict Ed25519 over the registered digest of exact received bytes without decode/re-encode canonical gating",
+			"copy own __proto__ as inert enumerable object data so the grammar encodes and digests it without prototype mutation",
+			"preserve unpaired-surrogate rejection and the explicit current >= MAX_SAFE nonclaim"
+		]
+	},
+	"correctionFreeze": {
+		"fixedAt": "2026-07-28T06:03:25.000Z",
+		"reason": "post-differential neutral-transport correction: omit redundant kind, dehydrate null-prototype objects as JSON objects, and exclude replica-local state context",
+		"sourceSha256": "993ceee31a030fec4bf02d74e72458e9649f9e1dc34c6bc2673829232df728b1"
+	},
+	"secondCorrectionFreeze": {
+		"fixedAt": "2026-07-28T06:04:49.000Z",
+		"reason": "post-differential neutral byte dehydration correction: emit the governed $bytesHex adapter form",
+		"sourceSha256": "99a4ea936eb122c220b6b2df18e56b8ee93fd67e7e7b6fdbfa839285b330032f"
+	},
+	"thirdCorrectionFreeze": {
+		"fixedAt": "2026-07-28T06:06:06.000Z",
+		"reason": "post-differential decode adapter correction: preserve __proto__ as inert own JSON data and use errorCategory",
+		"sourceSha256": "9bb59b05e77e6f827584dcad8e7426b92ad208dff46a070ba9de1d7192784fbe"
+	},
+	"fourthCorrectionFreeze": {
+		"fixedAt": "2026-07-28T06:07:23.000Z",
+		"reason": "post-differential validation request adapter: derive the nine governed rejection reasons from neutral request semantics",
+		"sourceSha256": "e835a37051ca77578e31cd90baca2343d8bc970a92c73f4cd8a7a0a4b0dac2c3"
+	},
+	"fifthCorrectionFreeze": {
+		"fixedAt": "2026-07-28T06:09:19.000Z",
+		"reason": "post-differential validation discriminator adapter: accept declared governed taxonomy and generalized major/field probes",
+		"sourceSha256": "0d634abd553033ce44a9d96701cd4f818f3eb054f4baa5e80c821a46bdfe2144"
+	},
+	"sixthCorrectionFreeze": {
+		"fixedAt": "2026-07-28T06:10:34.000Z",
+		"reason": "post-differential mechanical tuple/context classification: recognize field-list omissions and context-bearing request keys",
+		"sourceSha256": "5b207f88125971063bf065a7b2a2e1c25e130116ea216fcf15fb248271c216f9"
+	},
+	"seventhCorrectionFreeze": {
+		"fixedAt": "2026-07-28T06:12:04.000Z",
+		"reason": "post-differential validation discriminator adapter: normalize semantic request keys for omission/context probes",
+		"sourceSha256": "fb12f30018e2fa834b417c2f088b24b342708683b123886435ae8c38327ac060"
+	},
+	"eighthCorrectionFreeze": {
+		"fixedAt": "2026-07-28T06:13:50.000Z",
+		"reason": "post-differential validation byte-probe adapter: decode hex-bearing validation inputs before tuple/context classification",
+		"sourceSha256": "90319c36806ffa0a1e8b2415175fc87259d2529b67223dbae1dba163cbf547d0"
+	},
+	"comprehensiveAdapterFreeze": {
+		"fixedAt": "2026-07-28T06:15:53.000Z",
+		"reason": "neutral fixture specified operation names but omitted concrete per-operation transport envelopes; Phase d RED constructors were audited after the first freeze",
+		"adapterChanges": [
+			"encode: redundant result kind -> omitted; null-prototype wrapper -> ordinary JSON data; state.context included -> excluded; grammar bytes wrapper -> $bytesHex",
+			"decode: category -> errorCategory; unsafe __proto__ assignment -> inert own JSON data",
+			"validate: direct record -> request wrapper; surface-only scan -> canonical-hex decode plus governed taxonomy/major/tuple/context classification",
+			"issue: direct fields -> request wrapper; issued flag -> accepted plus top-level signature/instrumentation",
+			"digest-received: registry kind/digestHex -> supplied domain with receivedDigestHex and reencodedDigestHex",
+			"verify-received: registry kind/verified -> supplied domain and accepted"
+		],
+		"sourceSha256": "d0dccaef2481ea18ae92e399676b6080cac0fb1073a0a10dd2f48db798e3a6d2"
+	},
+	"correctedNeutralContractFreeze": {
+		"fixedAt": "2026-07-28T06:30:26.000Z",
+		"reason": "corrected immutable RED contract supplied input-only operation examples and no-output-leak declarations for the three previously opaque validation requests",
+		"correctedRedSha256": "34217f1c05910ad993130dde172a02d82fece980f5c797d5e7f5969c7d339443",
+		"correctedFixtureSha256": "f46c4ee3be04f4b0a53d4180322c1e8f4ad201d280ef4f2c5f0beb0bdfd1ab83",
+		"adapterChanges": [
+			"validate vertex request with absent authorSequence -> mechanical-v2-author-sequence-omission",
+			"validate roundChange request with absent anchor -> mechanical-v2-anchor-omission",
+			"validate state request key=context -> replica-local-context-on-wire",
+			"issue request before.lastIssued/candidate -> existing sustainable issuance engine inputs",
+			"standalone JavaScript ESLint return-type rule disabled; dead receivedParts adapter removed"
+		],
+		"sourceSha256": "964acd97d21d9dc88a12f89b90f2231d8d0c5b111cbf47aacabf3910129f678f"
+	},
+	"issuanceResultAdapterFreeze": {
+		"fixedAt": "2026-07-28T06:32:10.000Z",
+		"reason": "post-corrected-contract differential showed issuance semantics matched and isolated the result envelope",
+		"adapterChanges": [
+			"before -> omitted",
+			"envelope -> omitted",
+			"published -> explicit boolean",
+			"registeredDigestHex -> top-level digest or null"
+		],
+		"sourceSha256": "bbeb90c724a43df88c3a4897862729a80bfea8919388477fac4715bb056c621d"
+	},
+	"verificationResultAdapterFreeze": {
+		"fixedAt": "2026-07-28T06:33:20.000Z",
+		"reason": "post-issuance differential showed all verification decisions matched and isolated one omitted result field",
+		"adapterChanges": ["verify-received result now includes the already-computed exact-received digestHex"],
+		"sourceSha256": "a81a0248032494b3abfb13f5201201ffd8d4b7577a1275b08ad682c110017580"
+	},
+	"normativeInputs": {
+		"registry": {
+			"path": "packages/protocol-v3/registry/registry-v1.json",
+			"sha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+		},
+		"schema": {
+			"path": "packages/protocol-v3/registry/registry-v1.schema.json",
+			"sha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+		},
+		"specification": {
+			"path": "docs/protocol/attested-hard-epochs-v5.md",
+			"sha256": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8"
+		},
+		"amendments": {
+			"path": "docs/protocol/amendments-v3.json",
+			"sha256": "e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508"
+		},
+		"modelSignoff": {
+			"path": "packages/protocol-v3/formal/registry-model-signoff.json",
+			"sha256": "9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749"
+		},
+		"formalActions": {
+			"path": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+			"sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038"
+		},
+		"formalDerivation": {
+			"path": "packages/protocol-v3/formal/signed-field-derivation.json",
+			"sha256": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346"
+		},
+		"formalVariables": {
+			"path": "packages/protocol-v3/formal/registry-signed-envelope-variables.qnt",
+			"sha256": "f6dede1370a40a37d2dca526a27f3dc5c6884c9b8c23390da3372977c2bcef13"
+		},
+		"grammarMarkdown": {
+			"path": "docs/protocol/canonical-tag-codec-v1.md",
+			"sha256": "40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036"
+		},
+		"grammarMachine": {
+			"path": "docs/protocol/canonical-tag-codec-v1.json",
+			"sha256": "64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e"
+		},
+		"originalReference": {
+			"path": "packages/protocol-v3/conformance/original-reference/reference.mjs",
+			"sha256": "abb01f2f061b20428e1c412793380a0baf468bf9397c7ec2952a902f2aaf7bdc"
+		},
+		"originalProvenance": {
+			"path": "packages/protocol-v3/conformance/original-reference/provenance.json",
+			"sha256": "8b5e24c89dd32735ad95ca2a10a98e80dd2bb2623e0188b1355b51076bc90bc3"
+		},
+		"replacementVectors": {
+			"path": "packages/protocol-v3/conformance/vectors/registry-v1.json",
+			"sha256": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741"
+		},
+		"correctedC2Red": {
+			"path": "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+			"sha256": "d1d4751ccdb8db0e8dbd11e7e353727cdd3a6ef3c739a4a6e1680c16bf1a9b12"
+		},
+		"correctedC2Fixture": {
+			"path": "tests/fixtures/phase-n1prime-c2/independent-reference-vector-contract.json",
+			"sha256": "17e22228adc677f9287ced3610211b21ec926e7647b1179574f2299359ccca62"
+		},
+		"exhaustionRed": {
+			"path": "tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts",
+			"sha256": "23c5f1eb8d87f9fa9a758670216430d1bc96b8aaa6b4912a4d53690a1f9ae1b1"
+		},
+		"exhaustionFixture": {
+			"path": "tests/fixtures/phase-n1prime-c-exhaustion/paired-issuance-contract.json",
+			"sha256": "793da47de639ba3d40a205aab301e0b8b2a456347ded7b3d7a3c4bf3159dcd77"
+		}
+	},
+	"roleFirewall": {
+		"authoredFromNormativeAuthorityOnly": true,
+		"originalReferenceSourceInspectedBeforeFirstFreeze": false,
+		"originalReferenceExecutedBeforeFirstFreeze": false,
+		"predecessorOrTypeScriptImplementationInspected": false,
+		"replacementVectorDocumentInspected": false,
+		"phaseN1PrimeDRedInspectedBeforeFirstFreeze": false,
+		"phaseN1PrimeDRedExecutedBeforeFirstFreeze": false,
+		"futureTypeScriptPortParticipation": "permanently-barred"
+	},
+	"remediationFirewall": {
+		"originalReferenceImplementationSourceInspected": false,
+		"predecessorOrTypescriptImplementationSourceInspected": false,
+		"replacementVectorOutputDocumentInspected": false,
+		"expectedOutputsCopiedFromTestsVectorsOrOriginalPeer": false,
+		"networkUsed": false,
+		"runtimeOriginalReferenceExecutedBeforeRemediationFreeze": false,
+		"runtimePhaseDOrD2DifferentialExecutedBeforeRemediationFreeze": false,
+		"futureTypeScriptPortParticipation": "permanently-barred"
+	},
+	"runtimeDependencies": ["node:crypto"],
+	"runtimeNormativeReads": false,
+	"expectedOutputTables": false
+}

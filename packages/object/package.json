@@ -19,6 +19,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./internal/authenticated-commit": {
+			"types": "./dist/src/authenticated-commit.d.ts",
+			"import": "./dist/src/authenticated-commit.js"
 		}
 	},
 	"scripts": {
@@ -45,7 +49,11 @@
 	},
 	"dependencies": {
 		"@chainsafe/bls": "^8.1.0",
+		"@libp2p/crypto": "^5.1.21",
+		"@libp2p/peer-id": "^6.0.12",
 		"@noble/hashes": "^1.7.1",
+		"@noble/secp256k1": "^2.2.3",
+		"@ts-drp/errors": "0.11.0",
 		"@ts-drp/logger": "^0.11.0",
 		"@ts-drp/tracer": "^0.11.0",
 		"@ts-drp/types": "^0.11.0",

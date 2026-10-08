@@ -1,0 +1,133 @@
+{
+  "tests": "f932fc87cab77e22b2d3994b8af288e9e491547a",
+  "signature": "G",
+  "pushed": true,
+  "classification": "UNEXPECTED_MATRIX_STOP_NO_RERUN",
+  "accepted": false,
+  "executionCount": 1,
+  "expected": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0
+  },
+  "actual": {
+    "total": 20,
+    "passed": 2,
+    "failed": 18,
+    "skipped": 0
+  },
+  "failureGroups": {
+    "TypeError: v3 room preparation failed: trust-open-failed": 16,
+    "AssertionError: expected [Function] to throw error including 'issuance-rejected' but got 'v3 room preparation failed: trust-ope…'": 1,
+    "AssertionError: expected [Function] to throw error including 'readiness' but got 'v3 room preparation failed: trust-ope…'": 1
+  },
+  "functions": [
+    {
+      "name": "snapshotOpenedTrust",
+      "source": "function snapshotOpenedTrust(value: unknown, expectedObjectId: string): OpenedTrustSnapshot | undefined {\n\tconst result = snapshotClosedRecord(value, OPEN_RESULT_KEYS);\n\tif (result === undefined || result.ok !== true) return undefined;\n\tconst head = snapshotClosedRecord(result.head, PRESENT_HEAD_KEYS);\n\tconst trust = snapshotClosedRecord(result.trust, TRUST_KEYS);\n\tconst trustRef = snapshotClosedRecord(result.trustRef, TRUST_REF_KEYS);\n\tif (\n\t\thead === undefined ||\n\t\thead.kind !== \"present\" ||\n\t\thead.objectId !== expectedObjectId ||\n\t\ttypeof head.generationId !== \"string\" ||\n\t\ttypeof head.closureDigest !== \"string\" ||\n\t\ttypeof head.revision !== \"number\" ||\n\t\t!NumberIsSafeInteger(head.revision) ||\n\t\thead.revision < 1 ||\n\t\ttrust === undefined ||\n\t\ttrust.objectId !== expectedObjectId ||\n\t\t(trust.profileId !== \"creator-trusted-v1\" && settlementProfileFor(String(trust.profileId)) === \"none\") ||\n\t\t!isDigestHex(trust.currentAnchorDigest) ||\n\t\t!isDigestHex(trust.genesisAnchorDigest) ||\n\t\ttypeof trust.currentEpoch !== \"number\" ||\n\t\t!NumberIsSafeInteger(trust.currentEpoch) ||\n\t\ttrust.currentEpoch < 0 ||\n\t\ttrustRef === undefined ||\n\t\t!isDigestHex(trustRef.digest) ||\n\t\ttypeof trustRef.byteLength !== \"number\" ||\n\t\t!NumberIsSafeInteger(trustRef.byteLength) ||\n\t\ttrustRef.byteLength < 1\n\t) {\n\t\treturn undefined;\n\t}\n\treturn ObjectFreeze({\n\t\thead: ObjectFreeze({\n\t\t\tclosureDigest: head.closureDigest,\n\t\t\tgenerationId: head.generationId,\n\t\t\tkind: \"present\" as const,\n\t\t\tobjectId: head.objectId,\n\t\t\trevision: head.revision,\n\t\t}) as PresentHead,\n\t\ttrust: result.trust as CurrentAnchorTrust,\n\t\ttrustRef: ObjectFreeze({\n\t\t\tbyteLength: trustRef.byteLength,\n\t\t\tdigest: trustRef.digest,\n\t\t}) as GenerationRef,\n\t});\n}"
+    },
+    {
+      "name": "prepareV3LiveGeneration",
+      "source": "async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Promise<PrepareV3LiveResult> {\n\tconst captured = captureInput(input);\n\tif (captured === undefined) return failure(\"malformed-input\", \"creator preparation input is invalid\");\n\n\tlet openedTrust: OpenedTrustSnapshot;\n\tlet trustStore: ReturnType<typeof createCurrentAnchorTrustStore>;\n\ttry {\n\t\ttrustStore = createCurrentAnchorTrustStore({\n\t\t\tobjectId: captured.objectId,\n\t\t\tpinnedGenesisAnchorDigest: captured.pinnedGenesisAnchorDigest,\n\t\t\tstore: captured.store,\n\t\t});\n\t\tconst opened = await trustStore.open();\n\t\tconst snapshot = snapshotOpenedTrust(opened, captured.objectId);\n\t\tif (snapshot === undefined) {\n\t\t\treturn failure(\"trust-open-failed\", \"creator trust could not be opened\");\n\t\t}\n\t\topenedTrust = snapshot;\n\t} catch {\n\t\treturn failure(\"trust-open-failed\", \"creator trust could not be opened\");\n\t}\n\n\tlet provenance: ProvenanceSnapshot;\n\ttry {\n\t\tconst authenticated = authenticateCurrentEpochAnchor({\n\t\t\tdetachedSignature: captured.detachedSignature,\n\t\t\texactCanonicalAnchorPreimageBytes: captured.exactCanonicalAnchorPreimageBytes,\n\t\t\ttrust: openedTrust.trust,\n\t\t});\n\t\tconst snapshot = snapshotAuthenticatedProvenance(authenticated, captured.objectId);\n\t\tif (snapshot === undefined || snapshot.anchorDigest !== captured.pinnedGenesisAnchorDigest) {\n\t\t\treturn failure(\"anchor-authentication-failed\", \"current anchor authentication failed\");\n\t\t}\n\t\tprovenance = snapshot;\n\t} catch {\n\t\treturn failure(\"anchor-authentication-failed\", \"current anchor authentication failed\");\n\t}\n\ttry {\n\t\tconst independentlyHashedAnchor = bytesToLowerHex(\n\t\t\thashDomain(\"ts-drp/epoch-anchor/v3\", captured.exactCanonicalAnchorPreimageBytes)\n\t\t);\n\t\tif (\n\t\t\tindependentlyHashedAnchor !== captured.pinnedGenesisAnchorDigest ||\n\t\t\tindependentlyHashedAnchor !== provenance.anchorDigest\n\t\t) {\n\t\t\treturn failure(\"anchor-authentication-failed\", \"current anchor digest is invalid\");\n\t\t}\n\t} catch {\n\t\treturn failure(\"anchor-authentication-failed\", \"current anchor digest is invalid\");\n\t}\n\n\tconst parameters = acceptedParameterDigest(\n\t\tcaptured.exactCanonicalParametersCarrierBytes,\n\t\tprovenance.parametersDigest\n\t);\n\tif (parameters === undefined) {\n\t\treturn failure(\"parameters-rejected\", \"creator parameters are unsupported\");\n\t}\n\n\tlet catalog: CatalogSnapshot;\n\ttry {\n\t\tconst resolved = captured.catalog.resolve(provenance.blueprintDigest);\n\t\tconst snapshot = snapshotCatalog(captured.catalog, resolved);\n\t\tif (\n\t\t\tsnapshot === undefined ||\n\t\t\tsnapshot.blueprintDigest !== provenance.blueprintDigest ||\n\t\t\tsnapshot.runtimeProfile !== SUPPORTED_PARAMETER_PROFILE.runtimeProfile\n\t\t) {\n\t\t\treturn failure(\"blueprint-unresolved\", \"trusted blueprint could not be resolved\");\n\t\t}\n\t\tcatalog = snapshot;\n\t} catch {\n\t\treturn failure(\"blueprint-unresolved\", \"trusted blueprint could not be resolved\");\n\t}\n\n\tlet admission: PreparedBlueprintAdmission;\n\ttry {\n\t\tadmission = prepareBlueprintAdmission({\n\t\t\tcanonicalBlueprintPackageBytes: catalog.canonicalBlueprintPackageBytes,\n\t\t\texpectedBlueprintDigest: provenance.blueprintDigest,\n\t\t});\n\t} catch {\n\t\treturn failure(\"admission-rejected\", \"blueprint admission preparation failed\");\n\t}\n\tif (!admissionMatches(admission, catalog.blueprintDigest)) {\n\t\treturn failure(\"admission-rejected\", \"blueprint admission identity is invalid\");\n\t}\n\n\tlet runtime: PreparedBlueprintRuntime;\n\ttry {\n\t\truntime = await prepareBlueprintRuntime({\n\t\t\tcanonicalBlueprintPackageBytes: catalog.canonicalBlueprintPackageBytes,\n\t\t\texactArtifactBytes: catalog.exactArtifactBytes,\n\t\t\texpectedBlueprintDigest: provenance.blueprintDigest,\n\t\t\tpreparedBlueprintAdmission: admission,\n\t\t});\n\t} catch {\n\t\treturn failure(\"runtime-preparation-failed\", \"blueprint runtime preparation failed\");\n\t}\n\tif (!runtimeMatches(runtime, catalog)) {\n\t\treturn failure(\"runtime-preparation-failed\", \"blueprint runtime identity is invalid\");\n\t}\n\n\tconst byteCharge = typedArrayByteLength(captured.exactCanonicalAnchorPreimageBytes);\n\tif (\n\t\tbyteCharge === undefined ||\n\t\tbyteCharge < 1 ||\n\t\tbyteCharge > parameters.maxEpochBytes ||\n\t\tparameters.maxEpochVertices < 1\n\t) {\n\t\treturn failure(\"graph-rejected\", \"creator graph exceeds authenticated limits\");\n\t}\n\n\tconst dependencies = finishDenseArray<string>([], 0);\n\tconst orderValues: string[] = [];\n\tif (dependencies === undefined || !defineDenseElement(orderValues, 0, provenance.anchorDigest)) {\n\t\treturn failure(\"internal-invariant\", \"creator graph containers could not be constructed\");\n\t}\n\tconst order = finishDenseArray(orderValues, 1);\n\tif (order === undefined) return failure(\"internal-invariant\", \"creator graph containers could not be constructed\");\n\tconst vertex = ObjectFreeze({\n\t\thash: provenance.anchorDigest,\n\t\tkind: \"drp-epoch-anchor\" as const,\n\t\tobjectId: provenance.objectId,\n\t\tepoch: provenance.epoch,\n\t\tdependencies: dependencies as string[],\n\t});\n\tconst vertices = new IntrinsicMap<string, EpochVertex>();\n\tconst charges = new IntrinsicMap<string, number>();\n\ttry {\n\t\tReflectApply(MapPrototypeSet, vertices, [provenance.anchorDigest, vertex]);\n\t\tReflectApply(MapPrototypeSet, charges, [provenance.anchorDigest, byteCharge]);\n\t} catch {\n\t\treturn failure(\"internal-invariant\", \"creator graph containers could not be constructed\");\n\t}\n\tif (\n\t\t!isExactOwnedSingleEntryMap(vertices, provenance.anchorDigest, vertex) ||\n\t\t!isExactOwnedSingleEntryMap(charges, provenance.anchorDigest, byteCharge) ||\n\t\torder[0] !== provenance.anchorDigest\n\t) {\n\t\treturn failure(\"graph-rejected\", \"creator graph ownership is invalid\");\n\t}\n\ttry {\n\t\tnew CausalityIndex(vertices, order, {\n\t\t\tinitialByteCharges: charges,\n\t\t\tmaxEpochBytes: parameters.maxEpochBytes,\n\t\t\tmaxEpochVertices: parameters.maxEpochVertices,\n\t\t});\n\t} catch (error) {\n\t\treturn isLinearizationFailure(error)\n\t\t\t? failure(\"graph-rejected\", \"creator graph validation failed\")\n\t\t\t: failure(\"internal-invariant\", \"creator graph validation failed unexpectedly\");\n\t}\n\n\tlet durableProjectionBytes: Uint8Array;\n\tlet projectionDigest: BlobDigest;\n\tlet liveStateRef: GenerationRef;\n\tlet proposedClosure: readonly GenerationRef[];\n\tlet proposedClosureDigest: string;\n\ttry {\n\t\tconst orderedVertexHashesPreimage = {\n\t\t\tkind: \"v3-live-order-1\",\n\t\t\torderedVertexHashes: [provenance.anchorDigest],\n\t\t};\n\t\tconst graphChargePreimage = {\n\t\t\tkind: \"v3-live-graph-1\",\n\t\t\tvertices: [\n\t\t\t\t{\n\t\t\t\t\thash: provenance.anchorDigest,\n\t\t\t\t\tkind: \"drp-epoch-anchor\",\n\t\t\t\t\tobjectId: provenance.objectId,\n\t\t\t\t\tepoch: provenance.epoch,\n\t\t\t\t\tdependencies: [],\n\t\t\t\t},\n\t\t\t],\n\t\t\tcharges: [{ hash: provenance.anchorDigest, byteCharge }],\n\t\t};\n\t\tconst exactOrderPreimageBytes = encodeCanonical(orderedVertexHashesPreimage);\n\t\tconst exactGraphChargePreimageBytes = encodeCanonical(graphChargePreimage);\n\t\tconst orderedVertexHashesDigest = (digestBlob(exactOrderPreimageBytes) as { readonly value?: BlobDigest }).value;\n\t\tif (orderedVertexHashesDigest === undefined) {\n\t\t\treturn failure(\"internal-invariant\", \"creator order digest could not be derived\");\n\t\t}\n\t\tconst graphDigest = (digestBlob(exactGraphChargePreimageBytes) as { readonly value?: BlobDigest }).value;\n\t\tif (graphDigest === undefined) {\n\t\t\treturn failure(\"internal-invariant\", \"creator graph digest could not be derived\");\n\t\t}\n\t\tconst projectionRecord = {\n\t\t\tkind: \"v3-live-generation-1\",\n\t\t\tobjectId: provenance.objectId,\n\t\t\tepoch: provenance.epoch,\n\t\t\tanchorDigest: provenance.anchorDigest,\n\t\t\tblueprintDigest: provenance.blueprintDigest,\n\t\t\tparametersDigest: provenance.parametersDigest,\n\t\t\tprofileDigest: provenance.profileDigest,\n\t\t\tsignerSetDigest: provenance.signerSetDigest,\n\t\t\tartifactDigest: catalog.artifactDigest,\n\t\t\tartifactId: catalog.artifactId,\n\t\t\tcatalogDigest: catalog.catalogDigest,\n\t\t\truntimeProfile: catalog.runtimeProfile,\n\t\t\ttrustProfile: \"creator-only\",\n\t\t\tmaxEpochVertices: parameters.maxEpochVertices,\n\t\t\tmaxEpochBytes: parameters.maxEpochBytes,\n\t\t\tmaxDependencies: parameters.maxDependencies,\n\t\t\tvertexCount: 1,\n\t\t\tbyteCharge,\n\t\t\torderedVertexHashesDigest,\n\t\t\tgraphDigest,\n\t\t};\n\t\tconst exactProjectionBytes = encodeCanonical(projectionRecord);\n\t\tconst derivedProjectionDigest = (digestBlob(exactProjectionBytes) as { readonly value?: BlobDigest }).value;\n\t\tconst projectionByteLength = typedArrayByteLength(exactProjectionBytes);\n\t\tconst trustRef = copiedGenerationRef(openedTrust.trustRef.digest, openedTrust.trustRef.byteLength);\n\t\tconst derivedLiveStateRef = copiedGenerationRef(derivedProjectionDigest, projectionByteLength);\n\t\tif (trustRef === undefined || derivedLiveStateRef === undefined || trustRef.digest === derivedLiveStateRef.digest) {\n\t\t\treturn failure(\"internal-invariant\", \"creator live projection reference is invalid\");\n\t\t}\n\t\tconst proposedClosureValues: GenerationRef[] = [];\n\t\tconst firstRef = trustRef.digest < derivedLiveStateRef.digest ? trustRef : derivedLiveStateRef;\n\t\tconst secondRef = firstRef === trustRef ? derivedLiveStateRef : trustRef;\n\t\tif (\n\t\t\t!defineDenseElement(proposedClosureValues, 0, firstRef) ||\n\t\t\t!defineDenseElement(proposedClosureValues, 1, secondRef)\n\t\t) {\n\t\t\treturn failure(\"internal-invariant\", \"creator closure could not be constructed\");\n\t\t}\n\t\tconst frozenClosure = finishDenseArray(proposedClosureValues, 2);\n\t\tif (frozenClosure === undefined) {\n\t\t\treturn failure(\"internal-invariant\", \"creator closure could not be constructed\");\n\t\t}\n\t\tconst closureDigest = digestClosure(frozenClosure);\n\t\tif (!closureDigest.ok) return failure(\"internal-invariant\", \"creator closure digest could not be derived\");\n\t\tprojectionDigest = derivedLiveStateRef.digest;\n\t\tliveStateRef = derivedLiveStateRef;\n\t\tproposedClosure = frozenClosure;\n\t\tproposedClosureDigest = closureDigest.value;\n\t\tdurableProjectionBytes = exactProjectionBytes;\n\t} catch {\n\t\treturn failure(\"internal-invariant\", \"creator graph projection could not be derived\");\n\t}\n\n\tconst mintInput = ObjectFreeze({\n\t\tadmission,\n\t\tbyteCharge,\n\t\tcaptured,\n\t\tcatalog,\n\t\tcharges,\n\t\tdurableProjectionBytes,\n\t\tliveStateRef,\n\t\torder,\n\t\tparameters,\n\t\tprojectionDigest,\n\t\tproposedClosure,\n\t\tprovenance,\n\t\truntime,\n\t\tvertices,\n\t}) satisfies PreparedV3LiveMintInput;\n\tlet carried: DurableStateSnapshot | undefined;\n\tfor (let attempt = 0; attempt < 2; attempt += 1) {\n\t\tlet current = carried;\n\t\tlet stagedHead: PresentHead | undefined;\n\t\tlet swapResult: StoreResultSnapshot | undefined;\n\t\tlet awaitingOutcome = false;\n\t\tcarried = undefined;\n\t\twhile (true) {\n\t\t\tif (current === undefined) current = await reopenDurableState(captured, trustStore);\n\t\t\tif (current === undefined) return failure(\"storage-failed\", \"creator durable state could not be reopened\");\n\t\t\tconst trustOnlyValues: GenerationRef[] = [];\n\t\t\tconst copiedTrustRef = copiedGenerationRef(current.trustRef.digest, current.trustRef.byteLength);\n\t\t\tif (copiedTrustRef === undefined || !defineDenseElement(trustOnlyValues, 0, copiedTrustRef)) {\n\t\t\t\treturn failure(\"internal-invariant\", \"creator trust closure could not be copied\");\n\t\t\t}\n\t\t\tconst trustOnly = finishDenseArray(trustOnlyValues, 1);\n\t\t\tif (trustOnly === undefined) return failure(\"internal-invariant\", \"creator trust closure could not be copied\");\n\t\t\tif (sameClosure(current.references, proposedClosure)) {\n\t\t\t\tconst mint = buildPreparedV3LiveMint(mintInput, current);\n\t\t\t\tif (\"ok\" in mint) return mint;\n\t\t\t\tconst capability = mint.capability;\n\t\t\t\tpreparedV3LiveAuthority.set(capability, mint.payload);\n\t\t\t\treturn ObjectFreeze({ capability, descriptor: mint.descriptor, ok: true as const });\n\t\t\t}\n\t\t\tif (!sameClosure(current.references, trustOnly)) {\n\t\t\t\treturn failure(\"stale-head\", \"creator durable head is not an exact preparation predecessor\");\n\t\t\t}\n\t\t\tif (awaitingOutcome) {\n\t\t\t\tif (stagedHead === undefined || !sameHead(current.head, stagedHead)) {\n\t\t\t\t\treturn failure(\"stale-head\", \"another creator generation became authoritative\");\n\t\t\t\t}\n\t\t\t\tconst definiteLoss = swapResult?.ok === false && swapResult.reason === \"HEAD_CONFLICT\";\n\t\t\t\tif (!definiteLoss) return failure(\"storage-failed\", \"creator head swap outcome is ambiguous\");\n\t\t\t\tif (attempt === 1) return failure(\"stale-head\", \"creator head swap lost twice\");\n\t\t\t\tcarried = current;\n\t\t\t\tbreak;\n\t\t\t}\n\n\t\t\tconst candidates: Array<Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>> = [];\n\t\t\tlet closureIndex = 0;\n\t\t\twhile (closureIndex < proposedClosure.length) {\n\t\t\t\tconst ref = proposedClosure[closureIndex] as GenerationRef;\n\t\t\t\tlet bytes: Uint8Array | undefined;\n\t\t\t\tif (ref.digest === liveStateRef.digest) {\n\t\t\t\t\tbytes = copyDetachedBytes(durableProjectionBytes);\n\t\t\t\t} else {\n\t\t\t\t\tlet candidateIndex = 0;\n\t\t\t\t\twhile (candidateIndex < current.candidates.length) {\n\t\t\t\t\t\tconst candidate = current.candidates[candidateIndex];\n\t\t\t\t\t\tif (candidate?.ref.digest === ref.digest) bytes = copyDetachedBytes(candidate.bytes);\n\t\t\t\t\t\tcandidateIndex += 1;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tconst copiedRef = copiedGenerationRef(ref.digest, ref.byteLength);\n\t\t\t\tif (\n\t\t\t\t\tbytes === undefined ||\n\t\t\t\t\tcopiedRef === undefined ||\n\t\t\t\t\t!defineDenseElement(candidates, closureIndex, ObjectFreeze({ bytes, ref: copiedRef }))\n\t\t\t\t) {\n\t\t\t\t\treturn failure(\"internal-invariant\", \"creator preservation candidates could not be copied\");\n\t\t\t\t}\n\t\t\t\tclosureIndex += 1;\n\t\t\t}\n\t\t\tconst frozenCandidates = finishDenseArray(candidates, proposedClosure.length);\n\t\t\tconst closureForPreservation = copiedGenerationRefs(proposedClosure);\n\t\t\tconst expectedTrustRef = copiedGenerationRef(current.trustRef.digest, current.trustRef.byteLength);\n\t\t\tconst projectionBytesForStage = copyDetachedBytes(durableProjectionBytes);\n\t\t\tif (\n\t\t\t\tfrozenCandidates === undefined ||\n\t\t\t\tclosureForPreservation === undefined ||\n\t\t\t\texpectedTrustRef === undefined ||\n\t\t\t\tprojectionBytesForStage === undefined\n\t\t\t) {\n\t\t\t\treturn failure(\"internal-invariant\", \"creator preservation input could not be copied\");\n\t\t\t}\n\t\t\tlet preserved: unknown;\n\t\t\ttry {\n\t\t\t\tpreserved = assertTrustPreserved({\n\t\t\t\t\tcandidates: frozenCandidates,\n\t\t\t\t\tclosure: closureForPreservation,\n\t\t\t\t\texpectedTrustRef,\n\t\t\t\t});\n\t\t\t} catch {\n\t\t\t\treturn failure(\"trust-not-preserved\", \"creator trust preservation failed\");\n\t\t\t}\n\t\t\tconst preservation = snapshotClosedRecord(preserved, [\"exactCanonicalTrustStateRecordBytes\", \"ok\", \"trustRef\"]);\n\t\t\tconst preservedRef =\n\t\t\t\tpreservation === undefined ? undefined : snapshotClosedRecord(preservation.trustRef, TRUST_REF_KEYS);\n\t\t\tif (\n\t\t\t\tpreservation?.ok !== true ||\n\t\t\t\tcopyDetachedBytes(preservation.exactCanonicalTrustStateRecordBytes) === undefined ||\n\t\t\t\tpreservedRef === undefined ||\n\t\t\t\tpreservedRef.digest !== expectedTrustRef.digest ||\n\t\t\t\tpreservedRef.byteLength !== expectedTrustRef.byteLength\n\t\t\t) {\n\t\t\t\treturn failure(\"trust-not-preserved\", \"creator trust preservation failed\");\n\t\t\t}\n\n\t\t\tconst staged = await stagePreparedGeneration(\n\t\t\t\tcaptured,\n\t\t\t\tcurrent,\n\t\t\t\tproposedClosure,\n\t\t\t\tproposedClosureDigest,\n\t\t\t\tliveStateRef,\n\t\t\t\tprojectionBytesForStage\n\t\t\t);\n\t\t\tif (!staged.ok) return staged.result;\n\t\t\tstagedHead = current.head;\n\t\t\tswapResult = staged.swapResult;\n\t\t\tawaitingOutcome = true;\n\t\t\tcurrent = undefined;\n\t\t}\n\t}\n\n\treturn failure(\"internal-invariant\", \"creator preparation exhausted unexpectedly\");\n}"
+    }
+  ],
+  "sourceSha256": "cf1235b6d7e6944b19b9536d1ca9d911326ae86ce8252632df51c9aa270d462d",
+  "allOtherAssertionsUnchanged": true,
+  "parentTestsUnchanged": true,
+  "productionPreserved": true,
+  "isolatedSourceRuntimePreserved": true,
+  "targetDiagnostics": 3,
+  "externalDiagnostics": 1,
+  "editedSpanDiagnostics": 0,
+  "inheritedDiagnosticsIdenticalAfterExactMapping": true,
+  "typecheckClaimedPass": false,
+  "packageWideTypecheckClaimedGreen": false,
+  "protectedPaths": 86522,
+  "stashCount": 27,
+  "authorizedSpans": [
+    {
+      "start": 122,
+      "end": 186,
+      "text": "import { encodeCanonical, hashDomain } from \"@ts-drp/canonical\";"
+    },
+    {
+      "start": 9895,
+      "end": 12424,
+      "text": "function invite(anchor: string): V3RoomCreatorInviteMaterial {\n\t// These canonical records exercise room composition under the existing mocked trust boundary.\n\t// The a/b pins and detached signatures remain markers, not authenticated genesis proof.\n\tconst objectId = `creator:${\"d\".repeat(32)}`;\n\tconst creator = \"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\";\n\tconst digest = (domain: string, bytes: Uint8Array): string =>\n\t\tArray.from(hashDomain(domain, bytes), (byte) => byte.toString(16).padStart(2, \"0\")).join(\"\");\n\tconst signerSet = [{ publicKey: creator, signerId: \"creator\" }];\n\tconst exactCanonicalSignerSetBytes = encodeCanonical(signerSet);\n\tconst exactCanonicalProfileBytes = encodeCanonical({\n\t\tcryptoSuiteId: \"ed25519-sha256-v3\",\n\t\tprofileId: \"creator-trusted-v1\",\n\t\tquorum: 1,\n\t\tsigners: signerSet,\n\t});\n\tconst exactCanonicalLatchedAclBytes = encodeCanonical({\n\t\tepoch: 0,\n\t\tkind: \"drp-v3-latched-acl\",\n\t\tmembers: [{ author: creator, finalityKey: creator, groups: [\"admin\", \"finality\", \"writer\"] }],\n\t\tobjectId,\n\t\tpermissionless: false,\n\t\tversion: 1,\n\t});\n\tconst exactCanonicalParametersCarrierBytes = encodeCanonical({\n\t\tmaxEpochVertices: 8192,\n\t\tmaxEpochBytes: 8_388_608,\n\t\tmaxDependencies: 16,\n\t\tsnapshotChunkBytes: 131_072,\n\t\tmaxSnapshotBytes: 268_435_456,\n\t\tmaxPendingEntries: 4096,\n\t\tmaxPendingBytes: 16_777_216,\n\t});\n\tconst emptyRoot = \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\";\n\tconst exactCanonicalGenesisAnchorPreimageBytes = encodeCanonical({\n\t\taclDigest: digest(\"ts-drp/latched-acl/v3\", exactCanonicalLatchedAclBytes),\n\t\tarchiveIndexRoot: emptyRoot,\n\t\tblueprintDigest: \"b\".repeat(64),\n\t\tcryptoSuiteId: \"ed25519-sha256-v3\",\n\t\tcutDigest: \"0\".repeat(64),\n\t\tepoch: 0,\n\t\thistoryRoot: emptyRoot,\n\t\thistorySize: 0,\n\t\tkind: \"drp-epoch-anchor\",\n\t\tobjectId,\n\t\tparametersDigest: digest(\"ts-drp/parameters/v3\", exactCanonicalParametersCarrierBytes),\n\t\tpreviousAnchor: \"0\".repeat(64),\n\t\tprofileDigest: digest(\"ts-drp/profile/v3\", exactCanonicalProfileBytes),\n\t\tprotocolMajor: 3,\n\t\tsignerSetDigest: digest(\"ts-drp/signer-set/v3\", exactCanonicalSignerSetBytes),\n\t\tstateDigest: digest(\"ts-drp/state/v3\", encodeCanonical({ anchor })),\n\t});\n\treturn Object.freeze({\n\t\tdetachedGenesisSignature: new Uint8Array(64).fill(anchor === \"a\".repeat(64) ? 1 : 2),\n\t\texactCanonicalGenesisAnchorPreimageBytes,\n\t\texactCanonicalLatchedAclBytes,\n\t\texactCanonicalParametersCarrierBytes,\n\t\texactCanonicalProfileBytes,\n\t\texactCanonicalSignerSetBytes,\n\t\tpinnedGenesisAnchorDigest: anchor,\n\t});\n}"
+    },
+    {
+      "start": 19397,
+      "end": 19818,
+      "text": "encodeCanonical({\n\t\t\t\t\tepoch: 0,\n\t\t\t\t\tkind: \"drp-v3-latched-acl\",\n\t\t\t\t\tmembers: [\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\tauthor: \"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\n\t\t\t\t\t\t\tfinalityKey: \"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\n\t\t\t\t\t\t\tgroups: [\"admin\", \"finality\", \"writer\"],\n\t\t\t\t\t\t},\n\t\t\t\t\t],\n\t\t\t\t\tobjectId: `creator:${\"d\".repeat(32)}`,\n\t\t\t\t\tpermissionless: false,\n\t\t\t\t\tversion: 1,\n\t\t\t\t})"
+    }
+  ],
+  "retainedHashes": {
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "3eaf77c0438df09af30509c839531e78576a5fe6e88c70ea2983ee997807c885",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c",
+    "tests/phase-5a-c-seal-safety-red.test.ts": "3f849d43e92056e19e94d89619a792b6bbd962ae4ee9165c0e88fbaf141991bb",
+    "tests/phase-5e-creator-actor-red.test.ts": "f589a071a3844c31254ec648d2c0a6cf29b2f14cf29551d58556a24cbb48c906",
+    "tests/fixtures/phase-5-v3/seal-types.ts": "002405797fbeec6ddcb18c28f2261ba27b28d5e601cfd8a73b586d20077488d8",
+    "tests/fixtures/phase-5e-v3/creator-actor-contract.ts": "627b4dd02f716a3b457dc718f27e0ae9ec98a432fe8f68b2f4622d9f64ecb1ae"
+  },
+  "immutable": [
+    {
+      "name": "d110c-0c1f5b0r-design-3a156aca",
+      "entries": 3,
+      "manifestSha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0"
+    },
+    {
+      "name": "d110c-0c1f5b-red-observer-78e068a8",
+      "entries": 63,
+      "manifestSha256": "fb5f83746c7690a6c53cdccd5edc3821687042ed2832ed6165b862407f488148"
+    },
+    {
+      "name": "d110c-0c1f5b-red-checkpoint-link-f83764c5",
+      "entries": 71,
+      "manifestSha256": "606860edd135b91fbd1eb71b3ebed39caaa80860485024bff1564a7d65797a39"
+    },
+    {
+      "name": "d110c-0c1f5b-green-d8cdb620",
+      "entries": 77,
+      "manifestSha256": "0f4facc68a059323e1d8aa9d76b0c7ecaea9d43a74684f70cb2643b3bd34993f"
+    },
+    {
+      "name": "d110c-0c1f5b-green-729be70e",
+      "entries": 61,
+      "manifestSha256": "432a74a1d229346b225e96e7314435271e32acb653f8d1012c48aade4d565be0"
+    },
+    {
+      "name": "d110c-0c1f5b-red-scalar-6353eb61",
+      "entries": 75,
+      "manifestSha256": "4590049f6472fd0eb5699ed795289803ad3ca7197545356b5049ccf4ba77d0f0"
+    },
+    {
+      "name": "d110c-0c1f5b-green-89f147cc",
+      "entries": 137,
+      "manifestSha256": "9ee19175cda3b5a1db33319c16478b3c01f3ea5c30db08a1d0a99566c3c4ef4c"
+    },
+    {
+      "name": "d110c-0c1f5b-retained-counter-bc7d615b",
+      "entries": 66,
+      "manifestSha256": "aade868d5db834154c300c5d60a68cc217a792f8eecc90c4e8811b67d9d9a69d"
+    },
+    {
+      "name": "d110c-0c1f5b-green-ab98cce6",
+      "entries": 458,
+      "manifestSha256": "16888af6758fb12fa0cf4c55cf231babac0b468665e04b7a8e6f4976a4f41523"
+    },
+    {
+      "name": "d110c-0c1f5b-retained-finality-867d7f09",
+      "entries": 89,
+      "manifestSha256": "2ef800b9201a882c3c0c1cf1910bdf3cd470cb01f5420640e1cd9cbfeca7ed76"
+    },
+    {
+      "name": "d110c-0c1f5b-green-finality-140a3053",
+      "entries": 15,
+      "manifestSha256": "64919377b2fabf9fda671d2bc3554a11f2c095069f400ad821494bd2539ab4a3"
+    }
+  ],
+  "noRuntimeRerun": true,
+  "requiresNewScopeAuthorization": true
+}

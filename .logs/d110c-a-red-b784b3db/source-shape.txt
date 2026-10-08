@@ -1,0 +1,19 @@
+red_base=b784b3db724002f053d05d7c40024f21fb297126
+origin_base=b784b3db724002f053d05d7c40024f21fb297126
+production_diff_begin
+production_diff_end
+source_owners_begin
+packages/node/src/creator-close.ts:510: previousHistorySnapshot: new CompactMerkleAccumulator().snapshot()
+packages/node/src/creator-close.ts:596: epoch: 0 as const
+packages/node/src/creator-close.ts:600: successorEpoch: 1 as const
+packages/node/src/creator-adoption.ts:564: compactHistory: facts.history.historySnapshot
+source_owners_end
+source_hashes_begin
+dc509821d77523fda5afa71c6f6eea2de9a694ac8ad59c0bb56428fed18e1c90  packages/node/src/creator-close.ts
+39c5c197a08218cf2f8b1af19679b1072ef3ee62d0751d18ab9a8f5b35893fc5  packages/node/src/v3-live.ts
+07e8c680dfd520a1ce45e10081561a4014d4ce0003aa4ffba06c8aade4e5c7db  packages/node/src/creator-adoption.ts
+source_hashes_end
+built_import_hashes_begin
+45c80ee4c7de129abbbd7e4a9e86e74e2355c32015520a4b1492f59677da354c  packages/storage-node/dist/src/index.js
+b8612570e92e52878b9cf9c13003cc9aa3af26ea43ba5191602af2bf8d1129f1  packages/keychain/dist/src/finality.js
+built_import_hashes_end

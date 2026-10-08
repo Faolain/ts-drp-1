@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {spawnSync,execFileSync} from 'node:child_process';
+import ts from '/tmp/d110c-f5b-retained-room-hsBT3J/checkout/node_modules/typescript/lib/typescript.js';
+import {loadConfigFromFile} from '/tmp/d110c-f5b-retained-room-hsBT3J/checkout/node_modules/vite/dist/node/index.js';
+const root=process.cwd(),out=path.dirname(new URL(import.meta.url).pathname),files=['tests/phase-3g-v3-room-rebase-red.test.ts'],checkedFiles=files;
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const write=(name,data)=>fs.writeFileSync(path.join(out,name),JSON.stringify(data,null,2)+'\n',{flag:'wx'});
+
+const selected=JSON.parse(fs.readFileSync(path.join(out,'list.json'),'utf8'));
+const attribution=JSON.parse(fs.readFileSync(path.join(out,'typecheck-inherited-attribution.json'),'utf8'));
+if(!attribution.identical||attribution.baseline.targetDiagnostics.length!==3||attribution.baseline.externalDiagnostics.length!==1||attribution.editedSpanDiagnostics.length)throw Error('Inherited diagnostics differ');
+const stopped=JSON.parse(fs.readFileSync('/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-ab98cce6/retained-10/result.json','utf8')).testResults;
+const expected=stopped.flatMap(s=>s.assertionResults.map(r=>({file:path.basename(s.name),name:[...r.ancestorTitles,r.title].join(' > ')}))).sort((a,b)=>a.name.localeCompare(b.name));
+const actual=selected.map(r=>({file:path.basename(r.file),name:r.name})).sort((a,b)=>a.name.localeCompare(b.name));
+if(selected.length!==20||JSON.stringify(expected)!==JSON.stringify(actual))throw Error('Exact20 titles differ');
+for(const command of JSON.parse(fs.readFileSync(path.join(out,'preflight-commands.json'),'utf8')))if(command.status!==0)throw Error('Collection/static process failed');
+const matrix={frozenAt:new Date().toISOString(),base:'f932fc87cab77e22b2d3994b8af288e9e491547a',files,selected:20,expectedPassed:20,expectedFailed:0,intentionallyFiltered:0,executionCount:1,classification:'RETAINED_BASELINE_PRESERVATION_NOT_CAUSAL_RED',fileHashes:Object.fromEntries(checkedFiles.map(f=>[f,hash(fs.readFileSync(f))])),entries:selected.map(r=>({file:path.relative(root,r.file),name:r.name,expectedStatus:'passed',token:null}))};
+write('matrix.json',matrix);
+write('focused-command.json',{cwd:root,command:['pnpm','exec','vitest','run',...files,'--no-file-parallelism','--coverage.enabled=false','--reporter=json','--outputFile='+path.join(out,'focused.json')],executionCount:1});
+console.log(JSON.stringify({selected:20,expectedPassed:20,expectedFailed:0,inheritedTargetDiagnostics:3,inheritedExternalDiagnostics:1,editedSpanDiagnostics:0,matrixSha256:hash(fs.readFileSync(path.join(out,'matrix.json')))}));

@@ -1,0 +1,29 @@
+{
+  "status": "CAUSAL_RED",
+  "commit": "488a22a6d33392ee2d6640761b3510ff253f4e07",
+  "signature": "G",
+  "pushedRef": "488a22a6d33392ee2d6640761b3510ff253f4e07",
+  "selectedFiles": 1,
+  "failedTests": 1,
+  "filteredTests": 3,
+  "completeSoftFailures": [
+    "AssertionError: REPLAY_SECOND_FAILURE_ATOMIC_EXTERNAL_LEDGER: expected [ Array(1) ] to deeply equal []",
+    "AssertionError: REPLAY_COLD_REOPEN_IDEMPOTENT_EXTERNAL_LEDGER: expected [ …(3) ] to deeply equal [ …(2) ]"
+  ],
+  "nonfailureControls": [
+    "second callback reached in order",
+    "one-shot fault consumed",
+    "failed reopen refused",
+    "active owner released",
+    "transport released",
+    "cold reopen succeeded",
+    "exact canonical recovered state",
+    "each durable operation once",
+    "authority unchanged",
+    "one recovered owner"
+  ],
+  "stashCount": 27,
+  "protectedEntries": 81,
+  "productionChanges": 0,
+  "validatedAt": "2026-09-05T07:25:57.950Z"
+}

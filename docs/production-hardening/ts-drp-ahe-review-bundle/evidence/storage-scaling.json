@@ -1,0 +1,90 @@
+{
+  "assumptions": {
+    "active_tail_vertices": 8192,
+    "authority_changes_retained": 100,
+    "authority_handoff_bytes_each": 2048,
+    "average_vertex_bytes": 512,
+    "note": "Wire/index/state-clone overhead is excluded, so full-history numbers are conservative. AEC v3.1 includes its mandatory 32-byte covered-hash oracle. Hard epochs assume compact peers keep only current state/tail, Merkle peaks, rollback artifacts, and governance handoffs; archives/mirrors retain payload history.",
+    "snapshot_bytes": 10485760
+  },
+  "rows": [
+    {
+      "aec_covered_hash_bytes": 32000,
+      "aec_v3_1_compact_peer_bytes": 11029760,
+      "aec_v3_1_compact_peer_human": "10.52 MiB",
+      "full_history_bytes": 512000,
+      "full_history_human": "500.00 KiB",
+      "hard_epoch_compact_peer_bytes": 11235680,
+      "hard_epoch_compact_peer_human": "10.72 MiB",
+      "hard_epoch_merkle_peak_bytes": 352,
+      "vertices": 1000
+    },
+    {
+      "aec_covered_hash_bytes": 320000,
+      "aec_v3_1_compact_peer_bytes": 15000064,
+      "aec_v3_1_compact_peer_human": "14.31 MiB",
+      "full_history_bytes": 5120000,
+      "full_history_human": "4.88 MiB",
+      "hard_epoch_compact_peer_bytes": 14918112,
+      "hard_epoch_compact_peer_human": "14.23 MiB",
+      "hard_epoch_merkle_peak_bytes": 480,
+      "vertices": 10000
+    },
+    {
+      "aec_covered_hash_bytes": 3200000,
+      "aec_v3_1_compact_peer_bytes": 17880064,
+      "aec_v3_1_compact_peer_human": "17.05 MiB",
+      "full_history_bytes": 51200000,
+      "full_history_human": "48.83 MiB",
+      "hard_epoch_compact_peer_bytes": 14918208,
+      "hard_epoch_compact_peer_human": "14.23 MiB",
+      "hard_epoch_merkle_peak_bytes": 576,
+      "vertices": 100000
+    },
+    {
+      "aec_covered_hash_bytes": 32000000,
+      "aec_v3_1_compact_peer_bytes": 46680064,
+      "aec_v3_1_compact_peer_human": "44.52 MiB",
+      "full_history_bytes": 512000000,
+      "full_history_human": "488.28 MiB",
+      "hard_epoch_compact_peer_bytes": 14918304,
+      "hard_epoch_compact_peer_human": "14.23 MiB",
+      "hard_epoch_merkle_peak_bytes": 672,
+      "vertices": 1000000
+    },
+    {
+      "aec_covered_hash_bytes": 320000000,
+      "aec_v3_1_compact_peer_bytes": 334680064,
+      "aec_v3_1_compact_peer_human": "319.18 MiB",
+      "full_history_bytes": 5120000000,
+      "full_history_human": "4.77 GiB",
+      "hard_epoch_compact_peer_bytes": 14918432,
+      "hard_epoch_compact_peer_human": "14.23 MiB",
+      "hard_epoch_merkle_peak_bytes": 800,
+      "vertices": 10000000
+    },
+    {
+      "aec_covered_hash_bytes": 3200000000,
+      "aec_v3_1_compact_peer_bytes": 3214680064,
+      "aec_v3_1_compact_peer_human": "2.99 GiB",
+      "full_history_bytes": 51200000000,
+      "full_history_human": "47.68 GiB",
+      "hard_epoch_compact_peer_bytes": 14918528,
+      "hard_epoch_compact_peer_human": "14.23 MiB",
+      "hard_epoch_merkle_peak_bytes": 896,
+      "vertices": 100000000
+    },
+    {
+      "aec_covered_hash_bytes": 32000000000,
+      "aec_v3_1_compact_peer_bytes": 32014680064,
+      "aec_v3_1_compact_peer_human": "29.82 GiB",
+      "full_history_bytes": 512000000000,
+      "full_history_human": "476.84 GiB",
+      "hard_epoch_compact_peer_bytes": 14918624,
+      "hard_epoch_compact_peer_human": "14.23 MiB",
+      "hard_epoch_merkle_peak_bytes": 992,
+      "vertices": 1000000000
+    }
+  ],
+  "verdict": "AEC v3.1 bounds replay but remains O(total vertices); hard-epoch compact-peer storage is independent of message history at fixed state/tail and governance-change counts."
+}

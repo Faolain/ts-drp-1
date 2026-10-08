@@ -1,0 +1,15 @@
+{
+  "causalRows": 2,
+  "expected": 0,
+  "failures": [],
+  "flaky": 0,
+  "ordering": [
+    "old-ahe",
+    "new-ahe"
+  ],
+  "productSourceDiff": 0,
+  "skipped": 0,
+  "softFailures": 2,
+  "topLevelErrors": 0,
+  "unexpected": 1
+}

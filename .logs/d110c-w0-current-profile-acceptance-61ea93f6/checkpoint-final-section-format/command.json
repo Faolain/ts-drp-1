@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "-e",
+    "const fs=require(\"fs\"),cp=require(\"child_process\"),x=JSON.parse(fs.readFileSync(\".logs/d110c-w0-current-profile-acceptance-61ea93f6/combined-plan-section-format-final/command.json\"));cp.execFileSync(x.command,x.args,{cwd:x.cwd,stdio:\"inherit\"});"
+  ],
+  "start": "2026-09-06T12:20:00.248Z"
+}

@@ -1,0 +1,17 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout",
+  "command": [
+    "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+    "run",
+    "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout/tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-green-dc2f8dc2/isolated/focused/result.json"
+  ],
+  "environmentUnset": [
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC"
+  ]
+}

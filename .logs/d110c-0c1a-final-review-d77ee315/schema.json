@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["APPROVED", "CHANGES_REQUIRED"]
+    },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "title": { "type": "string" },
+          "evidence": { "type": "string" },
+          "impact": { "type": "string" },
+          "required_action": { "type": "string" }
+        },
+        "required": [
+          "severity",
+          "title",
+          "evidence",
+          "impact",
+          "required_action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "red_causal": { "type": "boolean" },
+    "green_closes_red": { "type": "boolean" },
+    "scope_preserved": { "type": "boolean" }
+  },
+  "required": [
+    "verdict",
+    "summary",
+    "findings",
+    "red_causal",
+    "green_closes_red",
+    "scope_preserved"
+  ],
+  "additionalProperties": false
+}

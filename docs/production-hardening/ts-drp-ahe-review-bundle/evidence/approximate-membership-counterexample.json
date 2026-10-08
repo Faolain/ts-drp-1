@@ -1,0 +1,14 @@
+{
+  "after_valid_parent_arrives": {
+    "compact_replica_with_false_positive": "terminal-covered",
+    "replica_without_false_positive": "accept"
+  },
+  "conclusion": "Bloom/cuckoo/XOR filters cannot replace the exact covered-hash set in an admission rule. Merkle membership works only when a proof is supplied, so it also cannot classify an unknown dependency by itself.",
+  "diverges": true,
+  "initial": {
+    "compact_replica_with_false_positive": "terminal-covered",
+    "replica_without_false_positive": "pending"
+  },
+  "model": "approximate-covered-membership-counterexample-v1",
+  "verdict": "counterexample-found"
+}

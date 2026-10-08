@@ -1,0 +1,85 @@
+{
+  "freeze": "0bca5b6d45dfaec66a3726d89093d0bc5d55c013",
+  "patchSha256": "7f1a115d0e81f426f1705948260cdc76e91463e73d086d47ee99edb9947e9c68",
+  "changes": [
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "beforeSha256": "c9889a0026c56225f98a3a31f8733c44c1b0b0fe9deecfc6ac116cdbf0239ec0",
+      "afterSha256": "53c2a1450b3617f291c8e5568cf98f8aba4d9cd69bf196958d2b78e1c7624a2a",
+      "normalizedAstSha256": "b0f76d20e27ed59453af752ba6107c70e1753ee467ca166da1c4fd8079d968af",
+      "frozenAstSha256": "b0f76d20e27ed59453af752ba6107c70e1753ee467ca166da1c4fd8079d968af",
+      "equivalentAfterRemovingOnlyEnumeratedObservations": true,
+      "removed": [
+        "expect diagnostic: JSON.stringify(measured)"
+      ]
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts",
+      "beforeSha256": "cc146472fe72947a9224201b377eda0f3f7c4ebbbaa87a2cb01953e53f98d62b",
+      "afterSha256": "e4f225eb13646eed32efcc03e2cddc50de95ab8d0fcf529448bffc137c85af83",
+      "normalizedAstSha256": "fde13e3e37ccd76672b9fa0984f41e704ff0d87a470195effb7138ce5be451ca",
+      "frozenAstSha256": "fde13e3e37ccd76672b9fa0984f41e704ff0d87a470195effb7138ce5be451ca",
+      "equivalentAfterRemovingOnlyEnumeratedObservations": true,
+      "removed": [
+        "readonly attemptedFenceCanonicalBytes: number;",
+        "readonly attemptedFenceDeliveredToApplication: boolean;",
+        "readonly attemptedFenceJournaled: boolean;",
+        "readonly closeCanonicalBytes: number;",
+        "readonly closedApplicationState: unknown;",
+        "readonly journalCanonicalBytes: number;",
+        "readonly offenderApplicationCount: number;",
+        "readonly offenderFenceCount: number;",
+        "readonly profileId: string;",
+        "let attemptedFenceCanonicalBytes = 0;",
+        "let attemptedFenceDeliveredToApplication = false;",
+        "let attemptedFenceDigest = \"\";",
+        "attemptedFenceCanonicalBytes = fence.canonicalPreimageBytes.byteLength;",
+        "attemptedFenceDigest = Buffer.from(fence.digest).toString(\"hex\");",
+        "attemptedFenceDeliveredToApplication = wasRegisteredVertexAdmitted(fence);",
+        "const canonicalByteLengths: number[] = [];",
+        "canonicalByteLengths.push(row.exactCanonicalPreimageBytes.byteLength);",
+        "canonicalByteLengths.push(issued.envelope.canonicalPreimageBytes.byteLength);",
+        "attemptedFenceCanonicalBytes",
+        "attemptedFenceDeliveredToApplication",
+        "attemptedFenceJournaled: rowDigests.has(attemptedFenceDigest)",
+        "closeCanonicalBytes: fixture.evidence.history.closeSetEntries.reduce(\n\t\t\t\t(total, entry) => total + entry.authenticatedCanonicalPreimageByteLength,\n\t\t\t\t0\n\t\t\t)",
+        "closedApplicationState: decodedRow(fixture.evidence.exactCanonicalPayloadBytes).application",
+        "journalCanonicalBytes: canonicalByteLengths.reduce((total, byteLength) => total + byteLength, 0)",
+        "offenderApplicationCount: decodedRows.filter(\n\t\t\t\t({ author, operation }) =>\n\t\t\t\t\tauthor === offenderAuthor &&\n\t\t\t\t\toperation !== null &&\n\t\t\t\t\ttypeof operation === \"object\" &&\n\t\t\t\t\t(operation as Readonly<Record<string, unknown>>).action === \"add\"\n\t\t\t).length",
+        "offenderFenceCount: decodedRows.filter(\n\t\t\t\t({ author, operation }) =>\n\t\t\t\t\tauthor === offenderAuthor &&\n\t\t\t\t\toperation !== null &&\n\t\t\t\t\ttypeof operation === \"object\" &&\n\t\t\t\t\t(operation as Readonly<Record<string, unknown>>).action === W0_FENCE_ACTION\n\t\t\t).length",
+        "profileId: fixture.evidence.currentTrust.profileId"
+      ]
+    }
+  ],
+  "historicalExecution": {
+    "path": ".logs/d110c-0c1f5b-green-71bca5d5/retained-58",
+    "reporterSha256": "4926a150b2355c8f908c89085ed6fd89070c03faf66498c8cc32de9b0914fc2b",
+    "commandSha256": "dfe6d69cc74a86b2d62eada4d1ab69144e667a39569285c2994bcf344e2737cc",
+    "custodyHead": "71bca5d580ef0bab9bd17aaf7b51df99810b61c1",
+    "status": {
+      "code": 1,
+      "signal": null,
+      "start": "2026-09-06T06:26:34.524Z",
+      "finish": "2026-09-06T06:26:54.984Z",
+      "pid": 57651
+    },
+    "tests": 6,
+    "passed": 5,
+    "failed": 1,
+    "failures": [
+      {
+        "title": "D.110c-0c1k W0 real lifecycle and capacity RED caps one authenticated writer, counts fence/join vertices, preserves another writer and closes below global capacity",
+        "failureMessages": [
+          "AssertionError: expected { causalJoinCount: 1, …(7) } to match object { causalJoinCount: 1, …(6) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts:83:20\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+        ]
+      }
+    ],
+    "limitation": "Original aggregate mismatch only; no new observation values are attributed to this old execution."
+  },
+  "currentPatch": {
+    "staticOnly": true,
+    "testExecutions": 0,
+    "observationsMeasured": false,
+    "expectationAndWorkloadPreserved": true
+  }
+}

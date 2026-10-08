@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-red-room-guard-ueW92K/checkout",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "const root=await import(\"./packages/node/dist/src/index.js\");console.log(JSON.stringify({exports:Object.keys(root).sort()}));"
+  ],
+  "start": "2026-09-06T02:30:57.515Z"
+}

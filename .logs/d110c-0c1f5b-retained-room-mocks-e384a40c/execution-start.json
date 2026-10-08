@@ -1,0 +1,19 @@
+{
+  "head": "e384a40cc9f30d4cb5f65b459e2be65858ce05e5",
+  "remote": "e384a40cc9f30d4cb5f65b459e2be65858ce05e5",
+  "signature": "G",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-room-mocks-e384a40c/focused.json"
+  ],
+  "matrixSha256": "6139fe42ec9d1f453730006e34918447d52838db9fd61879cbefa8b2d90852bf",
+  "executionCount": 1,
+  "startedAt": "2026-09-06T00:37:12.107Z"
+}

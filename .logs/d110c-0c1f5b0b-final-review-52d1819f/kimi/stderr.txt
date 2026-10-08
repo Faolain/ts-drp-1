@@ -1,0 +1,1063 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+.logs/d110c-0c1f5b0b-corrective-review-bb94a03f/:
+total 48
+drwxr-xr-x    10 aristotle  staff     320 Sep  4 07:12 .
+drwxr-xr-x  8033 aristotle  staff  257056 Sep  4 07:33 ..
+-rw-r--r--     1 aristotle  staff     543 Sep  4 07:12 blocking-union.json
+-rw-r--r--     1 aristotle  staff     373 Sep  4 07:12 commands.md
+drwxr-xr-x    10 aristotle  staff     320 Sep  4 07:12 grok
+drwxr-xr-x     5 aristotle  staff     160 Sep  4 07:12 kimi
+-rw-r--r--     1 aristotle  staff    1485 Sep  4 07:12 manifest.sha256
+drwxr-xr-x     5 aristotle  staff     160 Sep  4 07:12 opus
+-rw-r--r--     1 aristotle  staff    4837 Sep  4 06:56 prompt.md
+-rw-r--r--     1 aristotle  staff    1882 Sep  4 07:12 review-ledger.md
+
+.logs/d110c-0c1f5b0b-green-802a647e/:
+total 472
+drwxr-xr-x    28 aristotle  staff     896 Sep  4 07:31 .
+drwxr-xr-x  8033 aristotle  staff  257056 Sep  4 07:33 ..
+-rw-r--r--     1 aristotle  staff    1360 Sep  4 07:29 README.md
+-rw-r--r--     1 aristotle  staff    6036 Sep  4 07:31 built-child.json
+-rw-r--r--     1 aristotle  staff      29 Sep  4 07:29 changed-paths.txt
+-rw-r--r--     1 aristotle  staff    3810 Sep  4 07:31 commands.md
+-rw-r--r--     1 aristotle  staff     793 Sep  4 07:29 custody.txt
+-rw-r--r--     1 aristotle  staff   11279 Sep  4 07:31 focused27.json
+-rw-r--r--     1 aristotle  staff   15522 Sep  4 07:31 focused40.json
+-rw-r--r--     1 aristotle  staff    6046 Sep  4 07:31 isolated-built-child.json
+-rw-r--r--     1 aristotle  staff   11288 Sep  4 07:31 isolated-focused27.json
+-rw-r--r--     1 aristotle  staff   15568 Sep  4 07:31 isolated-focused40.json
+-rw-r--r--     1 aristotle  staff   11163 Sep  4 07:31 legacy26.json
+-rw-r--r--     1 aristotle  staff    2113 Sep  4 07:31 manifest.sha256
+-rw-r--r--     1 aristotle  staff     829 Sep  4 07:29 matrix.md
+-rw-r--r--     1 aristotle  staff    7249 Sep  4 07:31 node-typecheck.normalized
+-rw-r--r--     1 aristotle  staff       0 Sep  4 07:31 node-typecheck.stderr
+-rw-r--r--     1 aristotle  staff    9073 Sep  4 07:31 node-typecheck.stdout
+-rw-r--r--     1 aristotle  staff    7249 Sep  4 07:31 parent-node-typecheck.normalized
+-rw-r--r--     1 aristotle  staff       0 Sep  4 07:31 parent-node-typecheck.stderr
+-rw-r--r--     1 aristotle  staff    9553 Sep  4 07:31 parent-node-typecheck.stdout
+-rw-r--r--     1 aristotle  staff    6002 Sep  4 07:31 phase3g.json
+-rw-r--r--     1 aristotle  staff     599 Sep  4 07:31 production.diff
+-rw-r--r--     1 aristotle  staff    2003 Sep  4 07:29 result.json
+-rw-r--r--     1 aristotle  staff   33391 Sep  4 07:31 retained87.json
+-rw-r--r--     1 aristotle  staff   27321 Sep  4 07:31 shared64.json
+-rw-r--r--     1 aristotle  staff     772 Sep  4 07:29 source-audit.txt
+-rw-r--r--     1 aristotle  staff     743 Sep  4 07:30 verification.txt
+
+.logs/d110c-0c1f5b0b-red-a19e8454/:
+total 14736
+drwxr-xr-x    18 aristotle  staff      576 Sep  4 07:20 .
+drwxr-xr-x  8033 aristotle  staff   257056 Sep  4 07:33 ..
+-rw-r--r--     1 aristotle  staff      820 Sep  4 07:20 README.md
+-rw-r--r--     1 aristotle  staff      317 Sep  4 07:20 artifact-hashes.txt
+-rw-r--r--     1 aristotle  staff      102 Sep  4 07:20 changed-paths.txt
+-rw-r--r--     1 aristotle  staff     1689 Sep  4 07:20 commands.md
+-rw-r--r--     1 aristotle  staff      688 Sep  4 07:20 custody.txt
+-rw-r--r--     1 aristotle  staff        0 Sep  4 07:19 diff-check.stderr
+-rw-r--r--     1 aristotle  staff        0 Sep  4 07:19 diff-check.stdout
+-rw-r--r--     1 aristotle  staff        0 Sep  4 07:19 eslint-initial.stderr
+-rw-r--r--     1 aristotle  staff      313 Sep  4 07:19 eslint-initial.stdout
+-rw-r--r--     1 aristotle  staff        0 Sep  4 07:19 eslint.stderr
+-rw-r--r--     1 aristotle  staff        0 Sep  4 07:19 eslint.stdout
+-rw-r--r--     1 aristotle  staff  7504908 Sep  4 07:19 focused-red.json
+-rw-r--r--     1 aristotle  staff     1259 Sep  4 07:20 manifest.sha256
+-rw-r--r--     1 aristotle  staff     1291 Sep  4 07:20 matrix.md
+-rw-r--r--     1 aristotle  staff        0 Sep  4 07:19 prettier.stderr
+-rw-r--r--     1 aristotle  staff       66 Sep  4 07:19 prettier.stdout
+
+.logs/d110c-0c1f5b0b-review-9b02f9c2/:
+total 320
+drwxr-xr-x    14 aristotle  staff     448 Sep  4 05:08 .
+drwxr-xr-x  8033 aristotle  staff  257056 Sep  4 07:33 ..
+-rw-r--r--     1 aristotle  staff     705 Sep  4 05:08 blocking-union.json
+-rw-r--r--     1 aristotle  staff    1421 Sep  4 05:07 commands.md
+-rw-r--r--     1 aristotle  staff    1000 Sep  4 04:37 custody-chain.txt
+drwxr-xr-x    10 aristotle  staff     320 Sep  4 05:07 grok
+-rw-r--r--     1 aristotle  staff     465 Sep  4 04:49 grok-resume-prompt.md
+drwxr-xr-x     8 aristotle  staff     256 Sep  4 05:07 kimi
+-rw-r--r--     1 aristotle  staff    2129 Sep  4 05:08 manifest.sha256
+drwxr-xr-x     5 aristotle  staff     160 Sep  4 05:07 opus
+-rw-r--r--     1 aristotle  staff   76848 Sep  4 04:37 production.diff
+-rw-r--r--     1 aristotle  staff    6016 Sep  4 04:37 prompt.md
+-rw-r--r--     1 aristotle  staff   50382 Sep  4 04:37 red.diff
+-rw-r--r--     1 aristotle  staff    3654 Sep  4 05:08 review-ledger.md
+
+.logs/d110c-0c1f5b0r-design-3a156aca/:
+total 136
+drwxr-xr-x     6 aristotle  staff     192 Sep  3 21:48 .
+drwxr-xr-x  8033 aristotle  staff  257056 Sep  4 07:33 ..
+-rw-r--r--@    1 aristotle  staff   35701 Sep  3 23:19 design.md
+-rw-r--r--@    1 aristotle  staff     237 Sep  4 00:50 manifest.sha256
+-rw-r--r--@    1 aristotle  staff    7388 Sep  4 00:50 next-prompt.md
+-rw-r--r--     1 aristotle  staff   16553 Sep  3 21:42 pre-review.md
+802a647e fix(node): preserve legacy settlement compatibility
+eb302c07 test(hardening): record legacy settlement compatibility red
+a19e8454 test(hardening): pin legacy settlement compatibility red
+fa4ee8f3 test(hardening): record rejected settlement correction review
+bb94a03f test(hardening): record corrective settlement green
+e07f8a94 fix(node): restore profile-safe settlement behavior
+449b95a3 test(hardening): record explicit legacy completion red
+6e542c3d test(node): preserve explicit legacy rebase completion
+commit a19e84549e5d0a946ebf084bcbcecf72b4cc2df4
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 07:18:19 2026 -0400
+
+    test(hardening): pin legacy settlement compatibility red
+
+ tests/phase-3g-v3-rebase-outbox-red.test.ts        | 13 ++-----
+ ...e-6b-d110c-0c1f5b0b-node-corrective-red.test.ts | 41 +++++++++++++++++-----
+ 2 files changed, 36 insertions(+), 18 deletions(-)
+commit 802a647ea412df7dcfe6284f2b62bfd66554ae23
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 07:28:36 2026 -0400
+
+    fix(node): preserve legacy settlement compatibility
+
+ packages/node/src/v3-live.ts | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+52d1819f80b58b744fc5de8671870e68a2c6be52
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+?? .logs/d108e4ab-campaign/
+?? .logs/d108e4ab-freeze/
+?? .logs/d108e4ab-plan-review/
+?? .logs/d108e4ac-green-review-correction/
+?? .logs/d108e4ac-green-review/
+?? .logs/d108e4ac-green/
+?? .logs/d108e4ac-plan-review/
+?? .logs/d108e4ac-red-review/
+?? .logs/d108e4ac-red/
+?? .logs/d108e4ad-campaign/
+802a647ea412df7dcfe6284f2b62bfd66554ae23 G fix(node): preserve legacy settlement compatibility
+						epoch: registration.payload.provenance.epoch,
+						kind: "drp-vertex",
+						logicalTime,
+						objectId: registration.payload.provenance.objectId,
+						operation,
+						protocolMajor: 3,
+					})
+				);
+				const digest = hashDomain(V3_VERTEX_DOMAIN, canonicalPreimageBytes);
+				const signed = await input.signRegisteredVertexDigest(new Uint8ArrayConstructor(digest));
+				signerResolved = true;
+				const signature = copyDetachedBytes(signed);
+				if (signature === undefined || signature.byteLength !== 64) {
+					throw new TypeError("v3 author fence signature is invalid");
+				}
+				const envelope = ObjectFreeze({ canonicalPreimageBytes, digest, signature });
+				return ObjectFreeze({
+					authorSequence,
+					envelope,
+					issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
+					outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
+				});
+			});
+		} else {
+			commit = await issuer.issue({
+				anchor: registration.payload.provenance.anchorDigest,
+				dependencies,
+				epoch: registration.payload.provenance.epoch,
+				logicalTime,
+				objectId: registration.payload.provenance.objectId,
+				operation,
+			});
+		}
+	} catch (error) {
+		const issuanceOutcomeUnknown =
+			error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
+		if ((!signerResolved && !terminalTransactionStarted) || capacityRejected) {
+			releaseOperationReservation(reservation);
+		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
+			registration.operationAdmissionHalted = true;
+		}
+		if (requireTerminalAuthorization && terminalTransactionStarted) {
+			return internalLocalIssueFailure(
+				"issuance-rejected",
+				"v3 terminal issue transaction outcome is unknown",
+				"outcome-unknown"
+			);
+		}
+		if (issuanceOutcomeUnknown && settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
+			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
+		}
+		return capacityRejected
+			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+			: signerResolved
+				? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
+				: localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
+	}
+	const committedFailure = (
+		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+		detail: string
+	): InternalLocalIssueResult => {
+		registration.operationAdmissionHalted = true;
+		return requireTerminalAuthorization
+			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
+			: localIssueFailure(kind, detail);
+	};
+	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
+	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
+
+	let authenticated: AuthenticatedRecoveryVertex | undefined;
+	try {
+		authenticated = authenticateRecoveryVertex(
+			registration.payload,
+			registration.authorization,
+			row.canonicalPreimageBytes,
+			row.signature
+		);
+	} catch {
+		return committedFailure("admission-rejected", "v3 local issue authentication failed");
+	}
+	if (
+		authenticated === undefined ||
+		authenticated.digest !== lowerHexDigest(row.digest) ||
+		authenticated.author !== scope.author ||
+		authenticated.authorSequence !== row.authorSequence ||
+		registration.index.has(authenticated.digest)
+	) {
+		return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
+	}
+	if (!hasBoundedDependencies(registration.payload, authenticated)) {
+		return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+		classified.kind === "current"
+			? registration.payload
+			: historical
+				? registration.payload
+				: (registration.displacedSource?.prepared ?? registration.payload);
+	if (source === undefined || !hasBoundedDependencies(source, classified.authenticated)) return false;
+	const operation = classified.authenticated.vertex.operation;
+	if (operation === undefined) return false;
+	const settlementSourceControl =
+		settlementProfileFor(registration.payload.trust.trust.profileId) === "v1" &&
+		(isControlOperation(operation, registration.payload.trust.trust.profileId) ||
+			Reflect.get(operation, "action") === "acl");
+	return (
+		settlementSourceControl ||
+		acceptedApplicationOperation(source, operation, classified.authenticated.admitted.logicalTime)
+	);
+}
+
+function rebaseIntents(
+	payload: PreparedV3LivePayload,
+	authenticated: AuthenticatedRecoveryVertex
+):
+	| readonly Readonly<{
+			readonly logicalTime: number;
+			readonly operation: Readonly<Record<string, unknown>>;
+			readonly operationCount: number;
+			readonly operationIndex: number;
+	  }>[]
+	| undefined {
+	const sourceOperation = authenticated.vertex.operation;
+	if (sourceOperation === undefined) return undefined;
+	const action = Reflect.get(sourceOperation, "action");
+	const batch = applicationBatchEntries(payload, sourceOperation);
+	if (action === APPLICATION_BATCH_ACTION) {
+		return batch?.map((entry, operationIndex) =>
+			ObjectFreeze({ ...entry, operationCount: batch.length, operationIndex })
+		);
+	}
+	if (
+		isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
+		(typeof action === "string" &&
+			isReservedBatchAction(action) &&
+			settlementProfileFor(payload.trust.trust.profileId) !== "v1")
+	) {
+		return ObjectFreeze([]);
+	}
+	const operation = detachedCanonicalOperation(sourceOperation);
+	return operation === undefined
+		? undefined
+		: ObjectFreeze([
+				ObjectFreeze({
+					logicalTime: authenticated.admitted.logicalTime,
+					operation,
+					operationCount: 1,
+					operationIndex: 0,
+				}),
+			]);
+}
+
+async function authenticatedOutboxRow(
+	registration: V3PlaneRegistration,
+	rawRow: unknown,
+	issuanceStore: DurableIssuanceStore = registration.issuanceStore,
+	issuanceScope: DurableIssueScope = registration.issuanceScope,
+	settlementFrontier?: SettlementFrontierContext
+): Promise<ClassifiedRebaseRow | undefined> {
+	const row = outboxRowSnapshot(rawRow, issuanceScope);
+	if (row === undefined) return undefined;
+	const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+	const issuedRow = outboxRowSnapshot(ObjectFreeze({ commit: issued, publishState: row.publishState }), issuanceScope);
+	return issuedRow !== undefined && matchingOutboxRows(row, issuedRow)
+		? classifyRebaseRow(registration, row, settlementFrontier)
+		: undefined;
+}
+
+async function readRebaseOutbox(
+	registration: V3PlaneRegistration,
+	includePublishedSources = false,
+	settlementFrontier?: SettlementFrontierContext
+): Promise<V3RebaseOutboxResult> {
+	if (!currentRegistration(registration)) {
+		return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
+	}
+	if (registration.retainedBootstrapHold) {
+		return ObjectFreeze({
+			detail: "v3 retained bootstrap is incomplete",
+			kind: "not-active" as const,
+			ok: false as const,
+		});
+	}
+	if (registration.rebaseSnapshot === undefined) {
+		const crossSource =
+			registration.displacedSource?.issuanceStore === undefined ? undefined : registration.displacedSource;
+		const selectedStore = crossSource?.issuanceStore ?? registration.issuanceStore;
+		const selectedScope = crossSource?.issuanceScope ?? registration.issuanceScope;
+		const displaced: ClassifiedRebaseRow[] = [];
+		let currentRecordCount = 0;
+		let displacedRecordCount = 0;
+		let afterKey: readonly [string, string, number] | undefined;
+		beginHistoricalIssuanceScan(registration.historicalIssuance);
+		for (;;) {
+52d1819f test(hardening): record final settlement compatibility green
+---
+---
+---
+ .../blocking-union.json                            |   14 +
+ .../commands.md                                    |    5 +
+ .../grok/command.json                              |   26 +
+ .../grok/events.jsonl                              | 1914 +++++++++++
+ .../grok/input-packet.md                           | 3494 ++++++++++++++++++++
+ .../grok/public.txt                                |    1 +
+ .../grok/review.diff                               |  897 +++++
+ .../grok/status.json                               |    9 +
+ .../grok/verdict.json                              |   40 +
+ .../kimi/raw.jsonl                                 |   53 +
+ .../kimi/stderr.txt                                |  278 ++
+ .../kimi/verdict.json                              |   26 +
+ .../manifest.sha256                                |   18 +
+ .../opus/raw.json                                  |    1 +
+ .../opus/stderr.txt                                |    0
+ .../opus/verdict.json                              |   36 +
+ .../prompt.md                                      |   34 +
+ .../review-ledger.md                               |   21 +
+ .logs/d110c-0c1f5b0b-green-e07f8a94/README.md      |   21 +
+ .../built-replacement-title.json                   |    1 +
+ .../built-replacement-title.stderr                 |    2 +
+ .../built-replacement-title.stdout                 |    1 +
+ .../changed-paths.txt                              |    1 +
+ .logs/d110c-0c1f5b0b-green-e07f8a94/commands.md    |  123 +
+ .logs/d110c-0c1f5b0b-green-e07f8a94/custody.txt    |   13 +
+ .../dist-identity.txt                              |   18 +
+ .logs/d110c-0c1f5b0b-green-e07f8a94/focused39.json |    1 +
+ .../isolated-built-child.json                      |    1 +
+ .../isolated-focused39.json                        |    1 +
+ .../legacy-consumers.json                          |    1 +
+ .../d110c-0c1f5b0b-green-e07f8a94/manifest.sha256  |   30 +
+ .logs/d110c-0c1f5b0b-green-e07f8a94/matrix.md      |   15 +
+ .../node-typecheck.normalized                      |   61 +
+ .../node-typecheck.stderr                          |    0
+ .../node-typecheck.stdout                          |   61 +
+ .../parent-node-typecheck.normalized               |   61 +
+ .../parent-node-typecheck.stderr                   |    0
+ .../parent-node-typecheck.stdout                   |   61 +
+ .logs/d110c-0c1f5b0b-green-e07f8a94/phase3g.json   |    1 +
+ .../d110c-0c1f5b0b-green-e07f8a94/production.diff  |  121 +
+ .logs/d110c-0c1f5b0b-green-e07f8a94/result.json    |   59 +
+ .../d110c-0c1f5b0b-green-e07f8a94/retained87.json  |    1 +
+ .../shared-consumers-built.json                    |    1 +
+ .../d110c-0c1f5b0b-green-e07f8a94/source-audit.txt |   20 +
+ .../stale-dist-isolated-title.json                 |    1 +
+ .../stale-dist-isolated-title.stderr               |    2 +
+ .../stale-dist-isolated-title.stdout               |    1 +
+ .../stale-dist-shared-consumers.json               |    1 +
+ .../d110c-0c1f5b0b-green-e07f8a94/verification.txt |   18 +
+ .logs/d110c-0c1f5b0b-red-a19e8454/README.md        |   11 +
+ .../artifact-hashes.txt                            |    3 +
+ .../d110c-0c1f5b0b-red-a19e8454/changed-paths.txt  |    2 +
+ .logs/d110c-0c1f5b0b-red-a19e8454/commands.md      |   32 +
+ .logs/d110c-0c1f5b0b-red-a19e8454/custody.txt      |   16 +
+ .../d110c-0c1f5b0b-red-a19e8454/diff-check.stderr  |    0
+ .../d110c-0c1f5b0b-red-a19e8454/diff-check.stdout  |    0
+ .../eslint-initial.stderr                          |    0
+ .../eslint-initial.stdout                          |    7 +
+ .logs/d110c-0c1f5b0b-red-a19e8454/eslint.stderr    |    0
+ .logs/d110c-0c1f5b0b-red-a19e8454/eslint.stdout    |    0
+ .logs/d110c-0c1f5b0b-red-a19e8454/focused-red.json |    1 +
+ .logs/d110c-0c1f5b0b-red-a19e8454/manifest.sha256  |   15 +
+ .logs/d110c-0c1f5b0b-red-a19e8454/matrix.md        |   16 +
+ .logs/d110c-0c1f5b0b-red-a19e8454/prettier.stderr  |    0
+ .logs/d110c-0c1f5b0b-red-a19e8454/prettier.stdout  |    2 +
+ packages/node/src/v3-live.ts                       |    6 +-
+ tests/phase-3g-v3-rebase-outbox-red.test.ts        |   13 +-
+ ...e-6b-d110c-0c1f5b0b-node-corrective-red.test.ts |   41 +-
+ 68 files changed, 7709 insertions(+), 22 deletions(-)
+commit a19e84549e5d0a946ebf084bcbcecf72b4cc2df4
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 07:18:19 2026 -0400
+
+    test(hardening): pin legacy settlement compatibility red
+
+diff --git a/tests/phase-3g-v3-rebase-outbox-red.test.ts b/tests/phase-3g-v3-rebase-outbox-red.test.ts
+index c387bbf2..cdd184b6 100644
+--- a/tests/phase-3g-v3-rebase-outbox-red.test.ts
++++ b/tests/phase-3g-v3-rebase-outbox-red.test.ts
+@@ -66,7 +66,7 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
+ 		}
+ 	});
+ 
+-	it("preserves the authenticated legacy causalJoin source row as an application intent", async () => {
++	it("retires an authenticated stored structural source row without exposing an application policy intent", async () => {
+ 		const structural = await runSharedPlaneScenario({ sourceOperationProfile: "structural" });
+ 		expect(structural.recovery).toMatchObject({ ok: true });
+ 		expect(structural.rebaseOutbox).toEqual({
+@@ -75,18 +75,11 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
+ 			source: {
+ 				author: structural.sourceRowAuthor,
+ 				authorSequence: 1,
+-				intents: [
+-					{
+-						logicalTime: 3,
+-						operation: { action: "causalJoin" },
+-						operationCount: 1,
+-						operationIndex: 0,
+-					},
+-				],
++				intents: [],
+ 				vertexDigest: structural.sourceDigest,
+ 			},
+ 		});
+-		expect(structural.completion).toBeUndefined();
++		expect(structural.completion).toEqual({ kind: "published", ok: true });
+ 	});
+ 
+ 	it("fails closed before exposing an 8,193rd authenticated displaced source row", async () => {
+commit a19e84549e5d0a946ebf084bcbcecf72b4cc2df4
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 07:18:19 2026 -0400
+
+    test(hardening): pin legacy settlement compatibility red
+
+diff --git a/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts b/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts
+index 67a3e4d5..3cecfcaf 100644
+--- a/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts
++++ b/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts
+@@ -1,4 +1,4 @@
+-import { afterEach, describe, expect, it, type Mock } from "vitest";
++import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
+ 
+ import { runFrontierScenario } from "./fixtures/phase-3f-b/frontier-reduction-fixture.js";
+ import {
+@@ -51,20 +51,19 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
+ 		expect(opened.sink).not.toHaveBeenCalled();
+ 	});
+ 
+-	it("[RED] preserves legacy join as an application-visible displaced operation", async () => {
++	it("[RED] preserves legacy join structural retirement without exposing an application intent", async () => {
+ 		const result = await runSharedPlaneScenario({ sourceOperationProfile: "join" });
+-		expect(result.rebaseOutbox).toMatchObject({
++		expect(result.rebaseOutbox).toEqual({
+ 			kind: "displaced",
+ 			ok: true,
+ 			source: {
++				author: result.sourceRowAuthor,
+ 				authorSequence: 1,
+-				intents: [
+-					expect.objectContaining({
+-						operation: { action: "join", clientId: "phase-3g-displaced-client" },
+-					}),
+-				],
++				intents: [],
++				vertexDigest: result.sourceDigest,
+ 			},
+ 		});
++		expect(result.completion).toEqual({ kind: "published", ok: true });
+ 	});
+ 
+ 	it("[control] keeps settlement join control-only", async () => {
+@@ -131,6 +130,32 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
+ 		expect(result.beginAfterUnknown).toMatchObject({ kind: "already-terminal", ok: false });
+ 	});
+ 
++	it("[RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit", async () => {
++		const opened = await openSettlementNode("creator-trusted-v1");
++		activeNodes.push(opened);
++		const transactIssue = vi.mocked(opened.issuanceStore.transactIssue);
++		const durableTransactIssue = transactIssue.getMockImplementation();
++		if (durableTransactIssue === undefined) throw new TypeError("legacy issuance fixture is unavailable");
++		transactIssue.mockImplementationOnce(async (scope, buildAndSign) => {
++			await durableTransactIssue(scope, buildAndSign);
++			throw Object.assign(new Error("controlled ordinary transaction outcome"), {
++				code: "ISSUANCE_OUTCOME_UNKNOWN",
++			});
++		});
++		const issue = (): ReturnType<typeof opened.plane.issueLocal> =>
++			opened.plane.issueLocal({
++				operations: Object.freeze([
++					Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "add", value: 1 }) }),
++				]),
++				signRegisteredVertexDigest: opened.fixture.signRegisteredVertexDigest,
++			});
++		expect(await issue()).toMatchObject({ kind: "admission-rejected", ok: false });
++		const callsAfterUnknown = transactIssue.mock.calls.length;
++		expect(await issue()).toMatchObject({ kind: "admission-rejected", ok: false });
++		expect(transactIssue).toHaveBeenCalledTimes(callsAfterUnknown);
++		expect(opened.sink).not.toHaveBeenCalled();
++	});
++
+ 	it.each([
+ 		[
+ 			"non-array entries",
+== focused27.json
+total 27 passed 27 failed 0 files 4 failedSuites 0
+== focused40.json
+total 40 passed 40 failed 0 files 4 failedSuites 0
+== retained87.json
+total 87 passed 87 failed 0 files 12 failedSuites 0
+== legacy26.json
+total 26 passed 26 failed 0 files 8 failedSuites 0
+== shared64.json
+total 64 passed 64 failed 0 files 22 failedSuites 0
+== phase3g.json
+total 14 passed 14 failed 0 files 2 failedSuites 0
+== isolated-focused27.json
+total 27 passed 27 failed 0 files 4 failedSuites 0
+== isolated-focused40.json
+total 40 passed 40 failed 0 files 4 failedSuites 0
+total 27 passed 24 failed 3
+phase-3g-v3-rebase-outbox-red.test.ts [
+  'retires an authenticated stored structural source row without exposing an application policy intent'
+]
+phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts [
+  '[RED] preserves legacy join structural retirement without exposing an application intent',
+  '[RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit'
+]
+--- retires an authenticated stored structural source row without exposing an application policy intent
+AssertionError: expected { kind: 'displaced', ok: true, …(1) } to deeply equal { kind: 'displaced', ok: true, …(1) }
+    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-rebase-outbox-red.test.ts:72:35
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20
+--- [RED] preserves legacy join structural retirement without exposing an application intent
+AssertionError: expected { kind: 'displaced', ok: true, …(1) } to deeply equal { kind: 'displaced', ok: true, …(1) }
+    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts:56:31
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20
+--- [RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit
+AssertionError: expected { …(3) } to match object { kind: 'admission-rejected', …(1) }
+(1 matching property omitted from actual)
+    at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)
+    at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)
+    at Proxy.methodWrapper (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.j
+17 1 0
+17 1 0
+manifest-check-done
+173:   that throw byte-for-byte.
+418:  freeze is deliberately reopened for the settlement profile only): f5b0b;
+420:  `:5436-5438`): f5b0b;
+424:- `completeRebaseSource` is a second completion owner: f5b0b/f5b0c;
+426:  `applicationVertices/...` (`v3-live.ts:7432-7434`): rename in f5b0b;
+434:## TDD implementation slices
+450:3. **f5b0b — Node.** Dedicated fence issuer over `transactIssue` +
+548:migration or late opt-in; `creator-trusted-v1` behavior byte-for-byte
+17:	copySettlementPlan,
+59:import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
+1469:		(trust.profileId !== "creator-trusted-v1" && settlementProfileFor(String(trust.profileId)) === "none") ||
+3502:function isControlOperation(value: unknown, profileId: string): boolean {
+3503:	if (settlementProfileFor(profileId) !== "v1") return false;
+3906:	if (authorFence && settlementProfileFor(registration.payload.trust.trust.profileId) !== "v1") {
+3910:	const controlOperation = isControlOperation(
+4719:		if (settlementProfileFor(payload.trust.trust.profileId) === "v1") {
+4735:	if (settlementProfileFor(payload.trust.trust.profileId) === "v1" && settlementFrontier !== undefined) {
+5540:					(!isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId) &&
+5585:				if (authorFence && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+5588:				const controlOperation = isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId);
+5619:				if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
+5713:					settlementProfileFor(payload.trust.trust.profileId) === "v1" &&
+5714:					(isControlOperation(displacedOperation, payload.trust.trust.profileId) || displacedAction === "acl");
+5738:			if (authorFence && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+5741:			const controlOperation = isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId);
+5836:				if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
+6097:function isReservedBatchAction(action: string): boolean {
+6105:		!isReservedBatchAction(action) &&
+6246:		const settlementProfile = settlementProfileFor(payload.trust.trust.profileId);
+6264:	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+6301:	const controlOperation = isControlOperation(operation, registration.payload.trust.trust.profileId);
+6438:		if (issuanceOutcomeUnknown && settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
+6588:	if (settlementProfileFor(registration.payload.trust.trust.profileId) !== "v1") {
+6597:		plan = copySettlementPlan(
+6647:		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+6769:		settlementProfileFor(registration.payload.trust.trust.profileId) === "v1" &&
+6770:		(isControlOperation(operation, registration.payload.trust.trust.profileId) ||
+6799:		isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
+6801:			isReservedBatchAction(action) &&
+6802:			settlementProfileFor(payload.trust.trust.profileId) !== "v1")
+7135:	if (settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
+8092:							settlementProfileFor(registration.payload.trust.trust.profileId) === "v1"
+function isV3ApplicationAuthorAuthorized(authorization: V3LiveAuthorization, author: string): boolean {
+	if (authorization.kind === "author-list") {
+		return resolveCurrentEpochAuthorizedAuthor({ authorization: authorization.value, author }).ok;
+	}
+	const authority = authorizeLatchedApplicationWrite({ author, snapshot: authorization.value });
+	return authority.ok && authority.authorized;
+}
+
+function isAuthorFenceOperation(value: unknown): boolean {
+	return isObject(value) && Reflect.get(value, "action") === AUTHOR_FENCE_ACTION;
+}
+
+function isControlOperation(value: unknown, profileId: string): boolean {
+	if (settlementProfileFor(profileId) !== "v1") return false;
+	if (!isObject(value)) return false;
+	const action = Reflect.get(value, "action");
+	return action === AUTHOR_FENCE_ACTION || action === "causalJoin" || action === "join";
+}
+
+function aclOperation(author: string, digest: string, value: unknown): StagedLatchedAclOperation | null | undefined {
+	if (!isObject(value)) return null;
+	const action = ObjectGetOwnPropertyDescriptor(value, "action");
+	if (action === undefined || !("value" in action) || action.value !== "acl") return null;
+	const record = snapshotClosedRecord(value, ["action", "group", "kind", "target"]);
+	if (
+		record === undefined ||
+		(record.kind !== "grant" && record.kind !== "revoke") ||
+		(record.group !== "admin" &&
+			record.group !== "finality" &&
+			record.group !== "referee" &&
+			record.group !== "writer") ||
+		typeof record.target !== "string" ||
+		!/^[0-9a-f]{64}$/u.test(record.target)
+	) {
+		return undefined;
+	}
+	return ObjectFreeze({
+		actor: author,
+		digest,
+		operation: ObjectFreeze({
+			actor: author,
+			group: record.group,
+			kind: record.kind,
+			target: record.target,
+		}),
+	});
+}
+
+function orderedLatchedOperations(
+	operations: Map<string, StagedLatchedAclOperation>,
+	candidate?: StagedLatchedAclOperation
+): readonly StagedLatchedAclOperation[] {
+	const selected = [...operations.values()];
+	if (candidate !== undefined) selected.push(candidate);
+	return ObjectFreeze(
+		selected.sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
+	);
+}
+
+function validateLatchedOperation(
+	authorization: V3LiveAuthorization,
+	operations: Map<string, StagedLatchedAclOperation>,
+	candidate: StagedLatchedAclOperation | null | undefined
+): boolean {
+	if (candidate === null) return true;
+	if (candidate === undefined || authorization.kind !== "latched-acl" || operations.has(candidate.digest)) return false;
+	return stageLatchedAclOperations({
+		operations: orderedLatchedOperations(operations, candidate).map(({ operation }) => operation),
+		snapshot: authorization.value,
+	}).ok;
+}
+		if (!isObject(cloned) || ArrayIsArray(cloned) || ObjectGetPrototypeOf(cloned) !== null) return undefined;
+		return ObjectFreeze({ ...(cloned as Record<string, unknown>) });
+	} catch {
+		return undefined;
+	}
+}
+
+function isReservedBatchAction(action: string): boolean {
+	return RESERVED_BATCH_ACTIONS.some((reserved) => reserved === action);
+}
+
+function isKnownBatchChild(payload: PreparedV3LivePayload, operation: Readonly<Record<string, unknown>>): boolean {
+	const action = Reflect.get(operation, "action");
+	return (
+		typeof action === "string" &&
+		!isReservedBatchAction(action) &&
+		typeof Reflect.get(payload.runtime.reducers, action) === "function"
+	);
+}
+
+function applicationBatchEntries(
+	payload: PreparedV3LivePayload,
+	operation: unknown
+):
+	| readonly Readonly<{ readonly logicalTime: number; readonly operation: Readonly<Record<string, unknown>> }>[]
+	| undefined {
+	if (!isObject(operation) || ArrayIsArray(operation)) return undefined;
+	if (typeof Reflect.get(payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") return undefined;
+	if (Reflect.get(operation, "action") !== APPLICATION_BATCH_ACTION) return undefined;
+	const outer = canonicalRecord(operation, APPLICATION_BATCH_KEYS);
+	if (outer === undefined) return undefined;
+	const batch = canonicalRecord(outer.batch, APPLICATION_BATCH_PAYLOAD_KEYS);
+	if (batch === undefined || batch.version !== 1) return undefined;
+	const entries = denseArray(batch.entries);
+	if (entries === undefined || entries.length < 2 || entries.length > APPLICATION_BATCH_MAX_ENTRIES) return undefined;
+	const output: Readonly<{ readonly logicalTime: number; readonly operation: Readonly<Record<string, unknown>> }>[] =
+		[];
+	let priorLogicalTime = -1;
+	for (const value of entries) {
+		const entry = canonicalRecord(value, CANONICAL_APPLICATION_BATCH_ENTRY_KEYS);
+		if (
+1. **f5b0a — protocol codecs.** Fence codec and global reservation; settlement
+   checkpoint codec with the triple frontier, derivation/binding rules,
+   signer-agnostic prepare/open, shape-only predecessor validation, per-author accessor, 256-line frontier under the 32,768-byte ceiling and
+   the version-3 ACL constants; `settlementProfileFor` predicate and its
+   seven consumers; equivocation canonicaliser same-anchor rule
+   (`packages/protocol-v3/src/index.ts:3648-3665`).
+2. **f5b0s — settlement plan store.** The contract above; memory, browser and
+   node implementations; conformance vectors for CAS, atomic `planEffect`,
+   ambiguous outcome readback, corruption refusal and the prune gate.
+   Independent of f5b0a; may run in parallel.
+3. **f5b0b — Node.** Dedicated fence issuer over `transactIssue` +
+   `planEffect`; refusal without a complete plan; anchor-agnostic own-row
+   classification for any older epoch and for old incarnations;
+   `readSettlementSources` returning every own row above `terminalThrough`
+   regardless of `publishState`; `completeRebaseSource` unreachable under the
+   profile; close-graph split with the rename; retained compaction invariant
+   that no control operation reaches authorization, reservation, apply, ACL
+   staging, projection or application accounting.
+4. **f5b0c — room.** Plan building and merge, fence-then-replacements order,
+   deletion of `already-present`, `hasDisplacedOperation` and the
+   published-must-be-present throw, ACL-row surfacing, manual-review hold,
+   migration-import refusal. Public `issue()` unchanged.
+5. **f5b0d — reclamation.** `pruneAuthenticatedSettledPrefix` with the plan
+   gate, its production invocation, the recovery-scan cap correction, and
+   journal/snapshot/seal/AHE scope retirement hooks handed to D.110c-c.
+6. **f5b — creator settlement and recovery integration.** The scan above under
+   the profile, no v1 aggregate/legacy retirement, terminal recovery, and the
+   causal RED below through at least three closes with restart and cold reopen
+   for the creator and one non-creator writer.
+
+Dependency order: 1 and 2 in parallel; 3 needs both; 4 needs 3; 5 needs 1-2;
+		...(terminalDisposition === undefined ? {} : { terminalDisposition }),
+	});
+}
+
+async function issueAuthorFence(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput
+): Promise<V3LocalIssueResult> {
+	if (settlementProfileFor(registration.payload.trust.trust.profileId) !== "v1") {
+		return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+	}
+	const first = input.operations[0];
+	if (input.operations.length !== 1 || first === undefined || !isAuthorFenceOperation(first.operation)) {
+		return localIssueFailure("malformed-input", "v3 author fence input is invalid");
+	}
+	let plan;
+	try {
+		plan = copySettlementPlan(
+			await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
+			registration.issuanceScope
+		);
+	} catch {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("issuance-rejected", "v3 author fence plan read failed");
+	}
+	if (
+		plan === undefined ||
+		plan.fenceSequence !== null ||
+		plan.entries.some((entry) => entry.disposition === "manual-review")
+	) {
+		return localIssueFailure("issuance-rejected", "v3 author fence requires a complete durable plan");
+	}
+	// issueOneVertex owns the transactIssue call; this dedicated path supplies the atomic fence planEffect.
+	const tips = registration.index.tips();
+	if (tips.length === 0 || tips.length > registration.payload.parameters.maxDependencies) {
+		return localIssueFailure("graph-rejected", "v3 author fence frontier is invalid");
+	}
+	const issued = await issueOneVertex(
+		registration,
+		input,
+		tips,
+		first.logicalTime,
+		first.operation,
+		false,
+		ObjectFreeze({ kind: "fence" as const })
+	);
+	if (issued.ok) await drainPendingIngress(registration);
+	return issued;
+}
+
+async function issueLocal(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput
+): Promise<V3LocalIssueResult> {
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
+		registration.terminalState !== "active" ||
+		registration.retainedBootstrapHold
+	) {
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	}
+	const first = input.operations[0];
+	if (first === undefined) return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
+	if (isAuthorFenceOperation(first.operation)) return issueAuthorFence(registration, input);
+	if (
+		input.planEffect !== undefined &&
+		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+	) {
+		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+	}
+	let applicationOperation = first.operation;
+	if (input.operations.length > 1) {
+		if (typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") {
+			return localIssueFailure("malformed-input", "v3 local issue application batch reducer is unavailable");
+		}
+		const maximumPrefix = Math.min(input.operations.length, APPLICATION_BATCH_MAX_ENTRIES);
+		let prefixLength = maximumPrefix;
+		for (; prefixLength > 0; prefixLength -= 1) {
+			const candidate = applicationBatchOperation(input.operations.slice(0, prefixLength));
+			if (prefixLength === 1 || applicationBatchFits(candidate)) break;
+		}
+		if (prefixLength < input.operations.length) {
+			return prefixLength > 0
+				? localIssueSplit(prefixLength)
+				: localIssueFailure("malformed-input", "v3 local issue operation exceeds the application batch budget");
+		}
+		applicationOperation = applicationBatchOperation(input.operations);
+		if (!applicationBatchFits(applicationOperation)) {
+			return localIssueFailure("malformed-input", "v3 local issue application batch is invalid");
+		}
+	}
+	const initialTips = registration.index.tips();
+	const maxDependencies = registration.payload.parameters.maxDependencies;
+	if (initialTips.length === 0) return localIssueFailure("graph-rejected", "v3 local issue frontier is empty");
+	if (maxDependencies < 2 && initialTips.length > maxDependencies) {
+		return localIssueFailure("graph-rejected", "v3 local issue dependency bound cannot reduce the frontier");
+	}
+	const requiredJoins =
+		initialTips.length <= maxDependencies
+			? 0
+					continue;
+				const displacedPayload = registration.displacedSource?.prepared ?? registration.payload;
+				const intents = rebaseIntents(historical ? registration.payload : displacedPayload, classified.authenticated);
+				if (intents === undefined) {
+					return ObjectFreeze({
+						detail: "v3 rebase outbox intent is invalid",
+						kind: "record-rejected" as const,
+						ok: false as const,
+					});
+				}
+				if (
+					!historical &&
+					((crossSource !== undefined && classified.row.authorSequence === 0) ||
+						classified.authenticated.digest === registration.displacedSource?.activationVertexDigest)
+				) {
+					continue;
+				}
+				displacedRecordCount += 1;
+				const displacedLimit = historical
+					? registration.payload.parameters.maxEpochVertices
+					: displacedPayload.parameters.maxEpochVertices;
+				if (displacedRecordCount > displacedLimit) {
+					return ObjectFreeze({
+						detail: "v3 rebase displaced plane is at capacity",
+						kind: "record-rejected" as const,
+						ok: false as const,
+					});
+				}
+				displaced.push(classified);
+			}
+		}
+		registration.rebaseSnapshot = ObjectFreeze(displaced);
+	}
+	const snapshot = registration.rebaseSnapshot;
+	const selected = snapshot.find(
+		({ row }) => registration.rebaseCursor === undefined || row.authorSequence > registration.rebaseCursor
+	);
+	if (selected === undefined) return ObjectFreeze({ kind: "empty" as const, ok: true as const });
+	registration.rebaseCursor = selected.row.authorSequence;
+	const source = registration.displacedSource;
+	const historical = selected.kind === "covered-historical" || selected.kind === "pinned-genesis";
+	const intents = rebaseIntents(
+		historical ? registration.payload : (source?.prepared ?? registration.payload),
+		selected.authenticated
+	);
+	if (intents === undefined) {
+		return ObjectFreeze({
+			detail: "v3 rebase outbox intent is invalid",
+			kind: "record-rejected" as const,
+			ok: false as const,
+		});
+G
+
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index cbd8c9cc..df25dcd5 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -6435,7 +6435,7 @@ async function issueOneVertex(
+ 				"outcome-unknown"
+ 			);
+ 		}
+-		if (issuanceOutcomeUnknown) {
++		if (issuanceOutcomeUnknown && settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
+ 			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
+ 		}
+ 		return capacityRejected
+@@ -6799,9 +6799,7 @@ function rebaseIntents(
+ 		isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
+ 		(typeof action === "string" &&
+ 			isReservedBatchAction(action) &&
+-			settlementProfileFor(payload.trust.trust.profileId) !== "v1" &&
+-			action !== "causalJoin" &&
+-			action !== "join")
++			settlementProfileFor(payload.trust.trust.profileId) !== "v1")
+ 	) {
+ 		return ObjectFreeze([]);
+ 	}
+===
+f1fe7cb5fed31ebcd1b48e34eaae0c2b5518d2deeafd8c1914967312d25171c8  .logs/d110c-0c1f5b0b-green-802a647e/node-typecheck.normalized
+f1fe7cb5fed31ebcd1b48e34eaae0c2b5518d2deeafd8c1914967312d25171c8  .logs/d110c-0c1f5b0b-green-802a647e/parent-node-typecheck.normalized
+IDENTICAL
+22:this document freezes the exact construction, matrix, slices and stop rules.
+28:"Acceptance and stop rules"); it authorizes no production edit, campaign, long
+166:   (`s === null` or `m > s`); set `s := m − 1` (`m = 0` means the base is before slot 0; by contiguity
+202:   - `row.epoch < current` and `seq > s`: not admitted (contiguity), displaced;
+536:## Acceptance and stop rules
+555:the author's own abandonment, that anchor fencing is not the admission check
+556:for old incarnations, or that contiguity does not hold on a path this document
+## Acceptance and stop rules
+
+The three-model (Grok 4.6/high, Kimi K3, Opus xhigh) design-review gate that
+governed f5b0, f5b0p and f5b0q is waived for this design by explicit user
+decision on 2026-09-03. The recorded `pre-review.md` pass, with its seven items
+folded in, is the accepted design review. The f5b0a and f5b0s tests-only REDs
+are authorized from this checkpoint; every later slice is authorized by its
+predecessor's GREEN. No production edit runs before its slice's RED. P2
+findings surfaced during RED/GREEN receive an owner/disposition without
+prose-only recursion. No new cryptography; no protobuf/wire-envelope
+change (the fence is an operation inside the existing envelope; the plan is
+device-local); genesis-bound `creator-trusted-settlement-v1` with no v1
+migration or late opt-in; `creator-trusted-v1` behavior byte-for-byte
+unchanged. "Creator-trusted" constrains who may close; it does not license
+the settlement codec or verifier to compare closing-authority keys across
+epochs.
+
+If RED, GREEN or a later review shows that a durable device-local plan is
+insufficient authority for
+the author's own abandonment, that anchor fencing is not the admission check
+for old incarnations, or that contiguity does not hold on a path this document
+missed, stop and reslice rather than reintroducing the per-source grammar, the
+global floor or the retired-key dictionary. The named fallback for the
+incarnation carrier alone is `admissionEpoch` in a later latched-ACL member-record
+version (version 4 in D.110c-0c1k stage W2; version 3 is the constants-only
+bump of W1); it is not selected here because ingress is already anchor-fenced.
+
+The complete GREEN must demonstrate genuine plans, fences and replacements
+through ordinary publication, close/adopt, restart and cold reopen; exact
+state, ACL, authority, anchor, history, archive and operation accounting; no
+same-anchor double close; unchanged `creator-trusted-v1` behavior; fail-closed
+old/mixed peers; authenticated same-key re-entry on the same and a fresh
+device; retained f2/f4/f5a and D.108-D.110 lifecycle behavior; bounded active
+checkpoint/runtime census; and fresh-process repeated same-room memory in the
+later ≥100-transition gate. Tests-only injected plans, fences or synthetic
+packages/node/src/v3-live.ts
+===
+e7d49436e311ad5223f85910fb4d79fbd37b265c533d800f174a1d688da81625  tests/phase-3g-v3-rebase-outbox-red.test.ts
+c6a75c8def11892544a32e146f7c4fa6173fb8b26618745aa1d7e90f4071047a  tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts
+bf4a2bd1bac819925cdb99db03b2e8d1964db916f7a740db361768be04a52ed5  focused-red.json
+===
+bf4a2bd1bac819925cdb99db03b2e8d1964db916f7a740db361768be04a52ed5
+e7d49436e311ad5223f85910fb4d79fbd37b265c533d800f174a1d688da81625  -
+c6a75c8def11892544a32e146f7c4fa6173fb8b26618745aa1d7e90f4071047a  -
+c924d7c4a7257ce8a873b5a61569e7880b5500b71ee2d2473f7e17ee77332773  .logs/d110c-0c1f5b0b-green-802a647e/production.diff
+packages/node/src/v3-live.ts:235:	"causalJoin",
+packages/node/src/v3-live.ts:236:	"join",
+packages/node/src/v3-live.ts:3506:	return action === AUTHOR_FENCE_ACTION || action === "causalJoin" || action === "join";
+packages/node/src/v3-live.ts:4799:				action !== "join" &&
+packages/node/src/v3-live.ts:4800:				action !== "causalJoin" &&
+packages/node/src/v3-live.ts:6253:			action === "causalJoin" ||
+packages/node/src/v3-live.ts:6254:			(values.length > 1 && (action === "acl" || action === "join"))
+packages/node/src/v3-live.ts:6708:			ObjectFreeze({ action: "causalJoin" })
+===
+231:const RESERVED_BATCH_ACTIONS = ObjectFreeze([
+6098:	return RESERVED_BATCH_ACTIONS.some((reserved) => reserved === action);
+			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+		}
+		const action = Reflect.get(operation, "action");
+		if (typeof action !== "string") {
+			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+		}
+		const settlementProfile = settlementProfileFor(payload.trust.trust.profileId);
+		const authorFence = action === AUTHOR_FENCE_ACTION;
+		if (authorFence && (settlementProfile !== "v1" || values.length !== 1 || planEffect !== undefined)) {
+			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+		}
+		if (
+			action === APPLICATION_BATCH_ACTION ||
+			action === "causalJoin" ||
+			(values.length > 1 && (action === "acl" || action === "join"))
+		) {
+			return localIssueFailure("authorization-rejected", "v3 local issue operation is reserved to the node");
+		}
+		if (!authorFence && typeof Reflect.get(payload.runtime.reducers, action) !== "function") {
+			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+		}
+		priorLogicalTime = entry.logicalTime as number;
+		operations.push(ObjectFreeze({ logicalTime: priorLogicalTime, operation }));
+	}
+	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
+	}
+	return ObjectFreeze({
+		operations: ObjectFreeze(operations),
+		...(planEffect === undefined ? {} : { planEffect }),
+		signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
+	});
+}
+
+async function issueOneVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	dependencies: readonly string[],
+	logicalTime: number,
+	operation: Readonly<Record<string, unknown>>,
+	requireTerminalAuthorization = false,
+	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>
+): Promise<InternalLocalIssueResult> {
+	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+	if (registration.operationAdmissionHalted) {
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	}
+	if (registration.index.size >= registration.payload.parameters.maxEpochVertices) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	if (dependencies.length === 0 || dependencies.length > registration.payload.parameters.maxDependencies) {
+		return localIssueFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
+	const scope = copiedScope(registration.issuanceScope);
+	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
+		return localIssueFailure("authorization-rejected", "v3 local issue scope is invalid");
+	}
+	const authorized = resolveV3AuthorizedAuthor(registration.authorization, scope.author);
+	if (authorized === undefined) {
+		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
+	}
+	const controlOperation = isControlOperation(operation, registration.payload.trust.trust.profileId);
+	const proposedAcl = controlOperation ? null : aclOperation(scope.author, "0".repeat(64), operation);
+	if (
+		!controlOperation &&
+		!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)
+	) {
+		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
+	const reservation = controlOperation ? undefined : reserveOperation(registration.operationAdmissionPolicy, operation);
+	if (reservation === null) {

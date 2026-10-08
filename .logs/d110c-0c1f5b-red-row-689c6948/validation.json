@@ -1,0 +1,29 @@
+{
+  "tests": "689c69487d28cfdeae62a32ae4b56db36b037c60",
+  "signature": "G",
+  "pushed": true,
+  "classification": "ACCEPTED_CAUSAL_DURABLE_ROW_RED",
+  "executionCount": 1,
+  "exactInheritedMatrix": true,
+  "sourceBoundaryOnly": true,
+  "productionPreserved": true,
+  "isolatedSourceAndRuntimePreserved": true,
+  "stashCount": 27,
+  "immutable": [
+    {
+      "name": "d110c-0c1f5b-green-f031b166",
+      "manifestSha256": "f8104d640f96c23fb6d8c0d3b42aa414bd62bd13b35bd6244bee9d75945b83c2",
+      "entries": 10
+    },
+    {
+      "name": "d110c-0c1f5b-red-workload-d1eee8ed",
+      "manifestSha256": "9da17cf12ba0a281896bce99570130cce5aacae69bec33a83bf837c64728b889",
+      "entries": 18
+    },
+    {
+      "name": "d110c-0c1f5b0r-design-3a156aca",
+      "manifestSha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0",
+      "entries": 3
+    }
+  ]
+}

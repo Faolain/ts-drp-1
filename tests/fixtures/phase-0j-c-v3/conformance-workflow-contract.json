@@ -1,0 +1,14 @@
+{
+	"schemaVersion": 1,
+	"workflowPath": ".github/workflows/protocol-v3-blueprint-conformance.yml",
+	"releaseWorkflowPath": ".github/workflows/release.yml",
+	"npmPublishWorkflowPath": ".github/workflows/npm-publish.yml",
+	"focusedTestPath": "tests/protocol-v3-blueprint-conformance-0j-c.test.ts",
+	"prJobId": "phase-0j-c-pr",
+	"nightlyJobId": "phase-0j-c-nightly",
+	"releaseGateJobId": "phase-0j-c-release-conformance",
+	"npmPublishJobId": "npm_publish",
+	"releaseTier": "nightly",
+	"requiredBrowsers": ["chromium", "firefox", "webkit"],
+	"requiredSetupActions": ["actions/checkout@v4", "pnpm/action-setup@v4", "actions/setup-node@v4"]
+}

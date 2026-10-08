@@ -1,0 +1,543 @@
+node:internal/modules/run_main:122
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /kind: "v3-live-generation-1"/u. Input:
+
+'import type { ResolvedBlueprintBytes, TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";\n' +
+  'import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";\n' +
+  'import type { CloseSetHistoryCommitment } from "@ts-drp/compaction";\n' +
+  'import { verifySnapshotStreamWithReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";\n' +
+  'import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";\n' +
+  'import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";\n' +
+  'import type { DurableLiveJournalStore } from "@ts-drp/live-journal";\n' +
+  'import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";\n' +
+  'import { openCreatorCheckpointTrust } from "@ts-drp/protocol-v3/creator-checkpoint";\n' +
+  'import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";\n' +
+  'import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";\n' +
+  'import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";\n' +
+  'import {\n' +
+  '\ttype AheDurableStore,\n' +
+  '\tdigestBlob,\n' +
+  '\tdigestClosure,\n' +
+  '\ttype GenerationId,\n' +
+  '\ttype GenerationPageCursor,\n' +
+  '\ttype GenerationRecord,\n' +
+  '\ttype GenerationRef,\n' +
+  '\tparseGenerationId,\n' +
+  '\tparseStorageObjectId,\n' +
+  '\ttype PresentHead,\n' +
+  '\ttype StorageObjectId,\n' +
+  '} from "@ts-drp/storage";\n' +
+  'import type {\n' +
+  '\tSnapshotQuarantineDeclaration,\n' +
+  '\tSnapshotQuarantineStore,\n' +
+  '\tSnapshotVerificationReceipt,\n' +
+  '} from "@ts-drp/storage/snapshot-transfer";\n' +
+  '\n' +
+  'import type { CreatorLiveCloseResult } from "./creator-close.js";\n' +
+  'import {\n' +
+  '\tcreateCreatorAdoptionIntent,\n' +
+  '\ttype CreatorAdoptionIntent,\n' +
+  '\tresolveCreatorAdoptionFacts,\n' +
+  '} from "./internal/creator-adoption-intent.js";\n' +
+  'import {\n' +
+  '\ttype CreatorAdoptionPendingRecoveryInput,\n' +
+  '\ttype CreatorAdoptionPendingRecoveryResult,\n' +
+  '\ttype CreatorAdoptionRoomHead,\n' +
+  '\tinstallCreatorAdoptionPendingRecovery,\n' +
+  '} from "./internal/creator-adoption-recover.js";\n' +
+  'import {\n' +
+  '\ttype CreatorSuccessorLiveMaterial,\n' +
+  '\ttype CreatorSuccessorLiveSeed,\n' +
+  '\ttype CreatorSuccessorReopenInput,\n' +
+  '\ttype CreatorSuccessorReopenResult,\n' +
+  '\tinstallCreatorSuccessorReopen,\n' +
+  '} from "./internal/creator-successor-live.js";\n' +
+  'import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";\n' +
+  '\n' +
+  'const PROFILE = Object.freeze({\n' +
+  '\tmaxManifestBytes: 212_387,\n' +
+  '\tmaxSnapshotBytes: 268_435_456,\n' +
+  '\tsnapshotChunkBytes: 131_072,\n' +
+  '});\n' +
+  'const ED25519_PUBLIC_KEY_HEX = /^[0-9a-f]{64}$/u;\n' +
+  '\n' +
+  'type FailureKind =\n' +
+  '\t| "malformed-input"\n' +
+  '\t| "sealed-live-unavailable"\n' +
+  '\t| "recovery-failed"\n' +
+  '\t| "chain-invalid"\n' +
+  '\t| "journal-invalid"\n' +
+  '\t| "snapshot-invalid"\n' +
+  '\t| "blueprint-invalid"\n' +
+  '\t| "internal-invariant";\n' +
+  '\n' +
+  'type AdoptionFailure = Readonly<{ readonly detail: string; readonly kind: FailureKind; readonly ok: false }>;\n' +
+  'type AdoptionSuccess = Readonly<{\n' +
+  '\treadonly descriptor: Readonly<Record<string, unknown>>;\n' +
+  '\treadonly intent: CreatorAdoptionIntent;\n' +
+  '\treadonly ok: true;\n' +
+  '}>;\n' +
+  '\n' +
+  'interface SealedAdoptionFacts {\n' +
+  '\treadonly closeResult: CreatorLiveCloseResult;\n' +
+  '\treadonly currentHead: PresentHead;\n' +
+  '\treadonly currentReferences: readonly GenerationRef[];\n' +
+  '\treadonly currentTrust: CurrentAnchorTrust;\n' +
+  '\treadonly durableReplay: Readonly<{ verify(): Promise<boolean> }>;\n' +
+  '\treadonly exactCanonicalLatchedAclBytes: Uint8Array;\n' +
+  '\treadonly exactCanonicalParametersCarrierBytes: Uint8Array;\n' +
+  '\treadonly history: CloseSetHistoryCommitment;\n' +
+  '\treadonly issuanceScope: DurableIssueScope;\n' +
+  '\treadonly issuanceStore: DurableIssuanceStore;\n' +
+  '\treadonly liveJournalStore: DurableLiveJournalStore;\n' +
+  '\treadonly objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0];\n' +
+  '\treadonly proposedHead: PresentHead;\n' +
+  '\treadonly proposedReferences: readonly GenerationRef[];\n' +
+  '\treadonly snapshotDeclaration: SnapshotQuarantineDeclaration;\n' +
+  '\treadonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;\n' +
+  '\treadonly sourceRuntimeHandle: WeakRef<object>;\n' +
+  '\treadonly store: AheDurableStore;\n' +
+  '\tterminalizeSource(): boolean;\n' +
+  '}\n' +
+  '\n' +
+  'interface RecoveredClosure {\n' +
+  '\treadonly currentCandidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];\n' +
+  '\treadonly proposedCandidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];\n' +
+  '}\n' +
+  '\n' +
+  'interface VerifiedChain {\n' +
+  '\treadonly currentCatalog: Readonly<{\n' +
+  '\t\treadonly artifactDigest: string;\n' +
+  '\t\treadonly artifactId: string;\n' +
+  '\t\treadonly blueprintDigest: string;\n' +
+  '\t\treadonly catalogDigest: string;\n' +
+  '\t\treadonly runtimeProfile: string;\n' +
+  '\t}>;\n' +
+  '\treadonly currentAnchor: Readonly<Record<string, unknown>>;\n' +
+  '\treadonly currentEpoch: number;\n' +
+  '\treadonly currentProjectionKind: "v3-live-generation-1" | "v3-live-generation-2";\n' +
+  '\treadonly currentTrustRecord: Readonly<Record<string, unknown>>;\n' +
+  '\treadonly cut: Readonly<Record<string, unknown>>;\n' +
+  '\treadonly successorAnchor: Readonly<Record<string, unknown>>;\n' +
+  '\treadonly successorAnchorBytes: Uint8Array;\n' +
+  '\treadonly successorEpoch: number;\n' +
+  '\treadonly successorTrust: CurrentAnchorTrust;\n' +
+  '\treadonly successorTrustRecord: Readonly<Record<string, unknown>>;\n' +
+  '}\n' +
+  '\n' +
+  'interface VerifiedSnapshot {\n' +
+  '\treadonly exactCanonicalPayloadBytes: Uint8Array;\n' +
+  '\treadonly manifest: Readonly<Record<string, unknown>>;\n' +
+  '\treadonly payload: Readonly<Record<string, unknown>>;\n' +
+  '}\n' +
+  '\n' +
+  'interface CapturedInput {\n' +
+  '\treadonly catalog: TrustedBlueprintCatalog;\n' +
+  '\treadonly handle: object;\n' +
+  '}\n' +
+  '\n' +
+  'function failure(kind: FailureKind, detail: string): AdoptionFailure {\n' +
+  '\treturn Object.freeze({ detail, kind, ok: false as const });\n' +
+  '}\n' +
+  '\n' +
+  'function record(value: unknown): value is Readonly<Record<string, unknown>> {\n' +
+  '\treturn value !== null && typeof value === "object" && !Array.isArray(value);\n' +
+  '}\n' +
+  '\n' +
+  'function captureInput(value: unknown): CapturedInput | undefined {\n' +
+  '\ttry {\n' +
+  '\t\tif (!record(value) || Object.keys(value).sort().join(",") !== "catalog,handle") return undefined;\n' +
+  '\t\tconst catalog = Object.getOwnPropertyDescriptor(value, "catalog");\n' +
+  '\t\tconst handle = Object.getOwnPropertyDescriptor(value, "handle");\n' +
+  '\t\tif (\n' +
+  '\t\t\tcatalog === undefined ||\n' +
+  '\t\t\t!("value" in catalog) ||\n' +
+  '\t\t\t!record(catalog.value) ||\n' +
+  '\t\t\thandle === undefined ||\n' +
+  '\t\t\t!("value" in handle) ||\n' +
+  '\t\t\t!record(handle.value)\n' +
+  '\t\t) {\n' +
+  '\t\t\treturn undefined;\n' +
+  '\t\t}\n' +
+  '\t\treturn Object.freeze({ catalog: catalog.value as unknown as TrustedBlueprintCatalog, handle: handle.value });\n' +
+  '\t} catch {\n' +
+  '\t\treturn undefined;\n' +
+  '\t}\n' +
+  '}\n' +
+  '\n' +
+  'function sameHead(left: PresentHead, right: PresentHead): boolean {\n' +
+  '\treturn (\n' +
+  '\t\tleft.closureDigest === right.closureDigest &&\n' +
+  '\t\tleft.generationId === right.generationId &&\n' +
+  '\t\tleft.objectId === right.objectId &&\n' +
+  '\t\tleft.revision === right.revision\n' +
+  '\t);\n' +
+  '}\n' +
+  '\n' +
+  'function sameRef(left: GenerationRef, right: GenerationRef): boolean {\n' +
+  '\treturn left.byteLength === right.byteLength && left.digest === right.digest;\n' +
+  '}\n' +
+  '\n' +
+  'function sameClosure(left: readonly GenerationRef[], right: readonly GenerationRef[]): boolean {\n' +
+  '\treturn left.length === right.length && left.every((ref, index) => sameRef(ref, right[index] as GenerationRef));\n' +
+  '}\n' +
+  '\n' +
+  'function hex(bytes: Uint8Array): string {\n' +
+  '\treturn Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");\n' +
+  '}\n' +
+  '\n' +
+  'function sameBytes(left: Uint8Array, right: Uint8Array): boolean {\n' +
+  '\treturn left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);\n' +
+  '}\n' +
+  '\n' +
+  'function currentProjectionKind(epoch: number): "v3-live-generation-1" | "v3-live-generation-2" {\n' +
+  '\treturn epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2";\n' +
+  '}\n' +
+  '\n' +
+  'function canonicalRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {\n' +
+  '\ttry {\n' +
+  '\t\tconst decoded = decodeCanonical(bytes);\n' +
+  '\t\treturn record(decoded) && sameBytes(encodeCanonical(decoded), bytes) ? decoded : undefined;\n' +
+  '\t} catch {\n' +
+  '\t\treturn undefined;\n' +
+  '\t}\n' +
+  '}\n' +
+  '\n' +
+  'function factsFor(handle: unknown): SealedAdoptionFacts | undefined {\n' +
+  '\treturn handle !== null && typeof handle === "object"\n' +
+  '\t\t? resolveCreatorAdoptionFacts<SealedAdoptionFacts>(handle)\n' +
+  '\t\t: undefined;\n' +
+  '}\n' +
+  '\n' +
+  'function validGenerationLineage(generations: readonly GenerationRecord[], facts: SealedAdoptionFacts): boolean {\n' +
+  '\tconst byId = new Map(generations.map((generation) => [generation.generationId, generation]));\n' +
+  '\tif (byId.size !== generations.length) return false;\n' +
+  '\tconst current = byId.get(facts.currentHead.generationId);\n' +
+  '\tconst proposed = byId.get(facts.proposedHead.generationId);\n' +
+  '\tif (\n' +
+  '\t\tcurrent === undefined ||\n' +
+  '\t\tproposed === undefined ||\n' +
+  '\t\tcurrent.state !== "Superseded" ||\n' +
+  '\t\tproposed.state !== "Adopted" ||\n' +
+  '\t\tproposed.baseExpectedHead.kind !== "present" ||\n' +
+  '\t\t!sameHead(proposed.baseExpectedHead, facts.currentHead) ||\n' +
+  '\t\t!sameClosure(current.closure, facts.currentReferences) ||\n' +
+  '\t\t!sameClosure(proposed.closure, facts.proposedReferences)\n' +
+  '\t) {\n' +
+  '\t\treturn false;\n' +
+  '\t}\n' +
+  '\tfor (const generation of generations) {\n' +
+  '\t\tif (new Set(generation.closure.map(({ digest }) => digest)).size !== generation.closure.length) return false;\n' +
+  '\t\tif (\n' +
+  '\t\t\tgeneration.baseExpectedHead.kind === "present" &&\n' +
+  '\t\t\t(generation.baseExpectedHead.generationId === generation.generationId ||\n' +
+  '\t\t\t\t!byId.has(generation.baseExpectedHead.generationId))\n' +
+  '\t\t) {\n' +
+  '\t\t\treturn false;\n' +
+  '\t\t}\n' +
+  '\t}\n' +
+  '\treturn facts.proposedHead.revision === facts.currentHead.revision + 1;\n' +
+  '}\n' +
+  '\n' +
+  'async function loadClosure(\n' +
+  '\tstore: AheDurableStore,\n' +
+  '\treferences: readonly GenerationRef[]\n' +
+  '): Promise<readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[] | undefined> {\n' +
+  '\tconst candidates: Array<Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>> = [];\n' +
+  '\tfor (const ref of references) {\n' +
+  '\t\tconst loaded = await store.getBlob(ref.digest);\n' +
+  '\t\tif (!loaded.ok || loaded.value === null) return undefined;\n' +
+  '\t\tcandidates.push(Object.freeze({ bytes: Uint8Array.from(loaded.value), ref: Object.freeze({ ...ref }) }));\n' +
+  '\t}\n' +
+  '\treturn Object.freeze(candidates);\n' +
+  '}\n' +
+  '\n' +
+  'async function readGenerationLineage(\n' +
+  '\tstore: AheDurableStore,\n' +
+  '\tobjectId: StorageObjectId\n' +
+  '): Promise<readonly GenerationRecord[] | undefined> {\n' +
+  '\tconst generations: GenerationRecord[] = [];\n' +
+  '\tconst seenCursors = new Set<GenerationPageCursor>();\n' +
+  '\tlet cursor: GenerationPageCursor | undefined;\n' +
+  '\tfor (;;) {\n' +
+  '\t\tconst page = await store.readGenerationPage({\n' +
+  '\t\t\t...(cursor === undefined ? {} : { cursor }),\n' +
+  '\t\t\tlimit: 128,\n' +
+  '\t\t\tobjectId,\n' +
+  '\t\t});\n' +
+  '\t\tif (!page.ok || (page.value.generations.length === 0 && page.valu'... 56101 more characters
+
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/[eval1]:36:8 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'import type { ResolvedBlueprintBytes, TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";\n' +
+    'import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";\n' +
+    'import type { CloseSetHistoryCommitment } from "@ts-drp/compaction";\n' +
+    'import { verifySnapshotStreamWithReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";\n' +
+    'import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";\n' +
+    'import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";\n' +
+    'import type { DurableLiveJournalStore } from "@ts-drp/live-journal";\n' +
+    'import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";\n' +
+    'import { openCreatorCheckpointTrust } from "@ts-drp/protocol-v3/creator-checkpoint";\n' +
+    'import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";\n' +
+    'import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";\n' +
+    'import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";\n' +
+    'import {\n' +
+    '\ttype AheDurableStore,\n' +
+    '\tdigestBlob,\n' +
+    '\tdigestClosure,\n' +
+    '\ttype GenerationId,\n' +
+    '\ttype GenerationPageCursor,\n' +
+    '\ttype GenerationRecord,\n' +
+    '\ttype GenerationRef,\n' +
+    '\tparseGenerationId,\n' +
+    '\tparseStorageObjectId,\n' +
+    '\ttype PresentHead,\n' +
+    '\ttype StorageObjectId,\n' +
+    '} from "@ts-drp/storage";\n' +
+    'import type {\n' +
+    '\tSnapshotQuarantineDeclaration,\n' +
+    '\tSnapshotQuarantineStore,\n' +
+    '\tSnapshotVerificationReceipt,\n' +
+    '} from "@ts-drp/storage/snapshot-transfer";\n' +
+    '\n' +
+    'import type { CreatorLiveCloseResult } from "./creator-close.js";\n' +
+    'import {\n' +
+    '\tcreateCreatorAdoptionIntent,\n' +
+    '\ttype CreatorAdoptionIntent,\n' +
+    '\tresolveCreatorAdoptionFacts,\n' +
+    '} from "./internal/creator-adoption-intent.js";\n' +
+    'import {\n' +
+    '\ttype CreatorAdoptionPendingRecoveryInput,\n' +
+    '\ttype CreatorAdoptionPendingRecoveryResult,\n' +
+    '\ttype CreatorAdoptionRoomHead,\n' +
+    '\tinstallCreatorAdoptionPendingRecovery,\n' +
+    '} from "./internal/creator-adoption-recover.js";\n' +
+    'import {\n' +
+    '\ttype CreatorSuccessorLiveMaterial,\n' +
+    '\ttype CreatorSuccessorLiveSeed,\n' +
+    '\ttype CreatorSuccessorReopenInput,\n' +
+    '\ttype CreatorSuccessorReopenResult,\n' +
+    '\tinstallCreatorSuccessorReopen,\n' +
+    '} from "./internal/creator-successor-live.js";\n' +
+    'import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";\n' +
+    '\n' +
+    'const PROFILE = Object.freeze({\n' +
+    '\tmaxManifestBytes: 212_387,\n' +
+    '\tmaxSnapshotBytes: 268_435_456,\n' +
+    '\tsnapshotChunkBytes: 131_072,\n' +
+    '});\n' +
+    'const ED25519_PUBLIC_KEY_HEX = /^[0-9a-f]{64}$/u;\n' +
+    '\n' +
+    'type FailureKind =\n' +
+    '\t| "malformed-input"\n' +
+    '\t| "sealed-live-unavailable"\n' +
+    '\t| "recovery-failed"\n' +
+    '\t| "chain-invalid"\n' +
+    '\t| "journal-invalid"\n' +
+    '\t| "snapshot-invalid"\n' +
+    '\t| "blueprint-invalid"\n' +
+    '\t| "internal-invariant";\n' +
+    '\n' +
+    'type AdoptionFailure = Readonly<{ readonly detail: string; readonly kind: FailureKind; readonly ok: false }>;\n' +
+    'type AdoptionSuccess = Readonly<{\n' +
+    '\treadonly descriptor: Readonly<Record<string, unknown>>;\n' +
+    '\treadonly intent: CreatorAdoptionIntent;\n' +
+    '\treadonly ok: true;\n' +
+    '}>;\n' +
+    '\n' +
+    'interface SealedAdoptionFacts {\n' +
+    '\treadonly closeResult: CreatorLiveCloseResult;\n' +
+    '\treadonly currentHead: PresentHead;\n' +
+    '\treadonly currentReferences: readonly GenerationRef[];\n' +
+    '\treadonly currentTrust: CurrentAnchorTrust;\n' +
+    '\treadonly durableReplay: Readonly<{ verify(): Promise<boolean> }>;\n' +
+    '\treadonly exactCanonicalLatchedAclBytes: Uint8Array;\n' +
+    '\treadonly exactCanonicalParametersCarrierBytes: Uint8Array;\n' +
+    '\treadonly history: CloseSetHistoryCommitment;\n' +
+    '\treadonly issuanceScope: DurableIssueScope;\n' +
+    '\treadonly issuanceStore: DurableIssuanceStore;\n' +
+    '\treadonly liveJournalStore: DurableLiveJournalStore;\n' +
+    '\treadonly objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0];\n' +
+    '\treadonly proposedHead: PresentHead;\n' +
+    '\treadonly proposedReferences: readonly GenerationRef[];\n' +
+    '\treadonly snapshotDeclaration: SnapshotQuarantineDeclaration;\n' +
+    '\treadonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;\n' +
+    '\treadonly sourceRuntimeHandle: WeakRef<object>;\n' +
+    '\treadonly store: AheDurableStore;\n' +
+    '\tterminalizeSource(): boolean;\n' +
+    '}\n' +
+    '\n' +
+    'interface RecoveredClosure {\n' +
+    '\treadonly currentCandidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];\n' +
+    '\treadonly proposedCandidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];\n' +
+    '}\n' +
+    '\n' +
+    'interface VerifiedChain {\n' +
+    '\treadonly currentCatalog: Readonly<{\n' +
+    '\t\treadonly artifactDigest: string;\n' +
+    '\t\treadonly artifactId: string;\n' +
+    '\t\treadonly blueprintDigest: string;\n' +
+    '\t\treadonly catalogDigest: string;\n' +
+    '\t\treadonly runtimeProfile: string;\n' +
+    '\t}>;\n' +
+    '\treadonly currentAnchor: Readonly<Record<string, unknown>>;\n' +
+    '\treadonly currentEpoch: number;\n' +
+    '\treadonly currentProjectionKind: "v3-live-generation-1" | "v3-live-generation-2";\n' +
+    '\treadonly currentTrustRecord: Readonly<Record<string, unknown>>;\n' +
+    '\treadonly cut: Readonly<Record<string, unknown>>;\n' +
+    '\treadonly successorAnchor: Readonly<Record<string, unknown>>;\n' +
+    '\treadonly successorAnchorBytes: Uint8Array;\n' +
+    '\treadonly successorEpoch: number;\n' +
+    '\treadonly successorTrust: CurrentAnchorTrust;\n' +
+    '\treadonly successorTrustRecord: Readonly<Record<string, unknown>>;\n' +
+    '}\n' +
+    '\n' +
+    'interface VerifiedSnapshot {\n' +
+    '\treadonly exactCanonicalPayloadBytes: Uint8Array;\n' +
+    '\treadonly manifest: Readonly<Record<string, unknown>>;\n' +
+    '\treadonly payload: Readonly<Record<string, unknown>>;\n' +
+    '}\n' +
+    '\n' +
+    'interface CapturedInput {\n' +
+    '\treadonly catalog: TrustedBlueprintCatalog;\n' +
+    '\treadonly handle: object;\n' +
+    '}\n' +
+    '\n' +
+    'function failure(kind: FailureKind, detail: string): AdoptionFailure {\n' +
+    '\treturn Object.freeze({ detail, kind, ok: false as const });\n' +
+    '}\n' +
+    '\n' +
+    'function record(value: unknown): value is Readonly<Record<string, unknown>> {\n' +
+    '\treturn value !== null && typeof value === "object" && !Array.isArray(value);\n' +
+    '}\n' +
+    '\n' +
+    'function captureInput(value: unknown): CapturedInput | undefined {\n' +
+    '\ttry {\n' +
+    '\t\tif (!record(value) || Object.keys(value).sort().join(",") !== "catalog,handle") return undefined;\n' +
+    '\t\tconst catalog = Object.getOwnPropertyDescriptor(value, "catalog");\n' +
+    '\t\tconst handle = Object.getOwnPropertyDescriptor(value, "handle");\n' +
+    '\t\tif (\n' +
+    '\t\t\tcatalog === undefined ||\n' +
+    '\t\t\t!("value" in catalog) ||\n' +
+    '\t\t\t!record(catalog.value) ||\n' +
+    '\t\t\thandle === undefined ||\n' +
+    '\t\t\t!("value" in handle) ||\n' +
+    '\t\t\t!record(handle.value)\n' +
+    '\t\t) {\n' +
+    '\t\t\treturn undefined;\n' +
+    '\t\t}\n' +
+    '\t\treturn Object.freeze({ catalog: catalog.value as unknown as TrustedBlueprintCatalog, handle: handle.value });\n' +
+    '\t} catch {\n' +
+    '\t\treturn undefined;\n' +
+    '\t}\n' +
+    '}\n' +
+    '\n' +
+    'function sameHead(left: PresentHead, right: PresentHead): boolean {\n' +
+    '\treturn (\n' +
+    '\t\tleft.closureDigest === right.closureDigest &&\n' +
+    '\t\tleft.generationId === right.generationId &&\n' +
+    '\t\tleft.objectId === right.objectId &&\n' +
+    '\t\tleft.revision === right.revision\n' +
+    '\t);\n' +
+    '}\n' +
+    '\n' +
+    'function sameRef(left: GenerationRef, right: GenerationRef): boolean {\n' +
+    '\treturn left.byteLength === right.byteLength && left.digest === right.digest;\n' +
+    '}\n' +
+    '\n' +
+    'function sameClosure(left: readonly GenerationRef[], right: readonly GenerationRef[]): boolean {\n' +
+    '\treturn left.length === right.length && left.every((ref, index) => sameRef(ref, right[index] as GenerationRef));\n' +
+    '}\n' +
+    '\n' +
+    'function hex(bytes: Uint8Array): string {\n' +
+    '\treturn Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");\n' +
+    '}\n' +
+    '\n' +
+    'function sameBytes(left: Uint8Array, right: Uint8Array): boolean {\n' +
+    '\treturn left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);\n' +
+    '}\n' +
+    '\n' +
+    'function currentProjectionKind(epoch: number): "v3-live-generation-1" | "v3-live-generation-2" {\n' +
+    '\treturn epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2";\n' +
+    '}\n' +
+    '\n' +
+    'function canonicalRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {\n' +
+    '\ttry {\n' +
+    '\t\tconst decoded = decodeCanonical(bytes);\n' +
+    '\t\treturn record(decoded) && sameBytes(encodeCanonical(decoded), bytes) ? decoded : undefined;\n' +
+    '\t} catch {\n' +
+    '\t\treturn undefined;\n' +
+    '\t}\n' +
+    '}\n' +
+    '\n' +
+    'function factsFor(handle: unknown): SealedAdoptionFacts | undefined {\n' +
+    '\treturn handle !== null && typeof handle === "object"\n' +
+    '\t\t? resolveCreatorAdoptionFacts<SealedAdoptionFacts>(handle)\n' +
+    '\t\t: undefined;\n' +
+    '}\n' +
+    '\n' +
+    'function validGenerationLineage(generations: readonly GenerationRecord[], facts: SealedAdoptionFacts): boolean {\n' +
+    '\tconst byId = new Map(generations.map((generation) => [generation.generationId, generation]));\n' +
+    '\tif (byId.size !== generations.length) return false;\n' +
+    '\tconst current = byId.get(facts.currentHead.generationId);\n' +
+    '\tconst proposed = byId.get(facts.proposedHead.generationId);\n' +
+    '\tif (\n' +
+    '\t\tcurrent === undefined ||\n' +
+    '\t\tproposed === undefined ||\n' +
+    '\t\tcurrent.state !== "Superseded" ||\n' +
+    '\t\tproposed.state !== "Adopted" ||\n' +
+    '\t\tproposed.baseExpectedHead.kind !== "present" ||\n' +
+    '\t\t!sameHead(proposed.baseExpectedHead, facts.currentHead) ||\n' +
+    '\t\t!sameClosure(current.closure, facts.currentReferences) ||\n' +
+    '\t\t!sameClosure(proposed.closure, facts.proposedReferences)\n' +
+    '\t) {\n' +
+    '\t\treturn false;\n' +
+    '\t}\n' +
+    '\tfor (const generation of generations) {\n' +
+    '\t\tif (new Set(generation.closure.map(({ digest }) => digest)).size !== generation.closure.length) return false;\n' +
+    '\t\tif (\n' +
+    '\t\t\tgeneration.baseExpectedHead.kind === "present" &&\n' +
+    '\t\t\t(generation.baseExpectedHead.generationId === generation.generationId ||\n' +
+    '\t\t\t\t!byId.has(generation.baseExpectedHead.generationId))\n' +
+    '\t\t) {\n' +
+    '\t\t\treturn false;\n' +
+    '\t\t}\n' +
+    '\t}\n' +
+    '\treturn facts.proposedHead.revision === facts.currentHead.revision + 1;\n' +
+    '}\n' +
+    '\n' +
+    'async function loadClosure(\n' +
+    '\tstore: AheDurableStore,\n' +
+    '\treferences: readonly GenerationRef[]\n' +
+    '): Promise<readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[] | undefined> {\n' +
+    '\tconst candidates: Array<Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>> = [];\n' +
+    '\tfor (const ref of references) {\n' +
+    '\t\tconst loaded = await store.getBlob(ref.digest);\n' +
+    '\t\tif (!loaded.ok || loaded.value === null) return undefined;\n' +
+    '\t\tcandidates.push(Object.freeze({ bytes: Uint8Array.from(loaded.value), ref: Object.freeze({ ...ref }) }));\n' +
+    '\t}\n' +
+    '\treturn Object.freeze(candidates);\n' +
+    '}\n' +
+    '\n' +
+    'async function readGenerationLineage(\n' +
+    '\tstore: AheDurableStore,\n' +
+    '\tobjectId: StorageObjectId\n' +
+    '): Promise<readonly GenerationRecord[] | undefined> {\n' +
+    '\tconst generations: GenerationRecord[] = [];\n' +
+    '\tconst seenCursors = new Set<GenerationPageCursor>();\n' +
+    '\tlet cursor: GenerationPageCursor | undefined;\n' +
+    '\tfor (;;) {\n' +
+    '\t\tconst page = await store.readGenerationPage({\n' +
+    '\t\t\t...(cursor === undefined ? {} : { cursor }),\n' +
+    '\t\t\tlimit: 128,\n' +
+    '\t\t\tobjectId,\n' +
+    '\t\t});\n' +
+    '\t\tif (!page.ok || (page.value.generations.length === 0 && page.valu'... 56101 more characters,
+  expected: /kind: "v3-live-generation-1"/u,
+  operator: 'match'
+}
+
+Node.js v22.15.0

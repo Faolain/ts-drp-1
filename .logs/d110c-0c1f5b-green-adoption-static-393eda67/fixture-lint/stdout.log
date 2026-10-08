@@ -1,0 +1,8 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+  635:8  error  Insert `:·`            prettier/prettier
+  636:8  error  Replace `:·` with `↹`  prettier/prettier
+
+✖ 2 problems (2 errors, 0 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+

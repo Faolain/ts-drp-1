@@ -1,0 +1,18 @@
+{
+  "startedAt": "2026-09-06T05:16:02.621Z",
+  "pid": 61759,
+  "root": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "files": [
+    "tests/genesis-profile.test.ts",
+    "tests/phase-5a-c-seal-safety-red.test.ts",
+    "tests/phase-5d-pacemaker-red.test.ts",
+    "tests/phase-3g-v3-room-rebase-red.test.ts"
+  ],
+  "compilerVersion": "5.8.2",
+  "nodeVersion": "v22.15.0",
+  "nodeExecutable": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "programExecutions": 1,
+  "effectiveOptionsExactlyAccepted": true,
+  "acceptedDiagnosticFile": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-transport-native-a430272a/typecheck-baseline-comparison.json",
+  "acceptedSha256": "39f7d6bc3fd87e540d6ed9f828a7081634b9fa830eb0505878092a99c3c31687"
+}

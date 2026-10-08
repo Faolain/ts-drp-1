@@ -1,0 +1,98 @@
+{
+  "checkedAt": "2026-09-06T12:06:25.797Z",
+  "ports": [
+    {
+      "port": 4174,
+      "pids": []
+    },
+    {
+      "port": 4175,
+      "pids": []
+    },
+    {
+      "port": 51000,
+      "pids": []
+    },
+    {
+      "port": 51002,
+      "pids": []
+    }
+  ],
+  "processes": [
+    {
+      "pid": 19543,
+      "numericStatus": "19543 38746 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 19573,
+      "numericStatus": "19573 19528 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 19576,
+      "numericStatus": "19576 19573 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 19940,
+      "numericStatus": "19940 19576 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 20373,
+      "numericStatus": "20373 86727 R",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 56881,
+      "numericStatus": "56881 56847 SN",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/marketing"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 56966,
+      "numericStatus": "56966 56850 SN",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/web"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 86724,
+      "numericStatus": "86724 86675 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 86727,
+      "numericStatus": "86727 86724 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/worker"
+      ],
+      "relevant": false
+    }
+  ],
+  "noArgvCommOrEnvironmentDump": true,
+  "noCompetingTaskProcesses": true,
+  "inheritedProfilingAbsent": true
+}

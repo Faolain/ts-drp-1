@@ -1,0 +1,60 @@
+{
+  "valid": true,
+  "exactNames": true,
+  "exactFiles": true,
+  "observationsValid": true,
+  "success": true,
+  "total": 3,
+  "passed": 3,
+  "failed": 0,
+  "skipped": 0,
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suites": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "assertions": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f4 exact pinned-genesis bootstrap policy"
+      ],
+      "fullName": "D.110c-0c1f4 exact pinned-genesis bootstrap policy accepts only the four frozen recovery key combinations",
+      "status": "passed",
+      "title": "accepts only the four frozen recovery key combinations",
+      "duration": 133.30316600000015,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f4 exact pinned-genesis bootstrap policy"
+      ],
+      "fullName": "D.110c-0c1f4 exact pinned-genesis bootstrap policy rejects malformed bounded policy bytes before consuming the prepared capability",
+      "status": "passed",
+      "title": "rejects malformed bounded policy bytes before consuming the prepared capability",
+      "duration": 59.36200000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f4 exact pinned-genesis bootstrap policy"
+      ],
+      "fullName": "D.110c-0c1f4 exact pinned-genesis bootstrap policy freezes the one shared exact predicate and its custody boundaries",
+      "status": "passed",
+      "title": "freezes the one shared exact predicate and its custody boundaries",
+      "duration": 3.065166999999974,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "be2a22117b9335bbf1f0f608b8c9b7fb128413f284ab476f4bdb9aea5fdad7ef"
+}

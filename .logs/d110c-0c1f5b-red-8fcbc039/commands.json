@@ -1,0 +1,64 @@
+{
+  "base": "bc6ec1b12ce13baa408e0e4d7343f7730f7bcfed",
+  "testsCommit": "8fcbc0394d398120baaf2131ef5eebbe99ba74d8",
+  "branch": "codex/phase3a1b-p6-golden-path",
+  "commands": [
+    {
+      "command": "pnpm exec prettier --write tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "exit": 0,
+      "result": "Exact test formatted"
+    },
+    {
+      "command": "pnpm exec eslint tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "exit": 0,
+      "result": "No errors or warnings"
+    },
+    {
+      "command": "pnpm exec vitest list tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --json",
+      "exit": 0,
+      "result": "Exactly two unchanged titles in one exact file; no collection error"
+    },
+    {
+      "command": "pnpm exec prettier --check tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "exit": 0,
+      "result": "All matched files use Prettier code style!"
+    },
+    { "command": "git diff --check", "exit": 0 },
+    {
+      "command": "git -C /Users/aristotle/Documents/Projects/ts-drp-1 commit -S --only tests/phase-6b-d110c-0c1f5b-integration-red.test.ts -m 'test: isolate settlement clients by activation module realm'",
+      "exit": 0,
+      "result": "8fcbc0394d398120baaf2131ef5eebbe99ba74d8; G signature; exact test only, 55 insertions/21 deletions"
+    },
+    {
+      "command": "git -C /Users/aristotle/Documents/Projects/ts-drp-1 push",
+      "exit": 0,
+      "result": "bc6ec1b1..8fcbc039; exact HEAD/upstream match before focused execution"
+    },
+    {
+      "command": "pnpm exec vitest run tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --reporter=json --outputFile=.logs/d110c-0c1f5b-red-8fcbc039/focused.json > .logs/d110c-0c1f5b-red-8fcbc039/stdout.log 2> .logs/d110c-0c1f5b-red-8fcbc039/stderr.log",
+      "executionCount": 1,
+      "exit": 1,
+      "result": "REJECTED: 2 failed, 0 passed; expected profile failure plus fixture page-limit failure; stopped without edit/rerun"
+    }
+  ],
+  "targetTypecheck": {
+    "method": "Read-only TypeScript createProgram for exact test. Read root tsconfig; noEmit, composite/declaration/declarationMap false, ES2022 target; map each workspace package export to its existing types entry, then overlay workspaceAliases imported from vite.config.mts. No config/source/package file emitted.",
+    "exit": 0,
+    "targetDiagnostics": 0,
+    "externalDiagnostics": [
+      { "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts", "code": 2741, "detail": "Existing fixture live-journal store lacks installEpochAnchor" },
+      { "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts", "code": 7006, "detail": "Existing entry parameter implicitly any" },
+      { "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts", "code": 2322, "detail": "Existing fixture transactWriteSettlementPlan returns SettlementPlan | null" }
+    ],
+    "diagnosticCorrection": "Initial command used only Vite aliases plus the root wildcard and could not resolve six unaliased workspace exports. Corrected command added exact package-export type paths; zero target diagnostics. This was a diagnostic setup defect, not a code or runtime test failure.",
+    "caveat": "Not a full repository typecheck pass. These same three external fixture diagnostics are preserved in the prior rejected evidence."
+  },
+  "custody": {
+    "priorManifestsVerified": [".logs/d110c-0c1f5b-red-1dcff170/manifest.sha256", ".logs/d110c-0c1f5b0r-design-3a156aca/manifest.sha256"],
+    "productionEdits": 0,
+    "planEdits": 0,
+    "stashesPreserved": 27,
+    "longRuns": 0,
+    "processCheck": "No active ts-drp Vitest, Playwright, retained-heap or snapshot-memory process before run. Unrelated Next.js processes untouched."
+  }
+}

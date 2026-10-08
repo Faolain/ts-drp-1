@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "existing_resolution_path",
+    "recommended_option",
+    "new_api_required",
+    "reasoning",
+    "golden_path_assessment",
+    "security_contract",
+    "required_slice",
+    "parent_f5b_disposition",
+    "findings"
+  ],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["CONTINUE", "STOP_AND_RESLICE", "MORE_AUDIT"] },
+    "existing_resolution_path": { "type": "string" },
+    "recommended_option": { "type": "string", "enum": ["A_NEW_API", "B_EXISTING_POLICY_TRANSITION", "C_DEFER_RESOLUTION"] },
+    "new_api_required": { "type": "boolean" },
+    "reasoning": { "type": "string" },
+    "golden_path_assessment": { "type": "string" },
+    "security_contract": { "type": "string" },
+    "required_slice": { "type": "string" },
+    "parent_f5b_disposition": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "title", "evidence", "action"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "title": { "type": "string" },
+          "evidence": { "type": "string" },
+          "action": { "type": "string" }
+        }
+      }
+    }
+  }
+}

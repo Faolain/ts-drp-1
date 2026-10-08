@@ -1,0 +1,38 @@
+{
+	"schemaVersion": "ts-drp-equivocation-gossip-budget-freeze-v1",
+	"profile": "equivocation-gossip-budget-v1",
+	"baseProfile": "equivocation-author-projection-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+	"protectedArtifacts": [
+		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/check-freeze.mjs",
+		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/freeze-policy.json",
+		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/profile.json",
+		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/spec.md",
+		".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+		"tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+		"tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json",
+		"tests/fixtures/phase-0o-b2-v3/controlled-gossip-budget.ts",
+		"tests/fixtures/phase-0o-b2-v3/public-reexport-mutant.ts",
+		"tests/fixtures/phase-0o-b2-v3/public-entry-type-audit.ts",
+		"tests/fixtures/phase-0o-b2-v3/built-package-type-audit.ts",
+		"tests/fixtures/phase-0o-b2-v3/tsconfig.public-entry-audit.json",
+		"tests/fixtures/phase-0o-b2-v3/tsconfig.built-package-audit.json",
+		"tests/fixtures/phase-0o-b2-v3/public-export-contract.mjs"
+	],
+	"checkerSha256": "a993595e7f1f7f3be2f20cb7879a49ae4b187250d56427c1e86482f6ee95285b",
+	"artifactSha256": {
+		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/profile.json": "1fab00024d118b5e8b91d8de336a70e1eafc085890fcf27d69b80d2d071d3a09",
+		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/spec.md": "ec757262934bf3d290d46a3490549ee3014fc334ef53c85e1e4a9589c2025f28",
+		".github/workflows/protocol-v3-equivocation-gossip-budget.yml": "8b5606ee3fd0bb60091db8e26e3e0f1b22b1cc82595b696b42c14da4891f79e2",
+		"tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts": "24cc2e5a426de1e25a150196d822ae94cd4a63caabbaa9a697af28ae3d1d9855",
+		"tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json": "6b22b4e442ece82cf61aac6ef303aec7e3b74ba14a601b8f22c33769670d443f",
+		"tests/fixtures/phase-0o-b2-v3/controlled-gossip-budget.ts": "606b73eb153c60f00f33356d0ee56fe48da49ac0328703a2df8aaea39b5ee005",
+		"tests/fixtures/phase-0o-b2-v3/public-reexport-mutant.ts": "70c4a77458c679fcd763aa08fc145132b90f60b890d53a60cd06f574089abde3",
+		"tests/fixtures/phase-0o-b2-v3/public-entry-type-audit.ts": "f8d5d25cb10510cdd679f434a1e24bb63ef533e54af4d0b060c5c95d473e25f6",
+		"tests/fixtures/phase-0o-b2-v3/built-package-type-audit.ts": "4c1cd62ee1670ea3acf5f1a0d3cc047298fc0c3fb952fe838b90d0bf8dc69833",
+		"tests/fixtures/phase-0o-b2-v3/tsconfig.public-entry-audit.json": "6a22c3a47f085257a6441c46f8a28b6b0bf967bf88ad974f802556605d8832f0",
+		"tests/fixtures/phase-0o-b2-v3/tsconfig.built-package-audit.json": "7ea43d75df9a125d828f1a48cbea5a7f250f87e3bef4afb7066d3561ed5d5f6d",
+		"tests/fixtures/phase-0o-b2-v3/public-export-contract.mjs": "9fdbc27f8655dcda274f0c18554e086e2ada9191a78595c8194a66cb717e5d7f"
+	}
+}

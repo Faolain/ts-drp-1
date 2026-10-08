@@ -1,0 +1,50 @@
+{
+  "testsHead": "d1eee8ed48209c6ad3cfc07872984b4f94667cbb",
+  "signature": "G",
+  "remote": "d1eee8ed48209c6ad3cfc07872984b4f94667cbb\trefs/heads/codex/phase3a1b-p6-golden-path",
+  "trackedDiff": "",
+  "stagedDiff": "",
+  "testsOnlyChangedPaths": [
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  ],
+  "stashes": 27,
+  "frozenTestHashesUnchanged": true,
+  "verifiedManifests": [
+    {
+      "directory": ".logs/d110c-0c1f5b0r-design-3a156aca",
+      "entries": 3,
+      "sha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0",
+      "valid": true
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b-red-corrective-c1d04d31",
+      "entries": 16,
+      "sha256": "acc11788eb3fafcc358fb6178fc8bdecc3740d9c97653163d51d6032016eedad",
+      "valid": true
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b-red-corrective-accepted-c1d04d31",
+      "entries": 17,
+      "sha256": "425d45904058d483f6b15339724613a747a77a03fb48bcc3acb1b306ff23a2e5",
+      "valid": true
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b-workload-plan-confirmation-d836fc3d",
+      "entries": 11,
+      "sha256": "2ffe6ba37ac8d8a7944d43a3024a8bc6fe4050882bbfc16f8be39fc602353c8e",
+      "valid": true
+    }
+  ],
+  "productionChanges": "",
+  "noRerun": true,
+  "noCampaign": true,
+  "noReviewers": true,
+  "canonicalCalculatorSource": {
+    "path": "packages/canonical/src/index.ts",
+    "sha256": "49b58550b79271b6f5c2b805ab18a5fefae210d51f1b3d719b8384b7b600591c",
+    "command": "node --import=tsx .logs/d110c-0c1f5b-red-workload-working-a6a3f738/bounds.mjs",
+    "status": 0
+  },
+  "note": "Working evidence directory was renamed to this tests-SHA root without changing frozen contents before the sole focused execution."
+}

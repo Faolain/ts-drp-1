@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-0c1f5b-green-fixture-exit-f8ec9daf/custody-final.mjs",
+    "final"
+  ],
+  "start": "2026-09-06T05:37:05.477Z"
+}

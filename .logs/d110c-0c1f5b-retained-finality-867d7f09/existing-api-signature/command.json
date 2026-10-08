@@ -1,0 +1,11 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "log",
+    "-1",
+    "--format=%H %G? %s",
+    "d77ee315a7688cffb5fd55870c38231403ecc41f"
+  ],
+  "start": "2026-09-05T23:53:55.795Z"
+}

@@ -1,0 +1,53 @@
+D.109b GREEN command/result ledger (2026-08-31 AST)
+
+Focused execution
+- pnpm exec vitest run tests/phase-6b-cleanup-eligibility-red.test.ts tests/phase-6b-issuance-retention-red.test.ts packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=.logs/phase-6b-d109b-green/focused-vitest-final.json
+  - exit 0; three reported files; 45/45 passed; zero failed or pending; no top-level errors
+- PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.logs/phase-6b-d109b-green/focused-browser-final.json" pnpm exec playwright test --config packages/storage-browser/playwright.phase-6b-issuance-retention.config.ts --reporter=json
+  - exit 0; 4/4 expected; zero skipped, unexpected, flaky or top-level errors
+
+Retained execution
+- pnpm exec vitest run tests/phase-2l-a-shared-issuance-contract.test.ts tests/phase-2l-a-b2-b3-corrective.test.ts tests/phase-2l-a-b4-b5-semantic-lineage-null.test.ts tests/phase-2l-a-b6-b7-terminal-input-poison.test.ts tests/phase-2l-d-node-parity-red.test.ts tests/phase-2l-d-parity-governance-red.test.ts packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts packages/storage-node/tests/phase-2l-c-node-issuance-death-red.test.ts packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts packages/storage-browser/tests/phase-2l-b-browser-issuance-registry-red.test.ts tests/phase-3a1b-p2-outbox-publication-contract.test.ts packages/storage-node/tests/phase-3a1b-p2-node-outbox-publication-red.test.ts packages/storage-node/tests/phase-3a1b-p2-node-outbox-publication-death-red.test.ts tests/phase-6a-creator-adoption-commit-red.test.ts tests/phase-6a-creator-adoption-red.test.ts tests/phase-6a-creator-successor-activation-red.test.ts tests/phase-6a-creator-successor-epoch-red.test.ts tests/phase-6a-creator-successor-handle-identity-red.test.ts tests/phase-6a-creator-successor-infrastructure-red.test.ts tests/phase-6a-creator-successor-local-author-red.test.ts tests/phase-6a-creator-successor-product-red.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=.logs/phase-6b-d109b-green/retained-vitest-final.json
+  - exit 0; 22 reported files; 183/183 passed; zero failed or pending; no top-level errors
+- PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.logs/phase-6b-d109b-green/retained-phase2l-browser-final.json" pnpm exec playwright test --config packages/storage-browser/tests/playwright.phase-2l-b-browser-issuance.config.ts --reporter=json
+  - exit 0; 8/8 expected including the 16-edge hard-kill fixture; no soft failures
+- PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.logs/phase-6b-d109b-green/retained-phase2l-parity-browser-final.json" pnpm exec playwright test --config packages/storage-browser/playwright.phase-2l-d-parity.config.ts --reporter=json
+  - exit 0; 3/3 expected; no soft failures
+- pnpm exec playwright test --config packages/storage-browser/playwright.phase-3a1b-p2-outbox-publication.config.ts
+  - exit 0; 2/2 passed including fourteen publication hard-kill boundaries
+
+Corrected expectations and bounded diagnostics
+- first retained Phase-2l Vitest sweep: exit 1; 88/90 passed; two failures were exact user_version/schema-v1 expectations rendered stale by the reviewed v2 migration
+- corrected retained Phase-2l Vitest sweep: exit 0; 90/90 passed
+- first p2 contract sweep: exit 1; 9/10 passed; sole failure was the exact terminal.ts SHA-256 pin
+- corrected p2 plus Node publication sweep: exit 0
+- initial focused GREEN after the first implementation corrections: exit 0; 24/24 passed
+- expanded final focused GREEN: exit 0; 45/45 passed
+
+Build and type gates
+- pnpm --filter @ts-drp/issuance-store build: exit 0
+- pnpm --filter @ts-drp/storage-node build: exit 0
+- pnpm --filter @ts-drp/storage-browser build: exit 0
+- pnpm --filter @ts-drp/node build: exit 0
+- pnpm exec tsc -p packages/issuance-store/tsconfig.build.json --noEmit: exit 0
+- pnpm exec tsc -p packages/storage-node/tsconfig.build.json --noEmit: exit 0
+- pnpm exec tsc -p packages/storage-browser/tsconfig.build.json --noEmit: exit 0
+- pnpm exec tsc -p packages/node/tsconfig.build.json --noEmit: exit 0
+
+Mechanical and custody gates
+- exact-owner pnpm exec eslint --max-warnings=0: exit 0
+- exact-owner pnpm exec prettier --check: exit 0
+- git diff --check: exit 0
+- runtime export census: ordinary Node/browser issuance modules remain one factory each; maintenance modules remain one resolver each; package roots do not re-export maintenance
+- Node source shape: stable .drp-issuance-v1.sqlite filename, schema version 2, exact v1/v2 lineage catalogs, BEGIN IMMEDIATE admission and migration
+- browser source shape: stable --drp-issuance-v1 name, IndexedDB version 1, legacy four-member plus current five-member lineage rows
+- refactor-clean audit: one shared lineage equality/consumption owner; unused wrapper exports removed
+- protected paths: present
+- stashes: 26
+- relevant process scan: only the corrected diagnostic command and rg itself matched
+- ports 4174, 4175, 51000 and 51002: no listener
+- no retained campaign invocation
+
+Diagnostic correction
+- the first custody loop used `path` as its zsh variable, temporarily erasing PATH in that subprocess and making ps/rg/lsof unavailable
+- the corrected loop used `protected_entry`; this was a diagnostic error, not a code or gate failure

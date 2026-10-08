@@ -1,0 +1,17 @@
+{
+	"checks": {
+		"blockingFindingRecorded": true,
+		"completedEpochReopenAssigned": true,
+		"durableFloorProviderNamed": true,
+		"exactRoomFailurePinned": true,
+		"freshProviderRequired": true,
+		"functionScopedAuditRequired": true,
+		"localStoreReopenRequired": true,
+		"noPostCrashFloorAuthorship": true,
+		"postCommitIdentityRequired": true,
+		"projectionBindingRequired": true,
+		"testProviderDoesNotSelectProductionOwner": true,
+		"verbatimFloorRereadRequired": true
+	},
+	"ok": true
+}

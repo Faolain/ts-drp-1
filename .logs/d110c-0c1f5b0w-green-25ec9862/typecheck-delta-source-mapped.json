@@ -1,0 +1,538 @@
+{
+  "baseline": [
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2739,
+      "message": "Type '{ transactIssue: () => Promise<DurableIssueCommit>; compareAndMarkOutboxPublished: () => Promise<void>; readIssued: (selectedScope: DurableIssueScope, sequence: number) => Promise<...>; readOutboxPage(input?: DurableOutboxPageInput | undefined): Promise<...>; readLineage: () => Promise<...>; close: () => Promise<......' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan"
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2741,
+      "message": "Property 'installEpochAnchor' is missing in type '{ installGenesis: () => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>; readiness: () => Promise<Readonly<{ ...; }>>; readPage(input: LiveJournalPageInput): Promise<...>; appendAccepted(input: AppendAcceptedVertexInput): Promise<...>; close: () => Promise<...>; }' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2739,
+      "message": "Type '{ transactIssue(selectedScope: DurableIssueScope, buildAndSign: DurableBuildAndSign): Promise<DurableIssueCommit>; ... 4 more ...; close: () => Promise<...>; }' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan"
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2741,
+      "message": "Property 'installEpochAnchor' is missing in type '{ installGenesis: () => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>; readiness: () => Promise<Readonly<{ ...; }>>; readPage(input: LiveJournalPageInput): Promise<...>; appendAccepted(input: AppendAcceptedVertexInput): Promise<...>; close: () => Promise<...>; }' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 2741,
+      "message": "Property 'installEpochAnchor' is missing in type 'Readonly<{ appendAccepted: Mock<(input: any) => Promise<Readonly<{ idempotent: true; journalSequence: number; ok: true; scope: LiveJournalScope; sourceKind: \"received\" | \"local-issued\"; vertexDigest: string; }>> | Promise<...>>; close: Mock<...>; installGenesis: Mock<...>; readiness: Mock<...>; readPage: Mock<...>; }>' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 7006,
+      "message": "Parameter 'entry' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ store: Readonly<{ close: Mock<() => Promise<void>>; compareAndMarkOutboxPublished: Mock<(input: any) => Promise<void>>; readIssued: Mock<(selectedScope: any, sequence: any) => Promise<...>>; ... 4 more ...; transactWriteSettlementPlan: Mock<...>; }>; vertexDigest: string; }>' is not assignable to type 'Readonly<{ readonly store: DurableIssuanceStore; readonly vertexDigest: string; }>'.\n  The types returned by 'store.transactWriteSettlementPlan(...)' are incompatible between these types.\n    Type 'Promise<SettlementPlan | null>' is not assignable to type 'Promise<SettlementPlan>'.\n      Type 'SettlementPlan | null' is not assignable to type 'SettlementPlan'.\n        Type 'null' is not assignable to type 'SettlementPlan'."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'digest' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ baseExpectedHead: Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>; ... 4 more ...; state: GenerationState; }>' is not assignable to type 'GenerationRecord'.\n  Types of property 'baseExpectedHead' are incompatible.\n    Type 'Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>' is not assignable to type 'ExpectedHead'.\n      Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'ExpectedHead'.\n        Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'PresentHead'.\n          Types of property 'revision' are incompatible.\n            Type 'number' is not assignable to type 'HeadRevision'.\n              Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'declaration' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'receipt' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'signal' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'bytes' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2739,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (scope: any, sequence: any) => Promise<DurableIssueCommit | null>; readLineage: (scope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (scope: any, buildAndSign: any) =...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'sequence' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "code": 2698,
+      "message": "Spread types may only be created from object types."
+    }
+  ],
+  "current": [
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2739,
+      "message": "Type '{ transactIssue: () => Promise<DurableIssueCommit>; compareAndMarkOutboxPublished: () => Promise<void>; readIssued: (selectedScope: DurableIssueScope, sequence: number) => Promise<...>; readOutboxPage(input?: DurableOutboxPageInput | undefined): Promise<...>; readLineage: () => Promise<...>; close: () => Promise<......' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan"
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2741,
+      "message": "Property 'installEpochAnchor' is missing in type '{ installGenesis: () => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>; readiness: () => Promise<Readonly<{ ...; }>>; readPage(input: LiveJournalPageInput): Promise<...>; appendAccepted(input: AppendAcceptedVertexInput): Promise<...>; close: () => Promise<...>; }' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2739,
+      "message": "Type '{ transactIssue(selectedScope: DurableIssueScope, buildAndSign: DurableBuildAndSign): Promise<DurableIssueCommit>; ... 4 more ...; close: () => Promise<...>; }' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan"
+    },
+    {
+      "file": "tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts",
+      "code": 2741,
+      "message": "Property 'installEpochAnchor' is missing in type '{ installGenesis: () => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>; readiness: () => Promise<Readonly<{ ...; }>>; readPage(input: LiveJournalPageInput): Promise<...>; appendAccepted(input: AppendAcceptedVertexInput): Promise<...>; close: () => Promise<...>; }' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 2741,
+      "message": "Property 'installEpochAnchor' is missing in type 'Readonly<{ appendAccepted: Mock<(input: any) => Promise<Readonly<{ idempotent: true; journalSequence: number; ok: true; scope: LiveJournalScope; sourceKind: \"received\" | \"local-issued\"; vertexDigest: string; }>> | Promise<...>>; close: Mock<...>; installGenesis: Mock<...>; readiness: Mock<...>; readPage: Mock<...>; }>' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 7006,
+      "message": "Parameter 'entry' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ store: Readonly<{ close: Mock<() => Promise<void>>; compareAndMarkOutboxPublished: Mock<(input: any) => Promise<void>>; readIssued: Mock<(selectedScope: any, sequence: any) => Promise<...>>; ... 4 more ...; transactWriteSettlementPlan: Mock<...>; }>; vertexDigest: string; }>' is not assignable to type 'Readonly<{ readonly store: DurableIssuanceStore; readonly vertexDigest: string; }>'.\n  The types returned by 'store.transactWriteSettlementPlan(...)' are incompatible between these types.\n    Type 'Promise<SettlementPlan | null>' is not assignable to type 'Promise<SettlementPlan>'.\n      Type 'SettlementPlan | null' is not assignable to type 'SettlementPlan'.\n        Type 'null' is not assignable to type 'SettlementPlan'."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'digest' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ baseExpectedHead: Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>; ... 4 more ...; state: GenerationState; }>' is not assignable to type 'GenerationRecord'.\n  Types of property 'baseExpectedHead' are incompatible.\n    Type 'Readonly<{ generationId: GenerationId; kind: \"present\"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>' is not assignable to type 'ExpectedHead'.\n      Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'ExpectedHead'.\n        Type 'Readonly<{ revision: number; kind: \"present\"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'PresentHead'.\n          Types of property 'revision' are incompatible.\n            Type 'number' is not assignable to type 'HeadRevision'.\n              Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'objectId' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'declaration' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'receipt' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'selected' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'signal' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'descriptor' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'bytes' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'options' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 2739,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (scope: any, sequence: any) => Promise<DurableIssueCommit | null>; readLineage: (scope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (scope: any, buildAndSign: any) =...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'sequence' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "code": 2698,
+      "message": "Spread types may only be created from object types."
+    }
+  ],
+  "added": [],
+  "pass": true
+}

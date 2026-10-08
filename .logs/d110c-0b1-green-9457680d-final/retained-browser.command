@@ -1,0 +1,1 @@
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts --project=chromium --grep 'D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody' --reporter=json --fail-on-flaky-tests

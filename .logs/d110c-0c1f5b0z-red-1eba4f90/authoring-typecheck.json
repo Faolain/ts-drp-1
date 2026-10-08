@@ -1,0 +1,18 @@
+{
+  "targetDiagnostics": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "code": 2322,
+      "line": 61,
+      "message": "Type 'import(\"/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/dist/src/maintenance\", { with: { \"resolution-mode\": \"import\" } }).AheReclamationMaintenance' is not assignable to type 'import(\"/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/src/maintenance\", { with: { \"resolution-mode\": \"import\" } }).AheReclamationMaintenance'.\n  The types returned by 'reclaimClosedEpoch(...)' are incompatible between these types.\n    Type 'Promise<Readonly<{ activeGenerationId: import(\"/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/dist/src/types\", { with: { \"resolution-mode\": \"import\" } }).GenerationId; availabilityPolicyDigest: string; closedEpoch: number; ... 7 more ...; rollbackGenerationIds: readonly [...]; }>>' is not assignable to type 'Promise<Readonly<{ activeGenerationId: import(\"/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/src/types\", { with: { \"resolution-mode\": \"import\" } }).GenerationId; availabilityPolicyDigest: string; closedEpoch: number; ... 7 more ...; rollbackGenerationIds: readonly [...]; }>>'.\n      Type 'Readonly<{ activeGenerationId: import(\"/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/dist/src/types\", { with: { \"resolution-mode\": \"import\" } }).GenerationId; availabilityPolicyDigest: string; closedEpoch: number; ... 7 more ...; rollbackGenerationIds: readonly [...]; }>' is not assignable to type 'Readonly<{ activeGenerationId: import(\"/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/src/types\", { with: { \"resolution-mode\": \"import\" } }).GenerationId; availabilityPolicyDigest: string; closedEpoch: number; ... 7 more ...; rollbackGenerationIds: readonly [...]; }>'.\n        Types of property 'activeGenerationId' are incompatible.\n          Type 'import(\"/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/dist/src/types\", { with: { \"resolution-mode\": \"import\" } }).GenerationId' is not assignable to type 'import(\"/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/src/types\", { with: { \"resolution-mode\": \"import\" } }).GenerationId'.\n            Property '[generationIdBrand]' is missing in type 'String & { readonly [generationIdBrand]: true; }' but required in type '{ readonly [generationIdBrand]: true; }'."
+    }
+  ],
+  "externalDiagnostics": [
+    {
+      "file": "tests/fixtures/phase-6b/ahe-reclamation-contract.ts",
+      "code": 2322,
+      "line": 234,
+      "message": "Type 'Readonly<{ activeGenerationId: GenerationId; availabilityPolicyDigest: \"53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b\"; closedEpoch: 4; expectedHead: Readonly<...>; lineageFloor: Readonly<...>; objectId: StorageObjectId; rollbackGenerationIds: readonly [...]; }>' is not assignable to type 'Readonly<{ activeGenerationId: GenerationId; availabilityPolicyDigest: string; closedEpoch: number; expectedHead: PresentHead; lineageFloor: Readonly<{ deleteGenerationIds: readonly GenerationId[]; expectedBaseExpectedHead: ExpectedHead; generationId: GenerationId; replacementBaseExpectedHead: Readonly<...>; }>; obj...'.\n  The types of 'expectedHead.closureDigest' are incompatible between these types.\n    Type 'BlobDigest' is not assignable to type 'ClosureDigest'.\n      Property '[closureDigestBrand]' is missing in type 'String & { readonly [blobDigestBrand]: true; }' but required in type '{ readonly [closureDigestBrand]: true; }'."
+    }
+  ]
+}

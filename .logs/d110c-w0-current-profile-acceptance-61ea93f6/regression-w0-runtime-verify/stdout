@@ -1,0 +1,10 @@
+{
+  "gate": "runtime-w0",
+  "files": 1,
+  "passed": 7,
+  "elapsedMs": 27563,
+  "exactRoster": true,
+  "inputHashesVerified": 988,
+  "preparationArtifactsExact": true,
+  "postCustodyReportedExact": true
+}

@@ -1,0 +1,3278 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+d77ee315 feat: authenticate creator issuance retirement
+7e2f2694 test: capture D110c issuance checkpoint red
+add7f7dc docs: confirm D110c issuance checkpoint plan
+037b8244 docs: correct D110c issuance checkpoint plan
+fc384d1f docs: freeze D110c issuance retirement checkpoint plan
+d77ee315a7688cffb5fd55870c38231403ecc41f
+codex/phase3a1b-p6-golden-path
+1c907ac05acb6cd844fb5dbb4f15e7c1ee8940af
+commit d77ee315a7688cffb5fd55870c38231403ecc41f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 22:28:00 2026 -0400
+
+    feat: authenticate creator issuance retirement
+
+ .../production-hardening-tdd-plan-v2.md            | 100 ++++-
+ packages/keychain/src/finality.ts                  |  34 ++
+ packages/node/src/creator-adoption-commit.ts       |   2 +
+ packages/node/src/creator-adoption.ts              |   6 +
+ packages/node/src/creator-close.ts                 | 252 ++++++++++++-
+ .../src/internal/creator-transition-advance.ts     | 193 +++++++++-
+ packages/protocol-v3/package.json                  |   8 +
+ .../protocol-v3/src/creator-issuance-retirement.ts | 403 +++++++++++++++++++++
+ .../creator-issuance-retirement-signing-request.ts |  32 ++
+ .../tests/phase-5e-creator-live-close.pw.ts        |  15 +-
+ .../bounded-checkpoint-contract.ts                 |  28 +-
+ .../retirement-checkpoint-contract.ts              |  21 +-
+ tests/phase-6a-creator-adoption-red.test.ts        |  14 +-
+ ...ase-6b-d110c-0b1-bounded-checkpoint-red.test.ts |   9 +-
+ ...6b-d110c-0c1a-retirement-checkpoint-red.test.ts | 389 +++++++++++++++++++-
+ vite.config.mts                                    |   8 +
+ 16 files changed, 1483 insertions(+), 31 deletions(-)
+tree 1c907ac05acb6cd844fb5dbb4f15e7c1ee8940af
+parent 7e2f2694cdd1b3a2feb0265dd0a73fa52dcb52dc
+author Faolain <Faolain@users.noreply.github.com> 1788402480 -0400
+committer Faolain <Faolain@users.noreply.github.com> 1788402480 -0400
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ iQIzBAABCAAdFiEEVeIvFU+6+MhPN4MEdhuZzqgcYokFAmqY2zAACgkQdhuZzqgc
+ Yok4/g//cMoWACVLuDctgDhRoXzMHPD13OjuKvNx3mztrvnjPAKgp+6BApT+ug5Y
+ 8rv4IAX5j1HZAxDzM1fpBHFQxrLpIQQG4w74ibsl26fbxyz05pkmTqrgrfMVb4lO
+ s2h6uP9VvgQP9Ie8mfxEd949OivEMzZXlOBdzMa8pagLVD6fmhpFxU64dUiPJi+e
+ z13LjmRkoicpWKqoT5YpXcrk7LFdpRc8TcaOZpNkbceENpz0QXSGBwlGFZjyVILK
+ DKDUzYyKqCC4YAv8ELGRHhu4UTA7YtK6+wTzLkmJJjdwyXf/tyBuzoVK5xGvMQim
+ lLZuiKUodv8yZHPB6Zt8mKBT7yVR7bCyVznNAyEApcTcxRkAXfUpX5hdjwBqXPv1
+ JEoWYzn5vr7trTiXVYEanLy49FERrVFWJv8k7VK9VR0ycMOfk+oTcwtvSfK3UB1n
+ UBCgXi/gaJEiCatSJAXeplvYQH/9LNyq4EJh3iDhvvUUPA/lvp2pvj9VsRMvuye6
+ HK8hwS0ikDDfgqqMcF3zkNEwA9Z5lB+BKeoiZcVAZCdA5wwGl0uaeUBtNeBqXL6Q
+ /cv3xYk44xwVNejpM4gcPNLcohVUadpLCFBbuPJcKB6QukGZaV9INjTod0+frF3c
+ qiUQkMmmR+J+zH9J6nfX4HPOyxva07YJ5hO5JGQBfWrSr/lLtKg=
+ =//p/
+ -----END PGP SIGNATURE-----
+
+feat: authenticate creator issuance retirement
+---
+tree bcf8073f2d41c92c30eb17944f595291b23d584b
+parent add7f7dc8d5848c9305bec27fd4e52d4a4b358b3
+author Faolain <Faolain@users.noreply.github.com> 1788398043 -0400
+committer Faolain <Faolain@users.noreply.github.com> 1788398043 -0400
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ iQIzBAABCAAdFiEEVeIvFU+6+MhPN4MEdhuZzqgcYokFAmqYydsACgkQdhuZzqgc
+ Yoke5xAAynvSmJux2+G+y4vC/dZ+hBzN6QA4p5TAWkLMWTkx9r7aValXvmr0TIBn
+ Nl5hl2mR6T2FHpAskmefJ+tU5DiWAv/UYfYCnj1YrSRrNw4OAL9yZKfziZ/NME/r
+ Ov40NoqoT0DHtsKwRtaO4qtZejcaFzbmHD8bHKj61UthPhfJ8a3TPJYBrPiKakjt
+ RxNUz9W1cHtK/XvTPoS6mb1oWUjAd3uDy6NWdb4oLZe5EYjayP9MzgDoEnf2sLZ6
+ 8a17s97o8y0JObhCa73PaGdCKbnemzfnT1PMCKYYJuLpzukR1e4yfAYQs/uNnSO6
+ CeBs/3pb0IGO4TIAuS7dprrdtvFBU1GbiXq+P/8rLC34RRmwKG70dGEWsu6atW1I
+ kKUFtHZVYNBSc9eM/ga6ucx1ImqOB7pGEJ3cR1K9OzgLm0de39dqRQs+2uDm5YRy
+ Q+ZM0FqxSJ9ZFWBG+AqEoZizuGbkcDi9bQdphzgMcyphaxjrNRRR/sd9TL/TZuSj
+ 2JMU1t2U96LNubnV45R5u7pjTwdqvrK7ChZtFJ7fdLbq7byfUCZIYUE/+/GrzJNl
+ xOeqvcdO279aAt34sYFPCqg0fT95JB6gRkBmgkPObzs/bi+3CutAUyRjV82zJz1t
+ uXVMb7A0feh90KVVIpZV4+j2oOlh9qrPKtvGKPsh9UwBHxFbSXU=
+ =ADCY
+ -----END PGP SIGNATURE-----
+---
+d77ee315a7688cffb5fd55870c38231403ecc41f	refs/heads/codex/phase3a1b-p6-golden-path
+95503:remain blocked on D.110c-0c1a GREEN before any `v3-live.ts` or issuance-store
+95543:protocol-contract prerequisite as D.110c-0c1a before implementation. A signed
+95546:After D.110c-0c1a GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
+95835:###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
+96034:verified, the frozen narrow D.110c-0c1a production GREEN becomes authorized.
+96126:D.110c-0c1a failure. The current registry/public-entry and affected canonical
+commit 7e2f2694cdd1b3a2feb0265dd0a73fa52dcb52dc
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 21:14:03 2026 -0400
+
+    test: capture D110c issuance checkpoint red
+
+ .../SHA256SUMS                                     |   4 +
+ .../command.txt                                    |   1 +
+ .../metadata.json                                  |  15 ++
+ .../prompt.md                                      |  44 +++++
+ .../result.md                                      |  45 +++++
+ .logs/d110c-0c1a-red-add7f7dc/SHA256SUMS           |  10 ++
+ .logs/d110c-0c1a-red-add7f7dc/SOURCE-SHA256SUMS    |   2 +
+ .logs/d110c-0c1a-red-add7f7dc/audit.json           |  25 +++
+ .logs/d110c-0c1a-red-add7f7dc/focused.command      |   1 +
+ .logs/d110c-0c1a-red-add7f7dc/focused.status       |   1 +
+ .logs/d110c-0c1a-red-add7f7dc/focused.stdout.txt   |  15 ++
+ .logs/d110c-0c1a-red-add7f7dc/list.command         |   1 +
+ .logs/d110c-0c1a-red-add7f7dc/list.json            |   6 +
+ .logs/d110c-0c1a-red-add7f7dc/list.status          |   1 +
+ .logs/d110c-0c1a-red-add7f7dc/static-gates.txt     |  13 ++
+ .logs/d110c-0c1a-red-add7f7dc/vitest.json          |   1 +
+ .../production-hardening-tdd-plan-v2.md            |  44 ++++-
+ .../retirement-checkpoint-contract.ts              | 189 +++++++++++++++++++++
+ ...6b-d110c-0c1a-retirement-checkpoint-red.test.ts | 115 +++++++++++++
+ 19 files changed, 531 insertions(+), 2 deletions(-)
+###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
+
+**Status: causal RED is signed/pushed; bounded production GREEN and retained
+gates pass locally; the signed/pushed GREEN checkpoint and governing final
+plan→RED→GREEN review remain before closure.** Owner:
+protocol-v3 creator retirement record/opener and one-use signing request,
+keychain finality signing dispatch, the creator-close row/graph/replay capture,
+the Node-private
+`inspectCreatorTransitionAdvance()` exact-one normalization law across all
+stage/adoption/cold-reopen/pending-resume consumers, and pending/reopen AHE
+closure preservation. The underlying control-plane trust predicates remain
+unchanged: the Node-private wrapper strips and verifies exactly the permitted
+retirement ref/candidate pair from detached predicate inputs before invoking
+them. Candidate authenticity is not delegated to this structural normalization:
+every stage/verify consumer must first open the exact candidate against
+pinned-genesis creator trust and its independently authenticated
+current/successor floor, then pass that selected pair to the wrapper. After the
+inner verdict, stage mode preserves its existing retiring Cut/QC/ACL filter and
+restores only the opened successor retirement ref/candidate to that accepted
+proposal; verify mode preserves the stored closure and applies only the same
+retirement-pair normalization for predicate evaluation. Deadline: GREEN before
+D.110c-0c1 may
+change `creatorFilteredIssuanceStore()`, before D.110c-0c may claim its
+same-process epoch-3 reopen, and before D.110c-c/d or Phase 7 consumes repeated
+epochs.
+
+The tests-only RED uses a fresh genuine 0→1 creator close. It proves the current
+proposed closure contains zero authenticated
+`drp-creator-issuance-retirement-state` candidates even though the exact
+issuance lineage and pending bootstrap row exist, and terminates only with
+`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`. A second product-shaped row
+extends the lineage before close and must leave the same exact causal failure;
+no fixture writes a carrier or mutates the AHE closure. The RED evidence records
+and **asserts** the exact dense row keys/digests, issued/outbox byte equality,
+lineage, graph membership, durable-replay membership, and exact
+cut/QC/snapshot/successor identities before inspecting the selected closure.
+Per-row replay membership is discharged without a new product export: the RED
+asserts the sealed-replay `verify()` result, exact per-row issued/outbox bytes,
+and the independently recomputed close-set root/count that includes those row
+digests. Each refusal records a subclass (`missing-carrier`,
+`empty-initialization`, `exhausted-lineage`, or `non-dense-derivation`) beside
+the shared closed token.
+It records the one-test/one-file listing, reporter counts, and complete token.
+Any earlier close failure, different missing candidate, incomplete mint input,
+or hidden source mutation stops the slice.
+
+GREEN implements only the reviewed carrier prerequisite:
+
+1. add the exact source-owned control-record kind/domain constant, canonical
+   capture, prepare/complete/open APIs, opaque verified capability, frozen
+   domain-separated genesis prior-digest sentinel, and one-use signing request;
+   do not edit `registry-v1.json` or its normative wire table;
+2. extend finality-key custody only with the matching protocol-owned request;
+   arbitrary-digest signing remains impossible;
+3. derive the bounded dense admitted boundary through genuine creator close
+   graph, issuance, and durable-replay owners before producing the
+   successor-bound record; pending admitted rows are covered but remain pending,
+   while empty initialization and exhausted lineage refuse without an unbounded
+   scan;
+4. make the Node-private transition wrapper accept only these normalized laws:
+   epoch-0 initialization adds exactly one record and N≥1 replaces exactly one
+   prior record with exactly one successor. It removes those exact ref/candidate
+   pairs from detached current/proposed inputs before calling the unchanged
+   existing control-plane predicate, rejects every other
+   added/dropped/unknown candidate with the existing reason, preserves the
+   existing stage-only retiring Cut/QC/ACL filtering, and restores only the
+   opened successor retirement pair to the inner accepted proposal. The same
+   predicate normalization applies in stage and all four verify-mode
+   consumers;
+5. stage exactly one signed record in the proposed AHE closure, preserve it
+   through pending process death, and replace the adjacent predecessor record
+   with no third active/pending copy or uncounted sibling state;
+6. enforce fresh 0→1 initialization, ordinary monotonic advance,
+   same-boundary advance, and inherited epoch≥1 missing-record refusal pending
+   a separately reviewed migration;
+   and
+7. expose no filter/skip decision yet. D.110c-0c1 remains the sole consumer
+   that classifies old addresses from the verified capability.
+
+Adversarial GREEN rows cover wrong creator signer, altered signature/preimage,
+wrong object/genesis/author/current or successor head, wrong Cut/QC/snapshot,
+stale prior digest, decreased or jumped sequence, inconsistent exhausted/next,
+missing/duplicate record, duplicate/gapped issued address, issued/outbox
+substitution, pending admitted row, issued-but-unadmitted suffix, admitted row
+after a gap, valid same-room fork, graph/replay omission, post-capture mutation,
+ambiguous persistence, wrong/null genesis sentinel use, empty initialization,
+exhausted lineage single refusal, canonical record above the 8,192-byte
+scannable bound, consumed-signing-request reuse, cross-request-type dispatch,
+pending-floor stable/candidate selection, and replay after candidate
+replacement. The closure census proves exactly one retirement candidate in the
+active closure and at most one adjacent candidate in the staged/pending
+generation. Older records in the two retained rollback generations are counted
+separately as bounded rollback state, never opener authority; no third
+active/pending copy or uncounted sibling exists. Each record is at most 8,192
+bytes and active control bytes remain constant with epoch count for fixed
+scope/field sizes.
+
+Focused protocol/keychain/control-plane/Node tests run once for RED and once for
+GREEN. GREEN then retains creator close/seal/QC, 0b0/0b1 checkpoint opening and
+bounded closure, 0c pending process-death, Phase-6a adoption/reopen,
+issuance/outbox/offline-rebase, AHE crash/CAS, snapshot, D.109 pruning/runtime
+reclamation, and current protocol-v3 canonical/registry suites. Exact affected
+package builds and production-source typechecks, exact-owner lint/format/diff,
+source/export shape, protected paths, 27 stashes, process/ports, signed commits,
+pushed refs, hashes, and self-excluding manifests remain mandatory. D.110a's
+consumed full/preflight identities and every retained campaign remain excluded.
+
+Because 0c1a changes a signed protocol control carrier adjacent to authority,
+restart, pruning, and compatibility, this plan-only checkpoint receives the
+governing Grok 4.6/high, standard direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review before RED. Only P0/P1
+blocks. Corrections that alter carrier fields, authority, compatibility, or
+executable acceptance receive at most one confirmation; P2/bookkeeping does not
+recurse. The signed GREEN later receives the single complete plan→RED→GREEN
+review. If the review cannot accept this exact local signed carrier without an
+epoch-anchor/Cut wire change, public product API, new dependency, or different
+authority assumption, stop and reslice that demonstrated requirement rather
+than widening 0c1a. No Fable or collaboration subagent runs.
+
+The plan review of signed/pushed commit
+`fc384d1fe3d503bb9e3706e97bf62bea39fe8a7c` returned
+`CHANGES_REQUIRED` from all three reviewers. Grok's initial 24-turn request was
+service-cancelled without a verdict at 720.291 seconds and was therefore
+recorded honestly as `NO_VERDICT`; exact session
+`01a0649a-9cee-7dd1-8241-41f673464078` was resumed once and emitted the terminal
+review. Grok and Kimi each found the pending-row/empty-or-exhausted-lineage
+contradiction. Opus independently found those issues, the closure predicate's
+exact-delta conflict, and the cross-epoch pending-row pin. The blocking union is
+closed prospectively in this corrected text by authenticating admitted history
+independently from publish/prune state, deriving only from a bounded graph/replay
+candidate set, refusing exhausted lineage without numeric traversal, and
+normalizing the exact one-candidate delta in the Node-private wrapper before
+the unchanged control-plane predicates run. Because these corrections change
+the carrier's executable semantics, one material confirmation remains required
+before RED.
+
+All P2 findings have explicit disposition here: the prior-digest sentinel and
+8,192-byte limit are frozen; opener transition checks are separated from
+cold-floor checks; the census distinguishes active/pending from retained
+rollback generations; RED asserts rather than merely records mint inputs;
+registry-v1 remains unchanged; D.109d boundary reconciliation stays owned by
+D.110c-0c1/c; creator-only means one issuance author; and the combined future
+scan ceiling receives retained counter checks. The audit root itself remains
+immutable. Its broad sentence about later registered-view scans is narrowed
+prospectively: the demonstrated seam and this prerequisite cover recovery and
+bind-time filtered views; post-activation raw-store publication/rebase behavior
+is retained and must not be relabelled as already filtered. Complete raw review
+evidence is under `.logs/d110c-0c1a-plan-review-fc384d1f/`.
+
+The single material confirmation reviewed signed/pushed correction
+`037b82442167ef27b750b2349ec66f1285780e59`. Grok 4.6/high, standard Kimi K3
+with the 100-step cap, and Opus xhigh each returned `APPROVED` with zero P0/P1.
+Their one-, three-, and four-item P2 sets respectively are dispositioned in the
+executable wording above and do not trigger another review round. Exact-session
+continuity, raw outputs, commands, statuses, and the corrected local audit are
+under `.logs/d110c-0c1a-plan-confirmation-037b8244/`; its validating
+self-excluding manifest SHA-256 is
+`b1d63cad7ca15389590739a2e83e64b10aa6024eaac3e3891af81421f2569a5d`.
+The blocking union is empty and tests-only RED is authorized. Production GREEN
+remains unauthorized until the signed/pushed causal RED is accepted.
+
+The user's expressly authorized one-off advisory Fable 5.1/high course check
+then inspected this signed state independently. Session
+`1d97d050-d284-49c1-ae23-aebdb33708fc` used effective model
+`claude-fable-5-1`, high effort, read-only permissions, and zero subagents. It
+returned `PROCEED_TO_D110C_0C1A_RED` with no P0/P1-equivalent blocker. This was
+not a governing reviewer or substitute for the completed Grok/Kimi/Opus gate.
+Its useful P2 dispositions are applied prospectively here: the genuine fixture's
+bootstrap row is pending rather than published, and the eventual GREEN owner
+set is every `inspectCreatorTransitionAdvance()` caller—one stage and four
+verify call sites—instead of relying on the stale “all three” count. Complete
+advisory evidence is under
+`.logs/d110c-0c1a-fable51-high-course-review-20260903/`; its validating
+self-excluding manifest SHA-256 is
+`3ab16462eb058285509c4fb1ce9ea34c0228dc6c15d592030bec1ba5ef445c14`.
+This consumes the one-off authorization; no further Fable run is authorized.
+
+The tests-only RED was then implemented with zero production-source diff and
+executed exactly once against base `add7f7dc8d5848c9305bec27fd4e52d4a4b358b3`.
+The exact listing selected one test in one file and no retained-campaign title.
+The genuine creator close completed epoch 0→1 with dense issuance keys
+`[0,1,2]`, lineage `{exhausted:false,next:3}`, three exact issued/outbox/journal
+cross-links, observed publication states `[pending,pending,pending]`, verified
+sealed replay, close-set count/history size `3`, independently matching
+close-set/history root
+`c14dfa31eaab315aa0a435cdf3e5f042a9a5994177f093c91c43e1f6cce690e2`,
+and exact Cut/QC/snapshot/successor identities. Only after those assertions, the
+proposed closure's zero retirement candidates produced the sole failed test and
+exact token `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`, recorded with
+subclass `missing-carrier`. Reporter totals were one total, zero passed, one
+failed, zero skipped/todo, zero top-level errors; exit `1` is the accepted RED.
+The temporary standalone test-tsconfig diagnostic failed only because root
+NodeNext resolution has no root `@ts-drp` workspace links; it was removed before
+collection/execution and was not classified as a code failure. Exact-owner
+ESLint, Prettier, diff, protected-path, 27-stash, port, and zero-production-diff
+gates passed. Complete evidence is under
+`.logs/d110c-0c1a-red-add7f7dc/`; its validating self-excluding manifest SHA-256
+is `5726596405fe05894c2b796b1e400406ef11aaa1c07e07a2d0cee2e216829053`.
+This is the accepted causal RED; once its signed commit and pushed ref are
+verified, the frozen narrow D.110c-0c1a production GREEN becomes authorized.
+
+The causal RED is signed/pushed commit
+`7e2f2694cdd1b3a2feb0265dd0a73fa52dcb52dc`, tree
+`bcf8073f2d41c92c30eb17944f595291b23d584b`, with a good Faolain GPG
+signature and an exact remote branch ref. GREEN therefore proceeded without
+changing the frozen carrier design. Protocol-v3 now owns the exact canonical
+record, 8,192-byte limit, opaque verified capability, frozen genesis sentinel,
+and destructively one-use signing request; keychain dispatch signs only that
+protocol-authored request. Creator close derives the cumulative per-author
+admitted frontier only from complete dense issued/outbox agreement, exact
+nested scope/sequence/preimage/digest/signature equality, authenticated graph
+membership, sealed durable replay, and an exact non-exhausted lineage suffix
+bounded by `maxEpochVertices`. Pending admitted rows remain admitted; a
+post-boundary suffix absent from the close graph remains pending; gaps,
+substitution, graph re-entry after the first omitted row, exhaustion, incomplete
+lineage, empty initialization, and over-limit scans fail closed with the frozen
+unavailable token.
+
+The Node-private transition owner is now the single normalization seam for the
+one stage and four verify consumers. It opens the exact current/proposed
+carrier against independently authenticated adjacent floors and exact Cut/QC/
+snapshot identities, checks the carrier's closed anchor/epoch/object against
+the Cut, requires exact candidate/ref occurrence, accepts only epoch-0
+zero-to-one initialization or N≥1 one-to-one linked replacement, strips only
+that pair for the unchanged inner predicates, and restores only the opened
+successor carrier in stage mode. It exposes no issuance skip/filter decision.
+`registry-v1.json` and its normative wire table, `v3-live.ts`, dependencies,
+thresholds, and the protocol-v3 root export roster are unchanged.
+
+The final focused execution passes 2/2. It proves the genuine dense epoch-0
+close carrier; exact opener and recreation bytes; signature/preimage/head/Cut/
+QC/snapshot/sentinel/lineage/size mutants; exact missing, duplicate,
+candidate-only, ref-only, and duplicate-ref closure failures; one-use and
+cross-request signing refusal; an authenticated epoch-1 replacement whose
+tracked author boundary remains unchanged across a genuine nonempty Cut; and a
+valid creator-signed same-room stale-prior fork rejected with exact
+`TRUST_CLOSURE_INVALID`. Its evidence root is
+`.logs/d110c-0c1a-green-adversarial-final-7e2f2694/`; the three-entry
+self-excluding manifest SHA-256 is
+`9ebd55702fc02f46ecfd6f972b9afe839c754e5a45a7eac0dca65a3335e9db72`.
+
+The final retained unit run passes 230/230 with zero skip/todo across 24
+affected files, including creator close/adoption, successor activation/local
+author/product, genuine 0→1→2 checkpoint/census, issuance/outbox/rebase, AHE,
+snapshot quarantine, storage-node death/reopen, and the current registry suite.
+Its evidence root is
+`.logs/d110c-0c1a-green-retained-post-refactor-7e2f2694/`; manifest SHA-256 is
+`8a3ba7c69c15d70c3ec7580bbf5daca5b4ddae52cba5af82d2bdca98c3af6c8e`.
+Retained browser results are live close 9/9, adoption commit 6/6, successor
+activation 24/24, successor product 30/30 with only the separately preserved
+D.110c-0c causal RED selected out, successor epoch 3/3, AHE reclamation 4/4,
+and issuance retention 4/4. Stdout/status and reporter-JSON manifest SHA-256s
+are respectively
+`3eb2fba5e6d2c2d4ed6961c86771ae8b8d7fe35db96c8de6c988a846b33b3a1a`
+and
+`7a09bc9d7fa06721b9244d915407e185a3570a292a9970555c4c85219269ad04`.
+After the final fail-closed scan tightening, live close repeated 9/9 and the
+genuine three-engine D.110c-b 0→1→2 hot loop repeated 3/3; their paired
+manifest SHA-256s are
+`b6f7ce68ad3aa375ed3f3dfa62d7a2845d1bfa8db97ce8ba2683538f93d284ee`
+and
+`e13a26535d1c89c38fefaf1ce136dc8379a179046d4548e29c99e1f449a9055a`.
+
+Protocol-v3 typecheck/build/public-entry audit, keychain typecheck/build, Node
+production-source no-emit typecheck/build, storage-browser build, actual
+Node-consumer built-subpath import, exact-owner ESLint, 8-GiB Prettier, diff,
+and source-shape gates pass. The source audit proves exactly five wrapper call
+sites (one stage/four verify), the compound cursor order
+`[objectId, author, sequence]`, exact dense-lineage equality, the 8,192-byte
+bound, and zero registry/`v3-live.ts` diff. Static-root manifest SHA-256 is
+`e8e24b3de4b9a979e76f10c1df0a1e305a9ed9206b36aa594e346cde4faa7072`;
+the consolidated closure ledger is
+`.logs/d110c-0c1a-green-closure-7e2f2694/` with validating manifest SHA-256
+`74389094ae89affe4e76f82966bb856f9e5c96a675f3f9333cfd82d161410b6e`.
+
+Preserved non-product corrections remain explicit. The first same-boundary
+probe attempted a prohibited empty Cut and correctly met the pre-existing
+`CUT_VALUE_MISMATCH`; the accepted control instead uses a genuine nonempty Cut
+with an unchanged tracked-author frontier. A selector initially read `epoch`
+instead of `closedEpoch`; a live-close browser expectation omitted the new
+required ref; a bare-subpath smoke ran from the intentionally unlinked monorepo
+root rather than the actual Node consumer; and initial lint found only import
+order/return-type issues. Each diagnostic was corrected without weakening a
+contract. A first macOS `pgrep -a` process counter also counted its own shell
+PIDs because that platform emitted PIDs rather than command lines; the
+corrected `ps`-based predicate records zero relevant processes, zero protected
+port listeners, all three protected paths, and all 27 stashes. The successful
+final evidence is separate. The unrelated
+N1-prime canonical source-shape test still expects historical source hash
+`25ca…` while the signed repository has long contained `49b585…`; it remains
+explicit inherited test-contract debt and was not repinned or represented as a
+D.110c-0c1a failure. The current registry/public-entry and affected canonical
+behavior gates pass. The signed downstream D.110c-0c failure remains owned by
+D.110c-0c1 and was neither rerun nor weakened. D.110a and campaign identities
+remain excluded.
+
+The complete confirmation evidence is retained under
+`.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+self-excluding manifest SHA-256 is
+`5f932353bbd41bffc697424adfbe2c9a2835ac79de6f2dc9e51e6c455ae6a9e7`.
+
+The prerequisite decisions, including 0b0 freshness-floor authority and 0c1a
+issuance-retirement authority, are reviewed before their production edits; each
+executable sub-slice receives its own bounded causal RED and GREEN. The
+umbrella's minimum functional GREEN is not satisfied until
+D.110c-0a/0b0/0b/0b1/0c1a/0c1/0c/a/b/c jointly prove one genuine room completes
+epoch 0→1, restart/reopen, epoch 1→2,
+continued issue/publish after epoch 2, and cold recovery with exact application
+state, ACL, writer authority, current anchor/trust, compact history,
+archive-index root, snapshots, journals, and operation accounting. A second
+close that only returns an epoch number is not acceptance.
+
+##### Retained long-horizon and golden-path acceptance
+
+D.110c-d must prove, in a fresh process where required, all of the following:
+
+- at least 100 genuine transitions on one production room, with strictly
+  increasing epochs and authenticated anchor/QC/cut lineage;
+- exact compact-history root and size extension at every step, with no skipped,
+  duplicated, reordered, or substituted epoch and no same-anchor double close;
+- real issue/admit/apply/publish work before and after selected transitions,
+  exact aggregate operation accounting, exact application state, and an
+  independently derived semantic digest;
+- restart/reopen at selected pre-close, post-close, pre-adoption,
+  post-adoption, and post-prune boundaries, including offline/rebase outbox and
+  first-successful-publication continuity;
+     453 /tmp/green-protocol.diff
+     670 /tmp/green-node.diff
+commit d77ee315a7688cffb5fd55870c38231403ecc41f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 22:28:00 2026 -0400
+
+    feat: authenticate creator issuance retirement
+
+diff --git a/packages/protocol-v3/package.json b/packages/protocol-v3/package.json
+index 9df198de..8326bc1f 100644
+--- a/packages/protocol-v3/package.json
++++ b/packages/protocol-v3/package.json
+@@ -42,6 +42,10 @@
+ 			"types": "./dist/src/creator-checkpoint.d.ts",
+ 			"import": "./dist/src/creator-checkpoint.js"
+ 		},
++		"./creator-issuance-retirement": {
++			"types": "./dist/src/creator-issuance-retirement.d.ts",
++			"import": "./dist/src/creator-issuance-retirement.js"
++		},
+ 		"./seal": {
+ 			"types": "./dist/src/seal.d.ts",
+ 			"import": "./dist/src/seal.js"
+@@ -54,6 +58,10 @@
+ 			"types": "./dist/src/internal/creator-anchor-signing-request.d.ts",
+ 			"import": "./dist/src/internal/creator-anchor-signing-request.js"
+ 		},
++		"./internal/creator-issuance-retirement-signing-request": {
++			"types": "./dist/src/internal/creator-issuance-retirement-signing-request.d.ts",
++			"import": "./dist/src/internal/creator-issuance-retirement-signing-request.js"
++		},
+ 		"./internal/seal-authority-identity": {
+ 			"types": "./dist/src/internal/seal-authority-identity.d.ts",
+ 			"import": "./dist/src/internal/seal-authority-identity.js"
+diff --git a/vite.config.mts b/vite.config.mts
+index 60bc7d8a..46787ebb 100644
+--- a/vite.config.mts
++++ b/vite.config.mts
+@@ -27,6 +27,10 @@ const config = defineConfig({
+ 				__dirname,
+ 				"packages/protocol-v3/src/internal/creator-anchor-signing-request.ts"
+ 			),
++			"@ts-drp/protocol-v3/internal/creator-issuance-retirement-signing-request": path.resolve(
++				__dirname,
++				"packages/protocol-v3/src/internal/creator-issuance-retirement-signing-request.ts"
++			),
+ 			"@ts-drp/protocol-v3/internal/seal-signing-request": path.resolve(
+ 				__dirname,
+ 				"packages/protocol-v3/src/internal/seal-signing-request.ts"
+@@ -40,6 +44,10 @@ const config = defineConfig({
+ 				"packages/protocol-v3/src/creator-checkpoint.ts"
+ 			),
+ 			"@ts-drp/protocol-v3/creator-close": path.resolve(__dirname, "packages/protocol-v3/src/creator-close.ts"),
++			"@ts-drp/protocol-v3/creator-issuance-retirement": path.resolve(
++				__dirname,
++				"packages/protocol-v3/src/creator-issuance-retirement.ts"
++			),
+ 			"@ts-drp/protocol-v3/seal": path.resolve(__dirname, "packages/protocol-v3/src/seal.ts"),
+ 			"@ts-drp/storage-browser/seal-vote": path.resolve(__dirname, "packages/storage-browser/src/seal-vote.ts"),
+ 			"@ts-drp/seal/internal/storage-port": path.resolve(__dirname, "packages/seal/src/storage-port.ts"),
+commit d77ee315a7688cffb5fd55870c38231403ecc41f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 22:28:00 2026 -0400
+
+    feat: authenticate creator issuance retirement
+
+diff --git a/packages/protocol-v3/src/creator-issuance-retirement.ts b/packages/protocol-v3/src/creator-issuance-retirement.ts
+new file mode 100644
+index 00000000..176bb164
+--- /dev/null
++++ b/packages/protocol-v3/src/creator-issuance-retirement.ts
+@@ -0,0 +1,403 @@
++import { ed25519 } from "@noble/curves/ed25519.js";
++import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
++
++import type { CurrentAnchorTrust } from "./index.js";
++import {
++	type CreatorIssuanceRetirementSigningRequest,
++	mintCreatorIssuanceRetirementSigningRequest,
++} from "./internal/creator-issuance-retirement-signing-request.js";
++import { resolveCreatorAnchorTrustMaterial } from "./internal/seal-authority-custody.js";
++
++export const CREATOR_ISSUANCE_RETIREMENT_KIND = "drp-creator-issuance-retirement-state" as const;
++export const CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES = 8192 as const;
++export const CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE = "D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE" as const;
++export const CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL = hex(
++	hashDomain(
++		"ts-drp/creator-issuance-retirement/genesis/v1",
++		encodeCanonical({ kind: "drp-creator-issuance-retirement-genesis", version: 1 })
++	)
++);
++
++const DOMAIN = "ts-drp/creator-issuance-retirement/v1";
++const DIGEST = /^[0-9a-f]{64}$/u;
++const PREIMAGE_KEYS = Object.freeze([
++	"admittedAuthorSequence",
++	"author",
++	"closedAnchorDigest",
++	"closedEpoch",
++	"commitQcRef",
++	"cutValueDigest",
++	"genesisAnchorDigest",
++	"kind",
++	"objectId",
++	"observedLineage",
++	"priorAdmittedAuthorSequence",
++	"priorRetirementCandidateDigest",
++	"protocolMajor",
++	"snapshotManifestDigest",
++	"successorAnchorDigest",
++	"successorEpoch",
++	"version",
++] as const);
++const RECORD_KEYS = Object.freeze([...PREIMAGE_KEYS, "detachedCreatorSignature"] as const);
++const PREPARE_INPUT_KEYS = Object.freeze([
++	"admittedAuthorSequence",
++	"author",
++	"commitQcRef",
++	"currentTrust",
++	"cutValueDigest",
++	"observedLineage",
++	"priorAdmittedAuthorSequence",
++	"priorRetirementCandidateDigest",
++	"snapshotManifestDigest",
++	"successorTrust",
++] as const);
++
++export interface CreatorIssuanceRetirementRef {
++	readonly byteLength: number;
++	readonly digest: string;
++}
++
++export interface CreatorIssuanceRetirementLineage {
++	readonly exhausted: boolean;
++	readonly next: number;
++}
++
++export interface CreatorIssuanceRetirementIdentity {
++	readonly admittedAuthorSequence: number;
++	readonly author: string;
++	readonly closedAnchorDigest: string;
++	readonly closedEpoch: number;
++	readonly commitQcRef: CreatorIssuanceRetirementRef;
++	readonly cutValueDigest: string;
++	readonly genesisAnchorDigest: string;
++	readonly objectId: string;
++	readonly observedLineage: CreatorIssuanceRetirementLineage;
++	readonly priorAdmittedAuthorSequence: number | null;
++	readonly priorRetirementCandidateDigest: string;
++	readonly snapshotManifestDigest: string;
++	readonly successorAnchorDigest: string;
++	readonly successorEpoch: number;
++}
++
++export interface CreatorIssuanceRetirementPreparation {
++	readonly __creatorIssuanceRetirementPreparation?: never;
++}
++
++export interface VerifiedCreatorIssuanceRetirement {
++	readonly __verifiedCreatorIssuanceRetirement?: never;
++}
++
++interface PreparationState {
++	readonly digest: Uint8Array;
++	readonly preimage: Readonly<Record<string, unknown>>;
++	readonly publicKey: Uint8Array;
++}
++
++const preparations = new WeakMap<CreatorIssuanceRetirementPreparation, PreparationState>();
++const verified = new WeakMap<VerifiedCreatorIssuanceRetirement, CreatorIssuanceRetirementIdentity>();
++
++function hex(bytes: Uint8Array): string {
++	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
++}
++
++function plainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
++	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
++	const prototype = Object.getPrototypeOf(value);
++	return prototype === Object.prototype || prototype === null;
++}
++
++function exactKeys(value: Readonly<Record<string, unknown>>, keys: readonly string[]): boolean {
++	const actual = Reflect.ownKeys(value);
++	return (
++		actual.length === keys.length &&
++		actual.every((key) => typeof key === "string" && keys.includes(key)) &&
++		keys.every((key) => {
++			const descriptor = Object.getOwnPropertyDescriptor(value, key);
++			return descriptor?.enumerable === true && "value" in descriptor;
++		})
++	);
++}
++
++function safeSequence(value: unknown): value is number {
++	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
++}
++
++function validRef(value: unknown): value is CreatorIssuanceRetirementRef {
++	return (
++		plainRecord(value) &&
++		exactKeys(value, ["byteLength", "digest"]) &&
++		typeof value.byteLength === "number" &&
++		Number.isSafeInteger(value.byteLength) &&
++		value.byteLength > 0 &&
++		typeof value.digest === "string" &&
++		DIGEST.test(value.digest)
++	);
++}
++
++function validLineage(value: unknown): value is CreatorIssuanceRetirementLineage {
++	return (
++		plainRecord(value) &&
++		exactKeys(value, ["exhausted", "next"]) &&
++		value.exhausted === false &&
++		safeSequence(value.next)
++	);
++}
++
++function identityFromRecord(record: Readonly<Record<string, unknown>>): CreatorIssuanceRetirementIdentity {
++	const ref = record.commitQcRef as CreatorIssuanceRetirementRef;
++	const lineage = record.observedLineage as CreatorIssuanceRetirementLineage;
++	return Object.freeze({
++		admittedAuthorSequence: record.admittedAuthorSequence as number,
++		author: record.author as string,
++		closedAnchorDigest: record.closedAnchorDigest as string,
++		closedEpoch: record.closedEpoch as number,
++		commitQcRef: Object.freeze({ byteLength: ref.byteLength, digest: ref.digest }),
++		cutValueDigest: record.cutValueDigest as string,
++		genesisAnchorDigest: record.genesisAnchorDigest as string,
++		objectId: record.objectId as string,
++		observedLineage: Object.freeze({ exhausted: lineage.exhausted, next: lineage.next }),
++		priorAdmittedAuthorSequence: record.priorAdmittedAuthorSequence as number | null,
++		priorRetirementCandidateDigest: record.priorRetirementCandidateDigest as string,
++		snapshotManifestDigest: record.snapshotManifestDigest as string,
++		successorAnchorDigest: record.successorAnchorDigest as string,
++		successorEpoch: record.successorEpoch as number,
++	});
++}
++
++function copiedIdentity(identity: CreatorIssuanceRetirementIdentity): CreatorIssuanceRetirementIdentity {
++	return Object.freeze({
++		...identity,
++		commitQcRef: Object.freeze({ ...identity.commitQcRef }),
++		observedLineage: Object.freeze({ ...identity.observedLineage }),
++	});
++}
++
++function validRecordFields(record: Readonly<Record<string, unknown>>): boolean {
++	return (
++		record.kind === CREATOR_ISSUANCE_RETIREMENT_KIND &&
++		record.protocolMajor === 3 &&
++		record.version === 1 &&
++		typeof record.objectId === "string" &&
++		record.objectId.length > 0 &&
++		typeof record.author === "string" &&
++		DIGEST.test(record.author) &&
++		typeof record.genesisAnchorDigest === "string" &&
++		DIGEST.test(record.genesisAnchorDigest) &&
++		safeSequence(record.closedEpoch) &&
++		typeof record.closedAnchorDigest === "string" &&
++		DIGEST.test(record.closedAnchorDigest) &&
++		safeSequence(record.successorEpoch) &&
++		record.successorEpoch === record.closedEpoch + 1 &&
++		typeof record.successorAnchorDigest === "string" &&
++		DIGEST.test(record.successorAnchorDigest) &&
++		typeof record.cutValueDigest === "string" &&
++		DIGEST.test(record.cutValueDigest) &&
++		validRef(record.commitQcRef) &&
++		typeof record.snapshotManifestDigest === "string" &&
++		DIGEST.test(record.snapshotManifestDigest) &&
++		typeof record.priorRetirementCandidateDigest === "string" &&
++		DIGEST.test(record.priorRetirementCandidateDigest) &&
++		(record.priorAdmittedAuthorSequence === null || safeSequence(record.priorAdmittedAuthorSequence)) &&
++		safeSequence(record.admittedAuthorSequence) &&
++		(record.priorAdmittedAuthorSequence === null ||
++			record.admittedAuthorSequence >= record.priorAdmittedAuthorSequence) &&
++		validLineage(record.observedLineage) &&
++		(record.observedLineage as CreatorIssuanceRetirementLineage).next > record.admittedAuthorSequence &&
++		(record.closedEpoch === 0
++			? record.priorAdmittedAuthorSequence === null &&
++				record.priorRetirementCandidateDigest === CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL
++			: record.priorAdmittedAuthorSequence !== null &&
++				record.priorRetirementCandidateDigest !== CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL)
++	);
++}
++
++function failure(reason: string): Readonly<{ ok: false; reason: string }> {
++	return Object.freeze({ ok: false as const, reason });
++}
++
++/**
++ * Prepares one creator-signed cumulative admitted frontier.
++ * @param input - Authenticated adjacent trust floors and exact close identities.
++ * @returns One-use signing preparation or a closed failure.
++ */
++export function prepareCreatorIssuanceRetirement(input: unknown): Readonly<
++	| { ok: false; reason: string }
++	| {
++			digest: string;
++			exactCanonicalPreimageBytes: Uint8Array;
++			ok: true;
++			preparation: CreatorIssuanceRetirementPreparation;
++			signingRequest: CreatorIssuanceRetirementSigningRequest;
++	  }
++> {
++	try {
++		if (!plainRecord(input) || !exactKeys(input, PREPARE_INPUT_KEYS)) {
++			return failure("MALFORMED_INPUT");
++		}
++		const current = resolveCreatorAnchorTrustMaterial(input.currentTrust as CurrentAnchorTrust);
++		const successor = resolveCreatorAnchorTrustMaterial(input.successorTrust as CurrentAnchorTrust);
++		if (
++			current === undefined ||
++			successor === undefined ||
++			current.objectId !== successor.objectId ||
++			current.genesisAnchorDigest !== successor.genesisAnchorDigest ||
++			successor.currentEpoch !== current.currentEpoch + 1 ||
++			compareBytes(current.publicKey, successor.publicKey) !== 0
++		) {
++			return failure("TRUST_INVALID");
++		}
++		const preimage = Object.freeze({
++			admittedAuthorSequence: input.admittedAuthorSequence,
++			author: input.author,
++			closedAnchorDigest: current.currentAnchorDigest,
++			closedEpoch: current.currentEpoch,
++			commitQcRef: plainRecord(input.commitQcRef)
++				? Object.freeze({ byteLength: input.commitQcRef.byteLength, digest: input.commitQcRef.digest })
++				: input.commitQcRef,
++			cutValueDigest: input.cutValueDigest,
++			genesisAnchorDigest: current.genesisAnchorDigest,
++			kind: CREATOR_ISSUANCE_RETIREMENT_KIND,
++			objectId: current.objectId,
++			observedLineage: plainRecord(input.observedLineage)
++				? Object.freeze({ exhausted: input.observedLineage.exhausted, next: input.observedLineage.next })
++				: input.observedLineage,
++			priorAdmittedAuthorSequence: input.priorAdmittedAuthorSequence,
++			priorRetirementCandidateDigest: input.priorRetirementCandidateDigest,
++			protocolMajor: 3,
++			snapshotManifestDigest: input.snapshotManifestDigest,
++			successorAnchorDigest: successor.currentAnchorDigest,
++			successorEpoch: successor.currentEpoch,
++			version: 1,
++		});
++		if (!validRecordFields(preimage)) {
++			return failure("IDENTITY_INVALID");
++		}
++		const exactCanonicalPreimageBytes = encodeCanonical(preimage);
++		const digest = hashDomain(DOMAIN, exactCanonicalPreimageBytes);
++		const preparation = Object.freeze({}) as CreatorIssuanceRetirementPreparation;
++		preparations.set(
++			preparation,
++			Object.freeze({ digest: Uint8Array.from(digest), preimage, publicKey: Uint8Array.from(current.publicKey) })
++		);
++		return Object.freeze({
++			digest: hex(digest),
++			exactCanonicalPreimageBytes: Uint8Array.from(exactCanonicalPreimageBytes),
++			ok: true as const,
++			preparation,
++			signingRequest: mintCreatorIssuanceRetirementSigningRequest(digest),
++		});
++	} catch {
++		return failure("MALFORMED_INPUT");
++	}
++}
++
++/**
++ * Completes one prepared record after verifying the detached creator signature.
++ * @param input - Opaque preparation and exact detached signature.
++ * @returns Exact signed record bytes or a closed failure.
++ */
++export function completeCreatorIssuanceRetirement(
++	input: unknown
++): Readonly<{ exactCanonicalRecordBytes: Uint8Array; ok: true } | { ok: false; reason: string }> {
++	try {
++		if (!plainRecord(input) || !exactKeys(input, ["detachedSignature", "preparation"])) {
++			return failure("MALFORMED_INPUT");
++		}
++		const state = preparations.get(input.preparation as CreatorIssuanceRetirementPreparation);
++		preparations.delete(input.preparation as CreatorIssuanceRetirementPreparation);
++		if (state === undefined) return failure("PREPARATION_UNAVAILABLE");
++		if (!(input.detachedSignature instanceof Uint8Array) || input.detachedSignature.byteLength !== 64) {
++			return failure("SIGNATURE_INVALID");
++		}
++		const signature = Uint8Array.from(input.detachedSignature);
++		if (!ed25519.verify(signature, state.digest, state.publicKey, { zip215: false })) {
++			return failure("SIGNATURE_INVALID");
++		}
++		const exactCanonicalRecordBytes = encodeCanonical({
++			...state.preimage,
++			detachedCreatorSignature: signature,
++		});
++		if (exactCanonicalRecordBytes.byteLength > CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES) {
++			return failure("RECORD_TOO_LARGE");
++		}
++		return Object.freeze({ exactCanonicalRecordBytes: Uint8Array.from(exactCanonicalRecordBytes), ok: true as const });
++	} catch {
++		return failure("MALFORMED_INPUT");
++	}
++}
++
++/**
++ * Opens one signed record against an independently authenticated current floor.
++ * @param input - Exact record, floor and expected close identities.
++ * @returns Opaque verified capability or a closed failure.
++ */
++export function openCreatorIssuanceRetirement(
++	input: unknown
++): Readonly<{ capability: VerifiedCreatorIssuanceRetirement; ok: true } | { ok: false; reason: string }> {
++	try {
++		if (
++			!plainRecord(input) ||
++			!exactKeys(input, [
++				"exactCanonicalRecordBytes",
++				"expectedCommitQcRef",
++				"expectedCutValueDigest",
++				"expectedSnapshotManifestDigest",
++				"floorTrust",
++			]) ||
++			!(input.exactCanonicalRecordBytes instanceof Uint8Array) ||
++			input.exactCanonicalRecordBytes.byteLength > CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES
++		) {
++			return failure("MALFORMED_INPUT");
++		}
++		const bytes = Uint8Array.from(input.exactCanonicalRecordBytes);
++		const decoded = decodeCanonical(bytes);
++		if (
++			!plainRecord(decoded) ||
++			!exactKeys(decoded, RECORD_KEYS) ||
++			compareBytes(encodeCanonical(decoded), bytes) !== 0
++		) {
++			return failure("RECORD_INVALID");
++		}
++		if (!validRecordFields(decoded) || !(decoded.detachedCreatorSignature instanceof Uint8Array)) {
++			return failure("RECORD_INVALID");
++		}
++		const floor = resolveCreatorAnchorTrustMaterial(input.floorTrust as CurrentAnchorTrust);
++		if (
++			floor === undefined ||
++			decoded.objectId !== floor.objectId ||
++			decoded.genesisAnchorDigest !== floor.genesisAnchorDigest ||
++			decoded.successorEpoch !== floor.currentEpoch ||
++			decoded.successorAnchorDigest !== floor.currentAnchorDigest ||
++			decoded.cutValueDigest !== input.expectedCutValueDigest ||
++			decoded.snapshotManifestDigest !== input.expectedSnapshotManifestDigest ||
++			!validRef(input.expectedCommitQcRef) ||
++			(decoded.commitQcRef as CreatorIssuanceRetirementRef).byteLength !== input.expectedCommitQcRef.byteLength ||
++			(decoded.commitQcRef as CreatorIssuanceRetirementRef).digest !== input.expectedCommitQcRef.digest
++		) {
++			return failure("IDENTITY_INVALID");
++		}
++		const { detachedCreatorSignature: signature, ...preimage } = decoded;
++		const digest = hashDomain(DOMAIN, encodeCanonical(preimage));
++		if (signature.byteLength !== 64 || !ed25519.verify(signature, digest, floor.publicKey, { zip215: false })) {
++			return failure("SIGNATURE_INVALID");
++		}
++		const capability = Object.freeze({}) as VerifiedCreatorIssuanceRetirement;
++		verified.set(capability, identityFromRecord(decoded));
++		return Object.freeze({ capability, ok: true as const });
++	} catch {
++		return failure("MALFORMED_INPUT");
++	}
++}
++
++/**
++ * Resolves detached verified identity from an opaque retirement capability.
++ * @param capability - Genuine capability returned by the opener.
++ * @returns Detached identity or undefined for foreign custody.
++ */
++export function resolveCreatorIssuanceRetirement(
++	capability: VerifiedCreatorIssuanceRetirement
++): CreatorIssuanceRetirementIdentity | undefined {
++	const identity = verified.get(capability);
++	return identity === undefined ? undefined : copiedIdentity(identity);
++}
+diff --git a/packages/protocol-v3/src/internal/creator-issuance-retirement-signing-request.ts b/packages/protocol-v3/src/internal/creator-issuance-retirement-signing-request.ts
+new file mode 100644
+index 00000000..a71046e1
+--- /dev/null
++++ b/packages/protocol-v3/src/internal/creator-issuance-retirement-signing-request.ts
+@@ -0,0 +1,32 @@
++/** Opaque one-use request for a protocol-authored issuance-retirement digest. */
++export interface CreatorIssuanceRetirementSigningRequest {
++	readonly __creatorIssuanceRetirementSigningRequest?: never;
++}
++
++const requestDigests = new WeakMap<CreatorIssuanceRetirementSigningRequest, Uint8Array>();
++
++/**
++ * Mints one fieldless request after the protocol validates the complete record preimage.
++ * @param digest - Exact domain-separated retirement-record digest.
++ * @returns One-use signing request.
++ */
++export function mintCreatorIssuanceRetirementSigningRequest(
++	digest: Uint8Array
++): CreatorIssuanceRetirementSigningRequest {
++	const request = Object.freeze({}) as CreatorIssuanceRetirementSigningRequest;
++	requestDigests.set(request, Uint8Array.from(digest));
++	return request;
++}
++
++/**
++ * Destructively resolves one genuine protocol-authored signing request.
++ * @param request - Candidate opaque request.
++ * @returns Detached digest, or undefined for foreign or consumed requests.
++ */
++export function consumeCreatorIssuanceRetirementSigningRequest(request: unknown): Uint8Array | undefined {
++	if (request === null || typeof request !== "object") return undefined;
++	const digest = requestDigests.get(request as CreatorIssuanceRetirementSigningRequest);
++	if (digest === undefined) return undefined;
++	requestDigests.delete(request as CreatorIssuanceRetirementSigningRequest);
++	return Uint8Array.from(digest);
++}
+commit d77ee315a7688cffb5fd55870c38231403ecc41f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 22:28:00 2026 -0400
+
+    feat: authenticate creator issuance retirement
+
+diff --git a/packages/keychain/src/finality.ts b/packages/keychain/src/finality.ts
+index 9e518b39..cdb3a826 100644
+--- a/packages/keychain/src/finality.ts
++++ b/packages/keychain/src/finality.ts
+@@ -4,6 +4,10 @@ import {
+ 	consumeCreatorAnchorSigningRequest,
+ 	type CreatorAnchorSigningRequest,
+ } from "@ts-drp/protocol-v3/internal/creator-anchor-signing-request";
++import {
++	consumeCreatorIssuanceRetirementSigningRequest,
++	type CreatorIssuanceRetirementSigningRequest,
++} from "@ts-drp/protocol-v3/internal/creator-issuance-retirement-signing-request";
+ import { consumeSealSigningRequest, type SealSigningRequest } from "@ts-drp/protocol-v3/internal/seal-signing-request";
+ 
+ declare const finalitySignerBrand: unique symbol;
+@@ -155,3 +159,33 @@ export async function signCreatorAnchorRequest(
+ 	const digest = exactBytes(consumed, 32, "creator anchor digest must be exactly 32 bytes");
+ 	return copyLibrarySignature(await state.privateKey.sign(digest));
+ }
++
++/**
++ * Signs one protocol-authored, one-use creator issuance-retirement request.
++ * @param input - Opaque signer and retirement signing request.
++ * @returns Detached exact Ed25519 signature bytes.
++ */
++export async function signCreatorIssuanceRetirementRequest(
++	input: Readonly<{
++		request: CreatorIssuanceRetirementSigningRequest;
++		signer: FinalitySigner;
++	}>
++): Promise<Uint8Array> {
++	if (
++		input === null ||
++		typeof input !== "object" ||
++		Reflect.ownKeys(input).length !== 2 ||
++		!Object.hasOwn(input, "request") ||
++		!Object.hasOwn(input, "signer")
++	) {
++		throw new TypeError("creator issuance-retirement signing input is malformed");
++	}
++	const state = signerStates.get(input.signer);
++	if (state === undefined) throw new TypeError("untrusted finality signer");
++	const consumed = consumeCreatorIssuanceRetirementSigningRequest(input.request);
++	if (consumed === undefined) {
++		throw new TypeError("untrusted or consumed creator issuance-retirement signing request");
++	}
++	const digest = exactBytes(consumed, 32, "creator issuance-retirement digest must be exactly 32 bytes");
++	return copyLibrarySignature(await state.privateKey.sign(digest));
++}
+diff --git a/packages/node/src/creator-adoption-commit.ts b/packages/node/src/creator-adoption-commit.ts
+index 6adebe43..f95b50c5 100644
+--- a/packages/node/src/creator-adoption-commit.ts
++++ b/packages/node/src/creator-adoption-commit.ts
+@@ -389,9 +389,11 @@ function validTrustChain(
+ 	}
+ 	return inspectCreatorTransitionAdvance({
+ 		current: { candidates: currentCandidates, closure: facts.currentReferences },
++		currentTrust: facts.currentTrust,
+ 		mode: "verify",
+ 		proofRefs: [facts.closeResult.cutValueRef, facts.closeResult.commitQcRef],
+ 		proposed: { candidates: pendingCandidates, closure: facts.proposedReferences },
++		successorTrust: opened.trust,
+ 	}).ok;
+ }
+ 
+diff --git a/packages/node/src/creator-adoption.ts b/packages/node/src/creator-adoption.ts
+index 8f1ad31d..068668b6 100644
+--- a/packages/node/src/creator-adoption.ts
++++ b/packages/node/src/creator-adoption.ts
+@@ -357,9 +357,11 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
+ 	}
+ 	const advance = inspectCreatorTransitionAdvance({
+ 		current: { candidates: closure.currentCandidates, closure: facts.currentReferences },
++		currentTrust: facts.currentTrust,
+ 		mode: "verify",
+ 		proofRefs: [closeResult.cutValueRef, closeResult.commitQcRef],
+ 		proposed: { candidates: closure.proposedCandidates, closure: facts.proposedReferences },
++		successorTrust: opened.trust,
+ 	});
+ 	if (!advance.ok) return undefined;
+ 	const cut = canonicalRecord(cutBytes);
+@@ -1055,9 +1057,11 @@ async function reopenCreatorSuccessorMaterial(
+ 		if (
+ 			!inspectCreatorTransitionAdvance({
+ 				current: { candidates: currentCandidates, closure: currentGeneration.closure },
++				currentTrust: predecessorTrust,
+ 				mode: "verify",
+ 				proofRefs: [cutCandidate.ref, selectedQc.ref],
+ 				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
++				successorTrust,
+ 			}).ok
+ 		) {
+ 			return coldFailure("chain-invalid", "creator successor trust advance is invalid");
+@@ -1389,9 +1393,11 @@ async function authenticatePendingCandidate(
+ 			!sameRoomHead(roomHeadFromTrust(successorTrust), expectedNext) ||
+ 			!inspectCreatorTransitionAdvance({
+ 				current: { candidates: currentCandidates, closure: currentGeneration.closure },
++				currentTrust: predecessorTrust,
+ 				mode: "verify",
+ 				proofRefs: [cutCandidate.ref, selectedQc.ref],
+ 				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
++				successorTrust,
+ 			}).ok
+ 		) {
+ 			return undefined;
+diff --git a/packages/node/src/creator-close.ts b/packages/node/src/creator-close.ts
+index c3ffcd34..cdef2f86 100644
+--- a/packages/node/src/creator-close.ts
++++ b/packages/node/src/creator-close.ts
+@@ -1,15 +1,30 @@
+-import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
++import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+ import { type AccumulatorSnapshot, deriveCloseSetHistoryCommitment, type EpochVertex } from "@ts-drp/compaction";
+ import {
+ 	type SnapshotVerificationReceipt,
+ 	verifySnapshotStreamWithReceipt,
+ } from "@ts-drp/compaction/snapshot-quarantine-receipt";
+ import { inspectTrustClosure } from "@ts-drp/control-plane";
+-import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
+-import type { FinalitySigner } from "@ts-drp/keychain/finality";
++import {
++	type DurableIssuanceOutboxRecord,
++	type DurableIssuanceStore,
++	type DurableIssueCommit,
++	type DurableIssueScope,
++	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
++} from "@ts-drp/issuance-store";
++import { type FinalitySigner, signCreatorIssuanceRetirementRequest } from "@ts-drp/keychain/finality";
+ import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
+ import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+ import { openCreatorSuccessorTrust, prepareCreatorClose } from "@ts-drp/protocol-v3/creator-close";
++import {
++	completeCreatorIssuanceRetirement,
++	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
++	CREATOR_ISSUANCE_RETIREMENT_KIND,
++	CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE,
++	openCreatorIssuanceRetirement,
++	prepareCreatorIssuanceRetirement,
++	resolveCreatorIssuanceRetirement,
++} from "@ts-drp/protocol-v3/creator-issuance-retirement";
+ import {
+ 	decodeSnapshotManifest,
+ 	encodeSnapshotTransfer,
+@@ -223,6 +238,210 @@ function hex(bytes: Uint8Array): string {
+ 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+ }
+ 
++type InspectedHead = Awaited<ReturnType<typeof inspectHead>>;
++
++function uniqueRecordCandidate(
++	candidates: InspectedHead["candidates"],
++	kind: string,
++	epoch?: number,
++	phase?: string
++): InspectedHead["candidates"][number] | undefined {
++	const matches = candidates.filter((candidate) => {
++		try {
++			const value = decodeCanonical(candidate.bytes);
++			return (
++				plainRecord(value) &&
++				value.kind === kind &&
++				(epoch === undefined ||
++					(value.kind === "drp-anchor-trust-state" ? value.currentEpoch : value.epoch) === epoch) &&
++				(phase === undefined || value.phase === phase)
++			);
++		} catch {
++			return false;
++		}
++	});
++	return matches.length === 1 ? matches[0] : undefined;
++}
++
++function sameIssuanceScope(left: DurableIssueScope, right: DurableIssueScope): boolean {
++	return left.author === right.author && left.objectId === right.objectId;
++}
++
++function exactIssuanceCommit(commit: DurableIssueCommit, scope: DurableIssueScope, authorSequence: number): boolean {
++	return (
++		commit.authorSequence === authorSequence &&
++		commit.issuedRecord.authorSequence === authorSequence &&
++		commit.outboxEntry.authorSequence === authorSequence &&
++		sameIssuanceScope(commit.issuedRecord.scope, scope) &&
++		sameIssuanceScope(commit.outboxEntry.scope, scope) &&
++		compareBytes(commit.envelope.canonicalPreimageBytes, commit.issuedRecord.envelope.canonicalPreimageBytes) === 0 &&
++		compareBytes(commit.envelope.canonicalPreimageBytes, commit.outboxEntry.envelope.canonicalPreimageBytes) === 0 &&
++		compareBytes(commit.envelope.digest, commit.issuedRecord.envelope.digest) === 0 &&
++		compareBytes(commit.envelope.digest, commit.outboxEntry.envelope.digest) === 0 &&
++		compareBytes(commit.envelope.signature, commit.issuedRecord.envelope.signature) === 0 &&
++		compareBytes(commit.envelope.signature, commit.outboxEntry.envelope.signature) === 0
++	);
++}
++
++function exactIssuancePair(
++	left: DurableIssuanceOutboxRecord,
++	right: Awaited<ReturnType<DurableIssuanceStore["readIssued"]>>,
++	scope: DurableIssueScope,
++	authorSequence: number
++): boolean {
++	return (
++		right !== null &&
++		exactIssuanceCommit(left.commit, scope, authorSequence) &&
++		exactIssuanceCommit(right, scope, authorSequence) &&
++		compareBytes(left.commit.envelope.canonicalPreimageBytes, right.envelope.canonicalPreimageBytes) === 0 &&
++		compareBytes(left.commit.envelope.digest, right.envelope.digest) === 0 &&
++		compareBytes(left.commit.envelope.signature, right.envelope.signature) === 0
++	);
++}
++
++async function issuanceRetirementCandidate(
++	input: Readonly<{
++		current: InspectedHead;
++		currentTrust: CurrentAnchorTrust;
++		cutValueDigest: string;
++		durableReplay: Readonly<{ verify(): Promise<boolean> }>;
++		graph: Exclude<ReturnType<V3CreatorCloseRegistration["captureCloseGraph"]>, undefined>;
++		issuanceScope: DurableIssueScope;
++		issuanceStore: DurableIssuanceStore;
++		maxEpochVertices: number;
++		qcRef: GenerationRef;
++		signer: FinalitySigner;
++		snapshotManifestDigest: string;
++		successorTrust: CurrentAnchorTrust;
++	}>
++): Promise<Readonly<{ bytes: Uint8Array; priorRef?: GenerationRef; ref: GenerationRef }>> {
++	if (!(await input.durableReplay.verify())) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	let priorAdmittedAuthorSequence: number | null = null;
++	let priorRetirementCandidateDigest = CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL;
++	let priorRef: GenerationRef | undefined;
++	if (input.currentTrust.currentEpoch > 0) {
++		const candidate = uniqueRecordCandidate(input.current.candidates, CREATOR_ISSUANCE_RETIREMENT_KIND);
++		const cut = uniqueRecordCandidate(
++			input.current.candidates,
++			"drp-hard-epoch-cut",
++			input.currentTrust.currentEpoch - 1
++		);
++		const qc = uniqueRecordCandidate(
++			input.current.candidates,
++			"drp-seal-qc",
++			input.currentTrust.currentEpoch - 1,
++			"commit"
++		);
++		if (candidate === undefined || cut === undefined || qc === undefined) {
++			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		}
++		const cutRecord = decodeCanonical(cut.bytes);
++		if (!plainRecord(cutRecord) || typeof cutRecord.snapshotManifestDigest !== "string") {
++			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		}
++		const opened = openCreatorIssuanceRetirement({
++			exactCanonicalRecordBytes: candidate.bytes,
++			expectedCommitQcRef: qc.ref,
++			expectedCutValueDigest: hex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
++			expectedSnapshotManifestDigest: cutRecord.snapshotManifestDigest,
++			floorTrust: input.currentTrust,
++		});
++		const identity = opened.ok ? resolveCreatorIssuanceRetirement(opened.capability) : undefined;
++		if (identity === undefined || identity.author !== input.issuanceScope.author) {
++			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		}
++		priorAdmittedAuthorSequence = identity.admittedAuthorSequence;
++		priorRetirementCandidateDigest = candidate.ref.digest;
++		priorRef = candidate.ref;
++	}
++	const lineage = await input.issuanceStore.readLineage(input.issuanceScope);
++	if (lineage.exhausted) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	const rows: DurableIssuanceOutboxRecord[] = [];
++	let afterKey: readonly [string, string, number] | null =
++		priorAdmittedAuthorSequence === null
++			? null
++			: [input.issuanceScope.objectId, input.issuanceScope.author, priorAdmittedAuthorSequence];
++	while (rows.length <= input.maxEpochVertices) {
++		const page = await input.issuanceStore.readOutboxPage({
++			afterKey,
++			limit: Math.min(MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT, input.maxEpochVertices + 1 - rows.length),
++			scope: input.issuanceScope,
++		});
++		if (page.length === 0) break;
++		rows.push(...page);
++		const last = page[page.length - 1] as DurableIssuanceOutboxRecord;
++		afterKey = [input.issuanceScope.objectId, input.issuanceScope.author, last.commit.authorSequence];
++		if (
++			page.length <
++			Math.min(MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT, input.maxEpochVertices + 1 - (rows.length - page.length))
++		)
++			break;
++	}
++	const firstExpected = priorAdmittedAuthorSequence === null ? 0 : priorAdmittedAuthorSequence + 1;
++	if (rows.length > input.maxEpochVertices || lineage.next !== firstExpected + rows.length) {
++		throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	}
++	let admitted = priorAdmittedAuthorSequence;
++	let expected = firstExpected;
++	let truncated = false;
++	for (const row of rows) {
++		if (row.commit.authorSequence !== expected) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		const issued = await input.issuanceStore.readIssued(input.issuanceScope, expected);
++		if (!exactIssuancePair(row, issued, input.issuanceScope, expected)) {
++			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		}
++		const bytes = row.commit.envelope.canonicalPreimageBytes;
++		const digest = hex(row.commit.envelope.digest);
++		const decoded = decodeCanonical(bytes);
++		if (
++			!plainRecord(decoded) ||
++			compareBytes(encodeCanonical(decoded), bytes) !== 0 ||
++			hex(hashDomain("ts-drp/vertex/v3", bytes)) !== digest ||
++			decoded.anchor !== input.currentTrust.currentAnchorDigest ||
++			decoded.author !== input.issuanceScope.author ||
++			decoded.epoch !== input.currentTrust.currentEpoch ||
++			decoded.objectId !== input.issuanceScope.objectId ||
++			decoded.authorSequence !== expected
++		) {
++			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		}
++		const inGraph = input.graph.vertices.has(digest);
++		if (inGraph && truncated) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++		if (inGraph) admitted = expected;
++		else truncated = true;
++		expected += 1;
++	}
++	if (admitted === null || lineage.next <= admitted) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	const prepared = prepareCreatorIssuanceRetirement({
++		admittedAuthorSequence: admitted,
++		author: input.issuanceScope.author,
++		commitQcRef: input.qcRef,
++		currentTrust: input.currentTrust,
++		cutValueDigest: input.cutValueDigest,
++		observedLineage: lineage,
++		priorAdmittedAuthorSequence,
++		priorRetirementCandidateDigest,
++		snapshotManifestDigest: input.snapshotManifestDigest,
++		successorTrust: input.successorTrust,
++	});
++	if (!prepared.ok) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	const signature = await signCreatorIssuanceRetirementRequest({
++		request: prepared.signingRequest,
++		signer: input.signer,
++	});
++	const completed = completeCreatorIssuanceRetirement({
++		detachedSignature: signature,
++		preparation: prepared.preparation,
++	});
++	if (!completed.ok) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
++	const ref = refFor(completed.exactCanonicalRecordBytes);
++	return Object.freeze({
++		bytes: Uint8Array.from(completed.exactCanonicalRecordBytes),
++		...(priorRef === undefined ? {} : { priorRef: copiedRef(priorRef) }),
++		ref,
++	});
++}
++
+ function sameHead(left: PresentHead, right: PresentHead): boolean {
+ 	return (
+ 		left.closureDigest === right.closureDigest &&
+@@ -569,25 +788,47 @@ export async function bindCreatorLiveClose(
+ 					const successorTrustRef = refFor(finalized.exactCanonicalTrustStateRecordBytes);
+ 					const cutValueRef = refFor(prepared.exactCanonicalCutValueBytes);
+ 					const commitQcRef = refFor(finalized.exactCanonicalCommitQcBytes);
++					const retirement = await issuanceRetirementCandidate({
++						current,
++						currentTrust: registration.currentTrust,
++						cutValueDigest: prepared.valueDigest,
++						durableReplay,
++						graph,
++						issuanceScope: registration.issuanceScope,
++						issuanceStore: registration.issuanceStore,
++						maxEpochVertices: registration.maxEpochVertices,
++						qcRef: commitQcRef,
++						signer: input.signer,
++						snapshotManifestDigest: persistedSnapshot.manifestDigest,
++						successorTrust: successor.trust,
++					});
+ 					const proposed = Object.freeze(
+ 						[
+-							...current.references.filter(({ digest }) => digest !== current.trustRef.digest),
++							...current.references.filter(
++								({ digest }) => digest !== current.trustRef.digest && digest !== retirement.priorRef?.digest
++							),
+ 							successorTrustRef,
+ 							cutValueRef,
+ 							commitQcRef,
++							retirement.ref,
+ 						].sort(compareRef)
+ 					);
+ 					const proposedCandidates = [
+-						...current.candidates.filter(({ ref }) => ref.digest !== current.trustRef.digest),
++						...current.candidates.filter(
++							({ ref }) => ref.digest !== current.trustRef.digest && ref.digest !== retirement.priorRef?.digest
++						),
+ 						{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
+ 						{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
+ 						{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
++						{ bytes: retirement.bytes, ref: retirement.ref },
+ 					].filter(({ ref }) => ref.byteLength <= SCANNABLE_BYTES);
+ 					const advance = inspectCreatorTransitionAdvance({
+ 						current: { candidates: current.candidates, closure: current.references },
++						currentTrust: registration.currentTrust,
+ 						mode: "stage",
+ 						proofRefs: [cutValueRef, commitQcRef],
+ 						proposed: { candidates: proposedCandidates, closure: proposed },
++						successorTrust: successor.trust,
+ 					});
+ 					if (!advance.ok) throw new TypeError(`creator trust advance failed: ${advance.reason}`);
+ 					const acceptedProposed = advance.proposed.closure;
+@@ -598,6 +839,7 @@ export async function bindCreatorLiveClose(
+ 							{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
+ 							{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
+ 							{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
++							{ bytes: retirement.bytes, ref: retirement.ref },
+ 						],
+ 						acceptedProposed
+ 					);
+diff --git a/packages/node/src/internal/creator-transition-advance.ts b/packages/node/src/internal/creator-transition-advance.ts
+index 779be561..2ba35626 100644
+--- a/packages/node/src/internal/creator-transition-advance.ts
++++ b/packages/node/src/internal/creator-transition-advance.ts
+@@ -1,8 +1,16 @@
+-import { decodeCanonical } from "@ts-drp/canonical";
++import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+ import type { DetachedClosureCandidate } from "@ts-drp/control-plane";
+ import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
+ import { inspectBoundedCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-checkpoint-advance";
+-import type { GenerationRef } from "@ts-drp/storage";
++import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
++import {
++	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
++	CREATOR_ISSUANCE_RETIREMENT_KIND,
++	type CreatorIssuanceRetirementIdentity,
++	openCreatorIssuanceRetirement,
++	resolveCreatorIssuanceRetirement,
++} from "@ts-drp/protocol-v3/creator-issuance-retirement";
++import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+ 
+ export interface CreatorTransitionClosure {
+ 	readonly candidates: readonly DetachedClosureCandidate[];
+@@ -11,9 +19,11 @@ export interface CreatorTransitionClosure {
+ 
+ export interface InspectCreatorTransitionAdvanceInput {
+ 	readonly current: CreatorTransitionClosure;
++	readonly currentTrust: CurrentAnchorTrust;
+ 	readonly mode: "stage" | "verify";
+ 	readonly proofRefs: readonly GenerationRef[];
+ 	readonly proposed: CreatorTransitionClosure;
++	readonly successorTrust: CurrentAnchorTrust;
+ }
+ 
+ export type InspectCreatorTransitionAdvanceResult =
+@@ -60,6 +70,137 @@ function failure(reason: string): InspectCreatorTransitionAdvanceResult {
+ 	return Object.freeze({ ok: false as const, reason });
+ }
+ 
++function sameRef(left: GenerationRef, right: GenerationRef): boolean {
++	return left.byteLength === right.byteLength && left.digest === right.digest;
++}
++
++function exactCandidate(candidate: DetachedClosureCandidate): boolean {
++	const digest = digestBlob(candidate.bytes);
++	return digest.ok && digest.value === candidate.ref.digest && candidate.bytes.byteLength === candidate.ref.byteLength;
++}
++
++function hex(bytes: Uint8Array): string {
++	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
++}
++
++function retirementCandidates(closure: CreatorTransitionClosure): readonly DetachedClosureCandidate[] {
++	return closure.candidates.filter((candidate) => record(candidate)?.kind === CREATOR_ISSUANCE_RETIREMENT_KIND);
++}
++
++function exactClosureOccurrence(closure: readonly GenerationRef[], candidate: DetachedClosureCandidate): boolean {
++	return closure.filter((ref) => sameRef(ref, candidate.ref)).length === 1;
++}
++
++function openedRetirement(
++	candidate: DetachedClosureCandidate,
++	floorTrust: CurrentAnchorTrust,
++	cut: DetachedClosureCandidate,
++	qc: DetachedClosureCandidate
++):
++	| Readonly<{
++			readonly candidate: DetachedClosureCandidate;
++			readonly identity: CreatorIssuanceRetirementIdentity;
++	  }>
++	| undefined {
++	const decodedCut = record(cut);
++	if (
++		!exactCandidate(candidate) ||
++		!exactCandidate(cut) ||
++		!exactCandidate(qc) ||
++		typeof decodedCut?.snapshotManifestDigest !== "string"
++	) {
++		return undefined;
++	}
++	const opened = openCreatorIssuanceRetirement({
++		exactCanonicalRecordBytes: candidate.bytes,
++		expectedCommitQcRef: qc.ref,
++		expectedCutValueDigest: hex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
++		expectedSnapshotManifestDigest: decodedCut.snapshotManifestDigest,
++		floorTrust,
++	});
++	if (!opened.ok) return undefined;
++	const identity = resolveCreatorIssuanceRetirement(opened.capability);
++	return identity === undefined ||
++		decodedCut.kind !== "drp-hard-epoch-cut" ||
++		decodedCut.objectId !== identity.objectId ||
++		decodedCut.epoch !== identity.closedEpoch ||
++		decodedCut.previousAnchor !== identity.closedAnchorDigest
++		? undefined
++		: Object.freeze({ candidate, identity });
++}
++
++function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput):
++	| Readonly<{
++			readonly current?: DetachedClosureCandidate;
++			readonly proposed: DetachedClosureCandidate;
++	  }>
++	| undefined {
++	if (
++		input.currentTrust.currentEpoch < 0 ||
++		input.successorTrust.currentEpoch !== input.currentTrust.currentEpoch + 1 ||
++		input.currentTrust.objectId !== input.successorTrust.objectId ||
++		input.currentTrust.genesisAnchorDigest !== input.successorTrust.genesisAnchorDigest ||
++		input.proofRefs.length !== 2
++	) {
++		return undefined;
++	}
++	const currentMatches = retirementCandidates(input.current);
++	const proposedMatches = retirementCandidates(input.proposed);
++	if (proposedMatches.length !== 1 || currentMatches.length !== (input.currentTrust.currentEpoch === 0 ? 0 : 1)) {
++		return undefined;
++	}
++	const proposedRetirement = proposedMatches[0] as DetachedClosureCandidate;
++	if (!exactClosureOccurrence(input.proposed.closure, proposedRetirement)) return undefined;
++	if (
++		currentMatches.length === 1 &&
++		!exactClosureOccurrence(input.current.closure, currentMatches[0] as DetachedClosureCandidate)
++	) {
++		return undefined;
++	}
++	const proposedCut = input.proposed.candidates.find((candidate) =>
++		sameRef(candidate.ref, input.proofRefs[0] as GenerationRef)
++	);
++	const proposedQc = input.proposed.candidates.find((candidate) =>
++		sameRef(candidate.ref, input.proofRefs[1] as GenerationRef)
++	);
++	if (proposedCut === undefined || proposedQc === undefined) return undefined;
++	const openedProposed = openedRetirement(proposedRetirement, input.successorTrust, proposedCut, proposedQc);
++	if (
++		openedProposed === undefined ||
++		openedProposed.identity.closedEpoch !== input.currentTrust.currentEpoch ||
++		openedProposed.identity.closedAnchorDigest !== input.currentTrust.currentAnchorDigest
++	) {
++		return undefined;
++	}
++	if (input.currentTrust.currentEpoch === 0) {
++		return openedProposed.identity.priorAdmittedAuthorSequence === null &&
++			openedProposed.identity.priorRetirementCandidateDigest === CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL
++			? Object.freeze({ proposed: openedProposed.candidate })
++			: undefined;
++	}
++	const currentCandidate = currentMatches[0] as DetachedClosureCandidate;
++	const retiringCut = uniqueCandidate(
++		input.current.candidates,
++		"drp-hard-epoch-cut",
++		input.currentTrust.currentEpoch - 1
++	);
++	const retiringQc = uniqueCandidate(
++		input.current.candidates,
++		"drp-seal-qc",
++		input.currentTrust.currentEpoch - 1,
++		"commit"
++	);
++	if (retiringCut === undefined || retiringQc === undefined) return undefined;
++	const openedCurrent = openedRetirement(currentCandidate, input.currentTrust, retiringCut, retiringQc);
++	return openedCurrent !== undefined &&
++		openedProposed.identity.author === openedCurrent.identity.author &&
++		openedProposed.identity.priorRetirementCandidateDigest === currentCandidate.ref.digest &&
++		openedProposed.identity.priorAdmittedAuthorSequence === openedCurrent.identity.admittedAuthorSequence &&
++		openedProposed.identity.admittedAuthorSequence >= openedCurrent.identity.admittedAuthorSequence
++		? Object.freeze({ current: currentCandidate, proposed: openedProposed.candidate })
++		: undefined;
++}
++
+ /**
+  * Selects the compatibility or bounded transition predicate and owns stale-ref derivation.
+  * @param input - Current/proposed closure pair, new proof refs, and staging/verification mode.
+@@ -69,6 +210,20 @@ export function inspectCreatorTransitionAdvance(
+ 	input: InspectCreatorTransitionAdvanceInput
+ ): InspectCreatorTransitionAdvanceResult {
+ 	try {
++		const retirement = authenticatedRetirementPair(input);
++		if (retirement === undefined) return failure("TRUST_CLOSURE_INVALID");
++		const withoutRetirement = (
++			closure: CreatorTransitionClosure,
++			candidate?: DetachedClosureCandidate
++		): CreatorTransitionClosure =>
++			candidate === undefined
++				? closure
++				: Object.freeze({
++						candidates: Object.freeze(closure.candidates.filter((item) => !sameRef(item.ref, candidate.ref))),
++						closure: Object.freeze(closure.closure.filter((ref) => !sameRef(ref, candidate.ref))),
++					});
++		const normalizedCurrent = withoutRetirement(input.current, retirement.current);
++		const normalizedProposed = withoutRetirement(input.proposed, retirement.proposed);
+ 		const trustCandidates = input.current.candidates.filter(
+ 			(candidate) => record(candidate)?.kind === "drp-anchor-trust-state"
+ 		);
+@@ -78,7 +233,11 @@ export function inspectCreatorTransitionAdvance(
+ 			return failure("TRUST_CLOSURE_INVALID");
+ 		}
+ 		if (trust.currentEpoch === 0) {
+-			const result = inspectCreatorTrustAdvance(input);
++			const result = inspectCreatorTrustAdvance({
++				current: normalizedCurrent,
++				proofRefs: input.proofRefs,
++				proposed: normalizedProposed,
++			});
+ 			return result.ok
+ 				? Object.freeze({ kind: result.kind, ok: true as const, proposed: input.proposed })
+ 				: failure(result.reason);
+@@ -91,23 +250,37 @@ export function inspectCreatorTransitionAdvance(
+ 			return failure("RETIRING_PROOF_REFS_INVALID");
+ 		}
+ 		const retiring = new Set([retiringCut.ref.digest, retiringQc.ref.digest, retiringAcl.ref.digest]);
+-		const proposed =
++		const proposedWithoutRetiring =
+ 			input.mode === "stage"
+ 				? Object.freeze({
+ 						candidates: Object.freeze(
+-							input.proposed.candidates.filter((candidate) => !retiring.has(candidate.ref.digest))
++							normalizedProposed.candidates.filter((candidate) => !retiring.has(candidate.ref.digest))
++						),
++						closure: Object.freeze(
++							normalizedProposed.closure.filter((ref) => !retiring.has(ref.digest)).sort(compareRef)
+ 						),
+-						closure: Object.freeze(input.proposed.closure.filter((ref) => !retiring.has(ref.digest)).sort(compareRef)),
+ 					})
+-				: input.proposed;
++				: normalizedProposed;
+ 		const result = inspectBoundedCreatorTrustAdvance({
+-			current: input.current,
++			current: normalizedCurrent,
+ 			proofRefs: input.proofRefs,
+-			proposed,
++			proposed: proposedWithoutRetiring,
+ 			retiringPredecessorAclRef: retiringAcl.ref,
+ 			retiringProofRefs: [retiringCut.ref, retiringQc.ref],
+ 		});
+-		return result.ok ? Object.freeze({ kind: result.kind, ok: true as const, proposed }) : failure(result.reason);
++		if (!result.ok) return failure(result.reason);
++		const proposed =
++			input.mode === "verify"
++				? input.proposed
++				: Object.freeze({
++						candidates: Object.freeze(
++							[...proposedWithoutRetiring.candidates, retirement.proposed].sort((left, right) =>
++								compareRef(left.ref, right.ref)
++							)
++						),
++						closure: Object.freeze([...proposedWithoutRetiring.closure, retirement.proposed.ref].sort(compareRef)),
++					});
++		return Object.freeze({ kind: result.kind, ok: true as const, proposed });
+ 	} catch {
+ 		return failure("TRUST_CLOSURE_INVALID");
+ 	}
+153:export function inspectCreatorTrustAdvance(input: InspectCreatorTrustAdvanceInput): CreatorTrustAdvanceResult {
+154-	try {
+155-		if (input === null || typeof input !== "object" || Array.isArray(input)) return rejected("TRUST_CLOSURE_INVALID");
+156-		const currentClosure = Object.freeze([...input.current.closure].sort(compareRef));
+157-		const current = inspectTrustClosure({ candidates: input.current.candidates, closure: currentClosure });
+158-		const proposed = inspectTrustClosure(input.proposed);
+159-		const proofRefs = copyProofRefs(input.proofRefs);
+160-		if (!current.ok || !proposed.ok || proofRefs === undefined) return rejected("TRUST_CLOSURE_INVALID");
+161-		const combined = exactCombinedClosure(currentClosure, current.trustRef, proofRefs, proposed.trustRef);
+162-		if (
+163-			combined === undefined ||
+164-			combined.length !== input.proposed.closure.length ||
+165-			combined.some((ref, index) => !sameRef(ref, input.proposed.closure[index] as GenerationRef))
+166-		)
+167-			return rejected("TRUST_CLOSURE_INVALID");
+168-		if (sameBytes(current.exactCanonicalTrustStateRecordBytes, proposed.exactCanonicalTrustStateRecordBytes)) {
+169-			return rejected("BYTE_REPLAY");
+170-		}
+171-		const currentRecord = decodeTrust(current.exactCanonicalTrustStateRecordBytes);
+172-		const proposedRecord = decodeTrust(proposed.exactCanonicalTrustStateRecordBytes);
+173-		if (currentRecord === undefined || proposedRecord === undefined || typeof currentRecord.currentEpoch !== "number") {
+174-			return rejected("TRUST_CLOSURE_INVALID");
+175-		}
+176-		if (proposedRecord.currentEpoch === currentRecord.currentEpoch) return rejected("EPOCH_EQUIVOCATION");
+177-		if (typeof proposedRecord.currentEpoch !== "number" || proposedRecord.currentEpoch < currentRecord.currentEpoch) {
+178-			return rejected("ROLLBACK");
+179-		}
+180-		if (proposedRecord.currentEpoch !== currentRecord.currentEpoch + 1) return rejected("EPOCH_GAP");
+181-		if (!validSuccessorBinding(currentRecord, proposedRecord)) return rejected("TRUST_CLOSURE_INVALID");
+182-		return Object.freeze({ kind: "successor" as const, ok: true as const });
+183-	} catch {
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+import type { DetachedClosureCandidate } from "@ts-drp/control-plane";
+import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
+import { inspectBoundedCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-checkpoint-advance";
+import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import {
+	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
+	CREATOR_ISSUANCE_RETIREMENT_KIND,
+	type CreatorIssuanceRetirementIdentity,
+	openCreatorIssuanceRetirement,
+	resolveCreatorIssuanceRetirement,
+} from "@ts-drp/protocol-v3/creator-issuance-retirement";
+import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+
+export interface CreatorTransitionClosure {
+	readonly candidates: readonly DetachedClosureCandidate[];
+	readonly closure: readonly GenerationRef[];
+}
+
+export interface InspectCreatorTransitionAdvanceInput {
+	readonly current: CreatorTransitionClosure;
+	readonly currentTrust: CurrentAnchorTrust;
+	readonly mode: "stage" | "verify";
+	readonly proofRefs: readonly GenerationRef[];
+	readonly proposed: CreatorTransitionClosure;
+	readonly successorTrust: CurrentAnchorTrust;
+}
+
+export type InspectCreatorTransitionAdvanceResult =
+	| Readonly<{ readonly ok: false; readonly reason: string }>
+	| Readonly<{
+			readonly kind: "successor";
+			readonly ok: true;
+			readonly proposed: CreatorTransitionClosure;
+	  }>;
+
+function record(candidate: DetachedClosureCandidate): Readonly<Record<string, unknown>> | undefined {
+	try {
+		const decoded = decodeCanonical(candidate.bytes);
+		return decoded !== null && typeof decoded === "object" && !Array.isArray(decoded)
+			? (decoded as Readonly<Record<string, unknown>>)
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function compareRef(left: GenerationRef, right: GenerationRef): number {
+	return left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0;
+}
+
+function uniqueCandidate(
+	candidates: readonly DetachedClosureCandidate[],
+	kind: string,
+	epoch: number,
+	phase?: string
+): DetachedClosureCandidate | undefined {
+	const matches = candidates.filter((candidate) => {
+		const decoded = record(candidate);
+		return (
+			decoded?.kind === kind &&
+			(decoded.kind === "drp-anchor-trust-state" ? decoded.currentEpoch : decoded.epoch) === epoch &&
+			(phase === undefined || decoded.phase === phase)
+		);
+	});
+	return matches.length === 1 ? matches[0] : undefined;
+}
+
+function failure(reason: string): InspectCreatorTransitionAdvanceResult {
+	return Object.freeze({ ok: false as const, reason });
+137:export function inspectBoundedCreatorTrustAdvance(input: unknown): BoundedCreatorTrustAdvanceResult {
+export function inspectBoundedCreatorTrustAdvance(input: unknown): BoundedCreatorTrustAdvanceResult {
+	try {
+		if (!plainRecord(input) || !exactKeys(input, INPUT_KEYS)) return rejected("TRUST_CLOSURE_INVALID");
+		const typed = input as unknown as InspectBoundedCreatorTrustAdvanceInput;
+		const current = inspectTrustClosure(typed.current);
+		const proposed = inspectTrustClosure(typed.proposed);
+		const proofRefs = copyPair(typed.proofRefs);
+		const retiringProofRefs = copyPair(typed.retiringProofRefs);
+		const retiringAclRef = copyRef(typed.retiringPredecessorAclRef);
+		if (!current.ok || !proposed.ok || proofRefs === undefined) return rejected("TRUST_CLOSURE_INVALID");
+		if (retiringProofRefs === undefined) return rejected("RETIRING_PROOF_REFS_INVALID");
+		if (retiringAclRef === undefined) return rejected("RETIRING_PREDECESSOR_ACL_INVALID");
+		const identity = trustIdentity(current.exactCanonicalTrustStateRecordBytes);
+d110c-0c1a-fable51-high-course-review-20260903
+d110c-0c1a-final-review-d77ee315
+d110c-0c1a-green-7e2f2694
+d110c-0c1a-green-adversarial-final-7e2f2694
+d110c-0c1a-green-closure-7e2f2694
+d110c-0c1a-green-correction-7e2f2694
+d110c-0c1a-green-correction-final-7e2f2694
+d110c-0c1a-green-focused-final-7e2f2694
+d110c-0c1a-green-focused-post-retained-fix-7e2f2694
+d110c-0c1a-green-post-refactor-final-7e2f2694
+d110c-0c1a-green-retained-7e2f2694
+d110c-0c1a-green-retained-browser-7e2f2694
+d110c-0c1a-green-retained-browser-post-refactor-7e2f2694
+d110c-0c1a-green-retained-correction-7e2f2694
+d110c-0c1a-green-retained-correction-final-7e2f2694
+d110c-0c1a-green-retained-final-7e2f2694
+d110c-0c1a-green-retained-post-refactor-7e2f2694
+d110c-0c1a-green-same-boundary-7e2f2694
+d110c-0c1a-green-same-boundary-corrected-7e2f2694
+d110c-0c1a-green-same-boundary-final-7e2f2694
+d110c-0c1a-green-static-final-7e2f2694
+d110c-0c1a-plan-confirmation-037b8244
+d110c-0c1a-plan-review-fc384d1f
+d110c-0c1a-red-add7f7dc
+---
+1107
+.logs/d110c-0a-final-review-93fe946a/grok-reemit-prompt.txt
+.logs/d110c-0a-final-review-93fe946a/grok-reemit.json
+.logs/d110c-0a-final-review-93fe946a/grok/command.json
+.logs/d110c-0a-final-review-93fe946a/grok/events.jsonl
+.logs/d110c-0a-final-review-93fe946a/grok/input-packet.md
+.logs/d110c-0c1a-fable51-high-course-review-20260903/SHA256SUMS
+.logs/d110c-0c1a-fable51-high-course-review-20260903/command.txt
+.logs/d110c-0c1a-fable51-high-course-review-20260903/metadata.json
+.logs/d110c-0c1a-fable51-high-course-review-20260903/prompt.md
+.logs/d110c-0c1a-fable51-high-course-review-20260903/result.md
+.logs/d110c-0c1a-plan-confirmation-037b8244/commands.txt
+.logs/d110c-0c1a-plan-confirmation-037b8244/grok/events.jsonl
+.logs/d110c-0c1a-plan-confirmation-037b8244/grok/status
+.logs/d110c-0c1a-plan-confirmation-037b8244/kimi/status
+.logs/d110c-0c1a-plan-confirmation-037b8244/kimi/stderr.txt
+.logs/d110c-0c1a-plan-confirmation-037b8244/kimi/stream.jsonl
+.logs/d110c-0c1a-plan-confirmation-037b8244/local-audit.md
+.logs/d110c-0c1a-plan-confirmation-037b8244/manifest.sha256
+.logs/d110c-0c1a-plan-confirmation-037b8244/opus/raw.json
+.logs/d110c-0c1a-plan-confirmation-037b8244/opus/status
+.logs/d110c-0c1a-plan-confirmation-037b8244/opus/stderr.txt
+.logs/d110c-0c1a-plan-confirmation-037b8244/prompt.md
+.logs/d110c-0c1a-plan-confirmation-037b8244/review-summary.md
+.logs/d110c-0c1a-plan-confirmation-037b8244/schema.json
+.logs/d110c-0c1a-plan-confirmation-037b8244/status.json
+.logs/d110c-0c1a-plan-review-fc384d1f/commands.txt
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/command.json
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/events.jsonl
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/input-packet.md
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/public.txt
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/resume-prompt.md
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/resume.events.jsonl
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/resume.status
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/review.diff
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/status.json
+.logs/d110c-0c1a-plan-review-fc384d1f/kimi/status
+.logs/d110c-0c1a-plan-review-fc384d1f/kimi/stderr.txt
+.logs/d110c-0c1a-plan-review-fc384d1f/kimi/stream.jsonl
+.logs/d110c-0c1a-plan-review-fc384d1f/local-audit.md
+.logs/d110c-0c1a-plan-review-fc384d1f/manifest.sha256
+.logs/d110c-0c1a-plan-review-fc384d1f/opus/raw.json
+.logs/d110c-0c1a-plan-review-fc384d1f/opus/status
+.logs/d110c-0c1a-plan-review-fc384d1f/opus/stderr.txt
+.logs/d110c-0c1a-plan-review-fc384d1f/plan-correction.diff
+.logs/d110c-0c1a-plan-review-fc384d1f/prompt.md
+---
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+5726596405fe05894c2b796b1e400406ef11aaa1c07e07a2d0cee2e216829053  .logs/d110c-0c1a-red-add7f7dc/SHA256SUMS
+SHA256SUMS
+SOURCE-SHA256SUMS
+audit.json
+focused.command
+focused.status
+focused.stdout.txt
+list.command
+list.json
+list.status
+static-gates.txt
+vitest.json
+== d110c-0c1a-green-adversarial-final-7e2f2694
+exit.status
+manifest.sha256
+stdout.log
+vitest.json
+== d110c-0c1a-green-retained-post-refactor-7e2f2694
+exit.status
+manifest.sha256
+stdout.log
+vitest.json
+== d110c-0c1a-green-closure-7e2f2694
+ledger.md
+manifest.sha256
+== d110c-0c1a-green-static-final-7e2f2694
+diff-check-closure.log
+diff-check-closure.status
+diff-check-final.log
+diff-check-final.status
+diff-check.log
+diff-check.status
+eslint-closure.log
+eslint-closure.status
+eslint-final.log
+eslint-final.status
+eslint.log
+eslint.status
+keychain-build.log
+keychain-build.status
+keychain-typecheck.log
+keychain-typecheck.status
+manifest.sha256
+node-build-post-refactor.log
+node-build-post-refactor.status
+node-build.log
+== d110c-0c1a-green-retained-browser-7e2f2694
+manifest.sha256
+phase-5e-live-close
+phase-5e-live-close-corrected
+phase-6a-adoption-commit
+phase-6a-successor-activation
+phase-6a-successor-epoch
+phase-6a-successor-product-excluding-d110c-0c
+phase-6b-ahe-reclamation
+phase-6b-issuance-retention
+== d110c-0c1a-green-retained-browser-post-refactor-7e2f2694
+d110c-b-hot-loop
+manifest.sha256
+phase-5e-live-close
+== d110c-0c1a-green-adversarial-final-7e2f2694
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./exit.status
+0602cad571a9d7f44e2716009f5332a4a67ec9029b5091ffe9a561eb976bb7a6  ./stdout.log
+07297023fed1b7d08f12c7f2ec642453bbdb55c07b3099566ee6da487ac149bb  ./vitest.json
+== d110c-0c1a-green-retained-post-refactor-7e2f2694
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./exit.status
+83f56111305492b7efe1ad52276620d284c6ed3a9409b44fff01c5761b17d0c7  ./stdout.log
+50a23a5c9be8219d37c5ed9fd06805c5d6c83e70d1a919639a7bed93ad0510ce  ./vitest.json
+== d110c-0c1a-green-closure-7e2f2694
+a4e5c471425b05b5dbe663e5fbb242704f015466c24652981fdda5e3a5c8a8af  ./ledger.md
+== d110c-0c1a-green-static-final-7e2f2694
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./diff-check-closure.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./diff-check-closure.status
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./diff-check-final.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./diff-check-final.status
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./diff-check.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./diff-check.status
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./eslint-closure.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./eslint-closure.status
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./eslint-final.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./eslint-final.status
+a4b30c51ca0d53ad41c0e0d074a3b95782a398871cd12b3dea96a5c086c10683  ./eslint.log
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  ./eslint.status
+bdd394cf72cf3f89119004557b184c96bfa291c4703064f532d301615849a1ee  ./keychain-build.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./keychain-build.status
+76f20fe124dbcdf767df26b3c8b9cd8d83eff8a11bd0fba8a43f60033967f84d  ./keychain-typecheck.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./keychain-typecheck.status
+ecd80eb441ee33d14372cbb07a3a4dec09451fd776ceaa6b2ce7e57b3668344d  ./node-build-post-refactor.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./node-build-post-refactor.status
+ecd80eb441ee33d14372cbb07a3a4dec09451fd776ceaa6b2ce7e57b3668344d  ./node-build.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./node-build.status
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./node-production-typecheck-post-refactor.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./node-production-typecheck-post-refactor.status
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./node-production-typecheck.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./node-production-typecheck.status
+17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20  ./prettier-closure.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./prettier-closure.status
+17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20  ./prettier-final.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./prettier-final.status
+17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20  ./prettier.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./prettier.status
+e6c274d35e0efa7f18aab161906fd451564c71467f767eb39aaf34fad1c659b9  ./protected-state-corrected.log
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  ./protected-state-corrected.status
+e8573d95bc0d9ed80fac941acfafef3ccd15f17c077b8661c5df9952f22f6b4e  ./protected-state-final.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./protected-state-final.status
+aaf886c7c5efffaa4bd4cd1f10f94bd970422a56f43a02d96808ed834b7b13e9  ./protected-state.log
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  ./protected-state.status
+7cd94d05afe83e7bba2c282c95c438aefa1bdeb582d18591b450addd1889eeec  ./protocol-v3-build.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./protocol-v3-build.status
+b38a18df3f7ef0886b94580c3cde8a72a14c9b12d5623a78ca4456f010eab644  ./protocol-v3-built-subpath-consumer.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./protocol-v3-built-subpath-consumer.status
+f53bb1550f9e2402268e172ca4b98a17369e66d2d7c1f39902cf3f0aa60c07da  ./protocol-v3-built-subpath.log
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  ./protocol-v3-built-subpath.status
+875588d3479657552b6613a45cd97c5493028d379c885c66a0a04af709d7706f  ./protocol-v3-public-audit.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./protocol-v3-public-audit.status
+b46153795cafa2033b7dc7001fc8a0e0186be180cc68da4914d3bf8d8ba101af  ./protocol-v3-typecheck.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./protocol-v3-typecheck.status
+2684dee298e73ace0c8417aa569dd84abd94c61430125faf0681ad905df866ea  ./source-shape.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./source-shape.status
+8fd833aba6e3f5badb2552b2327f224b95a6712d13c1d157cacd25a049f2a76e  ./storage-browser-build.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./storage-browser-build.status
+== d110c-0c1a-green-retained-browser-7e2f2694
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./phase-5e-live-close-corrected/exit.status
+ff77637ecc242f0ae07cdeb9f0165b4c1a803a0f4b4dc6b2e6e9cc7cd9ebb552  ./phase-5e-live-close-corrected/stderr.log
+48f46de873edd2139f2328db4e03ee96eec72fc43094b5d75643ca5745075160  ./phase-5e-live-close-corrected/stdout.log
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  ./phase-5e-live-close/exit.status
+1e7d57147ded4c3c0d1e963d7c38ffbec6edb025d98aa07976b90a305e101125  ./phase-5e-live-close/stderr.log
+ef67c66e86d11f125c6f7ad73f13ca5d0e6f03bbcb3cf82647da2c9311bbe7c6  ./phase-5e-live-close/stdout.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./phase-6a-adoption-commit/exit.status
+b084bad9c4b8db2b8a96fea9860c72a0a694bd1c62177457943e449e65c9c8cc  ./phase-6a-adoption-commit/stderr.log
+509fb4067df07c4f28d1e790b9b9ebc2033b7966d442b9961b201e6be77c806c  ./phase-6a-adoption-commit/stdout.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./phase-6a-successor-activation/exit.status
+3fe7a04f42b3b8f692b2ec324573ad10eec5ddb5f8c6c15a1cb9f29430c89ad8  ./phase-6a-successor-activation/stderr.log
+f21f534f609a2dbf026d120c6155b3f9682c5d5b26f4677441e24f54ee5eefd5  ./phase-6a-successor-activation/stdout.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./phase-6a-successor-epoch/exit.status
+ec5789291293e9075afab3d67b880f365c83852bd54f973224b884342a32f6fe  ./phase-6a-successor-epoch/stderr.log
+d00c1d5362040fde7af7ec92be786d543e925c923a9763b5e574c3f00ebed1d1  ./phase-6a-successor-epoch/stdout.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./phase-6a-successor-product-excluding-d110c-0c/exit.status
+886bd493f849aff4b1fdfa49d37a29c65f33317229be3073e70be661ba6e3ef4  ./phase-6a-successor-product-excluding-d110c-0c/stderr.log
+b14a12c553b8333c99897e008335d84c09f5cb425cc00b2d3195b7c1031227ec  ./phase-6a-successor-product-excluding-d110c-0c/stdout.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./phase-6b-ahe-reclamation/exit.status
+cca5b946820f474505f8697ae9de0c82acbf43dd911c93b50f7d635d9ac4cd4b  ./phase-6b-ahe-reclamation/stderr.log
+26f391e254aa0e530f1a21428fe8c78dd8bc79a5ffdff10cccf8bcbff84896cb  ./phase-6b-ahe-reclamation/stdout.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./phase-6b-issuance-retention/exit.status
+19945e42b46538480fff7e3eea32018b509f12f81a8ff5d9657264d2f4289637  ./phase-6b-issuance-retention/stderr.log
+a6b4483fb77ade9aa253e265365c35969dc6f95dec746585e64335582b401c44  ./phase-6b-issuance-retention/stdout.log
+== d110c-0c1a-green-retained-browser-post-refactor-7e2f2694
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./d110c-b-hot-loop/exit.status
+57d39809788bf215ecb49d79e83491d3a7939f3de302aa372ad655c7adcef3c4  ./d110c-b-hot-loop/stderr.log
+900569f0a7f4fea4babb6949e119aed7ce383b3cb16bd75b5ce513077680359b  ./d110c-b-hot-loop/stdout.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./phase-5e-live-close/exit.status
+8052ba484019b3fecd70ad384c04482e5a5376897713335386f87dd4dbcc4817  ./phase-5e-live-close/stderr.log
+eed0282ddceac876695e7b1ecc69e0ba16002f6ac06a91e075f811096ee2cc09  ./phase-5e-live-close/stdout.log
+d110c-0c1a-green-adversarial-final-7e2f2694: 
+9ebd55702fc02f46ecfd6f972b9afe839c754e5a45a7eac0dca65a3335e9db72
+d110c-0c1a-green-retained-post-refactor-7e2f2694: 
+8a3ba7c69c15d70c3ec7580bbf5daca5b4ddae52cba5af82d2bdca98c3af6c8e
+d110c-0c1a-green-closure-7e2f2694: 
+74389094ae89affe4e76f82966bb856f9e5c96a675f3f9333cfd82d161410b6e
+d110c-0c1a-green-static-final-7e2f2694: 
+e8e24b3de4b9a979e76f10c1df0a1e305a9ed9206b36aa594e346cde4faa7072
+./exit.status: OK
+./stdout.log: OK
+./vitest.json: OK
+0
+(node:38623) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1a-green-adversarial-final-7e2f2694/vitest.json
+check-done
+exit.status
+stderr.log
+stdout.log
+.logs/d110c-0c1a-green-closure-7e2f2694/ledger.md:40:  `3eb2fba5e6d2c2d4ed6961c86771ae8b8d7fe35db96c8de6c988a846b33b3a1a`;
+.logs/d110c-0c1a-green-closure-7e2f2694/ledger.md:42:  `7a09bc9d7fa06721b9244d915407e185a3570a292a9970555c4c85219269ad04`.
+.logs/d110c-0c1a-green-closure-7e2f2694/ledger.md:45:  `b6f7ce68ad3aa375ed3f3dfa62d7a2845d1bfa8db97ce8ba2683538f93d284ee`;
+.logs/d110c-0c1a-green-closure-7e2f2694/ledger.md:47:  `e13a26535d1c89c38fefaf1ce136dc8379a179046d4548e29c99e1f449a9055a`.
+# D.110c-0c1a GREEN closure ledger
+
+Base RED commit: `7e2f2694cdd1b3a2feb0265dd0a73fa52dcb52dc`
+
+## Implemented contract
+
+- Added the canonical creator-signed `drp-creator-issuance-retirement-state`
+  record, its 8,192-byte bound, opener, opaque verified capability, frozen
+  genesis sentinel, and destructively one-use signing preparation.
+- Added the matching keychain dispatch without exposing arbitrary-digest
+  signing.
+- Creator close now derives one dense per-author admitted frontier from exact
+  issued/outbox pairs, authenticated graph membership, durable replay, and the
+  complete non-exhausted lineage. The scan is bounded by `maxEpochVertices`,
+  requires exact lineage/suffix equality, allows a pending admitted row, and
+  carries an unchanged admitted boundary across a nonempty later Cut.
+- The Node-private transition owner authenticates exactly zero-to-one carrier
+  initialization or one-to-one adjacent replacement, normalizes only that
+  pair around the unchanged control-plane predicates, and is used by one stage
+  and all four verify consumers.
+- No `v3-live.ts`, registry, wire table, product dependency, threshold, or
+  public root-export change was made.
+
+## Deterministic results
+
+- Focused final: 2/2 passed, including genuine epoch-0 initialization,
+  authenticated epoch-1 replacement with an unchanged admitted boundary,
+  one-use/cross-request signing, exact closure occurrence, and a valid signed
+  same-room stale-prior fork refusal. Root:
+  `.logs/d110c-0c1a-green-adversarial-final-7e2f2694`; manifest SHA-256
+  `9ebd55702fc02f46ecfd6f972b9afe839c754e5a45a7eac0dca65a3335e9db72`.
+- Retained unit/static behavior: 230/230 tests passed across 24 affected files,
+  zero skipped/todo. Root:
+  `.logs/d110c-0c1a-green-retained-post-refactor-7e2f2694`; manifest SHA-256
+  `8a3ba7c69c15d70c3ec7580bbf5daca5b4ddae52cba5af82d2bdca98c3af6c8e`.
+- Retained browser: live close 9/9, adoption commit 6/6, successor activation
+  24/24, successor product 30/30 with only the separately preserved downstream
+  D.110c-0c causal RED excluded, successor epoch 3/3, AHE reclamation 4/4, and
+  issuance retention 4/4. Stdout/status manifest SHA-256
+  `3eb2fba5e6d2c2d4ed6961c86771ae8b8d7fe35db96c8de6c988a846b33b3a1a`;
+  reporter-JSON manifest SHA-256
+  `7a09bc9d7fa06721b9244d915407e185a3570a292a9970555c4c85219269ad04`.
+- After the final fail-closed scan tightening, live close repeated 9/9 and the
+  genuine D.110c-b 0→1→2 hot loop repeated 3/3. Stdout/status manifest SHA-256
+  `b6f7ce68ad3aa375ed3f3dfa62d7a2845d1bfa8db97ce8ba2683538f93d284ee`;
+  reporter-JSON manifest SHA-256
+  `e13a26535d1c89c38fefaf1ce136dc8379a179046d4548e29c99e1f449a9055a`.
+- Protocol-v3 typecheck/build/public-entry audit, keychain typecheck/build,
+  Node production-source no-emit typecheck/build, storage-browser build,
+  actual Node-consumer built-subpath import, exact-owner ESLint, 8-GiB Prettier,
+  diff check, and source-shape checks passed. Static-root manifest SHA-256
+  `e8e24b3de4b9a979e76f10c1df0a1e305a9ed9206b36aa594e346cde4faa7072`.
+- Source shape proves five wrapper consumers (one stage/four verify), the fixed
+  `[objectId, author, sequence]` cursor order, exact dense lineage equality,
+  the 8,192-byte record bound, zero registry diff, and zero `v3-live.ts` diff.
+
+## Preserved diagnostic corrections
+
+- The first same-boundary probe incorrectly attempted a completely empty Cut
+  and reached the pre-existing `CUT_VALUE_MISMATCH` nonempty-Cut rule. The
+  accepted control instead keeps a genuine nonempty Cut while holding the
+  tracked author frontier constant.
+- A test selector initially read `epoch` instead of the carrier's documented
+  `closedEpoch`; this was a test diagnostic error.
+- The first browser retention run passed product close but had a stale exact
+  closure expectation that omitted the new carrier; the corrected assertion
+  requires exactly one bounded additional ref and the focused opener proves
+  its authenticated kind and identity.
+- A built-subpath smoke launched from the monorepo root failed because the root
+  intentionally has no bare workspace-package link. The same smoke passed from
+  the actual `packages/node` consumer.
+- The first exact-owner lint found only import order and a missing explicit
+  test-helper return type; the final lint is clean.
+- The first protected-process counter used macOS `pgrep -a` as if it printed
+  command lines and therefore counted its own shell PIDs. The corrected
+  `ps`-based predicate records zero ts-drp test/reviewer/profiler processes,
+  zero protected-port listeners, and all 27 stashes.
+
+## Remaining debt and exclusions
+
+7892334b33dc987a39476686e42c668cc9fa30cb150d02d4bf36c97ddb03dfd5  /tmp/b1
+d3d3e3594a4da48a5ce3eeefbbce1550d2fc2d0814f410a9af5d0116e86a040c  /tmp/b2
+3eb2fba5e6d2c2d4ed6961c86771ae8b8d7fe35db96c8de6c988a846b33b3a1a  manifest.sha256
+ok
+40b863f17851d4ca170bdb10dd8f45c8f549aa25dda9b506ebafc40acf657f75  /tmp/b3
+b6f7ce68ad3aa375ed3f3dfa62d7a2845d1bfa8db97ce8ba2683538f93d284ee  .logs/d110c-0c1a-green-retained-browser-post-refactor-7e2f2694/manifest.sha256
+.logs/d110c-0c1a-green-retained-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-same-boundary-final-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-adversarial-final-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-correction-final-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-7e2f2694/list-after-alias.json
+.logs/d110c-0c1a-green-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-retained-correction-final-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-correction-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-same-boundary-corrected-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-focused-final-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-post-refactor-final-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-retained-correction-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-focused-post-retained-fix-7e2f2694/vitest.json
+.logs/d110c-0c1a-red-add7f7dc/audit.json
+.logs/d110c-0c1a-red-add7f7dc/vitest.json
+.logs/d110c-0c1a-red-add7f7dc/list.json
+.logs/d110c-0c1a-green-retained-final-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-retained-post-refactor-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-same-boundary-7e2f2694/vitest.json
+.logs/d110c-0c1a-green-retained-browser-post-refactor-7e2f2694/manifest.sha256
+.logs/d110c-0c1a-green-retained-browser-7e2f2694/manifest.sha256
+exit.status
+stderr.log
+stdout.log
+b6f7ce68ad3aa375ed3f3dfa62d7a2845d1bfa8db97ce8ba2683538f93d284ee  .logs/d110c-0c1a-green-retained-browser-post-refactor-7e2f2694/manifest.sha256
+3eb2fba5e6d2c2d4ed6961c86771ae8b8d7fe35db96c8de6c988a846b33b3a1a  .logs/d110c-0c1a-green-retained-browser-7e2f2694/manifest.sha256
+./docs/production-hardening/production-hardening-tdd-plan-v2.md
+./.logs/d110c-0c1a-green-closure-7e2f2694/ledger.md
+./.logs/d110c-0c1a-final-review-d77ee315/review-prompt.md
+./.logs/d110c-0c1a-final-review-d77ee315/grok/input-packet.md
+./.logs/d110c-0c1a-final-review-d77ee315/kimi/stderr.txt
+== phase-5e-live-close-corrected/ exit=0
+9 passed
+== phase-5e-live-close/ exit=1
+3 failed
+6 passed
+== phase-6a-adoption-commit/ exit=0
+6 passed
+== phase-6a-successor-activation/ exit=0
+24 passed
+== phase-6a-successor-epoch/ exit=0
+3 passed
+== phase-6a-successor-product-excluding-d110c-0c/ exit=0
+30 passed
+== phase-6b-ahe-reclamation/ exit=0
+4 passed
+== phase-6b-issuance-retention/ exit=0
+4 passed
+commit 7e2f2694cdd1b3a2feb0265dd0a73fa52dcb52dc
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 21:14:03 2026 -0400
+
+    test: capture D110c issuance checkpoint red
+
+diff --git a/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts b/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+new file mode 100644
+index 00000000..a021da5a
+--- /dev/null
++++ b/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+@@ -0,0 +1,115 @@
++import "fake-indexeddb/auto";
++
++import { compareBytes, decodeCanonical } from "@ts-drp/canonical";
++import { describe, expect, it } from "vitest";
++
++import {
++	D110C_0C1A_RED_TOKEN,
++	D110C_0C1A_RETIREMENT_KIND,
++	openD110c0c1aRetirementCheckpointFixture,
++} from "./fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.js";
++
++describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
++	it("requires one authenticated retirement carrier after a genuine dense creator close", async () => {
++		Object.defineProperty(navigator, "storage", {
++			configurable: true,
++			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
++		});
++		const fixture = await openD110c0c1aRetirementCheckpointFixture();
++		try {
++			const { closeIdentity, closeResult, durableReplayVerified, history, lineage, retirementCandidates, rows } =
++				fixture.evidence;
++			expect(closeResult).toMatchObject({
++				closedVertexCount: history.closeSetCount,
++				epoch: 0,
++				lifecycle: "successor-pending-adoption",
++				ok: true,
++				successorEpoch: 1,
++			});
++			expect(lineage).toEqual({ exhausted: false, next: 3 });
++			expect(rows.map(({ authorSequence }) => authorSequence)).toEqual([0, 1, 2]);
++			expect(rows.map(({ digest }) => digest)).toEqual(history.closeSetOrder);
++			expect(rows.map(({ journalSequence }) => journalSequence)).toEqual([0, 1, 2]);
++			expect(rows.map(({ journalSourceKind }) => journalSourceKind)).toEqual([
++				"received",
++				"local-issued",
++				"local-issued",
++			]);
++			expect(rows.map(({ outbox }) => outbox.publishState)).toEqual(["pending", "pending", "pending"]);
++			for (const row of rows) {
++				const preimage = decodeCanonical(row.canonicalPreimageBytes) as Readonly<Record<string, unknown>>;
++				expect(preimage).toMatchObject({
++					authorSequence: row.authorSequence,
++					objectId: row.outbox.commit.outboxEntry.scope.objectId,
++				});
++				expect(preimage.author).toBe(row.outbox.commit.outboxEntry.scope.author);
++				expect(row.issued.authorSequence).toBe(row.authorSequence);
++				expect(row.outbox.commit.authorSequence).toBe(row.authorSequence);
++				expect(compareBytes(row.issued.envelope.canonicalPreimageBytes, row.canonicalPreimageBytes)).toBe(0);
++				expect(compareBytes(row.outbox.commit.envelope.canonicalPreimageBytes, row.canonicalPreimageBytes)).toBe(0);
++				expect(compareBytes(row.issued.envelope.digest, row.outbox.commit.envelope.digest)).toBe(0);
++				expect(compareBytes(row.issued.envelope.signature, row.signature)).toBe(0);
++				expect(compareBytes(row.outbox.commit.envelope.signature, row.signature)).toBe(0);
++				expect(history.closeSetOrder).toContain(row.digest);
++			}
++			expect(durableReplayVerified).toBe(true);
++			expect(history.closeSetCount).toBe(3);
++			expect(closeIdentity.cut).toMatchObject({
++				closeSetCount: history.closeSetCount,
++				closeSetRoot: history.closeSetRoot,
++				epoch: 0,
++				historyRoot: history.historyRoot,
++				historySize: history.historySize,
++				objectId: rows[0]?.outbox.commit.outboxEntry.scope.objectId,
++				snapshotManifestDigest: closeIdentity.snapshotManifestDigest,
++			});
++			expect(closeIdentity.commitQc).toMatchObject({
++				epoch: 0,
++				kind: "drp-seal-qc",
++				objectId: closeIdentity.cut.objectId,
++				phase: "commit",
++			});
++			expect(closeIdentity.successorTrust).toMatchObject({
++				currentAnchorDigest: closeResult.successorAnchorDigest,
++				currentEpoch: closeResult.successorEpoch,
++				kind: "drp-anchor-trust-state",
++				objectId: closeIdentity.cut.objectId,
++			});
++			expect(closeIdentity).toMatchObject({
++				commitQcRefExact: true,
++				cutRefExact: true,
++				successorOpened: true,
++				successorTrustRefExact: true,
++			});
++
++			const refusal = Object.freeze({ code: D110C_0C1A_RED_TOKEN, subclass: "missing-carrier" as const });
++			if (process.env.D110C_0C1A_RECORD_EVIDENCE === "1") {
++				process.stdout.write(
++					`D110C_0C1A_RED_EVIDENCE=${JSON.stringify({
++						closeSetCount: history.closeSetCount,
++						closeSetRoot: history.closeSetRoot,
++						durableReplayVerified,
++						historyRoot: history.historyRoot,
++						historySize: history.historySize,
++						lineage,
++						publishStates: rows.map(({ outbox }) => outbox.publishState),
++						refusal,
++						retirementCandidateCount: retirementCandidates.length,
++						rowDigests: rows.map(({ digest }) => digest),
++						rowKeys: rows.map(({ authorSequence }) => authorSequence),
++						successorAnchorDigest: closeResult.successorAnchorDigest,
++					})}\n`
++				);
++			}
++			if (retirementCandidates.length === 0) {
++				expect(refusal).toEqual({ code: D110C_0C1A_RED_TOKEN, subclass: "missing-carrier" });
++				throw new TypeError(D110C_0C1A_RED_TOKEN);
++			}
++			expect(retirementCandidates).toHaveLength(1);
++			expect(retirementCandidates[0]?.value.kind).toBe(D110C_0C1A_RETIREMENT_KIND);
++			expect(fixture.evidence.proposed.references).toContainEqual(retirementCandidates[0]?.ref);
++		} finally {
++			await fixture.close();
++		}
++	});
++});
+     492 /tmp/green-test.diff
+commit d77ee315a7688cffb5fd55870c38231403ecc41f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 22:28:00 2026 -0400
+
+    feat: authenticate creator issuance retirement
+
+diff --git a/tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts b/tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts
+index b2ad3cd1..89f3c5cb 100644
+--- a/tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts
+@@ -6,6 +6,7 @@ import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+ import type { CreatorLiveCloseResult } from "../../../packages/node/src/creator-close.js";
+ import { resolveCreatorAdoptionFacts } from "../../../packages/node/src/internal/creator-adoption-intent.js";
+ import { openCreatorSuccessorTrust } from "../../../packages/protocol-v3/src/creator-close.js";
++import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
+ import {
+ 	bytesForRef,
+ 	type DetachedHeadEvidence,
+@@ -43,6 +44,8 @@ export interface D110c0c1aRetirementCheckpointEvidence {
+ 		readonly successorTrustRefExact: boolean;
+ 	}>;
+ 	readonly closeResult: CreatorLiveCloseResult;
++	readonly current: DetachedHeadEvidence;
++	readonly currentTrust: CurrentAnchorTrust;
+ 	readonly durableReplayVerified: boolean;
+ 	readonly history: CloseSetHistoryCommitment;
+ 	readonly lineage: DurableLineage;
+@@ -53,6 +56,7 @@ export interface D110c0c1aRetirementCheckpointEvidence {
+ 		readonly value: Readonly<Record<string, unknown>>;
+ 	}>[];
+ 	readonly proposed: DetachedHeadEvidence;
++	readonly successorTrust: CurrentAnchorTrust;
+ }
+ 
+ export interface D110c0c1aRetirementCheckpointFixture {
+@@ -104,8 +108,17 @@ export async function openD110c0c1aRetirementCheckpointFixture(): Promise<D110c0
+ 	});
+ 
+ 	try {
+-		const { closeResult, currentTrust, declaration, history, issuanceScope, issuanceStore, journalRows, proposed } =
+-			fixture.evidence;
++		const {
++			closeResult,
++			current,
++			currentTrust,
++			declaration,
++			history,
++			issuanceScope,
++			issuanceStore,
++			journalRows,
++			proposed,
++		} = fixture.evidence;
+ 		const lineage = await issuanceStore.readLineage(issuanceScope);
+ 		const outbox = await issuanceStore.readOutboxPage({ limit: 128, scope: issuanceScope });
+ 		const rows = await Promise.all(
+@@ -144,6 +157,7 @@ export async function openD110c0c1aRetirementCheckpointFixture(): Promise<D110c0
+ 			exactCanonicalTrustStateRecordBytes: successorTrustBytes,
+ 		});
+ 		const snapshotManifest = canonicalRecord(declaration.exactCanonicalManifestBytes);
++		if (!successor.ok) throw new TypeError(`D.110c-0c1a successor open failed: ${successor.reason}`);
+ 		const retirementCandidates = proposed.candidates.flatMap((candidate) => {
+ 			const value = canonicalRecord(candidate.bytes);
+ 			return value.kind === D110C_0C1A_RETIREMENT_KIND
+@@ -174,12 +188,15 @@ export async function openD110c0c1aRetirementCheckpointFixture(): Promise<D110c0
+ 					successorTrustRefExact: exactRef(successorTrustBytes, closeResult.successorTrustRef),
+ 				}),
+ 				closeResult,
++				current,
++				currentTrust,
+ 				durableReplayVerified,
+ 				history,
+ 				lineage,
+ 				proposed,
+ 				retirementCandidates: Object.freeze(retirementCandidates),
+ 				rows: Object.freeze(rows),
++				successorTrust: successor.trust,
+ 			}),
+ 		});
+ 	} catch (error) {
+diff --git a/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts b/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+index a021da5a..e8b77d1c 100644
+--- a/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
++++ b/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+@@ -1,13 +1,58 @@
+ import "fake-indexeddb/auto";
+ 
+-import { compareBytes, decodeCanonical } from "@ts-drp/canonical";
++import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
++import { digestBlob } from "@ts-drp/storage";
+ import { describe, expect, it } from "vitest";
+ 
++import { contract, hexBytes } from "./fixtures/phase-3a0-v3/controlled-anchor-trust.js";
++import { openD110c0b1RedFixture } from "./fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.js";
+ import {
+ 	D110C_0C1A_RED_TOKEN,
+ 	D110C_0C1A_RETIREMENT_KIND,
+ 	openD110c0c1aRetirementCheckpointFixture,
+ } from "./fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.js";
++import {
++	createRecoverableFinalitySigner,
++	signCreatorAnchorRequest,
++	signCreatorIssuanceRetirementRequest,
++} from "../packages/keychain/src/finality.js";
++import { inspectCreatorTransitionAdvance } from "../packages/node/src/internal/creator-transition-advance.js";
++import { openCreatorCheckpointTrust } from "../packages/protocol-v3/src/creator-checkpoint.js";
++import {
++	completeCreatorIssuanceRetirement,
++	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
++	openCreatorIssuanceRetirement,
++	prepareCreatorIssuanceRetirement,
++	resolveCreatorIssuanceRetirement,
++} from "../packages/protocol-v3/src/creator-issuance-retirement.js";
++
++interface Candidate {
++	readonly bytes: Uint8Array;
++	readonly ref: Readonly<{ readonly byteLength: number; readonly digest: string }>;
++}
++
++function record(value: Uint8Array): Readonly<Record<string, unknown>> {
++	const decoded = decodeCanonical(value);
++	if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
++		throw new TypeError("D110C_0C1A_RECORD_INVALID");
++	}
++	return decoded as Readonly<Record<string, unknown>>;
++}
++
++function uniqueCandidate(candidates: readonly Candidate[], kind: string, epoch: number, phase?: string): Candidate {
++	const matches = candidates.filter((candidate) => {
++		const decoded = record(candidate.bytes);
++		const candidateEpoch =
++			decoded.kind === "drp-anchor-trust-state"
++				? decoded.currentEpoch
++				: decoded.kind === D110C_0C1A_RETIREMENT_KIND
++					? decoded.closedEpoch
++					: decoded.epoch;
++		return decoded.kind === kind && candidateEpoch === epoch && (phase === undefined || decoded.phase === phase);
++	});
++	if (matches.length !== 1) throw new TypeError(`D110C_0C1A_CANDIDATE_INVALID:${kind}:${epoch}`);
++	return matches[0] as (typeof matches)[number];
++}
+ 
+ describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
+ 	it("requires one authenticated retirement carrier after a genuine dense creator close", async () => {
+@@ -106,8 +151,346 @@ describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
+ 				throw new TypeError(D110C_0C1A_RED_TOKEN);
+ 			}
+ 			expect(retirementCandidates).toHaveLength(1);
+-			expect(retirementCandidates[0]?.value.kind).toBe(D110C_0C1A_RETIREMENT_KIND);
+-			expect(fixture.evidence.proposed.references).toContainEqual(retirementCandidates[0]?.ref);
++			const candidate = retirementCandidates[0];
++			if (candidate === undefined) throw new TypeError("D110C_0C1A_GREEN_CANDIDATE_UNAVAILABLE");
++			expect(candidate.value.kind).toBe(D110C_0C1A_RETIREMENT_KIND);
++			expect(fixture.evidence.proposed.references).toContainEqual(candidate.ref);
++			const expectedOpen = Object.freeze({
++				expectedCommitQcRef: closeResult.commitQcRef,
++				expectedCutValueDigest: Buffer.from(
++					hashDomain("ts-drp/hard-epoch-cut/v3", encodeCanonical(closeIdentity.cut))
++				).toString("hex"),
++				expectedSnapshotManifestDigest: closeIdentity.snapshotManifestDigest,
++				floorTrust: fixture.evidence.successorTrust,
++			});
++			expect(
++				openCreatorIssuanceRetirement({
++					...expectedOpen,
++					exactCanonicalRecordBytes: candidate.bytes,
++				})
++			).toMatchObject({ ok: true });
++			const mutatedSignature = Uint8Array.from(candidate.value.detachedCreatorSignature as Uint8Array);
++			mutatedSignature[0] = (mutatedSignature[0] as number) ^ 1;
++			const mutants = Object.freeze([
++				Object.freeze({ ...candidate.value, author: "0".repeat(64) }),
++				Object.freeze({ ...candidate.value, objectId: `${String(candidate.value.objectId)}-foreign` }),
++				Object.freeze({ ...candidate.value, genesisAnchorDigest: "0".repeat(64) }),
++				Object.freeze({ ...candidate.value, closedAnchorDigest: "0".repeat(64) }),
++				Object.freeze({ ...candidate.value, successorAnchorDigest: "0".repeat(64) }),
++				Object.freeze({ ...candidate.value, cutValueDigest: "0".repeat(64) }),
++				Object.freeze({ ...candidate.value, snapshotManifestDigest: "0".repeat(64) }),
++				Object.freeze({ ...candidate.value, priorRetirementCandidateDigest: "0".repeat(64) }),
++				Object.freeze({ ...candidate.value, admittedAuthorSequence: 1 }),
++				Object.freeze({ ...candidate.value, observedLineage: { exhausted: true, next: 3 } }),
++				Object.freeze({ ...candidate.value, detachedCreatorSignature: mutatedSignature }),
++			]);
++			for (const mutant of mutants) {
++				expect(
++					openCreatorIssuanceRetirement({
++						...expectedOpen,
++						exactCanonicalRecordBytes: encodeCanonical(mutant),
++					})
++				).toMatchObject({ ok: false });
++			}
++			expect(
++				openCreatorIssuanceRetirement({
++					...expectedOpen,
++					exactCanonicalRecordBytes: new Uint8Array(8193),
++				})
++			).toMatchObject({ ok: false });
++			const transition = Object.freeze({
++				current: {
++					candidates: fixture.evidence.current.candidates,
++					closure: fixture.evidence.current.references,
++				},
++				currentTrust: fixture.evidence.currentTrust,
++				mode: "verify" as const,
++				proofRefs: [closeResult.cutValueRef, closeResult.commitQcRef],
++				proposed: {
++					candidates: fixture.evidence.proposed.candidates,
++					closure: fixture.evidence.proposed.references,
++				},
++				successorTrust: fixture.evidence.successorTrust,
++			});
++			expect(inspectCreatorTransitionAdvance(transition)).toMatchObject({ ok: true });
++			expect(
++				inspectCreatorTransitionAdvance({
++					...transition,
++					proposed: {
++						candidates: transition.proposed.candidates.filter(({ ref }) => ref.digest !== candidate.ref.digest),
++						closure: transition.proposed.closure.filter(({ digest }) => digest !== candidate.ref.digest),
++					},
++				})
++			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
++			expect(
++				inspectCreatorTransitionAdvance({
++					...transition,
++					proposed: {
++						candidates: [...transition.proposed.candidates, candidate],
++						closure: [...transition.proposed.closure, candidate.ref],
++					},
++				})
++			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
++			expect(
++				inspectCreatorTransitionAdvance({
++					...transition,
++					proposed: {
++						candidates: transition.proposed.candidates,
++						closure: transition.proposed.closure.filter(({ digest }) => digest !== candidate.ref.digest),
++					},
++				})
++			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
++			expect(
++				inspectCreatorTransitionAdvance({
++					...transition,
++					proposed: {
++						candidates: transition.proposed.candidates.filter(({ ref }) => ref.digest !== candidate.ref.digest),
++						closure: transition.proposed.closure,
++					},
++				})
++			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
++			expect(
++				inspectCreatorTransitionAdvance({
++					...transition,
++					proposed: {
++						candidates: transition.proposed.candidates,
++						closure: [...transition.proposed.closure, candidate.ref],
++					},
++				})
++			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
++
++			const recreated = prepareCreatorIssuanceRetirement({
++				admittedAuthorSequence: candidate.value.admittedAuthorSequence,
++				author: candidate.value.author,
++				commitQcRef: closeResult.commitQcRef,
++				currentTrust: fixture.evidence.currentTrust,
++				cutValueDigest: candidate.value.cutValueDigest,
++				observedLineage: candidate.value.observedLineage,
++				priorAdmittedAuthorSequence: candidate.value.priorAdmittedAuthorSequence,
++				priorRetirementCandidateDigest: candidate.value.priorRetirementCandidateDigest,
++				snapshotManifestDigest: candidate.value.snapshotManifestDigest,
++				successorTrust: fixture.evidence.successorTrust,
++			});
++			expect(recreated).toMatchObject({ ok: true });
++			if (!recreated.ok) throw new TypeError("D110C_0C1A_GREEN_PREPARATION_UNAVAILABLE");
++			const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
++			await expect(
++				signCreatorAnchorRequest({ request: recreated.signingRequest as never, signer: signer.signer })
++			).rejects.toThrow("untrusted or consumed creator-anchor signing request");
++			const detachedSignature = await signCreatorIssuanceRetirementRequest({
++				request: recreated.signingRequest,
++				signer: signer.signer,
++			});
++			await expect(
++				signCreatorIssuanceRetirementRequest({
++					request: recreated.signingRequest,
++					signer: signer.signer,
++				})
++			).rejects.toThrow("untrusted or consumed creator issuance-retirement signing request");
++			const completed = completeCreatorIssuanceRetirement({
++				detachedSignature,
++				preparation: recreated.preparation,
++			});
++			expect(completed).toMatchObject({ ok: true });
++			if (!completed.ok) throw new TypeError("D110C_0C1A_GREEN_COMPLETION_UNAVAILABLE");
++			expect(completed.exactCanonicalRecordBytes).toEqual(candidate.bytes);
++			expect(
++				completeCreatorIssuanceRetirement({
++					detachedSignature,
++					preparation: recreated.preparation,
++				})
++			).toEqual({ ok: false, reason: "PREPARATION_UNAVAILABLE" });
++		} finally {
++			await fixture.close();
++		}
++	});
++
++	it("replaces the authenticated epoch-one carrier when the admitted boundary does not advance", async () => {
++		const fixture = await openD110c0b1RedFixture();
++		try {
++			const { checkpointInput, retirementTransition } = fixture.evidence;
++			const checkpoint = openCreatorCheckpointTrust(checkpointInput);
++			expect(checkpoint).toMatchObject({ ok: true });
++			if (!checkpoint.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_CHECKPOINT_FAILED");
++			const currentCarrier = uniqueCandidate(retirementTransition.current.candidates, D110C_0C1A_RETIREMENT_KIND, 0);
++			const ordinaryProposedCarrier = uniqueCandidate(
++				retirementTransition.proposed.candidates,
++				D110C_0C1A_RETIREMENT_KIND,
++				1
++			);
++			const currentCut = uniqueCandidate(retirementTransition.current.candidates, "drp-hard-epoch-cut", 0);
++			const currentQc = uniqueCandidate(retirementTransition.current.candidates, "drp-seal-qc", 0, "commit");
++			const proposedCut = uniqueCandidate(retirementTransition.proposed.candidates, "drp-hard-epoch-cut", 1);
++			const proposedQc = uniqueCandidate(retirementTransition.proposed.candidates, "drp-seal-qc", 1, "commit");
++			const currentCutRecord = record(currentCut.bytes);
++			const proposedCutRecord = record(proposedCut.bytes);
++			const openedCurrent = openCreatorIssuanceRetirement({
++				exactCanonicalRecordBytes: currentCarrier.bytes,
++				expectedCommitQcRef: currentQc.ref,
++				expectedCutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", currentCut.bytes)).toString("hex"),
++				expectedSnapshotManifestDigest: currentCutRecord.snapshotManifestDigest,
++				floorTrust: checkpoint.predecessorTrust,
++			});
++			expect(openedCurrent).toMatchObject({ ok: true });
++			if (!openedCurrent.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_OPEN_FAILED");
++			const currentIdentity = resolveCreatorIssuanceRetirement(openedCurrent.capability);
++			expect(currentIdentity).toBeDefined();
++			if (currentIdentity === undefined) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_IDENTITY_FAILED");
++			const ordinaryProposedRecord = record(ordinaryProposedCarrier.bytes);
++			const prepared = prepareCreatorIssuanceRetirement({
++				admittedAuthorSequence: currentIdentity.admittedAuthorSequence,
++				author: currentIdentity.author,
++				commitQcRef: proposedQc.ref,
++				currentTrust: checkpoint.predecessorTrust,
++				cutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
++				observedLineage: ordinaryProposedRecord.observedLineage,
++				priorAdmittedAuthorSequence: currentIdentity.admittedAuthorSequence,
++				priorRetirementCandidateDigest: currentCarrier.ref.digest,
++				snapshotManifestDigest: proposedCutRecord.snapshotManifestDigest,
++				successorTrust: checkpoint.currentTrust,
++			});
++			expect(prepared).toMatchObject({ ok: true });
++			if (!prepared.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_PREPARE_FAILED");
++			const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
++			const signature = await signCreatorIssuanceRetirementRequest({
++				request: prepared.signingRequest,
++				signer: signer.signer,
++			});
++			const completed = completeCreatorIssuanceRetirement({
++				detachedSignature: signature,
++				preparation: prepared.preparation,
++			});
++			expect(completed).toMatchObject({ ok: true });
++			if (!completed.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_COMPLETE_FAILED");
++			const sameBoundaryRef = digestBlob(completed.exactCanonicalRecordBytes);
++			expect(sameBoundaryRef).toMatchObject({ ok: true });
++			if (!sameBoundaryRef.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_DIGEST_FAILED");
++			const replacement = Object.freeze({
++				bytes: completed.exactCanonicalRecordBytes,
++				ref: Object.freeze({
++					byteLength: completed.exactCanonicalRecordBytes.byteLength,
++					digest: sameBoundaryRef.value,
++				}),
++			});
++			const proposed = Object.freeze({
++				candidates: Object.freeze(
++					retirementTransition.proposed.candidates.map((candidate) =>
++						candidate.ref.digest === ordinaryProposedCarrier.ref.digest ? replacement : candidate
++					)
++				),
++				closure: Object.freeze(
++					retirementTransition.proposed.references.map((ref) =>
++						ref.digest === ordinaryProposedCarrier.ref.digest ? replacement.ref : ref
++					)
++				),
++			});
++			const openedProposed = openCreatorIssuanceRetirement({
++				exactCanonicalRecordBytes: replacement.bytes,
++				expectedCommitQcRef: proposedQc.ref,
++				expectedCutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
++				expectedSnapshotManifestDigest: proposedCutRecord.snapshotManifestDigest,
++				floorTrust: checkpoint.currentTrust,
++			});
++			expect(openedProposed).toMatchObject({ ok: true });
++			if (!openedProposed.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_SUCCESSOR_OPEN_FAILED");
++			const proposedIdentity = resolveCreatorIssuanceRetirement(openedProposed.capability);
++			expect(proposedIdentity).toMatchObject({
++				admittedAuthorSequence: currentIdentity.admittedAuthorSequence,
++				closedEpoch: 1,
++				priorAdmittedAuthorSequence: currentIdentity.admittedAuthorSequence,
++				priorRetirementCandidateDigest: currentCarrier.ref.digest,
++				successorEpoch: 2,
++			});
++			expect(retirementTransition.current.references).toContainEqual(currentCarrier.ref);
++			expect(proposed.closure).not.toContainEqual(currentCarrier.ref);
++			expect(proposed.closure).toContainEqual(replacement.ref);
++			expect(
++				inspectCreatorTransitionAdvance({
++					current: {
++						candidates: retirementTransition.current.candidates,
++						closure: retirementTransition.current.references,
++					},
++					currentTrust: checkpoint.predecessorTrust,
++					mode: "verify",
++					proofRefs: [proposedCut.ref, proposedQc.ref],
++					proposed,
++					successorTrust: checkpoint.currentTrust,
++				})
++			).toMatchObject({ ok: true });
++
++			const forkPrepared = prepareCreatorIssuanceRetirement({
++				admittedAuthorSequence: currentIdentity.admittedAuthorSequence,
++				author: currentIdentity.author,
++				commitQcRef: proposedQc.ref,
++				currentTrust: checkpoint.predecessorTrust,
++				cutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
++				observedLineage: ordinaryProposedRecord.observedLineage,
++				priorAdmittedAuthorSequence: currentIdentity.admittedAuthorSequence,
++				priorRetirementCandidateDigest: currentCarrier.ref.digest === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64),
++				snapshotManifestDigest: proposedCutRecord.snapshotManifestDigest,
++				successorTrust: checkpoint.currentTrust,
++			});
++			expect(forkPrepared).toMatchObject({ ok: true });
++			if (!forkPrepared.ok) throw new TypeError("D110C_0C1A_FORK_PREPARE_FAILED");
++			const forkSignature = await signCreatorIssuanceRetirementRequest({
++				request: forkPrepared.signingRequest,
++				signer: signer.signer,
++			});
++			const forkCompleted = completeCreatorIssuanceRetirement({
++				detachedSignature: forkSignature,
++				preparation: forkPrepared.preparation,
++			});
++			expect(forkCompleted).toMatchObject({ ok: true });
++			if (!forkCompleted.ok) throw new TypeError("D110C_0C1A_FORK_COMPLETE_FAILED");
++			const forkDigest = digestBlob(forkCompleted.exactCanonicalRecordBytes);
++			expect(forkDigest).toMatchObject({ ok: true });
++			if (!forkDigest.ok) throw new TypeError("D110C_0C1A_FORK_DIGEST_FAILED");
++			const forkCandidate = Object.freeze({
++				bytes: forkCompleted.exactCanonicalRecordBytes,
++				ref: Object.freeze({
++					byteLength: forkCompleted.exactCanonicalRecordBytes.byteLength,
++					digest: forkDigest.value,
++				}),
++			});
++			const forkedProposed = Object.freeze({
++				candidates: Object.freeze(
++					retirementTransition.proposed.candidates.map((candidate) =>
++						candidate.ref.digest === ordinaryProposedCarrier.ref.digest ? forkCandidate : candidate
++					)
++				),
++				closure: Object.freeze(
++					retirementTransition.proposed.references.map((ref) =>
++						ref.digest === ordinaryProposedCarrier.ref.digest ? forkCandidate.ref : ref
++					)
++				),
++			});
++			expect(
++				inspectCreatorTransitionAdvance({
++					current: {
++						candidates: retirementTransition.current.candidates,
++						closure: retirementTransition.current.references,
++					},
++					currentTrust: checkpoint.predecessorTrust,
++					mode: "verify",
++					proofRefs: [proposedCut.ref, proposedQc.ref],
++					proposed: forkedProposed,
++					successorTrust: checkpoint.currentTrust,
++				})
++			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
++			expect(
++				prepareCreatorIssuanceRetirement({
++					admittedAuthorSequence: currentIdentity.admittedAuthorSequence,
++					author: currentIdentity.author,
++					commitQcRef: proposedQc.ref,
++					currentTrust: checkpoint.predecessorTrust,
++					cutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
++					observedLineage: ordinaryProposedRecord.observedLineage,
++					priorAdmittedAuthorSequence: null,
++					priorRetirementCandidateDigest: CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
++					snapshotManifestDigest: proposedCutRecord.snapshotManifestDigest,
++					successorTrust: checkpoint.currentTrust,
++				})
++			).toEqual({ ok: false, reason: "IDENTITY_INVALID" });
+ 		} finally {
+ 			await fixture.close();
+ 		}
+commit d77ee315a7688cffb5fd55870c38231403ecc41f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 22:28:00 2026 -0400
+
+    feat: authenticate creator issuance retirement
+
+diff --git a/tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts b/tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts
+index bf911b19..0d046822 100644
+--- a/tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts
+@@ -41,6 +41,10 @@ export interface D110c0b1RedEvidence {
+ 	readonly existingAdvance: Readonly<Record<string, unknown>>;
+ 	readonly oneStepFromGenesis: Readonly<Record<string, unknown>>;
+ 	readonly proposedCensus: readonly D110c0b1ClosureEntry[];
++	readonly retirementTransition: Readonly<{
++		readonly current: D110c0b1RedMaterial["current"];
++		readonly proposed: D110c0b1RedMaterial["proposed"];
++	}>;
+ }
+ 
+ export interface D110c0b1RedFixture {
+@@ -84,7 +88,9 @@ function census(candidates: readonly Candidate[]): readonly D110c0b1ClosureEntry
+ 							? decoded.currentEpoch
+ 							: typeof decoded.epoch === "number"
+ 								? decoded.epoch
+-								: undefined,
++								: typeof decoded.closedEpoch === "number"
++									? decoded.closedEpoch
++									: undefined,
+ 					kind: String(decoded.kind),
+ 					phase: typeof decoded.phase === "string" ? decoded.phase : undefined,
+ 				});
+@@ -117,6 +123,11 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
+ 		const newQc = candidate(material.proposed.candidates, "drp-seal-qc", 1, "commit");
+ 		const expectedObjectId = material.genesisTrust.objectId;
+ 		const pinnedGenesisAnchorDigest = material.genesisTrust.genesisAnchorDigest;
++		const retirementDigests = new Set(
++			[...material.current.candidates, ...material.proposed.candidates].flatMap((entry) =>
++				record(entry).kind === "drp-creator-issuance-retirement-state" ? [entry.ref.digest] : []
++			)
++		);
+ 		const openedEpochOne = openCurrentAnchorTrust({
+ 			exactCanonicalTrustStateRecordBytes: epochOneTrust.bytes,
+ 			expectedObjectId,
+@@ -131,19 +142,27 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
+ 		const retiredDigests = new Set([retiringCut.ref.digest, retiringQc.ref.digest, retiringAcl.ref.digest]);
+ 		const boundedReferences = Object.freeze(
+ 			material.proposed.references
+-				.filter((ref) => !retiredDigests.has(ref.digest))
++				.filter((ref) => !retiredDigests.has(ref.digest) && !retirementDigests.has(ref.digest))
+ 				.map((ref) => Object.freeze({ ...ref }))
+ 				.sort((left, right) => left.digest.localeCompare(right.digest))
+ 		);
+ 		const boundedCandidates = Object.freeze(
+-			material.proposed.candidates.filter((entry) => !retiredDigests.has(entry.ref.digest))
++			material.proposed.candidates.filter(
++				(entry) => !retiredDigests.has(entry.ref.digest) && !retirementDigests.has(entry.ref.digest)
++			)
++		);
++		const boundedCurrentReferences = Object.freeze(
++			material.current.references.filter((ref) => !retirementDigests.has(ref.digest))
++		);
++		const boundedCurrentCandidates = Object.freeze(
++			material.current.candidates.filter((entry) => !retirementDigests.has(entry.ref.digest))
+ 		);
+ 		return Object.freeze({
+ 			close: fixture.close,
+ 			evidence: Object.freeze({
+ 				activeCensus: census(material.active.candidates),
+ 				boundedInput: Object.freeze({
+-					current: Object.freeze({ candidates: material.current.candidates, closure: material.current.references }),
++					current: Object.freeze({ candidates: boundedCurrentCandidates, closure: boundedCurrentReferences }),
+ 					proofRefs: Object.freeze([newCut.ref, newQc.ref]),
+ 					proposed: Object.freeze({ candidates: boundedCandidates, closure: boundedReferences }),
+ 					retiringPredecessorAclRef: retiringAcl.ref,
+@@ -188,6 +207,7 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
+ 					exactCanonicalTrustStateRecordBytes: epochTwoTrust.bytes,
+ 				}),
+ 				proposedCensus: census(material.proposed.candidates),
++				retirementTransition: Object.freeze({ current: material.current, proposed: material.proposed }),
+ 			}),
+ 		});
+ 	} catch (error) {
+diff --git a/tests/phase-6a-creator-adoption-red.test.ts b/tests/phase-6a-creator-adoption-red.test.ts
+index 7b8df9c3..435321df 100644
+--- a/tests/phase-6a-creator-adoption-red.test.ts
++++ b/tests/phase-6a-creator-adoption-red.test.ts
+@@ -394,13 +394,25 @@ describe("D.108b read-only creator-successor adoption RED", () => {
+ 			reason: "COMMIT_QC_REJECTED",
+ 		});
+ 
++		const retirementRefs = new Set(
++			first.proposed.candidates.flatMap((candidate) => {
++				const value = decodeCanonical(candidate.bytes) as Readonly<Record<string, unknown>>;
++				return value.kind === "drp-creator-issuance-retirement-state" ? [candidate.ref.digest] : [];
++			})
++		);
++		const normalizedCandidates = first.proposed.candidates.filter(
++			(candidate) => !retirementRefs.has(candidate.ref.digest)
++		);
+ 		const advance = (
+ 			proposedReferences: typeof first.proposed.references
+ 		): ReturnType<typeof inspectCreatorTrustAdvance> =>
+ 			inspectCreatorTrustAdvance({
+ 				current: { candidates: first.current.candidates, closure: first.current.references },
+ 				proofRefs: [first.closeResult.cutValueRef, first.closeResult.commitQcRef],
+-				proposed: { candidates: first.proposed.candidates, closure: proposedReferences },
++				proposed: {
++					candidates: normalizedCandidates,
++					closure: proposedReferences.filter((ref) => !retirementRefs.has(ref.digest)),
++				},
+ 			});
+ 		expect(advance(first.proposed.references)).toEqual({ kind: "successor", ok: true });
+ 		const lengthMutant = first.proposed.references.map((ref) =>
+diff --git a/tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts b/tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+index 9f9bec73..09a6d0d4 100644
+--- a/tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
++++ b/tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+@@ -102,9 +102,12 @@ describe("D.110c-0b1 bounded checkpoint and control-proof GREEN", () => {
+ 		const { activeCensus, currentCensus, existingAdvance, proposedCensus } = fixture.evidence;
+ 		expect(existingAdvance).toMatchObject({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+ 		expect(bounded).toEqual({ kind: "successor", ok: true });
+-		expect(currentCensus).toHaveLength(5);
+-		expect(proposedCensus).toHaveLength(4);
+-		expect(activeCensus).toHaveLength(5);
++		expect(currentCensus).toHaveLength(6);
++		expect(proposedCensus).toHaveLength(5);
++		expect(activeCensus).toHaveLength(6);
++		expect(entries(currentCensus, "drp-creator-issuance-retirement-state", 0)).toHaveLength(1);
++		expect(entries(proposedCensus, "drp-creator-issuance-retirement-state", 1)).toHaveLength(1);
++		expect(entries(activeCensus, "drp-creator-issuance-retirement-state", 1)).toHaveLength(1);
+ 		expect(entries(currentCensus, "drp-hard-epoch-cut", 0)).toHaveLength(1);
+ 		expect(entries(currentCensus, "drp-seal-qc", 0, "commit")).toHaveLength(1);
+ 		expect(entries(currentCensus, "drp-v3-latched-acl", 0)).toHaveLength(1);
+ .../tests/phase-5e-creator-live-close.pw.ts        |  15 +-
+commit d77ee315a7688cffb5fd55870c38231403ecc41f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 22:28:00 2026 -0400
+
+    feat: authenticate creator issuance retirement
+
+diff --git a/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts b/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
+index 606556b8..33c2273a 100644
+--- a/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
++++ b/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
+@@ -51,12 +51,13 @@ function expectedCombinedClosure(
+ 		current: readonly ModelRef[];
+ 		currentTrustRef: ModelRef;
+ 		proofRefs: readonly ModelRef[];
++		retirementRef: ModelRef;
+ 		successorTrustRef: ModelRef;
+ 	}>
+ ): readonly ModelRef[] {
+ 	const retained = input.current.filter(({ digest }) => digest !== input.currentTrustRef.digest);
+ 	if (retained.length !== input.current.length - 1) throw new TypeError("current trust ref must occur exactly once");
+-	return [...retained, input.successorTrustRef, ...input.proofRefs].sort((left, right) =>
++	return [...retained, input.successorTrustRef, ...input.proofRefs, input.retirementRef].sort((left, right) =>
+ 		left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0
+ 	);
+ }
+@@ -340,11 +341,23 @@ test("closes a genuine non-empty creator room and terminalizes the old live hand
+ 	expect(after.revision).toBe(before.revision + 1);
+ 	expect(after.generationId).not.toBe(before.generationId);
+ 	expect(after.trustRef).toEqual(sealed.successorTrustRef);
++	const knownDigests = new Set([
++		...before.references.map(({ digest }) => digest),
++		sealed.successorTrustRef.digest,
++		sealed.cutValueRef.digest,
++		sealed.commitQcRef.digest,
++	]);
++	const retirementRefs = after.references.filter(({ digest }) => !knownDigests.has(digest));
++	expect(retirementRefs).toHaveLength(1);
++	const retirementRef = retirementRefs[0];
++	if (retirementRef === undefined) throw new TypeError("creator retirement ref is unavailable");
++	expect(retirementRef.byteLength).toBeLessThanOrEqual(8192);
+ 	expect(after.references).toEqual(
+ 		expectedCombinedClosure({
+ 			current: before.references,
+ 			currentTrustRef: sealed.currentTrustRef,
+ 			proofRefs: [sealed.cutValueRef, sealed.commitQcRef],
++			retirementRef,
+ 			successorTrustRef: sealed.successorTrustRef,
+ 		})
+ 	);
+RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+Coverage enabled with v8
+
+D110C_0C1A_RED_EVIDENCE={"closeSetCount":3,"closeSetRoot":"c14dfa31eaab315aa0a435cdf3e5f042a9a5994177f093c91c43e1f6cce690e2","durableReplayVerified":true,"historyRoot":"c14dfa31eaab315aa0a435cdf3e5f042a9a5994177f093c91c43e1f6cce690e2","historySize":3,"lineage":{"exhausted":false,"next":3},"publishStates":["pending","pending","pending"],"refusal":{"code":"D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE","subclass":"missing-carrier"},"retirementCandidateCount":0,"rowDigests":["67adebb144a26c955ea20ea96ee9166db32eceeaa8d9bc342c49cfe37409d42b","3c1e5fd777d9e88de22200f6b531ec3dd2640d181741c7393245e455ec6d7de6","9563b630a0c548830351f58b986176c97a82af942d84cfe4f7668a748f19dca2"],"rowKeys":[0,1,2],"successorAnchorDigest":"5e28d7e56d0af52081608a7f64b0ee2e0312cac89d0159da95751a94de403165"}
+
+FAIL tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts > D.110c-0c1a creator issuance-retirement checkpoint RED > requires one authenticated retirement carrier after a genuine dense creator close
+TypeError: D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE
+
+Test Files  1 failed (1)
+Tests       1 failed (1)
+Duration    3.41s (transform 1.45s, setup 0ms, collect 449ms, tests 548ms, environment 1ms, prepare 51ms)
+
+The complete machine-readable failure, stack, timing, and assertion identity are
+preserved in vitest.json. The CLI also emitted Node's experimental SQLite
+warning; it was non-fatal and preceded the expected causal test failure.
+[
+  {
+    "name": "D.110c-0c1a creator issuance-retirement checkpoint RED > requires one authenticated retirement carrier after a genuine dense creator close",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts"
+  }
+]
+1
+{
+  "baseCommit": "add7f7dc8d5848c9305bec27fd4e52d4a4b358b3",
+  "baseTree": "c14db367f47619d81471981ca52994398d0cfd0a",
+  "selectedFiles": 1,
+  "selectedTests": 1,
+  "retainedCampaignTitlesSelected": 0,
+  "totalTests": 1,
+  "passedTests": 0,
+  "failedTests": 1,
+  "pendingTests": 0,
+  "todoTests": 0,
+  "topLevelErrors": 0,
+  "expectedFailureToken": "D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE",
+  "expectedFailureSubclass": "missing-carrier",
+  "observedRetirementCandidates": 0,
+  "durableReplayVerified": true,
+  "lineage": { "exhausted": false, "next": 3 },
+  "rowKeys": [0, 1, 2],
+  "publishStates": ["pending", "pending", "pending"],
+  "closeSetCount": 3,
+  "historySize": 3,
+  "productionDiffPaths": [],
+  "focusedInvocationCount": 1,
+  "acceptedRed": true
+}
+packages/node/src/creator-adoption-commit.ts:390:	return inspectCreatorTransitionAdvance({
+packages/node/src/creator-close.ts:825:					const advance = inspectCreatorTransitionAdvance({
+packages/node/src/creator-adoption.ts:358:	const advance = inspectCreatorTransitionAdvance({
+packages/node/src/creator-adoption.ts:1058:			!inspectCreatorTransitionAdvance({
+packages/node/src/creator-adoption.ts:1394:			!inspectCreatorTransitionAdvance({
+2 2 0 True
+230 230 0 0 0 True 24
+		) {
+			return coldFailure("chain-invalid", "creator durable trust carriers are invalid");
+		}
+		const currentEpoch = currentTrustRecord.currentEpoch;
+		const successorEpoch = successorTrustRecord.currentEpoch;
+		const currentProjection = uniqueCandidateByKind(currentCandidates, currentProjectionKind(currentEpoch));
+		const successorProjection = uniqueCandidateByKind(activeCandidates, "v3-live-generation-2");
+		if (
+			currentProjection === undefined ||
+			successorProjection === undefined ||
+			!Number.isSafeInteger(currentEpoch) ||
+			currentEpoch < 0 ||
+			successorEpoch !== currentEpoch + 1
+		) {
+			return coldFailure("chain-invalid", "creator successor epoch projection is invalid");
+		}
+		const qcs = proposedCandidates.flatMap((candidate) => {
+			const decoded = canonicalRecord(candidate.bytes);
+			return decoded?.kind === "drp-seal-qc" && decoded.phase === "commit" && decoded.epoch === currentEpoch
+				? [candidate]
+				: [];
+		});
+		if (qcs.length !== 1) return coldFailure("chain-invalid", "creator successor QC is invalid");
+		const selectedQc = qcs[0] as (typeof qcs)[number];
+		let predecessorTrust: CurrentAnchorTrust;
+		let successorTrust: CurrentAnchorTrust;
+		if (currentEpoch === 0) {
+			if (
+				!sameBytes(
+					input.exactCanonicalAnchorPreimageBytes,
+					currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+				) ||
+				!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+			) {
+				return coldFailure("chain-invalid", "creator genesis carriers do not match durable trust");
+			}
+			const openedCurrent = openCurrentAnchorTrust({
+				exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
+				expectedObjectId: objectId,
+				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			});
+			if (!openedCurrent.ok) return coldFailure("chain-invalid", "creator genesis trust is invalid");
+			const openedSuccessor = openCreatorSuccessorTrust({
+				currentTrust: openedCurrent.trust,
+				exactCanonicalCommitQcBytes: selectedQc.bytes,
+				exactCanonicalCutValueBytes: cutCandidate.bytes,
+				exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
+			});
+			if (!openedSuccessor.ok) return coldFailure("chain-invalid", "creator successor QC is invalid");
+			predecessorTrust = openedCurrent.trust;
+			successorTrust = openedSuccessor.trust;
+		} else {
+			const openedCheckpoint = openCreatorCheckpointTrust({
+				detachedGenesisSignature: input.detachedSignature,
+				exactCanonicalCommitQcBytes: selectedQc.bytes,
+				exactCanonicalCurrentTrustStateRecordBytes: successorTrustCandidate.bytes,
+				exactCanonicalCutValueBytes: cutCandidate.bytes,
+				exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes,
+				exactCanonicalPredecessorTrustStateRecordBytes: currentTrustCandidate.bytes,
+				expectedCurrentHead: input.expectedRoomHead,
+				expectedObjectId: objectId,
+				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			});
+			if (!openedCheckpoint.ok) return coldFailure("chain-invalid", "creator checkpoint trust is invalid");
+			predecessorTrust = openedCheckpoint.predecessorTrust;
+			successorTrust = openedCheckpoint.currentTrust;
+		}
+		if (
+			!inspectCreatorTransitionAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				currentTrust: predecessorTrust,
+				mode: "verify",
+				proofRefs: [cutCandidate.ref, selectedQc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+				successorTrust,
+			}).ok
+		) {
+			return coldFailure("chain-invalid", "creator successor trust advance is invalid");
+		}
+		const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		const successorAnchorBytes = Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+	const { closeResult } = facts;
+	const cutBytes = bytesForRef(closure.proposedCandidates, closeResult.cutValueRef);
+	const commitBytes = bytesForRef(closure.proposedCandidates, closeResult.commitQcRef);
+	const successorTrustBytes = bytesForRef(closure.proposedCandidates, closeResult.successorTrustRef);
+	const currentTrustBytes = closure.currentCandidates.find((candidate) =>
+		sameRef(candidate.ref, closeResult.currentTrustRef)
+	)?.bytes;
+	if (
+		cutBytes === undefined ||
+		commitBytes === undefined ||
+		successorTrustBytes === undefined ||
+		currentTrustBytes === undefined
+	) {
+		return undefined;
+	}
+	const opened = openCreatorSuccessorTrust({
+		currentTrust: facts.currentTrust,
+		exactCanonicalCommitQcBytes: commitBytes,
+		exactCanonicalCutValueBytes: cutBytes,
+		exactCanonicalTrustStateRecordBytes: successorTrustBytes,
+	});
+	if (
+		!opened.ok ||
+		opened.trust.currentAnchorDigest !== closeResult.successorAnchorDigest ||
+		opened.trust.currentEpoch !== closeResult.successorEpoch
+	) {
+		return undefined;
+	}
+	const advance = inspectCreatorTransitionAdvance({
+		current: { candidates: closure.currentCandidates, closure: facts.currentReferences },
+		currentTrust: facts.currentTrust,
+		mode: "verify",
+		proofRefs: [closeResult.cutValueRef, closeResult.commitQcRef],
+====
+		if (
+			!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)
+		) {
+			return undefined;
+		}
+		let predecessorTrust: CurrentAnchorTrust;
+		let successorTrust: CurrentAnchorTrust;
+		let selectedQc: (typeof qcs)[number];
+		if (currentEpoch === 0) {
+			if (
+				!sameBytes(
+					input.exactCanonicalAnchorPreimageBytes,
+					currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+				) ||
+				!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+			) {
+				return undefined;
+			}
+			const openedCurrent = openCurrentAnchorTrust({
+				exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
+				expectedObjectId: objectId,
+				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			});
+			if (!openedCurrent.ok) return undefined;
+			const openedSuccessors = qcs.flatMap((entry) => {
+				const opened = openCreatorSuccessorTrust({
+					currentTrust: openedCurrent.trust,
+					exactCanonicalCommitQcBytes: entry.bytes,
+					exactCanonicalCutValueBytes: cutCandidate.bytes,
+					exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
+				});
+				return opened.ok ? [Object.freeze({ qc: entry, trust: opened.trust })] : [];
+			});
+			if (openedSuccessors.length !== 1) return undefined;
+			const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
+			predecessorTrust = openedCurrent.trust;
+			successorTrust = openedSuccessor.trust;
+			selectedQc = openedSuccessor.qc;
+		} else {
+			const openedCheckpoints = qcs.flatMap((entry) => {
+				const opened = openCreatorCheckpointTrust({
+					detachedGenesisSignature: input.detachedSignature,
+					exactCanonicalCommitQcBytes: entry.bytes,
+					exactCanonicalCurrentTrustStateRecordBytes: successorTrustCandidate.bytes,
+					exactCanonicalCutValueBytes: cutCandidate.bytes,
+					exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes,
+					exactCanonicalPredecessorTrustStateRecordBytes: currentTrustCandidate.bytes,
+					expectedCurrentHead: expectedNext,
+					expectedObjectId: objectId,
+					pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+				});
+				return opened.ok ? [Object.freeze({ opened, qc: entry })] : [];
+			});
+			if (openedCheckpoints.length !== 1) return undefined;
+			const selected = openedCheckpoints[0] as (typeof openedCheckpoints)[number];
+			predecessorTrust = selected.opened.predecessorTrust;
+			successorTrust = selected.opened.currentTrust;
+			selectedQc = selected.qc;
+		}
+		if (
+			!sameRoomHead(roomHeadFromTrust(predecessorTrust), expectedPrevious) ||
+			!sameRoomHead(roomHeadFromTrust(successorTrust), expectedNext) ||
+			!inspectCreatorTransitionAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				currentTrust: predecessorTrust,
+				mode: "verify",
+				proofRefs: [cutCandidate.ref, selectedQc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+				successorTrust,
+diff-check-closure.status: 0
+eslint.status: 1
+---
+inspect-call-sites
+packages/node/src/creator-adoption-commit.ts:390:	return inspectCreatorTransitionAdvance({
+packages/node/src/creator-close.ts:825:					const advance = inspectCreatorTransitionAdvance({
+packages/node/src/creator-adoption.ts:358:	const advance = inspectCreatorTransitionAdvance({
+packages/node/src/creator-adoption.ts:1058:			!inspectCreatorTransitionAdvance({
+packages/node/src/creator-adoption.ts:1394:			!inspectCreatorTransitionAdvance({
+mode-counts
+stage=1
+verify=4
+cursor-and-lineage
+363:			: [input.issuanceScope.objectId, input.issuanceScope.author, priorAdmittedAuthorSequence];
+373:		afterKey = [input.issuanceScope.objectId, input.issuanceScope.author, last.commit.authorSequence];
+381:	if (rows.length > input.maxEpochVertices || lineage.next !== firstExpected + rows.length) {
+record-bound
+12:export const CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES = 8192 as const;
+321:		if (exactCanonicalRecordBytes.byteLength > CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES) {
+349:			input.exactCanonicalRecordBytes.byteLength > CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES
+exports
+{
+  "types": "./dist/src/creator-issuance-retirement.d.ts",
+  "import": "./dist/src/creator-issuance-retirement.js"
+}
+{
+  "types": "./dist/src/internal/creator-issuance-retirement-signing-request.d.ts",
+  "import": "./dist/src/internal/creator-issuance-retirement-signing-request.js"
+}
+registry-diff-bytes=0
+v3-live-diff-bytes=0
+changed-production-paths
+packages/keychain/src/finality.ts
+NONZERO: eslint.status=1
+NONZERO: protected-state-corrected.status=1
+NONZERO: protected-state.status=1
+NONZERO: protocol-v3-built-subpath.status=1
+done
+packages/node/src/creator-adoption.ts
+packages/node/src/creator-close.ts
+packages/node/src/internal/creator-transition-advance.ts
+packages/protocol-v3/package.json
+packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
+.logs/d110c-0c1a-fable51-high-course-review-20260903/SHA256SUMS
+.logs/d110c-0c1a-fable51-high-course-review-20260903/command.txt
+.logs/d110c-0c1a-fable51-high-course-review-20260903/metadata.json
+.logs/d110c-0c1a-fable51-high-course-review-20260903/prompt.md
+.logs/d110c-0c1a-fable51-high-course-review-20260903/result.md
+.logs/d110c-0c1a-red-add7f7dc/SHA256SUMS
+.logs/d110c-0c1a-red-add7f7dc/SOURCE-SHA256SUMS
+.logs/d110c-0c1a-red-add7f7dc/audit.json
+.logs/d110c-0c1a-red-add7f7dc/focused.command
+.logs/d110c-0c1a-red-add7f7dc/focused.status
+.logs/d110c-0c1a-red-add7f7dc/focused.stdout.txt
+.logs/d110c-0c1a-red-add7f7dc/list.command
+.logs/d110c-0c1a-red-add7f7dc/list.json
+.logs/d110c-0c1a-red-add7f7dc/list.status
+.logs/d110c-0c1a-red-add7f7dc/static-gates.txt
+.logs/d110c-0c1a-red-add7f7dc/vitest.json
+.logs/d110c-0c1a-plan-confirmation-037b8244/commands.txt
+.logs/d110c-0c1a-plan-confirmation-037b8244/grok/events.jsonl
+.logs/d110c-0c1a-plan-confirmation-037b8244/grok/status
+.logs/d110c-0c1a-plan-confirmation-037b8244/kimi/status
+.logs/d110c-0c1a-plan-confirmation-037b8244/kimi/stderr.txt
+.logs/d110c-0c1a-plan-confirmation-037b8244/kimi/stream.jsonl
+.logs/d110c-0c1a-plan-confirmation-037b8244/local-audit.md
+.logs/d110c-0c1a-plan-confirmation-037b8244/manifest.sha256
+.logs/d110c-0c1a-plan-confirmation-037b8244/opus/raw.json
+.logs/d110c-0c1a-plan-confirmation-037b8244/opus/status
+.logs/d110c-0c1a-plan-confirmation-037b8244/opus/stderr.txt
+.logs/d110c-0c1a-plan-confirmation-037b8244/prompt.md
+.logs/d110c-0c1a-plan-confirmation-037b8244/review-summary.md
+.logs/d110c-0c1a-plan-confirmation-037b8244/schema.json
+.logs/d110c-0c1a-plan-confirmation-037b8244/status.json
+.logs/d110c-0c1a-plan-review-fc384d1f/commands.txt
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/command.json
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/events.jsonl
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/input-packet.md
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/public.txt
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/resume-prompt.md
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/resume.events.jsonl
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/resume.status
+.logs/d110c-0c1a-plan-review-fc384d1f/grok/review.diff
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/command.txt
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/diagnosis-audit.command.txt
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/diagnosis-audit.json
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/diagnosis-audit.mjs
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/diagnosis-audit.status
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/diagnosis-ledger.md
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/manifest.sha256
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/playwright.json
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-diagnostic-59330d85/playwright.status
+COMMIT d6f5de26 test: preserve D110c pending authenticator diagnostic
+  .logs/d110c-0c-green-focused-59330d85/command.txt
+===
+ff1a9807 docs: close D.110c-0b1 review
+420fd240 feat: close D.110c-0b1 bounded trust checkpoint
+9457680d test: freeze D.110c-0b1 causal RED
+2cd3ba51 docs: confirm D.110c-0b1 bounded plan
+627f98d1 docs(d110c-0b1): correct bounded checkpoint contract

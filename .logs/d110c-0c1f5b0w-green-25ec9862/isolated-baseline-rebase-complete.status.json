@@ -1,0 +1,23 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "--dir",
+    "/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "--no-file-parallelism",
+    "--maxWorkers=1",
+    "--minWorkers=1",
+    "--coverage.enabled=false",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile.json=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0w-green-25ec9862/isolated-baseline-rebase-complete.json"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:13:14.438Z",
+  "finished": "2026-09-05T14:13:16.768Z",
+  "status": 1,
+  "signal": null
+}

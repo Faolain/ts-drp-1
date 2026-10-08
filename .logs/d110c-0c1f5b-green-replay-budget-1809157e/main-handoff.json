@@ -1,0 +1,27 @@
+{
+  "readyForRootSourceSigning": true,
+  "sourceHead": "1809157edf1d2eaaeb4836e16e588a81a0c42064",
+  "sourceFiles": [
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "beforeSha256": "cf0ec7df87e6ac58c2e03d139d25078d372bb6e4ccc9005ab621744444f288db",
+      "afterSha256": "6d906b8a31cabab184c9e44a90dc20e369ab5509356ccd3f3f74a87bbef87c71"
+    }
+  ],
+  "patchSha256": "c75c6c597d3839394ab37d1c5d09cf4c35990045a7f76981852a82fee91bf6a8",
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "main": {
+    "total": 49,
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "reporterSha256": "f9d42b869d34ea6e70cc3d2bb030e4157d45e1f080a01b3c41cbc30836eeb20f"
+  },
+  "compiler": "exit 1, exact unchanged grid-only diagnostic; matrix 0; not whole-program typecheck pass",
+  "isolation": "pending separately signed source and root release",
+  "diagnosticErrors": [
+    "Initial equivalence compared enclosing describe callback, which necessarily contains the scalar change; distinct corrected checker proves every other byte unchanged.",
+    "Initial readiness recorder ran before lint status existed; failed before runtime; after lint 0 the distinct readiness capture passed."
+  ],
+  "effectiveCustody": "custody-after.json testHashes is the complete effective 85-entry map"
+}

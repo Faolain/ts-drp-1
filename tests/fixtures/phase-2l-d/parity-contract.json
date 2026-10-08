@@ -1,0 +1,50 @@
+{
+	"schemaVersion": 1,
+	"sharedScopeUtf16Units": 1024,
+	"observableCases": [
+		"builder-sync-rejection-identity",
+		"builder-async-rejection-identity",
+		"builder-exactly-once",
+		"malformed-candidate-old-state",
+		"complete-lineage-issued-outbox-recovery-closure",
+		"source-and-return-copy-detachment",
+		"public-misuse-taxonomy",
+		"pending-outbox",
+		"post-close-rejection"
+	],
+	"backends": [
+		{
+			"id": "browser",
+			"factorySubpath": "@ts-drp/storage-browser/issuance",
+			"deathTupleCount": 16,
+			"ambiguityOutcomeCount": 5,
+			"allowedPhysicalDivergence": [
+				"IndexedDB strict readwrite transaction",
+				"database identity suffix --drp-issuance-v1",
+				"native compound keys",
+				"16 request/event death tuples"
+			]
+		},
+		{
+			"id": "node",
+			"factorySubpath": "@ts-drp/storage-node/issuance",
+			"deathTupleCount": 18,
+			"ambiguityOutcomeCount": 5,
+			"allowedPhysicalDivergence": [
+				"SQLite BEGIN IMMEDIATE transaction",
+				"filename suffix .drp-issuance-v1.sqlite",
+				"WITHOUT ROWID tables and WAL sidecars",
+				"18 statement-boundary SIGKILL tuples"
+			]
+		}
+	],
+	"requiredPreservation": [
+		"phase-0g2i-transactional-issuer",
+		"phase-0g2s-strict-admission",
+		"phase-0i-public-boundary",
+		"storage-ahe",
+		"phase-2h-process-death",
+		"phase-2k-browser-currency",
+		"greenfield-no-plain-id"
+	]
+}

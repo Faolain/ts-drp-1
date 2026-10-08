@@ -1,0 +1,11 @@
+{
+	"verdict": "PASS",
+	"p0_count": 0,
+	"p1_count": 0,
+	"p2_count": 0,
+	"findings": [],
+	"blocking_union_empty": true,
+	"red_authorized": true,
+	"scope_preserved": true,
+	"assessment": "The signed 8bca2f67 correction removes the parent-codec cycle. Closed f5b0u openRebasePair writes a durable unfenced manual-review plan without epoch close; f5b0w requires only prompt refusal, same-epoch reopen, retained-store identity and reaching the unchanged existing close terminus. Parent f5b retains successful close/adopt and re-admission. No API or authority expansion is introduced."
+}

@@ -1,0 +1,12 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ↓ tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > retains checkpoint-terminal open progress through cold recovery, then composes 64 active writers across three transitions
+ ✓ tests/phase-6b-d110c-0c1f5b-integration-red.test.ts > D.110c-0c1f5b parent genuine settlement composition > keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged 1158ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 1 skipped (2)
+   Start at  10:12:17
+   Duration  2.77s (transform 798ms, setup 0ms, collect 1.21s, tests 1.16s, environment 0ms, prepare 55ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0w-green-25ec9862/retained-v1-exact.json

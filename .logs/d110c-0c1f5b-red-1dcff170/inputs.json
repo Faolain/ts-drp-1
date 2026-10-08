@@ -1,0 +1,20 @@
+{
+  "immutableInputs": [
+    { "path": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts", "sha256": "885f146a1a689255b3e8c3c343bf87afd1554ad484bb571a2192e0f9ddf2c6f5" },
+    { "path": "packages/protocol-v3/src/creator-close.ts", "sha256": "abb54cdabda724888aabed2119df45c8678623e6d701f8366a9f7919f018c95b" },
+    { "path": "packages/protocol-v3/src/creator-checkpoint.ts", "sha256": "4a44cb2d12788bb3aec5b692e0ca2479b7ab7e4ca3a64c97f41915a8860e62f2" },
+    { "path": "packages/node/src/creator-adoption-activate.ts", "sha256": "145caf12e72af3567e30e740f09cb162392a0120734fbd5d5843ca1b920c9fd7" },
+    { "path": ".logs/d110c-0c1f5b-red-review-f7df8f80/sol.json", "sha256": "395b6d6f481d0329539115c79686d5ae0b3ee0cd23ca3d83c0b2fc5e0c1e98bc", "verdict": "FAIL", "P1": 2 },
+    { "path": ".logs/d110c-0c1f5b-red-review-f7df8f80/fable-result.json", "sha256": "90b48b8e7477065cb3705d5dd520e382fa6de9def774ea09712df56ab4c9e097", "verdict": "PASS", "P2": 3 },
+    { "path": ".logs/d110c-0c1f5b-red-review-f7df8f80/grok/status.json", "sha256": "8e20b6921938c6bc32b0559672e4857c9781ded3beda81f9c07b0470e66f7795", "verdict": "NO_VERDICT_TIMEOUT", "finding": false }
+  ],
+  "preservedHistory": {
+    "initialRejectedTests": "0c59869a5199b880bb944aced8b7c82f5aaa59f0",
+    "initialRejectedEvidence": "50a3f494b64ec4935134b2acaa8bd6b90ff1cb9a",
+    "unexecutedIntermediate": "6610eec435a9d7575a564c25b2fa2d9f3833340b",
+    "priorCausalTests": "3a9e9329091b713022b2b36d371d1eb887633b6e",
+    "priorCausalEvidence": "f7df8f808ad7e53b23592db3a25ad8e56adc956a",
+    "case24PlanClarification": "62f71f4dccaf66da49d4af32f6afaf60394de7ee"
+  }
+}
+

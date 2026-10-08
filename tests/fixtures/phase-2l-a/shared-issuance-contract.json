@@ -1,0 +1,32 @@
+{
+	"implementationModule": "../../../packages/issuance-store/src/conformance.ts",
+	"errorCodes": [
+		"ISSUANCE_INVALID_ARGUMENT",
+		"ISSUANCE_EXHAUSTED",
+		"ISSUANCE_COMMIT_INVALID",
+		"ISSUANCE_RETRY_REQUIRED",
+		"ISSUANCE_STORE_CLOSED",
+		"ISSUANCE_UNSUPPORTED_SCHEMA",
+		"ISSUANCE_DURABILITY_UNAVAILABLE",
+		"ISSUANCE_SUBSTRATE_FAILURE",
+		"ISSUANCE_RECOVERY_CORRUPT",
+		"ISSUANCE_RECORD_PRUNED",
+		"ISSUANCE_OUTCOME_UNKNOWN"
+	],
+	"retryClasses": ["transient", "resource-exhausted", "permanent"],
+	"defaultPageLimit": 64,
+	"maximumPageLimit": 128,
+	"maximumScopeUtf16Units": 1024,
+	"terminalSuppressionCases": [
+		["browser", "exact-pair"],
+		["browser", "absent-old"],
+		["browser", "foreign-pair"],
+		["browser", "torn-or-inconsistent"],
+		["browser", "unreadable"],
+		["node", "exact-pair"],
+		["node", "absent-old"],
+		["node", "foreign-pair"],
+		["node", "torn-or-inconsistent"],
+		["node", "unreadable"]
+	]
+}

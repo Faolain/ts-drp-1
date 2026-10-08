@@ -1,0 +1,1 @@
+{"plannedCases":24,"projects":["chromium","firefox","webkit"],"shim":{"root":"tests/fixtures/node_modules/@ts-drp","parent":"tests/fixtures/node_modules","rootAbsentNow":true,"parentAbsentNow":true,"requirePreAndPostAbsence":true,"neverRemoveCallerOwnedShim":true}}

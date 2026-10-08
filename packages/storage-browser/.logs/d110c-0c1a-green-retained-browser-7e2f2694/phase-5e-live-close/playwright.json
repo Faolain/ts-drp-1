@@ -1,0 +1,525 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-5e-creator-live-close.config.ts",
+      "--reporter=json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-5e-creator-live-close.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": true,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 900000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5e-creator-live-close.pw.ts"
+        ],
+        "timeout": 180000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5e-creator-live-close.pw.ts"
+        ],
+        "timeout": 180000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-5e-creator-live-close.pw.ts"
+        ],
+        "timeout": 180000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-5e-creator-live-close.pw.ts",
+      "file": "phase-5e-creator-live-close.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "reports bounded telemetry when the entry bootstrap fails",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5280,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:57:28.559Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-bcfc50df233b7f6e44be",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 285,
+          "column": 1
+        },
+        {
+          "title": "closes a genuine non-empty creator room and terminalizes the old live handle",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 443,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -2,10 +2,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"1ca831e43f64a96f6f07294d7ef9ee7351b2254eb00a3d0dd905d99fe2cba8c7\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"29fe21b3c607b58a5bd5f839f7905d4d3048d8202a375e5202b40e7f646b1d3e\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m\n\u001b[2m      \"digest\": \"4faba18883323b61a63f4b82205360bb3b30aed64c3f5a2bd5ebc08bd63e780f\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 518,\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -2,10 +2,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"1ca831e43f64a96f6f07294d7ef9ee7351b2254eb00a3d0dd905d99fe2cba8c7\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"29fe21b3c607b58a5bd5f839f7905d4d3048d8202a375e5202b40e7f646b1d3e\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m\n\u001b[2m      \"digest\": \"4faba18883323b61a63f4b82205360bb3b30aed64c3f5a2bd5ebc08bd63e780f\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 518,\u001b[22m\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts:343:27",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                      "column": 27,
+                      "line": 343
+                    },
+                    "snippet": "  341 | \texpect(after.generationId).not.toBe(before.generationId);\n  342 | \texpect(after.trustRef).toEqual(sealed.successorTrustRef);\n> 343 | \texpect(after.references).toEqual(\n      | \t                         ^\n  344 | \t\texpectedCombinedClosure({\n  345 | \t\t\tcurrent: before.references,\n  346 | \t\t\tcurrentTrustRef: sealed.currentTrustRef,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                        "column": 27,
+                        "line": 343
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -2,10 +2,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"1ca831e43f64a96f6f07294d7ef9ee7351b2254eb00a3d0dd905d99fe2cba8c7\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"29fe21b3c607b58a5bd5f839f7905d4d3048d8202a375e5202b40e7f646b1d3e\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m\n\u001b[2m      \"digest\": \"4faba18883323b61a63f4b82205360bb3b30aed64c3f5a2bd5ebc08bd63e780f\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 518,\u001b[22m\n\n  341 | \texpect(after.generationId).not.toBe(before.generationId);\n  342 | \texpect(after.trustRef).toEqual(sealed.successorTrustRef);\n> 343 | \texpect(after.references).toEqual(\n      | \t                         ^\n  344 | \t\texpectedCombinedClosure({\n  345 | \t\t\tcurrent: before.references,\n  346 | \t\t\tcurrentTrustRef: sealed.currentTrustRef,\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts:343:27"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:57:34.516Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-5e-creator-live-clos-70606-nalizes-the-old-live-handle-chromium/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-5e-creator-live-clos-70606-nalizes-the-old-live-handle-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                    "column": 27,
+                    "line": 343
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-21adc60d944d92de35f6",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 311,
+          "column": 1
+        },
+        {
+          "title": "does not let a connected joined peer claim creator close authority",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 861,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:57:35.368Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-ee3a4553669d6cb16a5d",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 382,
+          "column": 1
+        },
+        {
+          "title": "reports bounded telemetry when the entry bootstrap fails",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5743,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:57:37.038Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-66690ee4bac687d9a1e9",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 285,
+          "column": 1
+        },
+        {
+          "title": "closes a genuine non-empty creator room and terminalizes the old live handle",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 760,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -6,10 +6,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"507b1ae9c11814162c7efb9833edd4c1cc382f8493fb0bbf6c56a76e799ea4b0\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"7d6f4ba38e703535338d8ee5585c82fb66e0de8ac3ff6cc8fae9484217908260\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1021,\u001b[22m\n\u001b[2m      \"digest\": \"db45cd7a84716522fcd13a90352e58dbba14e20dfb7f8683a5996d20ea78af82\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -6,10 +6,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"507b1ae9c11814162c7efb9833edd4c1cc382f8493fb0bbf6c56a76e799ea4b0\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"7d6f4ba38e703535338d8ee5585c82fb66e0de8ac3ff6cc8fae9484217908260\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1021,\u001b[22m\n\u001b[2m      \"digest\": \"db45cd7a84716522fcd13a90352e58dbba14e20dfb7f8683a5996d20ea78af82\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts:343:27",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                      "column": 27,
+                      "line": 343
+                    },
+                    "snippet": "  341 | \texpect(after.generationId).not.toBe(before.generationId);\n  342 | \texpect(after.trustRef).toEqual(sealed.successorTrustRef);\n> 343 | \texpect(after.references).toEqual(\n      | \t                         ^\n  344 | \t\texpectedCombinedClosure({\n  345 | \t\t\tcurrent: before.references,\n  346 | \t\t\tcurrentTrustRef: sealed.currentTrustRef,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                        "column": 27,
+                        "line": 343
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -6,10 +6,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"507b1ae9c11814162c7efb9833edd4c1cc382f8493fb0bbf6c56a76e799ea4b0\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"7d6f4ba38e703535338d8ee5585c82fb66e0de8ac3ff6cc8fae9484217908260\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1021,\u001b[22m\n\u001b[2m      \"digest\": \"db45cd7a84716522fcd13a90352e58dbba14e20dfb7f8683a5996d20ea78af82\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m\n\n  341 | \texpect(after.generationId).not.toBe(before.generationId);\n  342 | \texpect(after.trustRef).toEqual(sealed.successorTrustRef);\n> 343 | \texpect(after.references).toEqual(\n      | \t                         ^\n  344 | \t\texpectedCombinedClosure({\n  345 | \t\t\tcurrent: before.references,\n  346 | \t\t\tcurrentTrustRef: sealed.currentTrustRef,\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts:343:27"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:57:45.429Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-5e-creator-live-clos-70606-nalizes-the-old-live-handle-firefox/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-5e-creator-live-clos-70606-nalizes-the-old-live-handle-firefox/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                    "column": 27,
+                    "line": 343
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-c22fc030888e1b155911",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 311,
+          "column": 1
+        },
+        {
+          "title": "does not let a connected joined peer claim creator close authority",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2300,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:57:46.795Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-270e33e2021df2f25e6f",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 382,
+          "column": 1
+        },
+        {
+          "title": "reports bounded telemetry when the entry bootstrap fails",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5574,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:57:50.487Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-c6f9b2cb50ea1aebffe1",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 285,
+          "column": 1
+        },
+        {
+          "title": "closes a genuine non-empty creator room and terminalizes the old live handle",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 824,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -2,10 +2,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"3607b51d598c4e3f0069881626c7d231e488931155dfb4801d193207d8980c20\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"517459225b2621e1052ba75c635d04f84cee7190323b3785c10ec50221b94e70\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m\n\u001b[2m      \"digest\": \"b90a5cc1dc51baad62a8a2291a0fc974e2edf377d24e028deb9986d019c23e30\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1021,\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -2,10 +2,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"3607b51d598c4e3f0069881626c7d231e488931155dfb4801d193207d8980c20\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"517459225b2621e1052ba75c635d04f84cee7190323b3785c10ec50221b94e70\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m\n\u001b[2m      \"digest\": \"b90a5cc1dc51baad62a8a2291a0fc974e2edf377d24e028deb9986d019c23e30\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1021,\u001b[22m\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts:343:27",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                      "column": 27,
+                      "line": 343
+                    },
+                    "snippet": "  341 | \texpect(after.generationId).not.toBe(before.generationId);\n  342 | \texpect(after.trustRef).toEqual(sealed.successorTrustRef);\n> 343 | \texpect(after.references).toEqual(\n      | \t                         ^\n  344 | \t\texpectedCombinedClosure({\n  345 | \t\t\tcurrent: before.references,\n  346 | \t\t\tcurrentTrustRef: sealed.currentTrustRef,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                        "column": 27,
+                        "line": 343
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[33m@@ -2,10 +2,14 @@\u001b[39m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1780,\u001b[22m\n\u001b[2m      \"digest\": \"3607b51d598c4e3f0069881626c7d231e488931155dfb4801d193207d8980c20\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[31m+     \"byteLength\": 1057,\u001b[39m\n\u001b[31m+     \"digest\": \"517459225b2621e1052ba75c635d04f84cee7190323b3785c10ec50221b94e70\",\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   Object {\u001b[39m\n\u001b[2m      \"byteLength\": 1435,\u001b[22m\n\u001b[2m      \"digest\": \"b90a5cc1dc51baad62a8a2291a0fc974e2edf377d24e028deb9986d019c23e30\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m    Object {\u001b[22m\n\u001b[2m      \"byteLength\": 1021,\u001b[22m\n\n  341 | \texpect(after.generationId).not.toBe(before.generationId);\n  342 | \texpect(after.trustRef).toEqual(sealed.successorTrustRef);\n> 343 | \texpect(after.references).toEqual(\n      | \t                         ^\n  344 | \t\texpectedCombinedClosure({\n  345 | \t\t\tcurrent: before.references,\n  346 | \t\t\tcurrentTrustRef: sealed.currentTrustRef,\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts:343:27"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:57:58.866Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-5e-creator-live-clos-70606-nalizes-the-old-live-handle-webkit/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-5e-creator-live-clos-70606-nalizes-the-old-live-handle-webkit/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts",
+                    "column": 27,
+                    "line": 343
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-4c9199134faff05ad82f",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 311,
+          "column": 1
+        },
+        {
+          "title": "does not let a connected joined peer claim creator close authority",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1849,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T01:58:00.107Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "80579acf5b4d8b5a3931-d1adbdcb2af484f4669e",
+          "file": "phase-5e-creator-live-close.pw.ts",
+          "line": 382,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-03T01:57:28.140Z",
+    "duration": 34366.804,
+    "expected": 6,
+    "skipped": 0,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

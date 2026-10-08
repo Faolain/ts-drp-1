@@ -1,0 +1,231 @@
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index 8678f740..fefe751a 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -396,6 +396,11 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
+ 	readonly migrationDatabaseNamespace?: string;
+ 	readonly objectId: string;
+ 	openTransport(objectId: string): V3RoomTransport;
++	/**
++	 * Authenticated replayable notification attempt, not an exactly-once external commit.
++	 * Persistent consumers deduplicate side effects by authenticated vertex digest.
++	 * Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.
++	 */
+ 	onAcceptedVertex(vertex: AdmittedReceivedVertexView): void | Promise<void>;
+ 	onMigrationTarget?(session: V3RoomSession<Projection>, objectId: string): void;
+ 	onProjection(projection: Projection): void;
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index 48c733fc..825f2d3b 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -378,6 +378,11 @@ type V3BlueprintLiveBindingInput =
+ 	| V3BlueprintLiveRetrievalInput
+ 	| V3BlueprintProjectionBaseInput;
+ 
++/**
++ * Authenticated replayable notification attempt, not an exactly-once external commit.
++ * Persistent consumers deduplicate side effects by authenticated vertex digest.
++ * Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.
++ */
+ export type V3AdmittedVertexSink = (
+ 	delivery: Readonly<{
+ 		readonly vertex: AdmittedReceivedVertexView;
+diff --git a/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts b/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts
+index aa0cb2b4..59351a53 100644
+--- a/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts
++++ b/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts
+@@ -17,6 +17,7 @@ import {
+ 	type V3RoomSession,
+ } from "../examples/v3-room/src/index.js";
+ import { createRecoverableFinalitySigner } from "../packages/keychain/src/finality.js";
++import { createBrowserDurableIssuanceStore } from "../packages/storage-browser/src/issuance.js";
+ 
+ type Delivery = Parameters<V3AdmittedVertexSink>[0];
+ const observed = vi.hoisted(() => ({
+@@ -274,7 +275,21 @@ async function genuineSuccessor() {
+ 		sessions.push(reopened);
+ 		return reopened;
+ 	};
+-	return { accepted, authority, expected, projection, reopen };
++	const readIssuance = async () => {
++		const store = await createBrowserDurableIssuanceStore({ primaryDatabaseName: databaseName });
++		try {
++			const scope = { author, objectId };
++			const lineage = await store.readLineage(scope);
++			if (lineage.next > 16) throw new TypeError("D110C_0C1F5B0V_UNEXPECTED_ISSUANCE_GROWTH");
++			const rows = await Promise.all(
++				Array.from({ length: lineage.next + 1 }, (_, sequence) => store.readIssued(scope, sequence))
++			);
++			return { lineage, rows };
++		} finally {
++			await store.close();
++		}
++	};
++	return { accepted, authority, expected, projection, readIssuance, reopen };
+ }
+ 
+ beforeEach(() => {
+@@ -359,9 +374,24 @@ describe("D.110c-0c1f5b0u genuine successor recovered-delivery RED", () => {
+ 			.toHaveLength(1);
+ 	});
+ 
+-	it("preserves external delivery custody when callback two fails after callback one and the same room cold-reopens", async () => {
++	it("replays authenticated notifications after callback two rejects without duplicating canonical state or issuance", async () => {
+ 		const fixture = await genuineSuccessor();
+ 		const expectedDigests = fixture.expected.map(({ vertex }) => Buffer.from(vertex.digest).toString("hex"));
++		const issuedBefore = await fixture.readIssuance();
++		expect(issuedBefore.lineage.exhausted, "REPLAY_ISSUANCE_NOT_EXHAUSTED").toBe(false);
++		expect(issuedBefore.lineage.next, "REPLAY_EXACT_NEXT_DURABLE_SEQUENCE").toBe(
++			required(fixture.expected.at(-1)).vertex.authorSequence + 1
++		);
++		expect(issuedBefore.rows.at(-1), "REPLAY_NO_UNALLOCATED_ISSUED_ROW").toBeNull();
++		for (const { vertex, exactReceivedCanonicalPreimageBytes, signature } of fixture.expected) {
++			const row = required(issuedBefore.rows[vertex.authorSequence]);
++			expect(row.envelope.canonicalPreimageBytes, "REPLAY_EXACT_DURABLE_PREIMAGE").toEqual(
++				exactReceivedCanonicalPreimageBytes
++			);
++			expect(row.envelope.signature, "REPLAY_EXACT_DURABLE_SIGNATURE").toEqual(signature);
++			expect(row.envelope.digest, "REPLAY_EXACT_DURABLE_DIGEST").toEqual(vertex.digest);
++			expect(row.authorSequence, "REPLAY_EXACT_DURABLE_SEQUENCE").toBe(vertex.authorSequence);
++		}
+ 		observed.fault = "second-commit";
+ 		const outcome = await fixture.reopen().then(
+ 			() => "unexpected-success",
+@@ -383,10 +413,24 @@ describe("D.110c-0c1f5b0u genuine successor recovered-delivery RED", () => {
+ 			.toHaveLength(0);
+ 		expect.soft(observed.transportCloses, "REPLAY_SECOND_FAILURE_TRANSPORT_RELEASED").toBe(1);
+ 		// This ledger is external observer state: do not reset or deduplicate it across reopen.
+-		expect.soft([...fixture.accepted], "REPLAY_SECOND_FAILURE_ATOMIC_EXTERNAL_LEDGER").toEqual([]);
++		expect
++			.soft([...fixture.accepted], "REPLAY_SECOND_FAILURE_OBSERVED_NOTIFICATION_PREFIX")
++			.toEqual([required(expectedDigests[0])]);
++		expect(await fixture.readIssuance(), "REPLAY_REJECTION_DURABLE_ISSUANCE_UNCHANGED").toEqual(issuedBefore);
+ 		observed.fault = "none";
++		const secondAttemptStart = observed.events.length;
+ 		const recovered = await fixture.reopen();
+-		expect.soft(fixture.accepted, "REPLAY_COLD_REOPEN_IDEMPOTENT_EXTERNAL_LEDGER").toEqual(expectedDigests);
++		expect
++			.soft(fixture.accepted, "REPLAY_COLD_REOPEN_REPEATED_NOTIFICATION_ATTEMPTS")
++			.toEqual([required(expectedDigests[0]), ...expectedDigests]);
++		expect(await fixture.readIssuance(), "REPLAY_RECOVERY_DURABLE_ISSUANCE_UNCHANGED").toEqual(issuedBefore);
++		const secondAttemptEvents = observed.events.slice(secondAttemptStart);
++		const authentication = secondAttemptEvents.indexOf("authenticated-projection-base");
++		const validation = secondAttemptEvents.indexOf("validated-application-state");
++		const firstCallback = secondAttemptEvents.findIndex((event) => event.startsWith("commit:"));
++		expect(authentication, "REPLAY_SECOND_ATTEMPT_AUTHENTICATES_BASE").toBeGreaterThanOrEqual(0);
++		expect(validation, "REPLAY_SECOND_ATTEMPT_VALIDATES_STATE").toBeGreaterThan(authentication);
++		expect(firstCallback, "REPLAY_SECOND_ATTEMPT_VALIDATES_BEFORE_NOTIFICATION").toBeGreaterThan(validation);
+ 		const canonicalStateBytes = required(createV3ChatApplication("alice").migration).canonicalStateBytes;
+ 		expect
+ 			.soft(
+diff --git a/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts b/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts
+new file mode 100644
+index 00000000..9c49b66e
+--- /dev/null
++++ b/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts
+@@ -0,0 +1,105 @@
++import { readdirSync, readFileSync } from "node:fs";
++import { resolve } from "node:path";
++import ts from "typescript";
++import { describe, expect, it } from "vitest";
++
++import { REPOSITORY_ROOT } from "./fixtures/phase-6a-v3/creator-successor-activation-contract.js";
++
++const guidance = [
++	"Authenticated replayable notification attempt, not an exactly-once external commit.",
++	"Persistent consumers deduplicate side effects by authenticated vertex digest.",
++	"Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.",
++];
++
++function productionFiles(directory: string): string[] {
++	return readdirSync(resolve(REPOSITORY_ROOT, directory), { withFileTypes: true }).flatMap((entry) => {
++		if (["node_modules", "dist", "tests", "test", ".logs", ".git"].includes(entry.name)) return [];
++		const path = `${directory}/${entry.name}`;
++		if (entry.isDirectory()) return productionFiles(path);
++		return path.includes("/src/") && /\.[cm]?tsx?$/.test(path) && !/\.(test|spec)\./.test(path) ? [path] : [];
++	});
++}
++
++function parse(path: string): ts.SourceFile {
++	return ts.createSourceFile(path, readFileSync(resolve(REPOSITORY_ROOT, path), "utf8"), ts.ScriptTarget.Latest, true);
++}
++
++function normalized(source: string): string {
++	return source.replace(/\s+/g, " ").trim();
++}
++
++describe("D.110c-0c1f5b0v replayable callback contract", () => {
++	it("documents both existing callback surfaces without changing their type shapes", () => {
++		const room = parse("examples/v3-room/src/index.ts");
++		const node = parse("packages/node/src/v3-live.ts");
++		const roomInput = room.statements.find(
++			(statement): statement is ts.InterfaceDeclaration =>
++				ts.isInterfaceDeclaration(statement) && statement.name.text === "CreateV3RoomSessionInput"
++		);
++		const callback = roomInput?.members.find((member) => member.name?.getText(room) === "onAcceptedVertex");
++		const sink = node.statements.find(
++			(statement): statement is ts.TypeAliasDeclaration =>
++				ts.isTypeAliasDeclaration(statement) && statement.name.text === "V3AdmittedVertexSink"
++		);
++		expect(callback).toBeDefined();
++		expect(sink).toBeDefined();
++		for (const [surface, source] of [
++			[callback, room],
++			[sink, node],
++		] as const) {
++			const comment = surface?.getFullText(source).slice(0, surface.getStart(source) - surface.pos) ?? "";
++			for (const line of guidance) expect(comment).toContain(line);
++		}
++		expect(normalized(callback?.getText(room) ?? "")).toBe(
++			"onAcceptedVertex(vertex: AdmittedReceivedVertexView): void | Promise<void>;"
++		);
++		expect(sink?.type.kind).toBe(ts.SyntaxKind.FunctionType);
++	});
++
++	it("pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks", () => {
++		const inventory: { path: string; callbacks: string[] }[] = [];
++		for (const path of [...productionFiles("examples"), ...productionFiles("packages")].sort()) {
++			const source = parse(path);
++			const callbacks: string[] = [];
++			function visit(node: ts.Node): void {
++				if (
++					(ts.isPropertyAssignment(node) || ts.isMethodDeclaration(node) || ts.isShorthandPropertyAssignment(node)) &&
++					["onAcceptedVertex", '"onAcceptedVertex"', "'onAcceptedVertex'"].includes(node.name.getText(source))
++				)
++					callbacks.push(normalized(node.getText(source)));
++				ts.forEachChild(node, visit);
++			}
++			visit(source);
++			if (callbacks.length > 0) inventory.push({ path, callbacks });
++		}
++		expect(inventory).toEqual([
++			{ path: "examples/grid/src/v3-zone.ts", callbacks: ["onAcceptedVertex: () => undefined"] },
++			{ path: "examples/v3-chat/src/index.ts", callbacks: ["onAcceptedVertex: () => undefined"] },
++			{
++				path: "examples/v3-room/src/index.ts",
++				callbacks: [
++					"onAcceptedVertex: (vertex: AdmittedReceivedVertexView): void | Promise<void> => { if (callbacksReady) return input.onAcceptedVertex(vertex); acceptedVertices.push(vertex); }",
++					"onAcceptedVertex: acceptTarget",
++					"onAcceptedVertex: (vertex: V3RoomAcceptedVertex): void => { for (const row of acceptedOperationsForVertex(input.application, vertex, targetRecordAuthority) ?? []) { reopenedAccepted.push(row); } }",
++					'onAcceptedVertex: (vertex: V3RoomAcceptedVertex): void => { for (const row of acceptedOperationsForVertex(input.application, vertex, targetRecordAuthority) ?? []) { if (Reflect.get(row.operation, "action") === "migrationRecord") recoveredRecords.push(row); } }',
++				],
++			},
++		]);
++		const room = parse("examples/v3-room/src/index.ts");
++		const collectors: string[] = [];
++		function visit(node: ts.Node): void {
++			if (ts.isVariableDeclaration(node) && node.name.getText(room) === "acceptTarget")
++				collectors.push(normalized(node.initializer?.getText(room) ?? ""));
++			ts.forEachChild(node, visit);
++		}
++		visit(room);
++		expect(collectors).toEqual([
++			'(vertex: V3RoomAcceptedVertex): void => { for (const row of acceptedOperationsForVertex(input.application, vertex, targetRecordAuthority) ?? []) { targetAccepted.push(row); if (Reflect.get(row.operation, "action") === "migrationRecord") recordVertexDigest = row.vertexDigest; } }',
++		]);
++		expect(room.text).toContain("const targetAccepted: V3RoomAcceptedOperation[] = [];");
++		expect(room.text).toContain("const reopenedAccepted: V3RoomAcceptedOperation[] = [];");
++		expect(room.text).toContain("const recoveredRecords: V3RoomAcceptedOperation[] = [];");
++		expect(room.text).toContain("sameBytes(acceptedRowsEvidence(reopenedAccepted), completedTargetEvidence)");
++		expect(room.text).toContain("sameBytes(exactReopenedState, firstProjection.exactCanonicalApplicationStateBytes)");
++	});
++});

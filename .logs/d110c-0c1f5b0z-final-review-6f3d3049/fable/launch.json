@@ -1,0 +1,11 @@
+{
+  "command": "zsh",
+  "args": [
+    "-f",
+    "-c",
+    "alias claude-phel='CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude'\neval 'claude-phel -p --restricted --strict-mcp-config --tools Read,Glob,Grep --model \"claude-fable-5-1[1m]\" --effort xhigh --output-format stream-json --verbose'"
+  ],
+  "cwd": "/private/tmp/d110c-f5b0z-review-Kg6cuq/checkout",
+  "start": "2026-09-05T20:19:17.375Z",
+  "pid": 76589
+}

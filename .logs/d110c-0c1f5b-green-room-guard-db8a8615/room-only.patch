@@ -1,0 +1,83 @@
+diff --git a/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/room-before.ts b/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts
+index ba757961..33a87ec8 100644
+--- a/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-room-guard-db8a8615/room-before.ts
++++ b/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts
+@@ -1541,17 +1541,45 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	redirectSource?: RedirectSourceRecovery,
+ 	skipRoomHeadAuthority = false
+ ): Promise<V3RoomSession<Projection>> {
+-	const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(
+-		input.application.bootstrapOperation,
+-		APPLICATION_BATCH_LIMITS
+-	);
+-	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
+ 	if (
+ 		input.successorSnapshotDeclaration !== undefined &&
+ 		(input.createOperationAdmissionPolicy !== undefined || input.rebaseSourceInvite !== undefined)
+ 	) {
+ 		throw new TypeError("v3 room successor authority composition is unsupported");
+ 	}
++	const captureInvite = (
++		creatorInvite: string | V3RoomCreatorInviteMaterial
++	): { invite: string; material: V3RoomCreatorInviteMaterial; settlementProfile: ReturnType<typeof settlementProfileFor> } => {
++		const invite = typeof creatorInvite === "string" ? creatorInvite : encodeCreatorInvite(creatorInvite);
++		const material = decodeCreatorInvite(invite);
++		const profileCarrier = decodeCanonical(material.exactCanonicalProfileBytes, {
++			maxBytes: 65_536,
++			maxDepth: 4,
++			maxItems: 128,
++		});
++		const profileId =
++			profileCarrier !== null && typeof profileCarrier === "object" && !Array.isArray(profileCarrier)
++				? Reflect.get(profileCarrier, "profileId")
++				: undefined;
++		const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
++		return { invite, material, settlementProfile };
++	};
++	let capturedInvite: ReturnType<typeof captureInvite> | undefined;
++	if (input.successorSnapshotDeclaration !== undefined && input.creatorFinalitySigner !== undefined) {
++		const creatorInvite = input.creatorInvite;
++		if (creatorInvite === undefined) {
++			throw new TypeError("v3 room successor authority composition is unsupported");
++		}
++		capturedInvite = captureInvite(creatorInvite);
++		if (capturedInvite.settlementProfile !== "v1") {
++			throw new TypeError("v3 room successor authority composition is unsupported");
++		}
++	}
++	const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(
++		input.application.bootstrapOperation,
++		APPLICATION_BATCH_LIMITS
++	);
++	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
+ 	if (
+ 		input.createOperationAdmissionPolicy !== undefined &&
+ 		typeof input.createOperationAdmissionPolicy !== "function"
+@@ -1588,26 +1616,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 					"ts-drp/v3-room-migration-local-store/v1",
+ 					encodeCanonical({ localNamespace: input.migrationDatabaseNamespace, scratchDigest })
+ 				)}`;
+-	const invite =
+-		typeof input.creatorInvite === "string" ? input.creatorInvite : encodeCreatorInvite(input.creatorInvite);
+-	const material = decodeCreatorInvite(invite);
+-	const profileCarrier = decodeCanonical(material.exactCanonicalProfileBytes, {
+-		maxBytes: 65_536,
+-		maxDepth: 4,
+-		maxItems: 128,
+-	});
+-	const profileId =
+-		profileCarrier !== null && typeof profileCarrier === "object" && !Array.isArray(profileCarrier)
+-			? Reflect.get(profileCarrier, "profileId")
+-			: undefined;
+-	const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
+-	if (
+-		input.successorSnapshotDeclaration !== undefined &&
+-		input.creatorFinalitySigner !== undefined &&
+-		settlementProfile !== "v1"
+-	) {
+-		throw new TypeError("v3 room successor authority composition is unsupported");
+-	}
++	const { invite, material, settlementProfile } = capturedInvite ?? captureInvite(input.creatorInvite);
+ 	const sourceInvite = input.rebaseSourceInvite;
+ 	const sourceMaterial =
+ 		sourceInvite === undefined

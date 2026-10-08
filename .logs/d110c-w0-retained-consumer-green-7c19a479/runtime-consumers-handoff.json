@@ -1,0 +1,28 @@
+{
+  "status": "Released bounded GREEN gate passed; await root direction before any further runtime",
+  "gate": "runtime-consumers",
+  "baseline": "7c19a4792eb63eecb85e4ac7a1484df88c77c984",
+  "invocationCount": 1,
+  "tests": 51,
+  "passed": 51,
+  "failed": 0,
+  "pending": 0,
+  "todo": 0,
+  "skipped": 0,
+  "exactRoster": true,
+  "elapsedMs": 113947,
+  "sourcePatchSha256": "54baa695c170ae83431fee7b4478e1ced4227dc62fab7043b53fef95c594df8a",
+  "runtimeRosterSha256": "bc6e3512063b245f443e4426374451738206db92c3e46e4b782b5d1f906d58eb",
+  "custody": "custody-after-runtime-consumers.json",
+  "validation": "runtime-consumers/validation.json",
+  "sourceHashes": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "3c80b45a20d41a8044406270ffcee5ed954271ce9debfac71b25df778ad120fc",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "67be57e7ad5f72335c8e89b770a031960bf48b636594ec52e3b6c3adbb2db717",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "2944cdce0fd0ab8a1e1c0318e1bdc49522ac8ff678696a6a0a118f247739e00b"
+  },
+  "allCustodyPreserved": true,
+  "noRetries": true,
+  "noSourceEdits": true,
+  "ownedGroupQuiescent": true,
+  "cleanupSignals": 0
+}

@@ -1,0 +1,16 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/fixtures/phase-6b-d110c-0c1f5b0w/manual-review-probe.ts",
+    "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T13:18:17.362Z",
+  "finished": "2026-09-05T13:18:32.829Z",
+  "status": 0,
+  "signal": null
+}

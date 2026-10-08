@@ -1,0 +1,115 @@
+{
+  "stage": "after",
+  "sourceAttribution": {
+    "counterFile": "packages/node/src/v3-live.ts",
+    "resolverFile": "packages/node/src/internal/creator-transition-advance.ts",
+    "counter": "function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefined, authorSequence: number): boolean {\n\tif (context === undefined) return false;\n\tif (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;\n\tcontext.count += 1;\n\tReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);\n\tconst identity = resolveVerifiedCreatorHistoricalIssuance(context.capability);\n\tconst maxHistoricalIssuanceRows = context.maxEpochVertices * (identity?.admissionEpoch === undefined ? 1 : 3);\n\treturn context.count <= maxHistoricalIssuanceRows;\n}",
+    "signedCounter": "function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefined, authorSequence: number): boolean {\n\tif (context === undefined) return false;\n\tif (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;\n\tcontext.count += 1;\n\tReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);\n\tconst maxHistoricalIssuanceRows = context.maxEpochVertices;\n\treturn context.count <= maxHistoricalIssuanceRows;\n}",
+    "resolver": "export function resolveVerifiedCreatorHistoricalIssuance(\n\tcapability: VerifiedCreatorHistoricalIssuance\n): CreatorHistoricalIssuanceIdentity | undefined {\n\tconst identity = verifiedHistoricalIssuance.get(capability);\n\treturn identity === undefined ? undefined : Object.freeze({ ...identity });\n}",
+    "signedResolver": "export function resolveVerifiedCreatorHistoricalIssuance(\n\tcapability: VerifiedCreatorHistoricalIssuance\n): CreatorHistoricalIssuanceIdentity | undefined {\n\tconst identity = verifiedHistoricalIssuance.get(capability);\n\treturn identity === undefined ? undefined : Object.freeze({ ...identity });\n}",
+    "realResolverUnchanged": true,
+    "legacy8192BoundaryAssertionsUnchanged": true,
+    "isolatedBaselineCounterDoesNotCallResolver": true,
+    "pendingGreenCounterStillRequiresSeparateGate": true
+  },
+  "head": "bc7d615b40c5125ed5b48ff90d0be64dcdca4b15",
+  "signature": "G",
+  "productionHashes": {
+    "examples/v3-room/src/index.ts": "9bbef5c26be7281ecc5676a557000e32d5e2df273825b41b3d216e4087049082",
+    "packages/node/src/creator-adoption.ts": "a668a8c02f28cb4f936a0883fdaeee37a327774860fe173213fba0c0e3ab870a",
+    "packages/node/src/creator-close.ts": "df18f730c730533c7943d41dab1f26cab3718b1206f35a2bae50da82cc499c9d",
+    "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+    "packages/node/src/v3-live.ts": "389f6d9104b25ac58ef3f4b8e3b5fe6e33f4c516ae167926c9edbcc56265e602",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+    "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+    "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+  },
+  "productionPreserved": true,
+  "partialPatchSha256": "245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed",
+  "stashCount": 27,
+  "stashesSha256": "b426dba61f4f05787e77e297b02dd2ed84ef692908df757777f0c328c1d0e9c3",
+  "protectedPaths": 86522,
+  "allProtectedPathsExist": true,
+  "protectedFunctions": [
+    {
+      "name": "temporaryPrimary",
+      "sha256": "a3721656515e2787201a5fd92fbb33a34d4939ccfb4540368f4a01e7712b7cf8"
+    },
+    {
+      "name": "openMemory",
+      "sha256": "d3e6f226c644ec4d85658d388c6cef384529b88aa580fa5af00abd7057187fd4"
+    },
+    {
+      "name": "openBrowser",
+      "sha256": "e5a0fc1bfbf182541e492a08331b6fdcdb97b038d947cb3b3079443c3156085b"
+    },
+    {
+      "name": "openNode",
+      "sha256": "3c304ff43e38ac519d710884f4c2bfcca83615db000836f74943380e88234abd"
+    },
+    {
+      "name": "openAdapter",
+      "sha256": "c40e2433855167d37b3cb513be45d2205d339830e167e27a9da79eefbbb3f923"
+    },
+    {
+      "name": "withAdapter",
+      "sha256": "ed827c922b385ab87707179fec4668c3f613afcc863ea56a949c637ae669b194"
+    },
+    {
+      "name": "authenticatedSettledPrune",
+      "sha256": "518898e73aaa062f15bc6794c96540a8975545b440112f575774867f4cc145fb"
+    },
+    {
+      "name": "issueRows",
+      "sha256": "41099089f29572d7dcc6c290a928d5dbe08937b17dac82c91c4ed1554611a000"
+    },
+    {
+      "name": "writePlan",
+      "sha256": "e7f6653b402566fe9af5b7645fa74023f7609802dfdfd6c238f8217eec299353"
+    },
+    {
+      "name": "assertRowsRemain",
+      "sha256": "97eca5febfc64ef05ac2aa331bf003da63e50d30ab280c3081b9f54ff1f5acd9"
+    }
+  ],
+  "retainedHashes": {
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "3eaf77c0438df09af30509c839531e78576a5fe6e88c70ea2983ee997807c885",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c",
+    "tests/fixtures/phase-6b-d110c-0c1f5b0s/settlement-plan-contract.ts": "8866e93e6b6fa306a1fc2bfbda601d75585816121e8b8fc0305cbab523288952"
+  },
+  "syntaxDiagnostics": 0,
+  "allOutsideFunctionBytesPreserved": true,
+  "removedTokens": [],
+  "addedTokens": [],
+  "immutable": [
+    {
+      "name": "d110c-0c1f5b0r-design-3a156aca",
+      "entries": 3,
+      "manifestSha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0"
+    },
+    {
+      "name": "d110c-0c1f5b-green-89f147cc",
+      "entries": 137,
+      "manifestSha256": "9ee19175cda3b5a1db33319c16478b3c01f3ea5c30db08a1d0a99566c3c4ef4c"
+    },
+    {
+      "name": "d110c-0c1f5b-red-checkpoint-link-f83764c5",
+      "entries": 71,
+      "manifestSha256": "606860edd135b91fbd1eb71b3ebed39caaa80860485024bff1564a7d65797a39"
+    },
+    {
+      "name": "d110c-0c1f5b-red-scalar-6353eb61",
+      "entries": 75,
+      "manifestSha256": "4590049f6472fd0eb5699ed795289803ad3ca7197545356b5049ccf4ba77d0f0"
+    },
+    {
+      "name": "d110c-0c1f5b-red-observer-78e068a8",
+      "entries": 63,
+      "manifestSha256": "fb5f83746c7690a6c53cdccd5edc3821687042ed2832ed6165b862407f488148"
+    }
+  ],
+  "testSha256": "b3e4eb073dfd3e660703957573dbfadfe8e2989396f1d77041632614edaa5c20",
+  "trackedStatus": "M examples/v3-room/src/index.ts\n M packages/node/src/creator-adoption.ts\n M packages/node/src/creator-close.ts\n M packages/node/src/internal/closed-epoch-cleanup.ts\n M packages/node/src/internal/creator-transition-advance.ts\n M packages/node/src/v3-live.ts\n M packages/protocol-v3/src/creator-checkpoint.ts\n M packages/protocol-v3/src/creator-close.ts"
+}

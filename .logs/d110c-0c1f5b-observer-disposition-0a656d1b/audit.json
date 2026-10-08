@@ -1,0 +1,83 @@
+{
+  "head": "0a656d1ba37f7391f1a79e366136bd2248a16f0a",
+  "remote": "0a656d1ba37f7391f1a79e366136bd2248a16f0a",
+  "signature": "0a656d1b G docs: preserve stopped parent GREEN ownership diagnostics",
+  "changed": [
+    "docs/production-hardening/production-hardening-tdd-plan-v2.md"
+  ],
+  "sourcePaths": [
+    "examples/v3-room/src/index.ts",
+    "packages/node/src/creator-adoption.ts",
+    "packages/node/src/creator-close.ts",
+    "packages/node/src/internal/creator-transition-advance.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/protocol-v3/src/creator-checkpoint.ts",
+    "packages/protocol-v3/src/creator-close.ts"
+  ],
+  "productionPatchUnchanged": true,
+  "stashCount": 27,
+  "stashesUnchanged": true,
+  "inheritedUntrackedCount": 86522,
+  "missingUntracked": [],
+  "verified": [
+    {
+      "directory": ".logs/d110c-0c1f5b0r-design-3a156aca",
+      "entries": 3,
+      "manifest": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0"
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b-green-57834387",
+      "entries": 14,
+      "manifest": "e4b4f46f11ead95618a8a3c46fe62353c6e5473254de55cbcaf5b25a47aa603e"
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b-red-oracle-97c0836b",
+      "entries": 64,
+      "manifest": "45be504889e8735915336082c88247b0a5a4f3069023e47ec2db905e1c2789cf"
+    },
+    {
+      "directory": ".logs/d110c-0c1f5b-cleanup-api-fable-high-57834387",
+      "entries": 9,
+      "manifest": "8caa50fb258c2d80608effa7adb781aa94d9daaeb7efde2a85cadd0f29a517c2"
+    }
+  ],
+  "commands": [
+    {
+      "command": "git",
+      "args": [
+        "-C",
+        "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "diff",
+        "--check",
+        "--",
+        "docs/production-hardening/production-hardening-tdd-plan-v2.md"
+      ],
+      "nodeOptions": null,
+      "start": "2026-09-05T18:14:47.290Z",
+      "finish": "2026-09-05T18:14:47.399Z",
+      "status": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "prettier",
+        "--check",
+        "docs/production-hardening/production-hardening-tdd-plan-v2.md"
+      ],
+      "nodeOptions": "--max-old-space-size=12288",
+      "start": "2026-09-05T18:14:47.399Z",
+      "finish": "2026-09-05T18:15:00.500Z",
+      "status": 0,
+      "signal": null,
+      "stdout": "Checking formatting...\nAll matched files use Prettier code style!\n",
+      "stderr": ""
+    }
+  ],
+  "planHash": "753ac67465735c6c57dc41ee805705279115e3e756f1bbda24a1f0ae0f5e570e",
+  "runtimeRuns": 0,
+  "newReviewRuns": 0
+}

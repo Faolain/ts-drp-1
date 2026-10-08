@@ -1,0 +1,175 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-08/result.json",
+  "baselineSha256": "4346e1a13c981a89935a0e9a38363b342ce6b68bfc9ae1f42963f54efd01f236",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED pins exact-store identity and the trusted same-realm public maintenance subpath",
+      "status": "passed",
+      "title": "pins exact-store identity and the trusted same-realm public maintenance subpath",
+      "duration": 17.30175,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED memory refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "status": "passed",
+      "title": "memory refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "duration": 5.105208000000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED browser refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "status": "passed",
+      "title": "browser refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "duration": 80.06383399999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED node refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "status": "passed",
+      "title": "node refuses absent, null-fence, manual-review and unlinked-anywhere plans before mutation",
+      "duration": 53.95550000000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED memory deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "memory deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "duration": 1.6742499999999723,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED browser deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "browser deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "duration": 4.6682500000000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED node deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "node deletes one complete mixed-old-epoch pending/published prefix and replays monotonically",
+      "duration": 4.875042000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED memory refuses a row newer than closedEpoch before either table or watermark mutates",
+      "status": "passed",
+      "title": "memory refuses a row newer than closedEpoch before either table or watermark mutates",
+      "duration": 1.065417000000025,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED browser refuses a row newer than closedEpoch before either table or watermark mutates",
+      "status": "passed",
+      "title": "browser refuses a row newer than closedEpoch before either table or watermark mutates",
+      "duration": 5.311207999999965,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED node refuses a row newer than closedEpoch before either table or watermark mutates",
+      "status": "passed",
+      "title": "node refuses a row newer than closedEpoch before either table or watermark mutates",
+      "duration": 5.220458000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED node rolls back both tables and the watermark when authenticated deletion is partial",
+      "status": "passed",
+      "title": "node rolls back both tables and the watermark when authenticated deletion is partial",
+      "duration": 6.762417000000028,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d corrective store reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d corrective store reclamation RED does not relabel a permanently poisoned store as a retryable plan refusal",
+      "status": "passed",
+      "title": "does not relabel a permanently poisoned store as a retryable plan refusal",
+      "duration": 0.28437500000001137,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "de565a44a2a7f9f37cd61a5df3d9add222caae0d7abc89e04d43da3d53db3ebe",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

@@ -1,0 +1,11 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ✓ tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts (3 tests) 233ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  07:39:32
+   Duration  1.47s (transform 617ms, setup 0ms, collect 964ms, tests 233ms, environment 0ms, prepare 58ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-regression-readiness-7efe33dd/runtime-bootstrap-supplement/result.json

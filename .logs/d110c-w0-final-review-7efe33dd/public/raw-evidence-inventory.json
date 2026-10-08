@@ -1,0 +1,175 @@
+{
+  "policy": "Complete original streams and runner artifacts retained locally; hashes published without private reasoning content",
+  "files": [
+    {
+      "file": "capture-source.mjs",
+      "sha256": "ecf445b3f9cdbb152a4b0081cdcbc01a8ac781146ea3e866cdf9bdefaf180de2",
+      "bytes": 2353
+    },
+    {
+      "file": "custody-after.json",
+      "sha256": "318fa860764c22691acf753332c9e44b832ce1042c0e0ef80ab0ccd7549491cb",
+      "bytes": 231
+    },
+    {
+      "file": "custody-before.json",
+      "sha256": "5315c5de597ce2788a83d3c150f76944edaf273b140b26c947201c68b3998d72",
+      "bytes": 231
+    },
+    {
+      "file": "fable/events.jsonl",
+      "sha256": "9d27ad720a3a0220b58fa6220daaeee13a9077d42e6fb1b13b9b5cc11c9e480c",
+      "bytes": 3041656
+    },
+    {
+      "file": "fable/launch.json",
+      "sha256": "d929c4e4da16f781cbd35818c5faf0f62bb57a348e482a80d1cde27ffa74c09f",
+      "bytes": 495
+    },
+    {
+      "file": "fable/runner-status.json",
+      "sha256": "0e3f6ed4e430a3aa937ddf90b135bb18ef70db0d2a14b8bceae4b7d6efcf8c86",
+      "bytes": 235
+    },
+    {
+      "file": "fable/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "file": "freeze.mjs",
+      "sha256": "8eb107ba9d45305b06cd7b02afcc2be61765e51d71db90f2d574a0c140103c71",
+      "bytes": 3873
+    },
+    {
+      "file": "grok-runner/events.jsonl",
+      "sha256": "c52d25bb8eecdd1eaaa900b701bf063e03a649dcffb830522e1c4284f5611efc",
+      "bytes": 1933
+    },
+    {
+      "file": "grok-runner/launch.json",
+      "sha256": "5d95a78f4452a8a0add2e9512e701cf8ab581ebc3df9f62b125a50b06c06a024",
+      "bytes": 727
+    },
+    {
+      "file": "grok-runner/runner-status.json",
+      "sha256": "590d813f0499f64436e36d0c12b3de45e2f1ecfc9e993842346a13539d8515fe",
+      "bytes": 235
+    },
+    {
+      "file": "grok-runner/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "file": "grok/command.json",
+      "sha256": "1c64ddfdcbc8f00df06f97588aee5df00ff061d2776dd175fab37694205fd7f0",
+      "bytes": 722
+    },
+    {
+      "file": "grok/events.jsonl",
+      "sha256": "c33e6d1697b0b076753d2413a3c4eddc3edb2aff0a5b8636caea256ebb8c3e09",
+      "bytes": 2133070
+    },
+    {
+      "file": "grok/input-packet.md",
+      "sha256": "6522474a4cbb3f5454811386a3ca8d3093592700ef9fa16c7d3cdff10a16c84c",
+      "bytes": 188695
+    },
+    {
+      "file": "grok/public.txt",
+      "sha256": "25e30ec9ea7840a6d634a3f013adead51c22446404857d5f1ec81e1c9a63511d",
+      "bytes": 5776
+    },
+    {
+      "file": "grok/review.diff",
+      "sha256": "1d52cb58bd9a978567576db9a580c977a0948ed75c4643aff0470795471b7978",
+      "bytes": 16332518
+    },
+    {
+      "file": "grok/status.json",
+      "sha256": "b29cc1587d15a2bbd96dde73768939ded66de087650eb85d8ff8eba793371ea5",
+      "bytes": 365
+    },
+    {
+      "file": "grok/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "file": "prompt.md",
+      "sha256": "b1781f8d091ac692de8dc22a74f81a5f40be147f9210848d1ed2a8a00cde83d3",
+      "bytes": 5533
+    },
+    {
+      "file": "readiness.json",
+      "sha256": "681feaed6d61f80946a78850f99d0fd801a81cdc76a6be80d1b0f6f38b4384f7",
+      "bytes": 1587
+    },
+    {
+      "file": "requirements.md",
+      "sha256": "86942927757774e140a6a387fb0462347d3c7b2e60010d5baaf52c46a0a87e40",
+      "bytes": 4520
+    },
+    {
+      "file": "review-freeze.json",
+      "sha256": "5b3a00943a37c38177805b7ad44796f2580ab2bc7ebbd93b6db4f1105f550369",
+      "bytes": 10950082
+    },
+    {
+      "file": "run.mjs",
+      "sha256": "b835254f55987355d11993e6fd821c6c924a0745b5d8100e5b526a2c5946d231",
+      "bytes": 6270
+    },
+    {
+      "file": "schema.json",
+      "sha256": "7b61ed1784005756e8ee702d412c1468c3e6ec2dfd07e7d4dca07d45d3275226",
+      "bytes": 950
+    },
+    {
+      "file": "seal.mjs",
+      "sha256": "b337457274918cf26fc23975e8845ad1f218c3078ca1c52ab067fa6ccfe3a659",
+      "bytes": 1489
+    },
+    {
+      "file": "sol/events.jsonl",
+      "sha256": "cefb21c3765744561d7d8688b1f17926bd7d29b24008e9272b34fdb16a9caafd",
+      "bytes": 2970000
+    },
+    {
+      "file": "sol/final.txt",
+      "sha256": "e5b05a7312ad898480075cd8710c96ee3070f9b74b17ff6ff90a3eb4e6e431ec",
+      "bytes": 4505
+    },
+    {
+      "file": "sol/launch.json",
+      "sha256": "46eecb5a6b5d416d085b8db168f5cef372e2c9d4bf87a4caaf3bd4a04facb6c7",
+      "bytes": 6306
+    },
+    {
+      "file": "sol/runner-status.json",
+      "sha256": "804ea77970e276c58cdd353ae7d3bc19ea14292c2edb0aca1bee7f880c95fc8c",
+      "bytes": 235
+    },
+    {
+      "file": "sol/stderr.log",
+      "sha256": "1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+      "bytes": 39
+    },
+    {
+      "file": "source-capture.json",
+      "sha256": "afa8d60b4c5bcce4446a6d341e4cd8dda549666f6a8496c6f1545be250eb5850",
+      "bytes": 2472
+    },
+    {
+      "file": "validate.mjs",
+      "sha256": "3793661ed7cee73d64074fd58e4e68df2890012d910c0b885bf16eaba21350a3",
+      "bytes": 4744
+    },
+    {
+      "file": "w0-green.patch",
+      "sha256": "6c002d98eb4764ebe9b153c9e52dba4adac47e48ff31f5134f08b15fa7dddf0a",
+      "bytes": 18379
+    }
+  ]
+}

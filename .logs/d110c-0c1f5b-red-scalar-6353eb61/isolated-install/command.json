@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b-scalar-red-CWNpU6/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-05T21:30:54.144Z"
+}

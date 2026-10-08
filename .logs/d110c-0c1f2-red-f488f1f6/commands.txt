@@ -1,0 +1,8 @@
+D110C_0C1F2_RECORD_EVIDENCE=1 pnpm exec vitest run tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts --reporter=verbose
+pnpm exec playwright test --config packages/storage-browser/playwright.d110c-0c1f2-red.config.ts --reporter=line
+pnpm exec playwright test --config packages/storage-browser/playwright.d110c-0c1f2-red.config.ts --list
+pnpm exec vitest list tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts
+pnpm exec eslint tests/fixtures/phase-6b-d110c-0c1f2/multi-author-frontier-contract.ts tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts packages/storage-browser/playwright.d110c-0c1f2-red.config.ts
+pnpm exec prettier --check tests/fixtures/phase-6b-d110c-0c1f2/multi-author-frontier-contract.ts tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts packages/storage-browser/playwright.d110c-0c1f2-red.config.ts
+pnpm --filter @ts-drp/storage-browser typecheck
+git diff --check

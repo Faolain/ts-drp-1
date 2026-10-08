@@ -1,0 +1,234 @@
+[
+  {
+    "file": "compiler-green/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:47:19.737Z"
+  },
+  {
+    "file": "custody-after/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:55:53.523Z"
+  },
+  {
+    "file": "custody-before/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:46:35.105Z"
+  },
+  {
+    "file": "emitted-equivalence-corrected/status.json",
+    "status": 1,
+    "signal": null,
+    "endedAt": "2026-09-06T03:53:17.059Z"
+  },
+  {
+    "file": "emitted-equivalence-final/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:53:44.781Z"
+  },
+  {
+    "file": "emitted-equivalence/status.json",
+    "status": 1,
+    "signal": null,
+    "endedAt": "2026-09-06T03:51:44.252Z"
+  },
+  {
+    "file": "final-custody-corrected/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T04:11:35.908Z"
+  },
+  {
+    "file": "final-custody/status.json",
+    "status": 1,
+    "signal": null,
+    "endedAt": "2026-09-06T04:10:02.317Z"
+  },
+  {
+    "file": "fixture-diff/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:48:26.828Z"
+  },
+  {
+    "file": "fixture-format-final/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:48:25.411Z"
+  },
+  {
+    "file": "fixture-format/status.json",
+    "status": 1,
+    "signal": null,
+    "endedAt": "2026-09-06T03:47:14.846Z"
+  },
+  {
+    "file": "fixture-lint-final/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:48:59.777Z"
+  },
+  {
+    "file": "fixture-lint/status.json",
+    "status": 1,
+    "signal": null,
+    "endedAt": "2026-09-06T03:47:55.577Z"
+  },
+  {
+    "file": "freeze-runtime/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:55:05.839Z"
+  },
+  {
+    "file": "isolated/build/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:01:23.276Z",
+    "finish": "2026-09-06T04:02:13.739Z",
+    "pid": 74352
+  },
+  {
+    "file": "isolated/checkout/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T03:58:57.352Z",
+    "finish": "2026-09-06T03:58:58.004Z",
+    "pid": 69375
+  },
+  {
+    "file": "isolated/clone/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T03:58:43.885Z",
+    "finish": "2026-09-06T03:58:43.971Z",
+    "pid": 68879
+  },
+  {
+    "file": "isolated/compiler-green/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:02:58.298Z",
+    "finish": "2026-09-06T04:03:07.741Z",
+    "pid": 77160
+  },
+  {
+    "file": "isolated/custody-after/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:08:54.131Z",
+    "finish": "2026-09-06T04:08:57.195Z",
+    "pid": 83223
+  },
+  {
+    "file": "isolated/custody-before/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:02:59.554Z",
+    "finish": "2026-09-06T04:03:04.267Z",
+    "pid": 77199
+  },
+  {
+    "file": "isolated/custody-prepared/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:00:11.996Z",
+    "finish": "2026-09-06T04:00:16.308Z",
+    "pid": 70459
+  },
+  {
+    "file": "isolated/freeze-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:03:01.254Z",
+    "finish": "2026-09-06T04:03:03.480Z",
+    "pid": 77760
+  },
+  {
+    "file": "isolated/graph-comparison/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:04:57.750Z",
+    "finish": "2026-09-06T04:04:57.950Z",
+    "pid": 80565
+  },
+  {
+    "file": "isolated/install/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T03:58:58.443Z",
+    "finish": "2026-09-06T03:59:06.804Z",
+    "pid": 69593
+  },
+  {
+    "file": "isolated/native-addon-import/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:01:22.195Z",
+    "finish": "2026-09-06T04:01:23.079Z",
+    "pid": 74273
+  },
+  {
+    "file": "isolated/native-prebuild/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:00:25.962Z",
+    "finish": "2026-09-06T04:00:28.774Z",
+    "pid": 72616
+  },
+  {
+    "file": "isolated/native-preparation/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:00:15.633Z",
+    "finish": "2026-09-06T04:00:28.801Z",
+    "pid": 72405
+  },
+  {
+    "file": "isolated/node-root-import/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:02:41.328Z",
+    "finish": "2026-09-06T04:02:44.320Z",
+    "pid": 76810
+  },
+  {
+    "file": "isolated/patch-apply/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T03:58:58.286Z",
+    "finish": "2026-09-06T03:58:58.317Z",
+    "pid": 69553
+  },
+  {
+    "file": "isolated/patch-check/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T03:58:58.118Z",
+    "finish": "2026-09-06T03:58:58.147Z",
+    "pid": 69507
+  },
+  {
+    "file": "isolated/sparse/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T03:58:57.178Z",
+    "finish": "2026-09-06T03:58:57.208Z",
+    "pid": 69313
+  },
+  {
+    "file": "isolated/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T04:05:35.524Z"
+  },
+  {
+    "file": "main-78/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T03:55:39.377Z"
+  }
+]

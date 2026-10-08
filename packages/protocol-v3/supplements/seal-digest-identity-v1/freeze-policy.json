@@ -1,0 +1,27 @@
+{
+	"schemaVersion": "ts-drp-seal-digest-identity-freeze-v1",
+	"profile": "seal-digest-identity-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/protocol-v3-seal-digest-identity.yml",
+	"protectedArtifacts": [
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs",
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/freeze-policy.json",
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/profile.json",
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/schema.json",
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/spec.md",
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/vectors.json",
+		".github/workflows/protocol-v3-seal-digest-identity.yml",
+		"tests/phase-5a-seal-digest-law-red.test.ts",
+		"tests/fixtures/phase-5-v3/seal-digest-law-contract.json"
+	],
+	"checkerSha256": "c47f95489fb9da1c3a4ad3b1b2f51bfaecac2367a3120bab40840d4c15344894",
+	"artifactSha256": {
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/profile.json": "130e7322def1dd5f7e0caae9d77c7f7875a0e682f22f8ab025ab6c8e02f28bcf",
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/schema.json": "81ec693a6ec6c6a397b89a52163ac4984787eb263f3af8351a956b999b1c0c20",
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/spec.md": "9b4da9bbfdbf2b81c5b621312415b9a693a77828a53746bd4a1cd6707e2dc0bd",
+		"packages/protocol-v3/supplements/seal-digest-identity-v1/vectors.json": "394e838d75362aec66c65ddd5466639aec2afea07f331f919843157fd8a5c461",
+		".github/workflows/protocol-v3-seal-digest-identity.yml": "1f36bb5813e645e329a0530e0ce6bc9b30f75ba494fc01d9b7bf2347dc0ce784",
+		"tests/phase-5a-seal-digest-law-red.test.ts": "97d93f91020a26f6707b4eae4d35dbcf7e4420e040c3bc9ac89e9d2a086d9d72",
+		"tests/fixtures/phase-5-v3/seal-digest-law-contract.json": "5b810d74587065706f50bb337763b8bb66649c56746bd4da45e73976b4324462"
+	}
+}

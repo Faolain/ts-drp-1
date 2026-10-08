@@ -1,0 +1,319 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 24,
+  "passed": 24,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-59/result.json",
+  "baselineSha256": "facd3709bdd7a8f48f345b5356320c5d769ad48959d0a615b7f3db011c510cf2",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries treats a compatible pre-sign race as durable truth without reusing the unclassified handle",
+      "status": "passed",
+      "title": "treats a compatible pre-sign race as durable truth without reusing the unclassified handle",
+      "duration": 1181.937,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries rejects stale message progress before the missing fence",
+      "status": "passed",
+      "title": "rejects stale message progress before the missing fence",
+      "duration": 3.7445419999999103,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries rejects stale transform-me progress before the missing fence",
+      "status": "passed",
+      "title": "rejects stale transform-me progress before the missing fence",
+      "duration": 4.073875000000044,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries does not interpret an absent legacy entry as a durable replacement link",
+      "status": "passed",
+      "title": "does not interpret an absent legacy entry as a durable replacement link",
+      "duration": 1.7860000000000582,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries refuses wrong-sequence ambiguous progress readback",
+      "status": "passed",
+      "title": "refuses wrong-sequence ambiguous progress readback",
+      "duration": 2.252375000000029,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries refuses unchanged-revision ambiguous progress readback",
+      "status": "passed",
+      "title": "refuses unchanged-revision ambiguous progress readback",
+      "duration": 3.23700000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries refuses surplus-revision ambiguous progress readback",
+      "status": "passed",
+      "title": "refuses surplus-revision ambiguous progress readback",
+      "duration": 2.8129579999999805,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries refuses skipped-range ambiguous progress readback",
+      "status": "passed",
+      "title": "refuses skipped-range ambiguous progress readback",
+      "duration": 3.4364579999999023,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries refuses duplicate-range ambiguous progress readback",
+      "status": "passed",
+      "title": "refuses duplicate-range ambiguous progress readback",
+      "duration": 4.427000000000135,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries refuses incompatible-prefix ambiguous progress readback",
+      "status": "passed",
+      "title": "refuses incompatible-prefix ambiguous progress readback",
+      "duration": 2.1316249999999854,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u room reconciliation boundaries"
+      ],
+      "fullName": "D.110c-0c1f5b0u room reconciliation boundaries refuses wrong-final-scalar ambiguous progress readback",
+      "status": "passed",
+      "title": "refuses wrong-final-scalar ambiguous progress readback",
+      "duration": 1.5593750000000455,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks",
+      "status": "passed",
+      "title": "[f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks",
+      "duration": 8.887166999999863,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay",
+      "status": "passed",
+      "title": "[f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay",
+      "duration": 2.6318750000000364,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress",
+      "status": "passed",
+      "title": "[f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress",
+      "duration": 1.2590000000000146,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close",
+      "status": "passed",
+      "title": "[f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close",
+      "duration": 1.6831250000000182,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing",
+      "status": "passed",
+      "title": "[RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing",
+      "duration": 1.5912909999999556,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0w RED] keeps manual-review durable and promptly refuses public issue before any fence or replacement",
+      "status": "passed",
+      "title": "[f5b0w RED] keeps manual-review durable and promptly refuses public issue before any fence or replacement",
+      "duration": 1.2865830000000642,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source",
+      "status": "passed",
+      "title": "[RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source",
+      "duration": 1.078832999999804,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [RED] clears a displaced fence and drops terminal plan rows before issuing one larger fence",
+      "status": "passed",
+      "title": "[RED] clears a displaced fence and drops terminal plan rows before issuing one larger fence",
+      "duration": 1.6540829999999005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [RED] rebases a published displaced source without requiring in-memory target-map presence",
+      "status": "passed",
+      "title": "[RED] rebases a published displaced source without requiring in-memory target-map presence",
+      "duration": 1.090541999999914,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [RED] surfaces an ACL source into a durable manual-review entry before any fence",
+      "status": "passed",
+      "title": "[RED] surfaces an ACL source into a durable manual-review entry before any fence",
+      "duration": 0.8426669999998921,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [RED] covers reserved empty-intent rows with a settlement fence and never calls the legacy completion owner",
+      "status": "passed",
+      "title": "[RED] covers reserved empty-intent rows with a settlement fence and never calls the legacy completion owner",
+      "duration": 0.9957500000000437,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED [RED] reads back an ambiguous atomic replacement link and never reissues it after reopen",
+      "status": "passed",
+      "title": "[RED] reads back an ambiguous atomic replacement link and never reissues it after reopen",
+      "duration": 2.121167000000014,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0c room settlement orchestration RED"
+      ],
+      "fullName": "D.110c-0c1f5b0c room settlement orchestration RED keeps creator-trusted-v1 on the retained completion path with no settlement plan or fence",
+      "status": "passed",
+      "title": "keeps creator-trusted-v1 on the retained completion path with no settlement plan or fence",
+      "duration": 1.7696249999999054,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "cabc2a020a29f64bed09486deaea618cc71ceea8b749662a8d40aa85220ddbe5",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

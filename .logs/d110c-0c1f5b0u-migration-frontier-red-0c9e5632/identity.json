@@ -1,0 +1,29 @@
+{
+  "commit": "0c9e56321ea770259c90afe0e2d99d3569320ea7",
+  "checkout": "/tmp/d110c-f5b0u-migration-frontier-red-VknOZP/checkout",
+  "sources": {
+    "examples/v3-room/src/index.ts": "d872ebca21e0b637a258423650a3fa074556c4408a2f6057f7427fcdbd2f75fd",
+    "packages/issuance-store/src/conformance.ts": "00aa85f56e738686049099ded7ff4d1a12c34d54d7dadd9c6d47751df91a5c9a",
+    "packages/issuance-store/src/contract.ts": "5616617c29488208fe46c2fafd45e19af28129f7948b164424ea6275b621fab9",
+    "packages/issuance-store/src/types.ts": "2100ed2037bfb027d9f6090f843f04d9d448135498fa256e208afdd67ec65b8d",
+    "packages/node/src/v3-live.ts": "04057f76969a1286d511f629a3a0a84e60f1a811a0d7a7b0ba131d0a29db0177",
+    "packages/storage-browser/src/internal/browser-issuance-store.ts": "692e02f4381872f26b9d1801ef1d17cd760eb30ca6bfb9d8ffb09f4d27c024bd",
+    "packages/storage-node/src/internal/node-issuance-store.ts": "ab4fa2a5f81c5f674a799387d324e2f83db6dddbda6e22bc5611f0818f140110"
+  },
+  "patchHash": "1239cf2d5fbbc6e40eebdae4365ba7b8843af1d22586851548a1f995025684c9",
+  "mainSources": {
+    "examples/v3-room/package.json": "b7024b1a092796ba921b1b7d04e4cb1034b0a7a383bb098a8dd4ffa4b985bd98",
+    "examples/v3-room/src/index.ts": "cee6859dc0dd00aa976a9e294758acf7be55ee8043e6ade5a927d58924103576",
+    "packages/issuance-store/src/conformance.ts": "00aa85f56e738686049099ded7ff4d1a12c34d54d7dadd9c6d47751df91a5c9a",
+    "packages/issuance-store/src/contract.ts": "bd62232c4f8fc2408d975c77b5e43612ea7ed4b07724d172ea4d02a18eafc55e",
+    "packages/issuance-store/src/types.ts": "2100ed2037bfb027d9f6090f843f04d9d448135498fa256e208afdd67ec65b8d",
+    "packages/node/src/v3-live.ts": "5e8823aecc6b0b06e354e7e97ecd316556aaeb2c275da68c0ef46a6f0110169d",
+    "packages/storage-browser/src/internal/browser-issuance-store.ts": "cb738af795499fc7457ac2eeb16a82a9a3698dd74b1730a64e994cf89977604e",
+    "packages/storage-node/src/internal/node-issuance-store.ts": "68ae40d818b6afaedff85a805f32d216d66176b821f21a8193d2df05039967e0",
+    "pnpm-lock.yaml": "56e8b9b56d7e76d4651daec66b6ff8c0bc8150ce9fab588b97b1887f417d1251"
+  },
+  "mainPatchHash": "4296998368a87e11c7be6fcc8da05583c37d485c96b8f7b1917dd500a7839f61",
+  "stash": "829b1c89fd0069e9afdb026409c41570de840dea\n1f48be3b9a092c12855c78f59207a2548d46b17c\ne6caaedf7491ba53ed9d4927fb2b70de40c0ab4b\n67db3539c8dadfe926b6a5f268a71c2cccd3924e\n1cdc3549c1cc64173b3f8de654ee4c6c4ac1b73a\n812b1193c6d89009a7636eedba870168a958c3b5\n3e4f1a285fd4fa457be29b0ea1aec317e9ad27f6\nb95db16a6ed287143de53a94a4e1f26ec89ae50b\n682b534827f5ed076f32430e5880caed28a4ed21\n58cb8e914b32188a26e921478e1daf3c47962536\nba9eedbed58fa8290593111a756b4f3abbee24ae\n76410ca5cecdfc243d3dd5bfb0472195b3b5725e\n88f3caa9674bc7fb91a93ec7773b3f975b441f26\nb43fbd9750ead48382f5f28f900b8d440d2df19e\n9fe69cb440125d55a2fd414a42fb179846ccbef5\n0906adc84079ab2305d13b6e636fab4fc44a33ba\n9534388196b929dc72d916d5d22926fcb357029f\n0be7c85ee75b77160d9fca06320be43679a45590\nbc464fb59f0c37a29e666ff9e50e9fb48434fb4e\n90fcaaf0ba5c7c2a330a0a3c827616f2e87f23e6\nd215d8f284478655cd0654e6791a6f1bb2e1247c\n145b8c1670795c0efe5890ca222d3ba6fc507ba8\nf0684ba76103182fafcfe4b06d808f200c694e75\n14ea885d3165e2770029a713eef16312379636ce\nb4544b728d163e7070ca3b62c689b5dff0c48be0\n095b3500a262115b87940d23245498e75077afc1\nef3a53bdf318a5cea30761a9e3d203b106f16e7e\n",
+  "node": "v22.15.0",
+  "nodePath": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node"
+}

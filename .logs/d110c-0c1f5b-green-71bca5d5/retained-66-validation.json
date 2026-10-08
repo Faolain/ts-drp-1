@@ -1,0 +1,125 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 8,
+  "passed": 8,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-66/result.json",
+  "baselineSha256": "e71e01ce9c804dd7918c2ce258d49db52005c9b14e9f8125ff0193b84e1011d3",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "ancestorTitles": [],
+      "fullName": "E5-01 RED keeps the generic admission behavior dormant behind the missing outcome owner",
+      "status": "passed",
+      "title": "E5-01 RED keeps the generic admission behavior dormant behind the missing outcome owner",
+      "duration": 0.5740419999999631,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "ancestorTitles": [
+        "E5-01 serialized v3 operation admission"
+      ],
+      "fullName": "E5-01 serialized v3 operation admission rebuilds policy from authenticated recovery before activation effects",
+      "status": "passed",
+      "title": "rebuilds policy from authenticated recovery before activation effects",
+      "duration": 124.9391250000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "ancestorTitles": [
+        "E5-01 serialized v3 operation admission"
+      ],
+      "fullName": "E5-01 serialized v3 operation admission reserves before local issuance and commits after journal but before projection",
+      "status": "passed",
+      "title": "reserves before local issuance and commits after journal but before projection",
+      "duration": 53.29770799999983,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "ancestorTitles": [
+        "E5-01 serialized v3 operation admission"
+      ],
+      "fullName": "E5-01 serialized v3 operation admission returns duplicate and conflict before local issuance, journal or projection",
+      "status": "passed",
+      "title": "returns duplicate and conflict before local issuance, journal or projection",
+      "duration": 44.59887499999991,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "ancestorTitles": [
+        "E5-01 serialized v3 operation admission"
+      ],
+      "fullName": "E5-01 serialized v3 operation admission releases a definitely pre-issuance failure and permits one clean retry",
+      "status": "passed",
+      "title": "releases a definitely pre-issuance failure and permits one clean retry",
+      "duration": 43.30208299999981,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "ancestorTitles": [
+        "E5-01 serialized v3 operation admission"
+      ],
+      "fullName": "E5-01 serialized v3 operation admission holds an uncertain post-journal reservation until a fresh recovery rebuilds it exactly once",
+      "status": "passed",
+      "title": "holds an uncertain post-journal reservation until a fresh recovery rebuilds it exactly once",
+      "duration": 59.29095899999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "ancestorTitles": [
+        "E5-01 serialized v3 operation admission"
+      ],
+      "fullName": "E5-01 serialized v3 operation admission rejects remote replay conflicts before journal and effect while accepting one fresh vertex",
+      "status": "passed",
+      "title": "rejects remote replay conflicts before journal and effect while accepting one fresh vertex",
+      "duration": 38.98895900000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+      "ancestorTitles": [
+        "E5-01 serialized v3 operation admission"
+      ],
+      "fullName": "E5-01 serialized v3 operation admission preserves ordinary local issue when no policy is supplied",
+      "status": "passed",
+      "title": "preserves ordinary local issue when no policy is supplied",
+      "duration": 35.48291700000004,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "ac24ed7d80a4ab050ba51cd6f112b46404b38a2a6c40d9aca44e215f2af8f401",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

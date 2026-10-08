@@ -1,0 +1,15 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"exactOptionalPropertyTypes": true,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/protocol-v3": ["packages/protocol-v3/dist/src/public.d.ts"]
+		}
+	},
+	"files": ["protocol-package-type-audit.ts"]
+}

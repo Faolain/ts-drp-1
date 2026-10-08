@@ -1,0 +1,49 @@
+{
+  "reviewHead": "0181584496cb213fc8872b57f473f911589fd4d8",
+  "verdicts": {
+    "sol": {
+      "classification": "TERMINAL_SCHEMA_PASS",
+      "verdict": "PASS",
+      "findings": [],
+      "session": "01a076ab-1841-71f0-8d1b-a08fb06e0d80",
+      "wrapperClassification": null,
+      "rawEventsSha256": "cefb21c3765744561d7d8688b1f17926bd7d29b24008e9272b34fdb16a9caafd"
+    },
+    "grok": {
+      "classification": "TERMINAL_SCHEMA_PASS",
+      "verdict": "PASS",
+      "findings": [],
+      "session": null,
+      "wrapperClassification": "NO_VERDICT",
+      "rawEventsSha256": "c33e6d1697b0b076753d2413a3c4eddc3edb2aff0a5b8636caea256ebb8c3e09"
+    },
+    "fable": {
+      "classification": "TERMINAL_SCHEMA_PASS",
+      "verdict": "PASS",
+      "findings": [
+        {
+          "severity": "P3",
+          "title": "Global graph occupancy is asserted by fixed arithmetic, not observed from the plane"
+        },
+        {
+          "severity": "P3",
+          "title": "Historical legacy saturation case identity was retitled in GREEN; 'original W0 seven' is six historical identities plus one new companion"
+        },
+        {
+          "severity": "P3",
+          "title": "Current-successor cold-input pin is supplied in source but its runtime necessity is not demonstrated"
+        }
+      ],
+      "session": "bbcf35ad-cd42-46b6-9b0a-72f91eb8a5c2",
+      "wrapperClassification": null,
+      "rawEventsSha256": "9d27ad720a3a0220b58fa6220daaeee13a9077d42e6fb1b13b9b5cc11c9e480c"
+    }
+  },
+  "blockingFindingUnion": [],
+  "allFrozenInputsAndManifestsExactAfterReviews": true,
+  "runtimeReruns": 0,
+  "reviewReruns": 0,
+  "schemaValidatedRecursively": true,
+  "grokDisposition": "Normal model exit 0/end_turn with schema-valid terminal JSON; wrapper prose-marker NO_VERDICT and exit 2 remain unchanged. No absent/cancelled/timed-out verdict was promoted.",
+  "rawStreamPolicy": "Original complete streams remain locally retained and hashed. Public evidence contains terminal verdicts and execution/custody metadata, not private reasoning streams."
+}

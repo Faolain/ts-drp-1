@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import fs from \"node:fs\";import assert from \"node:assert/strict\";import prettier from \"prettier\";const file=\"docs/production-hardening/production-hardening-tdd-plan-v2.md\",text=fs.readFileSync(file,\"utf8\"),start=text.indexOf(\"**W0 combined acceptance checkpoint;\"),end=text.indexOf(\"Historical cleanup stop, resolved prospectively\",start),section=text.slice(start,end);assert.ok(start>=0&&end>start);const config=await prettier.resolveConfig(file);assert.equal(await prettier.format(section.trimEnd()+\"\\n\",{...config,filepath:file}),section.trimEnd()+\"\\n\");console.log(JSON.stringify({authoredSectionOnly:true,bytes:Buffer.byteLength(section),formatPass:true}));"
+  ],
+  "start": "2026-09-06T12:18:37.666Z"
+}

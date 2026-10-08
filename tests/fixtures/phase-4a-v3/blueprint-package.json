@@ -1,0 +1,113 @@
+{
+	"kind": "drp-blueprint-admission-package",
+	"protocolMajor": 3,
+	"schemaVersion": 1,
+	"implementation": {
+		"artifactDigest": "ff0daee89bad3bc1704816cd86c4ec448b82d66024207613a39c819581abf31a",
+		"artifactId": "@example/phase-4a-blueprint@1.0.0",
+		"runtimeProfile": "ecmascript-2024-sync-v1"
+	},
+	"manifest": {
+		"schemaVersion": 1,
+		"operationDiscriminator": "action",
+		"operations": [
+			{
+				"name": "add_mul",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [
+						{ "name": "add", "required": true, "type": "safe-integer" },
+						{ "name": "multiplier", "required": true, "type": "safe-integer" }
+					]
+				}
+			},
+			{
+				"name": "emit",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [{ "name": "value", "required": true, "type": "canonical-object" }]
+				}
+			},
+			{
+				"name": "malformed_accessor",
+				"argumentSchema": { "kind": "closed-record", "fields": [] }
+			},
+			{
+				"name": "malformed_extra",
+				"argumentSchema": { "kind": "closed-record", "fields": [] }
+			},
+			{
+				"name": "malformed_inherited",
+				"argumentSchema": { "kind": "closed-record", "fields": [] }
+			},
+			{
+				"name": "malformed_symbol",
+				"argumentSchema": { "kind": "closed-record", "fields": [] }
+			},
+			{
+				"name": "map_set",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [
+						{ "name": "key", "required": true, "type": "string" },
+						{ "name": "value", "required": true, "type": "string" }
+					]
+				}
+			},
+			{
+				"name": "mutate_bytes",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [{ "name": "value", "required": true, "type": "canonical-object" }]
+				}
+			},
+			{
+				"name": "mutate_bytes_then_throw",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [{ "name": "value", "required": true, "type": "canonical-object" }]
+				}
+			},
+			{
+				"name": "mutate_inputs",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [{ "name": "value", "required": true, "type": "safe-integer" }]
+				}
+			},
+			{
+				"name": "mutate_then_throw",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [{ "name": "value", "required": true, "type": "safe-integer" }]
+				}
+			},
+			{
+				"name": "replace_state",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [{ "name": "value", "required": true, "type": "canonical-object" }]
+				}
+			},
+			{
+				"name": "return_promise",
+				"argumentSchema": { "kind": "closed-record", "fields": [] }
+			},
+			{
+				"name": "return_thenable",
+				"argumentSchema": { "kind": "closed-record", "fields": [] }
+			},
+			{
+				"name": "set_add",
+				"argumentSchema": {
+					"kind": "closed-record",
+					"fields": [{ "name": "value", "required": true, "type": "string" }]
+				}
+			},
+			{
+				"name": "throw_sync",
+				"argumentSchema": { "kind": "closed-record", "fields": [] }
+			}
+		]
+	}
+}

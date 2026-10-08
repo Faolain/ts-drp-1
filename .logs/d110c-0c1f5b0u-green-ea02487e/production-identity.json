@@ -1,0 +1,17 @@
+{
+  "commit": "ea02487e9c80d25ab6e7038cdf35330b72f29de6",
+  "tree": "7ba509ebd0748e7014c12fab4d76235fd3f8bc0c",
+  "signature": "G",
+  "remote": "ea02487e9c80d25ab6e7038cdf35330b72f29de6\trefs/heads/codex/phase3a1b-p6-golden-path",
+  "paths": [
+    "examples/v3-room/package.json",
+    "examples/v3-room/src/index.ts",
+    "packages/issuance-store/src/conformance.ts",
+    "packages/issuance-store/src/contract.ts",
+    "packages/issuance-store/src/types.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/storage-browser/src/internal/browser-issuance-store.ts",
+    "packages/storage-node/src/internal/node-issuance-store.ts",
+    "pnpm-lock.yaml"
+  ]
+}

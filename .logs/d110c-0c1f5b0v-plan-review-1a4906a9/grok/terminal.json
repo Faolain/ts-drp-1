@@ -1,0 +1,19 @@
+{
+  "verdict": "PASS",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 1,
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "GREEN must rename ATOMIC/IDEMPOTENT observer tokens",
+      "evidence": "docs/production-hardening/production-hardening-tdd-plan-v2.md:100223-100228 requires replayable `d1,d1,d2` rather than an exactly-once label; tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts:386-389 still names the causal assertions REPLAY_SECOND_FAILURE_ATOMIC_EXTERNAL_LEDGER and REPLAY_COLD_REOPEN_IDEMPOTENT_EXTERNAL_LEDGER",
+      "impact": "Inverting expected values while keeping ATOMIC/IDEMPOTENT tokens would relabel the demonstrated leftover-d1 plus `d1,d1,d2` replay as exactly-once external delivery and recreate the overclaim this slice exists to close.",
+      "required_action": "f5b0v GREEN implementer: in the same tests-only commit, rename those two tokens to replayable-notification language (fail-closed leftover d1, then explicit `d1,d1,d2`) and keep the hard canonical exact-once checks. Disposition: non-blocking; GREEN/final review rejects any remaining exactly-once callback label. No recursive plan review."
+    }
+  ],
+  "contract_assessment": "Honest and architecture-true: acceptedVertices/projectAcceptedOperations/onProjection are exact-once by vertex digest; live journal and issuance own admission/replacement, not callback consumption; no durable application-delivery receipt exists, and a pre-callback receipt omits while a post-callback receipt duplicates. Defining onAcceptedVertex as a replayable authenticated notification attempt, with persistent consumers keying effects on AdmittedReceivedVertexView.digest, matches successor recovery, in-session recoverStartupPlane replay, and fail-closed throw without pretending external effects are transactional.",
+  "consumer_assessment": "No shipped consumer requires durable exactly-once callback effects. v3-chat and grid no-op onAcceptedVertex and rebuild from onProjection; room migration/reopen collectors are session-local reconstruction observers checked against canonical projection/state then closed; redirect buffering only forwards to the outer callback. A transactional application-owned effect/idempotency port is the correct stop if a later consumer needs exactly-once external effects; it is not required now.",
+  "red_green_assessment": "Causal RED 488a22a6/692b4add already isolates the two intended observer failures while canonical state, operation accounting, authority, owner cleanup and transport cleanup pass. Tests-only GREEN is sufficient if it keeps those hard exact-once state/authority pins, explicitly observes replayable d1,d1,d2, adds the public comment plus consumer inventory, and retains first-callback sink/commit fail-closed controls without changing callback shape, order, errors, schema or runtime.",
+  "parent_f5b_ready_after_green": true
+}

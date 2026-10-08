@@ -1,0 +1,17 @@
+# Stopped room authority-read-order RED preparation
+
+Signed/pushed tests: `da874b52ab99e7143911f1ce8c018c29f826db3c` (G), based on plan `61a793d38a9fa1eafd9639aa41de2335f9891695`.
+Classification: **STOPPED_NEW_TARGET_TYPE_DIAGNOSTIC_BEFORE_RUNTIME**. No constructor/test runtime was executed. The expected 13-total / 11-pass / 2-fail causal matrix remains prospective and unproved; no focused reporter, observations or execution marker exists.
+
+The exact test change is imports plus one appended fixture helper and one appended test. All twelve original titles and bodies, and all original non-import statements, remain byte-identical. The fixtures use the existing room product builder, full single-writer legacy/settlement ACL/profile/signer/parameter carriers and actual Ed25519 genesis signatures. Corrected independent fixture validation verified both signatures, canonical roundtrips, anchor identity and carrier digest bindings before any constructor invocation. The finality signer option is an unreachable presence control, not authenticated signer acceptance or activation.
+
+Preparation passed independent frozen offline installation, locked official native prebuild fetch into a fresh cache, direct addon import, complete source build, fresh Node root import, clean source/runtime isolation, lint, formatting and exact thirteen-title list (original twelve plus one additive title).
+
+Two preparation findings are preserved without rewriting:
+
+- Initial fixture-validation recorder exited 1: directly loading a bare canonical specifier omitted its importing file. Root authorized a diagnostic-only correction under fresh names. The original recorder/streams/status are unchanged. The corrected recorder resolves both canonical and noble from the exact signed test importer through the existing Vite SSR configuration, records physical isolated IDs, and passes. No test/config/source/dependency change or test retry occurred.
+- Bounded typecheck exited 1 on the newly authored `createV3ChatApplication("guard")` literal, outside the existing eight-persona union. This TS2345 is a real added-fixture error, not inherited debt. The signed test is preserved unchanged pending a separately authorized one-label continuation. One read-only same-program comparison replaced only target text in memory with signed plan-base source. Baseline target diagnostics are zero; current target diagnostics are one. All 41 external diagnostics in existing creator-adoption/product fixtures match exactly, including full message, source location and token. They are not a typecheck pass; parent static closure owns their disposition.
+
+The source-supported ordering diagnosis remains compatible with the accepted design: legacy unsupported composition must refuse before authority reads, while settlement creator cold reopen must remain permitted. Source currently reads bootstrap application before the guard in signed and pending versions. Neither fixture validation nor this stopped attempt proves the future eight-row causal observations, genuine rollover, signer authentication or adoption.
+
+Before/after custody preserves the exact eight-owner patch SHA256 `245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed`, seven main built artifacts, 78 other retained/shared files, 27 stashes, 86,522 protected paths and all prior evidence manifests. No production, plan, shared fixture or other test was edited; no parent runtime, old baseline, campaign or review was run. Root owns the next plan disposition and any separately authorized continuation.

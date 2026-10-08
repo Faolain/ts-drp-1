@@ -1,0 +1,355 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 27,
+  "passed": 27,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-89f147cc/retained-01/result.json",
+  "baselineSha256": "d04e5fc0d4258c455199d2a3e27da0e017b7e5062b195f1cc8bcae33c169b6e1",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a package and closed contract"
+      ],
+      "fullName": "Phase 2l-a package and closed contract publishes the exact closed error, retry and ten-case ambiguity registries",
+      "status": "passed",
+      "title": "publishes the exact closed error, retry and ten-case ambiguity registries",
+      "duration": 52.96437500000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a package and closed contract"
+      ],
+      "fullName": "Phase 2l-a package and closed contract has only canonical at runtime and keeps protocol-v3 out of source, runtime and declarations",
+      "status": "passed",
+      "title": "has only canonical at runtime and keeps protocol-v3 out of source, runtime and declarations",
+      "duration": 4.052166,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a package and closed contract"
+      ],
+      "fullName": "Phase 2l-a package and closed contract exposes exactly the store methods and creates only pending immutable rows",
+      "status": "passed",
+      "title": "exposes exactly the store methods and creates only pending immutable rows",
+      "duration": 4.049000000000035,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior selects zero, calls the closure exactly once and does not rehash or verify arbitrary non-empty bytes",
+      "status": "passed",
+      "title": "selects zero, calls the closure exactly once and does not rehash or verify arbitrary non-empty bytes",
+      "duration": 0.3850410000000011,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects public misuse asynchronously with the exact TypeError code and no build",
+      "status": "passed",
+      "title": "rejects public misuse asynchronously with the exact TypeError code and no build",
+      "duration": 0.8068749999999909,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects non-primitive, empty or over-bound scope fields without consuming",
+      "status": "passed",
+      "title": "rejects non-primitive, empty or over-bound scope fields without consuming",
+      "duration": 0.27608299999997143,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects non-primitive, empty or over-bound scope fields without consuming",
+      "status": "passed",
+      "title": "rejects non-primitive, empty or over-bound scope fields without consuming",
+      "duration": 0.20162500000003547,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects non-primitive, empty or over-bound scope fields without consuming",
+      "status": "passed",
+      "title": "rejects non-primitive, empty or over-bound scope fields without consuming",
+      "duration": 0.10933299999999235,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior propagates a closure synchronous throw and rejection unchanged with old state",
+      "status": "passed",
+      "title": "propagates a closure synchronous throw and rejection unchanged with old state",
+      "duration": 0.5747499999999945,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects selected ordinal, scope, canonical-preimage and equal-envelope mismatches as commit-invalid",
+      "status": "passed",
+      "title": "rejects selected ordinal, scope, canonical-preimage and equal-envelope mismatches as commit-invalid",
+      "duration": 1.8742500000000177,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects extra, inherited or accessor-backed commit records instead of normalizing a wider native shape",
+      "status": "passed",
+      "title": "rejects extra, inherited or accessor-backed commit records instead of normalizing a wider native shape",
+      "duration": 1.3385000000000105,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects empty canonicalPreimageBytes and never persists it",
+      "status": "passed",
+      "title": "rejects empty canonicalPreimageBytes and never persists it",
+      "duration": 0.192292000000009,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects empty digest and never persists it",
+      "status": "passed",
+      "title": "rejects empty digest and never persists it",
+      "duration": 0.1083749999999668,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects empty signature and never persists it",
+      "status": "passed",
+      "title": "rejects empty signature and never persists it",
+      "duration": 0.29504200000002356,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior rejects SharedArrayBuffer-backed views before persistence",
+      "status": "passed",
+      "title": "rejects SharedArrayBuffer-backed views before persistence",
+      "duration": 0.24250000000000682,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a validation, copying and promise behavior"
+      ],
+      "fullName": "Phase 2l-a validation, copying and promise behavior copies before persistence and returns fresh detached graphs on every read and success",
+      "status": "passed",
+      "title": "copies before persistence and returns fresh detached graphs on every read and success",
+      "duration": 1.521583000000021,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a lineage and deterministic concurrency"
+      ],
+      "fullName": "Phase 2l-a lineage and deterministic concurrency issues MAX_SAFE_INTEGER exactly once, marks exhausted and never computes or builds +1",
+      "status": "passed",
+      "title": "issues MAX_SAFE_INTEGER exactly once, marks exhausted and never computes or builds +1",
+      "duration": 0.5068749999999795,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a lineage and deterministic concurrency"
+      ],
+      "fullName": "Phase 2l-a lineage and deterministic concurrency leaves a failed final-slot build selectable for one later successful retry",
+      "status": "passed",
+      "title": "leaves a failed final-slot build selectable for one later successful retry",
+      "duration": 0.6334170000000086,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a lineage and deterministic concurrency"
+      ],
+      "fullName": "Phase 2l-a lineage and deterministic concurrency reports a final-slot CAS loser as retry-required even though the winner exhausted the lineage",
+      "status": "passed",
+      "title": "reports a final-slot CAS loser as retry-required even though the winner exhausted the lineage",
+      "duration": 1.1423750000000155,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a lineage and deterministic concurrency"
+      ],
+      "fullName": "Phase 2l-a lineage and deterministic concurrency makes one synchronized same-scope winner and private retry-required CAS losers without rebuilding",
+      "status": "passed",
+      "title": "makes one synchronized same-scope winner and private retry-required CAS losers without rebuilding",
+      "duration": 1.8927919999999858,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a lineage and deterministic concurrency"
+      ],
+      "fullName": "Phase 2l-a lineage and deterministic concurrency allows scope B to finish while scope A is suspended inside its one build",
+      "status": "passed",
+      "title": "allows scope B to finish while scope A is suspended inside its one build",
+      "duration": 0.8251249999999573,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a paging, terminal readback and poisoning"
+      ],
+      "fullName": "Phase 2l-a paging, terminal readback and poisoning uses the exact default/bounds, optional scope and UTF-16 compound-key comparator",
+      "status": "passed",
+      "title": "uses the exact default/bounds, optional scope and UTF-16 compound-key comparator",
+      "duration": 8.288041000000021,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a paging, terminal readback and poisoning"
+      ],
+      "fullName": "Phase 2l-a paging, terminal readback and poisoning classifies exact pending or published candidate rows as durable success, even after later advance",
+      "status": "passed",
+      "title": "classifies exact pending or published candidate rows as durable success, even after later advance",
+      "duration": 3.1245419999999626,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a paging, terminal readback and poisoning"
+      ],
+      "fullName": "Phase 2l-a paging, terminal readback and poisoning classifies absent-old, foreign-pair, torn and unreadable observations by the exact five-case table",
+      "status": "passed",
+      "title": "classifies absent-old, foreign-pair, torn and unreadable observations by the exact five-case table",
+      "duration": 1.9616659999999797,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a paging, terminal readback and poisoning"
+      ],
+      "fullName": "Phase 2l-a paging, terminal readback and poisoning treats final MAX lineage as consumed only when exhausted",
+      "status": "passed",
+      "title": "treats final MAX lineage as consumed only when exhausted",
+      "duration": 0.7082079999999564,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a paging, terminal readback and poisoning"
+      ],
+      "fullName": "Phase 2l-a paging, terminal readback and poisoning latches one recovery-corrupt error across every operation while close remains idempotent",
+      "status": "passed",
+      "title": "latches one recovery-corrupt error across every operation while close remains idempotent",
+      "duration": 0.5811249999999859,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-a paging, terminal readback and poisoning"
+      ],
+      "fullName": "Phase 2l-a paging, terminal readback and poisoning rejects every post-close operation with one closed code and never returns partial data",
+      "status": "passed",
+      "title": "rejects every post-close operation with one closed code and never returns partial data",
+      "duration": 0.29525000000001,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "2b94f444d32cc685f8dcb102fc5ec3f41568cdca705e1c9853903b66e4ff9258",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

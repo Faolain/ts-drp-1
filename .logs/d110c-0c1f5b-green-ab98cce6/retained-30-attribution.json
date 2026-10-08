@@ -1,0 +1,135 @@
+{
+  "head": "ab98cce6606e6762c19eaa2c6cc93493a68b419e",
+  "file": "tests/phase-5a-seal-digest-law-red.test.ts",
+  "testSha256": "97d93f91020a26f6707b4eae4d35dbcf7e4420e040c3bc9ac89e9d2a086d9d72",
+  "contractFile": "tests/fixtures/phase-5-v3/seal-digest-law-contract.json",
+  "contractSha256": "5b810d74587065706f50bb337763b8bb66649c56746bd4da45e73976b4324462",
+  "tuple": [
+    {
+      "file": "docs/protocol/amendments-v3.json",
+      "expected": "e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508",
+      "actual": "e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508",
+      "signedHead": "e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508"
+    },
+    {
+      "file": "docs/protocol/attested-hard-epochs-v5.md",
+      "expected": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8",
+      "actual": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8",
+      "signedHead": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8"
+    },
+    {
+      "file": "packages/protocol-v3/conformance/vectors/registry-v1.json",
+      "expected": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741",
+      "actual": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741",
+      "signedHead": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741"
+    },
+    {
+      "file": "packages/protocol-v3/formal/registry-model-signoff.json",
+      "expected": "9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749",
+      "actual": "9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749",
+      "signedHead": "9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749"
+    },
+    {
+      "file": "packages/protocol-v3/registry/registry-v1.json",
+      "expected": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9",
+      "actual": "663281a11da08d99e4a751ed3f439c1562a49d3b70ab21b34de50959bf47c190",
+      "signedHead": "663281a11da08d99e4a751ed3f439c1562a49d3b70ab21b34de50959bf47c190"
+    },
+    {
+      "file": "packages/protocol-v3/registry/registry-v1.schema.json",
+      "expected": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc",
+      "actual": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc",
+      "signedHead": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+    }
+  ],
+  "registryCommit": {
+    "commit": "0d6e38c2175806738cc568a56e19e9101a025d05",
+    "signature": "G",
+    "diff": "commit 0d6e38c2175806738cc568a56e19e9101a025d05\nAuthor:     Faolain <Faolain@users.noreply.github.com>\nAuthorDate: Fri Sep 4 01:31:22 2026 -0400\nCommit:     Faolain <Faolain@users.noreply.github.com>\nCommitDate: Fri Sep 4 01:32:25 2026 -0400\n\n    fix(node): enforce writer capacity invariants\n\ndiff --git a/packages/protocol-v3/registry/registry-v1.json b/packages/protocol-v3/registry/registry-v1.json\nindex f7c0a1bb..284b90be 100644\n--- a/packages/protocol-v3/registry/registry-v1.json\n+++ b/packages/protocol-v3/registry/registry-v1.json\n@@ -53,6 +53,17 @@\n \t\t\t\"domain\": \"ts-drp/parameters/v3\",\n \t\t\t\"encoding\": \"canonical-object\",\n \t\t\t\"fields\": [\n+\t\t\t\t{\n+\t\t\t\t\t\"name\": \"authorShareMultiplier\",\n+\t\t\t\t\t\"type\": \"safe-integer\",\n+\t\t\t\t\t\"const\": null,\n+\t\t\t\t\t\"constraints\": {\n+\t\t\t\t\t\t\"minimum\": 1,\n+\t\t\t\t\t\t\"maximum\": 1000000\n+\t\t\t\t\t},\n+\t\t\t\t\t\"required\": false,\n+\t\t\t\t\t\"sortRule\": null\n+\t\t\t\t},\n \t\t\t\t{\n \t\t\t\t\t\"name\": \"maxEpochVertices\",\n \t\t\t\t\t\"type\": \"safe-integer\",\n",
+    "currentMatchesCommit": true
+  },
+  "testSource": {
+    "readiness": "162: function supplementReady(): boolean {\n163: \tif (!existsSync(SUPPLEMENT_ROOT) || !statSync(SUPPLEMENT_ROOT).isDirectory()) return false;\n164: \tif (\n165: \t\tJSON.stringify(readdirSync(SUPPLEMENT_ROOT).sort()) !== JSON.stringify([...contract.supplement.exactFiles].sort())\n166: \t) {\n167: \t\treturn false;\n168: \t}\n169: \tif (\n170: \t\t![\n171: \t\t\t...contract.supplement.exactFiles.map((file) => resolve(SUPPLEMENT_ROOT, file)),\n172: \t\t\tresolve(REPOSITORY_ROOT, contract.supplement.workflow),\n173: \t\t].every((path) => existsSync(path) && statSync(path).isFile())\n174: \t) {\n175: \t\treturn false;\n176: \t}\n177: \tconst checker = spawnSync(process.execPath, [resolve(REPOSITORY_ROOT, contract.supplement.checker)], {\n178: \t\tcwd: REPOSITORY_ROOT,\n179: \t\tencoding: \"utf8\",\n180: \t\ttimeout: 30_000,\n181: \t});\n182: \treturn checker.status === 0;\n183: }\n184: \n185: function artifactHashes(paths: readonly string[]): Readonly<Record<string, string>> {",
+    "firstFail": "397: describe(\"D.105a governed protocol-v3 seal digest identity RED\", () => {\n398: \tit(\"keeps the frozen v3 tuple byte-identical and proves the identities independently\", () => {\n399: \t\texpect(artifactHashes(Object.keys(contract.baseTupleSha256))).toEqual(contract.baseTupleSha256);\n400: \n401: \t\tconst registry = readJson<RegistryV1>(REGISTRY_PATH);",
+    "secondFailAndConditionalSkips": "531: \n532: \tit(\"has the complete checker-authenticated seven-file PH-P5-D01 owner\", () => {\n533: \t\texpect(SUPPLEMENT_READY).toBe(true);\n534: \t});\n535: });\n536: \n537: describe.skipIf(!SUPPLEMENT_READY)(\"D.105a frozen supplement behavior\", () => {\n538: \tit(\"binds the exact profile, vectors, and normative law\", () => {\n539: \t\tconst profile = readJson(resolve(SUPPLEMENT_ROOT, \"profile.json\"));\n540: \t\tconst vectors = readJson(resolve(SUPPLEMENT_ROOT, \"vectors.json\"));\n541: \t\tconst specification = readFileSync(resolve(SUPPLEMENT_ROOT, \"spec.md\"), \"utf8\");\n542: \t\texpect(profile).toEqual(contract.profile);\n543: \t\texpect(vectors).toEqual(contract.vectors);"
+  },
+  "checkerSource": {
+    "sha256": "c47f95489fb9da1c3a4ad3b1b2f51bfaecac2367a3120bab40840d4c15344894",
+    "validation": "243: \n244: function validateBaseTuple(contract) {\n245: \tif (!isDeepStrictEqual(contract.baseTupleSha256, baseTupleSha256)) {\n246: \t\tfail(\"BASE_TUPLE_DRIFT\", \"RED contract base tuple differs\");\n247: \t}\n248: \tfor (const [path, digest] of Object.entries(baseTupleSha256)) {\n249: \t\tif (sha256(readWorking(path)) !== digest) fail(\"BASE_TUPLE_DRIFT\", path);\n250: \t}\n251: }"
+  },
+  "reporter": {
+    "total": 5,
+    "passed": 0,
+    "failed": 2,
+    "pending": 3,
+    "success": false,
+    "files": [
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "D.105a governed protocol-v3 seal digest identity RED"
+            ],
+            "fullName": "D.105a governed protocol-v3 seal digest identity RED keeps the frozen v3 tuple byte-identical and proves the identities independently",
+            "status": "failed",
+            "title": "keeps the frozen v3 tuple byte-identical and proves the identities independently",
+            "duration": 8.169708000000014,
+            "failureMessages": [
+              "AssertionError: expected { …(6) } to deeply equal { …(6) }\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-seal-digest-law-red.test.ts:399:65\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at runSuite (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)"
+            ],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "D.105a governed protocol-v3 seal digest identity RED"
+            ],
+            "fullName": "D.105a governed protocol-v3 seal digest identity RED has the complete checker-authenticated seven-file PH-P5-D01 owner",
+            "status": "failed",
+            "title": "has the complete checker-authenticated seven-file PH-P5-D01 owner",
+            "duration": 0.6723749999999882,
+            "failureMessages": [
+              "AssertionError: expected false to be true // Object.is equality\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-seal-digest-law-red.test.ts:533:28\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at runSuite (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)"
+            ],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "D.105a frozen supplement behavior"
+            ],
+            "fullName": "D.105a frozen supplement behavior binds the exact profile, vectors, and normative law",
+            "status": "skipped",
+            "title": "binds the exact profile, vectors, and normative law",
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "D.105a frozen supplement behavior"
+            ],
+            "fullName": "D.105a frozen supplement behavior pins its closed schema, protected owners, checker, and bootstrap workflow",
+            "status": "skipped",
+            "title": "pins its closed schema, protected owners, checker, and bootstrap workflow",
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "D.105a frozen supplement behavior"
+            ],
+            "fullName": "D.105a frozen supplement behavior passes the real supplement checker",
+            "status": "skipped",
+            "title": "passes the real supplement checker",
+            "failureMessages": [],
+            "meta": {}
+          }
+        ],
+        "startTime": 1788649775198,
+        "endTime": 1788649775207.6724,
+        "status": "failed",
+        "message": "",
+        "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-seal-digest-law-red.test.ts"
+      }
+    ]
+  },
+  "sourceConclusion": "Signed W0 added optional authorShareMultiplier to frozen registry. Five other tuple hashes remain exact. Neither this registry nor test/checker is one of the dirty parent production owners. Old whole-file SHA pins reject registry; checker carries same pin. The three supplement cases are explicitly skipIf(!SUPPLEMENT_READY); Vitest list omitted them, but runtime JSON reports skipped entries. No sibling-file selection or extra active workload. No test/governance edit, checker rerun or test rerun. This gate is not passed and governance disposition is required."
+}

@@ -1,0 +1,19 @@
+{
+  "verdict": "PASS",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 1,
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Document replay semantics on the exported Node sink",
+      "evidence": "packages/node/src/v3-live.ts:381-394 exports V3AdmittedVertexSink without replay/idempotency guidance, while docs/production-hardening/production-hardening-tdd-plan-v2.md:100233-100237 requires the contract comment only beside CreateV3RoomSessionInput.onAcceptedVertex",
+      "impact": "Direct Node consumers can encounter the same recovered-delivery replay but will not see the room-level contract clarification, leaving the public low-level sink semantics ambiguous.",
+      "required_action": "f5b0v owner: mirror the replayable-attempt, digest-keyed idempotency, and fail-closed rejection guidance beside V3AdmittedVertexSink during the tests/comment-only GREEN, without changing its shape or behavior."
+    }
+  ],
+  "contract_assessment": "The selected contract is technically honest: canonical projection deduplicates authenticated vertices by digest, while arbitrary external callback effects cannot be atomically coupled to the existing admission or issuance stores. Replayable authenticated notification with consumer-owned digest idempotency preserves fail-closed rejection, canonical ordering, recovery-before-issue, and owner cleanup. Durable external exactly-once would require the stated separately reviewed transactional application port.",
+  "consumer_assessment": "The named production consumers do not contradict the contract: v3-chat and grid use no-op onAcceptedVertex callbacks, and the room migration collectors are session-local reconstruction observers checked against canonical projection/state. Live-journal and issuance-store types contain admission/issuance durability but no application-delivery acknowledgement transaction.",
+  "red_green_assessment": "The signed two-row RED and validated self-excluding evidence are causal: only the two external-ledger assumptions fail, with d1,d1,d2 observed across failure and cold reopen while canonical state, operation accounting, authority, and cleanup remain intact. The proposed GREEN criteria retain hard canonical exact-once checks, explicitly assert replayable notification attempts, preserve failure controls, and require a complete consumer inventory and isolated evidence.",
+  "parent_f5b_ready_after_green": true
+}

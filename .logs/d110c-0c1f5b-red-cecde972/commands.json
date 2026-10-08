@@ -1,0 +1,21 @@
+{
+  "base": "aea679ba18c12120c80dc4dcf0bc7d08285e7572",
+  "testsCommit": "cecde972f4aac55714626d1af46dae32a1c7350c",
+  "branch": "codex/phase3a1b-p6-golden-path",
+  "commands": [
+    {"command":"Node SHA256 validation of accepted design, red-1dcff170 and red-8fcbc039 manifests","exit":0},
+    {"command":"pnpm exec prettier --write tests/phase-6b-d110c-0c1f5b-integration-red.test.ts","exit":0},
+    {"command":"pnpm exec eslint tests/phase-6b-d110c-0c1f5b-integration-red.test.ts","exit":0},
+    {"command":"node .logs/d110c-0c1f5b-red-bounds-working-aea679ba/typecheck.mjs > .logs/d110c-0c1f5b-red-bounds-working-aea679ba/typecheck.json","exit":0,"note":"Working directory moved to final SHA-named evidence root after tests commit; no diagnostic or source content changed. Zero target diagnostics; three inherited external fixture diagnostics, not a full repo typecheck pass."},
+    {"command":"pnpm exec vitest list tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --json","exit":0,"result":"Exactly 2 tests in 1 file"},
+    {"command":"pnpm exec prettier --check tests/phase-6b-d110c-0c1f5b-integration-red.test.ts","exit":0},
+    {"command":"git diff --check","exit":0},
+    {"command":"git -C /Users/aristotle/Documents/Projects/ts-drp-1 commit -S --only tests/phase-6b-d110c-0c1f5b-integration-red.test.ts -m 'test: page complete settlement durable census within store bounds'","exit":0,"result":"cecde972; G signature; exact tests-only diff"},
+    {"command":"git -C /Users/aristotle/Documents/Projects/ts-drp-1 push","exit":0,"result":"aea679ba..cecde972; exact HEAD/upstream match before execution"},
+    {"command":"ps -axo pid,command | rg 'vitest|playwright|retained-heap|snapshot-memory|f5b.*typecheck'","exit":0,"result":"Only own diagnostic and unrelated Next processes; no ts-drp test/campaign/profiler"},
+    {"command":"lsof -nP -iTCP:4174 -iTCP:4175 -iTCP:51000 -iTCP:51002 -sTCP:LISTEN","exit":1,"result":"No listeners"},
+    {"command":"pnpm exec vitest run tests/phase-6b-d110c-0c1f5b-integration-red.test.ts --reporter=json --outputFile=.logs/d110c-0c1f5b-red-cecde972/focused.json > .logs/d110c-0c1f5b-red-cecde972/stdout.log 2> .logs/d110c-0c1f5b-red-cecde972/stderr.log","exit":1,"executionCount":1,"result":"Accepted RED matrix: 1 failed intended causal token; 1 passed genuine v1 control"}
+  ],
+  "scope": {"productionEdits":0,"planEdits":0,"longRuns":0,"stashesPreserved":27},
+  "diagnosticCorrections": "Two initial read-only rg commands used absent shell globs and were rerun with explicit owner paths. These were diagnostic command errors, not code failures or test executions."
+}

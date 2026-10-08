@@ -1,0 +1,13 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ❯ tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts (1 test | 1 failed) 156ms
+   × D.110c-0c1f5b live snapshot fixture contract > rejects unsupported epoch-anchor installation without mutating genuine epoch-zero recovery bindings 155ms
+     → F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION: expected { kind: 'missing-required-rejection' } to deeply equal { Object (kind, error, ...) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  04:21:59
+   Duration  1.36s (transform 591ms, setup 0ms, collect 938ms, tests 156ms, environment 0ms, prepare 57ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-red-03acb4ac/focused.json

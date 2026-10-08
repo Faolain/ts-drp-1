@@ -1,0 +1,13 @@
+10:32:16 PM [vite] (ssr) warning: 
+/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/packages/protocol-v3/src/index.ts
+1824|    }
+1825|    const exactByteUrl = `data:text/javascript;base64,${bytesToBase64(exactArtifactBytes)}`;
+1826|    const namespace = await import(exactByteUrl);
+   |                                   ^^^^^^^^^^^^
+1827|    const operationNames = [...preparedAdmission.operations.keys()];
+1828|    const reducers = prepareRuntimeExport(namespace, operationNames, compiled);
+The above dynamic import cannot be analyzed by Vite.
+See https://github.com/rollup/plugins/tree/master/packages/dynamic-import-vars#limitations for supported dynamic import formats. If this is intended to be left as-is, you can use the /* @vite-ignore */ comment inside the import() call to suppress this warning.
+
+  Plugin: vite:import-analysis
+  File: /private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/packages/protocol-v3/src/index.ts

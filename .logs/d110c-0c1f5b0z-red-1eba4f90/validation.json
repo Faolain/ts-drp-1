@@ -1,0 +1,56 @@
+{
+  "acceptedCausalRed": true,
+  "executionCount": 1,
+  "testsCommit": "1eba4f9065d220afb0d77d90aac4a05b250a05bb",
+  "selected": 16,
+  "failed": 14,
+  "passed": 2,
+  "discoveryTokens": 11,
+  "refusalTokens": 3,
+  "topLevelErrors": 0,
+  "skippedFilteredPending": 0,
+  "matrixSha256": "464e04a81d2d3e798f9cdcb43321b28b0070009b4291f0ed1fd79c98ca7f422d",
+  "exactFrozenCommand": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/private/tmp/d110c-f5b0z-red-preflight-mWpFAK/focused.json"
+  ],
+  "commandStatuses": {
+    "isolated-after": 0,
+    "isolated-build": 0,
+    "isolated-checkout": 0,
+    "isolated-clone": 0,
+    "isolated-collection": 0,
+    "isolated-collection-validation": 0,
+    "isolated-focused": 0,
+    "isolated-install": 0,
+    "isolated-pristine": 0,
+    "isolated-sparse": 0,
+    "main-preflight": 0,
+    "signed-tests-check": 0,
+    "tests-push": 0
+  },
+  "targetTypeDiagnostics": 0,
+  "inheritedSourceMappedDiagnostics": [
+    {
+      "file": "tests/fixtures/phase-6b/ahe-reclamation-contract.ts",
+      "code": 2322,
+      "line": 234,
+      "message": "Type 'Readonly<{ activeGenerationId: GenerationId; availabilityPolicyDigest: \"53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b\"; closedEpoch: 4; expectedHead: Readonly<...>; lineageFloor: Readonly<...>; objectId: StorageObjectId; rollbackGenerationIds: readonly [...]; }>' is not assignable to type 'Readonly<{ activeGenerationId: GenerationId; availabilityPolicyDigest: string; closedEpoch: number; expectedHead: PresentHead; lineageFloor: Readonly<{ deleteGenerationIds: readonly GenerationId[]; expectedBaseExpectedHead: ExpectedHead; generationId: GenerationId; replacementBaseExpectedHead: Readonly<...>; }>; obj...'.\n  The types of 'expectedHead.closureDigest' are incompatible between these types.\n    Type 'BlobDigest' is not assignable to type 'ClosureDigest'.\n      Property '[closureDigestBrand]' is missing in type 'String & { readonly [blobDigestBrand]: true; }' but required in type '{ readonly [closureDigestBrand]: true; }'."
+    }
+  ],
+  "packageWideTypechecks": "storage pass; browser and Node existing diagnostics fully preserved, not claimed passed",
+  "protectedPaths": 86522,
+  "protectedMissing": [],
+  "parentFiles": 7,
+  "stashes": 27,
+  "noProductionOverlay": true,
+  "noCopiedDist": true,
+  "childStreamLimitation": "JSON reporter intercepts console.info; standalone child streams not retained; causal child-success/token assertions and native runtime hashes retained",
+  "evidenceMovedWithoutChangingFrozenOutputFile": true
+}

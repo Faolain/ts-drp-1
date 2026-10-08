@@ -1,0 +1,51 @@
+{
+  "verdict": "FAIL",
+  "findings": [
+    {
+      "severity": "P1",
+      "file": ".github/workflows/protocol-v3-author-authorization.yml",
+      "line": 30,
+      "title": "Named current root consumer still authorizes with the candidate checker",
+      "evidence": "Design requires CI to extract and run the unique merge-base checker with an explicit repository-root bind, fail closed on a missing checker, and never fall back to candidate bytes (current-contract-design.md:33-35). The same design then leaves protocol-v3-author-authorization.yml:30 as a current root consumer that runs the in-tree candidate `check-protocol-v3-freeze.mjs` with no base argument, no merge-base --all uniqueness check, and no PROTOCOL_V3_FREEZE_REPOSITORY_ROOT bind (red-proposal.md:59). Host branch protection is neither changed nor verified, so this job is a live candidate-authority path. Exact fix: retarget this freeze step onto the same merge-base extraction/fail-closed contract as registry.yml, or explicitly name it integrity-only and state it is not transition authorization.",
+      "violated_requirement": "CI loads the unique merge-base checker; no candidate fallback; author-authorization remains a current root consumer"
+    },
+    {
+      "severity": "P1",
+      "file": "tests/phase-5d-pacemaker-law-red.test.ts",
+      "line": 941,
+      "title": "Pacemaker bootstrap suite is not given the same fail-closed supersession as seal",
+      "evidence": "Pacemaker supplementReady() is true only when the live checker exits 0 (phase-5d-pacemaker-law-red.test.ts:564-581). After the stale tuple is repaired, skipIf(!SUPPLEMENT_READY) lifts and the previously skipped suite runs, including absent-base bootstrap success at :941-944 and CHECKER_WITHOUT_BASE_BOOTSTRAP at :966-976. Seal's isomorphic skipped cases are required to execute with retitled fail-closed predicates (current-contract-design.md:114-115; red-proposal.md:19). Pacemaker is only called a static discovery and 'not claimed executed' (current-contract-design.md:110-111; red-proposal.md:38), so GREEN may keep pacemaker.yml:51-59 candidate bootstrap or skip the suite. Exact fix: require the pacemaker readiness/bootstrap cases to execute after repair, retitle the bootstrap predicate, and replace absent-base success with fail-closed current acceptance, same as seal.",
+      "violated_requirement": "Honest historical-test supersession; seal/pacemaker relinquish bootstrap authority; a readiness skip is not acceptance"
+    },
+    {
+      "severity": "P2",
+      "file": "packages/protocol-v3/supplements/blueprint-work-budget-v1/check-freeze.mjs",
+      "line": 167,
+      "title": "Live seven-field field-list owners need an explicit historical-vs-executed disposition",
+      "evidence": "The current W0 registry already lists optional authorShareMultiplier first (registry-v1.json:57). Live executable checkers still require the old seven names (blueprint-work-budget-v1/check-freeze.mjs:154-167 and blueprint-operation-budget-v1/check-freeze.mjs:148-162). RED retargets the work-budget test at :289-298 and forbids treating spec.md:157 as a current seven-field claim, but does not classify these checkers as historical-not-executed after successor retirement or as current predicates to retarget. If freeze keeps executing them, they reject the signed W0 registry.",
+      "violated_requirement": "Full active consumer coverage; do not omit a subsystem because its old checker understands only seven fields; successor artifacts remain historical, not an alternative live route"
+    }
+  ],
+  "checked_requirements": [
+    "One current contract; no historical-tree projection, dual registry, accept-either hash, or recursive bootstrap/custody chain",
+    "Preserve old signed evidence; do not relabel old sign-offs as approval of current bytes",
+    "Preserve semantic and anti-self-blessing invariants; current registry already has optional multiplier; do not change registry bytes or Node supported runtime profiles",
+    "Prospective-baseline trust reset: old/missing bases reject; CI loads unique merge-base checker; base policy and inventory control the candidate; no candidate fallback",
+    "Signed reviewed baseline establishment is outside the old checker transition contract and is not claimed to pass an old-base PR",
+    "Local current/current acceptance is not proof of the old-to-new transition; host branch protection is neither changed nor verified",
+    "Full active consumer coverage of live registry-hash and current-routing owners",
+    "Preserved subsystem custody/commands, workflow identities, permissions, and v2 separation",
+    "Schema optional-field catch-up and independent oracle adequacy without canonical default injection",
+    "True causal RED entry through existing evaluateProtocolV3Freeze export; no missing-export RED",
+    "Mutation-baseline independence and semantic-validator coverage of schema mutants",
+    "Honest historical-test supersession; replace safety obligations rather than keep obsolete current owners",
+    "Eight dirty production owners inherited, preserved, and out of review"
+  ],
+  "limitations": [
+    "Read-only inspection of the two proposals, bounded plan anchors, and identified source; no tests, checkers, builds, or Git mutations were run",
+    "Exact freeze details still required before RED, and their absence is a freeze task rather than a design PASS: protected-path/CODEOWNERS roster, policy/checker hashes, workflow runner text, consumer derivation import from the unique root policy home, snapshot envelope field list, and bounded command selection",
+    "Successor-protected budget checkers remain executable current-tree validators; freeze must name them historical-not-executed or retarget them",
+    "Schema values 1 and 1,000,000 remain conformance-only; live-journal PARAMETER_KEYS (live-journal/src/contract.ts:89-97) stay a separate seven-key boundary",
+    "Host branch protection, required-check installation of the signed baseline onto a protected branch, and the eight dirty production owners are outside this review"
+  ]
+}

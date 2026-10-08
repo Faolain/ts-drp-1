@@ -1,0 +1,1 @@
+{"available":true,"profiles":[{"file":"profiles/CPU.20260906.033407.40665.0.001.cpuprofile","valid":true,"pid":40665,"role":"parent-vitest","sampleCount":52866,"timeDeltaSumMicros":74423666},{"file":"profiles/CPU.20260906.033408.40795.0.001.cpuprofile","valid":true,"pid":40795,"role":"owned-worker","sampleCount":51864,"timeDeltaSumMicros":73091667}]}

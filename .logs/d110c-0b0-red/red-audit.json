@@ -1,0 +1,38 @@
+{
+  "slice": "D.110c-0b0",
+  "checkpoint": "RED",
+  "headCommit": "2ba2752ff5dca0d39656f97b429fe6439be7bae9",
+  "headTree": "8f77c0b7b5403d411cf9844a01b0f8df7b47a3f8",
+  "upstreamCommit": "2ba2752ff5dca0d39656f97b429fe6439be7bae9",
+  "sourceTestSha256": "d9b41102189c0bf3e703d026ed050e08fc395f1dd815101ec9d6975c49258252",
+  "sourceIdentities": {
+    "nodeActivation": "70dba504e7f71fd830b89f28cbfde0d58a9f51584ca256a6058045e693c6cf46",
+    "nodeActivationBuilt": "4090eb6cfb921147fac9e29f803a67210741a6737cd9f9bf674996b7262fe7e1",
+    "room": "be0fae5e22476ebfcf2602c34213df60df954b51f1f2e945807c04a3e7fbb612",
+    "lockfile": "73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99",
+    "rootManifest": "1baa6c3967e63f1d8af5f1e70c6b6c62e032a90e770f18dd3d86f5cfc40e1a55"
+  },
+  "buildStatus": 0,
+  "testStatus": 1,
+  "selectedFileCount": 1,
+  "selectedTestCount": 1,
+  "passedTestCount": 0,
+  "failedTestCount": 1,
+  "skippedTestCount": 0,
+  "success": false,
+  "exactFailureToken": "D110C_0B0_FRESHNESS_FLOOR_MISSING",
+  "exactFailureObserved": true,
+  "causalObservation": "The genuine freshly built epoch-1 cold reopen activated without an independent room-head authority.",
+  "trackedDirtyCount": 0,
+  "stashCount": 26,
+  "protectedPaths": {
+    "agents": true,
+    "claude": true,
+    "pnpmStore": true
+  },
+  "relevantProcessCount": 0,
+  "occupiedFixedPortCount": 0,
+  "longCampaignInvocations": 0,
+  "d110aInvocations": 0,
+  "accepted": true
+}

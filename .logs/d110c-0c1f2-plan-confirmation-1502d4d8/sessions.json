@@ -1,0 +1,24 @@
+{
+  "reviewedCommit": "1502d4d81e1769a75bc3c416937b53e57dc3390b",
+  "grok": {
+    "sessionId": "01a067a6-fc0f-7f91-bf6f-a6a5f8728e10",
+    "model": "grok-4.6",
+    "effort": "high",
+    "terminalPath": "grok/continue.raw.json"
+  },
+  "kimi": {
+    "sessionId": "session_2bcb63d3-9fc2-4279-a7f7-96e005eeedce",
+    "model": "kimi-code/k3",
+    "maxStepsPerTurn": 100,
+    "terminalPath": "kimi/verdict.json"
+  },
+  "opus": {
+    "sessionId": "175e8bba-ce42-4580-b988-90370212c171",
+    "model": "opus",
+    "effort": "xhigh",
+    "terminalPath": "opus/verdict.json"
+  },
+  "blockingUnionCount": 0,
+  "p2Count": 4,
+  "redAuthorized": true
+}

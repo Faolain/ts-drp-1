@@ -1,0 +1,36 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-MEM-PLANEFFECT-READISSUED",
+      "finding": "Memory persists the issue-time commit graph, so readIssued after a planEffect issue returns planEffect; browser/node reconstruct from issued+outbox and omit it. Durable link remains the plan, but the public commit shape is not identical across backends.",
+      "evidence": "packages/issuance-store/src/conformance.ts:323",
+      "owner": "issuance-store",
+      "disposition": "Strip planEffect when storing/reading issued rows in memory, or reconstruct uniformly from the plan on all three backends. Do not treat readIssued as the settlement-link owner."
+    },
+    {
+      "id": "P2-BROWSER-V1-MIGRATION-VECTOR",
+      "finding": "Browser v1→v2 createObjectStore(settlementPlans) plus exact four-store admission is implemented, but the focused 45-case inventory only pins a fresh v2 database. Safe in-place v1 migration is unexecuted in that suite.",
+      "evidence": "packages/storage-browser/src/internal/browser-issuance-store.ts:1236",
+      "owner": "storage-browser",
+      "disposition": "Add one retained/focused vector that opens a real v1 three-store authority with rows, migrates in place, and asserts version 2, four exact stores, and preserved issued/outbox/lineage rows."
+    },
+    {
+      "id": "P2-EXPIRE-REPLACEMENT-LINK",
+      "finding": "applySettlementPlanEffect refuses absent, already-linked, and manual-review replacement targets, but will link an expire entry. Drain is supposed to skip expire issue; the store still accepts it.",
+      "evidence": "packages/issuance-store/src/contract.ts:431",
+      "owner": "issuance-store",
+      "disposition": "Refuse expire in applySettlementPlanEffect if the store is the fail-closed owner; otherwise keep drain-only and document the store as transport-neutral."
+    }
+  ],
+  "notes": [
+    "RED 5b286468 was causal: 24/21 on 45 cases. Native-method, atomic planEffect, ambiguous post-commit readback, prune-gate, browser v2, and node v3 migration failed against the old six-method/three-store/three-table owners. Write-path passes at RED were oracle/fallback/commit-grammar, not a green implementation.",
+    "GREEN 9fef8d24 implements exact SettlementPlan/Entry, CAS write, atomic planEffect inside the same browser four-store strict transaction and Node BEGIN IMMEDIATE, absent/fence-set/linked/manual-review retries, corruption latch on malformed plans, unlinked prune gate, browser v2 settlementPlans, and Node v3 settlement_plans with v1 and v2 in-place migrations. Poison precedes close.",
+    "Tests-only 6cc120eb/0508133f are harness fixes: raw v1 schema control stays v1 while adapter-derived DB is v2/four stores; death-arm evidence uses the sorted four-store set; CREATE TABLE inventory is v3; admission observer waits for IPC send before disconnect. Assertions were not weakened.",
+    "packages/node/src/v3-live.ts only forwards the two new DurableIssuanceStore methods through the existing creator filter so the widened interface remains assignable. No drain, fence issuer, or room behavior."
+  ]
+}

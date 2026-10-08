@@ -1,0 +1,9 @@
+{
+	"extends": "../../../packages/protocol-v3/tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"rootDir": "../../..",
+		"tsBuildInfoFile": "../../../packages/protocol-v3/node_modules/.tmp/phase-0o-b1a-built-package.tsbuildinfo"
+	},
+	"files": ["built-package-type-audit.ts"]
+}

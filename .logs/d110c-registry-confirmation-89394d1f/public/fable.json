@@ -1,0 +1,65 @@
+{
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/derive-inventory.mjs",
+      "line": 159,
+      "title": "Suffix heuristic labels actively consumed child contracts as historical evidence",
+      "evidence": "historical() classifies every tests/fixtures/*-contract.json as preserved-historical-evidence. inventory.json:2053 (seal-digest-law-contract.json) and :1260 (ed25519-acceptance-profile-contract.json) carry that label, yet the seal child CLI parses the seal contract for current profile/vector/decision identity (seal check-freeze.mjs:267-273) and the Ed25519 vectors pin the 0g2s contract as current fixture identity (vectors.json:13-14); the same applies to pacemaker, 0j-b, 0o-* and 0p* contracts consumed by current subsystem tests. Custody is byte-protected either way and README:135-136 keeps all preserved records byte-identical, so no preservation or authority error results; only the role label is imprecise.",
+      "violated_requirement": "Classification identifies current versus historical role (README:132-134)"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/README.md",
+      "line": 78,
+      "title": "Accepted real root-config shape is not named as the grammar's positive baseline",
+      "evidence": "vite.config.mts:7-8 declares `const config = defineConfig({ plugins: [tsconfigPaths()], ... })`, :139 exports `workspaceAliases` derived from config.resolve.alias, and :141 exports default `config`. The existing root grammar requires a direct `export default defineConfig(` call (check-protocol-v3-freeze.mjs:367-383,469) and therefore already rejects the real file independently of the eight exclusions. README:78-86 lists what the closed grammar must reject (plugin/export/mutation changes) and requires accepting the real config, but does not name this exact const-plus-default-export, named re-export and tsconfigPaths plugin shape as the frozen positive control, which RED's lifecycle-incompatibility attribution and the grammar's positive test both depend on.",
+      "violated_requirement": "Closed selection grammar must accept the real config and reject the reviewed mutant set; attributable RED refusal"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/verification.md",
+      "line": 14,
+      "title": "Checkout for the single RED execution and the per-checkout typecheck stage mapping are implicit",
+      "evidence": "verification.md:14-15 runs the new suite once after static gates and :53-58 states all runtime suites use dedicated current-source checkouts with no direct-main runtime claim, but neither the RED entry (gate-plan.mjs:35) nor the text says the RED execution occurs in a prepared checkout rather than main. typecheck.mjs accepts stages baseline/green/isolated with one exclusive report per OUTPUT directory; which of main, A and B runs `green` versus `isolated` is left to stage custody. Neither point blocks authoring; both belong in the capsule freeze.",
+      "violated_requirement": "Explicit stage custody before execution; no direct-main runtime claim"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/README.md",
+      "line": 67,
+      "title": "Semantic-only CODEOWNERS leaves newly byte-protected roots under the default owner rule",
+      "evidence": "The v3 CODEOWNERS block validated by the root (check-protocol-v3-freeze.mjs:165-180) covers 14 patterns; newlyByteProtectedPaths (inventory.json:3378-3416) and the supplements/scripts/workflow roots rely on the default `*` owner. Because CODEOWNERS is now semantic-source (:297-299) rather than byte-frozen, that default can change in-band, though any CODEOWNERS edit still needs the frozen cohort through the terminal `/CODEOWNERS` rule (:183) and byte-protected paths remain blocked by the root status regardless of approver. State this explicitly or extend the v3 block; not a security gap.",
+      "violated_requirement": "Explicit declaration of custody consequences for semantic-only sources"
+    }
+  ],
+  "checked_requirements": [
+    "Prior Fable P1 (exhaustion consumer): CLOSED. inventory.json:2584-2590 classifies tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts editable-current-owner; derive-inventory.mjs:71 adds it to affectedCurrentTestFiles; gate-plan.mjs:45 asserts 29 invocations and :11 asserts 28 compiler roots; consumer-supersession.md:8-15 preserves the paired attestation and moves only live c2-byte ownership. Its other historical pins (freeze-governance-contract.json:53, regenerated-reference-contract.json:247) are consumed only by editable e/e2/e3/d suites",
+    "Prior Fable P1 (byte versus semantic boundary): CLOSED. README:59-86 and :137-145 declare prospectiveByteProtectedPaths, semanticOnlyPaths and newlyByteProtectedPaths; inventory.json:3184-3189 lists exactly test.yml, CODEOWNERS, vite.config.mts, vitest.workspace.ts as semantic-source; step 3 (README:214-216) excludes semantic-only contents from base digest comparison; the trusted checker fixes roles so candidate policy cannot reclassify (README:73-74)",
+    "Prior Sol P1 / Grok P2 (successor fixture closure): CLOSED. derive-inventory.mjs:113-115,133 derives the closure from git ls-files; inventory.json:3417-3444 lists 26 files including successor-contract.json, harness, controlled checker, analyzer and its 19 YAML self-test fixtures, all byte-protected with owner historical-successor-evidence; currentSha256/currentBlob records are censused as historical-current-record (:2973-2995)",
+    "Prior Sol P2 (role classification): CLOSED with the P3 label note above; classification now has four role values plus a separate custody field (derive :161-163)",
+    "Prior Sol P2 (RED ordering): CLOSED. verification.md:39-41 blocks RED acceptance/GREEN handoff, not RED authoring; typecheck.mjs:22 still requires the authored roots to exist",
+    "Prior Fable P2 (historical tuple records): CLOSED. derive-inventory.mjs:172 censuses freezePolicyPath/freezePolicySha256/protectedPathStatesSha256/protectedPathCount; inventory.json holds six historical-compound-tuple records (:2667-2899) for both docs, blueprint profile, Ed25519 vectors, 0g2s and 0j-b contracts; payloads remain preserved and production-compatible (five keys, count 47)",
+    "Prior Fable P2 (ceilings): CLOSED as design. gate-plan.mjs:20-28 differentiates 900/900/360/480/480/600/600 with 240 elsewhere; verification.md:74-95 defines one-shot admission budgets, nested bounds, readiness prefix and stop-on-unexpected rules; exact case/child cardinalities and capsules remain execution release gates, as the fixed requirements demand",
+    "Prior Grok P3 (schema order): CLOSED. README:262-263 requires inserting authorShareMultiplier first, matching registry-v1.json:57",
+    "Prior Fable P3 (required-bump): CLOSED. README:51-54 states future registry changes need a separately reviewed amendment and the required bump, with no in-band exception",
+    "Prior Fable P3 (candidate mode source): CLOSED. README:175-185 specifies Git-tree base entries, worktree lstat candidate entries mapped to 100755/100644, stage-zero index agreement, symlink/ancestor/submodule/unmerged rejection, and untracked-entry treatment; derive-inventory.mjs:141-148 and :38-44 mirror the rule",
+    "Prior Fable P3 (compiler provenance/transient write): CLOSED. typecheck.mjs:94 records decodedTextSha256 and fileBytesSha256 separately; :62-70,110-117,125,130 census transient Vite bundles before/after in root and node_modules/.vite-temp, never delete them, and require cleanup completion for acceptance; verification.md:43-49 documents the non-write-free loader",
+    "Prior Fable P3 (derivation reproducibility): CLOSED. derive-inventory.mjs:7-8 uses fileURLToPath; :17-52 adds non-mutating --verify pre-red/post-red/green custody against an independently supplied digest; :210-218 restricts --write to --replace PRIOR_DIGEST with absent RED files",
+    "Prior Fable P3 (child evaluator disposition): CLOSED. README:98-102 and consumer-supersession.md:47-52 remove evaluateEd25519ProfileFreeze/evaluateBlueprintArtifactProfileFreeze and migrate callers; repository search finds only the two checkers and their two tests referencing those exports, so removal breaks no other consumer",
+    "Decision 1 (A/B dedicated checkouts): consistent across README:20-22,347-356, verification.md:18-20,53-72 and gate-plan.mjs:33-36. Source confirms both suites build in repository root (anchor-trust :392-395, blueprint-runtime :595-598), so main outputs cannot be preserved under direct-main runtime; the preparation shape (pnpm install --offline --frozen-lockfile --ignore-scripts, pnpm build:packages) matches package.json:24 and the W0 isolated handoff (:105,:122). Main keeps static, custody and post-checkpoint transition checks; no direct-main runtime is claimed",
+    "Decision 2 (successor supersession): faithful to greenfield one-current-owner intent and README:104-108. Retired surfaces verified at test :39-40 (eager plan/readiness), :302,:426,:444,:569 (certification skipIf), :672-712 (readiness-gated) and :714-745 (38 partitions of the 114-name plan). Object/mode/parent authentication is feasible from recorded data: predecessors carry baseline/baselineTree/directParent/directParentTree/checkerBase (successor-contract.json:160-215) and rootFreezeEvidence carries baselineTree/checkerBaseTree/checkerBlob/checkerSha256/historicalStdout (:44-70). Retained controlled positives/negatives use only the fixture-owned controlled checker and synthetic files (harness :83-160), and the census reads only unchanged predecessor policies. The map explicitly does not claim native checkers were rerun and forbids restamping; the audit's replay recommendation is not adopted and no contradiction results",
+    "Decision 3 (benign preload positive): harness :632-650 and :1064-1084 confirm the passthrough is a NODE_OPTIONS --import registration of a benign fault; the supersession retains an unchanged-base positive with a benign forwarding preload, disclaims compromised Git/Node/Bash resistance, and requires real extracted process errors to propagate, which runner.sh's set -e and unmasked node invocations satisfy",
+    "Decision 4 (semantic-only root config grammar): README:77-86 specifies literal selection preservation, exact workspace membership, actual exported config, rejection of duplicate/computed selection keys, include/name filters, hooks, later mutation, altered exports and escaping plugin changes, coverage keys excluded from selection, and unconditional real pnpm test. Sources agree: vite.config.mts:118-127 eight exclusions with coverage.exclude at :132, vitest.workspace.ts five literal projects, test.yml:28-30 unconditional bash step without if/continue-on-error",
+    "Fixed requirements re-verified: one prospective root with base-policy custody (inventory :503-505) and no self-hash; registry/runtime bytes unchanged; no candidate fallback and obsolete/partial/missing base rejection (README:38-44, runner.sh); v2 closure and ancestry/workflow controls retained (verification.md:107-137); independent oracle literals unchanged; eleven workflows byte-protected (inventory :3191-3201); inheritance of test.yml, CODEOWNERS and lifecycle files as semantic sources",
+    "gate-plan arithmetic re-verified against the corrected inventory: 23 affected files + 1 new test + 5 variants = 29; 23 tests + 2 helpers + 3 new .ts = 28 roots; 7 .mjs; 5 child-integrity commands; readiness prefix of six files all present in the roster; obsolete certification environment explicitly unset"
+  ],
+  "limitations": [
+    "Read-only confirmation: no derivation, gate plan, typecheck collector, oracle construction, runner, test, checker, build or Git command was executed; inventory digests, the 26-file closure listing and the A/B preparation commands were checked by inspection against sources, not recomputed",
+    "Bounded scope: only the corrected passages, the second-review packet, the runtime audit and the sources needed to verify the four decisions and prior finding families were inspected; the broad first-round audit was not repeated and the eight dirty production owners remain outside review",
+    "PASS accepts the design for RED authoring only. Runtime cardinalities, per-case limits, preparation capsules, native/offline prerequisites and the checkout used for the single RED execution remain execution release conditions, not demonstrated facts; no GREEN observation exists or was demanded",
+    "Historical successor execution claims (historicalStdout, native predecessor passes) will no longer be re-executed under the chosen supersession; their evidentiary weight rests on the preserved contract records and sealed packets, which were not re-verified here",
+    "Host branch protection, installation of the signed baseline on a protected branch, and Vite's exact transient-bundle naming across versions were not verifiable from repository evidence"
+  ]
+}

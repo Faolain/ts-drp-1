@@ -1,0 +1,18 @@
+{
+  "stage": "baseline",
+  "root": "/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout",
+  "targetDiagnostics": 0,
+  "inheritedDiagnostics": 1,
+  "wholeCustody": 12,
+  "spanCustody": 66,
+  "schedulingProbe": {
+    "capture": 6396,
+    "dispatch": 6440,
+    "classify": 7862
+  },
+  "owners": {
+    "packages/storage/src/maintenance.ts": "a328bcec1b9d416614570db83a5c618a4f9e8a59f43cf938f64dae3cb8ca47e2",
+    "packages/storage-browser/src/internal/ahe-reclamation.ts": "fa73cf9dfe30891349b8e6830443bdbcad1679a6f2ae6bdb97d8333e271428d7",
+    "packages/storage-node/src/internal/ahe-reclamation.ts": "5c390dd68295eb6284876133612ce58564c4b6ce2e7a714e7d3a36d2a8dbefa5"
+  }
+}

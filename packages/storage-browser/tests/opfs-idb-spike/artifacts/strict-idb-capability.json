@@ -1,0 +1,1 @@
+{"schemaVersion":1,"artifactKind":"strict-idb-capability","requestedDurability":"strict","observedDurability":"strict","observedFrom":"live-transaction","nonStrictOutcome":"typed-fatal-capability-error","nonStrictWritesCommitted":0,"durabilityEvidenceScope":"capability-and-no-fallback","notProven":["fsync","power-loss","torn-write"]}

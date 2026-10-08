@@ -1,0 +1,21 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-3a1b-p3-live-transport-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-transport-e122e280/focused.json"
+  ],
+  "head": "e122e2806eee036404e812080c658f9804df7852",
+  "expected": {
+    "total": 24,
+    "passed": 24,
+    "failed": 0,
+    "skipped": 0
+  }
+}

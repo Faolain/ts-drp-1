@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "diff",
+    "--check",
+    "f83764c5^",
+    "f83764c5",
+    "--",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  ],
+  "start": "2026-09-05T22:07:25.110Z"
+}

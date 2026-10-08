@@ -1,0 +1,233 @@
+commit fefa6805e16066f55d15bb95701b3ced290553b3
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Fri Sep 4 22:31:19 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Fri Sep 4 22:31:19 2026 -0400
+
+    docs(hardening): reslice settlement restart recovery
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 91a33815..68995865 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
+ 
+ ---
+ 
+-### Current frontier — author settlement and writer capacity (as of 2026-09-04, review b15917ff)
++### Current frontier — author settlement and writer capacity (as of 2026-09-04, f5b0u audit)
+ 
+ This subsection is the entry point for an agent resuming the D.110c-0c1f /
+ D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
+@@ -18436,18 +18436,18 @@ Closed in the 2026-09-04 checkpoint:
+ 
+ Authorized now (tests-only RED first, then GREEN):
+ 
+-- **f5b0t segmented replacement-progress prerequisite** below. The first
+-  parent f5b RED stopped before any edit because the one-link plan schema
+-  cannot represent crash-safe `split-required` progress. Complete the exact
+-  high-risk plan review, then one causal tests-only RED and GREEN for the
+-  device-local plan/progress contract, memory/browser/Node stores and room
+-  resume owner. No f5b integration or production edit is authorized before
+-  that checkpoint.
++- **f5b0u settlement restart/reconciliation prerequisite** below. The signed
++  f5b0t RED and corrected RED are causal, but the first incomplete GREEN audit
++  demonstrated missing failure classification, fresh-handle recovery and
++  constant-ownership seams. Complete the bounded high-risk f5b0u plan review,
++  then its causal tests-only RED and the combined f5b0t/f5b0u GREEN. No parent
++  f5b integration or further production edit is authorized before that
++  checkpoint.
+ 
+ Blocked, and on what:
+ 
+-- **f5b creator settlement and recovery integration** → f5b0t GREEN and empty
+-  P0/P1 review union. It then retains the full 27-case design matrix, all
++- **f5b creator settlement and recovery integration** → f5b0t/f5b0u GREEN
++  and empty P0/P1 review union. It then retains the full 27-case design matrix, all
+   resliced reclamation gates, and the same-room 64-active-writer,
+   every-writer-every-epoch, three-close acceptance unchanged.
+ - Stage W1 (256-line frontier, version-3 ACL) is inside the blocked parent f5b
+@@ -99438,8 +99438,17 @@ is nonblocking prospective evidence guidance.
+ 
+ ###### D.110c-0c1f5b0t segmented settlement replacement-progress prerequisite
+ 
+-**Status: AUTHORIZED for one causal tests-only RED on 2026-09-04; production
+-remains blocked until that RED is signed and pushed.** The first parent f5b RED
++**Status: RED complete; GREEN rejected and blocked on f5b0u.** Tests-only RED
++`fb3c5c599b8c50db55fcf361ea465531fbc90b2b` and evidence
++`03caff362bc0abcaa25c1e0f3095612d1ec3f218` are signed and pushed. The
++tests-only correction that removed an arbitrary microtask-timing expectation is
++`c1d602f6566d6a5a5743170efd62ef1aa7685712`, with evidence
++`acec5c3fe03c83add9cd2c992dcdae88786c48cf`; its clean detached run retained
++23 intended behavioral failures and 12 passing controls across exactly 35
++tests. The incomplete seven-path GREEN remains uncommitted and is not evidence:
++the f5b0u audit below found material missing acceptance coverage and recovery
++behavior. Further production edit is blocked until f5b0u plan review and its
++corrective tests-only RED are signed and pushed. The first parent f5b RED
+ stopped before any test or production edit under the accepted design stop rule:
+ the persisted `SettlementPlanEntry` has only one scalar
+ `replacementSequence`, `applySettlementPlanEffect` may fill it only once, the
+@@ -99716,9 +99725,162 @@ checkpoint/close/adopt, every-peer authenticated pruning, 8,192/8,193 recovery,
+ three-close restart/cold-reopen and explicit 64-active-writer composition; this
+ prerequisite neither satisfies nor weakens any of them.
+ 
++###### D.110c-0c1f5b0u settlement restart/reconciliation prerequisite
++
++**Status: PLAN REVIEW REQUIRED; tests-only RED is blocked until that review has
++an empty P0/P1 union.** The signed f5b0t RED `fb3c5c59` and its tests-only
++timing correction `c1d602f6` remain accepted causal evidence under
++`.logs/d110c-0c1f5b0t-red-fb3c5c59/` and
++`.logs/d110c-0c1f5b0t-red-correction-c1d602f6/`. The incomplete f5b0t GREEN
++must not be committed: an Astra/high audit on 2026-09-04 found that all new
++codec/store/Node paths could pass while the room still continued on a halted
++handle, classified an absent legacy link as present, accepted inexact
++ambiguous readback, fenced before rejecting a stale intent digest, and allowed
++a legacy entry to originate nonempty progress. It also found a field-name
++heuristic that could persist the wrong logical-time floor and missing runtime
++proof for the real room-to-Node split and frontier-covered cold reopen. This is
++a bounded implementation prerequisite, not a review-only slice and not a
++reopening of closed f5b0a through f5b0d or W0.
++
++Owners: the existing f5b0t issuance-store contract/conformance and three
++backends, Node v3-live issue/source owners, v3-room settlement startup and
++recovery orchestration, the f5b0t fixtures, and one direct existing workspace
++dependency edge from `@ts-drp/example-v3-room` to
++`@ts-drp/issuance-store`. Deadline: combined f5b0t/f5b0u GREEN and an empty
++P0/P1 final review union before parent f5b resumes, before its exact 64-writer
++three-close acceptance, and before D.110c-c/d, Phase-6 exit or Phase 7.
++
++Bounded source/architecture audit and selected construction:
++
++- A settlement issue that reaches signing or has an unclassified durable
++  outcome may latch `operationAdmissionHalted` in the Node registration.
++  `split-required` remains the only nonmutating, nonhalting control. The room
++  must never publish, retry a suffix, or accept a new public issue on a handle
++  whose issue result is not a success or `split-required` merely because a
++  compatible plan prefix can be read back.
++- Reuse the existing authenticated recovery APIs; add no product API or
++  authority carrier. For genesis startup, privately separate same-store
++  prepare/recover/activate from `prepareDurableRoomState` so the already-open
++  AHE, issuance and journal stores, transport and queue manager remain owned by
++  the session. For successor startup, first await wrapper deactivation and
++  then use `reopenCreatorSuccessorAdoption` against the same authenticated
++  stable room-head floor, current snapshot declaration and already-open
++  stores. Deactivation must precede recovery because same-head activation may
++  otherwise return the old registration. Whole-session `shutdown()` is not a
++  recovery primitive: it closes stores, transport and the queue manager.
++- Before an attempted replacement issue, capture the exact prior plan revision
++  and prefix. After a failed/unknown call, only a readback with the same entry,
++  digest and count, prior prefix plus exactly one matching range, one newly
++  allocated chunk sequence, revision exactly `prior + 1`, and the correct
++  partial-null or final-scalar projection is the attempted committed effect.
++  An independently compatible prefix is useful durable truth but is not proof
++  that the old handle remains usable. Quiesce settlement/public issue/close
++  work, deactivate the old handle, authenticate and activate a fresh handle,
++  publish any exact committed outbox row, and resume only the remaining bound
++  suffix. No failure loops on the same handle. Cleanup or fresh activation
++  failure leaves one terminal session and never two active owners.
++- Limit this recovery claim to settlement at room startup, where the room owns
++  either the genesis material or the current successor snapshot declaration.
++  A later hot-adopted successor's close result does not currently expose that
++  declaration and the room's snapshot-store owner is closure-local. Parent f5b
++  must prove authentic current-declaration custody before claiming repeated
++  hot epochs. If existing storage/close seams cannot provide it without a new
++  API, authority carrier or schema, parent f5b stops and reslices; f5b0u must
++  not invent a fixture-only declaration.
++- `lastLogicalTime` comes from the exact signed vertex input. Only an exact
++  `operation.action === "applicationBatch"` with the existing closed nested
++  `batch { entries, version }` grammar may select the final child logical time;
++  an ordinary application operation containing an `entries` or `batch` field
++  retains the vertex logical time. The current test helper's invented direct
++  `entries` grammar is removed rather than supported in production.
++- Validate every existing progress entry's count and digest against the fully
++  rederived ordered operation list before issuing a missing fence. A mismatch
++  issues and signs nothing, leaves lineage/plan unchanged and remains
++  permanently fail closed. Legacy-to-progress plan CAS may originate only the
++  exact zero-chunk record after a genuine nonmutating split; only atomic
++  `transactIssue` appends a chunk.
++- Fix legacy and progress readback without weakening compatibility. An absent
++  selected legacy entry is not linked. Exact progress readback owns sequence,
++  revision, prefix/range and final-scalar checks. Store-level ambiguous outcome
++  classification and room-level recovery must agree; neither digest/range
++  resemblance nor a mutable later plan is sufficient by itself.
++- Remove the room-local copies of the issuance-store count and digest limits.
++  The narrow compatibility amendment is one direct workspace dependency in
++  `examples/v3-room/package.json` plus its importer entry in `pnpm-lock.yaml`,
++  importing the already-public issuance-store constants/helper types. This is
++  no external package, version, runtime-policy or cryptographic dependency.
++  Re-exporting through storage-browser or Node is rejected because it would
++  create a false ownership seam. This exact workspace edge is the sole
++  exception to f5b0t's prior no-dependency-change sentence.
++
++Tests-only RED acceptance, written against existing public/runtime seams and
++not future missing imports or exports:
++
++1. Pin the real `applicationBatch` nested grammar and two ordinary-operation
++   collision controls (`entries` and `batch.entries`); only the genuine batch
++   uses its last child's logical time.
++2. Across memory, Chromium and Node conformance, refuse a legacy-unlinked to
++   nonempty-progress CAS with exact unchanged readback; retain zero-chunk
++   origination and atomic chunk append as the paired controls.
++3. With a progress entry and missing fence, change the rederived operation or
++   transform result and prove zero issue calls/signatures, unchanged lineage,
++   unchanged plan and no fence.
++4. Cover absent legacy entry, wrong sequence, unchanged or surplus revision,
++   skipped/duplicate range, incompatible prefix and wrong final scalar. Each
++   fails closed; the exact one-revision/one-chunk partial and final forms pass.
++5. Through a handle that genuinely latches after signing, cover both no-link
++   and committed-but-unknown partial/final outcomes. The old handle is awaited
++   through deactivation, no work continues on it, fresh authenticated startup
++   recovery owns publication/resume, and every operation appears exactly once.
++   A compatible pre-sign race is distinguished as plan truth but still cannot
++   authorize reuse of an unclassified old handle.
++6. Exercise one real room-to-Node legal deterministic transform whose assembled
++   batch exceeds 65,536 bytes, observes nonmutating `split-required`, and
++   commits at least two progress vertices. A mocked room split and a separate
++   Node split do not satisfy this case.
++7. Cold reopen with the original authenticated source below a supplied
++   `terminalThrough`: open progress exposes it only for digest/suffix
++   rederivation, admitted chunks are not repeated, completion restores normal
++   terminal classification, and another author/scope cannot borrow the
++   override.
++8. Race public issue, close/adopt and settlement recovery; only one active
++   owner survives, the fence stays first, the plan stays monotonic and cleanup
++   failure is terminal. Retain the legacy one-shot and creator-trusted-v1 byte
++   and behavior controls.
++
++GREEN is limited to the previously authorized seven f5b0t production paths,
++the private room recovery/refactor required above, bounded fixtures, and the
++two workspace-manifest paths. No wire/protobuf/checkpoint/anchor/ACL/authority,
++public API, external dependency, cryptography, threshold, timeout or workload
++change is authorized. Run the corrected 35-test f5b0t focused set plus the
++new f5b0u focused set, real Chromium, affected builds/typechecks,
++exact-owner lint/format/diff/source-shape checks, retained issuance/room/
++recovery/creator-successor/active-owner suites and an isolated clean-checkout
++gate. Timing-sensitive retained files may run sequentially, but every selected
++test and unchanged timeout must be recorded; host starvation is not a product
++failure and is not permission to change a threshold.
++
++Because this adds recovery behavior beside signed issuance and one explicit
++workspace dependency edge, one bounded Grok 4.6/high, direct Kimi K3 with
++`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh plan review is mandatory.
++Correct P0/P1 in one batch with at most one material confirmation. The final
++combined f5b0t/f5b0u GREEN review inspects the accepted plan, both causal REDs,
++the previously rejected incomplete GREEN, final production/evidence and the
++parent hot-adoption boundary. Only P0/P1 blocks; P2 receives an owner and
++disposition without recursive prose review. Do not invoke Fable.
++
++Stop and reslice if fresh recovery requires a new authority carrier, public
++API, schema, stale snapshot substitution, changed room-head/genesis trust,
++weakened admission-policy reconstruction, retry of an unclassified signed
++issue, replay of an admitted chunk, or a second active owner. Never widen this
++slice to solve hot-adopted successor declaration custody silently. Preserve
++the signed REDs, all immutable evidence, protected untracked paths, stashes and
++the explicit one-room 64-writer parent acceptance unchanged.
++
+ ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
+ 
+-**Status: BLOCKED on f5b0t GREEN and its empty P0/P1 review union.** The first
++**Status: BLOCKED on combined f5b0t/f5b0u GREEN and its empty P0/P1 review
++union.** The first
+ causal RED stopped before any edit when the accepted split-required case
+ demonstrated that the scalar replacement link cannot represent crash-safe
+ multi-vertex progress. After f5b0t closes, this record resumes under the

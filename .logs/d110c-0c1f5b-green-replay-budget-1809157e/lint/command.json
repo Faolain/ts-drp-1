@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/phase-5d-pacemaker-red.test.ts"
+  ],
+  "start": "2026-09-06T05:53:10.424Z"
+}

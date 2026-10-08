@@ -1,0 +1,60 @@
+## D.109c Final GREEN Implementation Review
+
+Reviewed read-only at `3d21264f` (signed `G`, `origin/codex/phase3a1b-p6-golden-path` == local HEAD == reviewed commit; working tree clean for all reviewed paths).
+
+### 1. RED causality — genuine
+
+`.logs/phase-6b-d109c-red/focused-vitest-final.json`: 38 selected, 6 passed, **2 failed, 30 pending**. The two failures are assertion failures carrying exactly `D109C_SHARED_MAINTENANCE_MISSING` and `D109C_NODE_MAINTENANCE_MISSING`; `focused-browser.stdout:9` carries exactly `D109C_BROWSER_MAINTENANCE_MISSING`. These are readiness-predicate assertions over owner file existence — not module-resolution, build, server, or fixture errors. The RED manifest verifies (20/20 OK) and its self-hash `d0745b39…` matches the plan anchor.
+
+GREEN adds the three owners and, as the plan authorized, replaces RED's gated placeholder bodies with genuine ones. I checked specifically for surviving placeholders: RED's `expect(mutant.length).toBeGreaterThan(0)` loop (`84cff9ce:packages/storage-node/tests/…:185-198`) is now a real per-mutant loop that mutates live SQLite, asserts the exact code, compares a full `databaseImage()` before/after, and asserts poison polarity (`packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts:650-676`). RED's constant-only SIGKILL test is now a real `fork`/`SIGKILL` matrix (`:740-766`). No placeholder remains.
+
+### 2. Authority — strict, identity-based, owner-scoped
+
+Module-private `WeakMap<AheDurableStore, …>` in `packages/storage-node/src/internal/ahe-reclamation.ts:43` and `packages/storage-browser/src/internal/ahe-reclamation.ts:59`, populated only from `SqliteAheDurableStore`'s constructor (`create-scaffold.ts:146`) and `createBrowserAheDurableStore` (`idb-adapter.ts:972`). Copy, `Proxy`, `{}`, and the memory facade all resolve `undefined` and are asserted on both backends (`…node/tests/…:623-631`; `…entry.ts:202-208`). The two registries are separate modules, so cross-backend borrowing is structurally impossible, not merely untested. No `src/index.ts` in any package contains `reclaimClosedEpoch`; the diff adds no method to either store class (12-key facade intact); `test-instrumentation.ts` and `internal/ahe-reclamation.ts` are absent from both export maps. Only the three authorized additive `./maintenance` subpaths appear.
+
+### 3. Contract surface — preserved
+
+`captureAheReclamationInput` (`packages/storage/src/maintenance.ts:175`) gates on `isClosedRecord`/`isClosedArray`, which reject accessors, inherited/symbol keys, sparse arrays, and extra fields; `copyBlobFacts:314` rejects `SharedArrayBuffer` backing. Receipts are detached and **deeply** frozen (`createAheReclamationReceipt:536`, verified by `d109cDeepFrozen` on both backends). Errors are `Object.freeze`d (`failure:121`) with exactly the 6-code registry. Both backends reject asynchronously, and invalid-argument precedes lifecycle on both (`…/storage-node/src/internal/ahe-reclamation.ts:124-130`; `…/storage-browser/src/internal/ahe-reclamation.ts:178-193`), pinned by `node…:643` and browser `invalidCode`.
+
+### 4. Lineage/floor/reference validation — complete, correct polarity
+
+Chain is rebuilt from `baseExpectedHead` links with a per-hop `cursor.revision !== expectedRevision - 1` decrement (`maintenance.ts:441-460`) and cycle detection, never from ID sort order (the two `.sort()` uses are set-comparison and receipt ordering only). Stale drift → `RETRY` (head, revision, rollback pair, floor, former parent, surviving branch, extra row); impossible state → `CORRUPT` (gap, cycle, duplicate identity, key/record misbinding, malformed target *and unrelated* rows, missing/extra/wrong promotion, missing/corrupt blob, partial replay, post-state dangling parent). Every case asserts an unchanged DB image plus `STORE_POISONED` exactly for `CORRUPT` and `ok:true` otherwise. Only `Superseded` rows can enter the prefix; `Staged`/`Discarded` are exempt from the complete-promotion requirement (`verifyPromotionsAndBlobs:356`) and are still counted as live references.
+
+### 5. Reference scan — genuinely global
+
+Node scans `generations`/`promotions` with no `WHERE`/`LIMIT`; browser uses uncapped `getAll()`. Deletion candidates come only from the selected prefix's promotions, so unrelated orphan blobs can never become candidates *or* be deleted — asserted by `unrelated-orphan-retained` (blob count drops by exactly 2) and `cross-object-shared-blob`/`retained-shared-blob`/`staged-`/`discarded-partial-promotions` (retained). Cross-object parent links are impossible by construction (`copyGenerationRecord` scopes `baseExpectedHead` to the record's own `objectId`), so no surviving edge can escape the `extras` check.
+
+### 6. Atomicity — one native transaction each
+
+Classification, exact write/delete counts, deletion, and the pre-commit re-classification all run inside one `BEGIN IMMEDIATE` (`node…:134-191`) and one strict four-store `readwrite` transaction (`browser…:195-254`). Divergence throws before `COMMIT`/`commit()`, rolls back, and latches poison only for `CORRUPT`. The Node fault fires *after* the floor `UPDATE`, so rollback-after-write is genuinely exercised; the browser fault fires after the floor `put` for the promotion/generation/blob labels. Counting is exact both ways (SQLite `changes`; IDB `getKey` present-then-absent per key).
+
+### 7–8. Controls and crash edges — genuine
+
+Empty-prefix, lost-receipt replay after full reopen, subsequent creator adoption to revision 6 (which exercises the real recovery/parent-presence predicate over the post-reclamation graph — the defect the plan named), strict identity, and lifecycle all pass on both backends. The six Node edges fork a real child that blocks in `Atomics.wait` **inside the open transaction** and is `SIGKILL`ed; reopen asserts `PRAGMA integrity_check = ok`, unchanged head, and `old XOR complete-new` with `completeNew === (edge === "after-commit")`. The six browser edges do the same via real `worker.terminate()`. Neither is mocked or post-completion.
+
+### 9. Evidence — internally consistent
+
+Focused Vitest 48/48/0 failed/0 pending; focused Chromium 4 expected / 0 unexpected / 0 flaky / 0 skipped with internal `total: 28`, `total: 6`, `total: 6`. Retained Vitest final 197 passed / 0 failed / 2 skipped — the two skips are exactly `reports the exact frozen strict capability pair` (declared D.109f debt) and `Phase 2c-b bounded repeated SIGKILL campaign`; the initial 197/1-failed diagnostic is retained honestly and its sole failure is that same D.109f assertion. Export/planner 15 passed / 38 filtered. Chromium retained 12/12, 22/22, 1/1, 2/2. Both manifests verify byte-exact; `manifest.sha256` self-hash is `6e21d87a…`, matching the plan. The Unicode-regex diagnostic is correctly recorded as a read-only tooling error.
+
+---
+
+### Findings (all P2, non-blocking)
+
+**P2-1 — Empty-deletion-list input invariant is unenforced, so the frozen `INVALID_ARGUMENT` polarity degrades to `RETRY_REQUIRED`.**
+`packages/storage/src/maintenance.ts:223`. The contract freezes "an empty deletion list is valid only when the expected floor parent is already that same no-head value", and requires impossible relationships to "fail before transaction work". `captureAheReclamationInput` validates identity disjointness and floor binding but never relates `deleteGenerationIds.length` to `expectedBaseExpectedHead`. Failure scenario: a request with `lineageFloor.deleteGenerationIds: []` and a *present* `expectedBaseExpectedHead` passes capture, enters `BEGIN IMMEDIATE`, walks a non-empty prefix, and fails `sameIds` at `:472` with `AHE_RECLAMATION_RETRY_REQUIRED` instead of `AHE_RECLAMATION_INVALID_ARGUMENT`. Safe direction (zero writes, no poison), but the wrong code and after transaction start. Smallest correction: inside the `:223` guard, add `(input.lineageFloor.deleteGenerationIds.length === 0) && !headsEqual(expectedBaseExpectedHead, replacementBaseExpectedHead)` → `invalid(...)`. `headsEqual` is already imported at `:5`.
+
+**P2-2 — The Node two-live-handle control cannot interleave, so it proves idempotent replay rather than lock serialization.**
+`packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts:606`. `DatabaseSync` is synchronous and `reclaimClosedEpoch`'s only suspension point is `await Promise.resolve()` at `…/src/internal/ahe-reclamation.ts:123`, so `Promise.all([first…, second…])` runs the first transaction start-to-`COMMIT` before the second begins; `[0, 2]` is guaranteed by event-loop ordering, not by SQLite locking. The frozen invariant ("cannot combine old classification with new writes") still holds structurally because classification occurs inside `BEGIN IMMEDIATE`, and the Chromium control at `…entry.ts:242` *does* genuinely interleave two IDB connections. Nonblocking; if strengthened later, the honest form is a two-process control reusing the existing child fixture, not a re-ordered `Promise.all`.
+
+**P2-3 — The browser fixture computes a facade-key census that no assertion consumes.**
+`packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-entry.ts:203` builds `facadeKeys`, but `packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:86` uses `toMatchObject` over a key set that omits it, so the browser side has no executable 12-key/no-13th-key assertion (only the memory facade is censused, in `tests/phase-6b-ahe-reclamation-red.test.ts:282`). The property itself is sound — the diff adds no method to `IdbAheDurableStore` — so this is evidence hygiene, not a behavior gap. Smallest correction: assert `facadeKeys` against the frozen 12-key list in the Playwright expectation, or drop the unused field.
+
+### Not cited (deliberately)
+
+The global generation/promotion scan poisoning the whole native owner on unrelated corruption is an accepted P2 already recorded in the plan, not a new finding. The `after-commit` observer converting a post-commit observer throw into `SUBSTRATE_FAILURE` is reachable only through the test-only observer and is covered by replay idempotence. The Node crash child importing `dist/` is safely ordered behind the `tsc -b --force` gate in the ledger.
+
+VERDICT: APPROVED
+
+P0_P1_UNION: none
+
+D109C_MAY_CLOSE: yes

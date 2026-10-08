@@ -1,0 +1,9 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),ports=[];
+if(process.env.NODE_OPTIONS||process.env.NODE_V8_COVERAGE||process.env.TS_DRP_F5B_WIDE_DIAGNOSTIC)throw Error('Non-default diagnostic environment');
+for(const port of [4174,4175,51000,51002]){const r=spawnSync('lsof',['-nP','-i:'+port,'-t'],{encoding:'utf8'});if(![0,1].includes(r.status))throw Error('Fixed-port query');const pids=r.stdout.trim().split(/\s/u).filter(s=>/^\d+$/u.test(s)).map(Number);ports.push({port,pids,unoccupied:pids.length===0});if(pids.length)throw Error('Fixed port occupied '+port);}
+const r=spawnSync('pgrep',['-f','(vitest|quint|apalache|heap-prof|cpu-prof)'],{encoding:'utf8'});if(![0,1].includes(r.status))throw Error('PID query');const candidates=[];
+for(const pid of r.stdout.trim().split(/\s/u).filter(s=>/^\d+$/u.test(s)).map(Number).filter(p=>p!==process.pid&&p!==process.ppid)){const s=spawnSync('ps',['-p',String(pid),'-o','pid=,ppid=,stat='],{encoding:'utf8'});if(s.status===1)continue;if(s.status!==0)throw Error('PID status');const cwd=spawnSync('lsof',['-a','-p',String(pid),'-d','cwd','-Fn'],{encoding:'utf8'}),taskRelevantCwd=cwd.stdout.split('\n').filter(v=>v.startsWith('n')).some(v=>v.slice(1)===root||v.slice(1).startsWith(root+'/')||/^\/(?:private\/)?tmp\/d110c-f5b-/u.test(v.slice(1)));candidates.push({pid,status:s.stdout.trim(),taskRelevantCwd});if(taskRelevantCwd)throw Error('Competing task runtime PID '+pid);}
+const data={time:new Date().toISOString(),ports,candidates,taskCompetitors:0,noArgvOrEnvironmentValuesCaptured:true,nodeOptionsAbsent:true,nodeV8CoverageAbsent:true,wideDiagnosticAbsent:true};fs.writeFileSync(path.join(out,'runtime-readiness-corrected.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(data));

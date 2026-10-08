@@ -1,0 +1,147 @@
+{
+  "valid": true,
+  "exactNames": true,
+  "exactFiles": true,
+  "status": {
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T01:03:05.511Z"
+  },
+  "success": true,
+  "total": 10,
+  "passed": 10,
+  "failed": 0,
+  "skipped": 0,
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "suites": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "assertions": [
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract keeps the exact independent Node and browser death registries causal",
+      "status": "passed",
+      "title": "keeps the exact independent Node and browser death registries causal",
+      "duration": 2.2522500000000036,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract kills every named semantic mutation without rejecting the valid transition control",
+      "status": "passed",
+      "title": "kills every named semantic mutation without rejecting the valid transition control",
+      "duration": 2.8247909999997773,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract freezes the erased input and exact eight-method owner without widening runtime registries",
+      "status": "passed",
+      "title": "freezes the erased input and exact eight-method owner without widening runtime registries",
+      "duration": 24.124042000000145,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract updates all genuine facade owners to eight while retaining the named stale mutant",
+      "status": "passed",
+      "title": "updates all genuine facade owners to eight while retaining the named stale mutant",
+      "duration": 4.782916999999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract publishes one exact ephemeral closure, copies input and preserves unrelated durable facts",
+      "status": "passed",
+      "title": "publishes one exact ephemeral closure, copies input and preserves unrelated durable facts",
+      "duration": 69.73262499999987,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract rejects the closed misuse table asynchronously before state changes and keeps invalid addressing non-poisoning",
+      "status": "passed",
+      "title": "rejects the closed misuse table asynchronously before state changes and keeps invalid addressing non-poisoning",
+      "duration": 2.5979999999999563,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract latches the executable ephemeral corruption control across the sixth method and existing reads",
+      "status": "passed",
+      "title": "latches the executable ephemeral corruption control across the sixth method and existing reads",
+      "duration": 0.581707999999935,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract keeps publication adapter-local and forbids classifier/schema/export sediment",
+      "status": "passed",
+      "title": "keeps publication adapter-local and forbids classifier/schema/export sediment",
+      "duration": 3.037249999999858,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract keeps the exact runtime roots and immutable classifier owners while forbidding publication claims",
+      "status": "passed",
+      "title": "keeps the exact runtime roots and immutable classifier owners while forbidding publication claims",
+      "duration": 14.793707999999924,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "ancestorTitles": [
+        "D.93.29 Seam 2 shared durable publication contract"
+      ],
+      "fullName": "D.93.29 Seam 2 shared durable publication contract pins the existing closed taxonomy and post-close precedence in every implementation owner",
+      "status": "passed",
+      "title": "pins the existing closed taxonomy and post-close precedence in every implementation owner",
+      "duration": 1.7499170000000959,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "2d17f2f286e99e6d28fb63039cfb709b6ac33ba1aa07561567c833d6e168c14f"
+}

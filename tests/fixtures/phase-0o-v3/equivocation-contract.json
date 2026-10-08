@@ -1,0 +1,40 @@
+{
+	"implementationModule": "../packages/protocol-v3/src/index.ts",
+	"supplementDirectory": "../packages/protocol-v3/supplements/equivocation-digest-identity-v1",
+	"supplementWorkflow": "../.github/workflows/protocol-v3-equivocation-digest-identity.yml",
+	"requiredSupplementFiles": [
+		"check-freeze.mjs",
+		"equivocation-digest-identity.qnt",
+		"freeze-policy.json",
+		"profile.json",
+		"spec.md"
+	],
+	"profileId": "equivocation-digest-identity-v1",
+	"proofKind": "drp-equivocation-proof",
+	"proofDomain": "ts-drp/equivocation-proof/v1",
+	"domain": "ts-drp/vertex/v3",
+	"suiteId": "ed25519-sha256-v3",
+	"privateKeySeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+	"wrongPrivateKeySeedHex": "f0e0d0c0b0a090807060504030201000ffeeddccbbaa99887766554433221100",
+	"author": "alice",
+	"objectId": "object:phase-0o-equivocation",
+	"anchor": "abababababababababababababababababababababababababababababababab",
+	"baseSequence": 7,
+	"gapSequence": 19,
+	"epoch": 4,
+	"logicalTime": 31,
+	"dependencies": ["1212121212121212121212121212121212121212121212121212121212121212"],
+	"alternateDependencies": ["cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"],
+	"operation": {
+		"action": "append",
+		"value": "same-operation-digest-identity"
+	},
+	"perSlotAdvisoryProofLimit": 2,
+	"permutationSeed": 52919,
+	"frozenD37": {
+		"modelSha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038",
+		"testSha256": "affc5e439220e8ac6353c0795f591da3946a6aeb37d69a71a05763f229f34f6d",
+		"fixtureSha256": "474c83e7a3f130504e8dedc8ceb0843ee3413ca56c27003a354f6088b0f41dcf",
+		"derivationSha256": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346"
+	}
+}

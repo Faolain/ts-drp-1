@@ -1,0 +1,30 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const root=process.cwd(),out=path.dirname(new URL(import.meta.url).pathname);
+const read=name=>JSON.parse(fs.readFileSync(path.join(out,name),'utf8'));
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const reporter=read('focused.json'),matrix=read('matrix.json');
+const suites=reporter.testResults,rows=suites.flatMap(s=>s.assertionResults);
+const active=rows.filter(r=>r.status==='passed'||r.status==='failed');
+const filtered=rows.filter(r=>r.status==='pending'||r.status==='skipped');
+const causalCounts={};
+for(const row of matrix.entries) if(row.token)causalCounts[row.token]=(causalCounts[row.token]??0)+1;
+const oldRoot=path.join(root,'.logs/d110c-0c1f5b-red-scalar-6353eb61');
+const oldList=JSON.parse(fs.readFileSync(path.join(oldRoot,'all-list.json'),'utf8'));
+const listNames=list=>list.map(r=>({file:path.basename(r.file),name:r.name}));
+if(JSON.stringify(listNames(oldList))!==JSON.stringify(listNames(read('all-list.json'))))throw Error('All-test names drift');
+if(suites.length!==2||rows.length!==45||active.length!==28||filtered.length!==17||reporter.numFailedTests!==23||reporter.numPassedTests!==5)throw Error('Exact totals differ');
+for(const expected of matrix.entries){
+ const matches=rows.filter(r=>r.fullName===expected.name);
+ if(matches.length!==1)throw Error('Expected exactly one selected name');
+ const actual=matches[0];
+ if(actual.status!==expected.expectedStatus||actual.failureMessages.length!==(expected.token?1:0)||expected.token&&!actual.failureMessages[0].includes(expected.token))throw Error('Exact causal row differs');
+}
+const types=read('typecheck.json'),oldTypes=JSON.parse(fs.readFileSync(path.join(oldRoot,'typecheck.json'),'utf8'));
+if(types.targetDiagnostics.length!==0)throw Error('Target diagnostics');
+const externalDiagnosticsMatchAcceptedScalar=JSON.stringify(types.externalDiagnostics)===JSON.stringify(oldTypes.externalDiagnostics);
+const softFailures=rows.flatMap(r=>(r.failureMessages??[]).map(message=>({name:r.fullName,message})));
+const audit={tests:'f83764c5a141972f13870168eb5b9a758cd92e1c',reporterSha256:hash(fs.readFileSync(path.join(out,'focused.json'))),testFiles:suites.map(s=>({file:path.basename(s.name),total:s.assertionResults.length})),total:rows.length,active:active.length,failed:23,passed:5,intentionallyFiltered:filtered.length,allTitlesMatchAcceptedScalar:true,causalCounts,softFailureCount:softFailures.length,softFailures,topLevel:read('result.json').topLevel,targetDiagnostics:0,externalDiagnosticCount:types.externalDiagnostics.length,externalDiagnosticsMatchAcceptedScalar,packageWideTypecheckClaimedGreen:false,executionCount:1};
+fs.writeFileSync(path.join(out,'independent-audit.json'),JSON.stringify(audit,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({...audit,softFailures:undefined},null,2));

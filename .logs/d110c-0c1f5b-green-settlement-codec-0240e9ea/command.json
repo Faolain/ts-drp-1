@@ -1,0 +1,21 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-settlement-codec-0240e9ea/focused.json"
+  ],
+  "head": "0240e9eadce6c19d5ea870f25235043682e996d3",
+  "expected": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+  }
+}

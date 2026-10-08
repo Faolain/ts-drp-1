@@ -1,0 +1,198 @@
+{
+  "stage": "signed",
+  "head": "97c0836bd92f2f045534852c991824fb9529b71c",
+  "signature": "G",
+  "productionHashes": {
+    "examples/v3-room/src/index.ts": "243d280b22f7aad3967e1a10aa82ffde3be8178b27d2cc23c8d03e5fc0f32cec",
+    "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+    "packages/node/src/creator-close.ts": "834b7877493d5feb3e883cb1e1de81211c64fa8d4d6b2fb6a6fdeb11c5532323",
+    "packages/node/src/internal/creator-transition-advance.ts": "19589ad05bf641e67a4e95ceb8d0bdd72b04fe7c90f1df47a132ab436cd03636",
+    "packages/node/src/v3-live.ts": "7683af0af26e29ab3186256dac377e0d7db3e0e70214dac21d60a4e0f4a0ddc3",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+    "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c"
+  },
+  "productionPreserved": true,
+  "stashesSha256": "b426dba61f4f05787e77e297b02dd2ed84ef692908df757777f0c328c1d0e9c3",
+  "stashCount": 27,
+  "protectedFunctions": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "required",
+      "sha256": "4f6f2c83773b264a1ef39465b6c3cd77ee9317dc35ba6e83142b696581b8e216"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "request",
+      "sha256": "72934dcb3bad333e6c274e4abc96221e7d833533bc826fcef248d5ae333a04b8"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "transactionDone",
+      "sha256": "aab37ceba6de68d18d77a25dca5309af077f29d9c2cad6f83eba390db39c304d"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "transferDatabase",
+      "sha256": "b1e6cc1faf2a0027420e026f5c02214f5e68006c135094925d1b697ee9d2529e"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "producedDeclaration",
+      "sha256": "0e0bb6546247095debcd73aef5b63756e25a8d3e5e9499b367bf6dc04299c64c"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "floorOwner",
+      "sha256": "b71b5ba9a6a63716f1b2ec9ad0f1e6330c67e48d19ffd7b558bd2e8e186cd65c"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "openRoom",
+      "sha256": "ad0af20874e903723193683e6e945d60f19b367c5ced90a990c4cf36689ea262"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "durable",
+      "sha256": "556522bd9042a452c5cc2f36b65216da96cedff50eaf5d5f6cd73c60ed087b34"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "productState",
+      "sha256": "432f0ac32b79153249e7fdf106ef7112e7873877f4421b9f89ff2aea2d9c5693"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "messages",
+      "sha256": "90d55cc84aad29a26389f070316acd14827898a805f7246dc19c04c46cb40b9b"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "ownCommits",
+      "sha256": "4e09b604e4c24d6633a836108625164760a146dc8a04beb6f4b6be9aa842b792"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "applicationOperations",
+      "sha256": "760d3fe7e501b981e0a0e099f57430f0bb7dcbbc1cf6868c923cc9471f73da3d"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "aheFacts",
+      "sha256": "0c24c5d637fdd58a08ca50f1d681b3005c3e6aa6db1d7df800a87f8a448cf3cf"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "displacedFixture",
+      "sha256": "18a43adf4d2326570802475271654d5412ffe58c141a9c962bf18dbe922e1b19"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "delayedDependency",
+      "sha256": "ee50b7f2c9e529ad0ffee7a41896fd70643be6f3cfc46ee27393874ddc57379f"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "nullBoundaryClose",
+      "sha256": "07a695be2fcebd3b5fdb3bbef7c586e69e715dd257642e536b385266c2acda25"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "delayedPublication",
+      "sha256": "cc97220e4902be17d2bcee9b2272ad1019055aee1633344ae7ded41ab798a114"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "ambiguousPlanIssue",
+      "sha256": "7821a54aa4d7329fa7436cbebfeee07635755e77572990ad59e26d3835da3fea"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "staleLocalHead",
+      "sha256": "fbed3a3d1215578bff7b11f25fcb1fcebb848cf4da6aab5d7dcc679281d40428"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "positiveAuthenticatedPruning",
+      "sha256": "6aa530323a19eb34c94da3a9364b9c41eef11f65645c8acc405ef5842503df03"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "displacedControls",
+      "sha256": "736c058fe21312057e7cd011cacb2b14230244d9ce58276ce475a9b57118afd7"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "sameKeyReentry",
+      "sha256": "e81d4aae818ac81ccb617a23e0599dbe90a380b9bc6fc8fe6820b9ff93e93f8c"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "manualReviewHold",
+      "sha256": "3f480a30cb7674f133ded9bcca349304bb4da0837ae5fdd8ef1beebd67cb5492"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "creatorFenceScan",
+      "sha256": "34e1f3930b282dfc8ba7c7ee2bd7ca35c0ff0f2c5aa5ab5fc7ae835e0b3069c7"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "required",
+      "sha256": "60d67b77a4285772cb11d9e3778f71742db93765ec3cec1351fe5a8c3994af4d"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "roomHeadAuthority",
+      "sha256": "8d5a120f49eae30ecf4e938d8ce46768123586858f1c144bf1350cc3e02ce797"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "openRebasePair",
+      "sha256": "6b22e7fc5d148b875da5b52648ee58b88d8f80294d392a37a7f9b076fb0bc482"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "holdEffects",
+      "sha256": "d12399a394a55511007837cc65b5702d7c1cc9eb11d9428ccecb8ed9de18aac6"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "observeHold",
+      "sha256": "d38308437031935027179f4f33e9ae1a2312abea7ab4b8a0b0ebef09af2e4056"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "openHeld",
+      "sha256": "b3dfc881ee5bb5d6394275da1e74e7d9a3fb0ae45f0b5eeab395613793011eaf"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "holdCustody",
+      "sha256": "1dde92381873afdc95c0691ea6d9cb8830c6237dcce3569612ee415e516fd781"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "expectPromptRefusal",
+      "sha256": "68c51650c7b68eed4739b302d1043d7e70637274754207e0fea906296f57bea5"
+    }
+  ],
+  "openEpoch3TailUnchanged": true,
+  "knownAuthoringDiagnostics": {
+    "initialLint": {
+      "status": 1,
+      "errors": [
+        "sort-imports SnapshotOracleVertex member order"
+      ],
+      "warnings": [
+        "five missing helper JSDoc param/returns tags"
+      ]
+    },
+    "initialCustody": {
+      "status": 1,
+      "error": "Unrelated function changed: positiveAuthenticatedPruning",
+      "correction": "Recognize only the authorized rollback-helper argument removal and corrected physical-generation comment; all pruning assertions must remain exact."
+    },
+    "disposition": "Corrected before commit/freeze; no runtime consumed."
+  },
+  "status": "M examples/v3-room/src/index.ts\n M packages/node/src/creator-adoption.ts\n M packages/node/src/creator-close.ts\n M packages/node/src/internal/creator-transition-advance.ts\n M packages/node/src/v3-live.ts\n M packages/protocol-v3/src/creator-checkpoint.ts\n M packages/protocol-v3/src/creator-close.ts"
+}

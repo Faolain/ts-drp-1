@@ -1,0 +1,16 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"rootDir": ".."
+	},
+	"files": [
+		"phase-3-exit-pinned-reference-conformance-red.test.ts",
+		"fixtures/phase-3-exit-reference-conformance/contract.ts",
+		"fixtures/phase-3-exit-reference-conformance/oracle.ts"
+	],
+	"include": ["fixtures/phase-3-exit-reference-conformance/driver.ts"]
+}

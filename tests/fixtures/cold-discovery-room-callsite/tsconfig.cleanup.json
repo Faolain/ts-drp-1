@@ -1,0 +1,5 @@
+{
+	"extends": "../producer-presign-retention/tsconfig.json",
+	"files": ["../../cold-discovery-fixture-cleanup.test.ts", "../../cold-discovery-fixture-paths.test.ts"],
+	"include": []
+}

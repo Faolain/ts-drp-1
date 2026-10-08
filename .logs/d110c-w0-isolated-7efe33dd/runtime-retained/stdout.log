@@ -1,0 +1,111 @@
+
+ RUN  v3.1.1 /private/tmp/d110c-w0-isolated-qA7HqL/checkout
+
+stdout | packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts > D.108d1b authenticated peer-local fresh-process issuance RED > fresh Node closes the D.108e4 authenticated oracle and per-reopen budget debt
+D108E4L_TIMING {"arch":"arm64","availableParallelism":10,"members":[{"durationMs":65357.642,"endOffsetMs":91636.303042,"name":"equality","startOffsetMs":26278.661042,"steps":[{"durationMs":366.3092499999984,"endOffsetMs":26644.970291999998,"name":"context-seed","startOffsetMs":26278.661042},{"durationMs":64960.779333,"endOffsetMs":91605.749625,"name":"reopen-and-evidence","startOffsetMs":26644.970291999998},{"durationMs":30.55341700000281,"endOffsetMs":91636.303042,"name":"close-context","startOffsetMs":91605.749625}],"counts":{"pageCount":8194,"returnedSequenceCount":8193}},{"durationMs":65322.165083,"endOffsetMs":91619.044708,"name":"reuse-0","startOffsetMs":26296.879624999998,"steps":[{"durationMs":351.97933300000295,"endOffsetMs":26648.858958,"name":"context-seed","startOffsetMs":26296.879624999998},{"durationMs":64948.272459,"endOffsetMs":91597.131417,"name":"reopen-and-evidence","startOffsetMs":26648.858958},{"durationMs":21.913291000004392,"endOffsetMs":91619.044708,"name":"close-context","startOffsetMs":91597.131417}],"counts":{"capturedIssuedCount":8190,"successorPageFaultCount":1}},{"durationMs":22763.721084000004,"endOffsetMs":114383.156417,"name":"reuse-1","startOffsetMs":91619.435333,"steps":[{"durationMs":77.64795899999444,"endOffsetMs":91697.083292,"name":"context-seed","startOffsetMs":91619.435333},{"durationMs":22676.467333000008,"endOffsetMs":114373.550625,"name":"reopen-and-evidence","startOffsetMs":91697.083292},{"durationMs":9.605792000002111,"endOffsetMs":114383.156417,"name":"close-context","startOffsetMs":114373.550625}],"counts":{"capturedIssuedCount":8190,"successorPageFaultCount":1}},{"durationMs":65334.51100000001,"endOffsetMs":91641.74375000001,"name":"over-budget","startOffsetMs":26307.23275,"steps":[{"durationMs":342.74966700000004,"endOffsetMs":26649.982417,"name":"context-seed","startOffsetMs":26307.23275},{"durationMs":64978.324833,"endOffsetMs":91628.30725,"name":"reopen-and-evidence","startOffsetMs":26649.982417},{"durationMs":13.43650000001071,"endOffsetMs":91641.74375000001,"name":"close-context","startOffsetMs":91628.30725}],"counts":{"pageCount":8195,"returnedSequenceCount":8195}},{"durationMs":65503.252624999994,"endOffsetMs":91830.77875,"name":"mismatch","startOffsetMs":26327.526125,"steps":[{"durationMs":324.1304999999993,"endOffsetMs":26651.656625,"name":"context-seed","startOffsetMs":26327.526125},{"durationMs":65167.53258299999,"endOffsetMs":91819.189208,"name":"reopen-and-evidence","startOffsetMs":26651.656625},{"durationMs":11.58954200000153,"endOffsetMs":91830.77875,"name":"close-context","startOffsetMs":91819.189208}],"counts":{"pageCount":2,"returnedSequenceCount":2}}],"nodeVersion":"v22.15.0","outcome":"proof","phases":[{"counts":{"storeOpenCount":2},"durationMs":24.259541999999897,"endOffsetMs":24.259541999999897,"maxRssKiB":93536,"name":"preflight-and-store-open","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":123,"systemCPUTime":4384,"userCPUTime":4518},"startOffsetMs":0},{"counts":{"appendCount":1},"durationMs":10.274833000000058,"endOffsetMs":34.534374999999955,"maxRssKiB":93616,"name":"current-row","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":68,"systemCPUTime":827,"userCPUTime":3117},"startOffsetMs":24.259541999999897},{"counts":{"genuineFutureCount":1},"durationMs":529.9859170000001,"endOffsetMs":564.520292,"maxRssKiB":126944,"name":"genuine-future","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":4098,"systemCPUTime":53747,"userCPUTime":415849},"startOffsetMs":34.534374999999955},{"counts":{"appendCount":8191},"durationMs":6567.8012499999995,"endOffsetMs":7132.321542,"maxRssKiB":143792,"name":"authenticated-future-appends","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":23391,"systemCPUTime":845300,"userCPUTime":2791877},"startOffsetMs":564.520292},{"counts":{"maximumPageLimit":128,"probeCount":1},"durationMs":338.6728750000002,"endOffsetMs":7470.994417,"maxRssKiB":200624,"name":"maximum-page-probe","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":2805,"systemCPUTime":42104,"userCPUTime":267510},"startOffsetMs":7132.321542},{"counts":{"facadeCount":2,"materializedRowCount":8193},"durationMs":18498.063916,"endOffsetMs":25969.058332999997,"maxRssKiB":389232,"name":"equality-materialization-and-facades","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":101160,"systemCPUTime":1052540,"userCPUTime":14977387},"startOffsetMs":7470.994417},{"counts":{"appendCount":2,"authenticatedSuffixCount":2,"materializedRowCount":8195},"durationMs":305.3093340000014,"endOffsetMs":26274.367667,"maxRssKiB":389232,"name":"over-budget-preparation","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":2388,"systemCPUTime":20526,"userCPUTime":254403},"startOffsetMs":25969.058332999997},{"counts":{"appendCount":2,"materializedRowCount":2},"durationMs":4.071833000001789,"endOffsetMs":26278.4395,"maxRssKiB":389232,"name":"mismatch-preparation","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":19,"systemCPUTime":769,"userCPUTime":4385},"startOffsetMs":26274.367667},{"counts":{"recoveryCount":5},"durationMs":88108.025333,"endOffsetMs":114386.464833,"maxRssKiB":389232,"name":"concurrent-recoveries","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":310656,"systemCPUTime":2016622,"userCPUTime":54083498},"startOffsetMs":26278.4395},{"counts":{"proofCount":1},"durationMs":20.567083999994793,"endOffsetMs":114407.031917,"maxRssKiB":389232,"name":"proof-assembly","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":108,"systemCPUTime":5208,"userCPUTime":2296},"startOffsetMs":114386.464833}],"pid":24259,"platform":"darwin","schema":"d108e4l-v1","wallTimeMs":114407.031917,"memberCountErrors":[]}
+
+ ✓ packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts (5 tests) 126413ms
+   ✓ D.108d1b authenticated peer-local fresh-process issuance RED > fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects  9630ms
+   ✓ D.108d1b authenticated peer-local fresh-process issuance RED > fresh Node closes the D.108e4 authenticated oracle and per-reopen budget debt  116738ms
+ ✓ tests/phase-6a-creator-adoption-red.test.ts (13 tests) 2086ms
+   ✓ D.108b read-only creator-successor adoption RED > has one composite readiness gate for the genuine future verifier  792ms
+ ✓ tests/phase-6b-runtime-reclamation-red.test.ts (13 tests) 4913ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > uses genuine close, verify, commit and hot activation identities  1117ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > enforces the exact refusal matrix and precedence with zero writes  519ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > accepts hot and cold real receipts and latches every authority field  926ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > serializes behind successor and predecessor gates with atomic observation  386ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > D.109f preserves owner-observed Discord and MMORPG projections with zero deleted durable reads  883ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > releases every predecessor owner while preserving the live successor  379ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > returns frozen replay success and refuses changed authority after release  336ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > keeps precommit construction failure byte-identical and subsequently usable  354ms
+ ✓ tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts (3 tests) 3515ms
+   ✓ D.110c-0c1a creator issuance-retirement checkpoint RED > requires one authenticated retirement carrier after a genuine dense creator close  532ms
+   ✓ D.110c-0c1a creator issuance-retirement checkpoint RED > replaces the authenticated epoch-one carrier when the admitted boundary does not advance  2754ms
+ ✓ tests/phase-6a-creator-successor-activation-red.test.ts (17 tests) 11382ms
+   ✓ D.108d1 creator successor activation RED > freezes the D.108e2a activation boundary and its single topic owner  499ms
+   ✓ D.108d1 creator successor activation RED > derives the exact epoch-one identity and pending epoch-zero lineage independently  454ms
+   ✓ D.108d1 creator successor activation RED > genuine successor imports its verified snapshot before epoch-one activation  550ms
+   ✓ D.108d1 creator successor activation RED > private custody alone selects installEpochAnchor  3061ms
+   ✓ D.108d1 creator successor activation RED > divergent genesis identity fails before every live effect  1366ms
+   ✓ D.108d1 creator successor activation RED > pending epoch-zero outbox is classified and never published as epoch one  407ms
+   ✓ D.108d1 creator successor activation RED > old handle registration author and prepared capability are terminal  336ms
+   ✓ D.108d1 creator successor activation RED > hot duplicate returns the same handle before a second source claim  430ms
+   ✓ D.108d1 creator successor activation RED > conflicting hot duplicate bindings fail closed  645ms
+   ✓ D.108d1 creator successor activation RED > post-adoption activation failure cleans up and fresh reverify performs no second swapHead  459ms
+   ✓ D.108d1 creator successor activation RED > TTL expiry performs one bounded full reverify attempt  3143ms
+ ✓ tests/phase-6b-cleanup-eligibility-red.test.ts (11 tests) 790ms
+   ✓ D.109a closed-epoch cleanup eligibility RED > accepts genuine Phase-6a close/adoption material without reopening verification  751ms
+stdout | tests/phase-6a-creator-successor-product-red.test.ts > classifies complete legacy and settlement successor compositions before reading room authorities
+{"kind":"F5B_ROOM_GUARD_OBSERVATIONS","observations":[{"profileId":"creator-trusted-v1","composition":"factory","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"rebase","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"signer","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"declaration-only","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"factory","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"rebase","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"signer","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"declaration-only","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}}]}
+
+ ✓ tests/phase-6a-creator-successor-product-red.test.ts (13 tests) 981ms
+   ✓ D.108e5 bounded redirected lifetime RED > bounds every migration invite encode before copying caller-controlled bodies  384ms
+ ✓ packages/storage-node/tests/phase-6b-differential-exit-red.test.ts (6 tests) 9573ms
+   ✓ D.109f Node differential exit RED > executes 128 genuine compacted maintenance steps while the archival owner remains complete  3522ms
+   ✓ D.109f Node differential exit RED > runs the genuine close, adopt, reclaim and next-live golden paths in a fresh process  5496ms
+ ✓ tests/phase-6b-d110c-0a-browser-custody-red.test.ts (1 test) 742ms
+ ✓ tests/phase-6b-d110c-0b1-boundaries.test.ts (4 tests) 2524ms
+ ✓ tests/phase-6a-creator-successor-local-author-red.test.ts (11 tests) 2202ms
+   ✓ D.108d1b authenticated peer-local cold issuance RED > admits Bob's genuine epoch-zero vertex before the multi-writer successor close  2046ms
+ ✓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts (27 tests) 3422ms
+   ✓ D.110c-0c1f5b0b Node settlement RED > [RED] rejects a genuine legacy-profile fence at ingress without journaling it  735ms
+   ✓ D.110c-0c1f5b0b Node settlement RED > [control] admits a huge valid settlement fence, rejects m > f, and never calls the application sink  630ms
+ ✓ tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts (3 tests) 2537ms
+   ✓ D.110c-0b0a staged adoption and pending recovery GREEN > stages without a head swap and publishes through one owner-bound CAS  905ms
+   ✓ D.110c-0b0a staged adoption and pending recovery GREEN > recovers equivalent Complete retries deterministically across both AHE orderings  544ms
+   ✓ D.110c-0b0a staged adoption and pending recovery GREEN > fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates  1086ms
+ ✓ tests/phase-6a-creator-successor-infrastructure-red.test.ts (10 tests) 922ms
+   ✓ D.108e1 activation test-infrastructure RED > binds the closed hook only after the package's own built export map resolves the exact target  313ms
+   ✓ D.108e1 activation test-infrastructure RED > moves package shims behind one bounded Playwright global-setup owner  409ms
+ ✓ tests/phase-6a-creator-adoption-commit-red.test.ts (9 tests) 10758ms
+   ✓ D.108c one-CAS creator adoption RED > consumes only a genuine owner-bound intent and commits one exact successor  547ms
+   ✓ D.108c one-CAS creator adoption RED > accepts a byte-identical second intent without a second head swap  342ms
+   ✓ D.108c one-CAS creator adoption RED > reopens pending-old or exact active-new at every logical request fault  9847ms
+ ✓ tests/protocol-v3-creator-author-issuance-frontiers.test.ts (4 tests) 1067ms
+   ✓ D.110c-0c1f2 creator author-issuance frontier carrier > round-trips the genuine creator-signed carrier and consumes preparation once  581ms
+ ✓ tests/phase-6a-creator-successor-handle-identity-red.test.ts (3 tests) 544ms
+   ✓ D.108d1a successor handle registration identity RED > returned hot wrapper retains route, admission, targeted replay and deactivation identity  537ms
+ ✓ packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts (2 tests) 6533ms
+   ✓ D.108c real SQLite process-death RED > recovers pending-old XOR active-new after genuine SIGKILL at every edge  6515ms
+ ✓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts (13 tests) 2708ms
+   ✓ D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress  545ms
+   ✓ D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy join structural retirement without exposing an application intent  379ms
+   ✓ D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] excludes an authenticated activation vertex while surfacing later source work  421ms
+ ✓ tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts (3 tests) 3215ms
+ ✓ tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts (2 tests) 1312ms
+   ✓ D.110c-0c1f5b0v replayable callback contract > pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks  1164ms
+ ✓ tests/phase-6b-differential-exit-red.test.ts (5 tests) 229ms
+ ✓ packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts (5 tests) 6573ms
+   ✓ D.108d1 fresh-process successor activation RED > fresh Node imports the built non-root successor activation subpath  854ms
+   ✓ D.108d1 fresh-process successor activation RED > cold reopen reconstructs active-new custody with no adoption CAS or displaced-row publication  1652ms
+   ✓ D.108d1 fresh-process successor activation RED > kills declaration-loop telemetry even when it copies the direct-read labels  2105ms
+   ✓ D.108d1 fresh-process successor activation RED > two independent cold wrappers retain identity-keyed publication after awaited release  1956ms
+ ✓ tests/phase-6b-d110c-a-repeat-close-red.test.ts (1 test) 5889ms
+   ✓ D.110c-a authenticated repeat-close carrier RED > extends authenticated compact history through one genuine adopted epoch-one close  5887ms
+ ✓ tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts (4 tests) 318ms
+D110C_B_HOT_ADOPTION_COMPLETE
+ ✓ tests/phase-6b-d110c-b-hot-adoption.test.ts (1 test) 8541ms
+   ✓ D.110c-b general hot adoption GREEN > advances the genuine epoch-one close to one exact epoch-two active owner  8539ms
+ ✓ tests/phase-6c-retained-heap-red.test.ts (23 tests) 16ms
+ ✓ tests/phase-6c-creator-replay-pagination-red.test.ts (2 tests) 4081ms
+   ✓ D.110a-p creator durable-replay pagination RED > closes a genuine 129-row creator journal across the public page boundary  4074ms
+ ✓ tests/phase-6b-d110c-0b0-floor-red.test.ts (1 test) 5535ms
+   ✓ D.110c-0b0 authenticated room-head floor causal RED > refuses a genuine advanced cold reopen when no independent room-head authority is supplied  5534ms
+ ✓ tests/phase-6b-d110c-0a-authority-red.test.ts (1 test) 670ms
+ ✓ tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts (3 tests) 1622ms
+   ✓ D.110c-0c1b committed-issuance recovery-required RED > refuses a pre-bound close after a durable issue is omitted from live admission  734ms
+   ✓ D.110c-0c1b committed-issuance recovery-required RED > halts a no-policy plane when the real issuance commit has an unknown return outcome  417ms
+   ✓ D.110c-0c1b committed-issuance recovery-required RED > releases a pre-durable byte-capacity reservation and preserves genuine close  470ms
+ ✓ tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts (1 test) 13996ms
+   ✓ D.110c-0c1f5 foreign-author close liveness > keeps foreign frontier anomalies author-local while creator corruption stays fail closed  13995ms
+ ✓ tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts (1 test) 569ms
+   ✓ D.110c-0c1f2 bounded multi-author issuance frontier > authenticates the exact creator-signed frontiers from a genuine two-writer close  567ms
+ ✓ tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts (1 test) 552ms
+   ✓ D.110c-0c1f2 compact multi-author issuance-frontier RED > requires a bounded authenticated frontier for every admitted successor writer  551ms
+
+ Test Files  34 passed (34)
+      Tests  222 passed (222)
+   Start at  08:07:44
+   Duration  286.43s (transform 6.15s, setup 0ms, collect 27.48s, tests 246.73s, environment 6ms, prepare 3.53s)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/runtime-retained/result.json

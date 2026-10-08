@@ -1,0 +1,114 @@
+diff --git a/tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts b/tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts
+new file mode 100644
+index 00000000..34d07bfd
+--- /dev/null
++++ b/tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts
+@@ -0,0 +1,108 @@
++import "fake-indexeddb/auto";
++
++import type { InstallLiveJournalGenesisInput } from "@ts-drp/live-journal";
++import { describe, expect, it } from "vitest";
++
++import { createGenuinePreparedV3Fixture } from "./fixtures/phase-3a1b-p3/live-fixture.js";
++import { createRecoveryInput } from "./fixtures/phase-4b-v3/live-snapshot.js";
++import { recoverV3LiveReplica } from "../packages/node/src/v3-live.js";
++
++describe("D.110c-0c1f5b live snapshot fixture contract", () => {
++	it("rejects unsupported epoch-anchor installation without mutating genuine epoch-zero recovery bindings", async () => {
++		const fixture = await createGenuinePreparedV3Fixture();
++		try {
++			const bindings = await createRecoveryInput(fixture, fixture.capability);
++			try {
++				const input: InstallLiveJournalGenesisInput = Object.freeze({
++					objectId: fixture.objectId,
++					exactCanonicalAnchorPreimageBytes: new Uint8Array(fixture.exactCanonicalAnchorPreimageBytes),
++					detachedAnchorSignature: new Uint8Array(fixture.detachedAnchorSignature),
++					exactCanonicalParametersCarrierBytes: new Uint8Array(fixture.exactCanonicalParametersCarrierBytes),
++				});
++				const originalInput = structuredClone(input);
++				const scope = Object.freeze({ anchorDigest: fixture.anchorDigest, epoch: 0, objectId: fixture.objectId });
++				const issuanceScope = Object.freeze({ author: fixture.author, objectId: fixture.objectId });
++				const readiness = await bindings.journal.readiness({ scope });
++				expect(readiness).toMatchObject({ ok: true, ready: true, rowCount: 0, scope });
++				if (!readiness.ok || !readiness.ready) throw new Error("genuine epoch-zero journal control is unavailable");
++				const pageInput = Object.freeze({ scope, snapshot: readiness.snapshot });
++				const journalBefore = structuredClone({ readiness, page: await bindings.journal.readPage(pageInput) });
++				expect(journalBefore.page).toMatchObject({ ok: true, rows: [], nextSequence: null, scope });
++				const issuanceBefore = structuredClone({
++					lineage: await bindings.issuanceStore.readLineage(issuanceScope),
++					issued: await bindings.issuanceStore.readIssued(issuanceScope, 0),
++					outbox: await bindings.issuanceStore.readOutboxPage({ scope: issuanceScope }),
++					plan: await bindings.issuanceStore.readSettlementPlan(issuanceScope),
++				});
++				expect(issuanceBefore.lineage).toEqual({ exhausted: false, next: 1 });
++				expect(issuanceBefore.issued).toMatchObject({ authorSequence: 0, issuedRecord: { scope: issuanceScope } });
++				expect(issuanceBefore.outbox).toEqual([{ commit: issuanceBefore.issued, publishState: "published" }]);
++				expect(issuanceBefore.plan).toBeNull();
++
++				// This fixture does not implement successor installation, even for genuine genesis-shaped input.
++				// Observe absence explicitly so RED is an outcome mismatch, never an undefined-function exception.
++				let observation: Readonly<Record<string, unknown>> = { kind: "missing-required-rejection" };
++				if (typeof bindings.journal.installEpochAnchor === "function") {
++					try {
++						const pending = bindings.journal.installEpochAnchor(input);
++						observation =
++							pending instanceof Promise
++								? await pending.then(
++										(value) => ({ kind: "fulfilled", value }),
++										(error: unknown) => ({
++											kind: "asynchronous-rejection",
++											error,
++											isExactError: error instanceof Error && Object.getPrototypeOf(error) === Error.prototype,
++										})
++									)
++								: { kind: "non-promise-return", value: pending };
++					} catch (error) {
++						observation = { kind: "synchronous-throw", error };
++					}
++				}
++
++				expect(input).toEqual(originalInput);
++				expect(fixture.exactCanonicalAnchorPreimageBytes).toEqual(originalInput.exactCanonicalAnchorPreimageBytes);
++				expect(fixture.detachedAnchorSignature).toEqual(originalInput.detachedAnchorSignature);
++				expect(fixture.exactCanonicalParametersCarrierBytes).toEqual(
++					originalInput.exactCanonicalParametersCarrierBytes
++				);
++				expect({
++					readiness: await bindings.journal.readiness({ scope }),
++					page: await bindings.journal.readPage(pageInput),
++				}).toEqual(journalBefore);
++				expect({
++					lineage: await bindings.issuanceStore.readLineage(issuanceScope),
++					issued: await bindings.issuanceStore.readIssued(issuanceScope, 0),
++					outbox: await bindings.issuanceStore.readOutboxPage({ scope: issuanceScope }),
++					plan: await bindings.issuanceStore.readSettlementPlan(issuanceScope),
++				}).toEqual(issuanceBefore);
++				await expect(bindings.journal.installGenesis(input)).resolves.toEqual({
++					ok: true,
++					idempotent: false,
++					parametersDigest: fixture.descriptor.parametersDigest,
++					scope,
++				});
++				await expect(bindings.journal.installGenesis(input)).resolves.toEqual({
++					ok: true,
++					idempotent: true,
++					parametersDigest: fixture.descriptor.parametersDigest,
++					scope,
++				});
++				const recovered = await recoverV3LiveReplica(bindings.input);
++				expect(recovered).toMatchObject({ ok: true });
++
++				expect(observation, "F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION").toEqual({
++					kind: "asynchronous-rejection",
++					error: new Error("unexpected installEpochAnchor in live snapshot fixture"),
++					isExactError: true,
++				});
++			} finally {
++				await bindings.journal.close();
++				await bindings.issuanceStore.close();
++			}
++		} finally {
++			await fixture.close();
++		}
++	});
++});

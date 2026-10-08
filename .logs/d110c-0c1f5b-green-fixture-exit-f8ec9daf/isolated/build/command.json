@@ -1,0 +1,8 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-06T05:29:52.860Z"
+}

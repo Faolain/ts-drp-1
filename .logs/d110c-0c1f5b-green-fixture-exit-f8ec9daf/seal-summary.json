@@ -1,0 +1,45 @@
+{
+  "stopped": true,
+  "main": {
+    "total": 49,
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "rawSha256": "e1aff50cad1e9daf31537ab39ccfa8f1286992b54a0a9b4fc2164ca2779a8a91"
+  },
+  "isolated": {
+    "total": 49,
+    "passed": 48,
+    "failed": 1,
+    "skipped": 0,
+    "rawSha256": "94fbf00d33cf54fb73a1c8d92657ef545e1803556282d6002c154074d899e1bd"
+  },
+  "compilerDisposition": "Both exit1 exact unchanged grid-only diagnostic; both matrix0; nine fixture diagnostics removed",
+  "commands": 38,
+  "nonzero": [
+    {
+      "file": "compiler-green/status.json",
+      "status": 1
+    },
+    {
+      "file": "isolated/compiler-green/status.json",
+      "status": 1
+    },
+    {
+      "file": "isolated/runtime-49/status.json",
+      "status": 1
+    },
+    {
+      "file": "timeout-attribution/status.json",
+      "status": 1
+    }
+  ],
+  "latestCustody": "custody-final.json",
+  "effectiveTestHashCount": 85,
+  "sourceHead": "8336eb777e775263d4983a76ffea8a699b8faf60",
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "noActiveRuntimeRecorder": true,
+  "noRuntimeRetry": true,
+  "parentClosed": false,
+  "fixtureBatchClosed": false
+}

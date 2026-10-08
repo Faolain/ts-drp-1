@@ -1,0 +1,19 @@
+{
+	"evidence_form": "normalized_summary_from exact-session terminal structuredOutput",
+	"verdict": "FAIL",
+	"p0_count": 0,
+	"p1_count": 1,
+	"p2_count": 4,
+	"findings": [
+		{
+			"severity": "P1",
+			"title": "f5b0w RED/GREEN as written depends on parent settlement close and a nonexistent parent sentinel",
+			"evidence": "Parent settlement fixture.close dies at F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED over CERTIFIED_VALUE_MISMATCH before any durable hold. manualReviewHold, displacedControls and sameKeyReentry all call that close first. There is no exported parent settlement sentinel. The hold is reachable without a close through the closed f5b0u rebase-pair fixture.",
+			"required_action": "Keep f5b0w tests-only RED/GREEN on codec-free product sessions and real stores. Prove creator sealEpoch reaches the unchanged close owner and returns the existing parent terminus. Move successful close/adopt, cross-close reopen and removal/re-admission to parent f5b."
+		}
+	],
+	"red_reachable_before_parent_green": false,
+	"scope_preserved": false,
+	"golden_path_fit": "Prompt fail-closed issue, creator close not blocked by a hold, durable unfenced hold, and a store reverse-disposition/digest backstop are the smallest continuity prerequisite.",
+	"assessment": "The API/authority/wire/crypto/threshold scope is sound, but the executable contract was circular. The exact-session terminal object counted four P2 findings without emitting their bodies; no un-emitted finding is invented here."
+}

@@ -1,0 +1,10 @@
+3eb62e7f7a7fb1c45856745fadce55a5e1b710fc0c5b8958af5c1c7e91d13727  .logs/d110c-0c1a-red-add7f7dc/SOURCE-SHA256SUMS
+e822541165b5561e4df907dad0a5e947efa7ed5bb8ace9662c4f40f595e9676c  .logs/d110c-0c1a-red-add7f7dc/audit.json
+4c36516d880ba554b056578f9bf91e8f71f7454e2e733f733563ffef612d423b  .logs/d110c-0c1a-red-add7f7dc/focused.command
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  .logs/d110c-0c1a-red-add7f7dc/focused.status
+4154dd7cdf7f7247b69509ea8d47c95901bc03345a610714eb5cd40570717924  .logs/d110c-0c1a-red-add7f7dc/focused.stdout.txt
+a4dab9dc4bbe9a4c96cc9e2f027ab0751a34fac46133435f5fe68298d39c1d95  .logs/d110c-0c1a-red-add7f7dc/list.command
+3ab86bcd678ced0e9c592e311a71a10e1b50a382e5c910ac3b5da346193d5cfa  .logs/d110c-0c1a-red-add7f7dc/list.json
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1a-red-add7f7dc/list.status
+e915fb67ead119c68c7dce5cebd05675d1dd1dc29748fe6dc266de3e3050be40  .logs/d110c-0c1a-red-add7f7dc/static-gates.txt
+5316366e6b88f868adc6d5b5e695fe5a38c5510d3bc0862aa71d5a2841b2fcc6  .logs/d110c-0c1a-red-add7f7dc/vitest.json

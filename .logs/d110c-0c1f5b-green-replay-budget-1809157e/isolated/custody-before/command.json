@@ -1,0 +1,9 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-green-replay-budget-zIt6Xr/checkout",
+  "command": "node",
+  "args": [
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-replay-budget-1809157e/isolated/custody.mjs",
+    "before"
+  ],
+  "start": "2026-09-06T06:02:44.988Z"
+}

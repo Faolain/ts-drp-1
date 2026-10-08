@@ -1,0 +1,208 @@
+commit 1a4906a940014e263e13a9088b7761ca7477a0c8
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Sat Sep 5 03:30:07 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Sat Sep 5 03:30:07 2026 -0400
+
+    docs(hardening): reslice recovered delivery custody
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 91f57e07..f6525aa2 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
+ 
+ ---
+ 
+-### Current frontier — author settlement and writer capacity (as of 2026-09-04, f5b0u audit)
++### Current frontier — author settlement and writer capacity (as of 2026-09-05, f5b0v reslice)
+ 
+ This subsection is the entry point for an agent resuming the D.110c-0c1f /
+ D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
+@@ -18436,26 +18436,26 @@ Closed in the 2026-09-04 checkpoint:
+ 
+ Authorized now (tests-only RED first, then GREEN):
+ 
+-- **f5b0u settlement restart/reconciliation prerequisite** below. The signed
+-  f5b0t RED and corrected RED are causal, but the first incomplete GREEN audit
+-  demonstrated missing failure classification, fresh-handle recovery and
+-  constant-ownership seams. Its initial bounded high-risk review returned a
+-  material P1 union; the single confirmation then found one nested-lifetime
+-  deadlock, which the final plan correction removes without another review
+-  round. The f5b0u RED uses the exact two-layer attribution method frozen in
+-  its record: clean signed HEAD classifies inherited f5b0t prerequisite
+-  failures, while a separate isolated checkout overlays only the byte-for-byte
+-  rejected seven-file candidate to reach the new f5b0u seams. Proceed with
+-  that tests-only RED for cases 1-6 and 8 and the combined f5b0t/f5b0u GREEN.
+-  Its original case 7 is dependency-corrected into parent f5b: current code
+-  has no authenticated checkpoint-to-runtime frontier handoff, and a fixture
+-  injection here would fabricate authority. No parent f5b integration or
+-  further production edit is authorized before that checkpoint.
++- **D.110c-0c1f5b0v replay-callback contract prerequisite** below. The
++  f5b0t/f5b0u production GREEN and its complete focused/static/retained/clean
++  evidence remain accepted candidate implementation, and the final-review AST
++  P1 is closed by signed correction `4521f03f` with evidence `22e909b91`.
++  Final review also found that an arbitrary external callback can expose its
++  first effect, reject on the second recovered vertex and be invoked again on
++  the next cold reopen. Genuine two-row RED `488a22a6` with evidence
++  `692b4add` proves exactly that while canonical state, durable issuance,
++  authority and owner cleanup remain correct. Existing private seams cannot
++  make an arbitrary external effect transactional. Run the one bounded
++  high-risk contract review below, then close the causal RED with the selected
++  replayable-notification contract or stop for the separately reviewed
++  transactional application-port design if the reviewers demonstrate that
++  external exactly-once effects are a product requirement. No parent f5b
++  production edit is authorized before this checkpoint.
+ 
+ Blocked, and on what:
+ 
+-- **f5b creator settlement and recovery integration** → f5b0t/f5b0u GREEN
+-  and empty P0/P1 review union. It then retains the full 27-case design matrix, all
++- **f5b creator settlement and recovery integration** → f5b0t/f5b0u GREEN,
++  f5b0v contract closure and an empty P0/P1 review union. It then retains the full 27-case design matrix, all
+   resliced reclamation gates, and the same-room 64-active-writer,
+   every-writer-every-epoch, three-close acceptance unchanged.
+ - Stage W1 (256-line frontier, version-3 ACL) is inside the blocked parent f5b
+@@ -99778,7 +99778,12 @@ prerequisite neither satisfies nor weakens any of them.
+ 
+ ###### D.110c-0c1f5b0u settlement restart/reconciliation prerequisite
+ 
+-**Status: PLAN ACCEPTED; tests-only RED is authorized.** The single material
++**Status: GREEN CANDIDATE; final review is blocked on f5b0v.** Production
++GREEN `ea02487e` and evidence `60548549` passed the complete focused, native
++Chromium, build, retained-baseline and clean-isolated gates. Its final review
++closed the AST P1 through `4521f03f`/`22e909b91`, then causal RED
++`488a22a6`/`692b4add` confirmed the remaining external replay-callback
++contract gap now owned by f5b0v below. The earlier single material
+ confirmation returned one P1 against nested lifetime-transition enqueueing;
+ the exact correction below makes startup settlement/rebase itself the sole
+ queued transition and is mechanically source-audited under the governing
+@@ -100141,10 +100146,126 @@ slice to solve hot-adopted successor declaration custody silently. Preserve
+ the signed REDs, all immutable evidence, protected untracked paths, stashes and
+ the explicit one-room 64-writer parent acceptance unchanged.
+ 
++###### D.110c-0c1f5b0v recovered-delivery callback contract prerequisite
++
++**Status: PLAN FROZEN; one bounded high-risk review is required before the
++tests-only GREEN correction. Parent f5b remains blocked.** Preserve the
++f5b0t/f5b0u GREEN `ea02487e`, evidence `60548549`, the final-review findings
++and all earlier immutable evidence. Final review found two P1s. The
++sensitive-return oracle P1 is closed by tests-only correction `4521f03f` and
++evidence `22e909b91`. The second P1 is now causal: genuine two-row successor
++recovery RED `488a22a6`, evidence `692b4add`, fails only
++`REPLAY_SECOND_FAILURE_ATOMIC_EXTERNAL_LEDGER` and
++`REPLAY_COLD_REOPEN_IDEMPOTENT_EXTERNAL_LEDGER`. Callback 1 leaves one
++observer effect before callback 2 rejects; the next cold reopen produces the
++observer sequence `d1,d1,d2` rather than `d1,d2`. The same execution proves
++that durable issuance, authenticated canonical projection, exact operation
++accounting, authority, transport cleanup and active-owner custody remain
++correct. This is an external-delivery-custody gap, not duplicate application
++state or duplicate issuance.
++
++Owner: the `CreateV3RoomSessionInput.onAcceptedVertex` public contract, the
++room startup replay/`commit` boundary, Node's recovered-delivery sink, the
++v3-chat/grid consumers and the f5b0u successor-replay fixture. Deadline: close
++this contract checkpoint and the corrected final f5b0t/f5b0u review before
++parent f5b resumes and before D.110c-c/d, the ≥100-transition gate, Phase-6
++exit or Phase 7.
++
++Bounded architecture audit and selected contract:
++
++- Node awaits recovered rows through a one-row sink. During room reopen that
++  sink first buffers authenticated rows until snapshot/authority/projection
++  validation completes; the room then calls the required external
++  `onAcceptedVertex` once per staged row before publishing its in-memory
++  candidate. A later callback rejection cannot undo an earlier arbitrary
++  external effect. A later process has no durable application-delivery cursor
++  and reconstructs the retained rows again.
++- The live journal durably owns admission, not consumption by an arbitrary
++  application callback. The settlement plan owns replacement issuance, not
++  application effects. The room-head record owns authenticated epoch state,
++  not per-consumer delivery acknowledgement. Moving in-memory map/projection
++  updates, reordering callbacks, or storing a receipt immediately before or
++  after a callback cannot atomically couple unknown external state with that
++  receipt: before risks omission and after risks duplication.
++- The selected narrow contract therefore distinguishes authoritative state
++  from notification. Canonical application state is the deterministic
++  `projectAcceptedOperations`/`onProjection` result and admits every
++  authenticated vertex exactly once by digest. `onAcceptedVertex` is an
++  authenticated **replayable notification attempt**: it may be invoked again
++  after its own rejection, session failure, crash or cold reopen. A consumer
++  that persists side effects must idempotently key them on the authenticated
++  vertex digest already present in `AdmittedReceivedVertexView`; callback
++  order remains canonical within one attempt. Throw/rejection remains
++  fail-closed for that session, cleanup remains mandatory, and no public issue
++  or active owner is exposed before successful recovery. This clarification
++  does not authorize swallowing callback errors, losing a retained row,
++  duplicating canonical state, retrying an unclassified signed issue, or
++  treating a callback as an authority source.
++- Current production examples do not depend on external exactly-once callback
++  effects: v3-chat and grid use `onAcceptedVertex` as a no-op and derive live
++  state from `onProjection`; the room's migration-local collectors are
++  bounded reconstruction observers whose results are checked against
++  canonical projection/state. GREEN must source-audit every current consumer
++  and pin this inventory. Any consumer that proves an un-idempotent durable
++  side effect is a blocking contradiction and forces the transactional-port
++  reslice below.
++- Rejected alternatives: swallow callback failure (silent loss), mark a local
++  receipt before callback (at-most-once omission), mark it after callback
++  (the demonstrated duplicate window), or claim failure atomicity by moving
++  only room-local map writes (does not roll back external state). A true
++  exactly-once external-effect guarantee requires an application-owned atomic
++  batch/idempotency port whose effect and durable receipt commit on one storage
++  boundary, plus restart, corruption, prune and compatibility ownership. That
++  is a public API/schema design and is expressly not folded into f5b0u.
++
++Tests-only GREEN acceptance for the selected contract:
++
++1. Preserve the genuine two-row, second-callback failure and same-room cold
++   reopen. Replace neither its authority nor its durable data. Prove the first
++   session rejects and releases transport/owner custody, the second session
++   authenticates and opens, and callback attempts are explicitly observed as
++   replayable `d1,d1,d2` rather than mislabeled as an exactly-once external
++   effect.
++2. In the same test, keep hard exact-once assertions for canonical projected
++   operation IDs, application-state bytes, durable issuance rows and room
++   authority. A mutant that duplicates `d1` in canonical state must fail even
++   though repeated notification attempts are permitted.
++3. Add the exact public-contract comment beside
++   `CreateV3RoomSessionInput.onAcceptedVertex`, and a source/type assertion
++   pinning digest-keyed idempotency guidance and fail-closed rejection. Do not
++   change the callback's field shape, return type, runtime ordering, error
++   behavior or export surface.
++4. Audit all production consumers and pin that none treats the callback as a
++   durable exactly-once commit. Preserve v3-chat/grid behavior byte-for-byte
++   and retain the existing first-callback sink/commit failure controls.
++5. Run the focused successor-replay suite, source-governance suite, affected
++   room/Node builds and typechecks, exact-owner lint/format/diff/source-shape
++   checks, retained room/recovery/creator-successor/active-owner suites and a
++   clean-isolated checkout. Record commands, complete results, consumer
++   inventory, hashes and a self-excluding manifest.
++
++Because this deliberately corrects a public callback semantic overclaim next
++to authenticated recovery, one bounded Grok 4.6/high, Codex
++`gpt-5.6-sol` high and Fable xhigh plan review is mandatory before changing
++the RED expectation or public-contract comment. Invoke Fable only through the
++interactive `claude-phel` alias. Only P0/P1 blocks; every P2 receives an owner
++and disposition without recursive review. After GREEN, the same trio performs
++the one remaining f5b0t/f5b0u/f5b0v final confirmation over the signed RED,
++contract correction, production candidate and retained evidence.
++
++Stop and replace this selected contract with a separately reviewed
++transactional application-port slice if review or consumer audit demonstrates
++that any shipped consumer requires durable exactly-once external effects. That
++slice must own its public API, storage schema, effect/receipt atomicity,
++ambiguous outcomes, restart, corruption, migration, pruning and compatibility;
++no receipt-only patch is sufficient. No production behavior, wire/protobuf,
++authority, checkpoint, ACL, cryptography, dependency, threshold, timeout or
++workload change is authorized here.
++
+ ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
+ 
+-**Status: BLOCKED on combined f5b0t/f5b0u GREEN and its empty P0/P1 review
+-union.** The first
++**Status: BLOCKED on f5b0v contract closure and the combined f5b0t/f5b0u/f5b0v
++empty P0/P1 review union.** The first
+ causal RED stopped before any edit when the accepted split-required case
+ demonstrated that the scalar replacement link cannot represent crash-safe
+ multi-vertex progress. After f5b0t closes, this record resumes under the

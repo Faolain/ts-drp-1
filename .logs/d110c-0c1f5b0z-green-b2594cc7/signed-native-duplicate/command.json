@@ -1,0 +1,9 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-green-signed-REUkBZ/checkout",
+  "command": "node",
+  "args": [
+    "tests/fixtures/phase-6b-d110c-0c1f5b0z/native-registry-child.mjs",
+    "duplicate"
+  ],
+  "start": "2026-09-05T20:04:56.587Z"
+}

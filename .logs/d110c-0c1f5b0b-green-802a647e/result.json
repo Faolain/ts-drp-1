@@ -1,0 +1,52 @@
+{
+  "recordId": "D.110c-0c1f5b0b",
+  "checkpoint": "final-compatibility-GREEN",
+  "productionCommit": "802a647ea412df7dcfe6284f2b62bfd66554ae23",
+  "parent": "eb302c078339098900335133d3dd926d0d9a678c",
+  "signature": "G",
+  "changedPaths": ["packages/node/src/v3-live.ts"],
+  "tests": {
+    "finalFocused": { "selected": 27, "passed": 27, "failed": 0, "skipped": 0 },
+    "canonicalPhase3g": { "selected": 14, "passed": 14, "failed": 0, "skipped": 0 },
+    "expandedFocused": { "selected": 40, "passed": 40, "failed": 0, "skipped": 0 },
+    "retained": { "selected": 87, "passed": 87, "failed": 0, "skipped": 0 },
+    "legacyConsumers": { "selected": 26, "passed": 26, "failed": 0, "skipped": 0 },
+    "sharedConsumersBuilt": { "selected": 64, "passed": 64, "failed": 0, "skipped": 0 },
+    "builtChild": { "selected": 1, "passed": 1, "filtered": 16 },
+    "isolatedFinalFocused": { "selected": 27, "passed": 27, "failed": 0, "skipped": 0 },
+    "isolatedExpandedFocused": { "selected": 40, "passed": 40, "failed": 0, "skipped": 0 },
+    "isolatedBuiltChild": { "selected": 1, "passed": 1, "filtered": 16 }
+  },
+  "builds": {
+    "node": "passed",
+    "protocolV3": "passed",
+    "protocolV3Typecheck": "passed",
+    "protocolV3PublicSmoke": "passed",
+    "isolatedDependencies": "passed"
+  },
+  "static": {
+    "eslint": "passed after one formatting-only correction",
+    "prettier": "passed",
+    "diffCheck": "passed",
+    "sourceShape": "passed"
+  },
+  "nodeTypecheck": {
+    "currentExit": 2,
+    "parentExit": 2,
+    "normalizedOutputsEqual": true,
+    "normalizedSha256": "f1fe7cb5fed31ebcd1b48e34eaae0c2b5518d2deeafd8c1914967312d25171c8",
+    "classification": "inherited"
+  },
+  "scope": {
+    "productionPathCount": 1,
+    "wireOrProtobufChanged": false,
+    "cryptographyChanged": false,
+    "dependencyChanged": false,
+    "apiChanged": false,
+    "thresholdChanged": false,
+    "fixtureChanged": false,
+    "planChanged": false,
+    "reviewRun": false,
+    "stopRuleTriggered": false
+  }
+}

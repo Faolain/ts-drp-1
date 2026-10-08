@@ -1,0 +1,19 @@
+{
+  "head": "bc7d615b40c5125ed5b48ff90d0be64dcdca4b15",
+  "remote": "bc7d615b40c5125ed5b48ff90d0be64dcdca4b15",
+  "signature": "G",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-counter-bc7d615b/focused.json"
+  ],
+  "matrixSha256": "f075265af61bbff440e0bd5709d6758f7d3bd076b60fcbda601b8c8dc64490de",
+  "executionCount": 1,
+  "startedAt": "2026-09-05T22:52:22.449Z"
+}

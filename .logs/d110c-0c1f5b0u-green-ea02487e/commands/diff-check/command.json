@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "diff",
+    "--check"
+  ],
+  "start": "2026-09-05T06:08:49.161Z"
+}

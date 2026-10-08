@@ -1,0 +1,1530 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+93fe946a feat: close D.110c-0a epoch seal custody GREEN
+0b7a1cf6 test: freeze D.110c-0a epoch custody RED
+5388f64d docs: accept D.110c-0a plan confirmation
+bc451706 docs: pin D.110c-0a resume selection
+113b3dd7 docs: correct D.110c-0a plan review findings
+4984619d docs: plan D.110c epoch seal custody
+acea45e4 docs: accept D.110c floor authority design
+49e8dcff docs: harden D.110c floor initialization
+65912fbc docs: select D.110c freshness floor owner
+309fdc10 docs: close D.110c floor confirmation
+340a6646 docs: close D.110c floor review finding
+610d0f9e docs: reslice D.110c freshness authority
+c11823b3 docs: close D.110c trust design review
+e65d24de docs: record D.110c design confirmation
+d12f57e2 docs: sequence D.110c checkpoint proof
+---
+93fe946abf33f052706343e2aa8c02a514f98627
+0b7a1cf6e01f3554363c4138b14eec779c05bc33
+G
+feat: close D.110c-0a epoch seal custody GREEN
+---
+0b7a1cf6e01f3554363c4138b14eec779c05bc33
+G
+test: freeze D.110c-0a epoch custody RED
+---
+5388f64db7973da7b04e4527c701da41602aecb1
+G
+docs: accept D.110c-0a plan confirmation
+.logs/d110c-0a-green-0b7a1cf6/:
+batch1-corrected-vitest.json
+batch1-vitest.json
+batch2-corrected-vitest.json
+batch2-genuine-actor-corrected-vitest.json
+batch2-genuine-actor-corrected2-vitest.json
+batch2-genuine-actor-matrix-vitest.json
+batch2-genuine-actor-vitest.json
+batch2-vitest.json
+green-ledger.json
+manifest.sha256
+phase-5c-playwright.json
+phase-5d-playwright.json
+phase-5e-actor-playwright.json
+phase-5e-live-close-playwright.json
+phase-5e-relearn-playwright.json
+phase-6a-activation-playwright.json
+phase-6a-adoption-commit-playwright.json
+phase-6a-product-playwright.json
+phase-6a-successor-epoch-playwright.json
+retained-corrected-vitest.json
+retained-creator-actor-corrected.json
+retained-vitest.json
+
+.logs/d110c-0a-red-5388f64d/:
+batch1-corrected-vitest.json
+batch1-corrected2-vitest.json
+batch1-vitest.json
+batch2-corrected-vitest.json
+batch2-corrected2-vitest.json
+batch2-vitest.json
+manifest.sha256
+red-ledger.json
+5104f9ef54fee70df1733a9aae2669bce45f8e366e1aed712a7b7ea12ad378a5  green-ledger.json
+c2bf2e48d907042e76da6548ab5f6a852f23b4f769c78e212f1fde4bb008d85e  manifest.sha256
+---
+3b073cd6332bba24b46fc1f4f3213dfceffd1b76af1d2375a9483e3c1f14cefc  .logs/d110c-0a-green-0b7a1cf6/batch1-corrected-vitest.json
+e641cb4f3c20ee2f3966469b7465c9934e6dcac52754bde0f97a092a664e7ea8  .logs/d110c-0a-green-0b7a1cf6/batch1-vitest.json
+14a68fac994ae66c0b894e09f0b13b06cfe5753575a65b490912b0583044fd0e  .logs/d110c-0a-green-0b7a1cf6/batch2-corrected-vitest.json
+c209060a03b5205b2f0a248415798732433408a2edfd1e03a937d05c1d567cee  .logs/d110c-0a-green-0b7a1cf6/batch2-genuine-actor-corrected-vitest.json
+e58753ff6344cc4474ede2096cad95cc7d6bc33e92a025041d775f7d18cc4919  .logs/d110c-0a-green-0b7a1cf6/batch2-genuine-actor-corrected2-vitest.json
+4639118d5c6b3e3f2b33e1834b5ab7448292a0063233d9b14572043c42ca2768  .logs/d110c-0a-green-0b7a1cf6/batch2-genuine-actor-matrix-vitest.json
+ade76feb7374cda7cd72cae5512ddacaf89d7bad96d871b0bdd7451c9f8566af  .logs/d110c-0a-green-0b7a1cf6/batch2-genuine-actor-vitest.json
+010c39db27decd236e4aabbf4ac0b105308166ef0118b098b75bdadf107a4168  .logs/d110c-0a-green-0b7a1cf6/batch2-vitest.json
+5104f9ef54fee70df1733a9aae2669bce45f8e366e1aed712a7b7ea12ad378a5  .logs/d110c-0a-green-0b7a1cf6/green-ledger.json
+715cd9a881d6b570bd8ff8abee8d990fd88822f643c91fa8c4a845802cbe7a47  .logs/d110c-0a-green-0b7a1cf6/phase-5c-playwright.json
+0f90c21fff1c21709f27b8c822fef0478593f4fc90c775de350480114fcbad23  .logs/d110c-0a-green-0b7a1cf6/phase-5d-playwright.json
+b586561a52b3104d2a16b829e98bfa9e11b63e1a629bacca5f469e8e01cbdbb5  .logs/d110c-0a-green-0b7a1cf6/phase-5e-actor-playwright.json
+04a04b4f99eaa0f7c9703c1471d287684b2f321371f865e09c54e29e986abf95  .logs/d110c-0a-green-0b7a1cf6/phase-5e-live-close-playwright.json
+12cc15d66390713099ee104ae8a76425e66633ae89ad029ccd90362fb92e8d15  .logs/d110c-0a-green-0b7a1cf6/phase-5e-relearn-playwright.json
+610769dacf50ad6a3b2521e991a62ee1f7a201042a60d4acf6e2f31b04bf652e  .logs/d110c-0a-green-0b7a1cf6/phase-6a-activation-playwright.json
+8c4221d6c690825dbe94a88fc3304d92d11f001d9052cca56035bff3f7dc74e1  .logs/d110c-0a-green-0b7a1cf6/phase-6a-adoption-commit-playwright.json
+5f85ba01357162a1f0a802de8c7146ed61597e8cdec22af814753862b07d4576  .logs/d110c-0a-green-0b7a1cf6/phase-6a-product-playwright.json
+fc26bde50670b2d680f3d072c613da7983411402d69db32ca05c30089b76c0d0  .logs/d110c-0a-green-0b7a1cf6/phase-6a-successor-epoch-playwright.json
+27296fbe5e781433e7f4010c395f84bebec1ec7955b1a2589a78677d7987d5e4  .logs/d110c-0a-green-0b7a1cf6/retained-corrected-vitest.json
+9893265887ae14c8ea233a71cf22975c24e5a192950c05747fcc9d3a37b51cd9  .logs/d110c-0a-green-0b7a1cf6/retained-creator-actor-corrected.json
+1562e9a81a501d62cc707aac6b85b059ab063e987d88599c5b05b2b837b0129f  .logs/d110c-0a-green-0b7a1cf6/retained-vitest.json
+dc509821d77523fda5afa71c6f6eea2de9a694ac8ad59c0bb56428fed18e1c90  packages/node/src/creator-close.ts
+2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9  packages/protocol-v3/registry/registry-v1.json
+9fd7c40deda30b88a9f3cec9a8f3d3a607cc2a09d276aee18791a4ff3326518c  packages/protocol-v3/src/internal/seal-authority-identity.ts
+d3abc99afe863d1e16c979282d9ddcf530090f255c56643b87644155992de58b  packages/protocol-v3/src/seal.ts
+324676bd2673809742f43e54414b0ad5e817e856c5babfa26f7da950ccf4a2fe  packages/seal/src/creator.ts
+3be1fb8e01fcbc3c4fa24fd80dbae7063b3084a19c4fe21675f1b44f213f67a4  packages/seal/src/index.ts
+1e561d0741125a76fda100be3bda7f6603255ceef46fa875f99853ca5d6f6356  packages/seal/src/internal/creator-close-intent.ts
+8ad7cbb9bf2f6916a44f37c902ff41e513b1ae0574025fdb43fe32d1db13f531  packages/seal/src/internal/seal-vote-intent.ts
+c9ae98618f5620664c5b0217215bebe7bbf77d5bc3074a0d3a96769991843410  packages/seal/src/pacemaker.ts
+166634277bc38dd4919300e2fa3f3509d10cfe51ab3cda22fd7dc52f1c42609e  packages/storage-browser/src/internal/schema-idb.ts
+867c7b41761db3b2628e610290b3b24f7fef1e6d5057dc191f81f312f29042c1  packages/storage-browser/src/internal/seal-evidence-store.ts
+9b851f446a110035991db4f349bd43617a0d7673cf918f3263f119786bf0526e  packages/storage-browser/src/internal/seal-vote-dispatch.ts
+b4f073c6646890e62b1c37f5399b73016586f0d16f4084c2e8f4a2eb2f7c194a  packages/storage-browser/src/internal/seal-vote-store.ts
+f7a83963d00df0c18b9871fc3b4dce8f3d7872b41693c068ee9890a95a103a3a  packages/storage-browser/src/internal/seal-vote-test-control.ts
+c292ac9db81e704221b5377cc6fdd6eba314a984d4f0ed44a8b44e804e18b60c  packages/storage-browser/src/seal-evidence.ts
+73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99  pnpm-lock.yaml
+3418aa9a5c851a77af73f1042ad6622ce7431e111f1c3cd062a6d3fdc7b953fa  tests/phase-5e-creator-actor-red.test.ts
+a56eb9a1932497cc1dce23d8faba196eb6853228970de71ba32b55da016e86c2  tests/phase-6b-d110c-0a-authority-red.test.ts
+f2c2156fd048e880646b0af5f9de2f24e52d616dab3f47b442b82da649da7ab4  tests/phase-6b-d110c-0a-browser-custody-red.test.ts
+commit 93fe946abf33f052706343e2aa8c02a514f98627
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 01:36:26 2026 -0400
+
+    feat: close D.110c-0a epoch seal custody GREEN
+
+ .../batch1-corrected-vitest.json                   |    1 +
+ .logs/d110c-0a-green-0b7a1cf6/batch1-vitest.json   |    1 +
+ .../batch2-corrected-vitest.json                   |    1 +
+ .../batch2-genuine-actor-corrected-vitest.json     |    1 +
+ .../batch2-genuine-actor-corrected2-vitest.json    |    1 +
+ .../batch2-genuine-actor-matrix-vitest.json        |    1 +
+ .../batch2-genuine-actor-vitest.json               |    1 +
+ .logs/d110c-0a-green-0b7a1cf6/batch2-vitest.json   |    1 +
+ .logs/d110c-0a-green-0b7a1cf6/green-ledger.json    |  153 +++
+ .logs/d110c-0a-green-0b7a1cf6/manifest.sha256      |   40 +
+ .../phase-5c-playwright.json                       | 1087 ++++++++++++++++++++
+ .../phase-5d-playwright.json                       |  929 +++++++++++++++++
+ .../phase-5e-actor-playwright.json                 |  521 ++++++++++
+ .../phase-5e-live-close-playwright.json            |  419 ++++++++
+ .../phase-5e-relearn-playwright.json               |  317 ++++++
+ .../phase-6a-activation-playwright.json            |  941 +++++++++++++++++
+ .../phase-6a-adoption-commit-playwright.json       |  317 ++++++
+ .../phase-6a-product-playwright.json               |  929 +++++++++++++++++
+ .../phase-6a-successor-epoch-playwright.json       |  215 ++++
+ .../retained-corrected-vitest.json                 |    1 +
+ .../retained-creator-actor-corrected.json          |    1 +
+ .logs/d110c-0a-green-0b7a1cf6/retained-vitest.json |    1 +
+ .../production-hardening-tdd-plan-v2.md            |   68 ++
+ .../src/internal/seal-authority-identity.ts        |    2 +-
+ packages/protocol-v3/src/seal.ts                   |   25 +-
+ packages/seal/src/creator.ts                       |   30 +-
+ packages/seal/src/index.ts                         |    2 +
+ packages/seal/src/internal/creator-close-intent.ts |    2 +-
+ packages/seal/src/internal/seal-vote-intent.ts     |    4 +-
+ packages/seal/src/pacemaker.ts                     |    6 +-
+ .../src/internal/seal-evidence-store.ts            |   23 +-
+ .../src/internal/seal-vote-dispatch.ts             |    2 +-
+ .../src/internal/seal-vote-store.ts                |   82 +-
+ .../src/internal/seal-vote-test-control.ts         |    1 +
+ packages/storage-browser/src/seal-evidence.ts      |   40 +-
+ tests/phase-5e-creator-actor-red.test.ts           |   10 +-
+ tests/phase-6b-d110c-0a-authority-red.test.ts      |    4 +-
+ .../phase-6b-d110c-0a-browser-custody-red.test.ts  |  282 ++++-
+ 38 files changed, 6344 insertions(+), 118 deletions(-)
+mismatches=0
+ .../src/internal/seal-authority-identity.ts        |   2 +-
+ packages/protocol-v3/src/seal.ts                   |  25 +-
+ packages/seal/src/creator.ts                       |  30 ++-
+ packages/seal/src/index.ts                         |   2 +
+ packages/seal/src/internal/creator-close-intent.ts |   2 +-
+ packages/seal/src/internal/seal-vote-intent.ts     |   4 +-
+ packages/seal/src/pacemaker.ts                     |   6 +-
+ .../src/internal/seal-evidence-store.ts            |  23 +-
+ .../src/internal/seal-vote-dispatch.ts             |   2 +-
+ .../src/internal/seal-vote-store.ts                |  82 +++---
+ .../src/internal/seal-vote-test-control.ts         |   1 +
+ packages/storage-browser/src/seal-evidence.ts      |  40 ++-
+ tests/phase-5e-creator-actor-red.test.ts           |  10 +-
+ tests/phase-6b-d110c-0a-authority-red.test.ts      |   4 +-
+ .../phase-6b-d110c-0a-browser-custody-red.test.ts  | 282 +++++++++++++++++----
+ 15 files changed, 397 insertions(+), 118 deletions(-)
+===
+ .../production-hardening-tdd-plan-v2.md            |  36 +++
+ tests/phase-6b-d110c-0a-authority-red.test.ts      |  48 ++++
+ .../phase-6b-d110c-0a-browser-custody-red.test.ts  | 299 +++++++++++++++++++++
+ 3 files changed, 383 insertions(+)
+diff --git a/packages/protocol-v3/src/internal/seal-authority-identity.ts b/packages/protocol-v3/src/internal/seal-authority-identity.ts
+index 8fef057d..2e08ee36 100644
+--- a/packages/protocol-v3/src/internal/seal-authority-identity.ts
++++ b/packages/protocol-v3/src/internal/seal-authority-identity.ts
+@@ -1,6 +1,6 @@
+ export interface SealAuthorityIdentity {
+ 	readonly anchor: string;
+-	readonly epoch: 0;
++	readonly epoch: number;
+ 	readonly objectId: string;
+ 	readonly signerId: string;
+ }
+diff --git a/packages/protocol-v3/src/seal.ts b/packages/protocol-v3/src/seal.ts
+index 3c10ef1e..b6130a69 100644
+--- a/packages/protocol-v3/src/seal.ts
++++ b/packages/protocol-v3/src/seal.ts
+@@ -27,7 +27,7 @@ interface RegistryKind {
+ 
+ interface SealAuthorityState {
+ 	readonly anchor: string;
+-	readonly epoch: 0;
++	readonly epoch: number;
+ 	readonly objectId: string;
+ 	readonly publicKeys: ReadonlyMap<string, Uint8Array>;
+ 	readonly quorum: number;
+@@ -264,8 +264,8 @@ function failure(reason: string): Readonly<{ ok: false; reason: string }> {
+ }
+ 
+ /**
+- * Binds a finality public key to the unique signer ID in certified epoch-zero custody.
+- * @param input - Certified trust capability and exact finality public key.
++ * Binds a finality public key to the unique signer ID in authenticated seal custody.
++ * @param input - Certified or current creator trust capability and exact finality public key.
+  * @returns Opaque seal authority or a typed failure.
+  */
+ export function openSealAuthority(
+@@ -273,10 +273,17 @@ export function openSealAuthority(
+ ): Readonly<{ authority: SealAuthority; ok: true; signerId: string } | { ok: false; reason: string }> {
+ 	try {
+ 		if (!plainRecord(input) || !exactRecordKeys(input, ["signerPublicKey", "trust"])) return failure("malformed-input");
+-		const material =
+-			resolveCertifiedSealAuthorityMaterial(input.trust as CertifiedAnchorTrust) ??
+-			resolveCreatorAnchorTrustMaterial(input.trust as CurrentAnchorTrust);
+-		if (material === undefined || material.currentEpoch !== 0) return failure("untrusted-context");
++		const certified = resolveCertifiedSealAuthorityMaterial(input.trust as CertifiedAnchorTrust);
++		const creator =
++			certified === undefined ? resolveCreatorAnchorTrustMaterial(input.trust as CurrentAnchorTrust) : undefined;
++		const material = certified ?? creator;
++		if (
++			material === undefined ||
++			!safeInteger(material.currentEpoch, 0) ||
++			(certified !== undefined && material.currentEpoch !== 0)
++		) {
++			return failure("untrusted-context");
++		}
+ 		const signerPublicKey = copyExactBytes(input.signerPublicKey, 32, 32);
+ 		const decodedSignerSet = decodeCanonical(material.exactCanonicalSignerSetBytes);
+ 		if (!validateSignerArray(decodedSignerSet)) {
+@@ -298,7 +305,7 @@ export function openSealAuthority(
+ 			authority,
+ 			Object.freeze({
+ 				anchor: material.currentAnchorDigest,
+-				epoch: 0,
++				epoch: material.currentEpoch,
+ 				objectId: material.objectId,
+ 				publicKeys,
+ 				quorum: material.quorum,
+@@ -307,7 +314,7 @@ export function openSealAuthority(
+ 		);
+ 		registerSealAuthorityIdentity(authority, {
+ 			anchor: material.currentAnchorDigest,
+-			epoch: 0,
++			epoch: material.currentEpoch,
+ 			objectId: material.objectId,
+ 			signerId,
+ 		});
+diff --git a/packages/seal/src/creator.ts b/packages/seal/src/creator.ts
+index 2c709257..bfdcd7bc 100644
+--- a/packages/seal/src/creator.ts
++++ b/packages/seal/src/creator.ts
+@@ -6,6 +6,7 @@ import {
+ 	prepareCreatorClose,
+ 	prepareCreatorSuccessor,
+ } from "@ts-drp/protocol-v3/creator-close";
++import { resolveSealAuthorityIdentity } from "@ts-drp/protocol-v3/internal/seal-authority-identity";
+ import { openSealAuthority, type SealAuthority, verifySealQC } from "@ts-drp/protocol-v3/seal";
+ 
+ import { createSealVoter, type ExactSealCarrier, type SealStorePort, type SealVoterHandle } from "./index.js";
+@@ -97,17 +98,22 @@ function signerIdentity(closeInput: Readonly<Record<string, unknown>>): Readonly
+ 	return Object.freeze({ publicKey: hexBytes(signer.publicKey), signerId: signer.signerId });
+ }
+ 
+-function cutIdentity(exactCanonicalCutValueBytes: Uint8Array): Readonly<{ anchor: string; objectId: string }> {
++function cutIdentity(
++	exactCanonicalCutValueBytes: Uint8Array
++): Readonly<{ anchor: string; epoch: number; objectId: string }> {
+ 	const decoded = decodeCanonical(exactCanonicalCutValueBytes);
+ 	if (
+ 		!plainRecord(decoded) ||
++		typeof decoded.epoch !== "number" ||
++		!Number.isSafeInteger(decoded.epoch) ||
++		decoded.epoch < 0 ||
+ 		typeof decoded.objectId !== "string" ||
+ 		typeof decoded.previousAnchor !== "string" ||
+ 		!digestHex.test(decoded.previousAnchor)
+ 	) {
+ 		throw new TypeError("invalid creator cut identity");
+ 	}
+-	return Object.freeze({ anchor: decoded.previousAnchor, objectId: decoded.objectId });
++	return Object.freeze({ anchor: decoded.previousAnchor, epoch: decoded.epoch, objectId: decoded.objectId });
+ }
+ 
+ function q1QcBytes(carrier: Readonly<{ exactCanonicalPreimageBytes: Uint8Array; signature: Uint8Array }>): Uint8Array {
+@@ -244,7 +250,7 @@ async function runClose(
+ 		if (record === null) {
+ 			record = Object.freeze({
+ 				anchor: identity.anchor,
+-				epoch: 0 as const,
++				epoch: identity.epoch,
+ 				exactCanonicalCommitQcBytes: null,
+ 				exactCanonicalCutValueBytes: Uint8Array.from(preparedClose.exactCanonicalCutValueBytes),
+ 				exactCanonicalPrepareQcBytes: null,
+@@ -261,6 +267,8 @@ async function runClose(
+ 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
+ 			emit(state, "close_evidence_committed");
+ 		} else if (
++			record.anchor !== identity.anchor ||
++			record.epoch !== identity.epoch ||
+ 			record.objectId !== identity.objectId ||
+ 			record.signerId !== signer.signerId ||
+ 			record.valueDigest !== preparedClose.valueDigest ||
+@@ -427,8 +435,20 @@ export async function createCreatorSealActor(
+ 		const evidence = resolveCreatorCloseEvidenceStore(input.evidenceStore);
+ 		if (evidence === undefined) return failure("UNTRUSTED_EVIDENCE_STORE");
+ 		const rows = await evidence.readAll();
+-		if (rows.length > 1) return failure("SIGNER_NOT_AUTHORIZED");
+-		const record = rows[0] ?? null;
++		const currentRows = rows.filter((candidate) => {
++			const opened = openSealAuthority({ signerPublicKey: candidate.signerPublicKey, trust: input.currentTrust });
++			if (!opened.ok || opened.signerId !== candidate.signerId) return false;
++			const identity = resolveSealAuthorityIdentity(opened.authority);
++			return (
++				identity !== undefined &&
++				candidate.anchor === identity.anchor &&
++				candidate.epoch === identity.epoch &&
++				candidate.objectId === identity.objectId &&
++				candidate.signerId === identity.signerId
++			);
++		});
++		if (currentRows.length > 1) return failure("SIGNER_NOT_AUTHORIZED");
++		const record = currentRows[0] ?? null;
+ 		if (record !== null && record.storageIncarnation !== input.storageIncarnation) return failure("STORAGE_LOSS");
+ 		const state: ActorState = {
+ 			activeTask: null,
+diff --git a/packages/seal/src/index.ts b/packages/seal/src/index.ts
+index 7c2d3ac1..3816c9b1 100644
+--- a/packages/seal/src/index.ts
++++ b/packages/seal/src/index.ts
+@@ -338,6 +338,7 @@ export async function createSealVoter(
+ 								exactCanonicalPreimageBytes: exactBytes(prepared.exactCanonicalPreimageBytes),
+ 								signature: exactBytes(signature, 64, 64),
+ 							}),
++							epoch: authorityIdentity.epoch,
+ 							expectedIncarnation: expectedStorageIncarnation,
+ 							expectedRevision: revision,
+ 							highestPrepareQcBytes,
+@@ -428,6 +429,7 @@ export async function createSealVoter(
+ 							mintSealVoteIntent({
+ 								anchor: prepared.anchor,
+ 								carrier,
++								epoch: authorityIdentity.epoch,
+ 								expectedIncarnation: expectedStorageIncarnation,
+ 								expectedRevision,
+ 								objectId: prepared.objectId,
+diff --git a/packages/seal/src/internal/creator-close-intent.ts b/packages/seal/src/internal/creator-close-intent.ts
+index 480a3bd3..4b52f1b9 100644
+--- a/packages/seal/src/internal/creator-close-intent.ts
++++ b/packages/seal/src/internal/creator-close-intent.ts
+@@ -9,7 +9,7 @@ export type CreatorCloseEvidencePhase =
+ 
+ export interface CreatorCloseEvidenceRecord {
+ 	readonly anchor: string;
+-	readonly epoch: 0;
++	readonly epoch: number;
+ 	readonly exactCanonicalCommitQcBytes: Uint8Array | null;
+ 	readonly exactCanonicalCutValueBytes: Uint8Array;
+ 	readonly exactCanonicalPrepareQcBytes: Uint8Array | null;
+diff --git a/packages/seal/src/internal/seal-vote-intent.ts b/packages/seal/src/internal/seal-vote-intent.ts
+index 1a9e4de1..2a0732b3 100644
+--- a/packages/seal/src/internal/seal-vote-intent.ts
++++ b/packages/seal/src/internal/seal-vote-intent.ts
+@@ -3,6 +3,7 @@ import type { ExactSealCarrier } from "../index.js";
+ export interface SealVoteIntentData {
+ 	readonly anchor: string;
+ 	readonly carrier: ExactSealCarrier;
++	readonly epoch: number;
+ 	readonly expectedIncarnation: string;
+ 	readonly expectedRevision: number;
+ 	readonly objectId: string;
+@@ -16,6 +17,7 @@ export interface SealVoteIntentData {
+ export interface SealRoundChangeIntentData {
+ 	readonly anchor: string;
+ 	readonly carrier: ExactSealCarrier;
++	readonly epoch: number;
+ 	readonly expectedIncarnation: string;
+ 	readonly expectedRevision: number;
+ 	readonly highestPrepareQcBytes: Uint8Array | null;
+@@ -26,7 +28,7 @@ export interface SealRoundChangeIntentData {
+ 
+ export interface SealVoterEnrollmentData {
+ 	readonly anchor: string;
+-	readonly epoch: 0;
++	readonly epoch: number;
+ 	readonly expectedIncarnation: string;
+ 	readonly objectId: string;
+ 	readonly signerId: string;
+diff --git a/packages/seal/src/pacemaker.ts b/packages/seal/src/pacemaker.ts
+index 0e4251d3..a892e12c 100644
+--- a/packages/seal/src/pacemaker.ts
++++ b/packages/seal/src/pacemaker.ts
+@@ -20,7 +20,7 @@ export type PacemakerEventKind =
+ 
+ export interface PacemakerEvent {
+ 	readonly anchor: string;
+-	readonly epoch: 0;
++	readonly epoch: number;
+ 	readonly kind: PacemakerEventKind;
+ 	readonly objectId: string;
+ 	readonly phase: "commit" | "prepare" | "round-change";
+@@ -117,7 +117,7 @@ export function leaderForRound(signerIds: readonly string[], round: number): str
+ }
+ 
+ /**
+- * Opens the epoch-zero pacemaker over genuine protocol, voter, and durable-store capabilities.
++ * Opens an epoch-bound pacemaker over genuine protocol, voter, and durable-store capabilities.
+  * @param input - Authenticated protocol, metrics, storage, and voter capabilities.
+  * @returns A pacemaker handle or a typed failure.
+  */
+@@ -181,7 +181,7 @@ export function createSealPacemaker(
+ 	): void => {
+ 		const event = Object.freeze({
+ 			anchor: identity.anchor,
+-			epoch: 0 as const,
++			epoch: identity.epoch,
+ 			kind,
+ 			objectId: identity.objectId,
+ 			phase: eventPhase,
+91828:D.110c-0a, D.110c-a, and D.110c-b GREEN and before D.110c-c RED**. It consumes their real
+91879:D.110c-0a GREEN; D.110c-0b0 RED/GREEN; D.110c-a GREEN; D.110c-b GREEN;
+91887:1. **D.110c-0a — epoch-relative creator seal custody.** Owner:
+92030:##### D.110c-0a bounded epoch-relative seal-custody plan
+92051:D.110c-0a is one security-authority TDD slice with two diagnostic batches and
+92194:retained D.110c-0a mutant preserves the existing exact protocol/storage error
+92253:and D.110c-0a RED is authorized. Grok's first confirmation request was canceled
+92309:the frozen D.110c-0a GREEN batches described above.
+92311:The D.110c-0a GREEN implementation now closes that causal RED without widening
+92657:D.110c-0a/0b0/0b/0b1/0c/a/b/c jointly prove one genuine room completes epoch 0→1,
+diff --git a/packages/storage-browser/src/internal/seal-evidence-store.ts b/packages/storage-browser/src/internal/seal-evidence-store.ts
+index fb239874..560acc7b 100644
+--- a/packages/storage-browser/src/internal/seal-evidence-store.ts
++++ b/packages/storage-browser/src/internal/seal-evidence-store.ts
+@@ -36,7 +36,7 @@ export interface InternalSealEvidenceStore {
+ 	restorePeerEvidence(
+ 		evidence: PeerSealEvidence
+ 	): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
+-	servePeerEvidence(objectId: string, signerId: string): Promise<PeerSealEvidence | null>;
++	servePeerEvidence(objectId: string, epoch: number, signerId: string): Promise<PeerSealEvidence | null>;
+ }
+ 
+ export interface PeerSealEvidence {
+@@ -87,7 +87,7 @@ function copiedRecord(value: unknown): CreatorCloseEvidenceRecord | undefined {
+ 		signerPublicKey.byteLength !== 32 ||
+ 		typeof value.anchor !== "string" ||
+ 		!digestHex.test(value.anchor) ||
+-		value.epoch !== 0 ||
++		!safeRevision(value.epoch) ||
+ 		typeof value.objectId !== "string" ||
+ 		typeof value.phase !== "string" ||
+ 		!phases.has(value.phase as CreatorCloseEvidencePhase) ||
+@@ -101,7 +101,7 @@ function copiedRecord(value: unknown): CreatorCloseEvidenceRecord | undefined {
+ 	}
+ 	return copyCreatorCloseEvidenceRecord({
+ 		anchor: value.anchor,
+-		epoch: 0,
++		epoch: value.epoch,
+ 		exactCanonicalCommitQcBytes: commit,
+ 		exactCanonicalCutValueBytes: cut,
+ 		exactCanonicalPrepareQcBytes: prepare,
+@@ -168,7 +168,7 @@ function samePeerEvidence(left: PeerSealEvidence, right: PeerSealEvidence): bool
+ 
+ function peerIdentity(
+ 	evidence: PeerSealEvidence
+-): Readonly<{ anchor: string; epoch: 0; objectId: string; signerId: string; valueDigest: string }> | undefined {
++): Readonly<{ anchor: string; epoch: number; objectId: string; signerId: string; valueDigest: string }> | undefined {
+ 	try {
+ 		const vote = decodeCanonical(evidence.carrier.exactCanonicalPreimageBytes);
+ 		const qc = decodeCanonical(evidence.exactCanonicalCommitQcBytes);
+@@ -179,7 +179,7 @@ function peerIdentity(
+ 			!plainRecord(cut) ||
+ 			vote.kind !== "drp-seal-vote" ||
+ 			vote.phase !== "commit" ||
+-			vote.epoch !== 0 ||
++			!safeRevision(vote.epoch) ||
+ 			qc.kind !== "drp-seal-qc" ||
+ 			qc.phase !== "commit" ||
+ 			qc.objectId !== vote.objectId ||
+@@ -196,7 +196,7 @@ function peerIdentity(
+ 		}
+ 		return Object.freeze({
+ 			anchor: cut.previousAnchor,
+-			epoch: 0 as const,
++			epoch: vote.epoch,
+ 			objectId: vote.objectId,
+ 			signerId: vote.signerId,
+ 			valueDigest: Array.from(hashDomain("ts-drp/hard-epoch-cut/v3", evidence.exactCanonicalCutValueBytes), (byte) =>
+@@ -298,7 +298,7 @@ export async function openInternalSealEvidenceStore(
+ 		}
+ 		const completion = transactionComplete(transaction);
+ 		const store = transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE);
+-		const key: [string, 0, string] = [identity.objectId, 0, identity.signerId];
++		const key: [string, number, string] = [identity.objectId, identity.epoch, identity.signerId];
+ 		const raw = await requestResult(store.get(key));
+ 		const existing = copiedRecord(raw);
+ 		const existingPeer = peerEvidenceFromRow(raw);
+@@ -331,7 +331,7 @@ export async function openInternalSealEvidenceStore(
+ 		}
+ 		const row =
+ 			existing === undefined
+-				? { epoch: 0 as const, objectId: identity.objectId, peerEvidence: evidence, signerId: identity.signerId }
++				? { epoch: identity.epoch, objectId: identity.objectId, peerEvidence: evidence, signerId: identity.signerId }
+ 				: { ...existing, peerEvidence: evidence };
+ 		await requestResult(store.put(row));
+ 		await completion;
+@@ -357,7 +357,7 @@ export async function openInternalSealEvidenceStore(
+ 			}
+ 			const completion = transactionComplete(transaction);
+ 			const store = transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE);
+-			const key: [string, 0, string] = [copied.objectId, 0, copied.signerId];
++			const key: [string, number, string] = [copied.objectId, copied.epoch, copied.signerId];
+ 			const existing = copiedRecord(await requestResult(store.get(key)));
+ 			if (existing !== undefined && sameRecord(existing, copied)) {
+ 				await completion;
+@@ -401,10 +401,11 @@ export async function openInternalSealEvidenceStore(
+ 		},
+ 		persistPeerEvidence: writePeerEvidence,
+ 		restorePeerEvidence: writePeerEvidence,
+-		async servePeerEvidence(objectId: string, signerId: string): Promise<PeerSealEvidence | null> {
++		async servePeerEvidence(objectId: string, epoch: number, signerId: string): Promise<PeerSealEvidence | null> {
+ 			if (
+ 				typeof objectId !== "string" ||
+ 				objectId.length === 0 ||
++				!safeRevision(epoch) ||
+ 				typeof signerId !== "string" ||
+ 				signerId.length === 0
+ 			) {
+@@ -412,7 +413,7 @@ export async function openInternalSealEvidenceStore(
+ 			}
+ 			const transaction = database.transaction(PHASE_5E_SEAL_EVIDENCE_STORE, "readonly");
+ 			const row = await requestResult(
+-				transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE).get([objectId, 0, signerId])
++				transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE).get([objectId, epoch, signerId])
+ 			);
+ 			await transactionComplete(transaction);
+ 			return peerEvidenceFromRow(row) ?? null;
+diff --git a/packages/storage-browser/src/internal/seal-vote-dispatch.ts b/packages/storage-browser/src/internal/seal-vote-dispatch.ts
+index bb32c7fe..4cee9d5d 100644
+--- a/packages/storage-browser/src/internal/seal-vote-dispatch.ts
++++ b/packages/storage-browser/src/internal/seal-vote-dispatch.ts
+@@ -51,7 +51,7 @@ export function createInternalVoteDispatcher(input: VoteDispatcherInput): Readon
+ 				try {
+ 					await input.publish({ carrier: row.carrier, key });
+ 					if (closed) return;
+-					await input.store.markDispatched([row.objectId, 0, row.round, row.phase, row.signerId]);
++					await input.store.markDispatched([row.objectId, row.epoch, row.round, row.phase, row.signerId]);
+ 					sentKeys.push(key);
+ 				} finally {
+ 					inFlight -= 1;
+diff --git a/packages/storage-browser/src/internal/seal-vote-store.ts b/packages/storage-browser/src/internal/seal-vote-store.ts
+index 348d0133..ec311446 100644
+--- a/packages/storage-browser/src/internal/seal-vote-store.ts
++++ b/packages/storage-browser/src/internal/seal-vote-store.ts
+@@ -22,7 +22,7 @@ export interface StoredSealCarrier {
+ 
+ export interface PendingVoteRow {
+ 	readonly carrier: StoredSealCarrier;
+-	readonly epoch: 0;
++	readonly epoch: number;
+ 	readonly objectId: string;
+ 	readonly phase: "commit" | "prepare" | "round-change";
+ 	readonly round: number;
+@@ -38,7 +38,7 @@ export interface InternalSealVoteStore {
+ 	commitRoundChange(input: unknown): Promise<unknown>;
+ 	commitVote(input: unknown): Promise<unknown>;
+ 	close(): void;
+-	markDispatched(key: readonly [string, 0, number, "commit" | "prepare" | "round-change", string]): Promise<void>;
++	markDispatched(key: readonly [string, number, number, "commit" | "prepare" | "round-change", string]): Promise<void>;
+ 	openSnapshot(scope: unknown): Promise<unknown>;
+ 	readPending(maxRows?: number): Promise<readonly PendingVoteRow[]>;
+ }
+@@ -155,12 +155,13 @@ async function settleAbort(transaction: IDBTransaction): Promise<void> {
+ }
+ 
+ function voteKey(input: {
++	readonly epoch: number;
+ 	readonly objectId: string;
+ 	readonly round: number;
+ 	readonly phase: "commit" | "prepare" | "round-change";
+ 	readonly signerId: string;
+-}): [string, 0, number, "commit" | "prepare" | "round-change", string] {
+-	return [input.objectId, 0, input.round, input.phase, input.signerId];
++}): [string, number, number, "commit" | "prepare" | "round-change", string] {
++	return [input.objectId, input.epoch, input.round, input.phase, input.signerId];
+ }
+ 
+ function copiedPendingRow(value: unknown): PendingVoteRow | undefined {
+@@ -169,7 +170,7 @@ function copiedPendingRow(value: unknown): PendingVoteRow | undefined {
+ 	if (
+ 		carrier === undefined ||
+ 		typeof value.objectId !== "string" ||
+-		value.epoch !== 0 ||
++		!safeNonnegative(value.epoch) ||
+ 		!safeNonnegative(value.round) ||
+ 		(value.phase !== "prepare" && value.phase !== "commit" && value.phase !== "round-change") ||
+ 		typeof value.signerId !== "string" ||
+@@ -180,7 +181,7 @@ function copiedPendingRow(value: unknown): PendingVoteRow | undefined {
+ 	return Object.freeze({
+ 		carrier,
+ 		dispatched: value.dispatched,
+-		epoch: 0,
++		epoch: value.epoch,
+ 		objectId: value.objectId,
+ 		phase: value.phase,
+ 		round: value.round,
+@@ -231,7 +232,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 		if (
+ 			carrier === undefined ||
+ 			prepareQC === undefined ||
+-			raw.epoch !== undefined ||
++			!safeNonnegative(raw.epoch) ||
+ 			typeof raw.anchor !== "string" ||
+ 			typeof raw.expectedIncarnation !== "string" ||
+ 			!safeNonnegative(raw.expectedRevision) ||
+@@ -256,7 +257,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			!plainRecord(decoded) ||
+ 			decoded.kind !== "drp-seal-vote" ||
+ 			decoded.objectId !== raw.objectId ||
+-			decoded.epoch !== 0 ||
++			decoded.epoch !== raw.epoch ||
+ 			decoded.phase !== raw.phase ||
+ 			decoded.round !== raw.round ||
+ 			decoded.signerId !== raw.signerId ||
+@@ -277,7 +278,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			await settleAbort(transaction);
+ 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS", writes: 0 });
+ 		}
+-		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
++		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
+ 		const existingState = await requestResult(transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get(stateKey));
+ 		const currentRevision =
+ 			existingState === undefined ? 0 : plainRecord(existingState) ? existingState.revision : undefined;
+@@ -294,6 +295,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			existingState !== undefined &&
+ 			(!plainRecord(existingState) ||
+ 				existingState.anchor !== raw.anchor ||
++				existingState.epoch !== raw.epoch ||
+ 				!safeNonnegative(existingState.enteredRound) ||
+ 				raw.round < existingState.enteredRound)
+ 		) {
+@@ -340,7 +342,13 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			await settleAbort(transaction);
+ 			return Object.freeze({ ok: false as const, reason: "LOCKED_VALUE_CONFLICT", writes: 0 });
+ 		}
+-		const key = voteKey({ objectId: raw.objectId, phase: raw.phase, round: raw.round, signerId: raw.signerId });
++		const key = voteKey({
++			epoch: raw.epoch,
++			objectId: raw.objectId,
++			phase: raw.phase,
++			round: raw.round,
++			signerId: raw.signerId,
++		});
+ 		const occupied = await requestResult(transaction.objectStore(PHASE_5C_VOTE_SLOTS_STORE).get(key));
+ 		if (occupied !== undefined) {
+ 			const stored = plainRecord(occupied) ? copiedCarrier(occupied.carrier) : undefined;
+@@ -359,7 +367,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 		}
+ 		const slotRow = {
+ 			carrier,
+-			epoch: 0,
++			epoch: raw.epoch,
+ 			objectId: raw.objectId,
+ 			phase: raw.phase,
+ 			round: raw.round,
+@@ -386,7 +394,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 					? existingState.durablePrepareQcCount
+ 					: 0,
+ 			enteredRound,
+-			epoch: 0,
++			epoch: raw.epoch,
+ 			finalizedCommitQC: plainRecord(existingState) ? (existingState.finalizedCommitQC ?? null) : null,
+ 			finalizedValueDigest: plainRecord(existingState) ? (existingState.finalizedValueDigest ?? null) : null,
+ 			highestPrepareQC: existingHighestPrepareQC,
+@@ -399,7 +407,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 		const outboxRow: PendingVoteRow = {
+ 			carrier,
+ 			dispatched: false,
+-			epoch: 0,
++			epoch: raw.epoch,
+ 			objectId: raw.objectId,
+ 			phase: raw.phase,
+ 			round: raw.round,
+@@ -434,7 +442,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			!plainRecord(decoded) ||
+ 			decoded.kind !== "drp-seal-qc" ||
+ 			decoded.objectId !== raw.objectId ||
+-			decoded.epoch !== 0 ||
++			decoded.epoch !== raw.epoch ||
+ 			decoded.phase !== raw.phase ||
+ 			decoded.round !== raw.round ||
+ 			decoded.proposalDigest !== raw.valueDigest ||
+@@ -445,7 +453,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			typeof raw.expectedIncarnation !== "string" ||
+ 			!safeNonnegative(raw.expectedRevision) ||
+ 			typeof raw.objectId !== "string" ||
+-			raw.epoch !== 0 ||
++			!safeNonnegative(raw.epoch) ||
+ 			(raw.phase !== "prepare" && raw.phase !== "commit") ||
+ 			!safeNonnegative(raw.round) ||
+ 			typeof raw.signerId !== "string" ||
+@@ -470,13 +478,14 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
+ 		}
+ 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
+-		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
++		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
+ 		const storedState = await requestResult(stateStore.get(stateKey));
+ 		if (
+ 			(storedState === undefined && raw.expectedRevision !== 0) ||
+ 			(storedState !== undefined &&
+ 				(!plainRecord(storedState) ||
+ 					storedState.anchor !== raw.anchor ||
++					storedState.epoch !== raw.epoch ||
+ 					storedState.revision !== raw.expectedRevision ||
+ 					!safeNonnegative(storedState.revision) ||
+ 					storedState.revision === Number.MAX_SAFE_INTEGER))
+@@ -493,7 +502,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 						durableCommitQcCount: 0,
+ 						durablePrepareQcCount: 0,
+ 						enteredRound: 0,
+-						epoch: 0,
++						epoch: raw.epoch,
+ 						finalizedCommitQC: null,
+ 						finalizedValueDigest: null,
+ 						highestPrepareQC: null,
+@@ -600,7 +609,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			!plainRecord(decoded) ||
+ 			decoded.kind !== "drp-round-change" ||
+ 			decoded.objectId !== raw.objectId ||
+-			decoded.epoch !== 0 ||
++			decoded.epoch !== raw.epoch ||
+ 			decoded.anchor !== raw.anchor ||
+ 			decoded.round !== raw.round ||
+ 			decoded.phase !== "round-change" ||
+@@ -609,6 +618,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			typeof raw.expectedIncarnation !== "string" ||
+ 			!safeNonnegative(raw.expectedRevision) ||
+ 			typeof raw.objectId !== "string" ||
++			!safeNonnegative(raw.epoch) ||
+ 			!safeNonnegative(raw.round) ||
+ 			typeof raw.signerId !== "string"
+ 		) {
+@@ -628,7 +638,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
+ 		}
+ 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
+-		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
++		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
+ 		const state = await requestResult(stateStore.get(stateKey));
+ 		const current =
+ 			state === undefined
+@@ -638,7 +648,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 						durableCommitQcCount: 0,
+ 						durablePrepareQcCount: 0,
+ 						enteredRound: 0,
+-						epoch: 0,
++						epoch: raw.epoch,
+ 						finalizedCommitQC: null,
+ 						finalizedValueDigest: null,
+ 						highestPrepareQC: null,
+@@ -652,6 +662,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 		if (
+ 			!plainRecord(current) ||
+ 			current.anchor !== raw.anchor ||
++			current.epoch !== raw.epoch ||
+ 			current.revision !== raw.expectedRevision ||
+ 			!safeNonnegative(current.revision) ||
+ 			current.revision === Number.MAX_SAFE_INTEGER ||
+@@ -662,7 +673,13 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			await settleAbort(transaction);
+ 			return Object.freeze({ ok: false as const, reason: "REVALIDATION_REQUIRED" });
+ 		}
+-		const key = voteKey({ objectId: raw.objectId, phase: "round-change", round: raw.round, signerId: raw.signerId });
++		const key = voteKey({
++			epoch: raw.epoch,
++			objectId: raw.objectId,
++			phase: "round-change",
++			round: raw.round,
++			signerId: raw.signerId,
++		});
+ 		const occupied = await requestResult(transaction.objectStore(PHASE_5C_VOTE_SLOTS_STORE).get(key));
+ 		if (occupied !== undefined) {
+ 			const stored = plainRecord(occupied) ? copiedCarrier(occupied.carrier) : undefined;
+@@ -680,7 +697,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 		const row: PendingVoteRow = {
+ 			carrier,
+ 			dispatched: false,
+-			epoch: 0,
++			epoch: raw.epoch,
+ 			objectId: raw.objectId,
+ 			phase: "round-change",
+ 			round: raw.round,
+@@ -690,7 +707,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			requestResult(
+ 				transaction.objectStore(PHASE_5C_VOTE_SLOTS_STORE).add({
+ 					carrier,
+-					epoch: 0,
++					epoch: raw.epoch,
+ 					objectId: raw.objectId,
+ 					phase: "round-change",
+ 					round: raw.round,
+@@ -751,7 +768,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			!safeNonnegative(raw.round) ||
+ 			typeof raw.anchor !== "string" ||
+ 			typeof raw.objectId !== "string" ||
+-			raw.epoch !== 0 ||
++			!safeNonnegative(raw.epoch) ||
+ 			typeof raw.signerId !== "string"
+ 		) {
+ 			return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
+@@ -772,7 +789,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
+ 		}
+ 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
+-		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
++		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
+ 		const existingState = await requestResult(stateStore.get(stateKey));
+ 		const state =
+ 			existingState === undefined
+@@ -782,7 +799,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 						durableCommitQcCount: 0,
+ 						durablePrepareQcCount: 0,
+ 						enteredRound: 0,
+-						epoch: 0,
++						epoch: raw.epoch,
+ 						finalizedCommitQC: null,
+ 						finalizedValueDigest: null,
+ 						highestPrepareQC: null,
+@@ -796,6 +813,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 		if (
+ 			!plainRecord(state) ||
+ 			state.anchor !== raw.anchor ||
++			state.epoch !== raw.epoch ||
+ 			!safeNonnegative(state.revision) ||
+ 			state.revision === Number.MAX_SAFE_INTEGER ||
+ 			state.revision !== raw.expectedRevision ||
+@@ -819,7 +837,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 		commitVote,
+ 		close: () => opened.close(),
+ 		incarnation,
+-		markDispatched: async (key: readonly [string, 0, number, "commit" | "prepare" | "round-change", string]) => {
++		markDispatched: async (key: readonly [string, number, number, "commit" | "prepare" | "round-change", string]) => {
+ 			const transaction = opened.transaction(PHASE_5C_VOTE_OUTBOX_STORE, "readwrite", { durability: "strict" });
+ 			if (transaction.durability !== "strict") {
+ 				abort(transaction);
+@@ -841,7 +859,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 				!plainRecord(scope) ||
+ 				typeof scope.expectedIncarnation !== "string" ||
+ 				typeof scope.objectId !== "string" ||
+-				scope.epoch !== 0 ||
++				!safeNonnegative(scope.epoch) ||
+ 				typeof scope.signerId !== "string"
+ 			) {
+ 				throw new TypeError("invalid voter enrollment scope");
+@@ -851,7 +869,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 			}
+ 			const transaction = opened.transaction([PHASE_5C_SIGNER_STATE_STORE, PHASE_5C_VOTE_OUTBOX_STORE], "readonly");
+ 			const state = await requestResult(
+-				transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get([scope.objectId, 0, scope.signerId])
++				transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get([scope.objectId, scope.epoch, scope.signerId])
+ 			);
+ 			const pendingRows = await requestResult(transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE).getAll());
+ 			await transactionComplete(transaction);
+@@ -859,7 +877,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 				(row) =>
+ 					plainRecord(row) &&
+ 					row.objectId === scope.objectId &&
+-					row.epoch === 0 &&
++					row.epoch === scope.epoch &&
+ 					row.signerId === scope.signerId &&
+ 					row.phase === "round-change"
+ 			).length;
+@@ -878,7 +896,9 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
+ 					revision: 0,
+ 				});
+ 			}
+-			if (!plainRecord(state) || state.anchor !== scope.anchor) throw new Error("invalid scoped signer state snapshot");
++			if (!plainRecord(state) || state.anchor !== scope.anchor || state.epoch !== scope.epoch) {
++				throw new Error("invalid scoped signer state snapshot");
++			}
+ 			const highest = plainRecord(state.highestPrepareQC) ? state.highestPrepareQC : null;
+ 			const finalized = plainRecord(state.finalizedCommitQC) ? state.finalizedCommitQC : null;
+ 			return Object.freeze({
+diff --git a/packages/storage-browser/src/internal/seal-vote-test-control.ts b/packages/storage-browser/src/internal/seal-vote-test-control.ts
+index 63482566..84047dd9 100644
+--- a/packages/storage-browser/src/internal/seal-vote-test-control.ts
++++ b/packages/storage-browser/src/internal/seal-vote-test-control.ts
+@@ -125,6 +125,7 @@ function commitInput(
+ 	return Object.freeze({
+ 		anchor: ANCHOR,
+ 		carrier: stored,
++		epoch: 0,
+ 		expectedIncarnation: incarnation,
+ 		expectedRevision: revision,
+ 		objectId,
+diff --git a/packages/storage-browser/src/seal-evidence.ts b/packages/storage-browser/src/seal-evidence.ts
+index c902d009..280a180d 100644
+--- a/packages/storage-browser/src/seal-evidence.ts
++++ b/packages/storage-browser/src/seal-evidence.ts
+@@ -22,7 +22,11 @@ export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseNam
+ 		restorePeerEvidence(
+ 			input: Readonly<{ evidence: PeerSealEvidence }>
+ 		): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
+-		servePeerEvidence(input: Readonly<{ objectId: string; signerId: string }>): Promise<PeerSealEvidence | null>;
++		servePeerEvidence(
++			input:
++				| Readonly<{ objectId: string; signerId: string }>
++				| Readonly<{ epoch: number; objectId: string; signerId: string }>
++		): Promise<PeerSealEvidence | null>;
+ 		store: CreatorCloseEvidenceStore;
+ 	}>
+ > {
+@@ -37,6 +41,38 @@ export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseNam
+ 	}
+ 	const internal = await openInternalSealEvidenceStore({ databaseName: input.databaseName });
+ 	const rows = await internal.readAll();
++	const selectPeerEvidence = async (selector: unknown): Promise<PeerSealEvidence | null> => {
++		if (selector === null || typeof selector !== "object" || Array.isArray(selector)) {
++			throw new TypeError("peer evidence identity is invalid");
++		}
++		const prototype = Object.getPrototypeOf(selector) as object | null;
++		const keys = Reflect.ownKeys(selector);
++		const expected = keys.length === 2 ? ["objectId", "signerId"] : ["epoch", "objectId", "signerId"];
++		const descriptors = Object.getOwnPropertyDescriptors(selector);
++		if (
++			(prototype !== Object.prototype && prototype !== null) ||
++			!keys.every((key): key is string => typeof key === "string") ||
++			keys.length !== expected.length ||
++			![...keys].sort().every((key, index) => key === expected[index]) ||
++			keys.some((key) => !("value" in (descriptors[key] as PropertyDescriptor)))
++		) {
++			throw new TypeError("peer evidence identity is invalid");
++		}
++		const record = selector as Readonly<Record<string, unknown>>;
++		const epoch = keys.length === 2 ? 0 : record.epoch;
++		if (
++			typeof record.objectId !== "string" ||
++			record.objectId.length === 0 ||
++			typeof epoch !== "number" ||
++			!Number.isSafeInteger(epoch) ||
++			epoch < 0 ||
++			typeof record.signerId !== "string" ||
++			record.signerId.length === 0
++		) {
++			throw new TypeError("peer evidence identity is invalid");
++		}
++		return internal.servePeerEvidence(record.objectId, epoch, record.signerId);
++	};
+ 	return Object.freeze({
+ 		close: () => Promise.resolve(internal.close()),
+ 		observation: Object.freeze({
+@@ -46,7 +82,7 @@ export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseNam
+ 		}),
+ 		persistPeerEvidence: ({ evidence }) => internal.persistPeerEvidence(evidence),
+ 		restorePeerEvidence: ({ evidence }) => internal.restorePeerEvidence(evidence),
+-		servePeerEvidence: ({ objectId, signerId }) => internal.servePeerEvidence(objectId, signerId),
++		servePeerEvidence: selectPeerEvidence,
+ 		store: mintCreatorCloseEvidenceStore({
+ 			put: (record, expectedPhase) => internal.put(record, expectedPhase),
+ 			readAll: () => internal.readAll(),
+== batch1-corrected-vitest.json
+{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":1,"numPassedTests":1,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788325055185,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["D.110c-0a epoch-relative seal-authority causal RED"],"fullName":"D.110c-0a epoch-relative seal-authority causal RED opens the genuine adopted epoch-one creator trust under the same authorized finality key","status":"passed","title":"opens the genuine adopted epoch-one creator trust under the same authorized finality key","duration":6.259666999999922,"failureMessages":[],"meta":{}}],"startTime":1788325056185,"endTime":1788325056191.2598,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0a-authority-red.test.ts"}]}
+== batch2-genuine-actor-matrix-vitest.json
+{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":1,"numPassedTests":1,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788325738112,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["D.110c-0a browser epoch-custody causal RED"],"fullName":"D.110c-0a browser epoch-custody causal RED uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers","status":"passed","title":"uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers","duration":56.749874999999975,"failureMessages":[],"meta":{}}],"startTime":1788325739167,"endTime":1788325739223.7498,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0a-browser-custody-red.test.ts"}]}
+== retained-corrected-vitest.json
+{"numTotalTestSuites":40,"numPassedTestSuites":40,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":148,"numPassedTests":148,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788326017337,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED executes independent registry, identity, schema and transaction controls before readiness","status":"passed","title":"executes independent registry, identity, schema and transaction controls before readiness","duration":8.852666,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED typechecks and executes the exact bounded n=4 Quint witness","status":"passed","title":"typechecks and executes the exact bounded n=4 Quint witness","duration":1789.875375,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED [RED readiness] requires the complete four-owner atomic product graph","status":"passed","title":"[RED readiness] requires the complete four-owner atomic product graph","duration":0.14170799999988049,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED binds a genuine certified roster key to its independent signer ID","status":"passed","title":"binds a genuine certified roster key to its independent signer ID","duration":90.66933399999971,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes","status":"passed","title":"authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes","duration":27.0456250000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED releases only a detached durable carrier after the exact state-slot-outbox commit","status":"passed","title":"releases only a detached durable carrier after the exact state-slot-outbox commit","duration":13.626583999999639,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED rejects wrong authority, stale revision and conflicting same-slot bytes without release","status":"passed","title":"rejects wrong authority, stale revision and conflicting same-slot bytes without release","duration":18.186457999999675,"failureMessages":[],"meta":{}}],"startTime":1788326182930,"endTime":1788326184879.1865,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.105a governed protocol-v3 seal digest identity RED"],"fullName":"D.105a governed protocol-v3 seal digest identity RED keeps the frozen v3 tuple byte-identical and proves the identities independently","status":"passed","title":"keeps the frozen v3 tuple byte-identical and proves the identities independently","duration":82.518959,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.105a governed protocol-v3 seal digest identity RED"],"fullName":"D.105a governed protocol-v3 seal digest identity RED has the complete checker-authenticated seven-file PH-P5-D01 owner","status":"passed","title":"has the complete checker-authenticated seven-file PH-P5-D01 owner","duration":0.13033300000000736,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.105a frozen supplement behavior"],"fullName":"D.105a frozen supplement behavior binds the exact profile, vectors, and normative law","status":"passed","title":"binds the exact profile, vectors, and normative law","duration":0.5852499999999736,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.105a frozen supplement behavior"],"fullName":"D.105a frozen supplement behavior pins its closed schema, protected owners, checker, and bootstrap workflow","status":"passed","title":"pins its closed schema, protected owners, checker, and bootstrap workflow","duration":7694.772583,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.105a frozen supplement behavior"],"fullName":"D.105a frozen supplement behavior passes the real supplement checker","status":"passed","title":"passes the real supplement checker","duration":63.52691700000014,"failureMessages":[],"meta":{}}],"startTime":1788326174885,"endTime":1788326182726.5269,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-seal-digest-law-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.106a governed protocol-v3 pacemaker profile RED"],"fullName":"D.106a governed protocol-v3 pacemaker profile RED keeps the inherited v3 tuple byte-identical and proves the composition law independently","status":"passed","title":"keeps the inherited v3 tuple byte-identical and proves the composition law independently","duration":298.41858299999996,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.106a governed protocol-v3 pacemaker profile RED"],"fullName":"D.106a governed protocol-v3 pacemaker profile RED has the complete checker-authenticated seven-file PH-P5-D02 owner","status":"passed","title":"has the complete checker-authenticated seven-file PH-P5-D02 owner","duration":0.16675000000009277,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.106a frozen supplement behavior"],"fullName":"D.106a frozen supplement behavior binds the exact profile, vectors, normative decision, and workflow","status":"passed","title":"binds the exact profile, vectors, normative decision, and workflow","duration":8.361999999999966,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.106a frozen supplement behavior"],"fullName":"D.106a frozen supplement behavior pins the closed schema, protected owners, checker, and single-use bootstrap","status":"passed","title":"pins the closed schema, protected owners, checker, and single-use bootstrap","duration":5014.84725,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.106a frozen supplement behavior"],"fullName":"D.106a frozen supplement behavior passes the real supplement checker","status":"passed","title":"passes the real supplement checker","duration":67.13758300000063,"failureMessages":[],"meta":{}}],"startTime":1788326019209,"endTime":1788326024599.1377,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5d-pacemaker-law-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED pins the governed profile, exact runtime boundary, and causal mutant roster","status":"passed","title":"pins the governed profile, exact runtime boundary, and causal mutant roster","duration":1.8880410000000154,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED causally rejects every named pacemaker mutant","status":"passed","title":"causally rejects every named pacemaker mutant","duration":13.88345799999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED authenticates the frozen proposal, leader vote, QCs and round-change evidence independently","status":"passed","title":"authenticates the frozen proposal, leader vote, QCs and round-change evidence independently","duration":36.036332999999985,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED hash-binds every closed ITF trace and rejects event-name-only state drift","status":"passed","title":"hash-binds every closed ITF trace and rejects event-name-only state drift","duration":8073.340334,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED typechecks and executes non-vacuous model actions before runtime readiness","status":"passed","title":"typechecks and executes non-vacuous model actions before runtime readiness","duration":3914.452625,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED typechecks the exact future fixture boundary before opening product readiness","status":"passed","title":"typechecks the exact future fixture boundary before opening product readiness","duration":1413.0002920000006,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED executes the real pinned Apalache backend rather than a transcript","status":"passed","title":"executes the real pinned Apalache backend rather than a transcript","duration":122151.34629100001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED runs a real fake-indexeddb additive schema-v3 control before runtime readiness","status":"passed","title":"runs a real fake-indexeddb additive schema-v3 control before runtime readiness","duration":4.983584000001429,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED keeps canonical CutValue and registered vote identities independently recomputable","status":"passed","title":"keeps canonical CutValue and registered vote identities independently recomputable","duration":6.028374999994412,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED [RED readiness] requires the complete nine-owner pacemaker runtime graph","status":"passed","title":"[RED readiness] requires the complete nine-owner pacemaker runtime graph","duration":0.12020800000755116,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED binds runtime exports to the governed timeout and UTF-8 leader profile","status":"passed","title":"binds runtime exports to the governed timeout and UTF-8 leader profile","duration":56.195624999993015,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED keeps registered protocol verification as the sole proposal and round-change authority","status":"passed","title":"keeps registered protocol verification as the sole proposal and round-change authority","duration":1.0367499999993015,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED replays every checked trace through the genuine voter, pacemaker, and fake-IDB store","status":"passed","title":"replays every checked trace through the genuine voter, pacemaker, and fake-IDB store","duration":7842.5079589999805,"failureMessages":[],"meta":{}}],"startTime":1788326031102,"endTime":1788326174618.508,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5d-pacemaker-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED freezes the exact six RED and exact twenty-four GREEN owner rosters","status":"passed","title":"freezes the exact six RED and exact twenty-four GREEN owner rosters","duration":2.905833000000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED keeps the inherited schema-v2 voter as an executable pre-readiness control","status":"passed","title":"keeps the inherited schema-v2 voter as an executable pre-readiness control","duration":3.9887500000000102,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED defines one additive v3 store while preserving the frozen four-store vote transaction","status":"passed","title":"defines one additive v3 store while preserving the frozen four-store vote transaction","duration":0.2525829999999871,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED closes the causal crash and mutation catalog without adding authority","status":"passed","title":"closes the causal crash and mutation catalog without adding authority","duration":0.23449999999999704,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED [RED readiness] requires the complete creator actor and evidence graph","status":"passed","title":"[RED readiness] requires the complete creator actor and evidence graph","duration":0.11854200000001924,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED keeps the actor, evidence, and finality subpaths closed","status":"passed","title":"keeps the actor, evidence, and finality subpaths closed","duration":47.475915999999984,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED persists the close candidate before either durable vote and releases only finalized evidence","status":"passed","title":"persists the close candidate before either durable vote and releases only finalized evidence","duration":98.96995800000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED re-verifies complete durable QC bytes before reopening signing authority","status":"passed","title":"re-verifies complete durable QC bytes before reopening signing authority","duration":77.70629100000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry","status":"passed","title":"ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry","duration":73.189458,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED reopens exact finalized custody and rejects a conflicting close without rewriting bytes","status":"passed","title":"reopens exact finalized custody and rejects a conflicting close without rewriting bytes","duration":61.981667000000016,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED rejects raw-digest signing and a copied actor capability causally","status":"passed","title":"rejects raw-digest signing and a copied actor capability causally","duration":4.162708000000066,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED copies all close carriers before awaiting storage and fences effects after stop","status":"passed","title":"copies all close carriers before awaiting storage and fences effects after stop","duration":23.423166000000037,"failureMessages":[],"meta":{}}],"startTime":1788326185633,"endTime":1788326186028.423,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED freezes the exact existing registry and bounded ten-path GREEN surface","status":"passed","title":"freezes the exact existing registry and bounded ten-path GREEN surface","duration":2.087208000000004,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED derives a genuine nontrivial close/history commitment and detects a post-sign vertex change","status":"passed","title":"derives a genuine nontrivial close/history commitment and detects a post-sign vertex change","duration":0.5964170000000024,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED differentially proves the multi-chunk manifest, CutValue and successor-anchor bytes","status":"passed","title":"differentially proves the multi-chunk manifest, CutValue and successor-anchor bytes","duration":43.818792,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED keeps the legacy v1 trust classifier exact while leaving successor opening to creator-close","status":"passed","title":"keeps the legacy v1 trust classifier exact while leaving successor opening to creator-close","duration":2.859000000000009,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED keeps the exact-three RED type surface buildable before the missing owner exists","status":"passed","title":"keeps the exact-three RED type surface buildable before the missing owner exists","duration":1027.017791,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED [RED readiness] requires the sole pure creator-close semantic owner","status":"passed","title":"[RED readiness] requires the sole pure creator-close semantic owner","duration":0.14304199999992306,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED authors exact detached snapshot transfer bytes through the shipped owner","status":"passed","title":"authors exact detached snapshot transfer bytes through the shipped owner","duration":167.8487500000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED mints only one-use creator-anchor signing requests bound to the exact creator tuple","status":"passed","title":"mints only one-use creator-anchor signing requests bound to the exact creator tuple","duration":1.507334000000128,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED forms genuine q=1 prepare and commit QCs through the common verifier","status":"passed","title":"forms genuine q=1 prepare and commit QCs through the common verifier","duration":11.177875000000085,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED opens only the exact v1 successor chain bound to the durable commit QC","status":"passed","title":"opens only the exact v1 successor chain bound to the durable commit QC","duration":39.27583400000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED rejects tampered snapshot and successor carriers without mutating caller bytes","status":"passed","title":"rejects tampered snapshot and successor carriers without mutating caller bytes","duration":1.7642920000000686,"failureMessages":[],"meta":{}}],"startTime":1788326024826,"endTime":1788326026124.7644,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-close-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED freezes the exact five RED and exact nine GREEN owners","status":"passed","title":"freezes the exact five RED and exact nine GREEN owners","duration":2.1064999999999827,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED pins separate honest trust, continuity and lifecycle projections","status":"passed","title":"pins separate honest trust, continuity and lifecycle projections","duration":0.31162499999999227,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED independently classifies replay, equivocation, rollback, gap and the exact successor without writes","status":"passed","title":"independently classifies replay, equivocation, rollback, gap and the exact successor without writes","duration":12.746541000000008,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED replaces exactly one trust ref while preserving every non-trust ref and adding proof refs","status":"passed","title":"replaces exactly one trust ref while preserving every non-trust ref and adding proof refs","duration":0.8526249999999891,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED accepts ambiguous head success only by exact successor reopen","status":"passed","title":"accepts ambiguous head success only by exact successor reopen","duration":0.13475000000002524,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED forbids activation, pruning and a second combined-head owner","status":"passed","title":"forbids activation, pruning and a second combined-head owner","duration":1.6149580000000014,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED [RED readiness] requires the live close and successor-classifier owners","status":"passed","title":"[RED readiness] requires the live close and successor-classifier owners","duration":0.07070799999999622,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED keeps both new runtime subpaths closed and binds every classifier verdict","status":"passed","title":"keeps both new runtime subpaths closed and binds every classifier verdict","duration":67.72641699999997,"failureMessages":[],"meta":{}}],"startTime":1788326192689,"endTime":1788326192774.7263,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED freezes the exact seven RED and exact nine GREEN owners","status":"passed","title":"freezes the exact seven RED and exact nine GREEN owners","duration":2.3913750000000107,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED pins one connected-only bounded protocol and a closed recovery state machine","status":"passed","title":"pins one connected-only bounded protocol and a closed recovery state machine","duration":0.42354100000000017,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED persists exact registered evidence before acknowledgement or relay","status":"passed","title":"persists exact registered evidence before acknowledgement or relay","duration":120.645083,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED queries every snapshotted authenticated peer and ignores foreign, malformed, and digest-only replies","status":"passed","title":"queries every snapshotted authenticated peer and ignores foreign, malformed, and digest-only replies","duration":45.038666999999975,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED terminalizes conflicting own-signed evidence independently of arrival or lexical order","status":"passed","title":"terminalizes conflicting own-signed evidence independently of arrival or lexical order","duration":84.66112500000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED stalls with no evidence and releases only the exact old value and carrier after complete re-learn","status":"passed","title":"stalls with no evidence and releases only the exact old value and carrier after complete re-learn","duration":40.78033300000004,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED [RED readiness] requires the connected carrier and node recovery owner","status":"passed","title":"[RED readiness] requires the connected carrier and node recovery owner","duration":0.11000000000001364,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED keeps the new runtime subpaths closed","status":"passed","title":"keeps the new runtime subpaths closed","duration":9.985500000000002,"failureMessages":[],"meta":{}}],"startTime":1788326193193,"endTime":1788326193496.9856,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-relearn-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED freezes exactly ten RED and four GREEN owners","status":"passed","title":"freezes exactly ten RED and four GREEN owners","duration":3.454332999999991,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED freezes the closed public contract and finite fault vocabulary","status":"passed","title":"freezes the closed public contract and finite fault vocabulary","duration":0.6169170000000008,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED constructs one sorted generation-2 replacement without a manifest ref","status":"passed","title":"constructs one sorted generation-2 replacement without a manifest ref","duration":1.1313340000000096,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED classifies exact active-new independently of a retrying generation id","status":"passed","title":"classifies exact active-new independently of a retrying generation id","duration":0.9246669999999995,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED keeps root/product/transport/issuance/activation owners outside the GREEN roster","status":"passed","title":"keeps root/product/transport/issuance/activation owners outside the GREEN roster","duration":3.2514579999999853,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED [RED readiness] requires all four candidate owners and the non-root package export","status":"passed","title":"[RED readiness] requires all four candidate owners and the non-root package export","duration":0.09008299999999281,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED consumes only a genuine owner-bound intent and commits one exact successor","status":"passed","title":"consumes only a genuine owner-bound intent and commits one exact successor","duration":279.1194999999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED accepts a byte-identical second intent without a second head swap","status":"passed","title":"accepts a byte-identical second intent without a second head swap","duration":154.45387500000004,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED reopens pending-old or exact active-new at every logical request fault","status":"passed","title":"reopens pending-old or exact active-new at every logical request fault","duration":2943.3861669999997,"failureMessages":[],"meta":{}}],"startTime":1788326188018,"endTime":1788326191405.3862,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED freezes the exact tests-only and GREEN owner rosters","status":"passed","title":"freezes the exact tests-only and GREEN owner rosters","duration":1.0734999999999673,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED freezes the exact v3-live-generation-2 grammar and compact-history carrier","status":"passed","title":"freezes the exact v3-live-generation-2 grammar and compact-history carrier","duration":0.9570000000001073,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED enumerates every registered CutValue field and every cross-owner causal mutant","status":"passed","title":"enumerates every registered CutValue field and every cross-owner causal mutant","duration":0.648665999999821,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED pins owner-bound one-use intent behavior independently of serialization","status":"passed","title":"pins owner-bound one-use intent behavior independently of serialization","duration":0.16637500000001637,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership","status":"passed","title":"forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership","duration":0.7110000000000127,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes every CutValue mutant against the genuine certified successor chain","status":"passed","title":"executes every CutValue mutant against the genuine certified successor chain","duration":76.00008300000013,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants","status":"passed","title":"executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants","duration":17.397207999999864,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes predecessor-lineage, close-order and append-only history mutants","status":"passed","title":"executes predecessor-lineage, close-order and append-only history mutants","duration":0.45204199999989214,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED replays the genuine durable journal/issuance pair and rejects missing local-issued custody","status":"passed","title":"replays the genuine durable journal/issuance pair and rejects missing local-issued custody","duration":0.7220000000002074,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes manifest, chunk, payload, catalog and artifact cross-pair mutants","status":"passed","title":"executes manifest, chunk, payload, catalog and artifact cross-pair mutants","duration":2.2924580000001242,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED detects a durable vertex appended after the sealed journal snapshot","status":"passed","title":"detects a durable vertex appended after the sealed journal snapshot","duration":2.321958999999879,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED derives the exact canonical generation-2 projection and reopens its compact history","status":"passed","title":"derives the exact canonical generation-2 projection and reopens its compact history","duration":3.1170419999998558,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED has one composite readiness gate for the genuine future verifier","status":"passed","title":"has one composite readiness gate for the genuine future verifier","duration":321.236625,"failureMessages":[],"meta":{}}],"startTime":1788326018503,"endTime":1788326018930.2366,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED freezes the D.108e2a activation boundary and its single topic owner","status":"passed","title":"freezes the D.108e2a activation boundary and its single topic owner","duration":162.02054099999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED rejects a hostile cold authentication profile before every downstream effect","status":"passed","title":"rejects a hostile cold authentication profile before every downstream effect","duration":3.905208000000016,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED freezes exactly seven RED and eight GREEN owners","status":"passed","title":"freezes exactly seven RED and eight GREEN owners","duration":0.6047909999999774,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster","status":"passed","title":"retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster","duration":0.24583300000006147,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED derives the exact epoch-one identity and pending epoch-zero lineage independently","status":"passed","title":"derives the exact epoch-one identity and pending epoch-zero lineage independently","duration":195.35454200000004,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED keeps the root and products outside D.108d1","status":"passed","title":"keeps the root and products outside D.108d1","duration":1.2629170000000158,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED pins the complete zero-skip GREEN inventory","status":"passed","title":"pins the complete zero-skip GREEN inventory","duration":0.7912079999999833,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED imports the shipped successor activation owner without a source-pattern readiness gate","status":"passed","title":"imports the shipped successor activation owner without a source-pattern readiness gate","duration":0.268291999999974,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED genuine successor imports its verified snapshot before epoch-one activation","status":"passed","title":"genuine successor imports its verified snapshot before epoch-one activation","duration":167.16745800000012,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED private custody alone selects installEpochAnchor","status":"passed","title":"private custody alone selects installEpochAnchor","duration":1464.0279999999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED divergent genesis identity fails before every live effect","status":"passed","title":"divergent genesis identity fails before every live effect","duration":711.8899579999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED pending epoch-zero outbox is classified and never published as epoch one","status":"passed","title":"pending epoch-zero outbox is classified and never published as epoch one","duration":150.39679100000012,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED old handle registration author and prepared capability are terminal","status":"passed","title":"old handle registration author and prepared capability are terminal","duration":144.82329200000004,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED hot duplicate returns the same handle before a second source claim","status":"passed","title":"hot duplicate returns the same handle before a second source claim","duration":164.940791,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED conflicting hot duplicate bindings fail closed","status":"passed","title":"conflicting hot duplicate bindings fail closed","duration":161.4595419999996,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED post-adoption activation failure cleans up and fresh reverify performs no second swapHead","status":"passed","title":"post-adoption activation failure cleans up and fresh reverify performs no second swapHead","duration":181.3956250000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED TTL expiry performs one bounded full reverify attempt","status":"passed","title":"TTL expiry performs one bounded full reverify attempt","duration":651.2883749999996,"failureMessages":[],"meta":{}}],"startTime":1788326026719,"endTime":1788326030882.2883,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED freezes exactly five RED and six GREEN owners without a new product API","status":"passed","title":"freezes exactly five RED and six GREEN owners without a new product API","duration":1.6171249999999873,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED constructs one exact canonical non-genesis anchor and epoch-one vertex independently","status":"passed","title":"constructs one exact canonical non-genesis anchor and epoch-one vertex independently","duration":6.507333000000017,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED preserves installGenesis as a genesis-only operation","status":"passed","title":"preserves installGenesis as a genesis-only operation","duration":17.254290999999995,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED [RED readiness] requires the six successor representation owners together","status":"passed","title":"[RED readiness] requires the six successor representation owners together","duration":0.09387499999999704,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED keeps epoch-zero and epoch-one rows isolated in one durable store","status":"passed","title":"keeps epoch-zero and epoch-one rows isolated in one durable store","duration":10.833625000000012,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED rejects hostile, noncanonical and unsafe successor epoch inputs closed","status":"passed","title":"rejects hostile, noncanonical and unsafe successor epoch inputs closed","duration":13.403957999999989,"failureMessages":[],"meta":{}}],"startTime":1788326192941,"endTime":1788326192990.404,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-epoch-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface","status":"passed","title":"freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface","duration":2.6204589999999826,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED [RED readiness] requires the private one-shot handle-alias bridge","status":"passed","title":"[RED readiness] requires the private one-shot handle-alias bridge","duration":0.20683300000001736,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED returned hot wrapper retains route, admission, targeted replay and deactivation identity","status":"passed","title":"returned hot wrapper retains route, admission, targeted replay and deactivation identity","duration":288.93850000000003,"failureMessages":[],"meta":{}}],"startTime":1788326194006,"endTime":1788326194296.9385,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-handle-identity-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED imports one explicit workspace package export only from its own fresh built file","status":"passed","title":"imports one explicit workspace package export only from its own fresh built file","duration":5.345208000000014,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED rejects every non-package-self workspace export-file target","status":"passed","title":"rejects every non-package-self workspace export-file target","duration":6.183999999999969,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED freezes exactly seven RED and eight GREEN test-infrastructure owners","status":"passed","title":"freezes exactly seven RED and eight GREEN test-infrastructure owners","duration":1.4392910000000256,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED binds the closed hook only after the package's own built export map resolves the exact target","status":"passed","title":"binds the closed hook only after the package's own built export map resolves the exact target","duration":179.326459,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED rejects completion-derived snapshot telemetry","status":"passed","title":"rejects completion-derived snapshot telemetry","duration":0.17000000000007276,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED removes its setup-created empty parent and preserves the live owner on refusal","status":"passed","title":"removes its setup-created empty parent and preserves the live owner on refusal","duration":24.249832999999967,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED preserves a pre-existing empty shim parent","status":"passed","title":"preserves a pre-existing empty shim parent","duration":24.218208000000004,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED refuses populated and dangling exact roots without deleting caller ownership","status":"passed","title":"refuses populated and dangling exact roots without deleting caller ownership","duration":5.165708999999993,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED cleans its root and setup-created parent after a deterministic setup failure","status":"passed","title":"cleans its root and setup-created parent after a deterministic setup failure","duration":4.733457999999928,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED moves package shims behind one bounded Playwright global-setup owner","status":"passed","title":"moves package shims behind one bounded Playwright global-setup owner","duration":203.298,"failureMessages":[],"meta":{}}],"startTime":1788326187298,"endTime":1788326187752.298,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-infrastructure-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact six-RED/two-GREEN oracle corrective ownership","status":"passed","title":"freezes the exact six-RED/two-GREEN oracle corrective ownership","duration":3.8915000000000077,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership","status":"passed","title":"freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership","duration":2.1782079999999837,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes exact nine-RED/three-GREEN ownership and the closed cold input","status":"passed","title":"freezes exact nine-RED/three-GREEN ownership and the closed cold input","duration":1.9162919999999986,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2d four-RED/one-GREEN performance ownership","status":"passed","title":"freezes the exact D.108e2d four-RED/one-GREEN performance ownership","duration":0.4918330000000424,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership","status":"passed","title":"freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership","duration":0.42479100000002745,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e4 thirteen-path tests-only ownership","status":"passed","title":"freezes the exact D.108e4 thirteen-path tests-only ownership","duration":2.828583999999978,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED requires every root canonical consumer to use the D.108e4 export-file boundary","status":"passed","title":"requires every root canonical consumer to use the D.108e4 export-file boundary","duration":0.4886659999999665,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED waits for reciprocal raw unreliable links before one measured movement in each direction","status":"passed","title":"waits for reciprocal raw unreliable links before one measured movement in each direction","duration":0.8884580000000142,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED derives the shipped eight-member chat identities and exact writer split","status":"passed","title":"derives the shipped eight-member chat identities and exact writer split","duration":32.169624999999996,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED admits Bob's genuine epoch-zero vertex before the multi-writer successor close","status":"passed","title":"admits Bob's genuine epoch-zero vertex before the multi-writer successor close","duration":296.766333,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED pins the complete zero-skip GREEN child inventory to direct execution","status":"passed","title":"pins the complete zero-skip GREEN child inventory to direct execution","duration":0.3611670000000231,"failureMessages":[],"meta":{}}],"startTime":1788326186493,"endTime":1788326186835.7664,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED freezes exactly five RED owners, one GREEN owner and seven browser behaviors","status":"passed","title":"freezes exactly five RED owners, one GREEN owner and seven browser behaviors","duration":2.2529590000000326,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED pins the exact seven-key successor authority and rejects pre-successor or widened values","status":"passed","title":"pins the exact seven-key successor authority and rejects pre-successor or widened values","duration":0.31654199999991306,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED keeps node-root and chat authority closed while assigning the room as sole node consumer","status":"passed","title":"keeps node-root and chat authority closed while assigning the room as sole node consumer","duration":67.28595799999994,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED runs all product behaviors without a source-pattern readiness gate","status":"passed","title":"runs all product behaviors without a source-pattern readiness gate","duration":0.45666700000003857,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED rejects only unsupported cold successor compositions before reading room authorities","status":"passed","title":"rejects only unsupported cold successor compositions before reading room authorities","duration":1.609792000000084,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e3 room lifetime transition RED"],"fullName":"D.108e3 room lifetime transition RED freezes four test owners, one room GREEN owner and twelve causal browser behaviors","status":"passed","title":"freezes four test owners, one room GREEN owner and twelve causal browser behaviors","duration":0.7516669999999976,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e5 bounded redirected lifetime RED"],"fullName":"D.108e5 bounded redirected lifetime RED bounds migration activation bytes before constructing the call-time owner","status":"passed","title":"bounds migration activation bytes before constructing the call-time owner","duration":99.554167,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e5 bounded redirected lifetime RED"],"fullName":"D.108e5 bounded redirected lifetime RED bounds every migration invite encode before copying caller-controlled bodies","status":"passed","title":"bounds every migration invite encode before copying caller-controlled bodies","duration":190.2182089999999,"failureMessages":[],"meta":{}}],"startTime":1788326192113,"endTime":1788326192476.2183,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-product-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.110c-0a epoch-relative seal-authority causal RED"],"fullName":"D.110c-0a epoch-relative seal-authority causal RED opens the genuine adopted epoch-one creator trust under the same authorized finality key","status":"passed","title":"opens the genuine adopted epoch-one creator trust under the same authorized finality key","duration":7.26724999999999,"failureMessages":[],"meta":{}}],"startTime":1788326194787,"endTime":1788326194794.2673,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0a-authority-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.110c-0a browser epoch-custody causal RED"],"fullName":"D.110c-0a browser epoch-custody causal RED uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers","status":"passed","title":"uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers","duration":57.19441699999999,"failureMessages":[],"meta":{}}],"startTime":1788326185403,"endTime":1788326185460.1943,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0a-browser-custody-red.test.ts"}]}
+== retained-vitest.json
+{"numTotalTestSuites":40,"numPassedTestSuites":38,"numFailedTestSuites":2,"numPendingTestSuites":0,"numTotalTests":148,"numPassedTests":147,"numFailedTests":1,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788325756929,"success":false,"testResults":[{"assertionResults":[{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED executes independent registry, identity, schema and transaction controls before readiness","status":"passed","title":"executes independent registry, identity, schema and transaction controls before readiness","duration":8.235499999999973,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED typechecks and executes the exact bounded n=4 Quint witness","status":"passed","title":"typechecks and executes the exact bounded n=4 Quint witness","duration":1821.4438750000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED [RED readiness] requires the complete four-owner atomic product graph","status":"passed","title":"[RED readiness] requires the complete four-owner atomic product graph","duration":0.13633299999992232,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED binds a genuine certified roster key to its independent signer ID","status":"passed","title":"binds a genuine certified roster key to its independent signer ID","duration":97.18879200000015,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes","status":"passed","title":"authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes","duration":27.07216699999981,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED releases only a detached durable carrier after the exact state-slot-outbox commit","status":"passed","title":"releases only a detached durable carrier after the exact state-slot-outbox commit","duration":13.586875000000418,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5a-c atomic seal safety RED"],"fullName":"Phase 5a-c atomic seal safety RED rejects wrong authority, stale revision and conflicting same-slot bytes without release","status":"passed","title":"rejects wrong authority, stale revision and conflicting same-slot bytes without release","duration":18.030749999999898,"failureMessages":[],"meta":{}}],"startTime":1788325924156,"endTime":1788325926142.0308,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-c-seal-safety-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.105a governed protocol-v3 seal digest identity RED"],"fullName":"D.105a governed protocol-v3 seal digest identity RED keeps the frozen v3 tuple byte-identical and proves the identities independently","status":"passed","title":"keeps the frozen v3 tuple byte-identical and proves the identities independently","duration":84.71862500000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.105a governed protocol-v3 seal digest identity RED"],"fullName":"D.105a governed protocol-v3 seal digest identity RED has the complete checker-authenticated seven-file PH-P5-D01 owner","status":"passed","title":"has the complete checker-authenticated seven-file PH-P5-D01 owner","duration":0.13237500000002456,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.105a frozen supplement behavior"],"fullName":"D.105a frozen supplement behavior binds the exact profile, vectors, and normative law","status":"passed","title":"binds the exact profile, vectors, and normative law","duration":0.5814169999999876,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.105a frozen supplement behavior"],"fullName":"D.105a frozen supplement behavior pins its closed schema, protected owners, checker, and bootstrap workflow","status":"passed","title":"pins its closed schema, protected owners, checker, and bootstrap workflow","duration":7788.887874999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.105a frozen supplement behavior"],"fullName":"D.105a frozen supplement behavior passes the real supplement checker","status":"passed","title":"passes the real supplement checker","duration":64.12337500000012,"failureMessages":[],"meta":{}}],"startTime":1788325916016,"endTime":1788325923954.1233,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5a-seal-digest-law-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.106a governed protocol-v3 pacemaker profile RED"],"fullName":"D.106a governed protocol-v3 pacemaker profile RED keeps the inherited v3 tuple byte-identical and proves the composition law independently","status":"passed","title":"keeps the inherited v3 tuple byte-identical and proves the composition law independently","duration":302.24979200000007,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.106a governed protocol-v3 pacemaker profile RED"],"fullName":"D.106a governed protocol-v3 pacemaker profile RED has the complete checker-authenticated seven-file PH-P5-D02 owner","status":"passed","title":"has the complete checker-authenticated seven-file PH-P5-D02 owner","duration":0.16333400000007714,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.106a frozen supplement behavior"],"fullName":"D.106a frozen supplement behavior binds the exact profile, vectors, normative decision, and workflow","status":"passed","title":"binds the exact profile, vectors, normative decision, and workflow","duration":8.070917000000009,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.106a frozen supplement behavior"],"fullName":"D.106a frozen supplement behavior pins the closed schema, protected owners, checker, and single-use bootstrap","status":"passed","title":"pins the closed schema, protected owners, checker, and single-use bootstrap","duration":4985.414584,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.106a frozen supplement behavior"],"fullName":"D.106a frozen supplement behavior passes the real supplement checker","status":"passed","title":"passes the real supplement checker","duration":64.50820899999962,"failureMessages":[],"meta":{}}],"startTime":1788325758804,"endTime":1788325764164.5083,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5d-pacemaker-law-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED pins the governed profile, exact runtime boundary, and causal mutant roster","status":"passed","title":"pins the governed profile, exact runtime boundary, and causal mutant roster","duration":1.6346249999999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED causally rejects every named pacemaker mutant","status":"passed","title":"causally rejects every named pacemaker mutant","duration":13.625917000000015,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED authenticates the frozen proposal, leader vote, QCs and round-change evidence independently","status":"passed","title":"authenticates the frozen proposal, leader vote, QCs and round-change evidence independently","duration":36.023708,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED hash-binds every closed ITF trace and rejects event-name-only state drift","status":"passed","title":"hash-binds every closed ITF trace and rejects event-name-only state drift","duration":8435.055917,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED typechecks and executes non-vacuous model actions before runtime readiness","status":"passed","title":"typechecks and executes non-vacuous model actions before runtime readiness","duration":3732.296625000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED typechecks the exact future fixture boundary before opening product readiness","status":"passed","title":"typechecks the exact future fixture boundary before opening product readiness","duration":1385.9392910000006,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED executes the real pinned Apalache backend rather than a transcript","status":"passed","title":"executes the real pinned Apalache backend rather than a transcript","duration":123653.377625,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED runs a real fake-indexeddb additive schema-v3 control before runtime readiness","status":"passed","title":"runs a real fake-indexeddb additive schema-v3 control before runtime readiness","duration":4.607374999992317,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED keeps canonical CutValue and registered vote identities independently recomputable","status":"passed","title":"keeps canonical CutValue and registered vote identities independently recomputable","duration":5.403624999977183,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED [RED readiness] requires the complete nine-owner pacemaker runtime graph","status":"passed","title":"[RED readiness] requires the complete nine-owner pacemaker runtime graph","duration":0.13316599998506717,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED binds runtime exports to the governed timeout and UTF-8 leader profile","status":"passed","title":"binds runtime exports to the governed timeout and UTF-8 leader profile","duration":81.04162500001257,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED keeps registered protocol verification as the sole proposal and round-change authority","status":"passed","title":"keeps registered protocol verification as the sole proposal and round-change authority","duration":0.9273329999996349,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5d model-first pacemaker RED"],"fullName":"Phase 5d model-first pacemaker RED replays every checked trace through the genuine voter, pacemaker, and fake-IDB store","status":"passed","title":"replays every checked trace through the genuine voter, pacemaker, and fake-IDB store","duration":7922.274124999996,"failureMessages":[],"meta":{}}],"startTime":1788325770438,"endTime":1788325915711.2742,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5d-pacemaker-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED freezes the exact six RED and exact twenty-four GREEN owner rosters","status":"passed","title":"freezes the exact six RED and exact twenty-four GREEN owner rosters","duration":3.3748329999999953,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED keeps the inherited schema-v2 voter as an executable pre-readiness control","status":"passed","title":"keeps the inherited schema-v2 voter as an executable pre-readiness control","duration":4.03841700000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED defines one additive v3 store while preserving the frozen four-store vote transaction","status":"passed","title":"defines one additive v3 store while preserving the frozen four-store vote transaction","duration":0.2857500000000073,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED closes the causal crash and mutation catalog without adding authority","status":"passed","title":"closes the causal crash and mutation catalog without adding authority","duration":0.2319169999999815,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED [RED readiness] requires the complete creator actor and evidence graph","status":"passed","title":"[RED readiness] requires the complete creator actor and evidence graph","duration":0.1165420000000097,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED keeps the actor, evidence, and finality subpaths closed","status":"passed","title":"keeps the actor, evidence, and finality subpaths closed","duration":48.56783299999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED persists the close candidate before either durable vote and releases only finalized evidence","status":"passed","title":"persists the close candidate before either durable vote and releases only finalized evidence","duration":94.94620799999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED re-verifies complete durable QC bytes before reopening signing authority","status":"passed","title":"re-verifies complete durable QC bytes before reopening signing authority","duration":76.740834,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED rejects foreign durable evidence and terminalizes an ambiguous commit retry","status":"failed","title":"rejects foreign durable evidence and terminalizes an ambiguous commit retry","duration":42.343458,"failureMessages":["Error: promise resolved \"{ actor: { …(3) }, authority: {}, …(4) }\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts:358:57\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED reopens exact finalized custody and rejects a conflicting close without rewriting bytes","status":"passed","title":"reopens exact finalized custody and rejects a conflicting close without rewriting bytes","duration":64.06116600000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED rejects raw-digest signing and a copied actor capability causally","status":"passed","title":"rejects raw-digest signing and a copied actor capability causally","duration":4.5141250000000355,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED copies all close carriers before awaiting storage and fences effects after stop","status":"passed","title":"copies all close carriers before awaiting storage and fences effects after stop","duration":24.110416999999984,"failureMessages":[],"meta":{}}],"startTime":1788325926936,"endTime":1788325927299.1104,"status":"failed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED freezes the exact existing registry and bounded ten-path GREEN surface","status":"passed","title":"freezes the exact existing registry and bounded ten-path GREEN surface","duration":2.1712090000000046,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED derives a genuine nontrivial close/history commitment and detects a post-sign vertex change","status":"passed","title":"derives a genuine nontrivial close/history commitment and detects a post-sign vertex change","duration":0.6033329999999921,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED differentially proves the multi-chunk manifest, CutValue and successor-anchor bytes","status":"passed","title":"differentially proves the multi-chunk manifest, CutValue and successor-anchor bytes","duration":43.05725000000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED keeps the legacy v1 trust classifier exact while leaving successor opening to creator-close","status":"passed","title":"keeps the legacy v1 trust classifier exact while leaving successor opening to creator-close","duration":3.1462080000000014,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED keeps the exact-three RED type surface buildable before the missing owner exists","status":"passed","title":"keeps the exact-three RED type surface buildable before the missing owner exists","duration":915.0333329999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED [RED readiness] requires the sole pure creator-close semantic owner","status":"passed","title":"[RED readiness] requires the sole pure creator-close semantic owner","duration":0.12562499999989996,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED authors exact detached snapshot transfer bytes through the shipped owner","status":"passed","title":"authors exact detached snapshot transfer bytes through the shipped owner","duration":166.05099999999993,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED mints only one-use creator-anchor signing requests bound to the exact creator tuple","status":"passed","title":"mints only one-use creator-anchor signing requests bound to the exact creator tuple","duration":1.7392910000000938,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED forms genuine q=1 prepare and commit QCs through the common verifier","status":"passed","title":"forms genuine q=1 prepare and commit QCs through the common verifier","duration":10.941709000000174,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED opens only the exact v1 successor chain bound to the durable commit QC","status":"passed","title":"opens only the exact v1 successor chain bound to the durable commit QC","duration":38.88458300000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e creator-certified close RED"],"fullName":"Phase 5e creator-certified close RED rejects tampered snapshot and successor carriers without mutating caller bytes","status":"passed","title":"rejects tampered snapshot and successor carriers without mutating caller bytes","duration":1.8680000000001655,"failureMessages":[],"meta":{}}],"startTime":1788325764388,"endTime":1788325765571.868,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-close-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED freezes the exact five RED and exact nine GREEN owners","status":"passed","title":"freezes the exact five RED and exact nine GREEN owners","duration":2.4899580000000014,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED pins separate honest trust, continuity and lifecycle projections","status":"passed","title":"pins separate honest trust, continuity and lifecycle projections","duration":0.3286669999999958,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED independently classifies replay, equivocation, rollback, gap and the exact successor without writes","status":"passed","title":"independently classifies replay, equivocation, rollback, gap and the exact successor without writes","duration":12.643750000000011,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED replaces exactly one trust ref while preserving every non-trust ref and adding proof refs","status":"passed","title":"replaces exactly one trust ref while preserving every non-trust ref and adding proof refs","duration":0.7362909999999943,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED accepts ambiguous head success only by exact successor reopen","status":"passed","title":"accepts ambiguous head success only by exact successor reopen","duration":0.11883299999999508,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED forbids activation, pruning and a second combined-head owner","status":"passed","title":"forbids activation, pruning and a second combined-head owner","duration":1.0937079999999924,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED [RED readiness] requires the live close and successor-classifier owners","status":"passed","title":"[RED readiness] requires the live close and successor-classifier owners","duration":0.07179199999998787,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e genuine creator live close RED"],"fullName":"Phase 5e genuine creator live close RED keeps both new runtime subpaths closed and binds every classifier verdict","status":"passed","title":"keeps both new runtime subpaths closed and binds every classifier verdict","duration":67.85054199999996,"failureMessages":[],"meta":{}}],"startTime":1788325933924,"endTime":1788325934008.8506,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-live-close-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED freezes the exact seven RED and exact nine GREEN owners","status":"passed","title":"freezes the exact seven RED and exact nine GREEN owners","duration":2.424915999999996,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED pins one connected-only bounded protocol and a closed recovery state machine","status":"passed","title":"pins one connected-only bounded protocol and a closed recovery state machine","duration":0.41133400000001075,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED persists exact registered evidence before acknowledgement or relay","status":"passed","title":"persists exact registered evidence before acknowledgement or relay","duration":123.64629199999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED queries every snapshotted authenticated peer and ignores foreign, malformed, and digest-only replies","status":"passed","title":"queries every snapshotted authenticated peer and ignores foreign, malformed, and digest-only replies","duration":44.402625,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED terminalizes conflicting own-signed evidence independently of arrival or lexical order","status":"passed","title":"terminalizes conflicting own-signed evidence independently of arrival or lexical order","duration":81.14745800000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED stalls with no evidence and releases only the exact old value and carrier after complete re-learn","status":"passed","title":"stalls with no evidence and releases only the exact old value and carrier after complete re-learn","duration":40.88154199999997,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED [RED readiness] requires the connected carrier and node recovery owner","status":"passed","title":"[RED readiness] requires the connected carrier and node recovery owner","duration":0.12758300000001555,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e persistent creator evidence and bounded re-learn RED"],"fullName":"Phase 5e persistent creator evidence and bounded re-learn RED keeps the new runtime subpaths closed","status":"passed","title":"keeps the new runtime subpaths closed","duration":6.507499999999993,"failureMessages":[],"meta":{}}],"startTime":1788325934424,"endTime":1788325934723.5076,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-relearn-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED freezes exactly ten RED and four GREEN owners","status":"passed","title":"freezes exactly ten RED and four GREEN owners","duration":3.875374999999991,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED freezes the closed public contract and finite fault vocabulary","status":"passed","title":"freezes the closed public contract and finite fault vocabulary","duration":0.6566669999999988,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED constructs one sorted generation-2 replacement without a manifest ref","status":"passed","title":"constructs one sorted generation-2 replacement without a manifest ref","duration":1.1376249999999857,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED classifies exact active-new independently of a retrying generation id","status":"passed","title":"classifies exact active-new independently of a retrying generation id","duration":0.9580829999999878,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED keeps root/product/transport/issuance/activation owners outside the GREEN roster","status":"passed","title":"keeps root/product/transport/issuance/activation owners outside the GREEN roster","duration":3.278415999999993,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED [RED readiness] requires all four candidate owners and the non-root package export","status":"passed","title":"[RED readiness] requires all four candidate owners and the non-root package export","duration":0.10041700000002152,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED consumes only a genuine owner-bound intent and commits one exact successor","status":"passed","title":"consumes only a genuine owner-bound intent and commits one exact successor","duration":276.99991600000004,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED accepts a byte-identical second intent without a second head swap","status":"passed","title":"accepts a byte-identical second intent without a second head swap","duration":152.360542,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED reopens pending-old or exact active-new at every logical request fault","status":"passed","title":"reopens pending-old or exact active-new at every logical request fault","duration":2904.104708,"failureMessages":[],"meta":{}}],"startTime":1788325929304,"endTime":1788325932648.1047,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED freezes the exact tests-only and GREEN owner rosters","status":"passed","title":"freezes the exact tests-only and GREEN owner rosters","duration":1.0152090000000271,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED freezes the exact v3-live-generation-2 grammar and compact-history carrier","status":"passed","title":"freezes the exact v3-live-generation-2 grammar and compact-history carrier","duration":0.8540000000000418,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED enumerates every registered CutValue field and every cross-owner causal mutant","status":"passed","title":"enumerates every registered CutValue field and every cross-owner causal mutant","duration":0.62824999999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED pins owner-bound one-use intent behavior independently of serialization","status":"passed","title":"pins owner-bound one-use intent behavior independently of serialization","duration":0.16229199999997945,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership","status":"passed","title":"forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership","duration":0.6257080000000315,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes every CutValue mutant against the genuine certified successor chain","status":"passed","title":"executes every CutValue mutant against the genuine certified successor chain","duration":73.14537500000006,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants","status":"passed","title":"executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants","duration":18.612540999999965,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes predecessor-lineage, close-order and append-only history mutants","status":"passed","title":"executes predecessor-lineage, close-order and append-only history mutants","duration":0.44383300000004056,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED replays the genuine durable journal/issuance pair and rejects missing local-issued custody","status":"passed","title":"replays the genuine durable journal/issuance pair and rejects missing local-issued custody","duration":1.0195420000000013,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes manifest, chunk, payload, catalog and artifact cross-pair mutants","status":"passed","title":"executes manifest, chunk, payload, catalog and artifact cross-pair mutants","duration":2.9965830000001006,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED detects a durable vertex appended after the sealed journal snapshot","status":"passed","title":"detects a durable vertex appended after the sealed journal snapshot","duration":2.3750420000001213,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED derives the exact canonical generation-2 projection and reopens its compact history","status":"passed","title":"derives the exact canonical generation-2 projection and reopens its compact history","duration":3.1363750000000437,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED has one composite readiness gate for the genuine future verifier","status":"passed","title":"has one composite readiness gate for the genuine future verifier","duration":327.6322909999999,"failureMessages":[],"meta":{}}],"startTime":1788325758033,"endTime":1788325758465.6323,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED freezes the D.108e2a activation boundary and its single topic owner","status":"passed","title":"freezes the D.108e2a activation boundary and its single topic owner","duration":151.529542,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED rejects a hostile cold authentication profile before every downstream effect","status":"passed","title":"rejects a hostile cold authentication profile before every downstream effect","duration":3.8834159999998974,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED freezes exactly seven RED and eight GREEN owners","status":"passed","title":"freezes exactly seven RED and eight GREEN owners","duration":0.6798749999999245,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster","status":"passed","title":"retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster","duration":0.27195800000004056,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED derives the exact epoch-one identity and pending epoch-zero lineage independently","status":"passed","title":"derives the exact epoch-one identity and pending epoch-zero lineage independently","duration":195.32379100000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED keeps the root and products outside D.108d1","status":"passed","title":"keeps the root and products outside D.108d1","duration":1.0851669999999558,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED pins the complete zero-skip GREEN inventory","status":"passed","title":"pins the complete zero-skip GREEN inventory","duration":0.6312920000000304,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED imports the shipped successor activation owner without a source-pattern readiness gate","status":"passed","title":"imports the shipped successor activation owner without a source-pattern readiness gate","duration":0.22387500000002092,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED genuine successor imports its verified snapshot before epoch-one activation","status":"passed","title":"genuine successor imports its verified snapshot before epoch-one activation","duration":165.40541699999994,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED private custody alone selects installEpochAnchor","status":"passed","title":"private custody alone selects installEpochAnchor","duration":1430.024667,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED divergent genesis identity fails before every live effect","status":"passed","title":"divergent genesis identity fails before every live effect","duration":688.9092920000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED pending epoch-zero outbox is classified and never published as epoch one","status":"passed","title":"pending epoch-zero outbox is classified and never published as epoch one","duration":148.52441700000008,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED old handle registration author and prepared capability are terminal","status":"passed","title":"old handle registration author and prepared capability are terminal","duration":144.75208399999974,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED hot duplicate returns the same handle before a second source claim","status":"passed","title":"hot duplicate returns the same handle before a second source claim","duration":159.38475000000017,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED conflicting hot duplicate bindings fail closed","status":"passed","title":"conflicting hot duplicate bindings fail closed","duration":159.91916700000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED post-adoption activation failure cleans up and fresh reverify performs no second swapHead","status":"passed","title":"post-adoption activation failure cleans up and fresh reverify performs no second swapHead","duration":177.977625,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED TTL expiry performs one bounded full reverify attempt","status":"passed","title":"TTL expiry performs one bounded full reverify attempt","duration":638.4848750000001,"failureMessages":[],"meta":{}}],"startTime":1788325766149,"endTime":1788325770216.4849,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED freezes exactly five RED and six GREEN owners without a new product API","status":"passed","title":"freezes exactly five RED and six GREEN owners without a new product API","duration":1.8282920000000047,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED constructs one exact canonical non-genesis anchor and epoch-one vertex independently","status":"passed","title":"constructs one exact canonical non-genesis anchor and epoch-one vertex independently","duration":6.551457999999997,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED preserves installGenesis as a genesis-only operation","status":"passed","title":"preserves installGenesis as a genesis-only operation","duration":18.23350000000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED [RED readiness] requires the six successor representation owners together","status":"passed","title":"[RED readiness] requires the six successor representation owners together","duration":0.10991699999999582,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED keeps epoch-zero and epoch-one rows isolated in one durable store","status":"passed","title":"keeps epoch-zero and epoch-one rows isolated in one durable store","duration":11.380833999999993,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED rejects hostile, noncanonical and unsafe successor epoch inputs closed","status":"passed","title":"rejects hostile, noncanonical and unsafe successor epoch inputs closed","duration":12.690500000000014,"failureMessages":[],"meta":{}}],"startTime":1788325934169,"endTime":1788325934219.6904,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-epoch-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface","status":"passed","title":"freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface","duration":2.5988330000000133,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED [RED readiness] requires the private one-shot handle-alias bridge","status":"passed","title":"[RED readiness] requires the private one-shot handle-alias bridge","duration":0.1901250000000232,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED returned hot wrapper retains route, admission, targeted replay and deactivation identity","status":"passed","title":"returned hot wrapper retains route, admission, targeted replay and deactivation identity","duration":295.45408399999997,"failureMessages":[],"meta":{}}],"startTime":1788325935224,"endTime":1788325935522.454,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-handle-identity-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED imports one explicit workspace package export only from its own fresh built file","status":"passed","title":"imports one explicit workspace package export only from its own fresh built file","duration":4.608291000000008,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED rejects every non-package-self workspace export-file target","status":"passed","title":"rejects every non-package-self workspace export-file target","duration":6.333624999999984,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED freezes exactly seven RED and eight GREEN test-infrastructure owners","status":"passed","title":"freezes exactly seven RED and eight GREEN test-infrastructure owners","duration":1.4333330000000046,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED binds the closed hook only after the package's own built export map resolves the exact target","status":"passed","title":"binds the closed hook only after the package's own built export map resolves the exact target","duration":181.60258300000004,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED rejects completion-derived snapshot telemetry","status":"passed","title":"rejects completion-derived snapshot telemetry","duration":0.16745800000001054,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED removes its setup-created empty parent and preserves the live owner on refusal","status":"passed","title":"removes its setup-created empty parent and preserves the live owner on refusal","duration":26.23787500000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED preserves a pre-existing empty shim parent","status":"passed","title":"preserves a pre-existing empty shim parent","duration":23.583334000000036,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED refuses populated and dangling exact roots without deleting caller ownership","status":"passed","title":"refuses populated and dangling exact roots without deleting caller ownership","duration":5.516916999999921,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED cleans its root and setup-created parent after a deterministic setup failure","status":"passed","title":"cleans its root and setup-created parent after a deterministic setup failure","duration":4.87804200000005,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e1 activation test-infrastructure RED"],"fullName":"D.108e1 activation test-infrastructure RED moves package shims behind one bounded Playwright global-setup owner","status":"passed","title":"moves package shims behind one bounded Playwright global-setup owner","duration":209.70408299999997,"failureMessages":[],"meta":{}}],"startTime":1788325928571,"endTime":1788325929035.704,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-infrastructure-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact six-RED/two-GREEN oracle corrective ownership","status":"passed","title":"freezes the exact six-RED/two-GREEN oracle corrective ownership","duration":4.210666000000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership","status":"passed","title":"freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership","duration":2.3052089999999907,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes exact nine-RED/three-GREEN ownership and the closed cold input","status":"passed","title":"freezes exact nine-RED/three-GREEN ownership and the closed cold input","duration":1.3269169999999804,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2d four-RED/one-GREEN performance ownership","status":"passed","title":"freezes the exact D.108e2d four-RED/one-GREEN performance ownership","duration":0.43591700000001765,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership","status":"passed","title":"freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership","duration":0.4003749999999968,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e4 thirteen-path tests-only ownership","status":"passed","title":"freezes the exact D.108e4 thirteen-path tests-only ownership","duration":3.5766249999999786,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED requires every root canonical consumer to use the D.108e4 export-file boundary","status":"passed","title":"requires every root canonical consumer to use the D.108e4 export-file boundary","duration":0.4835419999999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED waits for reciprocal raw unreliable links before one measured movement in each direction","status":"passed","title":"waits for reciprocal raw unreliable links before one measured movement in each direction","duration":0.84212500000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED derives the shipped eight-member chat identities and exact writer split","status":"passed","title":"derives the shipped eight-member chat identities and exact writer split","duration":31.521334000000024,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED admits Bob's genuine epoch-zero vertex before the multi-writer successor close","status":"passed","title":"admits Bob's genuine epoch-zero vertex before the multi-writer successor close","duration":290.400916,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1b authenticated peer-local cold issuance RED"],"fullName":"D.108d1b authenticated peer-local cold issuance RED pins the complete zero-skip GREEN child inventory to direct execution","status":"passed","title":"pins the complete zero-skip GREEN child inventory to direct execution","duration":0.3410000000000082,"failureMessages":[],"meta":{}}],"startTime":1788325927774,"endTime":1788325928110.401,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED freezes exactly five RED owners, one GREEN owner and seven browser behaviors","status":"passed","title":"freezes exactly five RED owners, one GREEN owner and seven browser behaviors","duration":2.259249999999952,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED pins the exact seven-key successor authority and rejects pre-successor or widened values","status":"passed","title":"pins the exact seven-key successor authority and rejects pre-successor or widened values","duration":0.2831669999999349,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED keeps node-root and chat authority closed while assigning the room as sole node consumer","status":"passed","title":"keeps node-root and chat authority closed while assigning the room as sole node consumer","duration":69.10516699999994,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED runs all product behaviors without a source-pattern readiness gate","status":"passed","title":"runs all product behaviors without a source-pattern readiness gate","duration":0.40658299999995506,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e2b creator successor room lifetime RED"],"fullName":"D.108e2b creator successor room lifetime RED rejects only unsupported cold successor compositions before reading room authorities","status":"passed","title":"rejects only unsupported cold successor compositions before reading room authorities","duration":1.6772909999999683,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e3 room lifetime transition RED"],"fullName":"D.108e3 room lifetime transition RED freezes four test owners, one room GREEN owner and twelve causal browser behaviors","status":"passed","title":"freezes four test owners, one room GREEN owner and twelve causal browser behaviors","duration":0.8123749999999745,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e5 bounded redirected lifetime RED"],"fullName":"D.108e5 bounded redirected lifetime RED bounds migration activation bytes before constructing the call-time owner","status":"passed","title":"bounds migration activation bytes before constructing the call-time owner","duration":99.79895799999997,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108e5 bounded redirected lifetime RED"],"fullName":"D.108e5 bounded redirected lifetime RED bounds every migration invite encode before copying caller-controlled bodies","status":"passed","title":"bounds every migration invite encode before copying caller-controlled bodies","duration":191.884416,"failureMessages":[],"meta":{}}],"startTime":1788325933338,"endTime":1788325933704.8845,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-product-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.110c-0a epoch-relative seal-authority causal RED"],"fullName":"D.110c-0a epoch-relative seal-authority causal RED opens the genuine adopted epoch-one creator trust under the same authorized finality key","status":"passed","title":"opens the genuine adopted epoch-one creator trust under the same authorized finality key","duration":7.43995799999999,"failureMessages":[],"meta":{}}],"startTime":1788325936009,"endTime":1788325936016.44,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0a-authority-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.110c-0a browser epoch-custody causal RED"],"fullName":"D.110c-0a browser epoch-custody causal RED uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers","status":"passed","title":"uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers","duration":56.12412500000005,"failureMessages":[],"meta":{}}],"startTime":1788325926703,"endTime":1788325926759.124,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0a-browser-custody-red.test.ts"}]}
+
+== retained-creator-actor-corrected.json
+{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":12,"numPassedTests":12,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788326003803,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED freezes the exact six RED and exact twenty-four GREEN owner rosters","status":"passed","title":"freezes the exact six RED and exact twenty-four GREEN owner rosters","duration":1.9885419999999954,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED keeps the inherited schema-v2 voter as an executable pre-readiness control","status":"passed","title":"keeps the inherited schema-v2 voter as an executable pre-readiness control","duration":4.5676249999999925,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED defines one additive v3 store while preserving the frozen four-store vote transaction","status":"passed","title":"defines one additive v3 store while preserving the frozen four-store vote transaction","duration":0.24462500000001342,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED closes the causal crash and mutation catalog without adding authority","status":"passed","title":"closes the causal crash and mutation catalog without adding authority","duration":0.24049999999999727,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED [RED readiness] requires the complete creator actor and evidence graph","status":"passed","title":"[RED readiness] requires the complete creator actor and evidence graph","duration":0.13229200000000674,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED keeps the actor, evidence, and finality subpaths closed","status":"passed","title":"keeps the actor, evidence, and finality subpaths closed","duration":118.95933399999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED persists the close candidate before either durable vote and releases only finalized evidence","status":"passed","title":"persists the close candidate before either durable vote and releases only finalized evidence","duration":156.822833,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED re-verifies complete durable QC bytes before reopening signing authority","status":"passed","title":"re-verifies complete durable QC bytes before reopening signing authority","duration":76.34654199999994,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry","status":"passed","title":"ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry","duration":75.25349999999992,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED reopens exact finalized custody and rejects a conflicting close without rewriting bytes","status":"passed","title":"reopens exact finalized custody and rejects a conflicting close without rewriting bytes","duration":63.65549999999996,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED rejects raw-digest signing and a copied actor capability causally","status":"passed","title":"rejects raw-digest signing and a copied actor capability causally","duration":4.191500000000019,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 5e durable creator actor RED"],"fullName":"Phase 5e durable creator actor RED copies all close carriers before awaiting storage and fences effects after stop","status":"passed","title":"copies all close carriers before awaiting storage and fences effects after stop","duration":24.088042000000087,"failureMessages":[],"meta":{}}],"startTime":1788326004111,"endTime":1788326004638.0881,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts"}]}
+diff --git a/tests/phase-5e-creator-actor-red.test.ts b/tests/phase-5e-creator-actor-red.test.ts
+index 2a40b7e1..26477556 100644
+--- a/tests/phase-5e-creator-actor-red.test.ts
++++ b/tests/phase-5e-creator-actor-red.test.ts
+@@ -347,7 +347,7 @@ describe("Phase 5e durable creator actor RED", () => {
+ 	});
+ 
+ 	it.skipIf(!readiness.ready)(
+-		"rejects foreign durable evidence and terminalizes an ambiguous commit retry",
++		"ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry",
+ 		async () => {
+ 			const foreignDatabase = `phase5e-actor-foreign-${crypto.randomUUID()}`;
+ 			openedDatabases.push(foreignDatabase);
+@@ -355,7 +355,13 @@ describe("Phase 5e durable creator actor RED", () => {
+ 			expect(await foreignFirst.actor.close({ closeInput: foreignFirst.closeInput })).toMatchObject({ ok: true });
+ 			await foreignFirst.close();
+ 			await mutateSealEvidence(foreignDatabase, (row) => ({ ...row, signerId: "foreign-finality" }));
+-			await expect(openCreatorActorHarness(foreignDatabase)).rejects.toThrow(/SIGNER_NOT_AUTHORIZED/u);
++			const foreignIgnored = await openCreatorActorHarness(foreignDatabase);
++			try {
++				expect(foreignIgnored.actor.status()).toMatchObject({ phase: "empty", terminal: false });
++				expect(await foreignIgnored.actor.close({ closeInput: foreignIgnored.closeInput })).toMatchObject({ ok: true });
++			} finally {
++				await foreignIgnored.close();
++			}
+ 
+ 			const ambiguousDatabase = `phase5e-actor-ambiguous-${crypto.randomUUID()}`;
+ 			openedDatabases.push(ambiguousDatabase);
+diff --git a/tests/phase-6b-d110c-0a-authority-red.test.ts b/tests/phase-6b-d110c-0a-authority-red.test.ts
+index f0f6b012..97f9aff6 100644
+--- a/tests/phase-6b-d110c-0a-authority-red.test.ts
++++ b/tests/phase-6b-d110c-0a-authority-red.test.ts
+@@ -39,7 +39,9 @@ describe("D.110c-0a epoch-relative seal-authority causal RED", () => {
+ 		if (!successor.ok) return;
+ 
+ 		const source = readFileSync(resolve(import.meta.dirname, "../packages/protocol-v3/src/seal.ts"), "utf8");
+-		expect(source, "D110C_0A_LITERAL_GUARD_SOURCE").toContain("material === undefined || material.currentEpoch !== 0");
++		expect(source, "D110C_0A_LITERAL_GUARD_SOURCE").not.toContain(
++			"material === undefined || material.currentEpoch !== 0"
++		);
+ 		expect(
+ 			openSealAuthority({ signerPublicKey: publicKey, trust: successor.trust }),
+ 			"D110C_0A_EPOCH_ONE_AUTHORITY_REFUSED"
+async function runClose(
+	state: ActorState,
+	input: Readonly<{ closeInput: Readonly<Record<string, unknown>> }>
+): Promise<ActorResult> {
+	try {
+		if (!plainRecord(input) || Reflect.ownKeys(input).length !== 1 || !plainRecord(input.closeInput)) {
+			return failure("MALFORMED_INPUT");
+		}
+		if (input.closeInput.currentTrust !== state.currentTrust) return failure("UNTRUSTED_CURRENT_ANCHOR");
+		const preparedClose = prepareCreatorClose(input.closeInput);
+		if (!preparedClose.ok) return failure(preparedClose.reason);
+		const signer = signerIdentity(input.closeInput);
+		const identity = cutIdentity(preparedClose.exactCanonicalCutValueBytes);
+		const voterFailure = await openVoter(state, signer.publicKey, signer.signerId);
+		if (voterFailure !== undefined) return failure(voterFailure);
+		const authority = state.authority;
+		const voter = state.voter;
+		if (authority === null || voter === null) return failure("UNTRUSTED_CREATOR_ACTOR");
+
+		let record = state.evidenceRecord;
+		if (record === null) {
+			record = Object.freeze({
+				anchor: identity.anchor,
+				epoch: identity.epoch,
+				exactCanonicalCommitQcBytes: null,
+				exactCanonicalCutValueBytes: Uint8Array.from(preparedClose.exactCanonicalCutValueBytes),
+				exactCanonicalPrepareQcBytes: null,
+				exactCanonicalTrustStateRecordBytes: null,
+				objectId: identity.objectId,
+				phase: "evidence-committed" as const,
+				revision: 0,
+				signerId: signer.signerId,
+				signerPublicKey: Uint8Array.from(signer.publicKey),
+				storageIncarnation: state.storageIncarnation,
+				valueDigest: preparedClose.valueDigest,
+			});
+			const evidenceFailure = await persistEvidence(state, record, null);
+			if (evidenceFailure !== undefined) return failure(evidenceFailure);
+			emit(state, "close_evidence_committed");
+		} else if (
+			record.anchor !== identity.anchor ||
+			record.epoch !== identity.epoch ||
+			record.objectId !== identity.objectId ||
+			record.signerId !== signer.signerId ||
+			record.valueDigest !== preparedClose.valueDigest ||
+			compareBytes(record.exactCanonicalCutValueBytes, preparedClose.exactCanonicalCutValueBytes) !== 0
+		) {
+			state.terminalReason = "CLOSE_CONFLICT";
+			return failure("CLOSE_CONFLICT");
+		}
+
+		if (record.phase === "commit-vote-pending") {
+			state.terminalReason = "AMBIGUOUS_OUTCOME";
+			return failure("AMBIGUOUS_OUTCOME");
+		}
+		if (state.stopRequested) return failure("STOPPED");
+		let voterStatus = voter.status();
+		let prepareQcBytes = record.exactCanonicalPrepareQcBytes;
+		let commitQcBytes = record.exactCanonicalCommitQcBytes;
+		let prepareCarrier: ExactSealCarrier | null = null;
+		let commitCarrier: ExactSealCarrier | null = null;
+
+		if (voterStatus.revision < 1) {
+			const voted = await voter.vote({
+				exactCanonicalCutValueBytes: preparedClose.exactCanonicalCutValueBytes,
+				expectedRevision: voterStatus.revision,
+				phase: "prepare",
+				round: 0,
+			});
+			if (!voted.ok) return failure(voted.reason);
+			prepareCarrier = voted.stored;
+packages/protocol-v3/src/seal.ts:139:function safeInteger(
+packages/protocol-v3/src/seal.ts:221:					!safeInteger(
+packages/protocol-v3/src/seal.ts:282:			!safeInteger(material.currentEpoch, 0) ||
+packages/protocol-v3/src/seal.ts:364:		if ((input.phase !== "prepare" && input.phase !== "commit") || !safeInteger(input.round, 0)) {
+packages/protocol-v3/src/seal.ts:454:			!safeInteger(qc.round, 0) ||
+packages/protocol-v3/src/seal.ts:577:		if (!safeInteger(input.round, 1)) return failure("malformed-input");
+packages/protocol-v3/src/seal.ts:648:			!safeInteger(decoded.round, 1) ||
+packages/protocol-v3/src/seal.ts:731:			!safeInteger(proposal.round, 0)
+packages/storage-browser/src/internal/seal-evidence-store.ts:60:function safeRevision(value: unknown): value is number {
+packages/storage-browser/src/internal/seal-evidence-store.ts:90:		!safeRevision(value.epoch) ||
+packages/storage-browser/src/internal/seal-evidence-store.ts:94:		!safeRevision(value.revision) ||
+packages/storage-browser/src/internal/seal-evidence-store.ts:182:			!safeRevision(vote.epoch) ||
+packages/storage-browser/src/internal/seal-evidence-store.ts:408:				!safeRevision(epoch) ||
+packages/storage-browser/src/internal/seal-vote-store.ts:98:function safeNonnegative(value: unknown): value is number {
+packages/storage-browser/src/internal/seal-vote-store.ts:173:		!safeNonnegative(value.epoch) ||
+packages/storage-browser/src/internal/seal-vote-store.ts:174:		!safeNonnegative(value.round) ||
+packages/storage-browser/src/internal/seal-vote-store.ts:223:					  safeNonnegative(raw.prepareQC.round) &&
+packages/storage-browser/src/internal/seal-vote-store.ts:235:			!safeNonnegative(raw.epoch) ||
+packages/storage-browser/src/internal/seal-vote-store.ts:238:			!safeNonnegative(raw.expectedRevision) ||
+packages/storage-browser/src/internal/seal-vote-store.ts:241:			!safeNonnegative(raw.round) ||
+phase-5c-playwright.json {"expected":25,"unexpected":0,"skipped":2,"flaky":0}
+phase-5d-playwright.json {"expected":24,"unexpected":0,"skipped":0,"flaky":0}
+phase-5e-actor-playwright.json {"expected":12,"unexpected":0,"skipped":0,"flaky":0}
+phase-5e-live-close-playwright.json {"expected":9,"unexpected":0,"skipped":0,"flaky":0}
+phase-5e-relearn-playwright.json {"expected":6,"unexpected":0,"skipped":0,"flaky":0}
+phase-6a-activation-playwright.json {"expected":24,"unexpected":0,"skipped":0,"flaky":0}
+phase-6a-adoption-commit-playwright.json {"expected":6,"unexpected":0,"skipped":0,"flaky":0}
+phase-6a-product-playwright.json {"expected":24,"unexpected":0,"skipped":0,"flaky":0}
+phase-6a-successor-epoch-playwright.json {"expected":3,"unexpected":0,"skipped":0,"flaky":0}
+diff --git a/tests/phase-6b-d110c-0a-browser-custody-red.test.ts b/tests/phase-6b-d110c-0a-browser-custody-red.test.ts
+index e8c0f1a8..cd650381 100644
+--- a/tests/phase-6b-d110c-0a-browser-custody-red.test.ts
++++ b/tests/phase-6b-d110c-0a-browser-custody-red.test.ts
+@@ -1,7 +1,7 @@
+ import "fake-indexeddb/auto";
+ 
+ import { ed25519 } from "@noble/curves/ed25519.js";
+-import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
++import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+ import { readFileSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { afterAll, beforeAll, describe, expect, it } from "vitest";
+@@ -9,15 +9,20 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
+ import { contract, hexBytes } from "./fixtures/phase-3a0-v3/controlled-anchor-trust.js";
+ import { independentQc } from "./fixtures/phase-5e-v3/creator-close-contract.js";
+ import { bytesForRef, openGenuineCreatorAdoptionFixture } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
++import { createRecoverableFinalitySigner } from "../packages/keychain/src/finality.js";
++import { openCreatorSuccessorTrust } from "../packages/protocol-v3/src/creator-close.js";
+ import { consumeSealSigningRequest } from "../packages/protocol-v3/src/internal/seal-signing-request.js";
+ import { openSealAuthority, prepareSealVote, verifySealQC } from "../packages/protocol-v3/src/seal.js";
++import { encodeSnapshotTransfer } from "../packages/protocol-v3/src/snapshot-transfer.js";
++import { createCreatorSealActor } from "../packages/seal/src/creator.js";
++import { PHASE_5E_SEAL_EVIDENCE_STORE } from "../packages/storage-browser/src/internal/schema-idb.js";
+ import {
+-	PHASE_5C_VOTE_OUTBOX_STORE,
+-	PHASE_5E_SEAL_EVIDENCE_STORE,
+-} from "../packages/storage-browser/src/internal/schema-idb.js";
+-import type { PeerSealEvidence } from "../packages/storage-browser/src/internal/seal-evidence-store.js";
++	openInternalSealEvidenceStore,
++	type PeerSealEvidence,
++} from "../packages/storage-browser/src/internal/seal-evidence-store.js";
+ import { openInternalSealVoteStore } from "../packages/storage-browser/src/internal/seal-vote-store.js";
+ import { openBrowserSealEvidenceStore } from "../packages/storage-browser/src/seal-evidence.js";
++import { openBrowserSealVoteStore } from "../packages/storage-browser/src/seal-vote.js";
+ 
+ interface ExactCarrier {
+ 	readonly exactCanonicalPreimageBytes: Uint8Array;
+@@ -56,14 +61,6 @@ async function withDatabase<T>(databaseName: string, operation: (database: IDBDa
+ 	}
+ }
+ 
+-async function putRaw(databaseName: string, storeName: string, row: unknown): Promise<void> {
+-	await withDatabase(databaseName, async (database) => {
+-		const transaction = database.transaction(storeName, "readwrite");
+-		await request(transaction.objectStore(storeName).put(row));
+-		await completed(transaction);
+-	});
+-}
+-
+ async function readRaw(databaseName: string, storeName: string, key: IDBValidKey): Promise<unknown> {
+ 	return withDatabase(databaseName, async (database) => {
+ 		const transaction = database.transaction(storeName, "readonly");
+@@ -83,16 +80,6 @@ function deleteDatabase(databaseName: string): Promise<void> {
+ 	});
+ }
+ 
+-function signedCarrier(exactCanonicalPreimageBytes: Uint8Array): ExactCarrier {
+-	return Object.freeze({
+-		exactCanonicalPreimageBytes: Uint8Array.from(exactCanonicalPreimageBytes),
+-		signature: ed25519.sign(
+-			hashDomain("ts-drp/seal-vote/v3", exactCanonicalPreimageBytes),
+-			hexBytes(contract.privateKeySeedHex)
+-		),
+-	});
+-}
+-
+ function peerEvidence(
+ 	carrier: ExactCarrier,
+ 	exactCanonicalCutValueBytes: Uint8Array,
+@@ -133,6 +120,7 @@ afterAll(async () => fixture?.close());
+ 
+ describe("D.110c-0a browser epoch-custody causal RED", () => {
+ 	it("uses schema-v3 epoch keys while refusing or misselecting the epoch-one diagnostic carriers", async () => {
++		const actorDatabase = `d110c-actor-${crypto.randomUUID()}`;
+ 		const evidenceDatabase = `d110c-evidence-${crypto.randomUUID()}`;
+ 		const voteDatabase = `d110c-vote-${crypto.randomUUID()}`;
+ 		const { closeResult, currentTrust, proposed } = fixture.evidence;
+@@ -191,25 +179,164 @@ describe("D.110c-0a browser epoch-custody causal RED", () => {
+ 			signerPublicKey
+ 		);
+ 
+-		const epochOneCutBytes = encodeCanonical({ ...cut, epoch: 1, previousAnchor: successorAnchor });
+-		const valueDigest = Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", epochOneCutBytes)).toString("hex");
+-		const epochOneVoteBytes = encodeCanonical({
++		const successor = openCreatorSuccessorTrust({
++			currentTrust,
++			exactCanonicalCommitQcBytes: bytesForRef(proposed, closeResult.commitQcRef),
++			exactCanonicalCutValueBytes,
++			exactCanonicalTrustStateRecordBytes,
++		});
++		expect(successor, "D110C_0A_BROWSER_GENUINE_SUCCESSOR_TRUST").toMatchObject({ ok: true });
++		if (!successor.ok) return;
++		const exactCanonicalSuccessorAnchorBytes = trustRecord.exactCanonicalCurrentAnchorPreimageBytes;
++		const exactCanonicalSignerSetBytes = trustRecord.exactCanonicalSignerSetBytes;
++		if (
++			!(exactCanonicalSuccessorAnchorBytes instanceof Uint8Array) ||
++			!(exactCanonicalSignerSetBytes instanceof Uint8Array)
++		) {
++			throw new TypeError("D110C_0A_SUCCESSOR_TRUST_BYTES_MISSING");
++		}
++		const successorAnchorRecord = decodeCanonical(exactCanonicalSuccessorAnchorBytes) as Readonly<
++			Record<string, unknown>
++		>;
++		const exactCanonicalParametersBytes = encodeCanonical(cut.parameters);
++		const snapshot = encodeSnapshotTransfer({
++			aclDigest: String(successorAnchorRecord.aclDigest),
++			anchor: successorAnchor,
+ 			epoch: 1,
+-			kind: "drp-seal-vote",
++			exactCanonicalPayloadBytes: fixture.evidence.exactCanonicalPayloadBytes,
+ 			objectId,
+-			phase: "prepare",
+-			proposalDigest: valueDigest,
+-			proposalHash: "c".repeat(64),
+-			round: 0,
+-			signerId: authority.signerId,
++			profile: {
++				maxManifestBytes: 212_387,
++				maxSnapshotBytes: 268_435_456,
++				snapshotChunkBytes: 131_072,
++			},
++			schemaVersion: 1,
++			stateDigest: String(successorAnchorRecord.stateDigest),
+ 		});
+-		const epochOneCarrier = signedCarrier(epochOneVoteBytes);
+-		const epochOneEvidence = peerEvidence(
+-			epochOneCarrier,
+-			epochOneCutBytes,
+-			exactCanonicalTrustStateRecordBytes,
+-			signerPublicKey
+-		);
++		const closeInput = Object.freeze({
++			aclDigest: String(successorAnchorRecord.aclDigest),
++			archiveIndexRoot: String(successorAnchorRecord.archiveIndexRoot),
++			blueprintDigest: String(successorAnchorRecord.blueprintDigest),
++			closeReason: "creator-requested",
++			closeSetCount: 1,
++			closeSetRoot: "d".repeat(64),
++			currentTrust: successor.trust,
++			exactCanonicalAvailabilityPolicyBytes: encodeCanonical({
++				minLocalCopies: 1,
++				minMirrorReceipts: 0,
++				minRollbackGenerations: 2,
++				mode: "local-only",
++			}),
++			exactCanonicalNextSignerSetBytes: Uint8Array.from(exactCanonicalSignerSetBytes),
++			exactCanonicalParametersBytes,
++			exactCanonicalSnapshotManifestBytes: snapshot.exactCanonicalManifestBytes,
++			historyRoot: "e".repeat(64),
++			historySize: Number(successorAnchorRecord.historySize) + 1,
++			snapshotManifestDigest: snapshot.manifestDigest,
++			stateDigest: String(successorAnchorRecord.stateDigest),
++		});
++
++		let epochOneCarrier: ExactCarrier;
++		let epochOneEvidence: PeerSealEvidence;
++		let valueDigest: string;
++		const actorVote = await openBrowserSealVoteStore({ databaseName: actorDatabase });
++		const actorEvidence = await openBrowserSealEvidenceStore({ databaseName: actorDatabase });
++		const staleEvidenceWriter = await openInternalSealEvidenceStore({ databaseName: actorDatabase });
++		expect(
++			await staleEvidenceWriter.put(
++				{
++					anchor: String(cut.previousAnchor),
++					epoch: 0,
++					exactCanonicalCommitQcBytes: bytesForRef(proposed, closeResult.commitQcRef),
++					exactCanonicalCutValueBytes,
++					exactCanonicalPrepareQcBytes: null,
++					exactCanonicalTrustStateRecordBytes,
++					objectId,
++					phase: "finalized",
++					revision: 4,
++					signerId: authority.signerId,
++					signerPublicKey,
++					storageIncarnation: actorVote.observation.incarnation,
++					valueDigest: committed.valueDigest,
++				},
++				null
++			),
++			"D110C_0A_STALE_EPOCH_ZERO_ACTOR_ROW"
++		).toMatchObject({ ok: true });
++		staleEvidenceWriter.close();
++		const finality = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
++		const openedActor = await createCreatorSealActor({
++			currentTrust: successor.trust,
++			evidenceStore: actorEvidence.store,
++			onObservation: () => undefined,
++			signer: finality.signer,
++			storageIncarnation: actorVote.observation.incarnation,
++			voteStore: actorVote.store,
++		});
++		expect(openedActor, "D110C_0A_GENUINE_EPOCH_ONE_ACTOR_OPEN").toMatchObject({ ok: true });
++		if (!openedActor.ok) return;
++		try {
++			const closed = await openedActor.actor.close({ closeInput });
++			expect(closed, "D110C_0A_GENUINE_EPOCH_ONE_ACTOR_CLOSE").toMatchObject({ ok: true });
++			if (!closed.ok) return;
++			valueDigest = closed.valueDigest;
++		} finally {
++			await openedActor.actor.stop();
++			await Promise.all([actorVote.close(), actorEvidence.close()]);
++		}
++		const resumedVote = await openBrowserSealVoteStore({ databaseName: actorDatabase });
++		const resumedEvidence = await openBrowserSealEvidenceStore({ databaseName: actorDatabase });
++		const resumedActor = await createCreatorSealActor({
++			currentTrust: successor.trust,
++			evidenceStore: resumedEvidence.store,
++			onObservation: () => undefined,
++			signer: finality.signer,
++			storageIncarnation: resumedVote.observation.incarnation,
++			voteStore: resumedVote.store,
++		});
++		expect(resumedActor, "D110C_0A_EXACT_EPOCH_ONE_ACTOR_RESUME").toMatchObject({ ok: true });
++		if (resumedActor.ok) {
++			expect(resumedActor.actor.status().phase, "D110C_0A_EXACT_EPOCH_ONE_ACTOR_PHASE").toBe("finalized");
++			await resumedActor.actor.stop();
++		}
++		await Promise.all([resumedVote.close(), resumedEvidence.close()]);
++		const actorEvidenceReader = await openInternalSealEvidenceStore({ databaseName: actorDatabase });
++		const actorVoteReader = await openInternalSealVoteStore({ databaseName: actorDatabase });
++		try {
++			const actorRows = await actorEvidenceReader.readAll();
++			const actorPending = await actorVoteReader.readPending();
++			const actorRow = actorRows.find(({ epoch }) => epoch === 1);
++			const prepareRow = actorPending.find(({ epoch, phase }) => epoch === 1 && phase === "prepare");
++			const commitRow = actorPending.find(({ epoch, phase }) => epoch === 1 && phase === "commit");
++			expect(
++				actorRows.map(({ epoch }) => epoch).sort((left, right) => left - right),
++				"D110C_0A_STALE_AND_CURRENT_ACTOR_ROWS"
++			).toEqual([0, 1]);
++			expect(actorRow?.epoch, "D110C_0A_GENUINE_EPOCH_ONE_EVIDENCE_EPOCH").toBe(1);
++			expect(prepareRow, "D110C_0A_GENUINE_EPOCH_ONE_PREPARE_ROW").toBeDefined();
++			expect(commitRow, "D110C_0A_GENUINE_EPOCH_ONE_COMMIT_ROW").toBeDefined();
++			if (
++				actorRow === undefined ||
++				prepareRow === undefined ||
++				commitRow === undefined ||
++				actorRow.exactCanonicalCommitQcBytes === null ||
++				actorRow.exactCanonicalTrustStateRecordBytes === null
++			) {
++				return;
++			}
++			epochOneCarrier = prepareRow.carrier;
++			epochOneEvidence = Object.freeze({
++				carrier: commitRow.carrier,
++				exactCanonicalCommitQcBytes: actorRow.exactCanonicalCommitQcBytes,
++				exactCanonicalCutValueBytes: actorRow.exactCanonicalCutValueBytes,
++				exactCanonicalTrustStateRecordBytes: actorRow.exactCanonicalTrustStateRecordBytes,
++				kind: "drp-creator-seal-evidence" as const,
++				signerPublicKey: actorRow.signerPublicKey,
++			});
++		} finally {
++			actorEvidenceReader.close();
++			actorVoteReader.close();
++		}
+ 
+ 		const evidence = await openBrowserSealEvidenceStore({ databaseName: evidenceDatabase });
+ 		const vote = await openInternalSealVoteStore({ databaseName: voteDatabase });
+@@ -218,12 +345,7 @@ describe("D.110c-0a browser epoch-custody causal RED", () => {
+ 				duplicate: false,
+ 				ok: true,
+ 			});
+-			await putRaw(evidenceDatabase, PHASE_5E_SEAL_EVIDENCE_STORE, {
+-				epoch: 1,
+-				objectId,
+-				peerEvidence: epochOneEvidence,
+-				signerId: authority.signerId,
+-			});
++			const epochOnePersist = await evidence.persistPeerEvidence({ evidence: epochOneEvidence });
+ 			expect(
+ 				await readRaw(evidenceDatabase, PHASE_5E_SEAL_EVIDENCE_STORE, [objectId, 1, authority.signerId]),
+ 				"D110C_0A_SCHEMA_EPOCH_ONE_EVIDENCE_CONTROL"
+@@ -234,6 +356,9 @@ describe("D.110c-0a browser epoch-custody causal RED", () => {
+ 			) => Promise<PeerSealEvidence | null>;
+ 			const explicit = await selector({ epoch: 1, objectId, signerId: authority.signerId });
+ 			const legacy = await selector({ objectId, signerId: authority.signerId });
++			const wrongEpoch = await selector({ epoch: 2, objectId, signerId: authority.signerId });
++			const wrongObject = await selector({ epoch: 1, objectId: `${objectId}:foreign`, signerId: authority.signerId });
++			const wrongSigner = await selector({ epoch: 1, objectId, signerId: `${authority.signerId}:foreign` });
+ 			const explicitEpoch =
+ 				explicit === null
+ 					? null
+@@ -243,10 +368,10 @@ describe("D.110c-0a browser epoch-custody causal RED", () => {
+ 					? null
+ 					: (decodeCanonical(legacy.carrier.exactCanonicalPreimageBytes) as Readonly<Record<string, unknown>>).epoch;
+ 
+-			const epochOnePersist = await evidence.persistPeerEvidence({ evidence: epochOneEvidence });
+ 			const epochOneVote = await vote.commitVote({
+ 				anchor: successorAnchor,
+ 				carrier: epochOneCarrier,
++				epoch: 1,
+ 				expectedIncarnation: vote.incarnation,
+ 				expectedRevision: 0,
+ 				objectId,
+@@ -256,18 +381,44 @@ describe("D.110c-0a browser epoch-custody causal RED", () => {
+ 				signerId: authority.signerId,
+ 				valueDigest,
+ 			});
+-			await putRaw(voteDatabase, PHASE_5C_VOTE_OUTBOX_STORE, {
++			const crossEpochVote = await vote.commitVote({
++				anchor: successorAnchor,
+ 				carrier: epochOneCarrier,
+-				dispatched: false,
+-				epoch: 1,
++				epoch: 0,
++				expectedIncarnation: vote.incarnation,
++				expectedRevision: 0,
+ 				objectId,
+ 				phase: "prepare",
++				prepareQC: null,
+ 				round: 0,
+ 				signerId: authority.signerId,
++				valueDigest,
+ 			});
+ 			const pending = await vote.readPending();
+ 			const invalidEpoch = await captured(selector({ epoch: -1, objectId, signerId: authority.signerId }));
++			const fractionalEpoch = await captured(selector({ epoch: 1.5, objectId, signerId: authority.signerId }));
++			const unsafeEpoch = await captured(
++				selector({ epoch: Number.MAX_SAFE_INTEGER + 1, objectId, signerId: authority.signerId })
++			);
++			const missingSigner = await captured(selector({ epoch: 1, objectId }));
+ 			const extraKey = await captured(selector({ extra: true, objectId, signerId: authority.signerId }));
++			const accessorSelector = Object.defineProperty({ objectId, signerId: authority.signerId }, "epoch", {
++				enumerable: true,
++				get: () => 1,
++			});
++			const accessorEpoch = await captured(selector(accessorSelector));
++			const epochOneDuplicate = await evidence.persistPeerEvidence({ evidence: epochOneEvidence });
++			const conflictingSignature = Uint8Array.from(epochOneEvidence.carrier.signature);
++			conflictingSignature[0] = (conflictingSignature[0] ?? 0) ^ 0xff;
++			const epochOneConflict = await evidence.persistPeerEvidence({
++				evidence: Object.freeze({
++					...epochOneEvidence,
++					carrier: Object.freeze({
++						...epochOneEvidence.carrier,
++						signature: conflictingSignature,
++					}),
++				}),
++			});
+ 			const dispatchSource = readFileSync(
+ 				resolve(import.meta.dirname, "../packages/storage-browser/src/internal/seal-vote-dispatch.ts"),
+ 				"utf8"
+@@ -275,10 +426,25 @@ describe("D.110c-0a browser epoch-custody causal RED", () => {
+ 			const dispatchedCall = dispatchSource.match(/markDispatched\(\[[^\]]+\]\)/u)?.[0];
+ 
+ 			expect.soft(epochOnePersist, "D110C_0A_EPOCH_ONE_EVIDENCE_WRITE").toMatchObject({ ok: true });
++			expect.soft(epochOneDuplicate, "D110C_0A_EPOCH_ONE_EVIDENCE_DUPLICATE").toEqual({
++				duplicate: true,
++				ok: true,
++			});
++			expect.soft(epochOneConflict, "D110C_0A_EPOCH_ONE_EVIDENCE_CONFLICT").toEqual({
++				ok: false,
++				reason: "EVIDENCE_CONFLICT",
++			});
+ 			expect.soft(epochOneVote, "D110C_0A_EPOCH_ONE_VOTE_WRITE").toMatchObject({ ok: true, writes: 3 });
++			expect.soft(crossEpochVote, "D110C_0A_CROSS_EPOCH_VOTE_REPLAY").toEqual({
++				ok: false,
++				reason: "MALFORMED_INPUT",
++			});
+ 			expect.soft(pending, "D110C_0A_EPOCH_ONE_PENDING_READ").toHaveLength(1);
+ 			expect.soft(explicitEpoch, "D110C_0A_EXPLICIT_SELECTOR_EPOCH").toBe(1);
+ 			expect.soft(legacyEpoch, "D110C_0A_LEGACY_SELECTOR_EPOCH_ZERO").toBe(0);
++			expect.soft(wrongEpoch, "D110C_0A_WRONG_EPOCH_SELECTOR").toBeNull();
++			expect.soft(wrongObject, "D110C_0A_CROSS_OBJECT_SELECTOR").toBeNull();
++			expect.soft(wrongSigner, "D110C_0A_CROSS_SIGNER_SELECTOR").toBeNull();
+ 			expect.soft(invalidEpoch, "D110C_0A_INVALID_SELECTOR_BEFORE_IO").toEqual({
+ 				message: "peer evidence identity is invalid",
+ 				name: "TypeError",
+@@ -289,11 +455,27 @@ describe("D.110c-0a browser epoch-custody causal RED", () => {
+ 				name: "TypeError",
+ 				status: "rejected",
+ 			});
++			for (const [token, result] of [
++				["D110C_0A_FRACTIONAL_SELECTOR_BEFORE_IO", fractionalEpoch],
++				["D110C_0A_UNSAFE_SELECTOR_BEFORE_IO", unsafeEpoch],
++				["D110C_0A_MISSING_SELECTOR_BEFORE_IO", missingSigner],
++				["D110C_0A_ACCESSOR_SELECTOR_BEFORE_IO", accessorEpoch],
++			] as const) {
++				expect.soft(result, token).toEqual({
++					message: "peer evidence identity is invalid",
++					name: "TypeError",
++					status: "rejected",
++				});
++			}
+ 			expect.soft(dispatchedCall, "D110C_0A_DISPATCH_USES_ROW_EPOCH").toContain("row.epoch");
+ 		} finally {
+ 			vote.close();
+ 			await evidence.close();
+-			await Promise.all([deleteDatabase(evidenceDatabase), deleteDatabase(voteDatabase)]);
++			await Promise.all([
++				deleteDatabase(actorDatabase),
++				deleteDatabase(evidenceDatabase),
++				deleteDatabase(voteDatabase),
++			]);
+ 		}
+ 	});
+ });
+25:describe("D.110c-0a epoch-relative seal-authority causal RED", () => {
+26:	it("opens the genuine adopted epoch-one creator trust under the same authorized finality key", () => {
+d1b923aa7ca7f8efa86eec589796337528c1920fa1001b2bdf672d46c8a5befb  batch1-corrected2-vitest.json
+2c52bbbecff841e0fd0efd834e0fdd1cb657a4651cf147de443f021cc15052e0  batch2-corrected2-vitest.json
+4edbe4204204339ebb0f53008d95737ca32ab2363ff6d19d3f2a46ae6d3c038c  red-ledger.json
+b98e06380678a8e458373b48f87cc69a8cf418705f4bda7772d77ee632a499c3  manifest.sha256
+  origin/codex/phase3a1b-p6-golden-path
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+      26

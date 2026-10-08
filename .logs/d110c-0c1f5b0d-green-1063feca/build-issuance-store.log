@@ -1,0 +1,4 @@
+
+> @ts-drp/issuance-store@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/issuance-store
+> tsc -b tsconfig.build.json
+

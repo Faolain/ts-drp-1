@@ -1,0 +1,18 @@
+I'll inspect the correction commit and the cited plan sources to confirm whether the first-round blockers are closed without a new P0/P1.The correction is a plan-only patch. I’ll read the frozen 0b0a section and the retained commit/product contracts next.I’ll check the retained export/governance contracts and the 0b0 section so the correction can be judged against the original blockers.I’ll inspect package exports, capability types, and the 0b0 product sequence so the frozen names and deferred work can be checked against source.The plan file is too large for a plain grep, so I’ll page around the 0b0 owner-selection and provider-tuple freeze next.{
+  "verdict": "PASS",
+  "summary": "The signed 0b0a correction closes the first-round blocking union: Node-only new stage/recover subpaths, frozen names/inputs/results/custody, lowest-generation-ID selection only for same-closure Completes, true-fork on different closures, commit/product contracts unchanged until 0b0, and provider/product/hot-cold expected-head gates deferred. No new P0/P1.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "AHE-already-new equality vs leftover generation ID",
+      "evidence": "Recovery selects the lexicographically smallest generation ID among equivalent Completes, while publish CAS-es the capability-bound generation. After retry-then-publish, AHE can already be the higher-ID Adopted head with a leftover same-closure Complete. Cited D.108c authenticatedTerminal/classifyD108cTerminal treat generation ID as irrelevant for active-new; sameHead() does not. The correction already says expected values are provider tuples and AHE locators are internal, so this is implementable, but the AHE-new equality target is not spelled against expectedNextRoomHead.",
+      "required_change": "Disposition without another round: when AHE is already new, prove authenticated successor trust equals expectedNextRoomHead (D.108c generation-id-independent active-new). Lowest generation ID is only the CAS target while AHE is still old; leftover equivalent Completes stay unselected."
+    },
+    {
+      "severity": "P2",
+      "title": "Frozen node export map companion",
+      "evidence": "New non-root exports are required, but tests/phase-3a1b-p3-live-transport-red.test.ts still JSON-string-equals the entire @ts-drp/node exports object and fails with export-targets if stage/recover entries are added. D.108c/d2 product-owner predicates are unaffected because commit export roster and examples/v3-room usage stay unchanged.",
+      "required_change": "Disposition in 0b0a GREEN: extend that exact export snapshot (and its duplicate around the same file) when adding ./creator-adoption-stage and ./creator-adoption-recover. Do not reopen plan review."
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "@ts-drp/canonical": {
+    "specifier": "@ts-drp/canonical",
+    "importer": "/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/tests/phase-6a-creator-successor-product-red.test.ts",
+    "ssr": true,
+    "id": "/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/packages/canonical/dist/src/index.js",
+    "physical": "/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/packages/canonical/dist/src/index.js",
+    "sha256": "cbc7746c51a5cd1da446865026a3e555b3aa5c69ebc9a8fa4f1f4552299aaa83"
+  },
+  "@noble/curves/ed25519.js": {
+    "specifier": "@noble/curves/ed25519.js",
+    "importer": "/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/tests/phase-6a-creator-successor-product-red.test.ts",
+    "ssr": true,
+    "id": "/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/ed25519.js",
+    "physical": "/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/ed25519.js",
+    "sha256": "28c6fd6157fe2d1c69ea4751844c3d8fe3ee1a496b4f10fb7b48a51c48857a21"
+  }
+}

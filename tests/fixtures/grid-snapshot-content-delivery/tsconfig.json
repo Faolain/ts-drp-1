@@ -1,0 +1,10 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../.."
+	},
+	"files": ["../grid-snapshot-content-delivery.ts", "../../grid-snapshot-content-delivery-red.test.ts"],
+	"include": []
+}

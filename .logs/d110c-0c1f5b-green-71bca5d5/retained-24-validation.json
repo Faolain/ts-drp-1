@@ -1,0 +1,211 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 15,
+  "passed": 15,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-24/result.json",
+  "baselineSha256": "68df376835ba427218fce4a8aba1a657d39eea7d72eb01dc7fcd2dde2c1bc53c",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c synchronous factory and exact SQLite admission"
+      ],
+      "fullName": "Phase 2l-c synchronous factory and exact SQLite admission exports one runtime factory and returns the frozen eight-member capability synchronously",
+      "status": "passed",
+      "title": "exports one runtime factory and returns the frozen eight-member capability synchronously",
+      "duration": 65.155416,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c synchronous factory and exact SQLite admission"
+      ],
+      "fullName": "Phase 2l-c synchronous factory and exact SQLite admission uses one-pass captured descriptors and rejects the complete closed-record misuse table before open",
+      "status": "passed",
+      "title": "uses one-pass captured descriptors and rejects the complete closed-record misuse table before open",
+      "duration": 9.52516700000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c synchronous factory and exact SQLite admission"
+      ],
+      "fullName": "Phase 2l-c synchronous factory and exact SQLite admission derives verbatim while never touching primary identity or creating parents",
+      "status": "passed",
+      "title": "derives verbatim while never touching primary identity or creating parents",
+      "duration": 11.681624999999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c synchronous factory and exact SQLite admission"
+      ],
+      "fullName": "Phase 2l-c synchronous factory and exact SQLite admission creates, byte-verifies and reopens exactly one authority at schema v3 in the stable v1-derived file",
+      "status": "passed",
+      "title": "creates, byte-verifies and reopens exactly one authority at schema v3 in the stable v1-derived file",
+      "duration": 5.944792000000007,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c synchronous factory and exact SQLite admission"
+      ],
+      "fullName": "Phase 2l-c synchronous factory and exact SQLite admission pins native constructor booleans, FULL/busy pragmas and explicit numeric statement reads",
+      "status": "passed",
+      "title": "pins native constructor booleans, FULL/busy pragmas and explicit numeric statement reads",
+      "duration": 71.380583,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c synchronous factory and exact SQLite admission"
+      ],
+      "fullName": "Phase 2l-c synchronous factory and exact SQLite admission retries an interrupted empty catalog but rejects partial, AHE-shaped and extra-schema files without repair",
+      "status": "passed",
+      "title": "retries an interrupted empty catalog but rejects partial, AHE-shaped and extra-schema files without repair",
+      "duration": 40.86987499999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c real transaction, lifecycle and paging contract"
+      ],
+      "fullName": "Phase 2l-c real transaction, lifecycle and paging contract commits one detached closure, returns fresh reads and preserves pending outbox",
+      "status": "passed",
+      "title": "commits one detached closure, returns fresh reads and preserves pending outbox",
+      "duration": 9.53533299999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c real transaction, lifecycle and paging contract"
+      ],
+      "fullName": "Phase 2l-c real transaction, lifecycle and paging contract copies pooled Buffer input into plain private bytes and rejects SharedArrayBuffer without mutation",
+      "status": "passed",
+      "title": "copies pooled Buffer input into plain private bytes and rejects SharedArrayBuffer without mutation",
+      "duration": 5.588208000000009,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c real transaction, lifecycle and paging contract"
+      ],
+      "fullName": "Phase 2l-c real transaction, lifecycle and paging contract uses shared UTF-16 order rather than SQLite BINARY order, including the inversion pair",
+      "status": "passed",
+      "title": "uses shared UTF-16 order rather than SQLite BINARY order, including the inversion pair",
+      "duration": 7.148166000000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c real transaction, lifecycle and paging contract"
+      ],
+      "fullName": "Phase 2l-c real transaction, lifecycle and paging contract applies the shared default page bound, afterKey, scope filter and closed input grammar",
+      "status": "passed",
+      "title": "applies the shared default page bound, afterKey, scope filter and closed input grammar",
+      "duration": 17.67012500000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c real transaction, lifecycle and paging contract"
+      ],
+      "fullName": "Phase 2l-c real transaction, lifecycle and paging contract makes one of eight same-scope candidates win and permits progress plus reentrancy during builders",
+      "status": "passed",
+      "title": "makes one of eight same-scope candidates win and permits progress plus reentrancy during builders",
+      "duration": 103.64883300000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c real transaction, lifecycle and paging contract"
+      ],
+      "fullName": "Phase 2l-c real transaction, lifecycle and paging contract uses one synchronous writer then one bounded readonly snapshot with no microtask in the writer",
+      "status": "passed",
+      "title": "uses one synchronous writer then one bounded readonly snapshot with no microtask in the writer",
+      "duration": 7.245875000000069,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c real transaction, lifecycle and paging contract"
+      ],
+      "fullName": "Phase 2l-c real transaction, lifecycle and paging contract maps cross-process writer expiry as transient and latches child-key collision corruption",
+      "status": "passed",
+      "title": "maps cross-process writer expiry as transient and latches child-key collision corruption",
+      "duration": 1087.468417,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c real transaction, lifecycle and paging contract"
+      ],
+      "fullName": "Phase 2l-c real transaction, lifecycle and paging contract close never awaits a suspended builder, validates malformed before closed, and MAX commits exactly once",
+      "status": "passed",
+      "title": "close never awaits a suspended builder, validates malformed before closed, and MAX commits exactly once",
+      "duration": 13.215582999999924,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c terminal suppression through the real adapter"
+      ],
+      "fullName": "Phase 2l-c terminal suppression through the real adapter classifies all five bounded ambiguity outcomes without exposing candidate bytes",
+      "status": "passed",
+      "title": "classifies all five bounded ambiguity outcomes without exposing candidate bytes",
+      "duration": 23.548708000000033,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "8454e625025db930afbec1ddcc89626355e2e936e81a105ba5bd4ae526585e2a",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

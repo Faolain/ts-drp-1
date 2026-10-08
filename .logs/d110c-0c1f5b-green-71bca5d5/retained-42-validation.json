@@ -1,0 +1,163 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 11,
+  "passed": 11,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-42/result.json",
+  "baselineSha256": "d864838a1d862b3a61554acd3143285c2edcaf54fb4d859951b645344ae9fc43",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED freezes one tests-only RED owner, one internal GREEN owner, the policy vector, and refusal precedence",
+      "status": "passed",
+      "title": "freezes one tests-only RED owner, one internal GREEN owner, the policy vector, and refusal precedence",
+      "duration": 1.5415000000000418,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED proves the dangling-parent mutant and exact local lineage-floor normalization",
+      "status": "passed",
+      "title": "proves the dangling-parent mutant and exact local lineage-floor normalization",
+      "duration": 2.2619999999999436,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED keeps the candidate package-internal and free of deletion effects",
+      "status": "passed",
+      "title": "keeps the candidate package-internal and free of deletion effects",
+      "duration": 1.438833000000045,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED [RED readiness] requires the sole closed-epoch cleanup planner",
+      "status": "passed",
+      "title": "[RED readiness] requires the sole closed-epoch cleanup planner",
+      "duration": 0.09749999999996817,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED returns the exact immutable active/two-ancestor/floor plan",
+      "status": "passed",
+      "title": "returns the exact immutable active/two-ancestor/floor plan",
+      "duration": 10.917874999999981,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED continues planning from a numeric pruning watermark across restart and a later epoch",
+      "status": "passed",
+      "title": "continues planning from a numeric pruning watermark across restart and a later epoch",
+      "duration": 2.18420900000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED rejects every causal mutant with the exact closed reason",
+      "status": "passed",
+      "title": "rejects every causal mutant with the exact closed reason",
+      "duration": 1.3868330000000242,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED refuses gaps, surviving branches, wrong floor parents, and incomplete closures",
+      "status": "passed",
+      "title": "refuses gaps, surviving branches, wrong floor parents, and incomplete closures",
+      "duration": 1.1368330000000242,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED applies exact refusal precedence",
+      "status": "passed",
+      "title": "applies exact refusal precedence",
+      "duration": 0.6373330000000124,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED is permutation-invariant and returns detached output",
+      "status": "passed",
+      "title": "is permutation-invariant and returns detached output",
+      "duration": 1.0903749999999945,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts",
+      "ancestorTitles": [
+        "D.109a closed-epoch cleanup eligibility RED"
+      ],
+      "fullName": "D.109a closed-epoch cleanup eligibility RED accepts genuine Phase-6a close/adoption material without reopening verification",
+      "status": "passed",
+      "title": "accepts genuine Phase-6a close/adoption material without reopening verification",
+      "duration": 634.2277500000001,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "50a5ffeaa484e7f9f2909cb9e3c07e9d1a3a6f831f1165c0feede851ee72aea6",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

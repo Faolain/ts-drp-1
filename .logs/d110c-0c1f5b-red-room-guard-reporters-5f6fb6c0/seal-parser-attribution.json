@@ -1,0 +1,6 @@
+{
+  "file": "/tmp/d110c-f5b-red-room-guard-reporters-L8TTrA/checkout/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cac.DK21mt6F.js",
+  "sha256": "a9902d721306b2a774318fd3bc14de35cb5add3fa82972f476e4d201c76cb8a0",
+  "lines1405to1418": "function parseCLI(argv, config = {}) {\n\tconst arrayArgs = typeof argv === \"string\" ? splitArgv(argv) : argv;\n\tif (arrayArgs[0] !== \"vitest\") {\n\t\tthrow new Error(`Expected \"vitest\" as the first argument, received \"${arrayArgs[0]}\"`);\n\t}\n\tarrayArgs[0] = \"/index.js\";\n\tarrayArgs.unshift(\"node\");\n\tlet { args, options } = createCLI(config).parse(arrayArgs, { run: false });\n\tif (arrayArgs[2] === \"watch\" || arrayArgs[2] === \"dev\") {\n\t\toptions.watch = true;\n\t}\n\tif (arrayArgs[2] === \"run\") {\n\t\toptions.run = true;\n\t}",
+  "documentedPrefixMutationOnly": true
+}

@@ -1,0 +1,203 @@
+{
+  "kind": "focused",
+  "root": "/private/tmp/d110c-f5b0z-green-signed-REUkBZ/checkout",
+  "status": 0,
+  "total": 16,
+  "files": 1,
+  "passed": 16,
+  "violations": [],
+  "assertions": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 01 real browser facade resolves the exact existing backend capability",
+      "status": "passed",
+      "title": "01 real browser facade resolves the exact existing backend capability",
+      "duration": 5.791124999999965,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 02 real SQLite facade resolves the exact existing backend capability",
+      "status": "passed",
+      "title": "02 real SQLite facade resolves the exact existing backend capability",
+      "duration": 5.2159580000000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 03 memory copied proxy and foreign facades do not inherit discovery",
+      "status": "passed",
+      "title": "03 memory copied proxy and foreign facades do not inherit discovery",
+      "duration": 5.397334000000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 04 first bind wins through both backends and refuses same and different second capabilities",
+      "status": "passed",
+      "title": "04 first bind wins through both backends and refuses same and different second capabilities",
+      "duration": 3.9830420000000686,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 05 duplicate internal backend registration preserves both first resolver identities",
+      "status": "passed",
+      "title": "05 duplicate internal backend registration preserves both first resolver identities",
+      "duration": 3.7967909999999847,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 06 fresh native ESM instances share exact bindings in one global",
+      "status": "passed",
+      "title": "06 fresh native ESM instances share exact bindings in one global",
+      "duration": 83.91508299999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 07 incompatible preoccupied registry value fails closed",
+      "status": "passed",
+      "title": "07 incompatible preoccupied registry value fails closed",
+      "duration": 52.94666700000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 08 preoccupied accessor is not invoked and import fails closed",
+      "status": "passed",
+      "title": "08 preoccupied accessor is not invoked and import fails closed",
+      "duration": 59.49570900000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 09 mutable configurable preoccupied descriptor fails closed",
+      "status": "passed",
+      "title": "09 mutable configurable preoccupied descriptor fails closed",
+      "duration": 64.78612499999986,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 10 discovered browser maintenance preserves closed refusal",
+      "status": "passed",
+      "title": "10 discovered browser maintenance preserves closed refusal",
+      "duration": 2.8662080000001424,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 11 discovered browser maintenance preserves poisoned refusal",
+      "status": "passed",
+      "title": "11 discovered browser maintenance preserves poisoned refusal",
+      "duration": 1.8483329999999114,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 12 discovered SQLite maintenance preserves closed refusal",
+      "status": "passed",
+      "title": "12 discovered SQLite maintenance preserves closed refusal",
+      "duration": 4.689041999999972,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 13 discovered SQLite maintenance preserves poisoned refusal",
+      "status": "passed",
+      "title": "13 discovered SQLite maintenance preserves poisoned refusal",
+      "duration": 4.273167000000058,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 14 registration and discovery preserve facade keys without additional store IO",
+      "status": "passed",
+      "title": "14 registration and discovery preserve facade keys without additional store IO",
+      "duration": 26.364499999999907,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 15 legacy backend resolvers stay backend specific and reject foreign identities",
+      "status": "passed",
+      "title": "15 legacy backend resolvers stay backend specific and reject foreign identities",
+      "duration": 7.643709000000172,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery"
+      ],
+      "fullName": "D.110c-0c1f5b0z backend-neutral AHE maintenance discovery 16 compatibility custody preserves interfaces roots manifests constructors and mutation bodies",
+      "status": "passed",
+      "title": "16 compatibility custody preserves interfaces roots manifests constructors and mutation bodies",
+      "duration": 29.15954099999999,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

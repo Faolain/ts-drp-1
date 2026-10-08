@@ -1,0 +1,26 @@
+{
+  "acceptedRed": true,
+  "baseCommit": "f488f1f675b15b3dde4428a24fa79077655c1dc0",
+  "browser": {
+    "currentEpoch": 3,
+    "displacedEpoch": 2,
+    "expectedToken": "D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED",
+    "localRowEpoch": 1,
+    "owner": "predecessor-validation",
+    "selectedFiles": 1,
+    "selectedTests": 1,
+    "status": 1
+  },
+  "productionPathsChanged": 0,
+  "protocol": {
+    "aggregateCarrierCount": 0,
+    "expectedToken": "D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED",
+    "legacyCarrierCount": 1,
+    "secondWriterAdmittedRows": 1,
+    "selectedFiles": 1,
+    "selectedTests": 1,
+    "status": 1,
+    "writerCount": 2
+  },
+  "unexpectedFailures": 0
+}

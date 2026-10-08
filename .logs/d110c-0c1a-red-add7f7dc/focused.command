@@ -1,0 +1,1 @@
+D110C_0C1A_RECORD_EVIDENCE=1 pnpm exec vitest run tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts --reporter=verbose --reporter=json --outputFile.verbose=.logs/d110c-0c1a-red-add7f7dc/vitest.verbose.txt --outputFile.json=.logs/d110c-0c1a-red-add7f7dc/vitest.json --testTimeout=30000 --hookTimeout=30000 --no-file-parallelism --maxWorkers=1 --minWorkers=1

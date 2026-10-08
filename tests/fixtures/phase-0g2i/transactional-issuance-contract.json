@@ -1,0 +1,31 @@
+{
+	"implementationModule": "../packages/protocol-v3/src/index.ts",
+	"domain": "ts-drp/vertex/v3",
+	"privateKeySeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+	"mismatchedPrivateKeySeedHex": "f0e0d0c0b0a090807060504030201000ffeeddccbbaa99887766554433221100",
+	"author": "alice",
+	"otherAuthor": "bob",
+	"scopes": {
+		"primary": "object:phase-0g2i-primary",
+		"independent": "object:phase-0g2i-independent"
+	},
+	"vertex": {
+		"epoch": 7,
+		"anchor": "abababababababababababababababababababababababababababababababab",
+		"logicalTime": 11,
+		"dependencies": [
+			"1212121212121212121212121212121212121212121212121212121212121212",
+			"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+		],
+		"operation": {
+			"action": "append",
+			"value": "phase-0g2i"
+		}
+	},
+	"overlap": {
+		"seed": 41042,
+		"requestCount": 18,
+		"issuerCount": 3
+	},
+	"microtaskBudget": 64
+}

@@ -1,0 +1,18 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+    "run",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-current-profile-green-61ea93f6/focused/result.json"
+  ],
+  "environmentUnset": [
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "TS_DRP_D108E4M_PROFILE"
+  ]
+}

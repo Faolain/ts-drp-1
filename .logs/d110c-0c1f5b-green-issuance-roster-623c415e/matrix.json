@@ -1,0 +1,82 @@
+{
+  "frozenAt": "2026-09-06T00:56:30.187Z",
+  "base": "d97813494f06a0c0913ac1a7b2f7760ed67bf2a8",
+  "files": [
+    "tests/phase-3a1b-p2-outbox-publication-contract.test.ts"
+  ],
+  "selected": 10,
+  "expectedPassed": 10,
+  "expectedFailed": 0,
+  "intentionallyFiltered": 0,
+  "executionCount": 1,
+  "classification": "PARENT_GREEN_RETAINED_ISSUANCE_ROSTER_CORRECTION_ONLY",
+  "fileHashes": {
+    "tests/phase-3a1b-p2-outbox-publication-contract.test.ts": "8056d279f67d2e672e07a99527c997891dbfd9e7459d8684593c062aabdf57ad",
+    "tests/fixtures/phase-3a1b-p2-outbox-publication-contract.ts": "49876c2afc1cfee5046ec3faa6632c8960b696949692c399816ce3becad2f60f"
+  },
+  "entries": [
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > keeps the exact independent Node and browser death registries causal",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > kills every named semantic mutation without rejecting the valid transition control",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > freezes the erased input and exact eight-method owner without widening runtime registries",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > updates all genuine facade owners to eight while retaining the named stale mutant",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > publishes one exact ephemeral closure, copies input and preserves unrelated durable facts",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > rejects the closed misuse table asynchronously before state changes and keeps invalid addressing non-poisoning",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > latches the executable ephemeral corruption control across the sixth method and existing reads",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > keeps publication adapter-local and forbids classifier/schema/export sediment",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > keeps the exact runtime roots and immutable classifier owners while forbidding publication claims",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+      "name": "D.93.29 Seam 2 shared durable publication contract > pins the existing closed taxonomy and post-close precedence in every implementation owner",
+      "expectedStatus": "passed",
+      "token": null
+    }
+  ],
+  "head": "623c415ed3ac2814d071bae59720456a92c804c0",
+  "priorTitleMultisetMatches": true,
+  "collectionRepeated": false
+}

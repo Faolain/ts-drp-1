@@ -1,0 +1,6 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": { "composite": false, "noEmit": true, "target": "ES2023", "rootDir": "../../..", "paths": {} },
+  "files": ["reference.mts", "promotion.mts", "../../forward-promotion-authority-red.test.mts"],
+  "include": []
+}

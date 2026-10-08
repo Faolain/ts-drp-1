@@ -1,0 +1,163 @@
+{
+  "root": "/private/tmp/d110c-f5b-red-room-guard-ueW92K/checkout",
+  "testSha256": "4040b1c3b706c8ba649f3cb63efd67f77624e1f90de12fbbdf7ab226877cf3fa",
+  "helperSha256": "51e21d1a254f3a8655b28f83136f0da5003be48db85024c259d2d67c7c979e30",
+  "sameExactSignedHelper": true,
+  "allVerified": true,
+  "realProductBuilder": true,
+  "actualEd25519GenesisSignatures": true,
+  "noRoomConstructorCalled": true,
+  "noMockOrAlternateConfig": true,
+  "fixtures": [
+    {
+      "profileId": "creator-trusted-v1",
+      "pinnedGenesisAnchorDigest": "e81c2d4a3e582b6a0355224881d8bb4c6ab9920794322b1ee4e803d0ec0cff55",
+      "signatureHex": "0f197b6936843799761a8aa78b3921ffc4deb6898463000e2045ffefe86ea1782d34e601c49cfa9cf5d65792edce060f53160dd2a192d28fb531959a0c0f4d0c",
+      "anchor": {
+        "kind": "drp-epoch-anchor",
+        "epoch": 0,
+        "objectId": "creator:0000000000000000000000000000d108",
+        "aclDigest": "ba303fbf69ccdeb47a0db7a4df3ff09fc9dea2f4f92577aef8d927e62449afc5",
+        "cutDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "historyRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "historySize": 0,
+        "stateDigest": "18a07b51b87283807800a4e28f70ee0636f1aeb84630e364cc1d698e3b355ac4",
+        "cryptoSuiteId": "ed25519-sha256-v3",
+        "profileDigest": "f90fe172978bc460828a9335239e7d9707f98d911742250af648aae3207b4895",
+        "protocolMajor": 3,
+        "previousAnchor": "0000000000000000000000000000000000000000000000000000000000000000",
+        "blueprintDigest": "f85824050b8b836be39ac920c0a72f6197a258f410309b36ccf4cbffeddaf80a",
+        "signerSetDigest": "0e5ed66a0f15b5d7d3a1bbb3098b1f267a6f232e77c90083515d7b3fc0d5d3c5",
+        "archiveIndexRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "parametersDigest": "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669"
+      },
+      "acl": {
+        "kind": "drp-v3-latched-acl",
+        "epoch": 0,
+        "members": [
+          {
+            "author": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5",
+            "groups": [
+              "admin",
+              "finality",
+              "writer"
+            ],
+            "finalityKey": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5"
+          }
+        ],
+        "version": 1,
+        "objectId": "creator:0000000000000000000000000000d108",
+        "permissionless": false
+      },
+      "parameters": {
+        "maxEpochBytes": 8388608,
+        "maxDependencies": 16,
+        "maxPendingBytes": 16777216,
+        "maxEpochVertices": 8192,
+        "maxSnapshotBytes": 268435456,
+        "maxPendingEntries": 4096,
+        "snapshotChunkBytes": 131072
+      },
+      "profile": {
+        "quorum": 1,
+        "signers": [
+          {
+            "signerId": "creator",
+            "publicKey": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5"
+          }
+        ],
+        "profileId": "creator-trusted-v1",
+        "cryptoSuiteId": "ed25519-sha256-v3"
+      },
+      "signers": [
+        {
+          "signerId": "creator",
+          "publicKey": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5"
+        }
+      ],
+      "carrierHashes": {
+        "detachedGenesisSignature": "ccdf55a72bd1e7dee952e50f7bd3b985321ea94ece6561d63b9e8914ec901682",
+        "exactCanonicalGenesisAnchorPreimageBytes": "c317b46f66da236900ab01ae1ecdbf75d52db7b008f4408bb509436514c1cc60",
+        "exactCanonicalLatchedAclBytes": "4df4fda17dc676fe247d636cde58e8fe8854c0e79eb577e46c1bb80f66ce9eac",
+        "exactCanonicalParametersCarrierBytes": "268ba3cade0827c50d5faba2b636e286e8e43d6b82c8be6f3837d84e50ea2dcf",
+        "exactCanonicalProfileBytes": "8cb406436db6c46b7f47ef6ba5e9c0655eb3eb95bbb89ef92a2362a0b5f7760b",
+        "exactCanonicalSignerSetBytes": "929f15c1e74f6424ba1b320abff335cec4d3333dc58058051551605e1f3ef463"
+      }
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "pinnedGenesisAnchorDigest": "24041ac9dc51aa63cd701f9afdeeb6910c8b17b1ae9f8efcd16949720d9ed7ea",
+      "signatureHex": "07362bec06697d7d627ac1b5e1250ca70d4b683e70580f26d3b8d84ecd884fdaeec95b7fa4d129a7581692de2a4dc9523d37b1497188f9c553af92dc24f81909",
+      "anchor": {
+        "kind": "drp-epoch-anchor",
+        "epoch": 0,
+        "objectId": "creator:0000000000000000000000000000d108",
+        "aclDigest": "a8c0d3c1ae5dc12c2afc9b49d169beadde7032d8b221d613aeaa8c97ce73aad1",
+        "cutDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "historyRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "historySize": 0,
+        "stateDigest": "18a07b51b87283807800a4e28f70ee0636f1aeb84630e364cc1d698e3b355ac4",
+        "cryptoSuiteId": "ed25519-sha256-v3",
+        "profileDigest": "4040d905392a1dcd62dde2631d8e2f4b3410d0624405bea0a8ec6b3a918ad61c",
+        "protocolMajor": 3,
+        "previousAnchor": "0000000000000000000000000000000000000000000000000000000000000000",
+        "blueprintDigest": "f85824050b8b836be39ac920c0a72f6197a258f410309b36ccf4cbffeddaf80a",
+        "signerSetDigest": "0e5ed66a0f15b5d7d3a1bbb3098b1f267a6f232e77c90083515d7b3fc0d5d3c5",
+        "archiveIndexRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "parametersDigest": "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669"
+      },
+      "acl": {
+        "kind": "drp-v3-latched-acl",
+        "epoch": 0,
+        "members": [
+          {
+            "author": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5",
+            "groups": [
+              "admin",
+              "finality",
+              "writer"
+            ],
+            "finalityKey": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5"
+          }
+        ],
+        "version": 3,
+        "objectId": "creator:0000000000000000000000000000d108",
+        "permissionless": false
+      },
+      "parameters": {
+        "maxEpochBytes": 8388608,
+        "maxDependencies": 16,
+        "maxPendingBytes": 16777216,
+        "maxEpochVertices": 8192,
+        "maxSnapshotBytes": 268435456,
+        "maxPendingEntries": 4096,
+        "snapshotChunkBytes": 131072
+      },
+      "profile": {
+        "quorum": 1,
+        "signers": [
+          {
+            "signerId": "creator",
+            "publicKey": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5"
+          }
+        ],
+        "profileId": "creator-trusted-settlement-v1",
+        "cryptoSuiteId": "ed25519-sha256-v3"
+      },
+      "signers": [
+        {
+          "signerId": "creator",
+          "publicKey": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5"
+        }
+      ],
+      "carrierHashes": {
+        "detachedGenesisSignature": "73a8bef60565a5f633fe8ba9bf6248f8dcf9bc2bdc36f0511c35745507a64fee",
+        "exactCanonicalGenesisAnchorPreimageBytes": "7e488942e8064cfbff67530b5428a3a6fcd90facd513f4984c002e2337c12055",
+        "exactCanonicalLatchedAclBytes": "45686669545e2127ceab9e5f07a4c3b7f3849259a86a246eca2144117f7a58ab",
+        "exactCanonicalParametersCarrierBytes": "268ba3cade0827c50d5faba2b636e286e8e43d6b82c8be6f3837d84e50ea2dcf",
+        "exactCanonicalProfileBytes": "d07b85177bed2c6be644dff3e695c97de8943f39b447347b2327322fc337538c",
+        "exactCanonicalSignerSetBytes": "929f15c1e74f6424ba1b320abff335cec4d3333dc58058051551605e1f3ef463"
+      }
+    }
+  ]
+}
