@@ -109,6 +109,11 @@ export function nodePort(identity: string): NativePort {
 		},
 		snapshotFault: (fault, objectId, epoch) => {
 			use(snapshot, (db) => {
+				// Deliberately damage this fixture's exact owned snapshot, as this
+				// fault scenario already requires. The v4 trigger's connection-local
+				// writer guard must be present on the corruption connection; normal
+				// product connections retain their original guard and enforcement.
+				db.function("snapshot_writer_v4", (_event, _objectId, _epoch, _anchor, _manifestDigest, _incarnation) => 1);
 				const rows = db.prepare("SELECT * FROM snapshot_scopes_v2 WHERE object_id=? AND epoch=?").all(objectId, epoch);
 				requireThat(rows.length === 1, "unique actual snapshot mutation");
 				const r = rows[0]!;

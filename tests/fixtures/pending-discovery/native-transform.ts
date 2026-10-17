@@ -90,8 +90,19 @@ export function transformNativeOwners(
 		if (name === "lookupRecoveryDeclaration") {
 			let misses = 0,
 				resolutions = 0,
-				conflicts = 0;
+				conflicts = 0,
+				metadataReads = 0,
+				metadataResolutions = 0;
 			const observeResolution = (node: ts.Node): void => {
+				if (
+					backend === "browser" &&
+					ts.isVariableDeclaration(node) &&
+					node.name.getText(ast) === "metadata" &&
+					node.initializer !== undefined &&
+					ts.isYieldExpression(node.initializer) &&
+					node.initializer.expression?.getText(ast) === "readRecoveryMetadata(transaction, scope)"
+				)
+					metadataReads++;
 				if (ts.isReturnStatement(node) && node.expression !== undefined) {
 					const value = node.expression,
 						text = value.getText(ast).replace(/\s+/gu, " ");
@@ -106,7 +117,11 @@ export function transformNativeOwners(
 								ts.isObjectLiteralExpression(value.arguments[1]) &&
 								value.arguments[1].getText(ast).replace(/\s+/gu, " ") ===
 									"{ exactCanonicalManifestBytes: row.exact_manifest_bytes, totalBytes: row.total_bytes, chunkCount: row.chunk_count, expiresAt: row.expires_at, state: row.state, retention: row.retention, incarnation: row.incarnation, descriptors, }");
-					if (text === 'Object.freeze({ kind: "missing" })' || validated) {
+					// Current bounded native metadata loading returns the same validated observation.
+					// Require the exact scope-bound producer rather than accepting an arbitrary property return.
+					const metadataResult = backend === "browser" && text === "metadata.observation";
+					if (metadataResult) metadataResolutions++;
+					if (text === 'Object.freeze({ kind: "missing" })' || validated || metadataResult) {
 						if (text.startsWith("Object.freeze")) misses++;
 						else resolutions++;
 						insertions.push(
@@ -131,7 +146,12 @@ export function transformNativeOwners(
 				ts.forEachChild(node, observeResolution);
 			};
 			observeResolution(method.body);
-			if (misses !== 1 || resolutions !== 1 || conflicts !== 1)
+			if (
+				misses !== 1 ||
+				resolutions !== 1 ||
+				conflicts !== 1 ||
+				(metadataResolutions !== 0 && (metadataResolutions !== 1 || metadataReads !== 1))
+			)
 				throw new Error("NATIVE_LOOKUP_RESOLUTION_SEAM_NOT_UNIQUE");
 		}
 		const call = `__pendingNativeOwner(${JSON.stringify(name === "openScope" ? "native-acquire" : "native-lookup")}, ${input})`;

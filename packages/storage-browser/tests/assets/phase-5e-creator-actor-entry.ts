@@ -119,7 +119,7 @@ function digest(domain: string, bytes: Uint8Array): string {
 	return bytesHex(hashDomain(domain, bytes));
 }
 
-function fixture(): Readonly<{
+export function prepareCreatorActorFixture(): Readonly<{
 	authority: SealAuthority;
 	closeInput: Readonly<Record<string, unknown>>;
 	currentTrust: unknown;
@@ -251,7 +251,7 @@ export async function openCreatorActorHarness(databaseName: string): Promise<Cre
 		CandidateVoteModule,
 		CandidateFinalityModule,
 	];
-	const prepared = fixture();
+	const prepared = prepareCreatorActorFixture();
 	const signer = await finalityCandidate.createRecoverableFinalitySigner({ seed: CREATOR_SEED });
 	const vote = await voteCandidate.openBrowserSealVoteStore({ databaseName });
 	const evidence = await evidenceCandidate.openBrowserSealEvidenceStore({ databaseName });

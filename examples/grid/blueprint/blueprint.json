@@ -1,0 +1,364 @@
+{
+	"schemaVersion": 2,
+	"kind": "ts-drp-blueprint-authoring-source",
+	"artifactId": "v3-zone.v2",
+	"runtimeProfile": "ecmascript-2024-sync-v1",
+	"operationDiscriminator": "action",
+	"workBudgetProfile": "blueprint-work-budget-v1",
+	"operations": [
+		{
+			"name": "applicationBatch",
+			"reducerBinding": "applicationBatchReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "batch",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "causalJoin",
+			"reducerBinding": "causalJoinReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": []
+			}
+		},
+		{
+			"name": "commit-outcome-v1",
+			"reducerBinding": "commitOutcomeReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "proof",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "installRoster",
+			"reducerBinding": "installRosterReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "roster",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "migrationActivation",
+			"reducerBinding": "migrationActivationReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "decision",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "migrationRecord",
+			"reducerBinding": "migrationRecordReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "record",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "placeBlock",
+			"reducerBinding": "placeBlockReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "id",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "kind",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "x",
+						"required": true,
+						"type": "safe-integer"
+					},
+					{
+						"name": "y",
+						"required": true,
+						"type": "safe-integer"
+					}
+				]
+			}
+		}
+	],
+	"conformance": {
+		"corpusVersion": "v3-zone-signed-creator-v2",
+		"seed": "v3-zone-conformance-2026-10-10",
+		"initialState": {
+			"version": 2,
+			"creatorAuthor": "1111111111111111111111111111111111111111111111111111111111111111",
+			"creatorPeerId": "peer:creator",
+			"blocks": [],
+			"outcomes": [],
+			"roster": []
+		},
+		"prCases": [
+			{
+				"id": "roster-writer-noop",
+				"action": "installRoster",
+				"arguments": {
+					"roster": {
+						"entries": [
+							{
+								"author": "1111111111111111111111111111111111111111111111111111111111111111",
+								"peerId": "peer:creator",
+								"order": 0
+							},
+							{
+								"author": "2222222222222222222222222222222222222222222222222222222222222222",
+								"peerId": "peer:writer",
+								"order": 1
+							}
+						]
+					}
+				},
+				"executionContext": {
+					"author": "2222222222222222222222222222222222222222222222222222222222222222"
+				}
+			},
+			{
+				"id": "roster-creator",
+				"action": "installRoster",
+				"arguments": {
+					"roster": {
+						"entries": [
+							{
+								"author": "1111111111111111111111111111111111111111111111111111111111111111",
+								"peerId": "peer:creator",
+								"order": 0
+							},
+							{
+								"author": "2222222222222222222222222222222222222222222222222222222222222222",
+								"peerId": "peer:writer",
+								"order": 1
+							}
+						]
+					}
+				},
+				"executionContext": {
+					"author": "1111111111111111111111111111111111111111111111111111111111111111"
+				}
+			},
+			{
+				"id": "causal-join",
+				"action": "causalJoin",
+				"arguments": {}
+			},
+			{
+				"id": "block-negative-zero",
+				"action": "placeBlock",
+				"arguments": {
+					"id": "block:0",
+					"kind": "stone",
+					"x": -0,
+					"y": 1
+				}
+			},
+			{
+				"id": "batch",
+				"action": "applicationBatch",
+				"arguments": {
+					"batch": {
+						"version": 1,
+						"entries": [
+							{
+								"logicalTime": 1,
+								"operation": {
+									"action": "placeBlock",
+									"id": "block:1",
+									"kind": "wood",
+									"x": 2,
+									"y": 3
+								}
+							},
+							{
+								"logicalTime": 2,
+								"operation": {
+									"action": "placeBlock",
+									"id": "block:0",
+									"kind": "grass",
+									"x": 4,
+									"y": 5
+								}
+							}
+						]
+					}
+				}
+			},
+			{
+				"id": "migration-record",
+				"action": "migrationRecord",
+				"arguments": {
+					"record": {
+						"applicationStateDigest": "test",
+						"archivePolicy": "retain-source",
+						"authorityKind": "creator-ed25519-registered-vertex-v1",
+						"exactCanonicalApplicationStateBytes": "test",
+						"kind": "ts-drp-v3-room-migration-record",
+						"rehearsalNonce": "test",
+						"sourceAcceptedOperationCount": 0,
+						"sourceAcceptedOperationsDigest": "test",
+						"sourceAnchorDigest": "test",
+						"sourceBlueprintDigest": "test",
+						"sourceCreatorAuthor": "test",
+						"sourceObjectId": "test",
+						"targetAnchorDigest": "test",
+						"targetBlueprintDigest": "test",
+						"targetCreatorAuthor": "test",
+						"targetImportOperationCount": 0,
+						"targetImportOperationsDigest": "test",
+						"targetObjectId": "test",
+						"version": 1
+					}
+				}
+			},
+			{
+				"id": "migration-activation",
+				"action": "migrationActivation",
+				"arguments": {
+					"decision": {
+						"kind": "inert-test"
+					}
+				}
+			}
+		],
+		"nightlyAdditionalCases": [
+			{
+				"id": "roster-exact-resume",
+				"action": "installRoster",
+				"arguments": {
+					"roster": {
+						"entries": [
+							{
+								"author": "1111111111111111111111111111111111111111111111111111111111111111",
+								"peerId": "peer:creator",
+								"order": 0
+							},
+							{
+								"author": "2222222222222222222222222222222222222222222222222222222222222222",
+								"peerId": "peer:writer",
+								"order": 1
+							}
+						]
+					}
+				},
+				"executionContext": {
+					"author": "1111111111111111111111111111111111111111111111111111111111111111"
+				}
+			},
+			{
+				"id": "migration-record-inheritance-v2",
+				"action": "migrationRecord",
+				"arguments": {
+					"record": {
+						"applicationStateDigest": "test",
+						"archivePolicy": "retain-source",
+						"authorityKind": "creator-ed25519-registered-vertex-v1",
+						"kind": "ts-drp-v3-room-migration-record",
+						"rehearsalNonce": "test",
+						"sourceAcceptedOperationCount": 0,
+						"sourceAcceptedOperationsDigest": "test",
+						"sourceAnchorDigest": "test",
+						"sourceBlueprintDigest": "test",
+						"sourceCreatorAuthor": "1111111111111111111111111111111111111111111111111111111111111111",
+						"sourceObjectId": "test",
+						"targetAnchorDigest": "test",
+						"targetBlueprintDigest": "test",
+						"targetCreatorAuthor": "1111111111111111111111111111111111111111111111111111111111111111",
+						"targetImportOperationCount": 0,
+						"targetImportOperationsDigest": "test",
+						"targetObjectId": "test",
+						"version": 2,
+						"applicationState": {
+							"version": 2,
+							"creatorAuthor": "1111111111111111111111111111111111111111111111111111111111111111",
+							"creatorPeerId": "peer:creator",
+							"blocks": [
+								{
+									"id": "block:0",
+									"kind": "grass",
+									"x": 4,
+									"y": 5
+								},
+								{
+									"id": "block:1",
+									"kind": "wood",
+									"x": 2,
+									"y": 3
+								}
+							],
+							"outcomes": [],
+							"roster": [
+								{
+									"author": "1111111111111111111111111111111111111111111111111111111111111111",
+									"peerId": "peer:creator",
+									"order": 0
+								},
+								{
+									"author": "2222222222222222222222222222222222222222222222222222222222222222",
+									"peerId": "peer:writer",
+									"order": 1
+								}
+							]
+						},
+						"targetAclDigest": "test",
+						"targetEpoch": 0
+					}
+				},
+				"executionContext": {
+					"author": "1111111111111111111111111111111111111111111111111111111111111111"
+				}
+			},
+			{
+				"id": "block-unicode",
+				"action": "placeBlock",
+				"arguments": {
+					"id": "block:🌱",
+					"kind": "grass",
+					"x": -9007199254740991,
+					"y": 9007199254740991
+				}
+			}
+		]
+	}
+}

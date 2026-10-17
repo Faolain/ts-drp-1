@@ -5,6 +5,10 @@ import "fake-indexeddb/auto";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DurableIssuanceStore, DurableIssueCommit, SettlementPlan } from "@ts-drp/issuance-store";
+import {
+	bindDurableIssuancePruningMaintenance,
+	durableIssuancePruningMaintenanceForStore,
+} from "@ts-drp/issuance-store/maintenance";
 import type { V3PlaneHandle } from "@ts-drp/node/v3-live";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +23,7 @@ import {
 } from "../examples/v3-room/src/index.js";
 import { createRecoverableFinalitySigner } from "../packages/keychain/src/finality.js";
 import { createBrowserDurableIssuanceStore } from "../packages/storage-browser/src/issuance.js";
+import { createBrowserRoomHeadAuthority } from "../packages/storage-browser/src/room-head.js";
 
 const observation = vi.hoisted(() => ({
 	activate: [] as V3PlaneHandle[],
@@ -42,6 +47,7 @@ const observation = vi.hoisted(() => ({
 	publications: 0,
 	migrations: 0,
 	issueTransactions: 0,
+	targetSigns: 0,
 }));
 
 // Every operation and capability below is real. Only the receipt following one
@@ -73,36 +79,43 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOrigina
 					observation.issueTransactions += 1;
 					let selected: DurableIssueCommit | undefined;
 					let failAfter = false;
-					const result = await real.transactIssue(scope, async (sequence) => {
-						const candidate = await build(sequence);
-						selected = candidate;
-						const effect = candidate.planEffect as unknown as Record<string, unknown> | undefined;
-						if (
-							!observation.fired &&
-							effect?.kind === "replacement" &&
-							(typeof effect.fromIntent === "number" || observation.fault === "legacy-unknown")
-						) {
-							const current = await real.readSettlementPlan(scope);
-							const entry = current?.entries.find((row) => row.sourceSequence === effect.sourceSequence);
-							const progress = Reflect.get(entry as object, "replacementProgress") as Record<string, unknown>;
-							const final = progress !== undefined && effect.throughIntent === progress.intentCount;
+					// Observation is not authority: the original native issuer checks
+					// plan currency atomically. A nested IDB read would wait on this RW.
+					const observedPlan = await real.readSettlementPlan(scope);
+					const result = await real
+						.transactIssue(scope, async (sequence, nativeSignAdmission) => {
+							const candidate = await build(sequence, nativeSignAdmission);
+							selected = candidate;
+							const effect = candidate.planEffect as unknown as Record<string, unknown> | undefined;
 							if (
-								observation.fault === "before-commit" ||
-								observation.fault === "legacy-unknown" ||
-								(observation.fault === "partial-unknown" && !final) ||
-								(observation.fault === "final-unknown" && final)
+								!observation.fired &&
+								effect?.kind === "replacement" &&
+								(typeof effect.fromIntent === "number" || observation.fault === "legacy-unknown")
 							) {
-								observation.fired = true;
-								observation.events.push(`signed-fault:${sequence}`);
-								if (observation.fault === "before-commit")
-									throw Object.assign(new Error("D110C_0C1F5B0U_SIGNED_NOT_COMMITTED"), {
-										code: "ISSUANCE_OUTCOME_UNKNOWN",
-									});
-								failAfter = true;
+								const entry = observedPlan?.entries.find((row) => row.sourceSequence === effect.sourceSequence);
+								const progress = Reflect.get(entry as object, "replacementProgress") as Record<string, unknown>;
+								const final = progress !== undefined && effect.throughIntent === progress.intentCount;
+								if (
+									observation.fault === "before-commit" ||
+									observation.fault === "legacy-unknown" ||
+									(observation.fault === "partial-unknown" && !final) ||
+									(observation.fault === "final-unknown" && final)
+								) {
+									observation.fired = true;
+									observation.events.push(`signed-fault:${sequence}`);
+									if (observation.fault === "before-commit")
+										throw Object.assign(new Error("D110C_0C1F5B0U_SIGNED_NOT_COMMITTED"), {
+											code: "ISSUANCE_OUTCOME_UNKNOWN",
+										});
+									failAfter = true;
+								}
 							}
-						}
-						return candidate;
-					});
+							return candidate;
+						})
+						.catch((error) => {
+							observation.events.push(`native-issue-error:${String(error)}`);
+							throw error;
+						});
 					if (selected !== undefined) observation.commits.push(selected);
 					observation.events.push(`commit:${result.authorSequence}`);
 					if (failAfter) {
@@ -115,6 +128,9 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOrigina
 					return result;
 				},
 			};
+			const maintenance = durableIssuancePruningMaintenanceForStore(real);
+			if (maintenance === undefined || !bindDurableIssuancePruningMaintenance(wrapped, maintenance))
+				throw new TypeError("original issuance observer lost its native maintenance owner");
 			observation.stores.set(input.primaryDatabaseName, wrapped);
 			return wrapped;
 		},
@@ -159,6 +175,34 @@ vi.mock("@ts-drp/node/creator-close", async (importOriginal) => {
 	return { ...actual, bindCreatorLiveClose: observed };
 });
 
+// Successor activation uses the private installed kernel rather than the
+// exported activation entry point. Observe its genuine result as well.
+vi.mock("../packages/node/src/internal/creator-successor-live.js", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../packages/node/src/internal/creator-successor-live.js")>();
+	return {
+		...actual,
+		installCreatorSuccessorLive: (owner: Parameters<typeof actual.installCreatorSuccessorLive>[0]) =>
+			actual.installCreatorSuccessorLive(async (...args) => {
+				const result = await owner(...args);
+				if (result.ok && !observation.activate.includes(result.handle as V3PlaneHandle)) {
+					observation.activate.push(result.handle as V3PlaneHandle);
+					observation.events.push("activate");
+				}
+				return result;
+			}),
+		installCreatorSuccessorHandleAlias: (owner: Parameters<typeof actual.installCreatorSuccessorHandleAlias>[0]) =>
+			actual.installCreatorSuccessorHandleAlias((rawHandle, wrapper) => {
+				const accepted = owner(rawHandle, wrapper);
+				if (accepted) {
+					const index = observation.activate.indexOf(rawHandle as V3PlaneHandle);
+					if (index < 0) observation.activate.push(wrapper as V3PlaneHandle);
+					else observation.activate[index] = wrapper as V3PlaneHandle;
+				}
+				return accepted;
+			}),
+	};
+});
+
 vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@ts-drp/node/v3-live")>();
 	return {
@@ -191,6 +235,7 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
 });
 
 const sessions: V3RoomSession[] = [];
+const headClosers: (() => Promise<void>)[] = [];
 const originalStorage = Object.getOwnPropertyDescriptor(navigator, "storage");
 let ordinal = 0;
 const parameters = Object.freeze({
@@ -211,67 +256,30 @@ function required<T>(value: T | null | undefined): T {
 	return value;
 }
 
-function roomHeadAuthority(scoped = false): CreateV3RoomSessionInput["roomHeadAuthority"] {
-	if (scoped) {
-		const owners = new Map<string, CreateV3RoomSessionInput["roomHeadAuthority"]>();
-		const owner = (scope: { readonly objectId: string }) => {
-			let selected = owners.get(scope.objectId);
-			if (selected === undefined) {
-				selected = roomHeadAuthority();
-				owners.set(scope.objectId, selected);
-			}
-			return selected;
-		};
-		return {
-			initialization: { kind: "create" },
-			read: (input) => owner(input.scope).read(input),
-			create: (input) => owner(input.scope).create(input),
-			migrate: (input) => owner(input.scope).migrate(input),
-			begin: (input) => owner(input.scope).begin(input),
-			commit: (input) => owner(input.scope).commit(input),
-		};
-	}
-	let state: { pending: null | { previous: unknown; next: unknown }; stable: unknown } | null = null;
-	const success = () => ({ ok: true as const, state: structuredClone(state) as never });
-	return {
-		initialization: { kind: "create" },
-		read: () => Promise.resolve(success()),
-		create: async (input) => {
-			await Promise.resolve();
-			if (state === null) state = { pending: null, stable: input.stable };
-			return success();
-		},
-		migrate: async (input) => {
-			await Promise.resolve();
-			state = { pending: null, stable: input.stable };
-			return success();
-		},
-		begin: async (input) => {
-			await Promise.resolve();
-			if (JSON.stringify(input.expected) !== JSON.stringify(state)) return { ok: false, reason: "conflict" };
-			state = { pending: { previous: required(state).stable, next: input.next }, stable: required(state).stable };
-			return success();
-		},
-		commit: async (input) => {
-			await Promise.resolve();
-			if (JSON.stringify(input.expected) !== JSON.stringify(state) || state?.pending === null)
-				return { ok: false, reason: "conflict" };
-			state = { pending: null, stable: required(required(state).pending).next };
-			return success();
-		},
-	};
+async function roomHeadAuthority(name: string) {
+	const owner = await createBrowserRoomHeadAuthority({ databaseName: name, initialization: { kind: "create" } });
+	headClosers.push(() => owner.close());
+	return owner;
 }
 
 async function openRebasePair(
 	count: number,
 	expandedBytes: number,
 	withClose = false,
-	migrationRecovery = false,
-	options: { hold?: boolean; singleGeneration?: boolean; prepareActivation?: boolean } = {}
+	_migrationRecovery = false,
+	options: {
+		hold?: boolean;
+		singleGeneration?: boolean;
+		prepareActivation?: boolean;
+		staleSourceFloor?: boolean;
+		missingSourceAhe?: boolean;
+	} = {}
 ) {
 	const identity = ++ordinal;
 	const objectId = `creator:${identity.toString(16).padStart(32, "0")}`;
 	const name = `d110c-f5b0u-runtime-${identity}`;
+	const sourceFloor = await roomHeadAuthority(`${name}--source-room-head`);
+	const targetFloor = await roomHeadAuthority(`${name}--target-room-head`);
 	const base = createV3ChatApplication("alice");
 	const application = Object.freeze({
 		...base,
@@ -358,10 +366,18 @@ async function openRebasePair(
 		},
 		onProjection: () => undefined,
 		publicKeyBytes: publicKey,
-		roomHeadAuthority: roomHeadAuthority(migrationRecovery),
+		roomHeadAuthority: target ? targetFloor : sourceFloor,
 		...(target && finality !== undefined ? { creatorFinalitySigner: finality.signer } : {}),
-		signRegisteredVertexDigest: (value) => Promise.resolve(ed25519.sign(value, authorSeed)),
-		...(target ? { rebaseSourceInvite: sourceInvite } : {}),
+		signRegisteredVertexDigest: (value) => {
+			if (target) observation.targetSigns += 1;
+			return Promise.resolve(ed25519.sign(value, authorSeed));
+		},
+		...(target
+			? {
+					rebaseSourceInvite: sourceInvite,
+					rebaseSourceStorage: { databaseName: `${name}-source`, roomHeadAuthority: sourceFloor },
+				}
+			: {}),
 	});
 	const source = await createV3RoomSession(input(false));
 	sessions.push(source);
@@ -384,11 +400,32 @@ async function openRebasePair(
 		return { name, objectId, target: source, rehearsal, input: input(false), activation: undefined };
 	await source.close();
 	sessions.splice(sessions.indexOf(source), 1);
+	if (options.missingSourceAhe) {
+		// Only this test-owned, joined source database is removed.
+		await new Promise<void>((resolve, reject) => {
+			const deleting = indexedDB.deleteDatabase(`${name}-source--ahe`);
+			deleting.onsuccess = () => resolve();
+			deleting.onerror = () => reject(deleting.error);
+		});
+	}
+	if (options.staleSourceFloor) {
+		const scope = { objectId, pinnedGenesisAnchorDigest: sourceInvite.pinnedGenesisAnchorDigest };
+		const original = await sourceFloor.read({ scope });
+		if (!original.ok || original.state === null) throw new Error("original source floor is missing");
+		const begun = await sourceFloor.begin({
+			scope,
+			expected: original.state,
+			next: { objectId, epoch: 1, currentAnchorDigest: "f".repeat(64) },
+		});
+		if (!begun.ok || begun.state === null) throw new Error("source floor mutation did not begin");
+		const committed = await sourceFloor.commit({ scope, expected: begun.state });
+		if (!committed.ok) throw new Error("source floor mutation did not commit");
+	}
 	let activation;
 	if (options.prepareActivation) {
 		// Genuine rehearsal with the exact held target's genesis authority and
 		// empty canonical projection, before any hold exists. No plan is injected.
-		const { rebaseSourceInvite: _source, ...donorInput } = input(true);
+		const { rebaseSourceInvite: _source, rebaseSourceStorage: _sourceStorage, ...donorInput } = input(true);
 		const donor = await createV3RoomSession({
 			...donorInput,
 			databaseName: `${name}-rehearsal-source`,
@@ -412,6 +449,7 @@ async function openRebasePair(
 	observation.accepted = 0;
 	observation.publications = 0;
 	observation.issueTransactions = 0;
+	observation.targetSigns = 0;
 	const targetInput = input(true);
 	const target = await createV3RoomSession(targetInput);
 	sessions.push(target);
@@ -608,6 +646,24 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 		await expect(target.sealEpoch()).resolves.toMatchObject({ ok: true, lifecycle: "successor-pending-adoption" });
 		expect(observation.closeCalls).toBe(1);
 	});
+	it("original rebase source whole-floor drift refuses before target bootstrap crypto or issuance", async () => {
+		await expect(openRebasePair(1, 100, false, false, { staleSourceFloor: true })).rejects.toThrow();
+		expect(observation.issueTransactions).toBe(0);
+		expect(observation.targetSigns).toBe(0);
+		expect(observation.commits).toHaveLength(0);
+		expect(observation.publications).toBe(0);
+		expect(observation.activate).toHaveLength(0);
+	});
+	it("missing original rebase source AHE refuses without reconstructing protocol rows or target crypto", async () => {
+		await expect(openRebasePair(1, 100, false, false, { missingSourceAhe: true })).rejects.toThrow(
+			"original rebase source AHE is unavailable"
+		);
+		expect(observation.issueTransactions).toBe(0);
+		expect(observation.targetSigns).toBe(0);
+		expect(observation.commits).toHaveLength(0);
+		expect(observation.publications).toBe(0);
+		expect(observation.activate).toHaveLength(0);
+	});
 	it("same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link", async () => {
 		const fixture = await openHeld();
 		await holdCustody(fixture);
@@ -735,9 +791,19 @@ describe("D.110c-0c1f5b0w durable manual-review hold semantics", () => {
 		sessions.splice(sessions.indexOf(fixture.target), 1);
 	});
 });
-afterEach(async () => {
+afterEach(async (context) => {
+	if (context.task.result?.state === "fail")
+		console.error(
+			JSON.stringify({
+				lane: "original-settlement-failure",
+				errors: context.task.result.errors,
+				native: observation.events.filter((event) => event.startsWith("native-issue-error:")),
+				plans: observation.planWrites,
+			})
+		);
 	try {
 		for (const session of sessions.splice(0)) await session.close().catch(() => undefined);
+		for (const close of headClosers.splice(0)) await close();
 	} finally {
 		if (originalStorage === undefined) Reflect.deleteProperty(navigator, "storage");
 		else Object.defineProperty(navigator, "storage", originalStorage);
@@ -787,6 +853,7 @@ describe("D.110c-0c1f5b0u genuine room Node settlement composition", () => {
 			const attempted = await Promise.allSettled([
 				target.issue({ action: "message", clientOperationId: "after", text: "continued" }),
 			]);
+			if (attempted[0]?.status === "rejected") console.error("original signed recovery refusal", attempted[0].reason);
 			expect.soft(observation.fired, "D110C_0C1F5B0U_SIGNED_FAULT_NOT_REACHED").toBe(true);
 			expect.soft(attempted[0]?.status, "D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED").toBe("fulfilled");
 			expect.soft(observation.activate.length, "D110C_0C1F5B0U_FRESH_ACTIVATION_MISSING").toBe(2);

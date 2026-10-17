@@ -226,7 +226,7 @@ type ExpectedEgress =
 	| Readonly<{ ok: true; kind: "empty" | "published" }>
 	| Readonly<{
 			ok: false;
-			kind: "not-active" | "store-failed" | "record-rejected" | "publish-failed" | "publication-state-unknown";
+			kind: "not-active" | "store-failed" | "record-rejected" | "publish-failed" | "publication-state-unknown" | "admission-rejected";
 			detail: string;
 	  }>;
 

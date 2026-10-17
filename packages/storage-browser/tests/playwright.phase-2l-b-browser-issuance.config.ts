@@ -7,7 +7,14 @@ export default defineConfig({
 	fullyParallel: false,
 	globalSetup: "./phase-2l-b-global-setup.ts",
 	globalTimeout: 300_000,
-	projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+	projects:
+		process.env.PHASE_2L_B_R8_SHARED === undefined
+			? [{ name: "chromium", use: { browserName: "chromium" } }]
+			: [
+					{ name: "chromium", use: { browserName: "chromium" } },
+					{ name: "firefox", use: { browserName: "firefox" } },
+					{ name: "webkit", use: { browserName: "webkit" } },
+				],
 	retries: 0,
 	timeout: 120_000,
 	use: { baseURL: "http://127.0.0.1:43891", browserName: "chromium", headless: true },

@@ -2,11 +2,11 @@ import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import type { Address, PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import {
+	ControlPlaneHealthAggregator,
 	type ControlPlaneMechanismPorts,
 	type ControlPlaneScheduler,
 	type RecoveryMechanismResult,
 } from "@ts-drp/control-plane";
-import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	AddressPolicy,
 	AdmissionPolicy,
@@ -32,6 +32,7 @@ import { IntervalRunnerState } from "@ts-drp/types";
 import { describe, expect, it, vi } from "vitest";
 
 import { DRPNode } from "../src/index.js";
+import type { NodeRoomControlPlaneObservation, NodeRoomNetworkPort } from "../src/room-network.js";
 
 const START_MS = 1_750_000_000_000;
 const NAMESPACE = `drp-network:v1:${"h".repeat(43)}`;
@@ -58,11 +59,11 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
-		const object = await node.createObject({ id: "local-object", acl: createPermissionlessACL() });
+		const object = openObservedRoom(node, "local-object");
 		await node.start();
 		const [firstGroupPeer] = groupPeers;
 		if (firstGroupPeer !== undefined) {
-			fake.emit({ peerId: firstGroupPeer, subscribed: true, topic: object.id });
+			fake.emit({ peerId: firstGroupPeer, subscribed: true, topic: object.topic });
 			await flushMicrotasks();
 		}
 		scheduler.advanceBy(50);
@@ -98,13 +99,13 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		await new Promise((resolve) => setTimeout(resolve, 100));
 		expect(fake.connect).not.toHaveBeenCalled();
 
-		const object = await node.createObject({ id: "live-health-count-object", acl: createPermissionlessACL() });
+		const object = openObservedRoom(node, "live-health-count-object");
 		scheduler.advanceBy(100);
 		await vi.waitFor(() => expect(fake.connect).toHaveBeenCalled());
 		await flushMicrotasks();
 
 		const postUnsubscribeEventIndex = events.length;
-		node.unsubscribeObject(object.id);
+		await object.port.close();
 		scheduler.advanceBy(500);
 		await flushMicrotasks();
 		expect(events.slice(postUnsubscribeEventIndex)).toContainEqual({ kind: "health", state: "healthy" });
@@ -133,13 +134,13 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		seedFreshControlPlane(node);
 
 		await node.start();
-		const object = await node.createObject({ id: "local-sole-writer-object", acl: createPermissionlessACL() });
-		fake.emit({ peerId: "member-a", subscribed: true, topic: object.id });
+		const object = openObservedRoom(node, "local-sole-writer-object", ["member-a"]);
+		fake.emit({ peerId: "member-a", subscribed: true, topic: object.topic });
 		await flushMicrotasks();
 		scheduler.advanceBy(100);
 		await flushMicrotasks();
 		for (let index = 0; index < 5; index += 1) {
-			fake.emit({ peerId: "member-a", subscribed: true, topic: object.id });
+			fake.emit({ peerId: "member-a", subscribed: true, topic: object.topic });
 		}
 		await flushMicrotasks();
 		scheduler.advanceBy(5_000);
@@ -166,7 +167,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
-		await node.createObject({ id: "default-recovery-object", acl: createPermissionlessACL() });
+		openObservedRoom(node, "default-recovery-object");
 		await node.start();
 		await vi.waitFor(() => expect(fake.redialBootstraps).toHaveBeenCalledOnce());
 
@@ -203,7 +204,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
-		await node.createObject({ id: "stop-during-recovery-object", acl: createPermissionlessACL() });
+		openObservedRoom(node, "stop-during-recovery-object");
 		await node.start();
 		await vi.waitFor(() => expect(ports.rendezvousBootstrap).toHaveBeenCalledOnce());
 		const stopping = node.stop();
@@ -228,7 +229,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
-		await node.createObject({ id: "failed-operation-history-object", acl: createPermissionlessACL() });
+		openObservedRoom(node, "failed-operation-history-object");
 		await node.start();
 		await vi.waitFor(() => expect(events).toContainEqual({ kind: "terminal", reason: "exhausted" }));
 		scheduler.advanceBy(500);
@@ -237,7 +238,144 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		await node.stop();
 		expect(scheduler.pendingCount()).toBe(0);
 	});
+
+	it("requires a current room-owned provider rather than transport presence", async () => {
+		const fake = createFakeNetwork({ allPeers: ["member-a"], groupPeers: ["member-a"] });
+		const node = new DRPNode(config([]), { networkNode: fake.networkNode, reconnect: false });
+		const port = node.openRoomNetwork("provider-absent-room");
+		await node["_refreshAuthenticatedDrpPeers"]();
+		const health = node["_readControlPlaneHealth"](new ControlPlaneHealthAggregator({ now: (): number => START_MS }));
+		expect(health.authenticatedDrpPeerIds).toEqual([]);
+		expect(health.objectSynchronization).toBe("unknown");
+		expect(health.subscribedObjectCount).toBe(1);
+		await port.close();
+		expect(() => port.setControlPlaneObservationProvider(() => undefined)).toThrow("room network is closed");
+	});
+
+	it("detaches exact current observations and refuses altered room identity", async () => {
+		const fake = createFakeNetwork({ allPeers: ["member-a"], groupPeers: ["member-a"] });
+		const node = new DRPNode(config([]), { networkNode: fake.networkNode, reconnect: false });
+		const peerIds = ["member-a"];
+		const room = openObservedRoom(node, "detached-room", peerIds);
+		const snapshots = node["_roomNetwork"].readControlPlaneObservations();
+		expect(Object.isFrozen(snapshots[0])).toBe(true);
+		peerIds.push("unauthenticated-stranger");
+		expect(snapshots[0]?.authenticatedPeerIds).toEqual(["member-a"]);
+		const current = room.observation();
+		if (current === undefined) throw new Error("fixture authority absent");
+		room.setObservation({ ...current, objectId: "foreign-room" });
+		expect(node["_roomNetwork"].readControlPlaneObservations()).toEqual([]);
+		await room.port.close();
+	});
+
+	it("serializes membership and rejects authority changed during verification before valid continuation", async () => {
+		const fake = createFakeNetwork({ allPeers: ["member-a"], groupPeers: ["member-a"] });
+		const verifier = fake.networkNode.membershipVerifier;
+		if (verifier === undefined) throw new Error("fixture verifier absent");
+		let settle: ((result: { accepted: boolean }) => void) | undefined;
+		const verify = vi.spyOn(verifier, "verify").mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					settle = resolve;
+				})
+		);
+		const node = new DRPNode(config([]), { networkNode: fake.networkNode, reconnect: false });
+		const room = openObservedRoom(node, "changed-authority-room", ["member-a"]);
+		const pending = node["_refreshAuthenticatedDrpPeers"]();
+		await flushMicrotasks();
+		const current = room.observation();
+		if (current === undefined) throw new Error("fixture authority absent");
+		room.setObservation({ ...current, epoch: 1, anchorDigest: "c".repeat(64) });
+		if (settle === undefined) throw new Error("fixture membership not entered");
+		settle({ accepted: true });
+		await pending;
+		expect(node["_authenticatedDrpPeerIds"].size).toBe(0);
+		await node["_refreshAuthenticatedDrpPeers"]();
+		expect(node["_authenticatedDrpPeerIds"]).toEqual(new Set(["member-a"]));
+		expect(verify).toHaveBeenCalledTimes(2);
+		const closing = room.port.close();
+		expect(node["_roomNetwork"].readControlPlaneObservations()).toEqual([]);
+		expect(
+			node["_readControlPlaneHealth"](new ControlPlaneHealthAggregator({ now: (): number => START_MS }))
+				.authenticatedDrpPeerIds
+		).toEqual([]);
+		await closing;
+	});
+
+	it("polls changed authority once while membership stalls and never claims local installation is convergence", async () => {
+		const fake = createFakeNetwork({ allPeers: ["member-a"], groupPeers: ["member-a"] });
+		const verifier = fake.networkNode.membershipVerifier;
+		if (verifier === undefined) throw new Error("fixture verifier absent");
+		let settle: ((result: { accepted: boolean }) => void) | undefined;
+		const verify = vi.spyOn(verifier, "verify").mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					settle = resolve;
+				})
+		);
+		const node = new DRPNode(config([]), { networkNode: fake.networkNode, reconnect: false });
+		const room = openObservedRoom(node, "polled-authority-room", ["member-a"]);
+		const aggregate = new ControlPlaneHealthAggregator({ now: (): number => START_MS });
+		for (let index = 0; index < 20; index += 1) node["_readControlPlaneHealth"](aggregate);
+		expect(verify).toHaveBeenCalledTimes(1);
+		if (settle === undefined) throw new Error("fixture membership not entered");
+		settle({ accepted: true });
+		await node["_controlPlaneMembershipRefresh"];
+		const installed = node["_readControlPlaneHealth"](aggregate);
+		expect(installed.authenticatedDrpPeerIds).toEqual(["member-a"]);
+		expect(installed.objectSynchronization).toBe("unknown");
+		const current = room.observation();
+		if (current === undefined) throw new Error("fixture authority absent");
+		room.setObservation({ ...current, localState: "transitioning" });
+		const transitioning = node["_readControlPlaneHealth"](aggregate);
+		expect(transitioning.objectSynchronization).toBe("behind");
+		expect(transitioning.state).not.toBe("healthy");
+		await room.port.close();
+	});
 });
+
+/**
+ * Explicit coordinator fixture premise, not native authorization/convergence evidence.
+ * @param node Existing node transport composition under observation.
+ * @param id Exact durable identity.
+ * @param authenticatedPeerIds Peers supplied by the current room owner.
+ * @returns Actual registered transport plus detached local authority fixture.
+ */
+function openObservedRoom(
+	node: DRPNode,
+	id: string,
+	authenticatedPeerIds: readonly string[] = []
+): {
+	readonly port: NodeRoomNetworkPort;
+	readonly topic: string;
+	setObservation(value: NodeRoomControlPlaneObservation | undefined): void;
+	observation(): NodeRoomControlPlaneObservation | undefined;
+} {
+	const port = node.openRoomNetwork(id);
+	const topic = `drp/v3/1/fixture/${id}`;
+	port.setIngressHandler(
+		topic,
+		() => undefined,
+		() => undefined
+	);
+	let observation: NodeRoomControlPlaneObservation | undefined = {
+		objectId: id,
+		epoch: 0,
+		anchorDigest: "a".repeat(64),
+		aclDigest: "b".repeat(64),
+		authenticatedPeerIds,
+		localState: "installed",
+	};
+	port.setControlPlaneObservationProvider(() => observation);
+	return {
+		port,
+		topic,
+		setObservation: (value): void => {
+			observation = value;
+		},
+		observation: () => observation,
+	};
+}
 
 class ManualNodeScheduler implements ControlPlaneScheduler {
 	#nextHandle = 1;

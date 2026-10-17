@@ -48,6 +48,7 @@ export interface CreatorCloseModule {
 		input: Readonly<{
 			aclDigest: string;
 			archiveIndexRoot: string;
+			archiveAppend?: import("@ts-drp/protocol-v3/creator-close").CreatorArchiveAppendBinding;
 			blueprintDigest: string;
 			closeReason: string;
 			closeSetCount: number;

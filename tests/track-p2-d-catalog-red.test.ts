@@ -65,6 +65,7 @@ vi.mock("@ts-drp/protocol-v3", async (importOriginal) => {
 });
 
 import * as catalogNamespace from "../packages/blueprint-catalog/src/index.js";
+import { openTrustedBlueprintCatalogBytes } from "../packages/blueprint-catalog/src/bytes.js";
 import { DRP_ERROR_CODES, DRPError } from "../packages/errors/src/index.js";
 import { runBlueprintCli } from "../packages/blueprint-toolchain/src/index.js";
 
@@ -454,6 +455,67 @@ afterAll(() => {
 });
 
 describe("Track P2-d canonical catalog fixture and public resolver RED", () => {
+	it("validates bundled bytes with the native validator and detaches inputs and results", () => {
+		const value = fixture();
+		const assets = {
+			[`${value.blueprintDigest}.artifact.mjs`]: value.artifactBytes,
+			[`${value.blueprintDigest}.package.bin`]: value.packageBytes,
+			[`${value.blueprintDigest}.lint.bin`]: value.lintBytes,
+			[`${value.blueprintDigest}.receipt.bin`]: value.receiptBytes,
+		};
+		const handle = openTrustedBlueprintCatalogBytes({ catalogBytes: value.catalogBytes, assets });
+		const workspace = materialize("byte-native-parity");
+		expect(handle.resolve(value.blueprintDigest)).toEqual(
+			api.openTrustedBlueprintCatalog({ catalogDirectory: workspace.directory }).resolve(value.blueprintDigest)
+		);
+		const expectedArtifact = new Uint8Array(value.artifactBytes);
+		const expectedPackage = new Uint8Array(value.packageBytes);
+		value.catalogBytes.fill(0);
+		for (const bytes of Object.values(assets)) bytes.fill(0);
+		const first = handle.resolve(value.blueprintDigest);
+		expect(first.exactArtifactBytes).toEqual(expectedArtifact);
+		expect(first.canonicalBlueprintPackageBytes).toEqual(expectedPackage);
+		first.exactArtifactBytes.fill(0);
+		expect(handle.resolve(value.blueprintDigest).exactArtifactBytes).toEqual(expectedArtifact);
+	});
+
+	it("refuses missing bundled assets, artifact corruption and insufficient evidence without runtime authority", () => {
+		const value = fixture();
+		const assets = {
+			[`${value.blueprintDigest}.artifact.mjs`]: value.artifactBytes,
+			[`${value.blueprintDigest}.package.bin`]: value.packageBytes,
+			[`${value.blueprintDigest}.lint.bin`]: value.lintBytes,
+			[`${value.blueprintDigest}.receipt.bin`]: value.receiptBytes,
+		};
+		expectCode(
+			() => openTrustedBlueprintCatalogBytes({ catalogBytes: value.catalogBytes, assets: {} }),
+			"BLUEPRINT_ENTRY_FILE_UNREADABLE"
+		);
+		expectCode(
+			() =>
+				openTrustedBlueprintCatalogBytes({
+					catalogBytes: value.catalogBytes,
+					assets: { ...assets, [`${value.blueprintDigest}.artifact.mjs`]: new TextEncoder().encode("corrupt\n") },
+				}),
+			"BLUEPRINT_ARTIFACT_BYTES_INVALID"
+		);
+		const receipt = decodeCanonical(value.receiptBytes) as Record<string, unknown>;
+		receipt.executionTier = "pr";
+		receipt.operationOrder = (receipt.operationOrder as string[]).slice(0, 2);
+		receipt.selectedCaseIds = (receipt.selectedCaseIds as string[]).slice(0, 2);
+		const receiptBytes = encodeCanonical(receipt);
+		const catalog = value.catalogValue;
+		soleEntry(catalog).conformanceReceiptDigest = domainHex("ts-drp/blueprint-conformance-receipt/v1", receiptBytes);
+		expectCode(
+			() =>
+				openTrustedBlueprintCatalogBytes({
+					catalogBytes: encodeCanonical(catalog),
+					assets: { ...assets, [`${value.blueprintDigest}.receipt.bin`]: receiptBytes },
+				}),
+			"BLUEPRINT_CONFORMANCE_TIER_INSUFFICIENT"
+		);
+		expect(preparationProbe.runtimeInputs).toEqual([]);
+	});
 	it("opens the exact one-entry synthetic nightly catalog and exposes only frozen byte provenance", () => {
 		const workspace = materialize("open-exact");
 		const realpath = vi.spyOn(fs, "realpathSync");
@@ -485,8 +547,8 @@ describe("Track P2-d canonical catalog fixture and public resolver RED", () => {
 				conformanceResult: "passed",
 			},
 		});
-		expect(resolved.canonicalBlueprintPackageBytes).toEqual(workspace.packageBytes);
-		expect(resolved.exactArtifactBytes).toEqual(workspace.artifactBytes);
+		expect(resolved.canonicalBlueprintPackageBytes).toEqual(new Uint8Array(workspace.packageBytes));
+		expect(resolved.exactArtifactBytes).toEqual(new Uint8Array(workspace.artifactBytes));
 		expect(Reflect.ownKeys(resolved).sort()).toEqual(
 			[
 				"artifactDigest",
@@ -534,8 +596,8 @@ describe("Track P2-d canonical catalog fixture and public resolver RED", () => {
 		first.canonicalBlueprintPackageBytes.fill(0);
 		const second = handle.resolve(workspace.blueprintDigest);
 		expect(read).not.toHaveBeenCalled();
-		expect(second.exactArtifactBytes).toEqual(workspace.artifactBytes);
-		expect(second.canonicalBlueprintPackageBytes).toEqual(workspace.packageBytes);
+		expect(second.exactArtifactBytes).toEqual(new Uint8Array(workspace.artifactBytes));
+		expect(second.canonicalBlueprintPackageBytes).toEqual(new Uint8Array(workspace.packageBytes));
 		expect(second.exactArtifactBytes).not.toBe(first.exactArtifactBytes);
 		expect(second.canonicalBlueprintPackageBytes).not.toBe(first.canonicalBlueprintPackageBytes);
 		expect(preparationProbe.admissionInputs).toHaveLength(1);
@@ -1114,7 +1176,7 @@ describe("Track P2-d private catalog construction and verify CLI RED", () => {
 		expect(catalogStat.isSymbolicLink()).toBe(false);
 		fs.rmSync(workspace.bundle, { force: true, recursive: true });
 		const handle = api.openTrustedBlueprintCatalog({ catalogDirectory: workspace.output });
-		expect(handle.resolve(value.blueprintDigest).exactArtifactBytes).toEqual(value.artifactBytes);
+		expect(handle.resolve(value.blueprintDigest).exactArtifactBytes).toEqual(new Uint8Array(value.artifactBytes));
 	});
 
 	it("verify is exactly synchronous open plus resolve for one digest", async () => {
@@ -1230,9 +1292,10 @@ describe("Track P2-d public/package/governance and preservation controls", () =>
 		expect(new Set(DRP_ERROR_CODES).size).toBe(DRP_ERROR_CODES.length);
 	});
 
-	it("keeps the catalog at its package root with only the frozen runtime dependencies", () => {
-		expect(Object.keys(catalogManifest.exports)).toEqual(["."]);
+	it("keeps the native catalog root and exposes the shared browser byte boundary", () => {
+		expect(Object.keys(catalogManifest.exports)).toEqual([".", "./bytes"]);
 		expect(catalogManifest.dependencies).toEqual({
+			"@noble/hashes": "^1.7.1",
 			"@ts-drp/canonical": "0.11.0",
 			"@ts-drp/errors": "0.11.0",
 			"@ts-drp/protocol-v3": "0.11.0",

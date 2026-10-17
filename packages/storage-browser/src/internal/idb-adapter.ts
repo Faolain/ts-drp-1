@@ -1,3 +1,4 @@
+import { encodeCanonical } from "@ts-drp/canonical";
 import {
 	type ActiveGenerationSnapshot,
 	type AheBoundedReadAcquisition,
@@ -5,19 +6,28 @@ import {
 	type AheBoundedRecoveryRoleRead,
 	type AheBoundedRecoveryRoleReadInput,
 	type AheBoundedRecoveryRoleStore,
+	type AheRetirementAdmissionImage,
+	type AheRetirementControl,
+	type AheRetirementControlRead,
+	aheRetirementGenerationBindingMatches,
+	aheRetirementNativeCommands,
+	type AheRetirementNativeMutation,
+	aheRetirementReclamationMatches,
 	type BlobDigest,
 	type BlobExistencePort,
+	createAheRetirementControlRead,
+	decodeAheRetirementControl,
 	decodeGenerationRecordV1,
 	decodeHeadRecordV1,
+	encodeAheRetirementControl,
 	type ExpectedHead,
 	type GenerationId,
 	type GenerationPage,
 	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
-	AHE_BOUNDED_READ_LIMITS as LIMITS,
 	parseBlobDigest,
-	parseGenerationId,
+	parseStorageObjectId,
 	type PresentHead,
 	type StorageObjectId,
 	type StoreCapabilities,
@@ -26,6 +36,8 @@ import {
 import {
 	boundedActiveReadSteps,
 	boundedHeadSteps,
+	BoundedReadBudgetError,
+	BoundedReadNativeFacts,
 	type BoundedReadRequest,
 	boundedRecoveryRoleReadSteps,
 	classifyPersistedState,
@@ -45,8 +57,27 @@ import {
 	type StorageAdapterWrite,
 } from "@ts-drp/storage/adapter";
 
-import { registerBrowserAheReclamationMaintenance } from "./ahe-reclamation.js";
+import { applyBrowserBoundedAheReclamation, registerBrowserAheReclamationMaintenance } from "./ahe-reclamation.js";
 import {
+	captureNativeReadReservationInput,
+	isNativeReadReservationTransaction,
+	nativeReadonlyTransaction,
+	nativeReadReservationCheck,
+	NativeReadReservationOwner,
+	type NativeReadReservationPort,
+	nativeReadReservationTransaction,
+	needsNativeReadReservationTurn,
+	runNativeReservedRead,
+} from "./native-read-reservation.js";
+import {
+	admitBrowserRetirementControl,
+	advanceBrowserRetirementControl,
+	loadBrowserBoundedReadRequest,
+	readBrowserRetirementControl,
+	writeBrowserRetirementControl,
+} from "./retirement-control.js";
+import {
+	browserAheControlStores,
 	openPhase2dInternalDatabase,
 	PHASE_2D_BLOBS_STORE,
 	PHASE_2D_GENERATIONS_STORE,
@@ -58,11 +89,14 @@ export interface BrowserAheDurableStoreOptions {
 	readonly databaseName: string;
 }
 
-export type BrowserAheDurableStore = AheBoundedRecoveryRoleStore & BlobExistencePort;
+export type BrowserAheDurableStore = AheBoundedRecoveryRoleStore & BlobExistencePort & NativeReadReservationPort;
 
 type Phase2dMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readGenerationPage" | "readHead">;
 
 type TransactionOutcome = Readonly<{ ok: true }> | Readonly<{ cause: unknown; ok: false }>;
+
+type HeldAheRetirementAdmissionImage = Readonly<{transaction: IDBTransaction; objectId: StorageObjectId;
+	controlBytes: Uint8Array | null; head: ExpectedHead; imageDigest: string; metadataBytes: number}>;
 
 type HeadFact = Extract<StorageAdapterFact, { kind: "head" }>;
 
@@ -120,6 +154,7 @@ class IdbAdapterLifecycle {
 	private activeOperations = 0;
 	private closePromise: Promise<void> | undefined;
 	private connection: IDBDatabase | undefined;
+	private readReservations: NativeReadReservationOwner | undefined;
 	private poisoned = false;
 	private recoveryActive = false;
 	private readonly recoveryWaiters: Array<(release: () => void) => void> = [];
@@ -137,6 +172,15 @@ class IdbAdapterLifecycle {
 		}
 		if (this.connection !== undefined) throw new Error("IndexedDB lifecycle already attached");
 		this.connection = database;
+		this.readReservations = new NativeReadReservationOwner(database);
+	}
+
+	public acquireNativeReadReservation(input: {
+		readonly objectId: string;
+	}): ReturnType<NativeReadReservationOwner["acquire"]> {
+		if (this.connection === undefined || this.readReservations === undefined) throw new Error("STORE_CLOSED");
+		if (this.poisoned) throw new Error("STORE_POISONED");
+		return this.readReservations.acquire(input);
 	}
 
 	public startOperation(): IDBDatabase | undefined {
@@ -174,10 +218,12 @@ class IdbAdapterLifecycle {
 	}
 
 	public close(): Promise<void> {
+		if (this.closePromise !== undefined) return this.closePromise;
 		for (const invalidate of this.invalidators) invalidate();
-		this.closePromise ??= new Promise((resolve) => {
+		const operationsJoined = new Promise<void>((resolve) => {
 			this.resolveClose = resolve;
 		});
+		this.closePromise = Promise.all([operationsJoined, this.readReservations?.close()]).then(() => undefined);
 		const database = this.connection;
 		if (database !== undefined) {
 			this.connection = undefined;
@@ -214,19 +260,459 @@ class PoisonedOperationError extends Error {
 class IdbAheDurableStore implements BrowserAheDurableStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
 	private readonly recoveryCertificates = new Map<StorageObjectId, string>();
+	#heldRetirementImage?: HeldAheRetirementAdmissionImage;
+	#heldBoundedReadFacts?: BoundedReadNativeFacts;
 
 	public constructor(private readonly lifecycle: IdbAdapterLifecycle) {
-		lifecycle.onInvalidation(() => this.recoveryCertificates.clear());
+		lifecycle.onInvalidation(() => {
+			this.recoveryCertificates.clear();
+			this.#heldRetirementImage = undefined;
+			this.#heldBoundedReadFacts = undefined;
+		});
 	}
 
 	public readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
 		return this.run(commandWithKind("readHead", { objectId })) as Promise<StoreResult<ExpectedHead>>;
 	}
 
+	public async readRetirementControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControl | null>> {
+		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!prepared.ok) return prepared;
+		const database = this.lifecycle.startOperation();
+		if (!database) return { ok: false, reason: "STORE_CLOSED" };
+		if (needsNativeReadReservationTurn(database)) {
+			try {
+				return await runNativeReservedRead(database, () => this.readRetirementControl(objectId));
+			} catch (cause) {
+				if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
+				if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+				return substrateFailure(cause);
+			} finally {
+				this.lifecycle.finishOperation();
+			}
+		}
+		let tx: IDBTransaction | undefined, done: Promise<TransactionOutcome> | undefined;
+		try {
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+			tx = nativeReadonlyTransaction(database, browserAheControlStores());
+			done = transactionOutcome(tx);
+			const value = await readBrowserRetirementControl(tx, objectId),
+				joined = await joinTransactionOutcome(tx, done);
+			return joined.ok ? { ok: true, value } : substrateFailure(joined.cause);
+		} catch (cause) {
+			if (tx) abortIfActive(tx);
+			if (done && tx) await joinTransactionOutcome(tx, done);
+			return substrateFailure(cause);
+		} finally {
+			this.lifecycle.finishOperation();
+		}
+	}
+
+	public async acquireNativeReadReservation(input: {
+		readonly objectId: string;
+	}): ReturnType<NativeReadReservationOwner["acquire"]> {
+		const objectId = captureNativeReadReservationInput(input);
+		if (!parseStorageObjectId(objectId).ok) throw new TypeError("INVALID_ARGUMENT");
+		this.#heldRetirementImage = undefined;
+		this.#heldBoundedReadFacts = undefined;
+		const original = await this.lifecycle.acquireNativeReadReservation({ objectId });
+		return Object.freeze({check: () => original.check(), release: () => {
+			// Revoke reuse immediately, before joining any admitted native work.
+			this.#heldRetirementImage = undefined;
+			this.#heldBoundedReadFacts = undefined;
+			return original.release();
+		}});
+	}
+
+	private detachedHeldRetirementImage(image: HeldAheRetirementAdmissionImage): StoreResult<AheRetirementAdmissionImage> {
+		const control = image.controlBytes === null ? null : decodeAheRetirementControl(image.controlBytes);
+		if (control !== null && !control.ok) return control;
+		return {ok: true, value: Object.freeze({control: control?.value ?? null,
+			head: Object.freeze({...image.head}), imageDigest: image.imageDigest, metadataBytes: image.metadataBytes})};
+	}
+
+	public readRetirementImage(
+		objectId: StorageObjectId
+	): Promise<StoreResult<Pick<AheRetirementControlRead, "control" | "head" | "imageDigest" | "metadataBytes">>> {
+		return this.readRetirementImagePoint(objectId, false);
+	}
+
+	public readRetirementAdmissionImage(objectId: StorageObjectId): Promise<StoreResult<AheRetirementAdmissionImage>> {
+		return this.readRetirementImagePoint(objectId, true);
+	}
+
+	private readRetirementImagePoint(
+		objectId: StorageObjectId,
+		allowAbsent: false
+	): Promise<StoreResult<Pick<AheRetirementControlRead, "control" | "head" | "imageDigest" | "metadataBytes">>>;
+	private readRetirementImagePoint(
+		objectId: StorageObjectId,
+		allowAbsent: true
+	): Promise<StoreResult<AheRetirementAdmissionImage>>;
+	private async readRetirementImagePoint(
+		objectId: StorageObjectId,
+		allowAbsent: boolean
+	): Promise<StoreResult<AheRetirementAdmissionImage>> {
+		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!prepared.ok) return prepared;
+		const database = this.lifecycle.startOperation();
+		if (!database) return { ok: false, reason: "STORE_CLOSED" };
+		if (needsNativeReadReservationTurn(database)) {
+			try {
+				return await runNativeReservedRead(database, () =>
+					allowAbsent ? this.readRetirementAdmissionImage(objectId) : this.readRetirementImage(objectId)
+				);
+			} catch (cause) {
+				return substrateFailure(cause);
+			} finally {
+				this.lifecycle.finishOperation();
+			}
+		}
+		let tx: IDBTransaction | undefined, done: Promise<TransactionOutcome> | undefined;
+		try {
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+			tx = nativeReadonlyTransaction(database, browserAheControlStores());
+			done = transactionOutcome(tx);
+			if (isNativeReadReservationTransaction(tx)) {
+				await nativeReadReservationCheck(tx);
+				const prior = this.#heldRetirementImage;
+				if (prior?.transaction === tx && prior.objectId === objectId) {
+					const joined = await joinTransactionOutcome(tx, done);
+					if (!joined.ok) return substrateFailure(joined.cause);
+					if (this.lifecycle.isClosed()) return {ok: false, reason: "STORE_CLOSED"};
+					if (this.lifecycle.isPoisoned()) return {ok: false, reason: "STORE_POISONED"};
+					if (nativeReadReservationTransaction(database) !== tx) throw new Error("NATIVE_READ_RESERVATION_LOST");
+					if (!allowAbsent && prior.controlBytes === null) return {ok: false, reason: "INVALID_ARGUMENT"};
+					return this.detachedHeldRetirementImage(prior);
+				}
+			} else this.#heldRetirementImage = undefined;
+			const control = await readBrowserRetirementControl(tx, objectId);
+			if (control === null && !allowAbsent) {
+				const joined = await joinTransactionOutcome(tx, done);
+				return joined.ok ? { ok: false, reason: "INVALID_ARGUMENT" } : substrateFailure(joined.cause);
+			}
+			const retained = this.#heldBoundedReadFacts;
+			const facts = isNativeReadReservationTransaction(tx) && retained?.matches(this, tx, objectId) ? retained : undefined;
+			if (facts === undefined) this.#heldBoundedReadFacts = undefined;
+			const bytes = control === null ? null : encodeAheRetirementControl(control),
+				head = await this.requiredHeadObservation(tx, objectId),
+				image = await admitBrowserRetirementControl(tx, objectId, bytes, facts),
+				joined = await joinTransactionOutcome(tx, done);
+			if (!joined.ok) return substrateFailure(joined.cause);
+			if (!image.ok) return image;
+			if (isNativeReadReservationTransaction(tx)) {
+				if (this.lifecycle.isClosed()) return {ok: false, reason: "STORE_CLOSED"};
+				if (this.lifecycle.isPoisoned()) return {ok: false, reason: "STORE_POISONED"};
+				if (nativeReadReservationTransaction(database) !== tx) throw new Error("NATIVE_READ_RESERVATION_LOST");
+				const admitted = Object.freeze({transaction: tx, objectId, controlBytes: bytes,
+					head: Object.freeze({...head.head}), imageDigest: image.value.imageDigest, metadataBytes: bytes?.byteLength ?? 0});
+				this.#heldRetirementImage = admitted;
+				return this.detachedHeldRetirementImage(admitted);
+			}
+			return {
+				ok: true,
+				value: Object.freeze({
+					control,
+					head: head.head,
+					imageDigest: image.value.imageDigest,
+					metadataBytes: bytes?.byteLength ?? 0,
+				}),
+			};
+		} catch (cause) {
+			if (tx) abortIfActive(tx);
+			if (done && tx) await joinTransactionOutcome(tx, done);
+			return substrateFailure(cause);
+		} finally {
+			this.lifecycle.finishOperation();
+		}
+	}
+
+	/* Original mutation path remains below; this point read births no metadata. */
+	public acquireRetirementControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>> {
+		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!prepared.ok) return Promise.resolve(prepared);
+		return this.runControl(objectId);
+	}
+
+	private runControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>>;
+	private runControl(
+		objectId: StorageObjectId,
+		compare: Readonly<{
+			bytes: Uint8Array;
+			head: string;
+			imageDigest: string;
+			next: AheRetirementControl;
+			mutation?: AheRetirementNativeMutation;
+		}>
+	): Promise<StoreResult<AheRetirementControl>>;
+	private async runControl(
+		objectId: StorageObjectId,
+		compare?: Readonly<{
+			bytes: Uint8Array;
+			head: string;
+			imageDigest: string;
+			next: AheRetirementControl;
+			mutation?: AheRetirementNativeMutation;
+		}>
+	): Promise<StoreResult<AheRetirementControlRead | AheRetirementControl>> {
+		const database = this.lifecycle.startOperation();
+		if (database === undefined) return { ok: false, reason: "STORE_CLOSED" };
+		const turn = this.lifecycle.acquireRecoveryTurn();
+		const releaseTurn = typeof turn === "function" ? turn : await turn;
+		let transaction: IDBTransaction | undefined;
+		let completion: Promise<TransactionOutcome> | undefined;
+		let postimage: string | undefined;
+		let nextControl: AheRetirementControl | undefined;
+		try {
+			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+			transaction = database.transaction(browserAheControlStores(), "readwrite", { durability: "strict" });
+			completion = transactionOutcome(transaction);
+			if (transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
+			const current = await readBrowserRetirementControl(transaction, objectId);
+			const observed = await this.requiredHeadObservation(transaction, objectId);
+			if (
+				compare !== undefined &&
+				(current === null ||
+					!equalBytes(encodeAheRetirementControl(current), compare.bytes) ||
+					headFingerprint(observed.head) !== compare.head)
+			) {
+				abortIfActive(transaction);
+				await joinTransactionOutcome(transaction, completion);
+				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+			}
+			const control = compare?.next ??
+				current ?? {
+					kind: "ahe-retirement-control-2" as const,
+					objectId,
+					incarnation: controlIncarnation(),
+					revision: 0,
+					sequence: 0,
+					active: null,
+					completed: null,
+				};
+			const bytes = encodeAheRetirementControl(control);
+			const admitted = await admitBrowserRetirementControl(transaction, objectId, bytes);
+			if (!admitted.ok) {
+				abortIfActive(transaction);
+				await joinTransactionOutcome(transaction, completion);
+				this.latchControlFailure(admitted);
+				return admitted;
+			}
+			if (compare !== undefined && admitted.value.imageDigest !== compare.imageDigest) {
+				abortIfActive(transaction);
+				await joinTransactionOutcome(transaction, completion);
+				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+			}
+			if (compare !== undefined) {
+				const mutationBefore = compare.mutation;
+				const records = admitted.value.generations.map((g) => g.recordDigest);
+				if (
+					!current ||
+					!aheRetirementGenerationBindingMatches(current, admitted.value.generations) ||
+					(mutationBefore?.kind !== "reclaim" &&
+						!aheRetirementGenerationBindingMatches(control, admitted.value.generations))
+				) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+				}
+				const mutation = compare.mutation;
+				if (mutation?.kind === "reclaim") {
+					if (
+						!aheRetirementReclamationMatches(
+							current,
+							control,
+							mutation.source,
+							admitted.value.imageDigest,
+							admitted.value.generations
+						)
+					) {
+						abortIfActive(transaction);
+						await joinTransactionOutcome(transaction, completion);
+						return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+					}
+					await applyBrowserBoundedAheReclamation(transaction, this, mutation.source.reclamation, true);
+				} else if (mutation) {
+					const candidate = admitted.value.generations.find((g) => g.generationId === mutation.material.generationId);
+					const resuming = mutation.kind === "stage" && current.nominee != null;
+					const existingDigest = mutation.material.existingGenerationRecordDigest;
+					const nominatingExisting = mutation.kind === "stage" && !resuming && existingDigest !== undefined;
+					if (
+						(mutation.kind === "stage" && !resuming && !nominatingExisting && (candidate !== undefined || records.length >= 7)) ||
+						(nominatingExisting && (candidate?.recordDigest !== existingDigest || control.nominee?.recordDigest !== existingDigest ||
+							mutation.material.blobs.length !== 0)) ||
+						(resuming &&
+							(candidate?.recordDigest !== current.nominee?.recordDigest ||
+								!equalBytes(encodeCanonical(current.nominee), encodeCanonical(control.nominee)))) ||
+						(mutation.kind === "publish" && candidate?.recordDigest !== current.nominee?.recordDigest)
+					) {
+						abortIfActive(transaction);
+						await joinTransactionOutcome(transaction, completion);
+						return { ok: false, reason: "RETIREMENT_FENCED" };
+					}
+					if (nominatingExisting) {
+						const prepared = prepareStorageAdapterCommand({kind: "completeGeneration", objectId,
+							generationId: mutation.material.generationId});
+						if (!prepared.ok) throw new TypeError("existing native future command is invalid");
+						const authorized = await this.verifyCandidate(transaction, objectId, mutation.material.generationId,
+							await this.loadFacts(transaction, prepared.value));
+						if (!authorized?.ok) {
+							abortIfActive(transaction);
+							await joinTransactionOutcome(transaction, completion);
+							return authorized ?? {ok: false, reason: "INVALID_ARGUMENT"};
+						}
+					}
+					for (const command of resuming || nominatingExisting ? [] : aheRetirementNativeCommands(mutation)) {
+						const prepared = prepareStorageAdapterCommand(command);
+						if (!prepared.ok) {
+							abortIfActive(transaction);
+							await joinTransactionOutcome(transaction, completion);
+							return prepared;
+						}
+						const facts = await this.loadFacts(transaction, prepared.value);
+						let evaluation = evaluateStorageAdapterCommand(prepared.value, facts);
+						if (prepared.value.command.kind === "completeGeneration" || prepared.value.command.kind === "swapHead") {
+							const authorized = await this.verifyCandidate(
+								transaction,
+								objectId,
+								mutation.material.generationId,
+								facts
+							);
+							if (!authorized?.ok) {
+								abortIfActive(transaction);
+								await joinTransactionOutcome(transaction, completion);
+								return authorized ?? { ok: false, reason: "INVALID_ARGUMENT" };
+							}
+							evaluation = evaluateStorageAdapterCommand(prepared.value, facts, authorized.value);
+						}
+						if (!evaluation.result.ok) {
+							abortIfActive(transaction);
+							await joinTransactionOutcome(transaction, completion);
+							return evaluation.result;
+						}
+						await this.applyWrites(transaction, evaluation);
+					}
+				}
+				// A metadata-only prepare/commit has changed no generation, blob,
+				// promotion or head in this SAME strict native RW transaction. The
+				// first census already admitted these exact next-control bytes. Do
+				// not reconstruct that identical whole image a second time. Actual
+				// stage/publish/reclaim commands still require their fresh postimage
+				// census; every branch retains independent native readback below.
+				const after = mutation === undefined ? admitted :
+					await admitBrowserRetirementControl(transaction, objectId, bytes);
+				if (!after.ok) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					this.latchControlFailure(after);
+					return after;
+				}
+				if (!aheRetirementGenerationBindingMatches({ ...control, binding: null }, after.value.generations)) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+				}
+				if (
+					mutation?.kind === "stage" &&
+					after.value.generations.find((g) => g.generationId === mutation.material.generationId)?.recordDigest !==
+						control.nominee?.recordDigest
+				) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					return { ok: false, reason: "NON_CANONICAL_RECORD" };
+				}
+				if (mutation?.kind === "reclaim" && after.value.imageDigest !== mutation.source.postImageDigest) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+				}
+				postimage = after.value.imageDigest;
+				nextControl = control;
+			}
+			if (compare !== undefined || current === null)
+				await writeBrowserRetirementControl(transaction, control, current === null);
+			const outcome = await joinTransactionOutcome(transaction, completion);
+			if (compare !== undefined && postimage !== undefined) {
+				const readback = await this.readControlPostimage(database, control, postimage);
+				if (readback.ok) return readback;
+				if (!outcome.ok) return substrateFailure(outcome.cause);
+				return readback;
+			}
+			if (!outcome.ok) return substrateFailure(outcome.cause);
+			return {
+				ok: true,
+				value: createAheRetirementControlRead(
+					control,
+					observed.head,
+					admitted.value.imageDigest,
+					(next, mutation) =>
+						this.runControl(objectId, {
+							bytes,
+							head: headFingerprint(observed.head),
+							imageDigest: admitted.value.imageDigest,
+							next,
+							...(mutation ? { mutation } : {}),
+						}),
+					this
+				),
+			};
+		} catch (cause) {
+			if (transaction !== undefined) abortIfActive(transaction);
+			if (completion !== undefined) await joinTransactionOutcome(transaction, completion);
+			if (nextControl && postimage !== undefined) {
+				const readback = await this.readControlPostimage(database, nextControl, postimage);
+				if (readback.ok) return readback;
+			}
+			if (cause instanceof BoundedReadBudgetError) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+			if (cause instanceof PersistedStorageError) return this.lifecycle.latchPoison(cause.reason);
+			return substrateFailure(cause);
+		} finally {
+			releaseTurn();
+			this.lifecycle.finishOperation();
+		}
+	}
+
+	private async readControlPostimage(
+		database: IDBDatabase,
+		next: AheRetirementControl,
+		imageDigest: string
+	): Promise<StoreResult<AheRetirementControl>> {
+		const tx = nativeReadonlyTransaction(database, browserAheControlStores()),
+			done = transactionOutcome(tx);
+		try {
+			const current = await readBrowserRetirementControl(tx, next.objectId),
+				image = await admitBrowserRetirementControl(tx, next.objectId, encodeAheRetirementControl(next));
+			const matches =
+				current !== null &&
+				equalBytes(encodeAheRetirementControl(current), encodeAheRetirementControl(next)) &&
+				image.ok &&
+				image.value.imageDigest === imageDigest;
+			const joined = await joinTransactionOutcome(tx, done);
+			return !joined.ok
+				? substrateFailure(joined.cause)
+				: matches
+					? { ok: true, value: next }
+					: { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+		} catch (cause) {
+			abortIfActive(tx);
+			await joinTransactionOutcome(tx, done);
+			return substrateFailure(cause);
+		}
+	}
+
+	private latchControlFailure(result: StoreResult<unknown>): void {
+		if (isBoundedReadCorruption(result)) {
+			this.recoveryCertificates.clear();
+			this.lifecycle.latchPoison("NON_CANONICAL_RECORD");
+		}
+	}
+
 	public acquireBoundedActiveRead(input: AheBoundedReadInput): Promise<StoreResult<AheBoundedReadAcquisition>> {
 		const prepared = prepareBoundedRead(input);
 		if (!prepared.ok) return Promise.resolve(prepared);
-		return this.runBoundedSteps(boundedActiveReadSteps(prepared.value), false).then((result) =>
+		return this.runBoundedSteps(facts => boundedActiveReadSteps(prepared.value, facts), false, undefined, undefined,
+			prepared.value.objectId).then((result) =>
 			!result.ok
 				? result
 				: {
@@ -243,47 +729,125 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 	): Promise<StoreResult<AheBoundedRecoveryRoleRead>> {
 		const prepared = prepareBoundedRecoveryRoleRead(input);
 		if (!prepared.ok) return Promise.resolve(prepared);
-		return this.runBoundedSteps(boundedRecoveryRoleReadSteps(prepared.value), false).then((result) =>
+		// One reader owns only a weak identity for its ORIGINAL successful native
+		// capture, not cached material or authority. A later/different reservation
+		// must run the complete verifier even when its head/epoch looks identical.
+		let heldCapture: WeakRef<IDBTransaction> | undefined;
+		return this.runBoundedSteps(facts => boundedRecoveryRoleReadSteps(prepared.value, facts), false, undefined,
+			transaction => { heldCapture = new WeakRef(transaction); }, prepared.value.objectId).then((result) =>
 			!result.ok
 				? result
 				: {
 						ok: true,
 						value: createBoundedRecoveryRoleRead(result.value, (steps, released) =>
-							this.runBoundedSteps(steps, false, released)
+							this.checkBoundedRecoveryRoleCurrency(steps, released, heldCapture)
 						),
 					}
 		);
 	}
 
+	private async checkBoundedRecoveryRoleCurrency(
+		steps: Generator<BoundedReadRequest, StoreResult<Readonly<{kind: "current"}>>, unknown>,
+		released: () => boolean,
+		heldCapture: WeakRef<IDBTransaction> | undefined
+	): Promise<StoreResult<Readonly<{kind: "current"}>>> {
+		const database = this.lifecycle.startOperation();
+		if (database === undefined) return {ok: false, reason: "STORE_CLOSED"};
+		try {
+			if (this.lifecycle.isPoisoned()) return {ok: false, reason: "STORE_POISONED"};
+			if (released()) return {ok: false, reason: "READ_RELEASED"};
+			const captured = heldCapture?.deref();
+			if (captured === undefined || nativeReadReservationTransaction(database) !== captured)
+				return await this.runBoundedSteps(steps, false, released);
+			// The exact all-store RO still excludes every native writer. Its complete
+			// captured census/material therefore cannot change. Check the genuine
+			// native transaction freshly, rather than loading/hashing it all again.
+			const current = nativeReadReservationCheck(captured);
+			if (current === undefined) return await this.runBoundedSteps(steps, false, released);
+			await current;
+			if (this.lifecycle.isClosed()) return {ok: false, reason: "STORE_CLOSED"};
+			if (this.lifecycle.isPoisoned()) return {ok: false, reason: "STORE_POISONED"};
+			if (released()) return {ok: false, reason: "READ_RELEASED"};
+			if (nativeReadReservationTransaction(database) !== captured)
+				return await this.runBoundedSteps(steps, false, released);
+			// createBoundedRecoveryRoleRead still performs its original final
+			// borrowed-buffer integrity sweep synchronously before public delivery.
+			return {ok: true, value: Object.freeze({kind: "current"})};
+		} catch (cause) {
+			return substrateFailure(cause);
+		} finally {
+			this.lifecycle.finishOperation();
+		}
+	}
+
 	private async runBoundedSteps<T>(
-		steps: Generator<BoundedReadRequest, StoreResult<T>, unknown>,
+		steps: Generator<BoundedReadRequest, StoreResult<T>, unknown> |
+			((facts: BoundedReadNativeFacts | undefined) => Generator<BoundedReadRequest, StoreResult<T>, unknown>),
 		headOnly: boolean,
-		released?: () => boolean
+		released?: () => boolean,
+		captureHeldTransaction?: (transaction: IDBTransaction) => void,
+		factObjectId?: StorageObjectId
 	): Promise<StoreResult<T>> {
 		const database = this.lifecycle.startOperation();
 		if (database === undefined) return { ok: false, reason: "STORE_CLOSED" };
-		const turn = this.lifecycle.acquireRecoveryTurn();
-		const releaseTurn = typeof turn === "function" ? turn : await turn;
+		if (needsNativeReadReservationTurn(database)) {
+			try {
+				return await runNativeReservedRead(database, () => this.runBoundedSteps(steps, headOnly, released, captureHeldTransaction, factObjectId));
+			} catch (cause) {
+				if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
+				if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+				if (released?.()) return { ok: false, reason: "READ_RELEASED" };
+				return substrateFailure(cause);
+			} finally {
+				this.lifecycle.finishOperation();
+			}
+		}
+		let releaseTurn = (): void => undefined;
 		let transaction: IDBTransaction | undefined;
 		let completion: Promise<TransactionOutcome> | undefined;
 		try {
+			const reserved = nativeReadReservationTransaction(database);
+			// A recovery/control RW may already own the JavaScript turn while
+			// waiting behind this physical RO. Its held-view reads must not wait
+			// behind that same write. Ordinary reads retain the existing turn law.
+			if (reserved === undefined) {
+				const turn = this.lifecycle.acquireRecoveryTurn();
+				releaseTurn = typeof turn === "function" ? turn : await turn;
+			}
 			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
 			if (released?.()) return { ok: false, reason: "READ_RELEASED" };
-			transaction = database.transaction(headOnly ? [PHASE_2D_OBJECTS_STORE] : allAuthorityStores(), "readonly");
+			transaction =
+				reserved ?? nativeReadonlyTransaction(database, headOnly ? [PHASE_2D_OBJECTS_STORE] : allAuthorityStores());
 			completion = transactionOutcome(transaction);
-			let step = steps.next();
-			while (!step.done) step = steps.next(await this.loadBoundedRequest(transaction, step.value));
-			const outcome = await completion;
+			const facts = typeof steps === "function" && reserved !== undefined && factObjectId !== undefined
+				? new BoundedReadNativeFacts(this, transaction, factObjectId) : undefined;
+			const driver = typeof steps === "function" ? steps(facts) : steps;
+			let step = driver.next();
+			while (!step.done) step = driver.next(await this.loadBoundedRequest(transaction, step.value));
+			const outcome = await joinTransactionOutcome(transaction, completion);
 			if (!outcome.ok) return substrateFailure(outcome.cause);
 			if (isBoundedReadCorruption(step.value)) {
 				this.recoveryCertificates.clear();
 				this.lifecycle.latchPoison("NON_CANONICAL_RECORD");
 			}
+			if (step.value.ok && reserved !== undefined && (captureHeldTransaction !== undefined || facts !== undefined)) {
+				if (this.lifecycle.isClosed()) return {ok: false, reason: "STORE_CLOSED"};
+				if (this.lifecycle.isPoisoned()) return {ok: false, reason: "STORE_POISONED"};
+				if (released?.()) return {ok: false, reason: "READ_RELEASED"};
+				if (nativeReadReservationTransaction(database) !== transaction) throw new Error("NATIVE_READ_RESERVATION_LOST");
+				captureHeldTransaction?.(transaction);
+				if (facts?.matches(this, transaction, factObjectId!)) this.#heldBoundedReadFacts = facts;
+			}
 			return step.value;
 		} catch (cause) {
 			if (transaction !== undefined) abortIfActive(transaction);
-			if (completion !== undefined) await completion;
+			if (completion !== undefined) await joinTransactionOutcome(transaction, completion);
+			if (cause instanceof BoundedReadBudgetError) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+			if (cause instanceof PersistedStorageError) {
+				this.recoveryCertificates.clear();
+				return this.lifecycle.latchPoison(cause.reason);
+			}
 			return substrateFailure(cause);
 		} finally {
 			releaseTurn();
@@ -292,62 +856,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 	}
 
 	private async loadBoundedRequest(transaction: IDBTransaction, request: BoundedReadRequest): Promise<unknown> {
-		if (request.kind === "blob-preflight") return true;
-		if (request.kind === "keys") {
-			return new Promise((resolve, reject) => {
-				const keys: unknown[] = [];
-				const cursorRequest = transaction
-					.objectStore(PHASE_2D_GENERATIONS_STORE)
-					.openKeyCursor(IDBKeyRange.lowerBound([request.objectId]));
-				cursorRequest.onerror = (): void => reject(cursorRequest.error);
-				cursorRequest.onsuccess = (): void => {
-					const cursor = cursorRequest.result;
-					if (cursor === null || !Array.isArray(cursor.key) || cursor.key[0] !== request.objectId) {
-						resolve(keys);
-						return;
-					}
-					// Native key cloning is unavoidable. Stop immediately on any invalid in-prefix key.
-					if (cursor.key.length !== 2 || typeof cursor.key[1] !== "string" || !parseGenerationId(cursor.key[1]).ok) {
-						keys.push(null);
-						resolve(keys);
-						return;
-					}
-					keys.push(cursor.key[1]);
-					if (keys.length === LIMITS.maxObjectGenerations + 1) {
-						resolve(keys);
-						return;
-					}
-					cursor.continue();
-				};
-			});
-		}
-		if (request.kind === "promotion")
-			return (
-				(await requestValue(
-					transaction
-						.objectStore(PHASE_2D_PROMOTIONS_STORE)
-						.getKey([request.objectId, request.generationId, request.digest])
-				)) !== undefined
-			);
-		if (request.kind === "blob") {
-			const row = await requestValue(transaction.objectStore(PHASE_2D_BLOBS_STORE).get(request.digest));
-			return row === undefined ? null : rowProperty(row, "bytes");
-		}
-		const head = request.kind === "head";
-		const row = await requestValue(
-			transaction
-				.objectStore(head ? PHASE_2D_OBJECTS_STORE : PHASE_2D_GENERATIONS_STORE)
-				.get(head ? request.objectId : [request.objectId, request.generationId])
-		);
-		return row === undefined
-			? null
-			: head
-				? { objectId: rowProperty(row, "objectId"), record: rowProperty(row, "record") }
-				: {
-						objectId: rowProperty(row, "objectId"),
-						generationId: rowProperty(row, "generationId"),
-						record: rowProperty(row, "record"),
-					};
+		return loadBrowserBoundedReadRequest(transaction, request);
 	}
 
 	public readGenerationPage(input: {
@@ -367,11 +876,22 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		if (copied === undefined) return { ok: false, reason: "INVALID_ARGUMENT" };
 		const database = this.lifecycle.startOperation();
 		if (database === undefined) return { ok: false, reason: "STORE_CLOSED" };
+		if (needsNativeReadReservationTurn(database)) {
+			try {
+				return await runNativeReservedRead(database, () => this.probeBlobPresence(copied));
+			} catch (cause) {
+				if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
+				if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+				return substrateFailure(cause);
+			} finally {
+				this.lifecycle.finishOperation();
+			}
+		}
 		let transaction: IDBTransaction | undefined;
 		let completion: Promise<TransactionOutcome> | undefined;
 		try {
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
-			transaction = database.transaction(PHASE_2D_BLOBS_STORE, "readonly");
+			transaction = nativeReadonlyTransaction(database, PHASE_2D_BLOBS_STORE);
 			completion = transactionOutcome(transaction);
 			const store = transaction.objectStore(PHASE_2D_BLOBS_STORE);
 			const uniqueDigests: BlobDigest[] = [];
@@ -385,13 +905,13 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				uniqueDigests.map(async (digest) => (await this.request(store.getKey(digest))) !== undefined)
 			);
 			const values = copied.map((digest) => uniqueValues[uniqueIndex[digest] ?? -1] ?? false);
-			const outcome = await completion;
+			const outcome = await joinTransactionOutcome(transaction, completion);
 			if (!outcome.ok) return substrateFailure(outcome.cause);
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
 			return { ok: true, value: Object.freeze(values) };
 		} catch (cause) {
 			if (transaction !== undefined) abortIfActive(transaction);
-			if (completion !== undefined) await completion;
+			if (completion !== undefined) await joinTransactionOutcome(transaction, completion);
 			return cause instanceof PoisonedOperationError
 				? { ok: false, reason: "STORE_POISONED" }
 				: substrateFailure(cause);
@@ -470,7 +990,13 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		}
 		try {
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
-			return await this.execute(database, prepared.value);
+			return await (isMutation(prepared.value.command.kind)
+				? this.execute(database, prepared.value)
+				: runNativeReservedRead(database, () => this.execute(database, prepared.value)));
+		} catch (cause) {
+			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+			return substrateFailure(cause);
 		} finally {
 			this.lifecycle.finishOperation();
 		}
@@ -482,25 +1008,45 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		let transaction: IDBTransaction | undefined;
 		let completion: Promise<TransactionOutcome> | undefined;
 		try {
-			const objectId = "objectId" in prepared.command ? prepared.command.objectId : undefined;
 			let headObservation: TransactionHeadObservation | undefined;
-			const authorityStores =
-				mutation &&
-				objectId !== undefined &&
-				(operation === "completeGeneration" || operation === "swapHead" || this.recoveryCertificates.has(objectId));
+			let control: AheRetirementControl | null = null;
 			transaction = mutation
-				? database.transaction(authorityStores ? allAuthorityStores() : [...OPERATION_STORES[operation]], "readwrite", {
+				? database.transaction(browserAheControlStores(), "readwrite", {
 						durability: "strict",
 					})
-				: database.transaction([...OPERATION_STORES[operation]], "readonly");
+				: nativeReadonlyTransaction(database, [...OPERATION_STORES[operation]]);
 			completion = transactionOutcome(transaction);
 			if (mutation && transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
 			if (mutation) {
 				if (!("objectId" in prepared.command)) throw new Error("mutation command lacks object scope");
+				control = await readBrowserRetirementControl(transaction, prepared.command.objectId);
+				if (control !== null && (control.active !== null || control.completed !== null)) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					return { ok: false, reason: "RETIREMENT_FENCED" };
+				}
+				if (control?.revision === Number.MAX_SAFE_INTEGER) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					return { ok: false, reason: "REVISION_EXHAUSTED" };
+				}
+				if (control !== null) {
+					const admitted = await admitBrowserRetirementControl(
+						transaction,
+						control.objectId,
+						encodeAheRetirementControl(control)
+					);
+					if (!admitted.ok) {
+						abortIfActive(transaction);
+						await joinTransactionOutcome(transaction, completion);
+						this.latchControlFailure(admitted);
+						return admitted;
+					}
+				}
 				const observed = await this.observeHead(transaction, prepared.command.objectId);
 				if (!observed.ok) {
 					abortIfActive(transaction);
-					await completion;
+					await joinTransactionOutcome(transaction, completion);
 					return this.lifecycle.latchPoison(observed.reason);
 				}
 				headObservation = observed.value;
@@ -511,7 +1057,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				);
 				if (!recovered.ok) {
 					abortIfActive(transaction);
-					await completion;
+					await joinTransactionOutcome(transaction, completion);
 					return this.lifecycle.latchPoison(recovered.reason as PersistedStorageError["reason"]);
 				}
 			}
@@ -521,7 +1067,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			if (prepared.command.kind === "completeGeneration" || prepared.command.kind === "swapHead") {
 				if (!evaluation.result.ok && evaluation.result.reason !== "INVALID_ARGUMENT") {
 					abortIfActive(transaction);
-					await completion;
+					await joinTransactionOutcome(transaction, completion);
 					return evaluation.result;
 				}
 				const authorization = await this.verifyCandidate(
@@ -532,18 +1078,27 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				);
 				if (authorization === undefined || !authorization.ok) {
 					abortIfActive(transaction);
-					await completion;
+					await joinTransactionOutcome(transaction, completion);
 					return authorization ?? { ok: false, reason: "INVALID_ARGUMENT" };
 				}
 				evaluation = evaluateStorageAdapterCommand(prepared, facts, authorization.value);
 			}
 			if (!evaluation.result.ok) {
 				abortIfActive(transaction);
-				await completion;
+				await joinTransactionOutcome(transaction, completion);
 				return evaluation.result;
 			}
-			if (mutation) await this.applyWrites(transaction, evaluation);
-			const outcome = await completion;
+			if (mutation) {
+				await this.applyWrites(transaction, evaluation);
+				const advanced = await advanceBrowserRetirementControl(transaction, control);
+				if (!advanced.ok) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					this.latchControlFailure(advanced);
+					return advanced;
+				}
+			}
+			const outcome = await joinTransactionOutcome(transaction, completion);
 			if (!outcome.ok) {
 				this.recoveryCertificates.clear();
 				return substrateFailure(outcome.cause);
@@ -555,6 +1110,11 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			return evaluation.result;
 		} catch (cause) {
 			this.recoveryCertificates.clear();
+			if (cause instanceof BoundedReadBudgetError) {
+				if (transaction !== undefined) abortIfActive(transaction);
+				if (completion !== undefined) await joinTransactionOutcome(transaction, completion);
+				return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+			}
 			const semanticResult =
 				cause instanceof PersistedStorageError
 					? this.lifecycle.latchPoison(cause.reason)
@@ -562,7 +1122,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 						? ({ ok: false, reason: "STORE_POISONED" } as const)
 						: undefined;
 			if (transaction !== undefined) abortIfActive(transaction);
-			if (completion !== undefined) await completion;
+			if (completion !== undefined) await joinTransactionOutcome(transaction, completion);
 			return semanticResult ?? substrateFailure(cause);
 		}
 	}
@@ -644,16 +1204,30 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		try {
 			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
-			transaction = database.transaction(allAuthorityStores(), "readwrite", { durability: "strict" });
+			transaction = database.transaction(browserAheControlStores(), "readwrite", { durability: "strict" });
 			completion = transactionOutcome(transaction);
 			if (transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
+			const control = await readBrowserRetirementControl(transaction, objectId);
+			if (control !== null) {
+				const admitted = await admitBrowserRetirementControl(
+					transaction,
+					objectId,
+					encodeAheRetirementControl(control)
+				);
+				if (!admitted.ok) {
+					abortIfActive(transaction);
+					await joinTransactionOutcome(transaction, completion);
+					this.latchControlFailure(admitted);
+					return admitted;
+				}
+			}
 			const result = await this.recoverWithinTransaction(transaction, objectId);
 			if (!result.ok) {
 				abortIfActive(transaction);
-				await completion;
+				await joinTransactionOutcome(transaction, completion);
 				return this.lifecycle.latchPoison(result.reason as PersistedStorageError["reason"]);
 			}
-			const outcome = await completion;
+			const outcome = await joinTransactionOutcome(transaction, completion);
 			if (!outcome.ok) {
 				this.recoveryCertificates.clear();
 				return substrateFailure(outcome.cause);
@@ -663,8 +1237,10 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			return { ok: true, value: snapshot };
 		} catch (cause) {
 			if (transaction !== undefined) abortIfActive(transaction);
-			if (completion !== undefined) await completion;
+			if (completion !== undefined) await joinTransactionOutcome(transaction, completion);
 			if (cause instanceof PoisonedOperationError) return { ok: false, reason: "STORE_POISONED" };
+			if (cause instanceof BoundedReadBudgetError) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+			if (cause instanceof PersistedStorageError) return this.lifecycle.latchPoison(cause.reason);
 			this.recoveryCertificates.clear();
 			return substrateFailure(cause);
 		} finally {
@@ -1033,6 +1609,16 @@ function headFingerprint(head: ExpectedHead): string {
 		: `present\0${head.objectId}\0${head.generationId}\0${head.revision}\0${head.closureDigest}`;
 }
 
+function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
+	return a.byteLength === b.byteLength && a.every((byte, index) => byte === b[index]);
+}
+
+function controlIncarnation(): string {
+	const bytes = new Uint8Array(32);
+	crypto.getRandomValues(bytes);
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function requestValue<T>(request: IDBRequest<T>): Promise<T> {
 	return new Promise((resolve, reject) => {
 		request.addEventListener("success", () => resolve(request.result), { once: true });
@@ -1042,7 +1628,23 @@ function requestValue<T>(request: IDBRequest<T>): Promise<T> {
 	});
 }
 
+async function joinTransactionOutcome(
+	transaction: IDBTransaction | undefined,
+	completion: Promise<TransactionOutcome>
+): Promise<TransactionOutcome> {
+	if (transaction !== undefined && isNativeReadReservationTransaction(transaction)) {
+		try {
+			await nativeReadReservationCheck(transaction);
+			return { ok: true };
+		} catch (cause) {
+			return { ok: false, cause };
+		}
+	}
+	return completion;
+}
+
 function transactionOutcome(transaction: IDBTransaction): Promise<TransactionOutcome> {
+	if (isNativeReadReservationTransaction(transaction)) return Promise.resolve({ ok: true });
 	return new Promise((resolve) => {
 		let observedError: unknown;
 		transaction.addEventListener("complete", () => resolve({ ok: true }), { once: true });
@@ -1066,6 +1668,7 @@ function transactionOutcome(transaction: IDBTransaction): Promise<TransactionOut
 }
 
 function abortIfActive(transaction: IDBTransaction): void {
+	if (isNativeReadReservationTransaction(transaction)) return;
 	try {
 		transaction.abort();
 	} catch {
@@ -1108,7 +1711,7 @@ export async function createBrowserAheDurableStore(
 ): Promise<BrowserAheDurableStore> {
 	const lifecycle = new IdbAdapterLifecycle();
 	const opaqueDatabase = await openPhase2dInternalDatabase(options, () => {
-		void lifecycle.close();
+		void lifecycle.close().catch(() => undefined);
 	});
 	lifecycle.attach(opaqueDatabase as IDBDatabase);
 	const store = new IdbAheDurableStore(lifecycle);

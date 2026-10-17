@@ -14,6 +14,16 @@ declare global {
 				seed: string
 			): Promise<Readonly<{ authorId: string; signatureHex: string; strictVerification: boolean }>>;
 			unavailableSummary(): Promise<Readonly<{ identity: string; signing: string }>>;
+			creatorSummary(seed: string): Promise<
+				Readonly<{
+					exactAuthorKey: boolean;
+					sameCustody: boolean;
+					retiredAliasRefused: boolean;
+					unavailableAfterStop: boolean;
+				}>
+			>;
+			acquireIdentitySummary(): Promise<string>;
+			releaseIdentity(): Promise<void>;
 		}>;
 	}
 }
@@ -49,8 +59,17 @@ test.afterAll(() => {
 	if (bundleDirectory !== "") rmSync(bundleDirectory, { force: true, recursive: true });
 });
 
-async function install(page: Page): Promise<void> {
-	await page.goto("about:blank");
+async function install(page: Page, identityOrigin = false): Promise<void> {
+	if (identityOrigin) {
+		await page.route("https://identity.example.test/", (route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "text/html",
+				body: "<!doctype html><title>Local author custody control</title>",
+			})
+		);
+		await page.goto("https://identity.example.test/");
+	} else await page.goto("about:blank");
 	await page.addScriptTag({ content: bundleSource, type: "module" });
 	await page.waitForFunction(() => "phase3a1bP5" in globalThis);
 }
@@ -63,6 +82,35 @@ test("the locked dependency graph independently produces the frozen browser vect
 		signatureHex: VECTOR.signatureHex,
 		strictVerification: true,
 	});
+});
+
+test("R9 genuine configured creator custody uses the author key and refuses retired aliases", async ({ page }) => {
+	await install(page);
+	await expect(page.evaluate((seed) => window.phase3a1bP5.creatorSummary(seed), VECTOR.seed)).resolves.toEqual({
+		exactAuthorKey: true,
+		sameCustody: true,
+		retiredAliasRefused: true,
+		unavailableAfterStop: true,
+	});
+});
+
+test("R9 real Web Locks separate concurrent browser authors and reclaim the durable slot after joined release", async ({
+	page,
+	context,
+}) => {
+	const second = await context.newPage();
+	await Promise.all([install(page, true), install(second, true)]);
+	const firstAuthor = await page.evaluate(() => window.phase3a1bP5.acquireIdentitySummary());
+	const secondAuthor = await second.evaluate(() => window.phase3a1bP5.acquireIdentitySummary());
+	expect(firstAuthor).toMatch(/^[0-9a-f]{64}$/u);
+	expect(secondAuthor).not.toBe(firstAuthor);
+	await page.evaluate(() => window.phase3a1bP5.releaseIdentity());
+	expect(await page.evaluate(() => window.phase3a1bP5.acquireIdentitySummary())).toBe(firstAuthor);
+	await Promise.all([
+		page.evaluate(() => window.phase3a1bP5.releaseIdentity()),
+		second.evaluate(() => window.phase3a1bP5.releaseIdentity()),
+	]);
+	await second.close();
 });
 
 test("configured local-author vectors and strict verification agree in every genuine browser engine", async ({

@@ -1,7 +1,6 @@
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { type Address, type PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
-import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	type AdmissionCredential,
 	AdmissionPolicy,
@@ -14,6 +13,7 @@ import type { DRPNetworkNode, DRPNodeConfig } from "@ts-drp/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DRPNode } from "../src/index.js";
+import type { NodeRoomNetworkPort } from "../src/room-network.js";
 
 const NOW = 1_750_000_000_000;
 const NAMESPACE = `drp-network:v1:${"q".repeat(43)}`;
@@ -56,7 +56,7 @@ describe("room presence retirement", () => {
 		runner.stop();
 
 		const retiredRoomId = "quota-room-a";
-		await node.createObject({ id: retiredRoomId, acl: createPermissionlessACL() });
+		openRoom(node, retiredRoomId);
 		const firstCycleStart = registrations.length;
 		await runner.fn();
 		const firstRoom = registrations
@@ -64,12 +64,12 @@ describe("room presence retirement", () => {
 			.find(({ endpoint, record }) => endpoint === ENDPOINTS[0] && record.namespace === roomNamespace(retiredRoomId));
 		expect(firstRoom).toMatchObject({ accepted: true });
 
-		node.unsubscribeObject(retiredRoomId);
+		closeRoom(node, retiredRoomId);
 		await flushMicrotasks();
 		await vi.advanceTimersByTimeAsync(5_500);
 
 		const replacementRoomId = "quota-room-b";
-		await node.createObject({ id: replacementRoomId, acl: createPermissionlessACL() });
+		openRoom(node, replacementRoomId);
 		const replacementCycleStart = registrations.length;
 		await runner.fn();
 		const replacementRoom = registrations
@@ -223,4 +223,25 @@ async function flushMicrotasks(): Promise<void> {
 
 function signal(): AbortSignal {
 	return new AbortController().signal;
+}
+
+// Presence records are routing advertisements, not portable app authority.
+// Keep every original quota law with the current room transport lifecycle.
+const currentRoomPorts = new WeakMap<DRPNode, Map<string, NodeRoomNetworkPort>>();
+
+function openRoom(node: DRPNode, id: string): NodeRoomNetworkPort {
+	let rooms = currentRoomPorts.get(node);
+	if (rooms === undefined) {
+		rooms = new Map();
+		currentRoomPorts.set(node, rooms);
+	}
+	const port = node.openRoomNetwork(id);
+	rooms.set(id, port);
+	return port;
+}
+
+function closeRoom(node: DRPNode, id: string): void {
+	const rooms = currentRoomPorts.get(node);
+	rooms?.get(id)?.close();
+	rooms?.delete(id);
 }

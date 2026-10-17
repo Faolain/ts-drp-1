@@ -41,24 +41,64 @@ export function createInternalVoteDispatcher(input: VoteDispatcherInput): Readon
 		const pending = await input.store.readPending(DISPATCH_CONCURRENCY + 1);
 		const overflow = pending.length > DISPATCH_CONCURRENCY;
 		const batch = pending.slice(0, DISPATCH_CONCURRENCY);
-		await Promise.all(
-			batch.map(async (row) => {
-				const key = encodedKey(row);
-				if (closed || activeKeys.has(key)) return;
-				activeKeys.add(key);
-				inFlight += 1;
-				inFlightPeak = Math.max(inFlightPeak, inFlight);
+		const failures: unknown[] = [];
+		const published: PendingVoteRow[] = [];
+		let releaseFailed = false;
+		// Original native signing custody, not the best-effort primary lock:
+		// all admitted publisher siblings join before the held RO releases.
+		// Foreign ACK/retirement RW cannot overlap it. ACK writes follow release
+		// so this same connection cannot deadlock on its own native reservation.
+		const admission =
+			batch[0] === undefined ? undefined : await input.store.acquireSigningAdmission({ objectId: batch[0].objectId });
+		try {
+			// A failed publication still owns its admitted siblings until they settle.
+			await Promise.allSettled(
+				batch.map(async (row) => {
+					const key = encodedKey(row);
+					if (closed || activeKeys.has(key)) return;
+					activeKeys.add(key);
+					inFlight += 1;
+					inFlightPeak = Math.max(inFlightPeak, inFlight);
+					try {
+						await admission?.check();
+						const current = await input.store.readPublicationCandidate(row);
+						if (current === undefined || closed) return;
+						await admission?.check();
+						await input.publish({ carrier: current.carrier, key });
+						if (closed) return;
+						published.push(current);
+					} catch (error) {
+						failures.push(error);
+						throw error;
+					} finally {
+						inFlight -= 1;
+						activeKeys.delete(key);
+					}
+				})
+			);
+		} finally {
+			try {
+				await admission?.release();
+			} catch (cause) {
+				releaseFailed = true;
+				failures.push(cause);
+			}
+		}
+		// Preserve successful siblings' original ACK progress even when another
+		// publisher failed, but never ACK after a failed custody release.
+		if (!closed && !releaseFailed) {
+			for (const row of published) {
 				try {
-					await input.publish({ carrier: row.carrier, key });
-					if (closed) return;
 					await input.store.markDispatched([row.objectId, row.epoch, row.round, row.phase, row.signerId]);
-					sentKeys.push(key);
-				} finally {
-					inFlight -= 1;
-					activeKeys.delete(key);
+					sentKeys.push(encodedKey(row));
+				} catch (cause) {
+					failures.push(cause);
 				}
-			})
-		);
+			}
+		}
+		if (failures.length === 1) throw failures[0];
+		if (failures.length > 1)
+			throw new AggregateError(failures, "seal vote publication batch failed", { cause: failures[0] });
 		return Object.freeze({
 			inFlightPeak,
 			overflowReason: overflow ? ("DISPATCH_QUEUE_FULL_RETRY_LATER" as const) : undefined,

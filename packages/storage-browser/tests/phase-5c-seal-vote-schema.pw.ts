@@ -184,6 +184,42 @@ test("voter enrollment scopes snapshots and round advancement across multiple la
 	expect(result.secondAfter).toMatchObject({ enteredRound: 0, revision: 1 });
 });
 
+test("signer snapshot counts scoped round-change keys without copying unrelated historical carriers", async ({
+	page,
+}) => {
+	await page.goto(server?.origin ?? "about:blank");
+	const result = (await page.evaluate(
+		(name) => window.phase5cSealVote.runSnapshotScanScenario(name),
+		`phase-6-scoped-scan-${crypto.randomUUID()}`
+	)) as {
+		readonly before: Record<string, number>;
+		readonly after: Record<string, number>;
+		readonly observation: { keyRows: number; selectedRowReads: number; valueReads: number };
+		readonly snapshot: { pendingRoundChangeCount: number; enteredRound: number; revision: number };
+	};
+	expect(result.before.voteOutbox).toBe(5);
+	expect(result.snapshot).toMatchObject({ pendingRoundChangeCount: 2, enteredRound: 2, revision: 2 });
+	expect(result.after).toEqual(result.before);
+	expect(result.observation).toEqual({ keyRows: 3, selectedRowReads: 2, valueReads: 0 });
+});
+
+test("scoped signer snapshot preserves the original count for native array-valued round keys", async ({ page }) => {
+	await page.goto(server?.origin ?? "about:blank");
+	const result = (await page.evaluate(
+		(name) => window.phase5cSealVote.runSnapshotScanScenario(name, true),
+		`phase-6-malformed-round-scan-${crypto.randomUUID()}`
+	)) as {
+		readonly before: Record<string, number>;
+		readonly after: Record<string, number>;
+		readonly observation: { keyRows: number; selectedRowReads: number; valueReads: number };
+		readonly snapshot: { pendingRoundChangeCount: number; enteredRound: number; revision: number };
+	};
+	expect(result.before.voteOutbox).toBe(6);
+	expect(result.snapshot).toMatchObject({ pendingRoundChangeCount: 3, enteredRound: 2, revision: 2 });
+	expect(result.after).toEqual(result.before);
+	expect(result.observation).toEqual({ keyRows: 4, selectedRowReads: 3, valueReads: 0 });
+});
+
 test("worker termination reopens only the committed exact vote state", async ({ page }) => {
 	await page.goto(server?.origin ?? "about:blank");
 	const databaseName = `phase-5c-worker-${crypto.randomUUID()}`;

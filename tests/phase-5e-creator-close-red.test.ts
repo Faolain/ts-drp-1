@@ -1,5 +1,6 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { CompactMerkleAccumulator, deriveClosedEpochArchiveAppend, EMPTY_MERKLE_ROOT, produceClosedEpochArchive } from "@ts-drp/compaction";
 import {
 	authenticateCurrentEpochAnchor,
 	isAnchorTrustStateRecordBytes,
@@ -14,6 +15,7 @@ import {
 	AVAILABILITY_POLICY,
 	carrierSha256,
 	createCreatorCloseFixture,
+	createCreatorArchiveSnapshot,
 	CREATOR_CLOSE_OWNER,
 	CREATOR_PRIVATE_KEY_SEED_HEX,
 	CREATOR_PUBLIC_KEY_HEX,
@@ -141,6 +143,52 @@ function mutatedCanonical(bytes: Uint8Array, patch: Readonly<Record<string, unkn
 }
 
 describe.sequential("Phase 5e creator-certified close RED", () => {
+	it.runIf(readiness.ready)("certifies the exact source-derived archive append, independently reopens its target and rejects altered source/descriptor bindings", async () => {
+		// Codec/QC scope only: the native held-source, activation and recovery scenarios remain separate.
+		const sourceFixture = await createCreatorCloseFixture(bytesHex(EMPTY_MERKLE_ROOT));
+		const limits = { maxSegmentBytes: 4096, maxRecordsPerSegment: 2, chunkBytes: 1024, maxChunks: 4, maxSegments: 4 };
+		const archive = await produceClosedEpochArchive({ ...sourceFixture.archiveSource, limits });
+		const append = await deriveClosedEpochArchiveAppend({ archive, expectedPreviousRoot: bytesHex(EMPTY_MERKLE_ROOT),
+			previousSnapshot: new CompactMerkleAccumulator().snapshot(), previousEndOrdinal: -1, limits });
+		const modules = await loadCreatorCloseModules();
+		const targetSnapshot = createCreatorArchiveSnapshot(sourceFixture, append.binding.targetArchiveIndexRoot);
+		const input = { ...closeInput({ ...sourceFixture, snapshot: targetSnapshot }), archiveIndexRoot: append.binding.targetArchiveIndexRoot, archiveAppend: append.binding };
+		expect(modules.creator.prepareCreatorClose({ ...closeInput(sourceFixture), archiveIndexRoot: append.binding.targetArchiveIndexRoot }))
+			.toMatchObject({ ok: false, reason: "CUT_VALUE_MISMATCH" });
+		const close = modules.creator.prepareCreatorClose(input);
+		expect(close.ok).toBe(true);
+		if (!close.ok) throw new Error(close.reason);
+		for (const changed of [{ sourceAnchorDigest: "f".repeat(64) }, { sourceEpoch: 1 }, { objectId: "foreign" },
+			{ sourceCloseSetRoot: "f".repeat(64) }, { previousArchiveIndexRoot: "f".repeat(64) },
+			{ targetArchiveIndexRoot: "f".repeat(64) }, { historySize: append.binding.historySize + 1 }])
+			expect(modules.creator.prepareCreatorClose({ ...input, archiveAppend: { ...append.binding, ...changed } }))
+				.toMatchObject({ ok: false, reason: "CUT_VALUE_MISMATCH" });
+		const alteredDescriptor = Uint8Array.from(append.binding.segments[0]!.exactCanonicalDescriptorBytes);
+		alteredDescriptor[alteredDescriptor.length - 1] ^= 1;
+		expect(modules.creator.prepareCreatorClose({ ...input, archiveAppend: { ...append.binding,
+			segments: [{ ...append.binding.segments[0]!, exactCanonicalDescriptorBytes: alteredDescriptor }, ...append.binding.segments.slice(1)] } }))
+			.toMatchObject({ ok: false, reason: "CUT_VALUE_MISMATCH" });
+		const opened = modules.seal.openSealAuthority({ signerPublicKey: hexBytes(CREATOR_PUBLIC_KEY_HEX), trust: sourceFixture.currentTrust });
+		if (!opened.ok) throw new Error(opened.reason);
+		const vote = modules.seal.prepareSealVote({ authority: opened.authority, exactCanonicalCutValueBytes: close.exactCanonicalCutValueBytes, phase: "commit", round: 0 });
+		if (!vote.ok) throw new Error(vote.reason);
+		const qc = independentQc(exactCarrier(vote));
+		const prepared = modules.creator.prepareCreatorSuccessor({ authority: opened.authority, close: close.close, exactCanonicalCommitQcBytes: qc.exactCanonicalQcBytes });
+		if (!prepared.ok) throw new Error(prepared.reason);
+		expect((decodeCanonical(prepared.exactCanonicalAnchorPreimageBytes) as Record<string, unknown>).archiveIndexRoot)
+			.toBe(append.binding.targetArchiveIndexRoot);
+		const digest = modules.request.consumeCreatorAnchorSigningRequest(prepared.signingRequest);
+		if (!(digest instanceof Uint8Array)) throw new Error("archive successor one-use signing request missing");
+		const completed = modules.creator.completeCreatorSuccessor({ preparation: prepared.preparation,
+			detachedSignature: ed25519.sign(digest, hexBytes(CREATOR_PRIVATE_KEY_SEED_HEX)) });
+		if (!completed.ok) throw new Error(completed.reason);
+		const request = { currentTrust: sourceFixture.currentTrust, exactCanonicalCommitQcBytes: qc.exactCanonicalQcBytes,
+			exactCanonicalCutValueBytes: close.exactCanonicalCutValueBytes, exactCanonicalTrustStateRecordBytes: completed.exactCanonicalTrustStateRecordBytes };
+		expect(modules.creator.openCreatorSuccessorTrust(request).ok).toBe(true);
+		const decoded = decodeCanonical(close.exactCanonicalCutValueBytes) as Record<string, unknown>;
+		expect(modules.creator.openCreatorSuccessorTrust({ ...request, exactCanonicalCutValueBytes: encodeCanonical({
+			...decoded, archiveAppend: { ...append.binding, sourceCloseSetRoot: "f".repeat(64) } }) }).ok).toBe(false);
+	});
 	it("freezes the exact existing registry and bounded ten-path GREEN surface", () => {
 		expect(REGISTRY.kinds.cutValue?.fields.map(({ name }) => name)).toEqual([
 			"kind",

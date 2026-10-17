@@ -277,6 +277,7 @@ export const PHASE_2L_B_FAST_CASES = Object.freeze([
 	"primary-opacity-schema-admission",
 	"v1-upgrade-preserves-committed-rows",
 	"issue-read-copy-paging",
+	"held-outbox-page-work",
 	"same-scope-race-and-cross-scope-progress",
 	"close-versionchange-and-max",
 	"collision-poison-and-ambiguity",

@@ -5,11 +5,12 @@
 		"rootDir": ".",
 		"strict": true,
 		"moduleResolution": "bundler",
+		"resolveJsonModule": true,
 		"allowSyntheticDefaultImports": true,
 		"allowJs": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"exclude": ["node_modules", "dist"]
+	"exclude": ["node_modules", "dist", "blueprint/blueprint.ts"]
 }

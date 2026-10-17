@@ -25,6 +25,10 @@
 			"types": "./dist/src/issuance.d.ts",
 			"import": "./dist/src/issuance.js"
 		},
+		"./room-head": {
+			"types": "./dist/src/room-head.d.ts",
+			"import": "./dist/src/room-head.js"
+		},
 		"./issuance-maintenance": {
 			"types": "./dist/src/issuance-maintenance.d.ts",
 			"import": "./dist/src/issuance-maintenance.js"
@@ -36,6 +40,10 @@
 		"./maintenance": {
 			"types": "./dist/src/maintenance.d.ts",
 			"import": "./dist/src/maintenance.js"
+		},
+		"./seal-signing": {
+			"types": "./dist/src/seal-signing.d.ts",
+			"import": "./dist/src/seal-signing.js"
 		},
 		"./seal-vote": {
 			"types": "./dist/src/seal-vote.d.ts",

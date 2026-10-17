@@ -1,4 +1,5 @@
 import { build, type Plugin } from "esbuild";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -31,18 +32,68 @@ function candidatePlugin(packageDirectory: string): Plugin {
  */
 export default async function globalSetup(): Promise<() => void> {
 	const packageDirectory = path.resolve(import.meta.dirname, "..");
-	const assetDirectory = fs.mkdtempSync(path.join(packageDirectory, ".phase-2l-b-assets-"));
-	await build({
-		bundle: true,
-		entryPoints: {
-			"phase-2l-b-browser-death": path.join(packageDirectory, "tests/assets/phase-2l-b-browser-death-entry.ts"),
-			"phase-2l-b-browser-death-worker": path.join(packageDirectory, "tests/assets/phase-2l-b-browser-death-worker.ts"),
-			"phase-2l-b-browser-issuance": path.join(packageDirectory, "tests/assets/phase-2l-b-browser-issuance-entry.ts"),
+	const r8Shared = process.env.PHASE_2L_B_R8_SHARED;
+	const r8Main = process.env.PHASE_2L_B_R8_MAIN;
+	const archive = process.env.PHASE_2L_B_R8_ARTIFACTS;
+	if (r8Shared !== undefined && (r8Main === undefined || archive === undefined))
+		throw new Error("R8 requires original MAIN/shared source and owned artifact directory");
+	const assetDirectory = fs.mkdtempSync(path.join(archive ?? packageDirectory, ".phase-2l-b-assets-"));
+	const sourcePlugin: Plugin = {
+		name: "phase-2l-b-r8-current-source",
+		setup(builder) {
+			builder.onResolve({ filter: /^@ts-drp\// }, ({ path: name }) => {
+				if (r8Shared === undefined || r8Main === undefined) return;
+				const [pkg, ...subpath] = name.slice("@ts-drp/".length).split("/");
+				const base = path.join(pkg === "issuance-store" ? r8Shared : r8Main, "packages", pkg);
+				const manifest = JSON.parse(fs.readFileSync(path.join(base, "package.json"), "utf8"));
+				const entry = manifest.exports[subpath.length ? "./" + subpath.join("/") : "."];
+				const imported = typeof entry === "string" ? entry : entry.import;
+				const current = path.join(base, imported.replace("/dist/src/", "/src/").replace(/\.js$/u, ".ts"));
+				return { path: current };
+			});
+			builder.onResolve({ filter: /^\./ }, (args) => {
+				if (r8Shared === undefined || !args.path.endsWith(".js") || args.importer.includes("/node_modules/")) return;
+				let target = path.resolve(path.dirname(args.importer), args.path).replace(/\.js$/u, ".ts");
+				const original = path.join(packageDirectory, "src");
+				if (
+					r8Main !== undefined &&
+					target.startsWith(original + path.sep) &&
+					!target.endsWith("/browser-issuance-store.ts") &&
+					!target.endsWith("/issuance.ts")
+				) {
+					const native = path.join(r8Main, "packages/storage-browser/src", path.relative(original, target));
+					if (fs.existsSync(native)) target = native;
+				}
+				return fs.existsSync(target) ? { path: target } : undefined;
+			});
 		},
+	};
+	const bundled = await build({
+		bundle: true,
+		entryPoints:
+			r8Shared === undefined
+				? {
+						"phase-2l-b-browser-death": path.join(packageDirectory, "tests/assets/phase-2l-b-browser-death-entry.ts"),
+						"phase-2l-b-browser-death-worker": path.join(
+							packageDirectory,
+							"tests/assets/phase-2l-b-browser-death-worker.ts"
+						),
+						"phase-2l-b-browser-issuance": path.join(
+							packageDirectory,
+							"tests/assets/phase-2l-b-browser-issuance-entry.ts"
+						),
+					}
+				: {
+						"phase-2l-b-browser-issuance": path.join(
+							packageDirectory,
+							"tests/assets/phase-2l-b-browser-issuance-entry.ts"
+						),
+					},
 		format: "esm",
 		outdir: assetDirectory,
 		platform: "browser",
-		plugins: [candidatePlugin(packageDirectory)],
+		plugins: [candidatePlugin(packageDirectory), ...(r8Shared === undefined ? [] : [sourcePlugin])],
+		metafile: r8Shared !== undefined,
 		target: "es2022",
 	});
 	await build({
@@ -67,5 +118,28 @@ export default async function globalSetup(): Promise<() => void> {
 		"utf8"
 	);
 	process.env.PHASE_2L_B_ASSET_DIR = assetDirectory;
+	if (archive !== undefined && bundled.metafile !== undefined) {
+		const hash = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
+		const inputs = Object.keys(bundled.metafile.inputs)
+			.filter((p) => fs.existsSync(p))
+			.map((p) => ({ path: path.resolve(p), sha256: hash(fs.readFileSync(p)) }));
+		fs.writeFileSync(
+			path.join(archive, "bundle-inputs.json"),
+			JSON.stringify(
+				{
+					assetDirectory,
+					inputs,
+					bundles: Object.keys(bundled.metafile.outputs).map((p) => ({
+						path: path.resolve(p),
+						sha256: hash(fs.readFileSync(p)),
+					})),
+				},
+				null,
+				2
+			)
+		);
+		fs.writeFileSync(path.join(archive, "metafile.json"), JSON.stringify(bundled.metafile, null, 2));
+	}
+	if (r8Shared !== undefined) return () => undefined; // Selected evidence assets retained; test server still joins.
 	return () => fs.rmSync(assetDirectory, { force: true, recursive: true });
 }

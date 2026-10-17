@@ -2,6 +2,20 @@
 
 ## Next Agent Prompt
 
+The subsequent [native-browser lifecycle audit](../grid-memory-production/lifecycle-audit.md)
+is now the starting point for retention work. It establishes the missing
+whole-storage retirement contract and the local snapshot-expiry recovery boundary;
+the earlier heap/backend distinction does not resolve those product concerns.
+
+The [longer-horizon investigation](slices/05-growth-horizon.md) has completed its
+extended capture, retention audit and separate post-return idle observation.
+Start from its [canonical outcome](../../.logs/grid-memory-attribution/capture60-growth/outcome.md),
+which distinguishes sustained database accumulation from the smaller uneven V8
+remainder and RSS reclamation. Any follow-up cleanup must first establish the
+retention/recovery eligibility contract; a store name or closed-epoch label does
+not authorize deletion. Memory acceptance remains open. Preserve historical
+evidence and workload/retention/acceptance invariants.
+
 The bounded attribution pass and final unprofiled diagnostic are complete;
 memory acceptance remains open. The confirmed growing owner was Vitest's
 expected-rejection callback registry, not a product lifecycle leak. Scalar
@@ -13,8 +27,18 @@ but still exceeds its reference. See the [evidence report](../../.logs/grid-memo
 for measured deltas, remaining unexplained growth, review scope and preserved
 failures; it is the canonical home for run-specific results.
 
-The next action is to attribute the remaining non-database graph-growth delta
-from the preserved paired snapshots before authorizing another cleanup or run.
+The follow-up [provenance slice](slices/04-residual-provenance.md) now has a
+completed fresh sampling capture on the original runtime. Its
+[canonical outcome](../../.logs/grid-memory-attribution/capture30-allocation-sampled/outcome.md)
+reconciles the new complement, identifies representative compiled functions and
+V8 metadata retaining paths, and separates statistical allocation-stack leads
+from exact heap ownership. The code/metadata-dominated pattern is reproduced;
+eventual reclamation and a new lifecycle defect are not established. Exact
+tracking failed or was interrupted; those preserved attempts are linked from
+the outcome, not treated as accepted captures. Sampling IDs cannot be joined to
+snapshot objects. Do not turn its function estimates into exact residual-byte
+attribution or compare separate captures by numerical subtraction.
+Keep the project's default runtime unchanged.
 Do not modify historical evidence or change heap limits, assertions, identities,
 retention policy or memory thresholds to obtain acceptance.
 
@@ -63,8 +87,9 @@ Top-node reports guide investigation; they are not exhaustive leak attribution.
 
 The causal chain is: shared capture contract → bounded snapshots → root-path
 attribution → confirmed-owner RED/GREEN → unprofiled full verification.
-Profiling pauses and allocates; its timing is not acceptance evidence. Quarantine
-retention is a hypothesis until the stored rows and actual heap paths agree.
+Profiling pauses and allocates; its timing is not acceptance evidence. Stored
+rows and heap ownership must agree before attributing growth; neither alone
+establishes cleanup eligibility under the actual retention/recovery policy.
 
 ## Review boundaries
 

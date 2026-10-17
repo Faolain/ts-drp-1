@@ -4,5 +4,6 @@
 		"exactOptionalPropertyTypes": true,
 		"outDir": "dist"
 	},
-	"include": ["src/**/*.ts", "tests/**/*.ts"]
+	"include": ["src/**/*.ts", "tests/**/*.ts"],
+	"exclude": ["tests/order-exhaustive.test.ts"]
 }

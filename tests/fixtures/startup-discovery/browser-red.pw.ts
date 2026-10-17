@@ -5,6 +5,20 @@ import { server as startServer } from "./server.js";
 import type { Bootstrap, Fault, RecoveryFault, Report, Scenario, SetupReport } from "./types.js";
 declare global {
 	interface Window {
+		startupShippedCanvas(identity: string): Promise<{
+			report: {
+				beforeSnapshot: unknown;
+				afterSnapshot: unknown;
+				beforeReopen: unknown;
+				afterReopen: unknown;
+				continued: unknown;
+				color: number[];
+				authority: unknown;
+			};
+			joinedRooms: number;
+			joinedHeads: number;
+			databases: string[];
+		}>;
 		startupShippedChat(
 			identity: string,
 			invite?: string
@@ -112,6 +126,68 @@ async function cleanup(
 	}
 	if (errors.length) throw new AggregateError(errors, "STARTUP_CLEANUP_FAILURE");
 }
+test("genuine additive Canvas retains full counters through healthy successor and persisted reopen", async ({
+	context,
+}, info) => {
+	const identity = "startup-canvas-" + info.project.name + "-" + crypto.randomUUID();
+	const page = await context.newPage();
+	let primary: unknown;
+	let exactTargets: string[] = [];
+	try {
+		await page.goto(server.origin + "/shipped");
+		await page.waitForFunction(() => typeof window.startupShippedCanvas === "function");
+		expect(await nativeDatabases(page)).toEqual([]);
+		const result = await page.evaluate((identity) => window.startupShippedCanvas(identity), identity);
+		exactTargets = result.databases;
+		await info.attach("genuine-native-additive-canvas", {
+			body: JSON.stringify(result),
+			contentType: "application/json",
+		});
+		expect(result.report.beforeSnapshot).toMatchObject({
+			version: 1,
+			width: 2,
+			height: 2,
+			counters: [
+				[510, 14, 2],
+				[0, 0, 0],
+				[2, 3, 4],
+				[2, 3, 4],
+			],
+		});
+		expect(result.report.afterSnapshot).toEqual(result.report.beforeSnapshot);
+		expect(result.report.beforeReopen).toMatchObject({
+			counters: [
+				[511, 16, 5],
+				[0, 0, 0],
+				[2, 3, 4],
+				[2, 3, 4],
+			],
+		});
+		expect(result.report.afterReopen).toEqual(result.report.beforeReopen);
+		expect(result.report.color).toEqual([255, 16, 5]);
+		expect(result.report.continued).toMatchObject({
+			counters: [
+				[511, 16, 5],
+				[0, 0, 0],
+				[2, 3, 4],
+				[5, 7, 9],
+			],
+		});
+		expect(result.report.authority).toMatchObject({ epoch: 1, lifecycle: "active", profileId: "creator-trusted-v1" });
+		expect(result.joinedRooms).toBe(2);
+		expect(result.joinedHeads).toBe(2);
+	} catch (error) {
+		primary = error;
+	}
+	try {
+		if (!page.isClosed()) exactTargets = await nativeDatabases(page);
+		await cleanup(context, [page], identity, exactTargets);
+	} catch (error) {
+		primary = primary === undefined ? error : new AggregateError([primary, error], "STARTUP_PRIMARY_AND_CLEANUP");
+	}
+	if (primary !== undefined) throw primary;
+});
+
 for (const consumer of ["chat", "grid"] as const) {
 	test(
 		"shipped " + consumer + " public genesis omission replays in fresh realm and continues",
@@ -124,8 +200,24 @@ for (const consumer of ["chat", "grid"] as const) {
 			try {
 				const setup = await context.newPage();
 				pages.push(setup);
-				await setup.goto(server.origin + "/shipped");
-				await setup.waitForFunction(() => typeof window.startupShippedChat === "function");
+				setup.on("console", (message) => {
+					if (message.type() === "error" && message.text().includes('"lane":"native-issue-error"'))
+						console.error(message.text());
+				});
+				const moduleFailure = new Promise<never>((_, reject) =>
+					setup.once("pageerror", (error) => {
+						console.error(
+							JSON.stringify({ lane: "shipped-module-error", consumer, error: error.stack ?? String(error) })
+						);
+						reject(error);
+					})
+				);
+				await Promise.race([
+					setup
+						.goto(server.origin + "/shipped")
+						.then(() => setup.waitForFunction(() => typeof window.startupShippedChat === "function")),
+					moduleFailure,
+				]);
 				expect(await nativeDatabases(setup), "SHIPPED_CONTEXT_NATIVE_BASELINE_MUST_BE_EMPTY").toEqual([]);
 				freshNativeOwner = true;
 				const initial = await setup.evaluate(

@@ -143,3 +143,74 @@ test("terminates at every live IndexedDB mutation edge and reopens old XOR compl
 		tokens.delete(issued.token);
 	}
 });
+
+for (const kind of ["shared", "atomic", "currency"] as const) {
+	test(`bounded AHE completed checkpoint ${kind} mechanics remain exact in native IndexedDB`, async ({ page }) => {
+		const issued = transition();
+		try {
+			await page.goto(issued.url, { waitUntil: "load" });
+			const result = await page.evaluate(
+				async ({ kind }) => {
+					const fixture = (
+						globalThis as unknown as {
+							phase6bAheReclamation: {
+								runBoundedCheckpoint(
+									databaseName: string,
+									kind: "shared" | "atomic" | "currency"
+								): Promise<Record<string, unknown>>;
+							};
+						}
+					).phase6bAheReclamation;
+					return fixture.runBoundedCheckpoint(`d109c-bounded-${kind}-${crypto.randomUUID()}`, kind);
+				},
+				{ kind }
+			);
+			expect(result).toEqual({
+				kind,
+				passed: true,
+				deleteCount: kind === "shared" ? 14 : 15,
+				singleGeneration: true,
+				foreignSharedRetained: kind === "shared",
+				actualAbortOld: kind === "atomic",
+				joinedCompleteNew: true,
+				coldSameNative: true,
+				staleCases: kind === "currency" ? 6 : 0,
+				pendingRefusals: kind === "currency" ? 3 : 0,
+			});
+		} finally {
+			tokens.delete(issued.token);
+		}
+	});
+}
+
+test("R8 AHE admission observes absent control and complete native image without birth", async ({ page }) => {
+	const issued = transition();
+	try {
+		await page.goto(issued.url, { waitUntil: "load" });
+		const result = await page.evaluate(() =>
+			(
+				globalThis as unknown as {
+					phase6bAheReclamation: {
+						runRetirementAdmissionImage(databaseName: string): Promise<Record<string, unknown>>;
+					};
+				}
+			).phase6bAheReclamation.runRetirementAdmissionImage(`r8-admission-${crypto.randomUUID()}`)
+		);
+		expect(result).toEqual({
+			absentNoncreating: true,
+			completeImage: true,
+			requiredByteRefusal: true,
+			sameDatabaseReopen: true,
+			genuineBirthCompatible: true,
+			closedRefusal: true,
+			heldRawAdmissionOnce: true,
+			heldForeignWriteExclusion: true,
+			heldPublicDtoIsolation: true,
+			heldReacquireFreshImage: true,
+			heldSameCountCorruptionRefusal: true,
+			heldFailedJoinPreserved: true,
+		});
+	} finally {
+		tokens.delete(issued.token);
+	}
+});

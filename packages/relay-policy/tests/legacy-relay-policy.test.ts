@@ -1,4 +1,4 @@
-import type { Multiaddr } from "@multiformats/multiaddr";
+import { multiaddr, type Multiaddr } from "@multiformats/multiaddr";
 import {
 	BrowserRoutingClosestPeersSource,
 	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
@@ -282,6 +282,44 @@ describe("Circuit Relay v2 reservation decoding", () => {
 		expect(onDisconnect, "T4_SUCCESSFUL_RESERVATION_PEER_DISCONNECT_USED").not.toHaveBeenCalled();
 		await client.stop();
 		expect(closeOwnedConnection).toHaveBeenCalledOnce();
+	});
+
+	it("releases only the circuit listener, not downstream WebRTC or unrelated relay listeners", async () => {
+		const candidate = validRelayCandidate();
+		const closeWebRtc = vi.fn(() => Promise.resolve());
+		const closeUnrelated = vi.fn(() => Promise.resolve());
+		const closeCircuit = vi.fn(() => Promise.resolve());
+		const expire = BigInt(Math.floor((NOW + 60_000) / 1_000));
+		const client = relayClientWith({
+			connection: true,
+			protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			onCircuitClose: closeCircuit,
+			borrowedListeners: [
+				{
+					close: closeWebRtc,
+					getAddrs: (): Multiaddr[] => [multiaddr(`${candidate.addresses[0]}/p2p-circuit/webrtc`)],
+				},
+				{
+					close: closeUnrelated,
+					getAddrs: (): Multiaddr[] => [
+						multiaddr(
+							"/ip4/127.0.0.1/tcp/50002/ws/p2p/16Uiu2HAmT72TapomemeWskZbmzd4hZcakAzYnTwLtbdsvdaSUvXU/p2p-circuit"
+						),
+					],
+				},
+			],
+			reservationResponse: protobufMessage(
+				protobufBytes(3, protobufVarint(1, expire)),
+				protobufVarint(5, BigInt(RELAY_RESERVATION_STATUS.OK))
+			),
+		});
+		await client.inspect(candidate, candidate.addresses[0] as string, signal());
+		await expect(client.reserve(candidate, signal())).resolves.toMatchObject({ status: RELAY_RESERVATION_STATUS.OK });
+		await client.release(candidate);
+		await client.stop();
+		expect(closeCircuit).toHaveBeenCalledOnce();
+		expect(closeWebRtc).not.toHaveBeenCalled();
+		expect(closeUnrelated).not.toHaveBeenCalled();
 	});
 
 	it("releases exact newly-created custody after a malformed RESERVE response", async () => {
@@ -1148,10 +1186,12 @@ function relayClientWith(options: {
 	readonly peerStoreGate?: Promise<void>;
 	readonly protocols: string[];
 	readonly reservationResponse?: Uint8Array;
+	readonly borrowedListeners?: readonly { close(): Promise<void>; getAddrs(): Multiaddr[] }[];
+	onCircuitClose?(): Promise<void>;
 }): Libp2pRelayClient {
 	const events = new EventTarget();
 	const circuitAddresses: Multiaddr[] = [];
-	const listeners: Array<{ close(): Promise<void>; getAddrs(): Multiaddr[] }> = [];
+	const listeners: Array<{ close(): Promise<void>; getAddrs(): Multiaddr[] }> = [...(options.borrowedListeners ?? [])];
 	const connection = {
 		id: "connection-1",
 		newStream: (): object => {
@@ -1199,7 +1239,10 @@ function relayClientWith(options: {
 					getListeners: () => listeners,
 					listen: (addresses: Multiaddr[]): Promise<void> => {
 						circuitAddresses.push(...addresses);
-						listeners.push({ close: () => Promise.resolve(), getAddrs: () => [...addresses] });
+						listeners.push({
+							close: options.onCircuitClose ?? ((): Promise<void> => Promise.resolve()),
+							getAddrs: () => [...addresses],
+						});
 						return Promise.resolve();
 					},
 				},

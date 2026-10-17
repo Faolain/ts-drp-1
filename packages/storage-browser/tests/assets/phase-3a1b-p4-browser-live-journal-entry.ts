@@ -1,4 +1,11 @@
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import {
+	encodeJournalRetirementControl,
+	journalRetirementFrameDigest,
+	LIVE_JOURNAL_RETIREMENT_LIMITS,
+	type DurableLiveJournalStore,
+	type LiveJournalScope,
+} from "@ts-drp/live-journal";
 
 import {
 	armPhase3a1bP4BrowserDurabilityDowngrade,
@@ -19,6 +26,10 @@ async function loadCandidate(): Promise<{
 }
 
 interface JournalStore {
+	acquireNativeReadReservation(input: { readonly objectId: string }): Promise<{
+		check(): Promise<void>;
+		release(): Promise<void>;
+	}>;
 	appendAccepted(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
 	close(): Promise<void>;
 	installGenesis(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
@@ -39,6 +50,18 @@ declare global {
 				| "persisted-shapes"
 				| "strict-downgrade"
 				| "surface-schema"
+				| "reserved-page-bound"
+				| "reserved-page-foreign"
+				| "reserved-page-lifetime"
+				| "reserved-page-poison"
+				| "reserved-readiness-reuse"
+				| "reserved-readiness-scopes"
+				| "incremental-replay-validation"
+				| "closed-membership-after-drain"
+				| "reserved-retirement-reuse"
+				| "reserved-retirement-abort"
+				| "reserved-retirement-admission"
+				| "reserved-retirement-current-probe"
 		): Promise<unknown>;
 	}
 }
@@ -729,7 +752,724 @@ function expectDataSuccess(value: Readonly<Record<string, unknown>>): void {
 	if (Reflect.get(value, "ok") !== true) throw new Error("p4 decision-mutant control did not reach the real adapter");
 }
 
+// Observe native result cardinality/bytes and transaction identity; do not
+// substitute rows, transactions, versions or terminal results.
+async function measuredPageRead<T>(operation: () => Promise<T>): Promise<{
+	readonly value: T;
+	readonly reads: readonly {
+		readonly rows: number;
+		readonly bytes: number;
+		readonly count: number | null;
+		readonly transaction: number;
+	}[];
+}> {
+	const original = IDBObjectStore.prototype.getAll;
+	const ids = new WeakMap<IDBTransaction, number>();
+	let next = 0;
+	const reads: { rows: number; bytes: number; count: number | null; transaction: number }[] = [];
+	IDBObjectStore.prototype.getAll = function (...args): IDBRequest {
+		const request = original.apply(this, args);
+		if (this.name === "acceptedEntries") {
+			const transaction = this.transaction;
+			const identity = ids.get(transaction) ?? ++next;
+			ids.set(transaction, identity);
+			request.addEventListener(
+				"success",
+				() => {
+					const rows = request.result as Record<string, unknown>[];
+					const bytes = rows.reduce(
+						(sum, row) =>
+							sum +
+							Object.values(row).reduce<number>(
+								(total, value) => total + (value instanceof Uint8Array ? value.byteLength : 0),
+								0
+							),
+						0
+					);
+					reads.push({ rows: rows.length, bytes, count: args[1] ?? null, transaction: identity });
+				},
+				{ once: true }
+			);
+		}
+		return request;
+	};
+	try {
+		return { value: await operation(), reads };
+	} finally {
+		IDBObjectStore.prototype.getAll = original;
+	}
+}
+
+function pageVertex(values: Readonly<Record<string, unknown>>, sequence: number): Readonly<Record<string, unknown>> {
+	const scope = values.scope as { objectId: string; anchorDigest: string; epoch: number };
+	const bytes = encodeCanonical({
+		kind: "drp-vertex",
+		protocolMajor: 3,
+		objectId: scope.objectId,
+		epoch: scope.epoch,
+		anchor: scope.anchorDigest,
+		author: "creator",
+		authorSequence: sequence,
+		logicalTime: sequence + 1,
+		dependencies: ["5".repeat(64)],
+		operation: { payload: "x".repeat(1024), sequence },
+	});
+	return {
+		scope: values.scope,
+		sourceKind: "received",
+		vertexDigest: lowerHex(hashDomain("ts-drp/vertex/v3", bytes)),
+		exactCanonicalPreimageBytes: bytes,
+		detachedSignature: new Uint8Array(64).fill(sequence + 1),
+	};
+}
+
+async function seededPageStore(count: number): Promise<{
+	primary: string;
+	derived: string;
+	store: JournalStore;
+	values: Readonly<Record<string, unknown>>;
+}> {
+	const primary = `phase-3a1b-p4-reserved-page-${crypto.randomUUID()}`;
+	const store = await open(primary);
+	const values = material();
+	try {
+		expectDataSuccess(await store.installGenesis(values.install as Readonly<Record<string, unknown>>));
+		for (let sequence = 0; sequence < count; sequence++)
+			expectDataSuccess(await store.appendAccepted(pageVertex(values, sequence)));
+		return { primary, derived: `${primary}--drp-live-journal-v1`, store, values };
+	} catch (cause) {
+		await store.close();
+		throw cause;
+	}
+}
+
+// Native mechanical regression only: these fixture preparations/opaque bytes do
+// not establish protocol eligibility or authenticate a close certificate.
+async function closedMembershipAfterDrain(): Promise<unknown> {
+	const { primary, derived, store: opened, values } = await seededPageStore(1);
+	let store = opened as unknown as DurableLiveJournalStore;
+	const scope = values.scope as LiveJournalScope;
+	const acquire = async () => {
+		const result = await store.acquireRetirementControl!({ objectId: scope.objectId });
+		if (!result.ok) throw new TypeError(`native regression acquisition: ${result.kind}`);
+		return result.value;
+	};
+	try {
+		const install = values.install as { exactCanonicalAnchorPreimageBytes: Uint8Array };
+		const anchor = decodeCanonical(install.exactCanonicalAnchorPreimageBytes) as Record<string, unknown>;
+		const nextBytes = encodeCanonical({ ...anchor, epoch: 1, previousAnchor: scope.anchorDigest });
+		const nextScope = { ...scope, epoch: 1, anchorDigest: lowerHex(hashDomain("ts-drp/epoch-anchor/v3", nextBytes)) };
+		expectDataSuccess(await store.installEpochAnchor({ ...install, exactCanonicalAnchorPreimageBytes: nextBytes } as never));
+		let view = await acquire();
+		expectDataSuccess(await view.prepareFence({ throughEpoch: 0, protectedScopes: [], decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64) }));
+		await view.release();
+		view = await acquire();
+		expectDataSuccess(await view.commitPrepared());
+		await view.release();
+		view = await acquire();
+		const frame = view.readExactCanonicalRows().find(bytes => (decodeCanonical(bytes) as unknown[])[0] === "acceptedEntries");
+		if (frame === undefined) throw new TypeError("native regression row missing");
+		const raw = (decodeCanonical(frame) as unknown[])[2] as { journalSequence: number; vertexDigest: string; exactCanonicalPreimageBytes: Uint8Array };
+		const vertex = decodeCanonical(raw.exactCanonicalPreimageBytes) as { author: string; authorSequence: number };
+		expectDataSuccess(await view.beginDrain({ baseControl: view.control, sourceImage: view.image, prefixes: [{ scope, highWatermark: 1, rows: [{ journalSequence: raw.journalSequence, vertexDigest: raw.vertexDigest, author: vertex.author, authorSequence: vertex.authorSequence, nativeFrameDigest: journalRetirementFrameDigest(frame), exactCanonicalNativeFrameBytes: frame }] }] }));
+		await view.release();
+		view = await acquire();
+		expectDataSuccess(await view.drainBatch());
+		await view.release();
+		view = await acquire();
+		const completedDrain = view.control.drain;
+		const expectedNativeImage = { imageDigest: view.image.imageDigest, controlBytes: encodeJournalRetirementControl(view.control) };
+		await view.release();
+		const membership = encodeCanonical({ kind: "native-membership-regression", epoch: 1 });
+		const fresh = await store.recordClosedMembership!({ scope: nextScope, exactCanonicalMembershipBytes: membership, expectedNativeImage });
+		const stale = await store.recordClosedMembership!({ scope: nextScope, exactCanonicalMembershipBytes: membership, expectedNativeImage });
+		const afterStale = await store.readRetirementImage!({ objectId: scope.objectId });
+		if (!fresh.ok) return { completedDrain, fresh, stale, afterStale };
+		await store.close();
+		store = await open(primary) as unknown as DurableLiveJournalStore;
+		const reopened = await store.readRetirementImage!({ objectId: scope.objectId });
+		const retry = await store.recordClosedMembership!({ scope: nextScope, exactCanonicalMembershipBytes: membership, expectedNativeImage: { imageDigest: fresh.value.imageDigest, controlBytes: fresh.value.controlBytes } });
+		// Explicit persisted-schema corruption remains unsupported: never relax the
+		// native decoder merely because logical controls are valid API evidence.
+		const database = await requestResult(indexedDB.open(derived));
+		try {
+			const tx = database.transaction("retirementControls", "readwrite", { durability: "strict" });
+			const terminal = transactionComplete(tx);
+			tx.objectStore("retirementControls").put({ objectId: scope.objectId, record: expectedNativeImage.controlBytes });
+			await terminal;
+		} finally { database.close(); }
+		const inlineRejected = await store.readRetirementImage!({ objectId: scope.objectId });
+		return { completedDrain, fresh, stale, afterStale, reopened, retry, inlineRejected };
+	} finally {
+		await store.close();
+		await deleteDatabase(derived);
+	}
+}
+
+// Exact native transaction identities, not database names or portable handles.
+const retirementTransactionIds = new WeakMap<IDBTransaction, number>();
+let nextRetirementTransactionId = 0;
+async function measuredRetirementRead<T>(operation: () => Promise<T>,
+	observeTransaction?: (transaction: IDBTransaction) => void): Promise<{
+	value: T; cursors: {scopes: number; acceptedEntries: number}; getKeyInvocations: number; transactions: number[];
+}> {
+	const cursor = IDBObjectStore.prototype.openCursor, getKey = IDBObjectStore.prototype.getKey;
+	const cursors = {scopes: 0, acceptedEntries: 0}, transactions = new Set<number>();
+	let getKeyInvocations = 0;
+	const observe = (transaction: IDBTransaction): void => {
+		let identity = retirementTransactionIds.get(transaction);
+		if (identity === undefined) { identity = ++nextRetirementTransactionId; retirementTransactionIds.set(transaction, identity); }
+		transactions.add(identity); observeTransaction?.(transaction);
+	};
+	IDBObjectStore.prototype.openCursor = function (...args) {
+		const request = Reflect.apply(cursor, this, args);
+		if (this.name === "scopes" || this.name === "acceptedEntries") { cursors[this.name]++; observe(this.transaction); }
+		return request;
+	};
+	IDBObjectStore.prototype.getKey = function (...args) {
+		const request = Reflect.apply(getKey, this, args);
+		getKeyInvocations++; observe(this.transaction);
+		return request;
+	};
+	try { return {value: await operation(), cursors, getKeyInvocations, transactions: [...transactions]}; }
+	finally { IDBObjectStore.prototype.openCursor = cursor; IDBObjectStore.prototype.getKey = getKey; }
+}
+
+async function reservedRetirementReuse(): Promise<unknown> {
+	const {primary, derived, store, values} = await seededPageStore(4);
+	const journal = store as unknown as DurableLiveJournalStore, objectId = (values.scope as LiveJournalScope).objectId;
+	let held: Awaited<ReturnType<JournalStore["acquireNativeReadReservation"]>> | undefined;
+	let second: JournalStore | undefined, write: Promise<unknown> | undefined;
+	try {
+		const control = await journal.acquireRetirementControl!({objectId});
+		if (!control.ok) throw new TypeError("native retirement control birth failed");
+		await control.value.release();
+		// Opening a facade performs the original RW schema admission. Complete
+		// it before the held RO book that must genuinely exclude native writers.
+		second = await open(primary);
+		held = await store.acquireNativeReadReservation({objectId});
+		const first = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+		if (!first.value.ok) throw new TypeError("initial native retirement capture failed");
+		const pristine = lowerHex(encodeCanonical(first.value));
+		first.value.value.canonicalRows[0]!.fill(255);
+		first.value.value.exactCanonicalControlCarriers[0]!.fill(255);
+		const repeated = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+		const isolated = lowerHex(encodeCanonical(repeated.value)) === pristine;
+		const wrongObject = await measuredRetirementRead(() => journal.readRetirementImage!({objectId: "uninstalled-object"}));
+		const recaptured = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+		const foreignFacade = await measuredRetirementRead(() =>
+			(second as unknown as DurableLiveJournalStore).readRetirementImage!({objectId}));
+		let committed = false;
+		write = second.appendAccepted(pageVertex(values, 4)).then(value => { committed = true; return value; });
+		await new Promise(resolve => setTimeout(resolve, 30));
+		const excluded = !committed;
+		const duringForeign = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+		// The hit must await a genuine native turn; release revokes this queued call.
+		const queued = journal.readRetirementImage!({objectId});
+		const releasing = held.release();
+		const afterRevocation = await journal.readRetirementImage!({objectId});
+		const revokedQueued = await queued;
+		await releasing; held = undefined;
+		const appended = await write;
+		const ordinary = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+		held = await store.acquireNativeReadReservation({objectId});
+		const replacement = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+		const replacementRepeat = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+		const queuedClose = journal.readRetirementImage!({objectId});
+		const closing = store.close();
+		const afterClose = await journal.readRetirementImage!({objectId}), closedQueued = await queuedClose;
+		await closing;
+		return {first: {cursors: first.cursors, transactions: first.transactions}, repeated,
+			isolated, wrongObject, recaptured, foreignFacade, excluded, duringForeign, revokedQueued, afterRevocation, appended, ordinary,
+			replacement, replacementRepeat, closedQueued, afterClose};
+	} finally {
+		await Promise.allSettled([Promise.resolve().then(() => held?.release()), Promise.resolve().then(() => store.close()),
+			Promise.resolve().then(() => write), Promise.resolve().then(() => second?.close())]);
+		await deleteDatabase(derived);
+	}
+}
+
+async function reservedRetirementAbort(): Promise<unknown> {
+	const {derived, store, values} = await seededPageStore(4);
+	const journal = store as unknown as DurableLiveJournalStore, objectId = (values.scope as LiveJournalScope).objectId;
+	const held = await store.acquireNativeReadReservation({objectId});
+	try {
+		let transaction: IDBTransaction | undefined;
+		const first = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}), value => { transaction = value; });
+		if (!first.value.ok || transaction === undefined) throw new TypeError("exact native held retirement book absent");
+		const probe = journal.readRetirementImage?.captureCurrentProbe?.(first.value.value);
+		if (probe === undefined) throw new TypeError("genuine held retirement probe absent");
+		transaction.abort(); // Original transaction only; no replacement or synthetic authority.
+		let checkRejected = false;
+		try { await held.check(); } catch { checkRejected = true; }
+		const afterAbort = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+		const release = await Promise.allSettled([held.release()]);
+		return {checkRejected, afterAbort, probeAfterAbort: await probe.checkCurrent(), releaseRejected: release[0]?.status === "rejected"};
+	} finally {
+		await Promise.allSettled([held.release(), store.close()]); await deleteDatabase(derived);
+	}
+}
+
+async function reservedRetirementAdmission(): Promise<unknown> {
+	const results: Record<string, unknown> = {};
+	for (const fate of ["control-corruption", "native-byte-quota", "poisoned-facade"] as const) {
+		const {derived, store, values} = await seededPageStore(4);
+		const journal = store as unknown as DurableLiveJournalStore, objectId = (values.scope as LiveJournalScope).objectId;
+		let held: Awaited<ReturnType<JournalStore["acquireNativeReadReservation"]>> | undefined;
+		try {
+			if (fate === "poisoned-facade") {
+				const closure = await rawClosure(derived) as {rows: Record<string, unknown>[]};
+				await replaceRaw(derived, "acceptedEntries", {...closure.rows[3], detachedSignature: new Uint8Array(1)});
+				held = await store.acquireNativeReadReservation({objectId});
+				// Retirement raw commitments are not authentication. A separate
+				// original replay reader must still poison this facade in the SAME book.
+				const initial = await journal.readRetirementImage!({objectId});
+				if (!initial.ok) throw new TypeError("initial raw retirement commitment failed");
+				const probe = journal.readRetirementImage?.captureCurrentProbe?.(initial.value);
+				if (probe === undefined) throw new TypeError("genuine held retirement probe absent");
+				const readiness = await store.readiness({scope: values.scope});
+				results[fate] = {readiness, probeAfterPoison: await probe.checkCurrent(),
+					after: await measuredRetirementRead(() => journal.readRetirementImage!({objectId}))};
+				continue;
+			}
+			held = await store.acquireNativeReadReservation({objectId});
+			const initial = await journal.readRetirementImage!({objectId});
+			if (!initial.ok) throw new TypeError("initial native retirement capture failed");
+			await held.release(); held = undefined;
+			if (fate === "control-corruption") {
+				const database = await requestResult(indexedDB.open(derived));
+				try { const tx = database.transaction("retirementControls", "readwrite", {durability: "strict"});
+					const terminal = transactionComplete(tx); tx.objectStore("retirementControls").put({objectId, record: new Uint8Array(1)}); await terminal;
+				} finally { database.close(); }
+			} else {
+				const closure = await rawClosure(derived) as {scopes: Record<string, unknown>[]};
+				await replaceRaw(derived, "scopes", {...closure.scopes[0],
+					detachedAnchorSignature: new Uint8Array(LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes + 1)});
+			}
+			// Ordinary original capture pins the existing failure classification.
+			const ordinary = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+			held = await store.acquireNativeReadReservation({objectId});
+			const fresh = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+			const repeated = await measuredRetirementRead(() => journal.readRetirementImage!({objectId}));
+			results[fate] = {ordinary, fresh, repeated};
+		} finally {
+			await Promise.allSettled([Promise.resolve().then(() => held?.release()), store.close()]); await deleteDatabase(derived);
+		}
+	}
+	return results;
+}
+
+async function reservedRetirementCurrentProbe(): Promise<unknown> {
+	const {primary, derived, store, values} = await seededPageStore(4);
+	const journal = store as unknown as DurableLiveJournalStore, read = journal.readRetirementImage;
+	const objectId = (values.scope as LiveJournalScope).objectId;
+	if (read?.captureCurrentProbe === undefined) throw new TypeError("current probe native port absent");
+	let held: Awaited<ReturnType<JournalStore["acquireNativeReadReservation"]>> | undefined;
+	let second: JournalStore | undefined, write: Promise<unknown> | undefined;
+	try {
+		const control = await journal.acquireRetirementControl!({objectId});
+		if (!control.ok) throw new TypeError("native retirement control birth failed");
+		await control.value.release(); second = await open(primary);
+		held = await store.acquireNativeReadReservation({objectId});
+		const first = await measuredRetirementRead(() => read({objectId}));
+		if (!first.value.ok) throw new TypeError("initial retirement capture failed");
+		const copiedObservationRefused = read.captureCurrentProbe({...first.value.value}) === undefined;
+		const forgedObservationRefused = read.captureCurrentProbe(decodeCanonical(encodeCanonical(first.value.value)) as typeof first.value.value) === undefined;
+		const wrongProducerReceiverRefused = Reflect.apply(read.captureCurrentProbe, read.bind(journal), [first.value.value]) === undefined;
+		const probe = read.captureCurrentProbe(first.value.value);
+		if (probe === undefined) throw new TypeError("genuine initial current probe absent");
+		const consumedEnrollmentRefused = read.captureCurrentProbe(first.value.value) === undefined;
+		first.value.value.canonicalRows[0]!.fill(255);
+		first.value.value.exactCanonicalControlCarriers[0]!.fill(255);
+		const isolated = await measuredRetirementRead(() => probe.checkCurrent());
+		const harmlessRead = await measuredRetirementRead(() => read({objectId}));
+		const afterHarmlessRead = await measuredRetirementRead(() => probe.checkCurrent());
+		const mutated = await read({objectId}); if (!mutated.ok) throw new TypeError("same-book mutation control absent");
+		mutated.value.canonicalRows[0]!.fill(254);
+		const mutatedObservationRefused = read.captureCurrentProbe(mutated.value) === undefined;
+		const afterMutatedObservation = await measuredRetirementRead(() => probe.checkCurrent());
+		const wrongProbeReceiver = await Object.freeze({...probe}).checkCurrent();
+		const evictingRead = await measuredRetirementRead(() => read({objectId: "uninstalled-object"}));
+		const evicted = await measuredRetirementRead(() => probe.checkCurrent());
+		const recaptured = await measuredRetirementRead(() => read({objectId}));
+		if (!recaptured.value.ok) throw new TypeError("same-book recapture absent");
+		const renewed = read.captureCurrentProbe(recaptured.value.value);
+		if (renewed === undefined) throw new TypeError("same-book renewed probe absent");
+		const afterRecapture = await measuredRetirementRead(() => renewed.checkCurrent());
+		let committed = false;
+		write = second.appendAccepted(pageVertex(values, 4)).then(value => {committed = true; return value;});
+		await new Promise(resolve => setTimeout(resolve, 30));
+		const excluded = !committed;
+		const queued = renewed.checkCurrent(), releasing = held.release();
+		const afterRevocation = await renewed.checkCurrent(), revokedQueued = await queued;
+		await releasing; held = undefined; const appended = await write;
+		held = await store.acquireNativeReadReservation({objectId});
+		const replacement = await measuredRetirementRead(() => read({objectId}));
+		if (!replacement.value.ok) throw new TypeError("replacement book capture absent");
+		const wrongBookObservationRefused = read.captureCurrentProbe(recaptured.value.value) === undefined;
+		const oldProbeNewBook = await renewed.checkCurrent();
+		const next = read.captureCurrentProbe(replacement.value.value);
+		if (next === undefined) throw new TypeError("replacement book probe absent");
+		const replacementProbe = await measuredRetirementRead(() => next.checkCurrent());
+		const queuedClose = next.checkCurrent(), closing = store.close();
+		const afterClose = await next.checkCurrent(), closedQueued = await queuedClose; await closing;
+		return {producerFrozen: Object.isFrozen(read), first, copiedObservationRefused, forgedObservationRefused,
+			wrongProducerReceiverRefused, consumedEnrollmentRefused, mutatedObservationRefused, isolated, harmlessRead,
+			afterHarmlessRead, afterMutatedObservation, wrongProbeReceiver,
+			evictingRead, evicted, recaptured, afterRecapture, excluded, revokedQueued, afterRevocation, appended,
+			replacement, wrongBookObservationRefused, oldProbeNewBook, replacementProbe, afterClose, closedQueued};
+	} finally {
+		await Promise.allSettled([Promise.resolve().then(() => held?.release()), Promise.resolve().then(() => store.close()),
+			Promise.resolve().then(() => write), Promise.resolve().then(() => second?.close())]);
+		await deleteDatabase(derived);
+	}
+}
+
+async function reservedReadinessReuse(): Promise<unknown> {
+	const { derived, store, values } = await seededPageStore(64);
+	let held: Awaited<ReturnType<JournalStore["acquireNativeReadReservation"]>> | undefined;
+	try {
+		const first = await measuredPageRead(async () => {
+			held = await store.acquireNativeReadReservation({objectId: Reflect.get(values.scope as object, "objectId") as string});
+			const ready = await store.readiness({scope: values.scope});
+			expectDataSuccess(ready);
+			const repeated = [];
+			for (let repeat = 0; repeat < 3; repeat++) repeated.push(await store.readiness({scope: values.scope}));
+			const bounded = await store.readPage({scope: values.scope, snapshot: ready.snapshot, limit: 1});
+			await held.check();
+			return {ready, repeated, bounded};
+		});
+		await held?.release();
+		held = undefined;
+		// The original append owner's preparation/readback is not a readiness read.
+		// Keep it outside these two explicitly scoped materialization measurements.
+		const append = await store.appendAccepted(pageVertex(values, 64));
+		expectDataSuccess(append);
+		const afterAppend = await measuredPageRead(async () => {
+			held = await store.acquireNativeReadReservation({objectId: Reflect.get(values.scope as object, "objectId") as string});
+			const oldPrefix = await store.readPage({scope: values.scope, snapshot: first.value.ready.snapshot, limit: 1});
+			const complete = await store.readiness({scope: values.scope});
+			const completeRepeat = await store.readiness({scope: values.scope});
+			await held.check();
+			return {oldPrefix, complete, completeRepeat};
+		});
+		return {first, append, afterAppend};
+	} finally {
+		const joined = await Promise.allSettled([
+			Promise.resolve().then(() => held?.release()), Promise.resolve().then(() => store.close()),
+		]);
+		await deleteDatabase(derived);
+		const failures = joined.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+		if (failures.length) throw new AggregateError(failures, "original repeated-readiness owners failed to join");
+	}
+}
+
+// Mechanical native replay coverage, not a claim of authenticated epoch activation.
+async function reservedReadinessScopes(): Promise<unknown> {
+	const {derived, store, values} = await seededPageStore(8);
+	let held: Awaited<ReturnType<JournalStore["acquireNativeReadReservation"]>> | undefined;
+	try {
+		const scope = values.scope as LiveJournalScope;
+		const install = values.install as {exactCanonicalAnchorPreimageBytes: Uint8Array};
+		const anchor = decodeCanonical(install.exactCanonicalAnchorPreimageBytes) as Record<string, unknown>;
+		const nextBytes = encodeCanonical({...anchor, epoch: 1, previousAnchor: scope.anchorDigest});
+		const nextScope = {...scope, epoch: 1, anchorDigest: lowerHex(hashDomain("ts-drp/epoch-anchor/v3", nextBytes))};
+		expectDataSuccess(await (store as unknown as DurableLiveJournalStore).installEpochAnchor({
+			...install, exactCanonicalAnchorPreimageBytes: nextBytes,
+		} as never));
+		for (let sequence = 0; sequence < 4; sequence++)
+			expectDataSuccess(await store.appendAccepted(pageVertex({...values, scope: nextScope}, sequence)));
+		return await measuredPageRead(async () => {
+			held = await store.acquireNativeReadReservation({objectId: scope.objectId});
+			const first = await store.readiness({scope}); expectDataSuccess(first);
+			const second = await store.readiness({scope: nextScope}); expectDataSuccess(second);
+			const repeated = await store.readiness({scope}); expectDataSuccess(repeated);
+			const page = await store.readPage({scope, snapshot: first.snapshot, limit: 1}); expectDataSuccess(page);
+			const row = (page.rows as {exactCanonicalPreimageBytes: Uint8Array}[])[0];
+			if (row === undefined) throw new TypeError("scope replay row absent");
+			const originalByte = row.exactCanonicalPreimageBytes[0];
+			row.exactCanonicalPreimageBytes.fill(255);
+			const secondPage = await store.readPage({scope: nextScope, snapshot: second.snapshot, limit: 1});
+			expectDataSuccess(secondPage);
+			const detached = await store.readPage({scope, snapshot: first.snapshot, limit: 1}); expectDataSuccess(detached);
+			const detachedByte = (detached.rows as {exactCanonicalPreimageBytes: Uint8Array}[])[0]?.exactCanonicalPreimageBytes[0];
+			await held.check(); await held.release(); held = undefined;
+			held = await store.acquireNativeReadReservation({objectId: scope.objectId});
+			const replacement = await store.readiness({scope}); expectDataSuccess(replacement); await held.check();
+			return {first, second, repeated, replacement, originalByte, detachedByte};
+		});
+	} finally {
+		await held?.release(); await store.close(); await deleteDatabase(derived);
+	}
+}
+
+async function incrementalReplayValidation(): Promise<unknown> {
+	const {primary, derived, store, values} = await seededPageStore(8);
+	let other: JournalStore | undefined;
+	const measure = async <T>(operation: () => Promise<T>) => {
+		const original = TextDecoder.prototype.decode;
+		let strings = 0;
+		TextDecoder.prototype.decode = function (...args) { strings++; return original.apply(this, args); };
+		try { return await measuredPageRead(async () => ({value: await operation(), strings: () => strings})); }
+		finally { TextDecoder.prototype.decode = original; }
+	};
+	// Return plain scalar observations; never serialize a function as evidence.
+	const read = async (owner: JournalStore) => {
+		const measured = await measure(() => owner.readiness({scope: values.scope}));
+		return {...measured, value: measured.value.value, strings: measured.value.strings()};
+	};
+	try {
+		const first = await read(store), repeated = await read(store);
+		const ready = repeated.value; expectDataSuccess(ready);
+		const page = await store.readPage({scope: values.scope, snapshot: ready.snapshot, limit: 1}); expectDataSuccess(page);
+		const returned = (page.rows as {exactCanonicalPreimageBytes: Uint8Array; detachedSignature: Uint8Array}[])[0];
+		if (returned === undefined) throw new TypeError("incremental replay row absent");
+		returned.exactCanonicalPreimageBytes.fill(255); returned.detachedSignature.fill(255);
+		const afterMutation = await read(store);
+		other = await open(primary);
+		const foreignFirst = await read(other), foreignRepeated = await read(other);
+		await other.close(); other = undefined;
+		const raw = await rawClosure(derived) as {rows: Record<string, unknown>[]};
+		const row = raw.rows[0]; if (row === undefined) throw new TypeError("native replay row absent");
+		await replaceRaw(derived, "acceptedEntries", {...row, exactCanonicalPreimageBytes: new Uint8Array([255])});
+		const corrupted = await read(store);
+		return {first, repeated, afterMutation, foreignFirst, foreignRepeated, corrupted};
+	} finally {
+		await other?.close(); await store.close(); await deleteDatabase(derived);
+	}
+}
+
+async function reservedPageBound(): Promise<unknown> {
+	const { derived, store, values } = await seededPageStore(64);
+	const held = await store.acquireNativeReadReservation({
+		objectId: Reflect.get(values.scope as object, "objectId") as string,
+	});
+	try {
+		return await measuredPageRead(async () => {
+			const ready = await store.readiness({ scope: values.scope });
+			expectDataSuccess(ready);
+			const first = await store.readPage({
+				scope: values.scope,
+				snapshot: ready.snapshot,
+				afterSequence: null,
+				limit: 2,
+			});
+			expectDataSuccess(first);
+			const rows = first.rows as { detachedSignature: Uint8Array; exactCanonicalPreimageBytes: Uint8Array }[];
+			const firstRow = rows[0];
+			if (firstRow === undefined) throw new TypeError("expected nonempty native page");
+			const detached = { signature: firstRow.detachedSignature[0], bytes: firstRow.exactCanonicalPreimageBytes[0] };
+			firstRow.detachedSignature.fill(255);
+			firstRow.exactCanonicalPreimageBytes.fill(255);
+			const repeat = await store.readPage({
+				scope: values.scope,
+				snapshot: ready.snapshot,
+				afterSequence: null,
+				limit: 2,
+			});
+			const tail = await store.readPage({ scope: values.scope, snapshot: ready.snapshot, afterSequence: 61, limit: 2 });
+			const empty = await store.readPage({
+				scope: values.scope,
+				snapshot: ready.snapshot,
+				afterSequence: Number.MAX_SAFE_INTEGER,
+				limit: 2,
+			});
+			await held.check();
+			return {
+				ready,
+				first,
+				repeat,
+				tail,
+				empty,
+				detached,
+				frozen:
+					Object.isFrozen(repeat) &&
+					Object.isFrozen(repeat.rows) &&
+					(repeat.rows as object[]).every((row) => Object.isFrozen(row) && Object.isFrozen(Reflect.get(row, "scope"))),
+			};
+		});
+	} finally {
+		await held.release();
+		await store.close();
+		await deleteDatabase(derived);
+	}
+}
+
+async function reservedPageForeign(): Promise<unknown> {
+	const { derived, store, values } = await seededPageStore(8);
+	const closure = (await rawClosure(derived)) as { rows: Record<string, unknown>[] };
+	const foreign = await requestResult(indexedDB.open(derived));
+	const held = await store.acquireNativeReadReservation({
+		objectId: Reflect.get(values.scope as object, "objectId") as string,
+	});
+	let write: Promise<void> | undefined;
+	try {
+		const ready = await store.readiness({ scope: values.scope });
+		const transaction = foreign.transaction("acceptedEntries", "readwrite", { durability: "strict" });
+		let committed = false,
+			requestSucceeded = false;
+		const terminal = transactionComplete(transaction);
+		const request = transaction
+			.objectStore("acceptedEntries")
+			.put({ ...closure.rows[7], detachedSignature: new Uint8Array(1) });
+		write = Promise.all([
+			requestResult(request).then(() => {
+				requestSucceeded = true;
+			}),
+			terminal.then(() => {
+				committed = true;
+			}),
+		]).then(() => undefined);
+		void write.catch(() => undefined);
+		await new Promise((resolve) => setTimeout(resolve, 30));
+		const before = { committed, requestSucceeded };
+		const during = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: ready.snapshot, limit: 1 })
+		);
+		await held.release();
+		await write;
+		const after = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: ready.snapshot, limit: 1 })
+		);
+		const sticky = await store.readiness({ scope: values.scope });
+		return { before, during, after, sticky, committed, requestSucceeded };
+	} finally {
+		await held.release();
+		await write;
+		foreign.close();
+		await store.close();
+		await deleteDatabase(derived);
+	}
+}
+
+async function reservedPageLifetime(): Promise<unknown> {
+	const { primary, derived, store, values } = await seededPageStore(4);
+	const second = await open(primary);
+	let held: Awaited<ReturnType<JournalStore["acquireNativeReadReservation"]>> | undefined;
+	try {
+		const outside = await store.readiness({ scope: values.scope });
+		held = await store.acquireNativeReadReservation({
+			objectId: Reflect.get(values.scope as object, "objectId") as string,
+		});
+		const newTransaction = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: outside.snapshot, limit: 1 })
+		);
+		const reused = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: outside.snapshot, limit: 1 })
+		);
+		await held.release();
+		held = undefined;
+		expectDataSuccess(await second.appendAccepted(pageVertex(values, 4)));
+		const unreserved = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: outside.snapshot, afterSequence: 2, limit: 2 })
+		);
+		held = await store.acquireNativeReadReservation({
+			objectId: Reflect.get(values.scope as object, "objectId") as string,
+		});
+		const restored = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: outside.snapshot, afterSequence: 2, limit: 2 })
+		);
+		const prefix = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: outside.snapshot, afterSequence: 2, limit: 2 })
+		);
+		const forged = await measuredPageRead(() =>
+			store.readPage({
+				scope: values.scope,
+				snapshot: { ...(outside.snapshot as object), orderedRowDigest: "f".repeat(64) },
+				limit: 1,
+			})
+		);
+		const stale = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: { ...(outside.snapshot as object), highWatermark: 6 }, limit: 1 })
+		);
+		const wrong = await measuredPageRead(() =>
+			store.readPage({
+				scope: { ...(values.scope as object), anchorDigest: "a".repeat(64) },
+				snapshot: outside.snapshot,
+				limit: 1,
+			})
+		);
+		await held.release();
+		held = undefined;
+		expectDataSuccess(await store.appendAccepted(pageVertex(values, 5)));
+		const ownAppend = await measuredPageRead(() =>
+			store.readPage({ scope: values.scope, snapshot: outside.snapshot, afterSequence: 2, limit: 2 })
+		);
+		return { newTransaction, reused, unreserved, restored, prefix, forged, stale, wrong, ownAppend };
+	} finally {
+		await held?.release();
+		await Promise.all([store.close(), second.close()]);
+		await deleteDatabase(derived);
+	}
+}
+
+async function reservedPagePoison(): Promise<unknown> {
+	const results: Record<string, unknown> = {};
+	for (const fate of ["hole", "offpage", "header", "absent", "wrong-anchor", "duplicate"] as const) {
+		const { derived, store, values } = await seededPageStore(4);
+		const held = await store.acquireNativeReadReservation({
+			objectId: Reflect.get(values.scope as object, "objectId") as string,
+		});
+		try {
+			const ready = await store.readiness({ scope: values.scope });
+			await held.release();
+			const closure = (await rawClosure(derived)) as {
+				rows: Record<string, unknown>[];
+				scopes: Record<string, unknown>[];
+			};
+			const scope = values.scope as { objectId: string; anchorDigest: string };
+			const key: IDBValidKey = [scope.objectId, 0, scope.anchorDigest];
+			let scopeRequest: unknown = values.scope;
+			let snapshot: unknown = ready.snapshot;
+			let duplicateRefused: boolean | undefined;
+			if (fate === "hole") await deleteRaw(derived, "acceptedEntries", [...(key as IDBValidKey[]), 3]);
+			if (fate === "offpage")
+				await replaceRaw(derived, "acceptedEntries", { ...closure.rows[3], detachedSignature: new Uint8Array(1) });
+			if (fate === "header" || fate === "wrong-anchor")
+				await replaceRaw(derived, "scopes", { ...closure.scopes[0], detachedAnchorSignature: new Uint8Array(1) });
+			if (fate === "absent") await deleteRaw(derived, "scopes", key);
+			if (fate === "wrong-anchor") {
+				scopeRequest = { ...scope, epoch: 0, anchorDigest: "a".repeat(64) };
+				snapshot = { ...(ready.snapshot as object), scope: scopeRequest };
+			}
+			if (fate === "duplicate") {
+				const firstRow = closure.rows[0];
+				if (firstRow === undefined) throw new TypeError("expected original seeded native row");
+				try {
+					await replaceRaw(derived, "acceptedEntries", {
+						...closure.rows[3],
+						vertexDigest: firstRow.vertexDigest,
+					});
+					duplicateRefused = false;
+				} catch {
+					duplicateRefused = true;
+				}
+			}
+			const page = await measuredPageRead(() => store.readPage({ scope: scopeRequest, snapshot, limit: 1 }));
+			const next = await store.readiness({ scope: values.scope });
+			results[fate] = { page, next, duplicateRefused };
+		} finally {
+			await held.release();
+			await store.close();
+			await deleteDatabase(derived);
+		}
+	}
+	return results;
+}
+
 window.phase3a1bP4Run = (caseId): Promise<unknown> => {
+	if (caseId === "reserved-retirement-current-probe") return reservedRetirementCurrentProbe();
+	if (caseId === "reserved-retirement-reuse") return reservedRetirementReuse();
+	if (caseId === "reserved-retirement-abort") return reservedRetirementAbort();
+	if (caseId === "reserved-retirement-admission") return reservedRetirementAdmission();
+	if (caseId === "closed-membership-after-drain") return closedMembershipAfterDrain();
+	if (caseId === "reserved-readiness-reuse") return reservedReadinessReuse();
+	if (caseId === "reserved-readiness-scopes") return reservedReadinessScopes();
+	if (caseId === "incremental-replay-validation") return incrementalReplayValidation();
+	if (caseId === "reserved-page-bound") return reservedPageBound();
+	if (caseId === "reserved-page-foreign") return reservedPageForeign();
+	if (caseId === "reserved-page-lifetime") return reservedPageLifetime();
+	if (caseId === "reserved-page-poison") return reservedPagePoison();
 	if (caseId === "decision-mutants") return decisionMutants();
 	if (caseId === "surface-schema") return surfaceSchema();
 	if (caseId === "lifecycle") return lifecycle();

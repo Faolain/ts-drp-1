@@ -54,8 +54,8 @@ it("preserves the primary snapshot source failure and partial artifact while clo
 		expect(existsSync(join(directory, "transition-10.heapsnapshot")), "FAILED_PARTIAL_SNAPSHOT_PRESERVED").toBe(true);
 		expect(() => profiler.finish()).toThrow(/incomplete/iu);
 	} finally {
-		expect(() => profiler.close(), "FAILED_SNAPSHOT_CLOSE_MUST_NOT_REPLACE_PRIMARY_ERROR").not.toThrow();
+		await expect(profiler.close(), "FAILED_SNAPSHOT_CLOSE_MUST_NOT_REPLACE_PRIMARY_ERROR").resolves.toBeUndefined();
 	}
-	expect(() => profiler.close()).not.toThrow();
+	await expect(profiler.close()).resolves.toBeUndefined();
 	expect(readdirSync(directory)).toContain("transition-10.heapsnapshot");
 }, 10_000);

@@ -182,9 +182,13 @@ describe("D.93.35 p5 Keychain configured local-author RED", () => {
 		expect(propertyReads).toBe(0);
 	});
 
-	test("[RED] exposes exactly the two new class members and no secret, generic-signer, serialization, stop or zeroization hook", () => {
+	// R9/6d adds genuine local creator acquisition and joined local shutdown.
+	// The historical p5 no-stop surface pin is superseded only for these two
+	// capabilities; no seed, callback-based finality factory or serialization leaks.
+	test("[R9/6d surface] exposes genuine creator acquisition and joined shutdown without a secret or generic-signer hook", () => {
 		expect(Object.keys(keychainModule).sort()).toEqual(["Keychain"]);
 		expect(Reflect.ownKeys(Keychain.prototype).map(String).sort()).toEqual([
+			"acquireLocalAuthorFinalitySigner",
 			"blsPublicKey",
 			"constructor",
 			"localAuthorId",
@@ -194,6 +198,7 @@ describe("D.93.35 p5 Keychain configured local-author RED", () => {
 			"signWithLocalAuthor",
 			"signWithSecp256k1",
 			"start",
+			"stop",
 		]);
 		expect(Reflect.ownKeys(Keychain).map(String).sort()).toEqual(["length", "name", "prototype"]);
 	});

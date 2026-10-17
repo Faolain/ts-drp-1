@@ -1,3 +1,4 @@
+import { encodeCanonical } from "@ts-drp/canonical";
 import {
 	applySettlementPlanEffect,
 	assertDurableIssueScope,
@@ -27,6 +28,7 @@ import {
 	type DurableOutboxPageInput,
 	type DurableOutboxPublicationTransitionInput,
 	durablePreimageMatchesScopeAndSequence,
+	type DurableUnsignedVertexSignAdmission,
 	isClosedDurableIssuanceRecord,
 	isValidDurableAuthorSequence,
 	isValidDurableScopeField,
@@ -37,24 +39,66 @@ import {
 	settlementReplacementLastLogicalTime,
 } from "@ts-drp/issuance-store";
 import {
+	advanceIssuanceRetirementControl,
+	assertIssuanceInheritedTargetPruningAllowed,
+	assertIssuanceRetirementPlanAllowed,
+	assertIssuanceRetirementPreparationRows,
+	assertIssuanceRetirementPruningAllowed,
 	bindDurableIssuancePruningMaintenance,
 	captureDurableIssuancePruningInput,
+	captureDurableIssuanceRecoveryCensusInput,
+	captureIssuanceNativeSignContext,
+	captureIssuanceNativeSignInput,
+	captureIssuancePendingUnsignedIntent,
+	captureIssuanceRetirementObject,
 	createDurableIssuancePruningReceipt,
 	createDurableIssuancePruningState,
 	createDurableIssuanceRecordPrunedError,
+	createIssuanceRetirementControlRead,
 	decodeDurableIssuancePreimage,
+	decodeIssuanceRetirementControl,
 	durableIssuanceAddressIsPruned,
 	durableIssuanceLineageConsumed,
 	durableIssuanceLineagesEqual,
+	type DurableIssuancePendingUnsignedIntent,
 	type DurableIssuancePruningReceipt,
 	type DurableIssuancePruningState,
 	DurableIssuanceRecordPrunedError,
+	type DurableIssuanceRecoveryCensus,
+	type DurableIssuanceRecoveryCensusInput,
+	type DurableIssuanceRecoveryCensusReader,
+	type DurableIssuanceRecoveryCensusCurrentProbe,
+	type DurableIssuanceRetirementControl,
+	type DurableIssuanceRetirementControlRead,
+	type DurableIssuanceRetirementPreparation,
+	encodeIssuanceRetirementControl,
+	ISSUANCE_RETIREMENT_LIMITS,
+	issuanceRetirementAllows,
+	issuanceRetirementBytesEqual,
+	issuanceRetirementHex,
+	issuanceRetirementImage,
+	issuanceRetirementRefusal,
+	type IssuanceRetirementRows,
+	issuanceUnsignedPostimageCharge,
+	joinIssuanceNativeSign,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
 
+import {
+	captureNativeReadReservationInput,
+	isNativeReadReservationTransaction,
+	nativeReadonlyTransaction,
+	nativeReadReservationTransaction,
+	nativeReadReservationCheck,
+	NativeReadReservationOwner,
+	type NativeReadReservationPort,
+	needsNativeReadReservationTurn,
+	runNativeReservedRead,
+} from "./native-read-reservation.js";
+
 const DATABASE_SUFFIX = "--drp-issuance-v1";
-const DATABASE_VERSION = 2;
-const STORE_NAMES = ["lineages", "issuedRecords", "issuanceOutbox", "settlementPlans"] as const;
+const DATABASE_VERSION = 3;
+const STORE_NAMES = ["lineages", "issuedRecords", "issuanceOutbox", "settlementPlans", "retirementControls"] as const;
 const LINEAGE_KEY_PATH = ["objectId", "author"] as const;
 const RECORD_KEY_PATH = ["objectId", "author", "authorSequence"] as const;
 
@@ -69,6 +113,90 @@ interface NativeOutboxRecord extends DurableIssueScope {
 	readonly authorSequence: number;
 	readonly digest: Uint8Array;
 	readonly publishState: "pending" | "published";
+}
+
+type ParsedOutboxPage = Readonly<{
+	afterKey: readonly [string, string, number] | null;
+	limit: number;
+	scope?: DurableIssueScope;
+}>;
+
+type NativeIssueCurrency = {
+	readonly imageDigest: string;
+	readonly controlBytes: Uint8Array;
+};
+type NativeIssueReservation = {
+	readonly pending: DurableIssuancePendingUnsignedIntent;
+	readonly currency?: NativeIssueCurrency;
+};
+type NativeIssueJob = {
+	readonly transaction: IDBTransaction;
+	readonly terminal: Promise<void>;
+	readonly readback: Promise<readonly unknown[]>;
+	readonly pending: DurableIssuancePendingUnsignedIntent;
+	readonly currency?: NativeIssueCurrency;
+	readonly turn: ReturnType<typeof issuanceWriteTurn>;
+};
+
+// The original strict writer stays alive through the admitted callback and its
+// builder. Requests resume only in its own native event turn, never an RO upgrade.
+function issuanceWriteTurn(transaction: IDBTransaction): {
+	run<T>(operation: () => Promise<T>): Promise<T>;
+	stop(): void;
+} {
+	let running = true;
+	const queued: Array<{ start(): void; reject(cause: unknown): void }> = [];
+	const reject = (cause: unknown): void => {
+		running = false;
+		for (const job of queued.splice(0)) job.reject(cause);
+	};
+	transaction.addEventListener(
+		"abort",
+		() => reject(transaction.error ?? new DOMException("issuance job aborted", "AbortError")),
+		{ once: true }
+	);
+	transaction.addEventListener("complete", () => reject(new Error("issuance job joined")), { once: true });
+	const pump = (): void => {
+		if (!running) return;
+		try {
+			const request = transaction.objectStore("lineages").getKey("");
+			request.addEventListener(
+				"success",
+				() => {
+					pump();
+					for (const job of queued.splice(0)) job.start();
+				},
+				{ once: true }
+			);
+			request.addEventListener("error", () => reject(request.error), { once: true });
+		} catch (cause) {
+			reject(cause);
+		}
+	};
+	pump();
+	return {
+		run<T>(operation: () => Promise<T>): Promise<T> {
+			return new Promise<T>((resolve, rejectJob) => {
+				if (!running) {
+					rejectJob(new Error("issuance job is no longer admitted"));
+					return;
+				}
+				queued.push({
+					reject: rejectJob,
+					start: () => {
+						try {
+							void operation().then(resolve, rejectJob);
+						} catch (cause) {
+							rejectJob(cause);
+						}
+					},
+				});
+			});
+		},
+		stop(): void {
+			running = false;
+		},
+	};
 }
 
 interface NativeSettlementPlan extends DurableIssueScope {
@@ -170,6 +298,8 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 function transactionResult(transaction: IDBTransaction): Promise<void> {
+	const held = nativeReadReservationCheck(transaction);
+	if (held !== undefined) return held;
 	return new Promise((resolve, reject) => {
 		transaction.addEventListener("complete", () => resolve(), { once: true });
 		transaction.addEventListener(
@@ -210,17 +340,25 @@ function strictTransaction(database: IDBDatabase, mode: IDBTransactionMode): IDB
 function copyNativeLineage(
 	value: unknown,
 	scope: DurableIssueScope
-): (DurableLineage & { readonly prunedThroughAuthorSequence: number | null }) | undefined {
-	const legacy = isClosedDurableIssuanceRecord(value, ["author", "exhausted", "next", "objectId"]);
-	const current = isClosedDurableIssuanceRecord(value, [
+):
+	| (DurableLineage & {
+			readonly prunedThroughAuthorSequence: number | null;
+			readonly pendingUnsigned?: DurableIssuancePendingUnsignedIntent;
+	  })
+	| undefined {
+	const record = typeof value === "object" && value !== null ? value : undefined;
+	const current = record !== undefined && Object.hasOwn(record, "prunedThroughAuthorSequence");
+	const pending = record !== undefined && Object.hasOwn(record, "pendingUnsigned");
+	const exact = isClosedDurableIssuanceRecord(value, [
 		"author",
 		"exhausted",
 		"next",
 		"objectId",
-		"prunedThroughAuthorSequence",
+		...(current ? ["prunedThroughAuthorSequence"] : []),
+		...(pending ? ["pendingUnsigned"] : []),
 	]);
 	if (
-		(!legacy && !current) ||
+		!exact ||
 		value.author !== scope.author ||
 		value.objectId !== scope.objectId ||
 		typeof value.exhausted !== "boolean" ||
@@ -237,7 +375,21 @@ function copyNativeLineage(
 	) {
 		return undefined;
 	}
-	return { exhausted: value.exhausted, next: value.next, prunedThroughAuthorSequence: watermark };
+	let pendingUnsigned: DurableIssuancePendingUnsignedIntent | undefined;
+	if (pending) {
+		try {
+			pendingUnsigned = captureIssuancePendingUnsignedIntent(value.pendingUnsigned, scope);
+		} catch {
+			return undefined;
+		}
+		if (value.exhausted || pendingUnsigned.authorSequence !== value.next) return undefined;
+	}
+	return {
+		exhausted: value.exhausted,
+		next: value.next,
+		prunedThroughAuthorSequence: watermark,
+		...(pendingUnsigned === undefined ? {} : { pendingUnsigned }),
+	};
 }
 
 function copyNativeIssued(value: unknown): NativeIssuedRecord | undefined {
@@ -323,10 +475,11 @@ function nativeSettlementPlan(plan: SettlementPlan): NativeSettlementPlan {
 function commitFromIssued(row: NativeIssuedRecord): DurableIssueCommit {
 	const scope = { author: row.author, objectId: row.objectId };
 	const envelope = {
-		canonicalPreimageBytes: new Uint8Array(row.canonicalPreimageBytes),
-		digest: new Uint8Array(row.digest),
-		signature: new Uint8Array(row.signature),
+		canonicalPreimageBytes: row.canonicalPreimageBytes,
+		digest: row.digest,
+		signature: row.signature,
 	};
+	// The shared clone detaches all three envelope graphs in one synchronous call.
 	return cloneDurableIssueCommit({
 		authorSequence: row.authorSequence,
 		envelope,
@@ -354,9 +507,144 @@ function nativeOutbox(candidate: DurableIssueCommit): NativeOutboxRecord {
 	};
 }
 
+async function browserRetirementControl(
+	transaction: IDBTransaction,
+	objectId: string
+): Promise<DurableIssuanceRetirementControl | null> {
+	const raw: unknown = await requestResult(transaction.objectStore("retirementControls").get(objectId));
+	if (raw === undefined) return null;
+	if (!isClosedDurableIssuanceRecord(raw, ["objectId", "record"]) || raw.objectId !== objectId)
+		throw issuanceRetirementRefusal("issuance retirement control unclassified");
+	return decodeIssuanceRetirementControl(raw.record);
+}
+async function browserRetirementRows(
+	transaction: IDBTransaction,
+	objectId: string,
+	limits: Readonly<{ maxRows: number; maxBytes: number }> = ISSUANCE_RETIREMENT_LIMITS,
+	seed?: { keysMatch: boolean; encodedRowBytes: number }
+): Promise<IssuanceRetirementRows> {
+	const names = ["lineages", "issuedRecords", "issuanceOutbox", "settlementPlans"] as const;
+	const range = IDBKeyRange.bound([objectId], [objectId, []]);
+	let count = 0;
+	for (const name of names) count += await requestResult(transaction.objectStore(name).count(range));
+	if (count > limits.maxRows) throw issuanceRetirementRefusal("issuance retirement native census exceeds bound");
+	let bytes = 0;
+	const collect = <T>(name: (typeof names)[number], parse: (raw: unknown) => T | undefined): Promise<T[]> =>
+		new Promise((resolve, reject) => {
+			const output: T[] = [];
+			const request = transaction.objectStore(name).openCursor(range);
+			request.addEventListener("error", () => reject(request.error));
+			request.addEventListener("success", () => {
+				try {
+					const cursor = request.result;
+					if (!cursor) {
+						resolve(output);
+						return;
+					}
+					const row = parse(cursor.value);
+					if (!row) throw issuanceRetirementRefusal("issuance retirement native row unclassified");
+					if (seed !== undefined) {
+						const address = name === "settlementPlans" ? Reflect.get(row as object, "scope") : row;
+						const expected = typeof address === "object" && address !== null ?
+							[Reflect.get(address, "objectId"), Reflect.get(address, "author"),
+								...(name === "issuedRecords" || name === "issuanceOutbox" ? [Reflect.get(address, "authorSequence")] : [])] : [];
+						const key = cursor.primaryKey;
+						if (!Array.isArray(key) || key.length !== expected.length || !key.every((part, index) => part === expected[index]))
+							seed.keysMatch = false;
+					}
+					bytes += encodeCanonical(row, {
+						maxBytes: limits.maxBytes,
+						maxDepth: 16,
+						maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32,
+					}).length;
+					if (bytes > limits.maxBytes)
+						throw issuanceRetirementRefusal("issuance retirement native image exceeds bound");
+					if (seed !== undefined) seed.encodedRowBytes = bytes;
+					output.push(row);
+					cursor.continue();
+				} catch (error) {
+					reject(error);
+				}
+			});
+		});
+	return {
+		lineages: await collect("lineages", (raw) => {
+			if (typeof raw !== "object" || raw === null) return undefined;
+			const scope = { objectId, author: Reflect.get(raw, "author") as string };
+			if (!isValidDurableScopeField(scope.author)) return undefined;
+			const l = copyNativeLineage(raw, scope);
+			return l && { ...scope, ...l };
+		}),
+		issued: await collect("issuedRecords", copyNativeIssued),
+		outbox: await collect("issuanceOutbox", copyNativeOutbox),
+		plans: await collect("settlementPlans", (raw) => {
+			if (typeof raw !== "object" || raw === null) return undefined;
+			return copyNativeSettlementPlan(raw, { objectId, author: Reflect.get(raw, "author") as string });
+		}),
+	};
+}
+
+/** Private data for ONE object in ONE genuine readonly transaction. No
+ * authentication, control, classification or protocol currency is retained. */
+interface HeldIssuanceRecoveryImage {
+	readonly transaction: IDBTransaction;
+	readonly objectId: string;
+	readonly rows: IssuanceRetirementRows;
+	readonly image: DurableIssuanceRecoveryCensus["image"];
+	readonly encodedRowBytes: number;
+	readonly limits: Readonly<{maxRows: number; maxBytes: number}>;
+	readonly lineages: ReadonlyMap<string, IssuanceRetirementRows["lineages"][number]>;
+	readonly issued: ReadonlyMap<string, ReadonlyMap<number, NativeIssuedRecord>>;
+	readonly outbox: ReadonlyMap<string, ReadonlyMap<number, NativeOutboxRecord>>;
+	readonly plans: ReadonlyMap<string, SettlementPlan>;
+	readonly globalOutboxComplete: boolean;
+	// Consumed by the original reader only; cleared with this exact held basis.
+	readonly enrollment: {value?: Readonly<{observation: WeakRef<DurableIssuanceRecoveryCensus>;
+		input: DurableIssuanceRecoveryCensusInput; exactValueBytes: Uint8Array}>};
+}
+
+function copyRecoveryCensusRows(rows: IssuanceRetirementRows): IssuanceRetirementRows {
+	return {
+		lineages: rows.lineages.map(row => ({...row, ...(row.pendingUnsigned === undefined ? {} : {
+			pendingUnsigned: captureIssuancePendingUnsignedIntent(row.pendingUnsigned, copyDurableIssueScope(row)) })})),
+		issued: rows.issued.map(row => ({...row, canonicalPreimageBytes: new Uint8Array(row.canonicalPreimageBytes),
+			digest: new Uint8Array(row.digest), signature: new Uint8Array(row.signature)})),
+		outbox: rows.outbox.map(row => ({...row, digest: new Uint8Array(row.digest)})),
+		plans: rows.plans.map(cloneSettlementPlan),
+	};
+}
+async function browserRetirementRow(
+	transaction: IDBTransaction,
+	scope: DurableIssueScope,
+	seq: number,
+	preimage: Uint8Array,
+	digest: Uint8Array
+): Promise<void> {
+	if (
+		!issuanceRetirementAllows(await browserRetirementControl(transaction, scope.objectId), scope, seq, preimage, digest)
+	)
+		throw issuanceRetirementRefusal("issued epoch is retired");
+}
+async function browserBumpRetirement(transaction: IDBTransaction, objectId: string): Promise<void> {
+	const control = await browserRetirementControl(transaction, objectId);
+	if (control)
+		await requestResult(
+			transaction
+				.objectStore("retirementControls")
+				.put({ objectId, record: encodeIssuanceRetirementControl(advanceIssuanceRetirementControl(control)) })
+		);
+}
+
 class BrowserIssuanceImplementation {
 	readonly #database: IDBDatabase;
+	readonly #readReservations: NativeReadReservationOwner;
+	// A basis is valid only inside this exact, still-held native readonly image.
+	// Retain no issued/outbox history and never reuse across native transactions.
+	readonly #validatedOutboxReadImages = new WeakSet<IDBTransaction>();
+	#heldRecoveryImage?: HeldIssuanceRecoveryImage;
 	readonly #transactions = new Set<IDBTransaction>();
+	readonly #retirementOperations = new Set<Promise<unknown>>();
+	readonly #signReleases = new Set<() => Promise<void>>();
 	#closed = false;
 	#closePromise?: Promise<void>;
 	#resolveClose?: () => void;
@@ -364,22 +652,402 @@ class BrowserIssuanceImplementation {
 
 	constructor(database: IDBDatabase) {
 		this.#database = database;
+		this.#readReservations = new NativeReadReservationOwner(database);
+	}
+
+	async acquireNativeReadReservation(input: {
+		readonly objectId: string;
+	}): ReturnType<NativeReadReservationOwner["acquire"]> {
+		this.#assertAvailable();
+		const objectId = captureNativeReadReservationInput(input);
+		if (!isValidDurableScopeField(objectId)) throw invalid("reservation objectId is malformed");
+		const held = await this.#readReservations.acquire({ objectId });
+		let transaction: IDBTransaction | undefined;
+		try { transaction = this.#readReservations.view(); }
+		catch (primary) {
+			try { await held.release(); }
+			catch (cleanup) { throw new AggregateError([primary, cleanup], "native issuance read acquisition cleanup failed", {cause: primary}); }
+			throw primary;
+		}
+		let releaseTask: Promise<void> | undefined;
+		return Object.freeze({check: () => held.check(), release: () => releaseTask ??= (async () => {
+			try { await held.release(); }
+			finally { if (this.#heldRecoveryImage?.transaction === transaction) this.#heldRecoveryImage = undefined; }
+		})()});
+	}
+
+	readBoundedRecoveryCensus(input: unknown): Promise<DurableIssuanceRecoveryCensus> {
+		this.#assertAvailable();
+		const captured = captureDurableIssuanceRecoveryCensusInput(input);
+		return this.#trackRetirement(
+			this.#runReservedRead(async () => {
+				this.#assertAvailable();
+				const transaction = this.#startTransaction("readonly"),
+					terminal = transactionResult(transaction);
+				try {
+					const prior = this.#recoveryImage(transaction, captured.objectId);
+					// A smaller entitlement retains the original native read/codec
+					// refusal order, rather than projecting a new refusal from a cache.
+					const existing = prior !== undefined && captured.limits.maxRows >= prior.limits.maxRows &&
+						captured.limits.maxBytes >= prior.limits.maxBytes ? prior : undefined;
+					const seed = {keysMatch: true, encodedRowBytes: 0};
+					if (existing !== undefined) {
+						if (existing.image.lineageCount + existing.image.issuedCount + existing.image.outboxCount + existing.image.planCount > captured.limits.maxRows)
+							throw issuanceRetirementRefusal("issuance retirement native census exceeds bound");
+						if (existing.encodedRowBytes > captured.limits.maxBytes)
+							throw issuanceRetirementRefusal("issuance retirement native image exceeds bound");
+					}
+					const rows = existing?.rows ?? await browserRetirementRows(transaction, captured.objectId, captured.limits, seed);
+					const image = existing?.image ?? issuanceRetirementImage(rows, captured.objectId);
+					const control = await browserRetirementControl(transaction, captured.objectId);
+					if (image.logicalBytes > captured.limits.maxBytes)
+						throw issuanceRetirementRefusal("issuance recovery census exceeds byte entitlement");
+					await terminal;
+					this.#assertAvailable();
+					if (existing === undefined && isNativeReadReservationTransaction(transaction) &&
+						this.#heldRecoveryImage === undefined && seed.keysMatch)
+						await this.#captureRecoveryImage(transaction, captured.objectId, rows, image, seed.encodedRowBytes, captured.limits);
+					// Ordinary transactions have already emitted completion at terminal;
+					// only a held view has an additional, fresh native currency check.
+					if (isNativeReadReservationTransaction(transaction)) await transactionResult(transaction);
+					this.#assertAvailable();
+					const observation = { rows: this.#heldRecoveryImage?.rows === rows ? copyRecoveryCensusRows(rows) : rows, image, control };
+					const basis = this.#heldRecoveryImage;
+					if (basis?.transaction === transaction && basis.objectId === captured.objectId) {
+						try { basis.enrollment.value = Object.freeze({observation: new WeakRef(observation), input: captured,
+							exactValueBytes: encodeCanonical(observation)}); }
+						catch { basis.enrollment.value = undefined; } // Optional reuse never narrows the original full read.
+					}
+					return observation;
+				} catch (error) {
+					// A borrowed transaction belongs to the original reservation owner.
+					if (!isNativeReadReservationTransaction(transaction)) {
+						try {
+							transaction.abort();
+						} catch {
+							/* Original terminal may have joined. */
+						}
+					}
+					await terminal.catch(() => undefined);
+					throw error;
+				}
+			})
+		);
+	}
+
+	captureRecoveryCensusCurrentProbe(input: DurableIssuanceRecoveryCensusInput,
+		observation: DurableIssuanceRecoveryCensus): DurableIssuanceRecoveryCensusCurrentProbe | undefined {
+		this.#assertAvailable();
+		const basis = this.#heldRecoveryImage, enrollment = basis?.enrollment.value;
+		if (basis === undefined || enrollment === undefined || enrollment.observation.deref() !== observation) return undefined;
+		try {
+			const captured = captureDurableIssuanceRecoveryCensusInput(input);
+			if (!isClosedDurableIssuanceRecord(observation, ["rows", "image", "control"]) ||
+				captured.objectId !== enrollment.input.objectId || captured.limits.maxRows !== enrollment.input.limits.maxRows ||
+				captured.limits.maxBytes !== enrollment.input.limits.maxBytes ||
+				nativeReadReservationTransaction(this.#database) !== basis.transaction ||
+				!issuanceRetirementBytesEqual(encodeCanonical(observation), enrollment.exactValueBytes)) return undefined;
+		} catch { return undefined; } // Copied, mutated or wrong-entitlement data cannot enroll.
+		basis.enrollment.value = undefined;
+		const reference = new WeakRef(basis), transactionReference = new WeakRef(basis.transaction), objectId = basis.objectId;
+		const implementation = this;
+		const probe: DurableIssuanceRecoveryCensusCurrentProbe = Object.freeze({
+			checkCurrent: function (this: DurableIssuanceRecoveryCensusCurrentProbe): Promise<boolean> {
+				if (this !== probe) return Promise.reject(invalid("native census probe is foreign"));
+				return implementation.#trackRetirement(implementation.#checkRecoveryCensusCurrent(reference, transactionReference, objectId));
+			},
+		});
+		return probe;
+	}
+
+	async #checkRecoveryCensusCurrent(reference: WeakRef<HeldIssuanceRecoveryImage>, transactionReference: WeakRef<IDBTransaction>,
+		objectId: string): Promise<boolean> {
+		this.#assertAvailable();
+		const transaction = transactionReference.deref();
+		if (transaction === undefined || nativeReadReservationTransaction(this.#database) !== transaction) return false;
+		// A genuine fresh request/terminal check in the SAME native all-store view.
+		// No census rows, control carriers or image checksum are copied/redecoded.
+		await this.#runReservedRead(async () => {
+			if (nativeReadReservationTransaction(this.#database) !== transaction) return;
+			await transactionResult(transaction);
+		});
+		this.#assertAvailable();
+		if (nativeReadReservationTransaction(this.#database) !== transaction) return false;
+		const basis = reference.deref();
+		return basis !== undefined && this.#heldRecoveryImage === basis && basis.transaction === transaction && basis.objectId === objectId;
+	}
+
+	#recoveryImage(transaction: IDBTransaction, objectId: string): HeldIssuanceRecoveryImage | undefined {
+		this.#assertAvailable();
+		const image = this.#heldRecoveryImage;
+		return isNativeReadReservationTransaction(transaction) && image?.transaction === transaction && image.objectId === objectId ? image : undefined;
+	}
+
+	async #captureRecoveryImage(transaction: IDBTransaction, objectId: string, rows: IssuanceRetirementRows,
+		image: DurableIssuanceRecoveryCensus["image"], encodedRowBytes: number,
+		limits: Readonly<{maxRows: number; maxBytes: number}>): Promise<void> {
+		// The original image has already validated native schema, preimage,
+		// lineage/watermark, plan and every issued-to-outbox pair. Validate the
+		// reverse direction and exact addresses before these data replace reads.
+		const lineages = new Map(rows.lineages.map(row => [row.author, row]));
+		const plans = new Map(rows.plans.map(row => [row.scope.author, row]));
+		const indexRows = <T extends {readonly author: string; readonly authorSequence: number}>(values: readonly T[]) => {
+			const index = new Map<string, Map<number, T>>();
+			for (const row of values) {
+				let author = index.get(row.author);
+				if (author === undefined) index.set(row.author, author = new Map());
+				if (author.has(row.authorSequence)) return undefined;
+				author.set(row.authorSequence, row);
+			}
+			return index;
+		};
+		const issued = indexRows(rows.issued), outbox = indexRows(rows.outbox);
+		if (issued === undefined || outbox === undefined || lineages.size !== rows.lineages.length || plans.size !== rows.plans.length ||
+			rows.outbox.some(row => !issued.get(row.author)?.has(row.authorSequence))) return;
+		const counted = await Promise.allSettled(["lineages", "issuedRecords", "issuanceOutbox"].map(name =>
+			requestResult(transaction.objectStore(name).count())));
+		const counts: number[] = [];
+		for (const result of counted) {
+			if (result.status === "rejected") throw result.reason;
+			counts.push(result.value);
+		}
+		await transactionResult(transaction);
+		this.#assertAvailable();
+		if (this.#heldRecoveryImage !== undefined) return;
+		this.#heldRecoveryImage = Object.freeze({transaction, objectId, rows, image, encodedRowBytes, limits, lineages, enrollment: {},
+			issued, outbox, plans, globalOutboxComplete: counts[0] === rows.lineages.length &&
+				counts[1] === rows.issued.length && counts[2] === rows.outbox.length});
+	}
+
+	#trackRetirement<T>(operation: Promise<T>): Promise<T> {
+		this.#retirementOperations.add(operation);
+		void operation.then(
+			() => this.#retirementOperations.delete(operation),
+			() => this.#retirementOperations.delete(operation)
+		);
+		return operation;
+	}
+	withNativeSignAdmission(input: unknown, sign: () => Promise<Uint8Array>): Promise<Uint8Array> {
+		return this.#trackRetirement(this.#withNativeSignAdmission(input, sign));
+	}
+	async #withNativeSignAdmission(input: unknown, sign: () => Promise<Uint8Array>): Promise<Uint8Array> {
+		this.#assertAvailable();
+		const captured = captureIssuanceNativeSignInput(input);
+		if (typeof sign !== "function") throw invalid("native sign continuation must be a function");
+		if (this.#readReservations.view()) throw issuanceRetirementRefusal("issuance native read view already held");
+		const held = await this.acquireNativeReadReservation({ objectId: captured.scope.objectId });
+		const release = (): Promise<void> => held.release();
+		this.#signReleases.add(release);
+		try {
+			return await joinIssuanceNativeSign(
+				async () => {
+					this.#assertAvailable();
+					await held.check();
+					await this.#runReservedRead(async () => {
+						const transaction = this.#startTransaction("readonly");
+						const raw = await requestResult(
+							transaction.objectStore("lineages").get([captured.scope.objectId, captured.scope.author])
+						);
+						const lineage =
+							raw === undefined
+								? { next: 0, exhausted: false, prunedThroughAuthorSequence: null }
+								: copyNativeLineage(raw, captured.scope);
+						if (!lineage || lineage.exhausted || lineage.next !== captured.sequence)
+							throw issuanceRetirementRefusal("native sign lineage changed");
+						await browserRetirementRow(transaction, captured.scope, captured.sequence, captured.bytes, captured.digest);
+					});
+				},
+				release,
+				sign
+			);
+		} finally {
+			this.#signReleases.delete(release);
+		}
+	}
+	acquireRetirementControl(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead> {
+		return this.#trackRetirement(this.#acquireRetirementControl(input));
+	}
+	async #acquireRetirementControl(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead> {
+		this.#assertAvailable();
+		const objectId = captureIssuanceRetirementObject(input);
+		if (this.#readReservations.view())
+			throw issuanceRetirementRefusal("join issuance native readonly reservation before retirement");
+		let snapshot = await this.#retirementSnapshot(objectId);
+		this.#assertAvailable();
+		if (snapshot.control === null) {
+			const born: DurableIssuanceRetirementControl = {
+				kind: "v3-issuance-retirement-control-1",
+				objectId,
+				incarnation: issuanceRetirementHex(globalThis.crypto.getRandomValues(new Uint8Array(32))),
+				revision: 0,
+				sequence: 0,
+				active: null,
+				completed: null,
+			};
+			const transaction = this.#startTransaction("readwrite"),
+				terminal = transactionResult(transaction);
+			let primary: unknown;
+			try {
+				const rows = await browserRetirementRows(transaction, objectId);
+				if (
+					(await browserRetirementControl(transaction, objectId)) !== null ||
+					issuanceRetirementImage(rows, objectId).imageDigest !== snapshot.image.imageDigest
+				)
+					throw issuanceRetirementRefusal("issuance retirement birth stale");
+				await requestResult(
+					transaction.objectStore("retirementControls").add({ objectId, record: encodeIssuanceRetirementControl(born) })
+				);
+				await terminal;
+			} catch (error) {
+				primary = error;
+				try {
+					transaction.abort();
+				} catch {
+					/* Original terminal may have joined. */
+				}
+				await terminal.catch(() => undefined);
+			}
+			const observed = await this.#retirementSnapshot(objectId);
+			if (
+				!observed.control ||
+				!issuanceRetirementBytesEqual(
+					encodeIssuanceRetirementControl(observed.control),
+					encodeIssuanceRetirementControl(born)
+				) ||
+				observed.image.imageDigest !== snapshot.image.imageDigest
+			)
+				throw primary ?? issuanceRetirementRefusal("issuance retirement birth changed");
+			snapshot = observed;
+		}
+		const control = snapshot.control as DurableIssuanceRetirementControl,
+			image = snapshot.image;
+		return createIssuanceRetirementControlRead(control, image, (next, p) =>
+			this.#trackRetirement(this.#compareRetirement(control, image.imageDigest, next, p))
+		);
+	}
+	async #compareRetirement(
+		control: DurableIssuanceRetirementControl,
+		imageDigest: string,
+		next: DurableIssuanceRetirementControl,
+		p?: DurableIssuanceRetirementPreparation
+	): Promise<DurableIssuanceRetirementControl> {
+		this.#assertAvailable();
+		if (this.#readReservations.view())
+			throw issuanceRetirementRefusal("join issuance native readonly reservation before retirement");
+		const objectId = control.objectId,
+			transaction = this.#startTransaction("readwrite"),
+			terminal = transactionResult(transaction);
+		let primary: unknown;
+		try {
+			const current = await browserRetirementControl(transaction, objectId),
+				rows = await browserRetirementRows(transaction, objectId);
+			if (
+				!current ||
+				!issuanceRetirementBytesEqual(
+					encodeIssuanceRetirementControl(current),
+					encodeIssuanceRetirementControl(control)
+				) ||
+				issuanceRetirementImage(rows, objectId).imageDigest !== imageDigest
+			)
+				throw issuanceRetirementRefusal("issuance retirement source stale");
+			if (p) assertIssuanceRetirementPreparationRows(current, p, rows);
+			await requestResult(
+				transaction.objectStore("retirementControls").put({ objectId, record: encodeIssuanceRetirementControl(next) })
+			);
+			await terminal;
+		} catch (error) {
+			primary = error;
+			try {
+				transaction.abort();
+			} catch {
+				/* Readback owns terminal ambiguity. */
+			}
+			await terminal.catch(() => undefined);
+		}
+		let observed;
+		try {
+			observed = await this.#retirementSnapshot(objectId);
+		} catch {
+			throw new DurableIssuanceContractError("ISSUANCE_OUTCOME_UNKNOWN", "issuance retirement outcome unknown");
+		}
+		if (
+			observed.control &&
+			issuanceRetirementBytesEqual(
+				encodeIssuanceRetirementControl(observed.control),
+				encodeIssuanceRetirementControl(next)
+			) &&
+			observed.image.imageDigest === imageDigest
+		)
+			return observed.control;
+		if (
+			observed.control &&
+			issuanceRetirementBytesEqual(
+				encodeIssuanceRetirementControl(observed.control),
+				encodeIssuanceRetirementControl(control)
+			) &&
+			observed.image.imageDigest === imageDigest
+		)
+			throw primary ?? issuanceRetirementRefusal("issuance retirement unchanged");
+		throw primary instanceof DurableIssuanceContractError || primary instanceof DurableIssuanceInvalidArgumentError
+			? primary
+			: new DurableIssuanceContractError("ISSUANCE_OUTCOME_UNKNOWN", "issuance retirement readback ambiguous");
+	}
+	async #retirementSnapshot(objectId: string): Promise<{
+		rows: IssuanceRetirementRows;
+		image: ReturnType<typeof issuanceRetirementImage>;
+		control: DurableIssuanceRetirementControl | null;
+	}> {
+		const transaction = this.#startTransaction("readonly"),
+			terminal = transactionResult(transaction);
+		try {
+			const rows = await browserRetirementRows(transaction, objectId),
+				control = await browserRetirementControl(transaction, objectId);
+			const image = issuanceRetirementImage(rows, objectId);
+			await terminal;
+			return { rows, image, control };
+		} catch (error) {
+			try {
+				transaction.abort();
+			} catch {
+				/* Preserve source failure. */
+			}
+			await terminal.catch(() => undefined);
+			throw error;
+		}
 	}
 
 	close(): Promise<void> {
 		if (this.#closePromise !== undefined) return this.#closePromise;
 		this.#closed = true;
+		const releases = Array.from(this.#signReleases);
 		this.#database.onversionchange = null;
 		this.#database.close();
-		this.#closePromise = new Promise<void>((resolve) => {
+		const operationsJoined = new Promise<void>((resolve) => {
 			this.#resolveClose = resolve;
 			this.#finishCloseIfIdle();
+		});
+		// Connection close preserves admitted transactions. Release exclusion
+		// only after admitted crypto joins, never merely after close invocation.
+		this.#closePromise = Promise.allSettled(this.#retirementOperations).then(async () => {
+			const joined = await Promise.allSettled([
+				operationsJoined,
+				this.#readReservations.close(),
+				...releases.map((release) => release()),
+			]);
+			const failures = joined
+				.filter((r): r is PromiseRejectedResult => r.status === "rejected")
+				.map((r) => r.reason as unknown);
+			// The original native owner has now joined every admitted read. No
+			// privately retained image outlives that reservation/close boundary.
+			this.#heldRecoveryImage = undefined;
+			if (failures.length === 1) throw failures[0];
+			if (failures.length) throw new AggregateError(failures, "native sign close failed", { cause: failures[0] });
 		});
 		return this.#closePromise;
 	}
 
 	versionchange(): void {
-		void this.close();
+		void this.close().catch(() => undefined);
 	}
 
 	async compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void> {
@@ -413,6 +1081,21 @@ class BrowserIssuanceImplementation {
 				throw reason;
 			}
 			const status = this.#publicationStatus(observation, captured);
+			if (observation.issuedRecord) {
+				try {
+					await browserRetirementRow(
+						transaction,
+						captured.scope,
+						captured.authorSequence,
+						observation.issuedRecord.envelope.canonicalPreimageBytes,
+						observation.issuedRecord.envelope.digest
+					);
+				} catch (error) {
+					reason = error instanceof Error ? error : issuanceRetirementRefusal("issued epoch is retired");
+					transaction.abort();
+					throw reason;
+				}
+			}
 			if (status === "never-issued") reason = invalid("publication address has never been issued");
 			else if (status === "pruned") {
 				reason = createDurableIssuanceRecordPrunedError(captured.scope, captured.authorSequence);
@@ -438,6 +1121,7 @@ class BrowserIssuanceImplementation {
 				}
 			}
 			if (reason !== undefined) transaction.abort();
+			await browserBumpRetirement(transaction, captured.scope.objectId);
 			await terminal;
 			if (reason !== undefined) throw reason;
 		} catch {
@@ -454,8 +1138,16 @@ class BrowserIssuanceImplementation {
 		this.#assertAvailable();
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
+		if (needsNativeReadReservationTurn(this.#database)) return this.#runReservedRead(() => this.readLineage(detached));
 		const transaction = this.#startTransaction("readonly");
 		try {
+			const image = this.#recoveryImage(transaction, detached.objectId);
+			if (image !== undefined) {
+				const lineage = image.lineages.get(detached.author);
+				await transactionResult(transaction);
+				this.#assertAvailable();
+				return lineage === undefined ? {exhausted: false, next: 0} : {exhausted: lineage.exhausted, next: lineage.next};
+			}
 			const raw = await requestResult(transaction.objectStore("lineages").get([detached.objectId, detached.author]));
 			await transactionResult(transaction);
 			if (raw === undefined) return { exhausted: false, next: 0 };
@@ -472,8 +1164,17 @@ class BrowserIssuanceImplementation {
 		this.#assertAvailable();
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
+		if (needsNativeReadReservationTurn(this.#database))
+			return this.#runReservedRead(() => this.readSettlementPlan(detached));
 		const transaction = this.#startTransaction("readonly");
 		try {
+			const image = this.#recoveryImage(transaction, detached.objectId);
+			if (image !== undefined) {
+				const plan = image.plans.get(detached.author);
+				await transactionResult(transaction);
+				this.#assertAvailable();
+				return plan === undefined ? null : cloneSettlementPlan(plan);
+			}
 			const raw = await requestResult(
 				transaction.objectStore("settlementPlans").get([detached.objectId, detached.author])
 			);
@@ -517,7 +1218,15 @@ class BrowserIssuanceImplementation {
 				}
 			}
 			if (reason === undefined) {
+				const retired = await browserRetirementControl(transaction, captured.scope.objectId);
+				if (retired)
+					assertIssuanceRetirementPlanAllowed(
+						retired,
+						captured.plan,
+						await browserRetirementRows(transaction, captured.scope.objectId)
+					);
 				const writtenKey = await requestResult(plans.put(nativeSettlementPlan(captured.plan)));
+				await browserBumpRetirement(transaction, captured.scope.objectId);
 				if (!this.#sameNativePlanKey(writtenKey, captured.scope)) {
 					reason = this.#latchCorruption("settlement plan put returned an impossible key");
 					transaction.abort();
@@ -547,8 +1256,20 @@ class BrowserIssuanceImplementation {
 		assertDurableIssueScope(scope);
 		if (!isValidDurableAuthorSequence(authorSequence)) throw invalid("authorSequence must be a safe ordinal");
 		const detached = copyDurableIssueScope(scope);
+		if (needsNativeReadReservationTurn(this.#database))
+			return this.#runReservedRead(() => this.readIssued(detached, authorSequence));
 		const transaction = this.#startTransaction("readonly");
 		try {
+			const image = this.#recoveryImage(transaction, detached.objectId);
+			if (image !== undefined) {
+				const row = image.issued.get(detached.author)?.get(authorSequence);
+				// Native complete-image validation and exact key correspondence
+				// establish the same pair/lineage/watermark laws as the point path.
+				// Every delivery still checks the real held transaction freshly.
+				await transactionResult(transaction);
+				this.#assertAvailable();
+				return row === undefined ? null : commitFromIssued(row);
+			}
 			const key = [detached.objectId, detached.author, authorSequence];
 			const [rawIssued, rawOutbox, rawLineage] = await Promise.all([
 				requestResult(transaction.objectStore("issuedRecords").get(key)),
@@ -598,77 +1319,478 @@ class BrowserIssuanceImplementation {
 	async readOutboxPage(input: DurableOutboxPageInput = {}): Promise<readonly DurableIssuanceOutboxRecord[]> {
 		this.#assertAvailable();
 		const parsed = this.#parsePageInput(input);
+		if (needsNativeReadReservationTurn(this.#database)) {
+			const captured: DurableOutboxPageInput = {
+				...parsed,
+				afterKey: parsed.afterKey === null ? null : [parsed.afterKey[0], parsed.afterKey[1], parsed.afterKey[2]],
+			};
+			return this.#runReservedRead(() => this.readOutboxPage(captured));
+		}
 		const transaction = this.#startTransaction("readonly");
 		try {
-			const [nativeRows, issuedRows, lineageRows] = await Promise.all([
-				requestResult(transaction.objectStore("issuanceOutbox").getAll()),
-				requestResult(transaction.objectStore("issuedRecords").getAll()),
-				requestResult(transaction.objectStore("lineages").getAll()),
-			]);
-			await transactionResult(transaction);
-			const lineageByScope = new Map<
-				string,
-				DurableLineage & { readonly prunedThroughAuthorSequence: number | null }
-			>();
-			for (const raw of lineageRows) {
-				if (
-					typeof raw !== "object" ||
-					raw === null ||
-					!isValidDurableScopeField(raw.author) ||
-					!isValidDurableScopeField(raw.objectId)
-				) {
-					throw this.#latchCorruption("stored lineage is malformed");
+			const image = this.#heldRecoveryImage;
+			if (image?.transaction === transaction && isNativeReadReservationTransaction(transaction) &&
+				(image.globalOutboxComplete || (parsed.scope?.objectId === image.objectId && this.#validatedOutboxReadImages.has(transaction)))) {
+				const records: DurableIssuanceOutboxRecord[] = [];
+				for (const row of image.rows.outbox) {
+					if (parsed.scope !== undefined && !this.#sameScope(row, parsed.scope)) continue;
+					if (parsed.afterKey !== null && compareDurableIssuanceCompoundKeys(this.#issuedKey(row), parsed.afterKey) <= 0) continue;
+					const issued = image.issued.get(row.author)?.get(row.authorSequence);
+					if (issued === undefined) throw this.#latchCorruption("outbox has no matching issued record");
+					records.push({commit: commitFromIssued(issued), publishState: row.publishState});
+					if (records.length === parsed.limit) break;
 				}
-				const scope = { author: raw.author, objectId: raw.objectId };
-				const lineage = copyNativeLineage(raw, scope);
-				const key = this.#scopeKey(scope);
-				if (lineage === undefined || lineageByScope.has(key)) {
-					throw this.#latchCorruption("stored lineage is malformed");
-				}
-				lineageByScope.set(key, lineage);
+				await transactionResult(transaction);
+				this.#assertAvailable();
+				if (image.globalOutboxComplete) this.#validatedOutboxReadImages.add(transaction);
+				return records;
 			}
-			const issuedByKey = new Map<string, NativeIssuedRecord>();
-			for (const raw of issuedRows) {
-				const row = copyNativeIssued(raw);
-				if (row === undefined) throw this.#latchCorruption("stored issued record is malformed");
-				issuedByKey.set(this.#recordKey(row, row.authorSequence), row);
+			if (isNativeReadReservationTransaction(transaction) && this.#validatedOutboxReadImages.has(transaction)) {
+				return await this.#readValidatedOutboxPage(transaction, parsed);
 			}
-			const records: DurableIssuanceOutboxRecord[] = [];
-			for (const raw of nativeRows) {
-				const outbox = copyNativeOutbox(raw);
-				if (outbox === undefined) throw this.#latchCorruption("stored outbox record is malformed");
-				const issued = issuedByKey.get(this.#recordKey(outbox, outbox.authorSequence));
-				if (issued === undefined || !this.#bytesEqual(issued.digest, outbox.digest)) {
-					throw this.#latchCorruption("outbox has no matching issued record");
-				}
-				const lineage = lineageByScope.get(this.#scopeKey(outbox));
-				if (
-					lineage === undefined ||
-					!durableIssuanceLineageConsumed(lineage, outbox.authorSequence) ||
-					durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, outbox.authorSequence)
-				) {
-					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
-				}
-				issuedByKey.delete(this.#recordKey(outbox, outbox.authorSequence));
-				const commit = commitFromIssued(issued);
-				records.push({ commit, publishState: outbox.publishState });
+			const terminal = transactionResult(transaction);
+			// Observe terminal failure even if validation refuses before its join.
+			void terminal.catch(() => undefined);
+			let records: readonly DurableIssuanceOutboxRecord[];
+			try {
+				records = await this.#scanOutboxPage(transaction, parsed);
+			} finally {
+				await terminal;
 			}
-			if (issuedByKey.size !== 0) throw this.#latchCorruption("issued record has no matching outbox entry");
-			return records
-				.filter(({ commit }) => parsed.scope === undefined || this.#sameScope(commit.outboxEntry.scope, parsed.scope))
-				.sort((left, right) =>
-					compareDurableIssuanceCompoundKeys(this.#commitKey(left.commit), this.#commitKey(right.commit))
-				)
-				.filter(
-					({ commit }) =>
-						parsed.afterKey === null || compareDurableIssuanceCompoundKeys(this.#commitKey(commit), parsed.afterKey) > 0
-				)
-				.slice(0, parsed.limit)
-				.map(({ commit, publishState }) => ({ commit: cloneDurableIssueCommit(commit), publishState }));
+			if (isNativeReadReservationTransaction(transaction)) await transactionResult(transaction);
+			this.#assertAvailable();
+			if (isNativeReadReservationTransaction(transaction)) this.#validatedOutboxReadImages.add(transaction);
+			return records;
 		} catch (error) {
 			if (this.#isClosedFailure(error)) throw error;
 			throw mapSubstrateError(error, "outbox read failed");
 		}
+	}
+
+	// Validate the whole held image, retaining only three heads and the requested page.
+	#scanOutboxPage(
+		transaction: IDBTransaction,
+		parsed: ParsedOutboxPage
+	): Promise<readonly DurableIssuanceOutboxRecord[]> {
+		return new Promise((resolve, reject) => {
+			const requests = ["lineages", "issuedRecords", "issuanceOutbox"].map((name) =>
+				transaction.objectStore(name).openCursor()
+			);
+			const ready = [false, false, false];
+			const cursors: (IDBCursorWithValue | null)[] = [null, null, null];
+			let lineage: { scope: DurableIssueScope; value: NonNullable<ReturnType<typeof copyNativeLineage>> } | null = null;
+			let issued: NativeIssuedRecord | null = null;
+			let outbox: NativeOutboxRecord | null = null;
+			const page: DurableIssuanceOutboxRecord[] = [];
+			let settled = false;
+			const fail = (error: unknown): void => {
+				if (settled) return;
+				settled = true;
+				reject(error);
+			};
+			const advance = (index: number): void => {
+				const cursor = cursors[index];
+				if (cursor === null || cursor === undefined) throw new Error("outbox cursor exhausted");
+				ready[index] = false;
+				cursors[index] = null;
+				// Continuation stays in the native success-event transaction turn.
+				cursor.continue();
+			};
+			const step = (): void => {
+				if (settled || !ready.every(Boolean)) return;
+				if (issued === null || outbox === null) {
+					if (issued !== null || outbox !== null) throw this.#latchCorruption("issued/outbox closure is incomplete");
+					if (lineage !== null) {
+						advance(0);
+						return;
+					}
+					settled = true;
+					resolve(page);
+					return;
+				}
+				if (
+					compareDurableIssuanceCompoundKeys(this.#issuedKey(issued), this.#issuedKey(outbox)) !== 0 ||
+					!this.#bytesEqual(issued.digest, outbox.digest)
+				)
+					throw this.#latchCorruption("outbox has no matching issued record");
+				const scopeOrder =
+					lineage === null
+						? 1
+						: compareDurableIssuanceCompoundKeys(
+								[lineage.scope.objectId, lineage.scope.author, 0],
+								[issued.objectId, issued.author, 0]
+							);
+				if (scopeOrder < 0) {
+					advance(0);
+					return;
+				}
+				if (
+					lineage === null ||
+					scopeOrder !== 0 ||
+					!durableIssuanceLineageConsumed(lineage.value, issued.authorSequence) ||
+					durableIssuanceAddressIsPruned(lineage.value.prunedThroughAuthorSequence, issued.authorSequence)
+				)
+					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
+				if (
+					page.length < parsed.limit &&
+					(parsed.scope === undefined || this.#sameScope(issued, parsed.scope)) &&
+					(parsed.afterKey === null || compareDurableIssuanceCompoundKeys(this.#issuedKey(issued), parsed.afterKey) > 0)
+				)
+					page.push({ commit: commitFromIssued(issued), publishState: outbox.publishState });
+				advance(1);
+				advance(2);
+			};
+			for (let index = 0; index < requests.length; index++) {
+				const request = requests[index];
+				if (request === undefined) throw new Error("outbox cursor request missing");
+				request.addEventListener("error", () => fail(request.error), { once: true });
+				request.addEventListener("success", () => {
+					if (settled) return;
+					try {
+						const cursor = request.result;
+						cursors[index] = cursor;
+						ready[index] = true;
+						if (index === 0) {
+							lineage = null;
+							if (cursor !== null) {
+								const raw: unknown = cursor.value;
+								if (
+									typeof raw !== "object" ||
+									raw === null ||
+									!isValidDurableScopeField(Reflect.get(raw, "author")) ||
+									!isValidDurableScopeField(Reflect.get(raw, "objectId"))
+								)
+									throw this.#latchCorruption("stored lineage is malformed");
+								const scope = {
+									author: Reflect.get(raw, "author") as string,
+									objectId: Reflect.get(raw, "objectId") as string,
+								};
+								const value = copyNativeLineage(raw, scope);
+								if (value === undefined) throw this.#latchCorruption("stored lineage is malformed");
+								lineage = { scope, value };
+							}
+						} else if (index === 1) {
+							issued = cursor === null ? null : (copyNativeIssued(cursor.value) ?? null);
+							if (cursor !== null && issued === null) throw this.#latchCorruption("stored issued record is malformed");
+						} else {
+							outbox = cursor === null ? null : (copyNativeOutbox(cursor.value) ?? null);
+							if (cursor !== null && outbox === null) throw this.#latchCorruption("stored outbox record is malformed");
+						}
+						step();
+					} catch (error) {
+						fail(error);
+					}
+				});
+			}
+		});
+	}
+
+	async #readValidatedOutboxPage(
+		transaction: IDBTransaction,
+		parsed: ParsedOutboxPage
+	): Promise<readonly DurableIssuanceOutboxRecord[]> {
+		let range: IDBKeyRange | undefined;
+		if (parsed.scope !== undefined) {
+			const { objectId, author } = parsed.scope;
+			const first: readonly [string, string, number] = [objectId, author, 0];
+			if (parsed.afterKey !== null && compareDurableIssuanceCompoundKeys(parsed.afterKey, first) >= 0) {
+				if (parsed.afterKey[0] !== objectId || parsed.afterKey[1] !== author) {
+					await transactionResult(transaction);
+					this.#assertAvailable();
+					return [];
+				}
+				range = IDBKeyRange.bound([...parsed.afterKey], [objectId, author, []], true, true);
+			} else {
+				range = IDBKeyRange.bound([objectId, author], [objectId, author, []], false, true);
+			}
+		} else if (parsed.afterKey !== null) {
+			range = IDBKeyRange.lowerBound([...parsed.afterKey], true);
+		}
+		const rawRows = await requestResult(transaction.objectStore("issuanceOutbox").getAll(range, parsed.limit));
+		const result: DurableIssuanceOutboxRecord[] = [];
+		for (const raw of rawRows) {
+			const row = copyNativeOutbox(raw);
+			if (row === undefined) throw this.#latchCorruption("stored outbox record is malformed");
+			// Reuse the original exact pair/lineage reader and shared detachment law.
+			const commit = await this.readIssued({ objectId: row.objectId, author: row.author }, row.authorSequence);
+			if (commit === null || !this.#bytesEqual(commit.envelope.digest, row.digest)) {
+				throw this.#latchCorruption("outbox has no matching issued record");
+			}
+			result.push({ commit, publishState: row.publishState });
+		}
+		await transactionResult(transaction);
+		this.#assertAvailable();
+		return result;
+	}
+
+	async #reserveUnsigned(
+		scope: DurableIssueScope,
+		prior: DurableLineage,
+		bytes: Uint8Array,
+		context?: Parameters<DurableUnsignedVertexSignAdmission>[2]
+	): Promise<NativeIssueReservation> {
+		const captured = captureIssuanceNativeSignInput({ scope, exactCanonicalUnsignedVertexBytes: bytes });
+		if (captured.sequence !== prior.next) throw issuanceRetirementRefusal("unsigned intent ordinal changed");
+		const capturedContext = captureIssuanceNativeSignContext(context);
+		const transaction = this.#startTransaction("readwrite"),
+			terminal = transactionResult(transaction);
+		let inheritedEntered = false;
+		try {
+			let rows = await browserRetirementRows(transaction, scope.objectId);
+			const raw = await requestResult(transaction.objectStore("lineages").get([scope.objectId, scope.author]));
+			const lineage =
+				raw === undefined
+					? { next: 0, exhausted: false, prunedThroughAuthorSequence: null }
+					: copyNativeLineage(raw, scope);
+			if (!lineage) throw issuanceRetirementRefusal("unsigned intent lineage changed");
+			const existing = "pendingUnsigned" in lineage ? lineage.pendingUnsigned : undefined;
+			inheritedEntered = existing?.phase === "entered";
+			if (!durableIssuanceLineagesEqual(lineage, prior))
+				throw issuanceRetirementRefusal("unsigned intent lineage changed");
+			let control = await browserRetirementControl(transaction, scope.objectId);
+			if (capturedContext?.expectedIssuanceImageDigest !== undefined) {
+				const image = issuanceRetirementImage(rows, scope.objectId);
+				const expectedControl = capturedContext.expectedIssuanceControlBytes;
+				if (
+					image.imageDigest !== capturedContext.expectedIssuanceImageDigest ||
+					(expectedControl === null
+						? control !== null
+						: control === null ||
+							expectedControl === undefined ||
+							!issuanceRetirementBytesEqual(encodeIssuanceRetirementControl(control), expectedControl))
+				)
+					throw issuanceRetirementRefusal("native issuance quote currency changed");
+			}
+			if (control === null)
+				control = {
+					kind: "v3-issuance-retirement-control-1",
+					objectId: scope.objectId,
+					incarnation: issuanceRetirementHex(globalThis.crypto.getRandomValues(new Uint8Array(32))),
+					revision: 0,
+					sequence: 0,
+					active: null,
+					completed: null,
+				};
+			const plan =
+				capturedContext?.planEffect === undefined ? undefined : rows.plans.find((p) => this.#sameScope(p.scope, scope));
+			if (capturedContext?.planEffect !== undefined && plan === undefined)
+				throw issuanceRetirementRefusal("unsigned settlement plan is absent");
+			const pending = captureIssuancePendingUnsignedIntent(
+				{
+					kind: "v3-issuance-pending-unsigned-1",
+					incarnation: control.incarnation,
+					authorSequence: captured.sequence,
+					canonicalPreimageBytes: captured.bytes,
+					digest: captured.digest,
+					phase: existing?.phase ?? "reserved",
+					...(plan === undefined
+						? {}
+						: { planEffect: capturedContext?.planEffect, exactCanonicalPlanBytes: encodeCanonical(plan) }),
+				},
+				scope
+			);
+			if (existing !== undefined && !this.#bytesEqual(encodeCanonical(existing), encodeCanonical(pending)))
+				throw issuanceRetirementRefusal("another unsigned intent owns the selected ordinal");
+			await browserRetirementRow(transaction, scope, prior.next, captured.bytes, captured.digest);
+			if (raw === undefined) rows = { ...rows, lineages: [...rows.lineages, { ...scope, ...lineage }] };
+			issuanceUnsignedPostimageCharge(rows, scope, pending);
+			const pendingRows = {
+				...rows,
+				lineages: rows.lineages.map((l) => (this.#sameScope(l, scope) ? { ...l, pendingUnsigned: pending } : l)),
+			};
+			const pendingImage = issuanceRetirementImage(pendingRows, scope.objectId);
+			this.#assertAvailable();
+			if (existing === undefined) {
+				if ((await browserRetirementControl(transaction, scope.objectId)) === null)
+					await requestResult(
+						transaction
+							.objectStore("retirementControls")
+							.add({ objectId: scope.objectId, record: encodeIssuanceRetirementControl(control) })
+					);
+				await requestResult(
+					// Validation normalizes an absent watermark for arithmetic, not a native rewrite.
+					transaction.objectStore("lineages").put({
+						...(raw === undefined ? { ...scope, ...lineage } : raw),
+						pendingUnsigned: pending,
+					})
+				);
+				await browserBumpRetirement(transaction, scope.objectId);
+			}
+			// This exact post-reserved source is volatile custody for the next
+			// writer, not persistent quote authority or a second budget ledger.
+			const currency =
+				capturedContext?.expectedIssuanceImageDigest === undefined
+					? undefined
+					: {
+							imageDigest: pendingImage.imageDigest,
+							controlBytes: encodeIssuanceRetirementControl(
+								existing === undefined ? advanceIssuanceRetirementControl(control) : control
+							),
+						};
+			await terminal;
+			return { pending, ...(currency === undefined ? {} : { currency }) };
+		} catch (error) {
+			try {
+				transaction.abort();
+			} catch {
+				/* Original terminal owns outcome. */
+			}
+			await terminal.catch(() => undefined);
+			if (
+				inheritedEntered &&
+				!this.#hasCode(error, "ISSUANCE_STORE_CLOSED") &&
+				!this.#hasCode(error, "ISSUANCE_RECOVERY_CORRUPT") &&
+				!this.#hasCode(error, "ISSUANCE_OUTCOME_UNKNOWN")
+			)
+				throw new DurableIssuanceUnknownOutcomeError(scope, { cause: error });
+			throw error;
+		}
+	}
+
+	async #beginIssueJob(scope: DurableIssueScope, reservation: NativeIssueReservation): Promise<NativeIssueJob> {
+		const { pending } = reservation;
+		if (this.#readReservations.view()) throw issuanceRetirementRefusal("join issuance native read view before signing");
+		// The entered marker joins durably before crypto. An inherited entered
+		// marker never becomes a no-entry cancellation merely because this attempt closes.
+		const marker = this.#startTransaction("readwrite"),
+			markerTerminal = transactionResult(marker);
+		void markerTerminal.catch(() => undefined);
+		const entered = captureIssuancePendingUnsignedIntent({ ...pending, phase: "entered" }, scope);
+		let transaction: IDBTransaction | undefined;
+		let terminal: Promise<void> | undefined;
+		let observedTerminal: Promise<void> | undefined;
+		let readback: Promise<readonly unknown[]> | undefined;
+		let turn: ReturnType<typeof issuanceWriteTurn> | undefined;
+		let markerJoined = false;
+		let inheritedEntered = pending.phase === "entered";
+		try {
+			// Queue the original writer BEFORE the entered marker can join. No
+			// foreign same-intent signer may interpose between that durable marker
+			// and this attempt's native job. Entered debt still never clears from
+			// local no-entry knowledge.
+			transaction = this.#startTransaction("readwrite");
+			terminal = transactionResult(transaction);
+			void terminal.catch(() => undefined);
+			turn = issuanceWriteTurn(transaction);
+			// Born while open, behind this exact writer. Only its committed
+			// terminal postimage is read here, never uncommitted RW state as NEW.
+			const observation = this.#startTransaction("readonly");
+			observedTerminal = transactionResult(observation);
+			void observedTerminal.catch(() => undefined);
+			const observationJoined = observedTerminal;
+			const key = [scope.objectId, scope.author, pending.authorSequence];
+			readback = Promise.all([
+				requestResult(observation.objectStore("lineages").get([scope.objectId, scope.author])),
+				requestResult(observation.objectStore("issuedRecords").get(key)),
+				requestResult(observation.objectStore("issuanceOutbox").get(key)),
+				requestResult(observation.objectStore("settlementPlans").get([scope.objectId, scope.author])),
+			]).then(
+				async (raw) => {
+					await observationJoined;
+					return raw;
+				},
+				async (error: unknown) => {
+					await observationJoined.catch(() => undefined);
+					throw error;
+				}
+			);
+			void readback.catch(() => undefined);
+			const raw = await requestResult(marker.objectStore("lineages").get([scope.objectId, scope.author]));
+			const lineage = copyNativeLineage(raw, scope);
+			const control = await browserRetirementControl(marker, scope.objectId);
+			inheritedEntered ||=
+				lineage?.pendingUnsigned?.phase === "entered" ||
+				(lineage !== undefined && durableIssuanceLineageConsumed(lineage, pending.authorSequence));
+			if (
+				!lineage?.pendingUnsigned ||
+				!control ||
+				control.incarnation !== pending.incarnation ||
+				!this.#bytesEqual(encodeCanonical(lineage.pendingUnsigned), encodeCanonical(pending))
+			)
+				throw issuanceRetirementRefusal("unsigned intent marker changed");
+			const markerRows =
+				reservation.currency === undefined ? undefined : await browserRetirementRows(marker, scope.objectId);
+			if (
+				reservation.currency !== undefined &&
+				markerRows !== undefined &&
+				(issuanceRetirementImage(markerRows, scope.objectId).imageDigest !== reservation.currency.imageDigest ||
+					!issuanceRetirementBytesEqual(encodeIssuanceRetirementControl(control), reservation.currency.controlBytes))
+			)
+				throw issuanceRetirementRefusal("native issuance reserved currency changed");
+			await browserRetirementRow(marker, scope, pending.authorSequence, pending.canonicalPreimageBytes, pending.digest);
+			this.#assertAvailable();
+			if (pending.phase !== "entered") {
+				await requestResult(marker.objectStore("lineages").put({ ...raw, pendingUnsigned: entered }));
+				await browserBumpRetirement(marker, scope.objectId);
+			}
+			const currency =
+				markerRows === undefined
+					? undefined
+					: {
+							imageDigest: issuanceRetirementImage(
+								{
+									...markerRows,
+									lineages: markerRows.lineages.map((row) =>
+										this.#sameScope(row, scope) ? { ...row, pendingUnsigned: entered } : row
+									),
+								},
+								scope.objectId
+							).imageDigest,
+							controlBytes: encodeIssuanceRetirementControl(
+								pending.phase === "entered" ? control : advanceIssuanceRetirementControl(control)
+							),
+						};
+			await markerTerminal;
+			markerJoined = true;
+			return {
+				transaction,
+				terminal,
+				readback,
+				pending: entered,
+				...(currency === undefined ? {} : { currency }),
+				turn,
+			};
+		} catch (error) {
+			turn?.stop();
+			try {
+				marker.abort();
+			} catch {
+				/* Preserve original terminal. */
+			}
+			try {
+				transaction?.abort();
+			} catch {
+				/* Preserve original terminal. */
+			}
+			await markerTerminal.catch(() => undefined);
+			await terminal?.catch(() => undefined);
+			await readback?.catch(() => undefined);
+			await observedTerminal?.catch(() => undefined);
+			if (
+				(inheritedEntered || markerJoined) &&
+				!this.#hasCode(error, "ISSUANCE_STORE_CLOSED") &&
+				!this.#hasCode(error, "ISSUANCE_RECOVERY_CORRUPT") &&
+				!this.#hasCode(error, "ISSUANCE_OUTCOME_UNKNOWN")
+			)
+				throw new DurableIssuanceUnknownOutcomeError(scope, { cause: error });
+			throw error;
+		}
+	}
+
+	async #jobReadback(
+		job: NativeIssueJob,
+		scope: DurableIssueScope,
+		candidate?: DurableIssueCommit,
+		expectedPlan?: SettlementPlan
+	): Promise<TerminalReadback> {
+		const [rawLineage, rawIssued, rawOutbox, rawPlan] = await job.readback;
+		const observed = this.#terminalFromRaw(scope, rawLineage, rawIssued, rawOutbox);
+		if (candidate?.planEffect !== undefined) {
+			const plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, scope);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			this.#assertPlanEffectReadback(plan, observed, candidate, expectedPlan);
+		}
+		return observed;
 	}
 
 	async transactIssue(scope: DurableIssueScope, buildAndSign: DurableBuildAndSign): Promise<DurableIssueCommit> {
@@ -678,16 +1800,117 @@ class BrowserIssuanceImplementation {
 		const detached = copyDurableIssueScope(scope);
 		const prior = await this.readLineage(detached);
 		if (prior.exhausted) throw createDurableIssuanceFailure("ISSUANCE_EXHAUSTED", "author sequence is exhausted");
-		const built = await buildAndSign(prior.next);
-		const candidate = copyAndValidateDurableIssueCommit(built, detached, prior.next);
-		this.#assertAvailable();
-		return this.#commitCandidate(detached, prior, candidate);
+		let job: NativeIssueJob | undefined;
+		let hookEntered = false;
+		let inheritedEntered = false;
+		let resolveJoined: (() => void) | undefined;
+		let admittedSigning: Promise<Uint8Array> | undefined;
+		const enterNativeAdmission: DurableUnsignedVertexSignAdmission = async (bytes, sign, context) => {
+			this.#assertAvailable();
+			if (typeof sign !== "function") throw invalid("sign must be a function");
+			if (this.#readReservations.view())
+				throw issuanceRetirementRefusal("join issuance native read view before signing");
+			const reservation = await this.#reserveUnsigned(detached, prior, bytes, context);
+			inheritedEntered = reservation.pending.phase === "entered";
+			const owned = await this.#beginIssueJob(detached, reservation);
+			job = owned;
+			await owned.turn.run(async () => {
+				this.#assertAvailable();
+				const raw = await requestResult(
+					owned.transaction.objectStore("lineages").get([detached.objectId, detached.author])
+				);
+				const current = copyNativeLineage(raw, detached);
+				const control = await browserRetirementControl(owned.transaction, detached.objectId);
+				if (
+					!control ||
+					control.incarnation !== owned.pending.incarnation ||
+					!current?.pendingUnsigned ||
+					!this.#bytesEqual(encodeCanonical(current.pendingUnsigned), encodeCanonical(owned.pending))
+				)
+					throw issuanceRetirementRefusal("unsigned native job changed");
+				await browserRetirementRow(
+					owned.transaction,
+					detached,
+					prior.next,
+					owned.pending.canonicalPreimageBytes,
+					owned.pending.digest
+				);
+				const rows = await browserRetirementRows(owned.transaction, detached.objectId);
+				if (
+					owned.currency !== undefined &&
+					(issuanceRetirementImage(rows, detached.objectId).imageDigest !== owned.currency.imageDigest ||
+						!issuanceRetirementBytesEqual(encodeIssuanceRetirementControl(control), owned.currency.controlBytes))
+				)
+					throw issuanceRetirementRefusal("native issuance entered currency changed");
+				issuanceUnsignedPostimageCharge(rows, detached, owned.pending);
+			});
+			this.#assertAvailable();
+			const signature = await sign();
+			this.#assertAvailable();
+			if (!(signature instanceof Uint8Array) || signature.byteLength !== 64)
+				throw invalid("native registered signature is malformed");
+			return new Uint8Array(signature);
+		};
+		const nativeAdmission: DurableUnsignedVertexSignAdmission = (bytes, sign, context) => {
+			this.#assertAvailable();
+			if (hookEntered) throw issuanceRetirementRefusal("issuance native job already entered");
+			hookEntered = true;
+			const joined = new Promise<void>((resolve) => {
+				resolveJoined = resolve;
+			});
+			void this.#trackRetirement(joined);
+			admittedSigning = enterNativeAdmission(bytes, sign, context);
+			void admittedSigning.catch(() => undefined);
+			return admittedSigning;
+		};
+		try {
+			const built = await buildAndSign(prior.next, nativeAdmission);
+			// Even a raw builder that neglects the hook's returned promise cannot
+			// detach an entered native signer from its original issue/close owner.
+			await admittedSigning;
+			const candidate = copyAndValidateDurableIssueCommit(built, detached, prior.next);
+			this.#assertAvailable();
+			return await this.#commitCandidate(detached, prior, candidate, job);
+		} catch (error) {
+			await admittedSigning?.catch(() => undefined);
+			if (job !== undefined) {
+				// A committed entered marker is durable crypto debt even when this
+				// attempt did not enter its local callback. Only paired NEW clears it.
+				job.turn.stop();
+				try {
+					job.transaction.abort();
+				} catch {
+					/* Original terminal owns outcome. */
+				}
+				await job.terminal.catch(() => undefined);
+				await job.readback.catch(() => undefined);
+				if (
+					job.pending.phase === "entered" &&
+					!this.#hasCode(error, "ISSUANCE_OUTCOME_UNKNOWN") &&
+					!this.#hasCode(error, "ISSUANCE_STORE_CLOSED") &&
+					!this.#hasCode(error, "ISSUANCE_RECOVERY_CORRUPT")
+				)
+					throw new DurableIssuanceUnknownOutcomeError(detached, { cause: error });
+			}
+			if (
+				inheritedEntered &&
+				!this.#hasCode(error, "ISSUANCE_OUTCOME_UNKNOWN") &&
+				!this.#hasCode(error, "ISSUANCE_STORE_CLOSED") &&
+				!this.#hasCode(error, "ISSUANCE_RECOVERY_CORRUPT")
+			)
+				throw new DurableIssuanceUnknownOutcomeError(detached, { cause: error });
+			throw error;
+		} finally {
+			resolveJoined?.();
+		}
 	}
 
 	async inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
 		this.#assertAvailable();
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
+		if (needsNativeReadReservationTurn(this.#database))
+			return this.#runReservedRead(() => this.inspectPruningState(detached));
 		const transaction = this.#startTransaction("readonly");
 		try {
 			const raw = await requestResult(transaction.objectStore("lineages").get([detached.objectId, detached.author]));
@@ -733,6 +1956,7 @@ class BrowserIssuanceImplementation {
 					? { exhausted: false, next: 0, prunedThroughAuthorSequence: null }
 					: copyNativeLineage(rawLineage, captured.scope);
 			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			if ("pendingUnsigned" in current) throw issuanceRetirementRefusal("join pending unsigned custody before pruning");
 			const lineage = { exhausted: current.exhausted, next: current.next };
 			let plan: SettlementPlan | null | undefined;
 			if (authenticatedSettled) {
@@ -773,6 +1997,18 @@ class BrowserIssuanceImplementation {
 				throw invalid("selected pruning boundary is invalid");
 			}
 			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
+			assertIssuanceRetirementPruningAllowed(
+				await browserRetirementControl(transaction, captured.scope.objectId),
+				captured.scope,
+				from,
+				captured.throughAuthorSequence
+			);
+			assertIssuanceInheritedTargetPruningAllowed(
+				(await browserRetirementRows(transaction, captured.scope.objectId)).plans,
+				captured.scope,
+				from,
+				captured.throughAuthorSequence
+			);
 			if (!authenticatedSettled) {
 				const rawPlan = await requestResult(settlementPlans.get([captured.scope.objectId, captured.scope.author]));
 				plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
@@ -844,6 +2080,7 @@ class BrowserIssuanceImplementation {
 			) {
 				throw this.#latchCorruption("watermark put returned an impossible key");
 			}
+			await browserBumpRetirement(transaction, captured.scope.objectId);
 			await terminal;
 			return createDurableIssuancePruningReceipt(captured, lineage, from);
 		} catch (error) {
@@ -872,82 +2109,141 @@ class BrowserIssuanceImplementation {
 	async #commitCandidate(
 		scope: DurableIssueScope,
 		prior: DurableLineage,
-		candidate: DurableIssueCommit
+		candidate: DurableIssueCommit,
+		job?: NativeIssueJob
 	): Promise<DurableIssueCommit> {
 		let transaction: IDBTransaction;
 		try {
-			transaction = this.#startTransaction("readwrite");
+			transaction = job?.transaction ?? this.#startTransaction("readwrite");
 		} catch (error) {
 			this.#assertAvailable();
 			throw error;
 		}
 		let reason: Error | undefined;
 		let expectedPlan: SettlementPlan | undefined;
-		const terminal = transactionResult(transaction);
+		const terminal = job?.terminal ?? transactionResult(transaction);
 		try {
-			const lineages = transaction.objectStore("lineages");
-			const issued = transaction.objectStore("issuedRecords");
-			const outbox = transaction.objectStore("issuanceOutbox");
-			const plans = transaction.objectStore("settlementPlans");
-			const rawPrior = await requestResult(lineages.get([scope.objectId, scope.author]));
-			const current =
-				rawPrior === undefined
-					? { exhausted: false, next: 0, prunedThroughAuthorSequence: null }
-					: copyNativeLineage(rawPrior, scope);
-			if (current === undefined) {
-				reason = this.#latchCorruption("stored lineage is malformed");
-				transaction.abort();
-			} else if (!durableIssuanceLineagesEqual(current, prior)) {
-				reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "author sequence changed while signing");
-				transaction.abort();
-			} else {
-				let updatedPlan: SettlementPlan | undefined;
-				if (candidate.planEffect !== undefined) {
-					const rawPlan = await requestResult(plans.get([scope.objectId, scope.author]));
-					if (rawPlan === undefined) {
-						reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+			const write = async (): Promise<void> => {
+				const lineages = transaction.objectStore("lineages");
+				const issued = transaction.objectStore("issuedRecords");
+				const outbox = transaction.objectStore("issuanceOutbox");
+				const plans = transaction.objectStore("settlementPlans");
+				const rawPrior = await requestResult(lineages.get([scope.objectId, scope.author]));
+				const current =
+					rawPrior === undefined
+						? { exhausted: false, next: 0, prunedThroughAuthorSequence: null }
+						: copyNativeLineage(rawPrior, scope);
+				if (current === undefined) {
+					reason = this.#latchCorruption("stored lineage is malformed");
+					transaction.abort();
+				} else if (!durableIssuanceLineagesEqual(current, prior)) {
+					reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "author sequence changed while signing");
+					transaction.abort();
+				} else {
+					if (this.#closed) {
+						reason = createDurableIssuanceFailure("ISSUANCE_STORE_CLOSED", "durable issuance store is closed");
 						transaction.abort();
-					} else {
-						const plan = copyNativeSettlementPlan(rawPlan, scope);
-						if (plan === undefined) {
-							reason = this.#latchCorruption("stored settlement plan is malformed");
-							transaction.abort();
-						} else {
-							try {
-								updatedPlan = applySettlementPlanEffect(
-									plan,
-									candidate.planEffect,
-									candidate.authorSequence,
-									settlementReplacementLastLogicalTime(candidate)
-								);
-								expectedPlan = updatedPlan;
-							} catch (error) {
-								reason = error instanceof Error ? error : invalid("settlement plan effect failed");
-								transaction.abort();
-							}
-						}
-					}
-					if (reason !== undefined) {
-						await terminal;
 						throw reason;
 					}
+					if (
+						job === undefined
+							? "pendingUnsigned" in current
+							: !("pendingUnsigned" in current) ||
+								!this.#bytesEqual(encodeCanonical(current.pendingUnsigned), encodeCanonical(job.pending)) ||
+								!this.#bytesEqual(candidate.envelope.canonicalPreimageBytes, job.pending.canonicalPreimageBytes) ||
+								!this.#bytesEqual(candidate.envelope.digest, job.pending.digest) ||
+								!this.#bytesEqual(
+									encodeCanonical(candidate.planEffect ?? null),
+									encodeCanonical(job.pending.planEffect ?? null)
+								)
+					) {
+						reason = issuanceRetirementRefusal("issued candidate does not own the exact unsigned intent");
+						transaction.abort();
+						throw reason;
+					}
+					try {
+						await browserRetirementRow(
+							transaction,
+							scope,
+							candidate.authorSequence,
+							candidate.envelope.canonicalPreimageBytes,
+							candidate.envelope.digest
+						);
+					} catch (error) {
+						reason = error instanceof Error ? error : issuanceRetirementRefusal("issued epoch is retired");
+						transaction.abort();
+						throw reason;
+					}
+					let updatedPlan: SettlementPlan | undefined;
+					if (candidate.planEffect !== undefined) {
+						const rawPlan = await requestResult(plans.get([scope.objectId, scope.author]));
+						if (rawPlan === undefined) {
+							reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+							transaction.abort();
+						} else {
+							const plan = copyNativeSettlementPlan(rawPlan, scope);
+							if (plan === undefined) {
+								reason = this.#latchCorruption("stored settlement plan is malformed");
+								transaction.abort();
+							} else {
+								try {
+									updatedPlan = applySettlementPlanEffect(
+										plan,
+										candidate.planEffect,
+										candidate.authorSequence,
+										settlementReplacementLastLogicalTime(candidate)
+									);
+									expectedPlan = updatedPlan;
+								} catch (error) {
+									reason = error instanceof Error ? error : invalid("settlement plan effect failed");
+									transaction.abort();
+								}
+							}
+						}
+						if (reason !== undefined) {
+							await terminal;
+							throw reason;
+						}
+					}
+					const next = {
+						...scope,
+						exhausted: prior.next === Number.MAX_SAFE_INTEGER,
+						next: prior.next === Number.MAX_SAFE_INTEGER ? prior.next : prior.next + 1,
+						...(current.prunedThroughAuthorSequence === null
+							? {}
+							: { prunedThroughAuthorSequence: current.prunedThroughAuthorSequence }),
+					};
+					await requestResult(rawPrior === undefined ? lineages.add(next) : lineages.put(next));
+					await requestResult(issued.add(nativeIssued(candidate)));
+					await requestResult(outbox.add(nativeOutbox(candidate)));
+					if (updatedPlan !== undefined) await requestResult(plans.put(nativeSettlementPlan(updatedPlan)));
+					if (updatedPlan !== undefined) {
+						try {
+							const retired = await browserRetirementControl(transaction, scope.objectId);
+							if (retired)
+								assertIssuanceRetirementPlanAllowed(
+									retired,
+									updatedPlan,
+									await browserRetirementRows(transaction, scope.objectId)
+								);
+						} catch (error) {
+							reason = error instanceof Error ? error : issuanceRetirementRefusal("settlement plan effect refused");
+							transaction.abort();
+							throw reason;
+						}
+					}
+					await browserBumpRetirement(transaction, scope.objectId);
 				}
-				const next = {
-					...scope,
-					exhausted: prior.next === Number.MAX_SAFE_INTEGER,
-					next: prior.next === Number.MAX_SAFE_INTEGER ? prior.next : prior.next + 1,
-					...(current.prunedThroughAuthorSequence === null
-						? {}
-						: { prunedThroughAuthorSequence: current.prunedThroughAuthorSequence }),
-				};
-				await requestResult(rawPrior === undefined ? lineages.add(next) : lineages.put(next));
-				await requestResult(issued.add(nativeIssued(candidate)));
-				await requestResult(outbox.add(nativeOutbox(candidate)));
-				if (updatedPlan !== undefined) await requestResult(plans.put(nativeSettlementPlan(updatedPlan)));
-			}
+			};
+			if (job === undefined) await write();
+			else await job.turn.run(write);
+			job?.turn.stop();
 			await terminal;
 			if (reason !== undefined) throw reason;
-			const observation = await this.#readTerminal(scope, candidate.authorSequence, candidate, expectedPlan);
+			const observation =
+				job === undefined
+					? await this.#readTerminal(scope, candidate.authorSequence, candidate, expectedPlan)
+					: await this.#jobReadback(job, scope, candidate, expectedPlan);
 			const committed = classifyDurableIssuanceTerminalSuppression({
 				candidate,
 				observation,
@@ -955,13 +2251,24 @@ class BrowserIssuanceImplementation {
 				scope,
 			});
 			return committed;
-		} catch {
+		} catch (error) {
+			if (job !== undefined) {
+				job.turn.stop();
+				try {
+					transaction.abort();
+				} catch {
+					/* Original terminal owns outcome. */
+				}
+			}
 			await terminal.catch(() => undefined);
 			if (reason !== undefined) throw reason;
 			if (this.#poison !== undefined) throw this.#poison;
 			let observation: TerminalReadback;
 			try {
-				observation = await this.#readTerminal(scope, candidate.authorSequence, candidate, expectedPlan);
+				observation =
+					job === undefined
+						? await this.#readTerminal(scope, candidate.authorSequence, candidate, expectedPlan)
+						: await this.#jobReadback(job, scope, candidate, expectedPlan);
 			} catch {
 				if (this.#closed || this.#poison !== undefined) this.#assertAvailable();
 				return classifyDurableIssuanceTerminalSuppression({
@@ -983,6 +2290,7 @@ class BrowserIssuanceImplementation {
 				if (this.#hasCode(classified, "ISSUANCE_RECOVERY_CORRUPT")) {
 					throw this.#latchCorruption("terminal issuance readback is corrupt");
 				}
+				if (job?.pending.phase === "entered") throw new DurableIssuanceUnknownOutcomeError(scope, { cause: error });
 				throw classified;
 			}
 		}
@@ -1016,6 +2324,8 @@ class BrowserIssuanceImplementation {
 		candidate?: DurableIssueCommit,
 		expectedPlan?: SettlementPlan
 	): Promise<TerminalReadback> {
+		if (needsNativeReadReservationTurn(this.#database))
+			return this.#runReservedRead(() => this.#readTerminal(scope, authorSequence, candidate, expectedPlan));
 		const transaction = this.#startTransaction("readonly");
 		const key = [scope.objectId, scope.author, authorSequence];
 		const [rawLineage, rawIssued, rawOutbox, rawPlan] = await Promise.all([
@@ -1171,9 +2481,24 @@ class BrowserIssuanceImplementation {
 		throw this.#latchCorruption("publication terminal readback is incomplete or malformed");
 	}
 
+	async #runReservedRead<T>(operation: () => Promise<T>): Promise<T> {
+		try {
+			return await runNativeReservedRead(this.#database, operation);
+		} catch (error) {
+			this.#assertAvailable();
+			if (error instanceof DurableIssuanceContractError || error instanceof DurableIssuanceInvalidArgumentError)
+				throw error;
+			throw mapSubstrateError(error, "reserved issuance read failed");
+		}
+	}
+
 	#startTransaction(mode: IDBTransactionMode): IDBTransaction {
 		this.#assertAvailable();
-		const transaction = strictTransaction(this.#database, mode);
+		const transaction =
+			mode === "readonly"
+				? nativeReadonlyTransaction(this.#database, [...STORE_NAMES])
+				: strictTransaction(this.#database, mode);
+		if (isNativeReadReservationTransaction(transaction)) return transaction;
 		this.#transactions.add(transaction);
 		const settled = (): void => {
 			this.#transactions.delete(transaction);
@@ -1198,11 +2523,7 @@ class BrowserIssuanceImplementation {
 		return this.#poison;
 	}
 
-	#parsePageInput(input: DurableOutboxPageInput): {
-		afterKey: readonly [string, string, number] | null;
-		limit: number;
-		scope?: DurableIssueScope;
-	} {
+	#parsePageInput(input: DurableOutboxPageInput): ParsedOutboxPage {
 		if (!this.#closedPageInput(input)) throw invalid("page input must be a closed record");
 		if (input.scope !== undefined) assertDurableIssueScope(input.scope);
 		const limit = input.limit === undefined ? DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT : input.limit;
@@ -1239,16 +2560,8 @@ class BrowserIssuanceImplementation {
 		});
 	}
 
-	#recordKey(scope: DurableIssueScope, authorSequence: number): string {
-		return `${scope.objectId.length}:${scope.objectId}${scope.author.length}:${scope.author}:${authorSequence}`;
-	}
-
-	#scopeKey(scope: DurableIssueScope): string {
-		return `${scope.objectId.length}:${scope.objectId}${scope.author.length}:${scope.author}`;
-	}
-
-	#commitKey(commit: DurableIssueCommit): readonly [string, string, number] {
-		return [commit.outboxEntry.scope.objectId, commit.outboxEntry.scope.author, commit.authorSequence];
+	#issuedKey(issued: DurableIssueScope & { readonly authorSequence: number }): readonly [string, string, number] {
+		return [issued.objectId, issued.author, issued.authorSequence];
 	}
 
 	#sameScope(left: DurableIssueScope, right: DurableIssueScope): boolean {
@@ -1288,15 +2601,15 @@ async function openIssuanceDatabase(name: string): Promise<IDBDatabase> {
 					request.result.createObjectStore("issuedRecords", { autoIncrement: false, keyPath: [...RECORD_KEY_PATH] });
 					request.result.createObjectStore("issuanceOutbox", { autoIncrement: false, keyPath: [...RECORD_KEY_PATH] });
 				} else if (
-					event.oldVersion !== 1 ||
-					request.result.objectStoreNames.length !== 3 ||
+					(event.oldVersion !== 1 && event.oldVersion !== 2) ||
+					request.result.objectStoreNames.length !== (event.oldVersion === 1 ? 3 : 4) ||
 					!["issuanceOutbox", "issuedRecords", "lineages"].every((name) =>
 						request.result.objectStoreNames.contains(name)
 					)
 				) {
 					throw createDurableIssuanceFailure("ISSUANCE_UNSUPPORTED_SCHEMA", "issuance database cannot be upgraded");
 				}
-				if (event.oldVersion === 1) {
+				if (event.oldVersion === 1 || event.oldVersion === 2) {
 					const transaction = request.transaction;
 					if (transaction === null) {
 						throw createDurableIssuanceFailure(
@@ -1307,9 +2620,12 @@ async function openIssuanceDatabase(name: string): Promise<IDBDatabase> {
 					verifyStore(transaction.objectStore("lineages"), LINEAGE_KEY_PATH);
 					verifyStore(transaction.objectStore("issuedRecords"), RECORD_KEY_PATH);
 					verifyStore(transaction.objectStore("issuanceOutbox"), RECORD_KEY_PATH);
+					if (event.oldVersion === 2) verifyStore(transaction.objectStore("settlementPlans"), LINEAGE_KEY_PATH);
 				}
 				upgraded = true;
-				request.result.createObjectStore("settlementPlans", { autoIncrement: false, keyPath: [...LINEAGE_KEY_PATH] });
+				if (event.oldVersion !== 2)
+					request.result.createObjectStore("settlementPlans", { autoIncrement: false, keyPath: [...LINEAGE_KEY_PATH] });
+				request.result.createObjectStore("retirementControls", { autoIncrement: false, keyPath: "objectId" });
 			} catch (error) {
 				request.transaction?.abort();
 				if (!settled) {
@@ -1355,6 +2671,9 @@ async function admitDatabase(database: IDBDatabase): Promise<void> {
 		verifyStore(transaction.objectStore("issuedRecords"), RECORD_KEY_PATH);
 		verifyStore(transaction.objectStore("issuanceOutbox"), RECORD_KEY_PATH);
 		verifyStore(transaction.objectStore("settlementPlans"), LINEAGE_KEY_PATH);
+		const controls = transaction.objectStore("retirementControls");
+		if (controls.keyPath !== "objectId" || controls.autoIncrement || controls.indexNames.length !== 0)
+			throw createDurableIssuanceFailure("ISSUANCE_UNSUPPORTED_SCHEMA", "issuance retirement schema unsupported");
 		await transactionResult(transaction);
 	} catch (error) {
 		try {
@@ -1372,14 +2691,18 @@ async function admitDatabase(database: IDBDatabase): Promise<void> {
  * @param options - Untrusted exact browser factory options.
  * @returns The eight-method shared issuance capability.
  */
-export async function createBrowserDurableIssuanceStoreImplementation(options: unknown): Promise<DurableIssuanceStore> {
+export async function createBrowserDurableIssuanceStoreImplementation(
+	options: unknown
+): Promise<DurableIssuanceStore & NativeReadReservationPort> {
 	const primaryDatabaseName = captureOptions(options);
 	const database = await openIssuanceDatabase(`${primaryDatabaseName}${DATABASE_SUFFIX}`);
 	const implementation = new BrowserIssuanceImplementation(database);
 	database.onversionchange = (): void => implementation.versionchange();
 	try {
 		await admitDatabase(database);
-		const store = Object.assign(Object.create(null) as DurableIssuanceStore, {
+		const store = Object.freeze(Object.assign(Object.create(null) as DurableIssuanceStore & NativeReadReservationPort, {
+			acquireNativeReadReservation: (input: { readonly objectId: string }) =>
+				implementation.acquireNativeReadReservation(input),
 			close: (): Promise<void> => implementation.close(),
 			compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
 				implementation.compareAndMarkOutboxPublished(input),
@@ -1391,9 +2714,21 @@ export async function createBrowserDurableIssuanceStoreImplementation(options: u
 			transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
 				implementation.transactIssue(scope, buildAndSign),
 			transactWriteSettlementPlan: (input: unknown) => implementation.transactWriteSettlementPlan(input),
-		});
+		}));
 		implementationByStore.set(store, implementation);
+		const readBoundedRecoveryCensus: DurableIssuanceRecoveryCensusReader = input => implementation.readBoundedRecoveryCensus(input);
+		Object.defineProperty(readBoundedRecoveryCensus, "captureCurrentProbe", {value: function (this: DurableIssuanceRecoveryCensusReader,
+			input: DurableIssuanceRecoveryCensusInput, observation: DurableIssuanceRecoveryCensus): DurableIssuanceRecoveryCensusCurrentProbe | undefined {
+			if (this !== readBoundedRecoveryCensus) return undefined;
+			return implementation.captureRecoveryCensusCurrentProbe(input, observation);
+		}});
+		Object.freeze(readBoundedRecoveryCensus);
 		const maintenance = Object.freeze({
+			readBoundedRecoveryCensus,
+			withNativeSignAdmission: (input: unknown, sign: () => Promise<Uint8Array>) =>
+				implementation.withNativeSignAdmission(input, sign),
+			acquireRetirementControl: (input: { readonly objectId: string }) =>
+				implementation.acquireRetirementControl(input),
 			inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
 			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 			prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
@@ -1428,6 +2763,7 @@ export function browserIssuanceImplementationForTest(
  */
 export function browserIssuancePruningMaintenanceForStore(store: DurableIssuanceStore):
 	| Readonly<{
+			readBoundedRecoveryCensus(input: unknown): Promise<DurableIssuanceRecoveryCensus>;
 			inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
 			pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
 			prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
@@ -1436,6 +2772,8 @@ export function browserIssuancePruningMaintenanceForStore(store: DurableIssuance
 	const implementation = implementationByStore.get(store);
 	if (implementation === undefined) return undefined;
 	return Object.freeze({
+		readBoundedRecoveryCensus: (input: unknown) => implementation.readBoundedRecoveryCensus(input),
+		acquireRetirementControl: (input: { readonly objectId: string }) => implementation.acquireRetirementControl(input),
 		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
 		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),

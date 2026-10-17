@@ -110,6 +110,93 @@ test("sweeps at the exact owner-local retention boundary", async ({ page }) => {
 	expect(value.rows).toMatchObject({ chunks: 0, scopes: 0 });
 });
 
+test("reclaims exact expired mixed cohorts and preserves refreshed resumable bytes", async ({ page }, testInfo) => {
+	await page.goto(server.origin);
+	await page.waitForFunction(() => typeof window.phase4cBRun === "function");
+	const originalClock = await page.evaluate(() => Date.now.toString());
+	const value = (await page.evaluate(() => window.phase4cBRun("mixed-expiry"))) as Record<string, unknown>;
+	await testInfo.attach("mixed-expiry.json", {
+		body: Buffer.from(JSON.stringify(value)),
+		contentType: "application/json",
+	});
+	expect(await page.evaluate(() => Date.now.toString())).toBe(originalClock);
+	expect(value.verifiedStatus).toMatchObject({
+		kind: "verified",
+		missingIndices: [],
+		expiresAt: 4_000 + SNAPSHOT_QUARANTINE_RETENTION_MS,
+	});
+	expect(value.originalExpiry).toBe(4_000 + SNAPSHOT_QUARANTINE_RETENTION_MS);
+	expect(value.refreshedExpiry).toBe(4_100 + SNAPSHOT_QUARANTINE_RETENTION_MS);
+	expect(value.duplicateExpiry).toBe(value.refreshedExpiry);
+	expect(value.youngerExpiry).toBe(4_300 + SNAPSHOT_QUARANTINE_RETENTION_MS);
+	expect(value.reopenedBeforeExpiry).toMatchObject({ scopes: 4, chunks: 7 });
+	expect(value.before).toBe(0);
+	expect(value.elapsedOnly).toEqual(value.reopenedBeforeExpiry);
+	expect(value.at).toBe(2);
+	expect(value.afterExplicit).toMatchObject({
+		scopes: 2,
+		chunks: 3,
+		scopeDetails: [
+			{ objectId: "mixed-refreshed", state: "open", expiresAt: value.refreshedExpiry },
+			{ objectId: "mixed-younger", state: "open", expiresAt: value.youngerExpiry },
+		],
+	});
+	expect(value.missingBeforeResume).toEqual([2]);
+	expect(value.survivorExact).toBe(true);
+	expect(value.completedExpiry).toBe(4_000 + 2 * SNAPSHOT_QUARANTINE_RETENTION_MS);
+	expect(value.resumedStatus).toMatchObject({ kind: "verified", missingIndices: [], expiresAt: value.completedExpiry });
+	expect(value.openedStoreOnly).toMatchObject({ scopes: 2, chunks: 4 });
+	expect(value.afterImplicit).toMatchObject({
+		scopes: 2,
+		chunks: 3,
+		scopeDetails: [
+			{
+				objectId: "mixed-maintenance",
+				state: "open",
+				expiresAt: Number(value.youngerExpiry) + SNAPSHOT_QUARANTINE_RETENTION_MS,
+			},
+			{ objectId: "mixed-refreshed", state: "verified", expiresAt: value.completedExpiry },
+		],
+	});
+});
+
+test("streams native expired cohorts without bulk materialization and preserves resumable survivors", async ({
+	page,
+}, info) => {
+	await page.goto(server.origin);
+	await page.waitForFunction(() => typeof window.phase4cBRun === "function");
+	const value = (await page.evaluate(() => window.phase4cBRun("streaming-expiry"))) as {
+		extraExpiredScopes: number;
+		expiryRequests: { bulkRequests: number; maximumBulkRows: number; cursorRequests: number; cursorRows: number };
+		reopenedBeforeExpiry: { scopes: number; chunks: number };
+		before: number;
+		at: number;
+		afterExplicit: { scopes: number; chunks: number };
+		missingBeforeResume: number[];
+		survivorExact: boolean;
+		resumedStatus: { kind: string; missingIndices: number[] };
+		afterImplicit: { scopes: number; chunks: number };
+	};
+	await info.attach("native-streaming-expiry", {
+		body: Buffer.from(JSON.stringify(value)),
+		contentType: "application/json",
+	});
+	// Native maintenance, not the test-only census, must never return the whole
+	// expiry cohort. Cursor event counts are telemetry, not a CPU/RSS bound.
+	expect(value.expiryRequests.maximumBulkRows).toBeLessThanOrEqual(1);
+	expect(value.expiryRequests.bulkRequests).toBe(0);
+	expect(value.expiryRequests.cursorRequests).toBeGreaterThan(0);
+	expect(value.expiryRequests.cursorRows).toBeGreaterThanOrEqual(value.extraExpiredScopes + 2);
+	expect(value.reopenedBeforeExpiry).toMatchObject({ scopes: value.extraExpiredScopes + 4, chunks: 7 });
+	expect(value.before).toBe(0);
+	expect(value.at).toBe(value.extraExpiredScopes + 2);
+	expect(value.afterExplicit).toMatchObject({ scopes: 2, chunks: 3 });
+	expect(value.missingBeforeResume).toEqual([2]);
+	expect(value.survivorExact).toBe(true);
+	expect(value.resumedStatus).toMatchObject({ kind: "verified", missingIndices: [] });
+	expect(value.afterImplicit).toMatchObject({ scopes: 2, chunks: 3 });
+});
+
 test("terminates a genuine writer and reopens only old-or-exact-new state", async ({ browser }) => {
 	const firstContext = await browser.newContext();
 	const firstPage = await firstContext.newPage();

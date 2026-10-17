@@ -1,3 +1,4 @@
+import { acquireBrowserIdentity } from "@ts-drp/example-browser-network";
 import { DRPNode } from "@ts-drp/node";
 import { enableTracing } from "@ts-drp/tracer";
 
@@ -5,11 +6,17 @@ import { env } from "./env";
 import { createModularGridNetwork, type ModularGridNetworkSession } from "./modular-network";
 import { isModularNetworkEnv, getNetworkConfigFromEnv as selectNetworkConfigFromEnv } from "./network-config";
 import { enableUIControls, renderNetwork, renderZone } from "./render";
-import { createV3ZoneApi, type V3ZoneApi, type V3ZoneRoomHeadAuthorityForOpen } from "./v3-zone";
+import {
+	createV3ZoneApi,
+	type V3ZoneApi,
+	type V3ZoneRoomHeadAuthorityForOpen,
+	type V3ZoneSettlementSourceApproval,
+} from "./v3-zone";
 
 declare global {
 	interface Window {
 		__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: V3ZoneRoomHeadAuthorityForOpen;
+		__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__?: V3ZoneSettlementSourceApproval;
 	}
 }
 
@@ -21,88 +28,12 @@ interface GridNetworkSession {
 
 let applicationInterval: ReturnType<typeof setInterval> | undefined;
 
-interface BrowserIdentityLease {
-	release(): void;
-	readonly seed: string;
-}
-
-const IDENTITY_LOCK_PREFIX = "ts-drp:grid:v3-zone:identity-slot";
-const IDENTITY_SEED_KEY = "ts-drp:grid:v3-zone:identity-seed";
-
 /**
  * Get the selected network config.
  * @returns The environment-selected network configuration.
  */
 export function getNetworkConfigFromEnv(): ReturnType<typeof selectNetworkConfigFromEnv> {
 	return selectNetworkConfigFromEnv(env, window.location.origin);
-}
-
-function seedForSlot(slot: number): string {
-	const key = slot === 0 ? IDENTITY_SEED_KEY : `${IDENTITY_SEED_KEY}:${slot}`;
-	const existing = localStorage.getItem(key);
-	if (existing !== null && /^[0-9a-f]{64}$/u.test(existing)) return existing;
-	const seedBytes = new Uint8Array(32);
-	crypto.getRandomValues(seedBytes);
-	const seed = Array.from(seedBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-	localStorage.setItem(key, seed);
-	return seed;
-}
-
-async function stableBrowserIdentity(): Promise<BrowserIdentityLease> {
-	if (navigator.locks === undefined) throw new Error("v3 zone browser identity locks are unavailable");
-	// Let a just-closed document release its browser-owned lease before selecting
-	// the lowest available durable slot. Uniqueness itself comes from Web Locks,
-	// not from this reclamation grace period.
-	await new Promise((resolve) => setTimeout(resolve, 100));
-	for (let slot = 0; slot < 64; slot += 1) {
-		const lease = await acquireIdentitySlot(slot);
-		if (lease !== undefined) return lease;
-	}
-	throw new Error("v3 zone browser identity capacity is exhausted");
-}
-
-async function acquireIdentitySlot(slot: number): Promise<BrowserIdentityLease | undefined> {
-	let releaseLock: (() => void) | undefined;
-	let settleAvailability: ((available: boolean) => void) | undefined;
-	let rejectAvailability: ((error: unknown) => void) | undefined;
-	const availability = new Promise<boolean>((resolve, reject) => {
-		settleAvailability = resolve;
-		rejectAvailability = reject;
-	});
-	const hold = new Promise<void>((resolve) => {
-		releaseLock = resolve;
-	});
-	const request = navigator.locks.request(
-		`${IDENTITY_LOCK_PREFIX}:${slot}`,
-		{ ifAvailable: true, mode: "exclusive" },
-		async (lock) => {
-			settleAvailability?.(lock !== null);
-			if (lock !== null) await hold;
-		}
-	);
-	void request.catch((error: unknown) => rejectAvailability?.(error));
-	if (!(await availability)) {
-		await request;
-		return undefined;
-	}
-	let seed: string;
-	try {
-		seed = seedForSlot(slot);
-	} catch (error) {
-		releaseLock?.();
-		await request.catch(() => undefined);
-		throw error;
-	}
-	let released = false;
-	return Object.freeze({
-		release(): void {
-			if (released) return;
-			released = true;
-			releaseLock?.();
-			void request.catch(() => undefined);
-		},
-		seed,
-	});
 }
 
 function bindControls(zone: V3ZoneApi): void {
@@ -133,11 +64,12 @@ function bindControls(zone: V3ZoneApi): void {
 		if (
 			event.target instanceof HTMLInputElement ||
 			event.target instanceof HTMLTextAreaElement ||
-			event.target instanceof HTMLSelectElement ||
-			!zone.snapshot().ready
+			event.target instanceof HTMLSelectElement
 		) {
 			return;
 		}
+		// move() checks the live room/channel owner. Readiness must not build the
+		// complete diagnostic/ACL/durable-digest snapshot on every input event.
 		if (event.key === "w") zone.move(0, 1);
 		if (event.key === "a") zone.move(-1, 0);
 		if (event.key === "s") zone.move(0, -1);
@@ -149,8 +81,11 @@ function bindControls(zone: V3ZoneApi): void {
 }
 
 async function main(): Promise<void> {
-	if (env.enableTracing) enableTracing();
-	const identity = await stableBrowserIdentity();
+	if (env.enableTracing) await enableTracing();
+	const identity = await acquireBrowserIdentity({
+		lockPrefix: "ts-drp:grid:v3-zone:identity-slot",
+		seedKey: "ts-drp:grid:v3-zone:identity-seed",
+	});
 	const target = window as typeof window & {
 		__TS_DRP_GRID_SESSION__?: GridNetworkSession;
 		__TS_DRP_V3_ZONE__?: V3ZoneApi;
@@ -172,15 +107,20 @@ async function main(): Promise<void> {
 			stop: (): Promise<void> => node.stop(),
 		};
 		await node.start();
-		zone = createV3ZoneApi(node, renderZone, (context) => {
-			const factory = window.__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
-			if (typeof factory !== "function") {
-				throw new TypeError(
-					"v3 zone room-head authority is unavailable: the application host must configure its factory"
-				);
-			}
-			return factory(context);
-		});
+		zone = createV3ZoneApi(
+			node,
+			renderZone,
+			(context) => {
+				const factory = window.__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
+				if (typeof factory !== "function") {
+					throw new TypeError(
+						"v3 zone room-head authority is unavailable: the application host must configure its factory"
+					);
+				}
+				return factory(context);
+			},
+			window.__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__
+		);
 		target.__TS_DRP_GRID_SESSION__ = session;
 		target.__TS_DRP_V3_ZONE__ = zone;
 		window.dispatchEvent(new CustomEvent("ts-drp:grid-ready", { detail: session.snapshot() }));
@@ -193,8 +133,11 @@ async function main(): Promise<void> {
 			applicationInterval = undefined;
 			// The document owns the Web Lock until termination. Releasing it here
 			// would let a replacement page reuse this identity while teardown is pending.
-			void zone?.close().catch((error: unknown) => console.error("Failed to close v3 zone", error));
-			void session?.stop().catch((error: unknown) => console.error("Failed to stop grid session", error));
+			void (async (): Promise<void> => {
+				// The room joins admitted work before node.stop revokes its signer.
+				await zone?.close().catch((error: unknown) => console.error("Failed to close v3 zone", error));
+				await session?.stop().catch((error: unknown) => console.error("Failed to stop grid session", error));
+			})();
 		};
 		window.addEventListener("beforeunload", unloadHandler, { once: true });
 		await node.networkNode.isDialable(() => {

@@ -9,6 +9,7 @@ const capture = real.captureLiveJournalInput as AnyDecision;
 const duplicate = real.decideLiveJournalDuplicate as AnyDecision;
 const observation = real.classifyLiveJournalMutationObservation as AnyDecision;
 const snapshot = real.deriveLiveJournalSnapshot as AnyDecision;
+const readinessSnapshot = real.deriveLiveJournalSnapshotReadiness as AnyDecision;
 
 function mode(): unknown {
 	return Reflect.get(globalThis, "__TS_DRP_P4_LIVE_JOURNAL_DECISION_MUTANT__");
@@ -65,5 +66,11 @@ export function classifyLiveJournalMutationObservation(...arguments_: readonly u
  */
 export function deriveLiveJournalSnapshot(...arguments_: readonly unknown[]): unknown {
 	const result = snapshot(...arguments_);
+	return mode() === "snapshot" ? flipDecision(result) : result;
+}
+
+/** Keeps the same deliberately broken shared-validation control for readiness. */
+export function deriveLiveJournalSnapshotReadiness(...arguments_: readonly unknown[]): unknown {
+	const result = readinessSnapshot(...arguments_);
 	return mode() === "snapshot" ? flipDecision(result) : result;
 }

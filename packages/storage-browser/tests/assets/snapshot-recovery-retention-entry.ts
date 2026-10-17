@@ -1,6 +1,11 @@
-import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
+import {
+	durableIssuancePruningMaintenanceForStore,
+	ISSUANCE_RETIREMENT_LIMITS,
+} from "@ts-drp/issuance-store/maintenance";
+import { createBrowserDurableIssuanceStore } from "@ts-drp/storage-browser/issuance";
 
 import { createSnapshotQuarantineFixture } from "../../../../tests/fixtures/phase-4c-v3/snapshot-quarantine-contract.js";
+import { D109B_SCOPE, d109bIssue } from "../../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 import {
 	fixture,
 	type LegacyStore,
@@ -14,7 +19,10 @@ import {
 	type RetentionCase,
 	type RetentionEnvironment,
 	runRetentionCase,
+	runTemporaryAdmissionCase,
+	type TemporaryAdmissionCase,
 } from "../../../../tests/fixtures/snapshot-recovery-retention/contract.js";
+import { createBrowserSnapshotQuarantineStore } from "../../src/snapshot-transfer.js";
 import { createBrowserSnapshotQuarantineStore as createLegacy } from "../fixtures/legacy-snapshot-transfer.mjs";
 
 function request<T>(value: IDBRequest<T>): Promise<T> {
@@ -346,7 +354,7 @@ async function runNative(name: NativeCase, env: RetentionEnvironment, databaseNa
 	};
 }
 
-async function run(name: RetentionCase | NativeCase): Promise<unknown> {
+async function run(name: RetentionCase | NativeCase | `temporary-${TemporaryAdmissionCase}`): Promise<unknown> {
 	const primaryDatabaseName = `retention-red-${crypto.randomUUID()}`;
 	const databaseName = `${primaryDatabaseName}--drp-snapshot-quarantine-v1`;
 	const stores: LegacyStore[] = [];
@@ -464,6 +472,8 @@ async function run(name: RetentionCase | NativeCase): Promise<unknown> {
 			].includes(name)
 		)
 			return await runNative(name as NativeCase, env, databaseName);
+		if (name.startsWith("temporary-"))
+			return await runTemporaryAdmissionCase(name.slice(10) as TemporaryAdmissionCase, env);
 		return await runRetentionCase(name as RetentionCase, env);
 	} finally {
 		for (const store of stores) await store.close();
@@ -472,7 +482,176 @@ async function run(name: RetentionCase | NativeCase): Promise<unknown> {
 }
 declare global {
 	interface Window {
-		runSnapshotRecoveryRetention(name: RetentionCase | NativeCase): Promise<unknown>;
+		runSnapshotRecoveryRetention(
+			name: RetentionCase | NativeCase | `temporary-${TemporaryAdmissionCase}`
+		): Promise<unknown>;
+		runSnapshotRetirementSourceImage(): Promise<unknown>;
+		runIssuanceRetirementSourceControl(): Promise<unknown>;
 	}
 }
 window.runSnapshotRecoveryRetention = run;
+window.runIssuanceRetirementSourceControl = async (): Promise<unknown> => {
+	const primaryDatabaseName = `issuance-source-control-${crypto.randomUUID()}`;
+	let store = await createBrowserDurableIssuanceStore({ primaryDatabaseName });
+	try {
+		await d109bIssue(store, D109B_SCOPE, 1);
+		const owner = durableIssuancePruningMaintenanceForStore(store);
+		if (owner?.readBoundedRecoveryCensus === undefined || owner.acquireRetirementControl === undefined)
+			throw new Error("native census absent");
+		const input = { objectId: D109B_SCOPE.objectId, limits: ISSUANCE_RETIREMENT_LIMITS };
+		const before = await owner.readBoundedRecoveryCensus(input);
+		const acquire: unknown = Reflect.get(store, "acquireNativeReadReservation");
+		if (typeof acquire !== "function") throw new Error("original native reservation absent");
+		const held = (await Reflect.apply(acquire, store, [{ objectId: input.objectId }])) as {
+			check(): Promise<void>;
+			release(): Promise<void>;
+		};
+		const nativeTransaction = IDBDatabase.prototype.transaction;
+		let transactions = 0;
+		IDBDatabase.prototype.transaction = function (...args): IDBTransaction {
+			if (this.name === `${primaryDatabaseName}--drp-issuance-v1`) transactions++;
+			return Reflect.apply(nativeTransaction, this, args) as IDBTransaction;
+		};
+		let borrowed;
+		let birthRefused;
+		try {
+			borrowed = await owner.readBoundedRecoveryCensus(input);
+			birthRefused = await outcome(() => owner.acquireRetirementControl?.({ objectId: input.objectId }));
+			await held.check();
+		} finally {
+			IDBDatabase.prototype.transaction = nativeTransaction;
+			await held.release();
+		}
+		const first = await owner.acquireRetirementControl({ objectId: input.objectId });
+		const born = await owner.readBoundedRecoveryCensus(input);
+		const prepared = await first.prepareFence({
+			decisionDigest: "33".repeat(32),
+			sourceProofDigest: "44".repeat(32),
+			throughEpoch: 0,
+			protectedRecords: [],
+		});
+		await first.release();
+		const during = await owner.readBoundedRecoveryCensus(input);
+		const second = await owner.acquireRetirementControl({ objectId: input.objectId });
+		const completed = await second.commitPrepared();
+		await second.release();
+		const after = await owner.readBoundedRecoveryCensus(input);
+		await store.close();
+		store = await createBrowserDurableIssuanceStore({ primaryDatabaseName });
+		const reopened = durableIssuancePruningMaintenanceForStore(store);
+		if (reopened?.readBoundedRecoveryCensus === undefined) throw new Error("reopened native census absent");
+		return {
+			nullableControl: before.control === null,
+			borrowedExact: stable(before) === stable(borrowed),
+			borrowedTransactions: transactions,
+			birthRefusal: birthRefused.code,
+			birthRefusalDetail: birthRefused.detail,
+			bornExact: stable(born.control) === stable(first.control),
+			preparedExact: stable(during.control) === stable(prepared),
+			completedExact: stable(after.control) === stable(completed),
+			dataUnchanged: [born, during, after].every(
+				(value) => stable(value.rows) === stable(before.rows) && stable(value.image) === stable(before.image)
+			),
+			reopenedExact: stable(await reopened.readBoundedRecoveryCensus(input)) === stable(after),
+		};
+	} finally {
+		await store.close();
+		await request(indexedDB.deleteDatabase(`${primaryDatabaseName}--drp-issuance-v1`));
+	}
+};
+window.runSnapshotRetirementSourceImage = async (): Promise<unknown> => {
+	const primaryDatabaseName = `snapshot-source-image-${crypto.randomUUID()}`;
+	const databaseName = `${primaryDatabaseName}--drp-snapshot-quarantine-v1`;
+	const objectId = "snapshot-source-image";
+	let owner = await createBrowserSnapshotQuarantineStore({ primaryDatabaseName });
+	let raw: IDBDatabase | undefined;
+	try {
+		for (const epoch of [0, 1]) {
+			const selected = createSnapshotQuarantineFixture({ objectId, epoch, chunks: [Uint8Array.of(3, 5, 8)] });
+			const scope = await owner.openScope(selected.declaration);
+			try {
+				await scope.complete(await receiptFor(scope, selected));
+				if (epoch === 0) await scope.retainForRecovery();
+			} finally {
+				await scope.release();
+			}
+		}
+		const read = owner.readRetirementImage;
+		const acquire = owner.acquireRetirementControl;
+		const inventory = owner.captureRecoveryRoleInventory;
+		if (read === undefined || acquire === undefined || inventory === undefined)
+			throw new Error("native source port absent");
+		const before = await read({ objectId });
+		const census = await inventory({ objectId });
+		if (!(await indexedDB.databases()).some((row) => row.name === databaseName))
+			throw new Error("inspection must not create native owner");
+		raw = await request(indexedDB.open(databaseName));
+		const inspect = raw.transaction("retirementControls", "readonly");
+		const inspected = terminal(inspect);
+		const controlsBefore = await request(inspect.objectStore("retirementControls").count());
+		await inspected;
+		const view = await acquire({ objectId });
+		let borrowed;
+		let transactions = 0;
+		const nativeTransaction = IDBDatabase.prototype.transaction;
+		IDBDatabase.prototype.transaction = function (...args): IDBTransaction {
+			if (this.name === databaseName) transactions++;
+			return Reflect.apply(nativeTransaction, this, args) as IDBTransaction;
+		};
+		try {
+			borrowed = await read({ objectId });
+		} finally {
+			IDBDatabase.prototype.transaction = nativeTransaction;
+			await view.release();
+		}
+		const stale = await acquire({ objectId });
+		// Queue a genuine foreign RW behind the held native RO, then let prepare join
+		// that RO. The queued metadata change precedes its original fresh-image CAS.
+		const drift = raw.transaction("scopes", "readwrite", { durability: "strict" });
+		const drifted = terminal(drift);
+		const rows = request(drift.objectStore("scopes").getAll()) as Promise<Record<string, unknown>[]>;
+		const mutation = rows.then((values) => {
+			const temporary = values.find((row) => row.objectId === objectId && row.epoch === 1);
+			if (temporary === undefined || typeof temporary.expiresAt !== "number")
+				throw new Error("temporary metadata absent");
+			drift.objectStore("scopes").put({ ...temporary, expiresAt: temporary.expiresAt + 1 });
+		});
+		const refused = await outcome(() =>
+			stale.prepareFence({
+				decisionDigest: "33".repeat(32),
+				sourceProofDigest: "44".repeat(32),
+				throughEpoch: 0,
+				protectedScopes: stale.image.scopes.filter((entry) => entry.scope.epoch === 0),
+			})
+		);
+		await mutation;
+		await drifted;
+		const changed = await read({ objectId });
+		const censusAfter = await inventory({ objectId });
+		raw.close();
+		raw = undefined;
+		await owner.close();
+		owner = await createBrowserSnapshotQuarantineStore({ primaryDatabaseName });
+		const reopened = owner.readRetirementImage;
+		if (reopened === undefined) throw new Error("reopened source port absent");
+		return {
+			controlsBefore,
+			nullControl: before.control === null,
+			scopeCount: before.image.scopeCount,
+			chunkCount: before.image.chunkCount,
+			recoveryScopeCount: census.scopes.length,
+			borrowedTransactions: transactions,
+			birthPreservedImage: stable(borrowed.image) === stable(before.image),
+			borrowedExactControl: stable(borrowed.control) === stable(view.control),
+			temporaryDriftChangesImage: changed.image.imageDigest !== before.image.imageDigest,
+			recoveryInventoryUnchanged: stable(censusAfter.scopes) === stable(census.scopes),
+			refusal: refused.code,
+			refusalPreservedControl: stable(changed.control) === stable(stale.control),
+			reopenedExact: stable(await reopened({ objectId })) === stable(changed),
+		};
+	} finally {
+		raw?.close();
+		await owner.close();
+		await request(indexedDB.deleteDatabase(databaseName));
+	}
+};

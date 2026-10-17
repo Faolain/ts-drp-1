@@ -1,4 +1,24 @@
-import { spawn } from "node:child_process";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { build } from "esbuild";
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+import {
+	applySettlementPlanEffect,
+	assertSettlementPlanProgressTransition,
+	cloneSettlementPlan,
+	copySettlementPlan,
+} from "@ts-drp/issuance-store";
+import {
+	captureIssuanceNativeSignInput,
+	decodeIssuanceRetirementControl,
+	durableIssuancePruningMaintenanceForStore,
+	encodeIssuanceRetirementControl,
+	ISSUANCE_RETIREMENT_LIMITS,
+	issuanceRetirementImage,
+	issuanceUnsignedContinuationWidths,
+	issuanceUnsignedPostimageWidths,
+	issuanceUnsignedSuccessorFenceWidths,
+} from "@ts-drp/issuance-store/maintenance";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,17 +35,787 @@ import {
 	PHASE_2L_C_SCOPE,
 	PHASE_2L_C_V3_DDL,
 } from "./fixtures/phase-2l-c-node-issuance-contract.js";
+import contract from "../../../tests/fixtures/phase-0i-v3/blueprint-admission-package.json" with { type: "json" };
 import { encodeCanonical } from "../../canonical/dist/src/index.js";
 import type {
 	DurableIssuanceStore,
 	DurableIssueCommit,
 	DurableIssueScope,
 } from "../../issuance-store/dist/src/index.js";
+import registry from "../../protocol-v3/registry/registry-v1.json" with { type: "json" };
+import {
+	createAdmissionBoundTransactionalVertexIssuer,
+	createTransactionalVertexIssuer,
+	prepareBlueprintAdmission,
+	verifyReceivedVertex,
+} from "../../protocol-v3/src/index.js";
 
 const temporaryDirectories: string[] = [];
 const lockFixture = new URL("./fixtures/phase-2l-c-node-lock-child.mjs", import.meta.url);
 const raceFixture = new URL("./fixtures/phase-2l-c-node-race-child.mjs", import.meta.url);
 const admissionObserverFixture = new URL("./fixtures/phase-2l-c-node-admission-observer-child.mjs", import.meta.url);
+
+const currencySeed = new Uint8Array(Buffer.from(contract.privateKeySeedHex, "hex"));
+const currencyPublicKey = ed25519.getPublicKey(currencySeed);
+const currencyScope = { objectId: contract.vertex.objectId, author: Buffer.from(currencyPublicKey).toString("hex") };
+const currencyPackageBytes = encodeCanonical(contract.package);
+const currencyPrepared = prepareBlueprintAdmission({
+	canonicalBlueprintPackageBytes: currencyPackageBytes,
+	expectedBlueprintDigest: Buffer.from(hashDomain("ts-drp/blueprint-admission/v3", currencyPackageBytes)).toString(
+		"hex"
+	),
+});
+const currencyInput = { ...contract.vertex, epoch: 1, operation: contract.validOperation };
+
+describe("Node exact-held recovery census producer", () => {
+	const input = {objectId: currencyScope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS};
+	const nativeStore = (store: DurableIssuanceStore) => store as DurableIssuanceStore & {
+		acquireNativeReadReservation(input: {objectId: string}): Promise<import("@ts-drp/storage").NativeReadReservation>;
+	};
+
+	it("checks genuine current observations freshly without rereading their complete native census", async () => {
+		const filename = primary("census-probe-checks"), {createNodeDurableIssuanceStore} = await loadPhase2lCNodeModule();
+		const store = nativeStore(createNodeDurableIssuanceStore({primaryFilename: filename}));
+		let lease: Awaited<ReturnType<typeof store.acquireNativeReadReservation>> | undefined;
+		const original = DatabaseSync.prototype.prepare;
+		let rowReads = 0, nativeChecks = 0;
+		try {
+			await currencyIssuer(store, undefined, digest => Promise.resolve(ed25519.sign(digest, currencySeed))).issue(currencyInput);
+			const reader = durableIssuancePruningMaintenanceForStore(store)!.readBoundedRecoveryCensus!;
+			expect(Object.isFrozen(reader)).toBe(true);
+			lease = await store.acquireNativeReadReservation({objectId: input.objectId});
+			DatabaseSync.prototype.prepare = function (sql: string) {
+				if (/FROM (lineages|issued_records|issuance_outbox|settlement_plans)\b/.test(sql)) rowReads++;
+				if (sql === "SELECT name FROM sqlite_schema LIMIT 1") nativeChecks++;
+				return original.call(this, sql);
+			};
+			const observation = await reader(input), reads = rowReads;
+			expect(reads).toBeGreaterThan(0);
+			expect(reader.captureCurrentProbe).toBeTypeOf("function");
+			const probe = reader.captureCurrentProbe!.call(reader, input, observation)!;
+			expect(probe).toBeDefined();
+			expect(reader.captureCurrentProbe!.call(reader, input, observation)).toBeUndefined();
+			const beforeChecks = nativeChecks;
+			for (let index = 0; index < 5; index++) expect(await probe.checkCurrent()).toBe(true);
+			expect(nativeChecks - beforeChecks).toBe(5);
+			expect(rowReads).toBe(reads);
+			await expect(probe.checkCurrent.call({...probe})).rejects.toMatchObject({code: "ISSUANCE_INVALID_ARGUMENT"});
+			await lease.release(); lease = undefined;
+			expect(await probe.checkCurrent()).toBe(false);
+			lease = await store.acquireNativeReadReservation({objectId: input.objectId});
+			expect(await probe.checkCurrent()).toBe(false);
+			const fresh = await reader(input);
+			expect(rowReads).toBeGreaterThan(reads);
+			expect(reader.captureCurrentProbe!.call(reader, input, fresh)).toBeDefined();
+		} finally {DatabaseSync.prototype.prepare = original; await lease?.release(); await store.close();}
+	});
+
+	it("refuses copied, mutated, wrong-input, accessor and foreign-producer enrollment", async () => {
+		const filename = primary("census-probe-enrollment"), {createNodeDurableIssuanceStore} = await loadPhase2lCNodeModule();
+		const store = nativeStore(createNodeDurableIssuanceStore({primaryFilename: filename}));
+		let lease: Awaited<ReturnType<typeof store.acquireNativeReadReservation>> | undefined;
+		try {
+			await currencyIssuer(store, undefined, digest => Promise.resolve(ed25519.sign(digest, currencySeed))).issue(currencyInput);
+			const reader = durableIssuancePruningMaintenanceForStore(store)!.readBoundedRecoveryCensus!;
+			lease = await store.acquireNativeReadReservation({objectId: input.objectId});
+			const observation = await reader(input), capture = reader.captureCurrentProbe!;
+			expect(capture).toBeTypeOf("function");
+			expect(capture.call(reader, input, structuredClone(observation))).toBeUndefined();
+			expect(capture.call(reader, {...input, objectId: "foreign"}, observation)).toBeUndefined();
+			expect(capture.call(reader, {...input, limits: {...input.limits, maxRows: input.limits.maxRows - 1}}, observation)).toBeUndefined();
+			let getters = 0;
+			const accessor = Object.defineProperty({}, "objectId", {enumerable: true, get() {getters++; return input.objectId;}});
+			expect(capture.call(reader, accessor as typeof input, observation)).toBeUndefined();
+			expect(getters).toBe(0);
+			const wrapper = ((value: typeof input) => reader(value));
+			expect(capture.call(wrapper, input, observation)).toBeUndefined();
+			expect(capture.call(reader, input, Object.defineProperty({...observation}, "rows", {enumerable: true,
+				get() {getters++; return observation.rows;}}))).toBeUndefined();
+			expect(getters).toBe(0);
+			observation.rows.issued[0]!.signature[0] ^= 1;
+			expect(capture.call(reader, input, observation)).toBeUndefined();
+			const fresh = await reader(input), probe = capture.call(reader, input, fresh)!;
+			expect(await probe.checkCurrent()).toBe(true);
+		} finally {await lease?.release(); await store.close();}
+	});
+
+	it("revokes immediately and joins admitted checks before releasing foreign native exclusion", async () => {
+		const filename = primary("census-probe-join"), {createNodeDurableIssuanceStore} = await loadPhase2lCNodeModule();
+		const store = nativeStore(createNodeDurableIssuanceStore({primaryFilename: filename}));
+		const foreign = new DatabaseSync(derivedFilename(filename)); foreign.exec("PRAGMA busy_timeout=0");
+		let lease: Awaited<ReturnType<typeof store.acquireNativeReadReservation>> | undefined;
+		try {
+			const reader = durableIssuancePruningMaintenanceForStore(store)!.readBoundedRecoveryCensus!;
+			lease = await store.acquireNativeReadReservation({objectId: input.objectId});
+			const observation = await reader(input), probe = reader.captureCurrentProbe!.call(reader, input, observation)!;
+			const check = probe.checkCurrent();
+			await Promise.resolve(); // The original fresh native check has entered; delivery is pending.
+			const released = lease.release();
+			const revokedCheck = lease.check();
+			expect(reader.captureCurrentProbe!.call(reader, input, observation)).toBeUndefined();
+			expect(() => foreign.exec("BEGIN IMMEDIATE")).toThrow();
+			await expect(revokedCheck).rejects.toThrow("NATIVE_READ_RESERVATION_RELEASED");
+			expect(await check).toBe(false);
+			await released; lease = undefined;
+			foreign.exec("BEGIN IMMEDIATE"); foreign.exec("ROLLBACK");
+			expect(await probe.checkCurrent()).toBe(false);
+			lease = await store.acquireNativeReadReservation({objectId: input.objectId});
+			const next = await reader(input), nextProbe = reader.captureCurrentProbe!.call(reader, input, next)!;
+			const pending = nextProbe.checkCurrent(), closing = store.close();
+			await expect(pending).rejects.toMatchObject({code: "ISSUANCE_STORE_CLOSED"});
+			await closing; lease = undefined;
+			await expect(nextProbe.checkCurrent()).rejects.toMatchObject({code: "ISSUANCE_STORE_CLOSED"});
+		} finally {await lease?.release(); foreign.close(); await store.close();}
+	});
+
+	it("revalidates raw corruption after release rather than extending a released probe into a new read", async () => {
+		const filename = primary("census-probe-corruption"), {createNodeDurableIssuanceStore} = await loadPhase2lCNodeModule();
+		const store = nativeStore(createNodeDurableIssuanceStore({primaryFilename: filename}));
+		let lease: Awaited<ReturnType<typeof store.acquireNativeReadReservation>> | undefined;
+		try {
+			await currencyIssuer(store, undefined, digest => Promise.resolve(ed25519.sign(digest, currencySeed))).issue(currencyInput);
+			const reader = durableIssuancePruningMaintenanceForStore(store)!.readBoundedRecoveryCensus!;
+			lease = await store.acquireNativeReadReservation({objectId: input.objectId});
+			const observation = await reader(input), probe = reader.captureCurrentProbe!.call(reader, input, observation)!;
+			await lease.release(); lease = undefined;
+			const raw = new DatabaseSync(derivedFilename(filename));
+			try {
+				raw.function("issuance_retirement_connection", {varargs: true}, () => 1);
+				raw.function("issuance_retirement_record", {varargs: true}, () => 1);
+				raw.prepare("UPDATE issued_records SET canonical_preimage=?").run(Uint8Array.of(255));
+			} finally {raw.close();}
+			lease = await store.acquireNativeReadReservation({objectId: input.objectId});
+			expect(await probe.checkCurrent()).toBe(false);
+			await expect(reader(input)).rejects.toBeInstanceOf(Error);
+			expect(reader.captureCurrentProbe!.call(reader, input, observation)).toBeUndefined();
+		} finally {await lease?.release(); await store.close();}
+	});
+
+	it("bounds image retention through escaping ended same-job probes", async () => {
+		const filename = primary("census-probe-retention"), {createNodeDurableIssuanceStore} = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({primaryFilename: filename});
+		try {
+			await store.transactIssue(PHASE_2L_C_SCOPE, async sequence => {
+				const commit = phase2lCCommit(sequence);
+				const envelope = {...commit.envelope, canonicalPreimageBytes: encodeCanonical({...PHASE_2L_C_SCOPE,
+					kind: "drp-vertex", protocolMajor: 3, epoch: 0, authorSequence: sequence, payload: new Uint8Array(131_072)})};
+				return {...commit, envelope, issuedRecord: {...commit.issuedRecord, envelope}, outboxEntry: {...commit.outboxEntry, envelope}};
+			});
+		} finally {await store.close();}
+		const output = path.join(path.dirname(filename), "census-probe-retention.mjs");
+		await build({bundle: true, platform: "node", format: "esm", target: "node22", outfile: output,
+			stdin: {resolveDir: import.meta.dirname, sourcefile: "census-probe-retention-child.ts", contents: `
+				import {createNodeDurableIssuanceStore} from "../src/issuance.ts";
+				import {durableIssuancePruningMaintenanceForStore, ISSUANCE_RETIREMENT_LIMITS} from "@ts-drp/issuance-store/maintenance";
+				const store = createNodeDurableIssuanceStore({primaryFilename:process.argv[2],initialization:"reopen"});
+				const input={objectId:process.argv[3],limits:ISSUANCE_RETIREMENT_LIMITS}, probes=[];
+				const reader=durableIssuancePruningMaintenanceForStore(store).readBoundedRecoveryCensus;
+				global.gc(); const before=process.memoryUsage().arrayBuffers; let imageBytes=0;
+				for(let index=0;index<24;index++) {
+					const held=await store.acquireNativeReadReservation({objectId:input.objectId});
+					try {const image=await reader(input); imageBytes=image.image.logicalBytes;
+						const probe=reader.captureCurrentProbe?.call(reader,input,image);
+						if(!probe) throw Error("original current producer probe missing"); probes.push(probe);
+					} finally {await held.release();}
+				}
+				global.gc(); const after=process.memoryUsage().arrayBuffers;
+				for(const probe of probes) if(await probe.checkCurrent()) throw Error("released probe became current");
+				console.log(JSON.stringify({retained:after-before,imageBytes,count:probes.length})); await store.close();
+			`}});
+		const child = spawnSync(process.execPath, ["--expose-gc", "--no-concurrent-array-buffer-sweeping", output, filename, PHASE_2L_C_SCOPE.objectId],
+			{encoding: "utf8", timeout: 15_000});
+		expect(child.error).toBeUndefined(); expect(child.status, child.stderr).toBe(0);
+		const result = JSON.parse(child.stdout.trim()) as {retained: number; imageBytes: number; count: number};
+		console.info("native census ended probe retention", result);
+		expect(result.count).toBe(24); expect(result.retained).toBeLessThan(result.imageBytes * 4);
+	});
+});
+
+describe("R9 native inherited settlement reference", () => {
+	it("retains and charges the exact reference through SQLite reopen without granting replacement authority", async () => {
+		const primaryFilename = primary("r9-inherited-reference");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		let store = createNodeDurableIssuanceStore({ primaryFilename });
+		try {
+			const issuer = currencyIssuer(store, undefined, (digest) => Promise.resolve(ed25519.sign(digest, currencySeed)));
+			const source = await issuer.issue(currencyInput);
+			const inheritance = {
+				sourceObjectId: "r9-source",
+				targetObjectId: currencyScope.objectId,
+				targetAuthor: currencyScope.author,
+				targetAuthorSequence: 3,
+				targetVertexDigest: new Uint8Array(32).fill(7),
+			};
+			const plan = {
+				scope: currencyScope,
+				revision: 0,
+				fenceSequence: null,
+				entries: [
+					{
+						sourceSequence: source.authorSequence,
+						sourceDigest: new Uint8Array(32).fill(6),
+						disposition: "inherited" as const,
+						replacementSequence: null,
+						inheritance,
+					},
+				],
+			};
+			const captured = copySettlementPlan(plan, currencyScope);
+			expect(plan.entries[0]?.sourceDigest).not.toEqual(source.envelope.digest);
+			expect(captured).toEqual(plan);
+			if (captured === undefined) throw new Error("inherited structural reference was refused");
+			const detached = cloneSettlementPlan(captured);
+			expect(() =>
+				applySettlementPlanEffect(captured, { kind: "replacement", sourceSequence: source.authorSequence }, 4)
+			).toThrow();
+			expect(detached.entries[0]?.inheritance?.targetVertexDigest).not.toBe(inheritance.targetVertexDigest);
+			for (const malformed of [
+				{ ...plan.entries[0], inheritance: undefined },
+				{ ...plan.entries[0], disposition: "rebase" },
+				{ ...plan.entries[0], replacementSequence: 3 },
+				{ ...plan.entries[0], inheritance: { ...inheritance, targetVertexDigest: Uint8Array.of(7) } },
+				{ ...plan.entries[0], inheritance: { ...inheritance, portableAuthority: true } },
+			])
+				expect(copySettlementPlan({ ...plan, entries: [malformed] }, currencyScope)).toBeUndefined();
+			const maintenance = durableIssuancePruningMaintenanceForStore(store);
+			if (!maintenance?.readBoundedRecoveryCensus) throw new Error("bounded native census missing");
+			const priorCensus = await maintenance.readBoundedRecoveryCensus({
+				objectId: currencyScope.objectId,
+				limits: ISSUANCE_RETIREMENT_LIMITS,
+			});
+			await store.transactWriteSettlementPlan({ scope: currencyScope, expectedRevision: null, plan });
+			const before = currencyNativeImage(primaryFilename);
+			const changed = {
+				...plan,
+				revision: 1,
+				entries: [
+					{ ...plan.entries[0], inheritance: { ...inheritance, targetVertexDigest: new Uint8Array(32).fill(8) } },
+				],
+			};
+			expect(() => assertSettlementPlanProgressTransition(plan, changed)).toThrow();
+			await expect(
+				store.transactWriteSettlementPlan({ scope: currencyScope, expectedRevision: 0, plan: changed })
+			).rejects.toMatchObject({ code: "ISSUANCE_RETRY_REQUIRED" });
+			expect(currencyNativeImage(primaryFilename)).toEqual(before);
+			const census = await maintenance.readBoundedRecoveryCensus({
+				objectId: currencyScope.objectId,
+				limits: ISSUANCE_RETIREMENT_LIMITS,
+			});
+			expect(census.image.planCount).toBe(1);
+			expect(census.rows.plans).toEqual([captured]);
+			const ordinaryEntries = captured.entries.map(({ inheritance: _reference, ...entry }) => ({
+				...entry,
+				disposition: "rebase" as const,
+			}));
+			expect(() =>
+				issuanceRetirementImage(
+					{
+						...census.rows,
+						plans: [{ ...captured, entries: ordinaryEntries }],
+					},
+					currencyScope.objectId
+				)
+			).toThrow("issuance retirement plan source is unclassified");
+			expect(census.image.logicalBytes - priorCensus.image.logicalBytes).toBeGreaterThan(
+				encodeCanonical(captured.entries[0]?.inheritance).byteLength
+			);
+			await store.close();
+			store = createNodeDurableIssuanceStore({ primaryFilename });
+			expect(await store.readSettlementPlan(currencyScope)).toEqual(captured);
+		} finally {
+			await store.close();
+		}
+	});
+	it("protects pending inherited target records across local authors before published pruning", async () => {
+		const primaryFilename = primary("r9-inherited-cross-author");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		try {
+			await currencyIssuer(store, undefined, (digest) => Promise.resolve(ed25519.sign(digest, currencySeed))).issue(
+				currencyInput
+			);
+			const targetSeed = new Uint8Array(32).fill(11),
+				targetKey = ed25519.getPublicKey(targetSeed);
+			const targetAuthor = Buffer.from(targetKey).toString("hex");
+			const targetScope = { objectId: currencyScope.objectId, author: targetAuthor };
+			const target = await createTransactionalVertexIssuer({
+				author: targetAuthor,
+				privateKeySeed: targetSeed,
+				publicKey: { bytes: targetKey, format: "raw" },
+				transactIssue: (scope, build) => store.transactIssue(scope, build),
+			}).issue(currencyInput);
+			await store.compareAndMarkOutboxPublished({
+				scope: targetScope,
+				authorSequence: target.authorSequence,
+				digest: target.envelope.digest,
+			});
+			await store.transactWriteSettlementPlan({
+				scope: currencyScope,
+				expectedRevision: null,
+				plan: {
+					scope: currencyScope,
+					revision: 0,
+					fenceSequence: null,
+					entries: [
+						{
+							sourceSequence: 0,
+							sourceDigest: new Uint8Array(32).fill(6),
+							disposition: "inherited",
+							replacementSequence: null,
+							inheritance: {
+								sourceObjectId: "r9-external-source",
+								targetObjectId: targetScope.objectId,
+								targetAuthor,
+								targetAuthorSequence: target.authorSequence,
+								targetVertexDigest: target.envelope.digest,
+							},
+						},
+					],
+				},
+			});
+			const maintenance = durableIssuancePruningMaintenanceForStore(store);
+			if (maintenance === undefined) throw new Error("native pruning owner unavailable");
+			const before = currencyNativeImage(primaryFilename);
+			await expect(
+				maintenance.prunePublishedPrefix({
+					closedEpoch: 1,
+					commitQcRef: { byteLength: 1, digest: "e".repeat(64) },
+					expectedLineage: { exhausted: false, next: 1 },
+					expectedPrunedThroughAuthorSequence: null,
+					scope: targetScope,
+					snapshotManifestDigest: "f".repeat(64),
+					throughAuthorSequence: target.authorSequence,
+				})
+			).rejects.toThrow("issuance inherited target dependency remains pending");
+			expect(currencyNativeImage(primaryFilename)).toEqual(before);
+		} finally {
+			await store.close();
+		}
+	});
+});
+
+function currencyNativeImage(primaryFilename: string): unknown {
+	const database = new DatabaseSync(derivedFilename(primaryFilename), { readOnly: true });
+	try {
+		return Object.fromEntries(
+			["lineages", "issued_records", "issuance_outbox", "settlement_plans", "retirement_controls"].map((table) => [
+				table,
+				database
+					.prepare(
+						`SELECT * FROM ${table} ORDER BY object_id${table === "retirement_controls" ? "" : ",author"}${table === "issued_records" || table === "issuance_outbox" ? ",author_sequence" : ""}`
+					)
+					.all(),
+			])
+		);
+	} finally {
+		database.close();
+	}
+}
+
+async function currencyContext(
+	store: DurableIssuanceStore
+): Promise<{ expectedIssuanceImageDigest: string; expectedIssuanceControlBytes: Uint8Array | null }> {
+	const maintenance = durableIssuancePruningMaintenanceForStore(store);
+	if (!maintenance?.readBoundedRecoveryCensus) throw new Error("original noncreating census missing");
+	const captured = await maintenance.readBoundedRecoveryCensus({
+		objectId: currencyScope.objectId,
+		limits: ISSUANCE_RETIREMENT_LIMITS,
+	});
+	return {
+		expectedIssuanceImageDigest: captured.image.imageDigest,
+		expectedIssuanceControlBytes:
+			captured.control === null || captured.control === undefined
+				? null
+				: encodeIssuanceRetirementControl(captured.control),
+	};
+}
+
+function currencyIssuer(
+	store: DurableIssuanceStore,
+	context: unknown,
+	sign: (digest: Uint8Array) => Promise<Uint8Array>
+): ReturnType<typeof createAdmissionBoundTransactionalVertexIssuer> {
+	return createAdmissionBoundTransactionalVertexIssuer({
+		author: currencyScope.author,
+		preparedBlueprintAdmission: currencyPrepared,
+		publicKey: { bytes: currencyPublicKey, format: "raw" },
+		signRegisteredVertexDigest: sign,
+		transactIssue: (selected, build) =>
+			store.transactIssue(selected, (sequence, nativeSignAdmission) =>
+				build(sequence, (bytes: Uint8Array, task: () => Promise<Uint8Array>, effect?: object) => {
+					if (!nativeSignAdmission) throw new Error("original native job hook missing");
+					return nativeSignAdmission(bytes, task, { ...effect, ...(context as object) });
+				})
+			),
+	});
+}
+
+describe("R8 mechanical native currency CAS", () => {
+	it("matching complete context with null control permits genuine once NEW", async () => {
+		const primaryFilename = primary("currency-match");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		let entered = 0;
+		try {
+			const context = await currencyContext(store);
+			expect(context.expectedIssuanceControlBytes).toBeNull();
+			const committed = await currencyIssuer(store, context, (digest) => {
+				entered++;
+				const signature = ed25519.sign(digest, currencySeed);
+				expect(ed25519.verify(signature, digest, currencyPublicKey)).toBe(true);
+				return Promise.resolve(signature);
+			}).issue(currencyInput);
+			expect(entered).toBe(1);
+			expect(committed.authorSequence).toBe(0);
+			expect(await store.readLineage(currencyScope)).toEqual({ next: 1, exhausted: false });
+			expect((await store.readIssued(currencyScope, 0))?.envelope).toEqual(committed.envelope);
+			expect(await store.readOutboxPage({ scope: currencyScope })).toHaveLength(1);
+			console.log(
+				"R8_CURRENCY_MATCH_ONCE_NEW",
+				JSON.stringify({ entered, sequence: committed.authorSequence, next: 1, outbox: 1, priorControl: null })
+			);
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("same rows with a changed original control refuse before crypto without effects", async () => {
+		const primaryFilename = primary("currency-control");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		try {
+			const old = await currencyContext(store);
+			const maintenance = durableIssuancePruningMaintenanceForStore(store);
+			if (!maintenance?.acquireRetirementControl) throw new Error("original control owner missing");
+			const birth = await maintenance.acquireRetirementControl({ objectId: currencyScope.objectId });
+			await birth.release();
+			const current = await currencyContext(store);
+			expect(current.expectedIssuanceImageDigest).toBe(old.expectedIssuanceImageDigest);
+			expect(old.expectedIssuanceControlBytes).toBeNull();
+			expect(current.expectedIssuanceControlBytes).not.toBeNull();
+			const before = currencyNativeImage(primaryFilename);
+			let entered = 0;
+			await expect(
+				currencyIssuer(store, old, (digest) => {
+					entered++;
+					return Promise.resolve(ed25519.sign(digest, currencySeed));
+				}).issue(currencyInput)
+			).rejects.toMatchObject({ code: "ISSUANCE_RETRY_REQUIRED" });
+			expect(entered).toBe(0);
+			expect(currencyNativeImage(primaryFilename)).toEqual(before);
+			console.log(
+				"R8_CURRENCY_CONTROL_STALE",
+				JSON.stringify({ sameRows: true, changedControl: true, entered, unchangedAllFiveTables: true })
+			);
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("stale rows refuse even with matching current control before crypto without effects", async () => {
+		const primaryFilename = primary("currency-rows");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		try {
+			const first = await currencyIssuer(store, {}, (digest) =>
+				Promise.resolve(ed25519.sign(digest, currencySeed))
+			).issue(currencyInput);
+			const old = await currencyContext(store);
+			await store.compareAndMarkOutboxPublished({
+				scope: currencyScope,
+				authorSequence: first.authorSequence,
+				digest: first.envelope.digest,
+			});
+			const current = await currencyContext(store);
+			expect(current.expectedIssuanceImageDigest).not.toBe(old.expectedIssuanceImageDigest);
+			const stale = { ...current, expectedIssuanceImageDigest: old.expectedIssuanceImageDigest };
+			const before = currencyNativeImage(primaryFilename);
+			let entered = 0;
+			await expect(
+				currencyIssuer(store, stale, (digest) => {
+					entered++;
+					return Promise.resolve(ed25519.sign(digest, currencySeed));
+				}).issue(currencyInput)
+			).rejects.toMatchObject({ code: "ISSUANCE_RETRY_REQUIRED" });
+			expect(entered).toBe(0);
+			expect(currencyNativeImage(primaryFilename)).toEqual(before);
+			console.log(
+				"R8_CURRENCY_ROWS_STALE",
+				JSON.stringify({
+					changedRows: true,
+					expectedControlMatchesCurrent: true,
+					entered,
+					unchangedAllFiveTables: true,
+				})
+			);
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("malformed paired currency contexts refuse before crypto without effects", async () => {
+		const primaryFilename = primary("currency-malformed");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		try {
+			const valid = await currencyContext(store);
+			const before = currencyNativeImage(primaryFilename);
+			const invalid = [
+				{ expectedIssuanceImageDigest: valid.expectedIssuanceImageDigest },
+				{ expectedIssuanceControlBytes: null },
+				{ ...valid, expectedIssuanceControlBytes: undefined },
+				{ ...valid, expectedIssuanceControlBytes: Uint8Array.of(1) },
+				{ ...valid, expectedIssuanceImageDigest: "not-a-digest" },
+				{ ...valid, callerEligible: true },
+			];
+			let entered = 0;
+			for (const context of invalid) {
+				await expect(
+					currencyIssuer(store, context, (digest) => {
+						entered++;
+						return Promise.resolve(ed25519.sign(digest, currencySeed));
+					}).issue(currencyInput)
+				).rejects.toMatchObject({ code: "ISSUANCE_INVALID_ARGUMENT" });
+				expect(currencyNativeImage(primaryFilename)).toEqual(before);
+			}
+			expect(entered).toBe(0);
+			console.log(
+				"R8_CURRENCY_MALFORMED",
+				JSON.stringify({ cases: invalid.length, entered, unchangedAllFiveTables: true })
+			);
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("inherited entered debt with stale currency returns UNKNOWN at local zero and retains exact identity", async () => {
+		const primaryFilename = primary("currency-inherited");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const original = createNodeDurableIssuanceStore({ primaryFilename });
+		const old = await currencyContext(original);
+		let originalEntered = 0;
+		try {
+			await expect(
+				currencyIssuer(original, {}, (digest) => {
+					originalEntered++;
+					const signature = ed25519.sign(digest, currencySeed);
+					expect(ed25519.verify(signature, digest, currencyPublicKey)).toBe(true);
+					return Promise.reject(new Error("R8_TEST_ENTERED_CRYPTO_DELIVERY_LOST"));
+				}).issue(currencyInput)
+			).rejects.toMatchObject({ code: "ISSUANCE_OUTCOME_UNKNOWN" });
+		} finally {
+			await original.close();
+		}
+		expect(originalEntered).toBe(1);
+		const cold = createNodeDurableIssuanceStore({ primaryFilename });
+		try {
+			const current = await currencyContext(cold);
+			expect(current.expectedIssuanceImageDigest).not.toBe(old.expectedIssuanceImageDigest);
+			expect(current.expectedIssuanceControlBytes).not.toEqual(old.expectedIssuanceControlBytes);
+			const before = currencyNativeImage(primaryFilename);
+			const raw = new DatabaseSync(derivedFilename(primaryFilename), { readOnly: true });
+			try {
+				const pending = raw
+					.prepare("SELECT pending_unsigned FROM lineages WHERE object_id=? AND author=?")
+					.get(currencyScope.objectId, currencyScope.author)?.pending_unsigned;
+				expect(pending).toBeInstanceOf(Uint8Array);
+				expect(decodeCanonical(pending as Uint8Array)).toMatchObject({ phase: "entered", authorSequence: 0 });
+			} finally {
+				raw.close();
+			}
+			let entered = 0;
+			await expect(
+				currencyIssuer(cold, old, (digest) => {
+					entered++;
+					return Promise.resolve(ed25519.sign(digest, currencySeed));
+				}).issue(currencyInput)
+			).rejects.toMatchObject({ code: "ISSUANCE_OUTCOME_UNKNOWN", cause: { code: "ISSUANCE_RETRY_REQUIRED" } });
+			expect(entered).toBe(0);
+			expect(currencyNativeImage(primaryFilename)).toEqual(before);
+			expect(await cold.readLineage(currencyScope)).toEqual({ next: 0, exhausted: false });
+			expect(await cold.readIssued(currencyScope, 0)).toBeNull();
+			console.log(
+				"R8_CURRENCY_INHERITED_UNKNOWN",
+				JSON.stringify({
+					originalEntered,
+					entered,
+					code: "ISSUANCE_OUTCOME_UNKNOWN",
+					cause: "ISSUANCE_RETRY_REQUIRED",
+					unchangedAllFiveTables: true,
+					retainedIdentity: true,
+					next: 0,
+					pair: 0,
+				})
+			);
+		} finally {
+			await cold.close();
+		}
+	});
+});
+
+describe("R8 mechanical native currency writer gap", () => {
+	it("rechecks currency after reserved COMMIT before crypto when another author publishes in the writer gap", async () => {
+		const primaryFilename = primary("currency-writer-gap");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		const foreign = createNodeDurableIssuanceStore({ primaryFilename });
+		const foreignSeed = new Uint8Array(currencySeed);
+		foreignSeed[0] ^= 1;
+		const foreignPublicKey = ed25519.getPublicKey(foreignSeed);
+		const foreignScope = { objectId: currencyScope.objectId, author: Buffer.from(foreignPublicKey).toString("hex") };
+		const originalExec = DatabaseSync.prototype.exec;
+		let armed = false,
+			interposed = false,
+			entered = 0;
+		let publication: Promise<void> | undefined;
+		let afterInterposition: unknown;
+		try {
+			const foreignIssuer = createAdmissionBoundTransactionalVertexIssuer({
+				author: foreignScope.author,
+				preparedBlueprintAdmission: currencyPrepared,
+				publicKey: { bytes: foreignPublicKey, format: "raw" },
+				signRegisteredVertexDigest: (digest) => {
+					const signature = ed25519.sign(digest, foreignSeed);
+					expect(ed25519.verify(signature, digest, foreignPublicKey)).toBe(true);
+					return Promise.resolve(signature);
+				},
+				transactIssue: (scope, build) => foreign.transactIssue(scope, build),
+			});
+			const earlier = await foreignIssuer.issue(currencyInput);
+			const context = await currencyContext(store);
+			DatabaseSync.prototype.exec = function (sql: string): void {
+				originalExec.call(this, sql);
+				if (!armed || sql.trim().toUpperCase() !== "COMMIT") return;
+				const raw = new DatabaseSync(derivedFilename(primaryFilename), { readOnly: true });
+				let pending: unknown;
+				try {
+					const bytes = raw
+						.prepare("SELECT pending_unsigned FROM lineages WHERE object_id=? AND author=?")
+						.get(currencyScope.objectId, currencyScope.author)?.pending_unsigned;
+					if (bytes instanceof Uint8Array) pending = decodeCanonical(bytes);
+				} finally {
+					raw.close();
+				}
+				if (pending === null || typeof pending !== "object" || Reflect.get(pending, "phase") !== "reserved") return;
+				armed = false;
+				interposed = true;
+				// Original native method performs its real atomic publication synchronously
+				// before returning its Promise; no mutation of primary receiver/SQL/transaction.
+				publication = foreign.compareAndMarkOutboxPublished({
+					scope: foreignScope,
+					authorSequence: earlier.authorSequence,
+					digest: earlier.envelope.digest,
+				});
+				afterInterposition = currencyNativeImage(primaryFilename);
+			};
+			armed = true;
+			const result = await settled(() =>
+				currencyIssuer(store, context, (digest) => {
+					entered++;
+					const signature = ed25519.sign(digest, currencySeed);
+					expect(ed25519.verify(signature, digest, currencyPublicKey)).toBe(true);
+					return Promise.resolve(signature);
+				}).issue(currencyInput)
+			);
+			await publication;
+			const foreignOutbox = await foreign.readOutboxPage({ scope: foreignScope });
+			console.log(
+				"R8_CURRENCY_RESERVED_WRITER_GAP",
+				JSON.stringify({
+					interposed,
+					entered,
+					foreignPublished: foreignOutbox[0]?.publishState === "published",
+					result: result.ok
+						? { ok: true, sequence: result.value.authorSequence }
+						: { ok: false, code: Reflect.get(result.error as object, "code") },
+					primaryNext: (await store.readLineage(currencyScope)).next,
+					pair: (await store.readIssued(currencyScope, 0)) !== null,
+					onlyAllowedInterpositionPreserved:
+						JSON.stringify(currencyNativeImage(primaryFilename)) === JSON.stringify(afterInterposition),
+				})
+			);
+			expect(interposed).toBe(true);
+			expect(foreignOutbox[0]?.publishState).toBe("published");
+			expect(entered).toBe(0);
+			expect(result).toMatchObject({ ok: false, error: { code: "ISSUANCE_RETRY_REQUIRED" } });
+			// Original finally permits only this job's definitely-unentered exact
+			// reserved cancellation: clear its carrier and bump original control once.
+			// It may not advance next/floors, touch another row or clear entered debt.
+			const expected = afterInterposition as Record<string, Array<Record<string, unknown>>>;
+			const expectedAfterDefiniteCancellation = {
+				...expected,
+				lineages: expected.lineages.map((row) =>
+					row.author === currencyScope.author ? { ...row, pending_unsigned: null } : row
+				),
+				retirement_controls: expected.retirement_controls.map((row) => {
+					const control = decodeIssuanceRetirementControl(row.record);
+					return { ...row, record: encodeIssuanceRetirementControl({ ...control, revision: control.revision + 1 }) };
+				}),
+			};
+			expect(await store.readLineage(currencyScope)).toEqual({ next: 0, exhausted: false });
+			expect(await store.readIssued(currencyScope, 0)).toBeNull();
+			expect(currencyNativeImage(primaryFilename)).toEqual(expectedAfterDefiniteCancellation);
+		} finally {
+			armed = false;
+			DatabaseSync.prototype.exec = originalExec;
+			await publication;
+			await store.close();
+			await foreign.close();
+		}
+	});
+});
+
+describe("R8 mechanical native raw context bounds", () => {
+	it("rejects actual oversized control view before copying despite shadowed length and buffer", async () => {
+		const primaryFilename = primary("currency-shadowed-view");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		const originalConstructor = globalThis.Uint8Array;
+		let copies = 0,
+			entered = 0;
+		try {
+			const valid = await currencyContext(store);
+			const raw = new originalConstructor(ISSUANCE_RETIREMENT_LIMITS.maxBytes + 1);
+			Object.defineProperties(raw, { byteLength: { value: 1 }, buffer: { value: null } });
+			expect(raw.byteLength).toBe(1);
+			const before = currencyNativeImage(primaryFilename);
+			// Exact original construction semantics; observe only copying this raw
+			// carrier. This is not a heap/RSS benchmark or a general allocation proof.
+			globalThis.Uint8Array = new Proxy(originalConstructor, {
+				construct(target, argumentsList, newTarget): Uint8Array {
+					if (argumentsList[0] === raw) copies++;
+					return Reflect.construct(target, argumentsList, newTarget);
+				},
+			});
+			const result = await settled(() =>
+				currencyIssuer(store, { ...valid, expectedIssuanceControlBytes: raw }, (digest) => {
+					entered++;
+					return Promise.resolve(ed25519.sign(digest, currencySeed));
+				}).issue(currencyInput)
+			);
+			globalThis.Uint8Array = originalConstructor;
+			console.log(
+				"R8_CURRENCY_SHADOWED_RAW_VIEW",
+				JSON.stringify({
+					actualLength: ISSUANCE_RETIREMENT_LIMITS.maxBytes + 1,
+					shadowedLength: raw.byteLength,
+					shadowedBuffer: raw.buffer,
+					copies,
+					entered,
+					result: result.ok ? { ok: true } : { ok: false, code: Reflect.get(result.error as object, "code") },
+					unchangedAllFiveTables: JSON.stringify(currencyNativeImage(primaryFilename)) === JSON.stringify(before),
+				})
+			);
+			expect(result).toMatchObject({ ok: false, error: { code: "ISSUANCE_INVALID_ARGUMENT" } });
+			expect(entered).toBe(0);
+			expect(currencyNativeImage(primaryFilename)).toEqual(before);
+			expect(copies).toBe(0);
+		} finally {
+			globalThis.Uint8Array = originalConstructor;
+			await store.close();
+		}
+	});
+});
 
 function primary(label: string): string {
 	const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), `phase-2l-c-${label}-`));
@@ -427,6 +1217,195 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			expect(schema(filename)).toEqual(before);
 		}
 	});
+});
+
+describe("R8 SQLite bounded outbox materialization", () => {
+	it.skipIf(typeof Reflect.get(globalThis, "gc") !== "function")(
+		"retains native streamed outbox statements across forced GC",
+		async () => {
+			await withStore(primary("r8-outbox-iterator-gc"), async (store) => {
+				for (let sequence = 0; sequence < 3; sequence++)
+					await store.transactIssue(PHASE_2L_C_SCOPE, (selected) =>
+						Promise.resolve(commit(PHASE_2L_C_SCOPE, selected))
+					);
+				const nativeIterate = StatementSync.prototype.iterate;
+				const collect = Reflect.get(globalThis, "gc") as () => void;
+				let collections = 0;
+				StatementSync.prototype.iterate = function (
+					this: StatementSync,
+					...parameters: unknown[]
+				): ReturnType<StatementSync["iterate"]> {
+					const iterator = Reflect.apply(nativeIterate, this, parameters) as ReturnType<StatementSync["iterate"]>;
+					const guarded: ReturnType<StatementSync["iterate"]> = new Proxy(iterator, {
+						get(target, key): unknown {
+							if (key === Symbol.iterator) return (): typeof guarded => guarded;
+							const value: unknown = Reflect.get(target, key);
+							if (key === "next")
+								return (...args: unknown[]): unknown => {
+									collect();
+									collections++;
+									return Reflect.apply(value as (...args: unknown[]) => unknown, target, args);
+								};
+							return typeof value === "function" ? value.bind(target) : value;
+						},
+					});
+					return guarded;
+				} as typeof StatementSync.prototype.iterate;
+				try {
+					const page = await store.readOutboxPage({ scope: PHASE_2L_C_SCOPE, limit: 2 });
+					expect(page.map((row) => row.commit.authorSequence)).toEqual([0, 1]);
+					expect(collections).toBeGreaterThanOrEqual(6);
+					console.info(JSON.stringify({ site: "native-outbox-statement-gc", collections, rows: page.length }));
+				} finally {
+					StatementSync.prototype.iterate = nativeIterate;
+				}
+				await store.transactIssue(PHASE_2L_C_SCOPE, (selected) => Promise.resolve(commit(PHASE_2L_C_SCOPE, selected)));
+				expect(
+					(await store.readOutboxPage({ scope: PHASE_2L_C_SCOPE })).map((row) => row.commit.authorSequence)
+				).toEqual([0, 1, 2, 3]);
+			});
+		}
+	);
+
+	it("initial outbox validation does not materialize whole-store SELECT arrays", async () => {
+		await withStore(primary("r8-outbox-materialization"), async (store) => {
+			const scopes = [
+				{ author: "foreign-before", objectId: "a" },
+				PHASE_2L_C_SCOPE,
+				{ author: "foreign-after", objectId: "z" },
+			];
+			for (const scope of scopes) {
+				for (let sequence = 0; sequence < 64; sequence++) {
+					await store.transactIssue(scope, (selected) => Promise.resolve(commit(scope, selected)));
+				}
+			}
+			const originalAll = StatementSync.prototype.all;
+			const arrays: Array<{ rows: number; sql: string }> = [];
+			StatementSync.prototype.all = function (
+				this: StatementSync,
+				...parameters: unknown[]
+			): ReturnType<StatementSync["all"]> {
+				const result = Reflect.apply(originalAll, this, parameters) as ReturnType<StatementSync["all"]>;
+				const sql = this.sourceSQL;
+				if (/^\s*SELECT\b[\s\S]*\bFROM\s+(?:lineages|issued_records|issuance_outbox)\b/iu.test(sql)) {
+					arrays.push({ rows: result.length, sql });
+				}
+				return result;
+			} as typeof StatementSync.prototype.all;
+			try {
+				const page = await store.readOutboxPage({
+					afterKey: [PHASE_2L_C_SCOPE.objectId, PHASE_2L_C_SCOPE.author, 0],
+					limit: 2,
+					scope: PHASE_2L_C_SCOPE,
+				});
+				const projected = page.map(({ commit: value, publishState }) => ({
+					sequence: value.authorSequence,
+					scope: value.issuedRecord.scope,
+					publishState,
+				}));
+				console.log("R8_SQLITE_OUTBOX_MATERIALIZATION", JSON.stringify({ arrays, page: projected }));
+				expect(projected).toEqual(
+					[1, 2].map((sequence) => ({
+						sequence,
+						scope: PHASE_2L_C_SCOPE,
+						publishState: "pending",
+					}))
+				);
+				expect(arrays).toEqual([]);
+			} finally {
+				StatementSync.prototype.all = originalAll;
+			}
+		});
+	});
+
+	it("bounded global selection preserves UTF-16 inversion, afterKey and detached bytes", async () => {
+		await withStore(primary("r8-outbox-utf16"), async (store) => {
+			const scopes = [
+				{ author: "a", objectId: "\ue000" },
+				{ author: "\ue000", objectId: "a" },
+				{ author: "a", objectId: "\u{10000}" },
+				{ author: "\u{10000}", objectId: "a" },
+			];
+			for (const scope of scopes) {
+				await store.transactIssue(scope, (selected) => Promise.resolve(commit(scope, selected)));
+			}
+			const first = await store.readOutboxPage({ limit: 2 });
+			expect(first.map(({ commit: value }) => value.issuedRecord.scope)).toEqual([scopes[3], scopes[1]]);
+			const rest = await store.readOutboxPage({ afterKey: ["a", "\ue000", 0], limit: 2 });
+			expect(rest.map(({ commit: value }) => value.issuedRecord.scope)).toEqual([scopes[2], scopes[0]]);
+			const expected = commit(scopes[3] as DurableIssueScope, 0);
+			const firstRow = first[0];
+			if (firstRow === undefined) throw new Error("requested first page row missing");
+			firstRow.commit.envelope.digest.fill(255);
+			firstRow.commit.envelope.signature.fill(255);
+			firstRow.commit.envelope.canonicalPreimageBytes.fill(255);
+			const fresh = await store.readOutboxPage({ limit: 1 });
+			expect(fresh[0]?.commit).toEqual(expected);
+			expect(fresh[0]?.commit).not.toBe(first[0]?.commit);
+			expect(await store.readOutboxPage({ scope: { objectId: "absent", author: "none" }, limit: 1 })).toEqual([]);
+		});
+	});
+
+	for (const caseId of [
+		"orphan-issued-before",
+		"orphan-outbox-after",
+		"digest-after",
+		"unconsumed-after",
+		"pruned-after",
+		"malformed-issued-after",
+		"malformed-tail-lineage",
+	] as const) {
+		it(`complete global closure refuses ${caseId} after a full requested page`, async () => {
+			const primaryFilename = primary(`r8-outbox-${caseId}`);
+			const foreignScope = { objectId: caseId === "orphan-issued-before" ? "a" : "z", author: "foreign" };
+			await withStore(primaryFilename, async (store) => {
+				for (let sequence = 0; sequence < 3; sequence++) {
+					await store.transactIssue(PHASE_2L_C_SCOPE, (selected) => Promise.resolve(phase2lCCommit(selected)));
+				}
+				await store.transactIssue(foreignScope, (selected) => Promise.resolve(commit(foreignScope, selected)));
+			});
+			const raw = new DatabaseSync(derivedFilename(primaryFilename));
+			try {
+				// This raw fixture injects corruption, not authorized retirement.
+				// Keep native triggers/catalog intact; production connections retain
+				// their original guarded functions and must refuse the poisoned image.
+				raw.function("issuance_retirement_connection", { varargs: true }, () => 1);
+				raw.function("issuance_retirement_record", { varargs: true }, () => 1);
+				const keys = [foreignScope.objectId, foreignScope.author];
+				if (caseId === "orphan-issued-before") {
+					raw.prepare("DELETE FROM issuance_outbox WHERE object_id=? AND author=?").run(...keys);
+				} else if (caseId === "orphan-outbox-after") {
+					raw.prepare("DELETE FROM issued_records WHERE object_id=? AND author=?").run(...keys);
+				} else if (caseId === "digest-after") {
+					raw.prepare("UPDATE issuance_outbox SET digest=X'FFFF' WHERE object_id=? AND author=?").run(...keys);
+				} else if (caseId === "unconsumed-after") {
+					raw.prepare("UPDATE lineages SET next=0 WHERE object_id=? AND author=?").run(...keys);
+				} else if (caseId === "pruned-after") {
+					raw
+						.prepare("UPDATE lineages SET pruned_through_author_sequence=0 WHERE object_id=? AND author=?")
+						.run(...keys);
+				} else if (caseId === "malformed-issued-after") {
+					raw.prepare("UPDATE issued_records SET canonical_preimage=X'01' WHERE object_id=? AND author=?").run(...keys);
+				} else {
+					raw
+						.prepare("INSERT INTO lineages(object_id,author,next,exhausted) VALUES(?,?,?,?)")
+						.run("zz-tail", "unused", 0, 1);
+				}
+			} finally {
+				raw.close();
+			}
+			await withStore(primaryFilename, async (store) => {
+				const outcome = await settled(() => store.readOutboxPage({ scope: PHASE_2L_C_SCOPE, limit: 2 }));
+				expect(outcome.ok).toBe(false);
+				const failure = outcome.ok ? undefined : outcome.error;
+				expect(errorShape(failure)).toMatchObject({ code: "ISSUANCE_RECOVERY_CORRUPT" });
+				await expect(store.readOutboxPage({ scope: { objectId: "absent", author: "none" }, limit: 1 })).rejects.toBe(
+					failure
+				);
+				await expect(store.readLineage(PHASE_2L_C_SCOPE)).rejects.toBe(failure);
+			});
+		});
+	}
 });
 
 describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
@@ -953,6 +1932,10 @@ describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
 		const seeded = createNodeDurableIssuanceStore({ primaryFilename: maxPrimary });
 		await seeded.close();
 		const raw = new DatabaseSync(derivedFilename(maxPrimary));
+		// Seed the original guarded native schema without bypassing production
+		// admission. The MAX arithmetic/lifecycle assertions below are unchanged.
+		raw.function("issuance_retirement_connection", {varargs: true}, () => 1);
+		raw.function("issuance_retirement_record", {varargs: true}, () => 1);
 		raw
 			.prepare("INSERT INTO lineages(object_id,author,next,exhausted) VALUES(?,?,?,?)")
 			.run(PHASE_2L_C_SCOPE.objectId, PHASE_2L_C_SCOPE.author, Number.MAX_SAFE_INTEGER, 0);
@@ -1083,6 +2066,578 @@ describe("Phase 2l-c terminal suppression through the real adapter", () => {
 		if (unknown !== undefined && !unknown.ok) {
 			expect(Reflect.get(unknown.error as object, "scope")).toEqual(PHASE_2L_C_SCOPE);
 			expect(Reflect.get(unknown.error as object, "scope")).not.toBe(PHASE_2L_C_SCOPE);
+		}
+	});
+});
+
+describe("R8 native unsigned phase codec widths", () => {
+	it("matches complete native continuation widths through ACKs and initialized split progress", async () => {
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const primaryFilename = primary("continuation-widths");
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		const observer = createNodeDurableIssuanceStore({ primaryFilename });
+		const maintenance = durableIssuancePruningMaintenanceForStore(observer);
+		if (!maintenance?.readBoundedRecoveryCensus) throw new Error("original native census missing");
+		const read = () =>
+			maintenance.readBoundedRecoveryCensus!({ objectId: currencyScope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS });
+		const originalExec = DatabaseSync.prototype.exec;
+		let armed = false,
+			capturing = false,
+			entered = 0;
+		const observations: Array<ReturnType<typeof read>> = [];
+		const intents: Array<Parameters<typeof issuanceUnsignedContinuationWidths>[2]> = [];
+		const sign = async (digest: Uint8Array) => {
+			entered++;
+			const signature = ed25519.sign(digest, currencySeed);
+			expect(ed25519.verify(signature, digest, currencyPublicKey)).toBe(true);
+			return signature;
+		};
+		try {
+			const baseIssuer = currencyIssuer(store, undefined, sign);
+			const sources = [await baseIssuer.issue(currencyInput), await baseIssuer.issue(currencyInput)];
+			const foreignSeed = new Uint8Array(32).fill(9);
+			const foreignAuthor = Buffer.from(ed25519.getPublicKey(foreignSeed)).toString("hex");
+			const foreignIssuer = createTransactionalVertexIssuer({
+				author: foreignAuthor,
+				privateKeySeed: foreignSeed,
+				publicKey: { bytes: ed25519.getPublicKey(foreignSeed), format: "raw" },
+				transactIssue: (scope, build) => store.transactIssue(scope, build),
+			});
+			await foreignIssuer.issue(currencyInput);
+			await store.transactWriteSettlementPlan({
+				scope: currencyScope,
+				expectedRevision: null,
+				plan: {
+					scope: currencyScope,
+					revision: 0,
+					fenceSequence: null,
+					entries: sources.map((source) => ({
+						sourceSequence: source.authorSequence,
+						sourceDigest: source.envelope.digest,
+						disposition: "rebase" as const,
+						replacementSequence: null,
+					})),
+				},
+			});
+			const before = await read();
+			DatabaseSync.prototype.exec = function (sql: string): void {
+				originalExec.call(this, sql);
+				if (!armed || capturing || sql.trim().toUpperCase() !== "COMMIT") return;
+				capturing = true;
+				try {
+					observations.push(read());
+				} finally {
+					capturing = false;
+				}
+			};
+			const issue = async (effect: NonNullable<DurableIssueCommit["planEffect"]>, logicalTime: number) => {
+				const plan = await store.readSettlementPlan(currencyScope);
+				if (!plan) throw new Error("genuine current plan missing");
+				const issuer = createTransactionalVertexIssuer({
+					author: currencyScope.author,
+					privateKeySeed: currencySeed,
+					publicKey: { bytes: currencyPublicKey, format: "raw" },
+					transactIssue: (scope, build) =>
+						store.transactIssue(scope, async (sequence, admission) => {
+							const commit = await build(sequence, (bytes, task) => {
+								if (!admission) throw new Error("original lexical admission missing");
+								const captured = captureIssuanceNativeSignInput({ scope, exactCanonicalUnsignedVertexBytes: bytes });
+								intents.push({
+									kind: "v3-issuance-pending-unsigned-1",
+									authorSequence: sequence,
+									canonicalPreimageBytes: captured.bytes,
+									digest: captured.digest,
+									planEffect: effect,
+									exactCanonicalPlanBytes: encodeCanonical(plan),
+								});
+								armed = true;
+								return admission(
+									bytes,
+									async () => {
+										const signature = await task();
+										entered++;
+										expect(ed25519.verify(signature, captured.digest, currencyPublicKey)).toBe(true);
+										return signature;
+									},
+									{ planEffect: effect }
+								);
+							});
+							return { ...commit, planEffect: effect };
+						}),
+				});
+				try {
+					return await issuer.issue({
+						...currencyInput,
+						epoch: 2,
+						logicalTime,
+						operation:
+							effect.kind === "fence"
+								? { action: "$drp.author-fence.v1", fenceSequence: 2, version: 1 }
+								: currencyInput.operation,
+					});
+				} finally {
+					armed = false;
+				}
+			};
+			const ack = async () => {
+				for (const row of await store.readOutboxPage({ scope: currencyScope })) {
+					if (row.publishState !== "pending") continue;
+					await store.compareAndMarkOutboxPublished({
+						scope: currencyScope,
+						authorSequence: row.commit.authorSequence,
+						digest: row.commit.envelope.digest,
+					});
+				}
+			};
+			await issue({ kind: "fence" }, 90);
+			const immediate = await read();
+			if (!immediate.control) throw new Error("genuine immediate control missing");
+			await ack();
+			await issue({ kind: "replacement", sourceSequence: 0 }, 98);
+			await ack();
+			const intentDigest = hashDomain(
+				"ts-drp/settlement-replacement-intents/v1",
+				encodeCanonical([currencyInput.operation, currencyInput.operation])
+			);
+			const initializeProgress = { sourceSequence: 1, intentCount: 2, intentDigest };
+			const plan = await store.readSettlementPlan(currencyScope);
+			if (!plan) throw new Error("genuine split plan missing");
+			await store.transactWriteSettlementPlan({
+				scope: currencyScope,
+				expectedRevision: plan.revision,
+				plan: {
+					...plan,
+					revision: plan.revision + 1,
+					entries: plan.entries.map((entry) =>
+						entry.sourceSequence === 1
+							? { ...entry, replacementProgress: { version: 1, intentCount: 2, intentDigest, chunks: [] } }
+							: entry
+					),
+				},
+			});
+			await issue({ kind: "replacement", sourceSequence: 1, fromIntent: 0, throughIntent: 1, intentDigest }, 100);
+			await ack();
+			await issue({ kind: "replacement", sourceSequence: 1, fromIntent: 1, throughIntent: 2, intentDigest }, 102);
+			await ack();
+			const final = await read();
+			const phases = await Promise.all(observations);
+			expect(intents).toHaveLength(4);
+			const forecast = issuanceUnsignedContinuationWidths(
+				before.rows,
+				currencyScope,
+				intents[0]!,
+				before.control ?? null,
+				intents.slice(1).map((intent, index) => ({ intent, ...(index === 1 ? { initializeProgress } : {}) }))
+			);
+			const actual = (image: Awaited<ReturnType<typeof read>>) => {
+				if (!image.control) throw new Error("genuine native control missing");
+				const canonicalRowBytes = [
+					...image.rows.lineages,
+					...image.rows.issued,
+					...image.rows.outbox,
+					...image.rows.plans,
+				].map((row) => encodeCanonical(row).byteLength);
+				return {
+					rowCount: canonicalRowBytes.length,
+					canonicalRowBytes,
+					canonicalRowsBytes: encodeCanonical(image.rows).byteLength,
+					encodedControlBytes: encodeIssuanceRetirementControl(image.control).byteLength,
+					nativeCensusBytes: encodeCanonical(image).byteLength,
+					nativeImageBytes: encodeCanonical(image.image).byteLength,
+					controlRevisionDelta: image.control.revision - immediate.control!.revision,
+				};
+			};
+			for (const projected of forecast.phases) {
+				const image = phases.find((image) =>
+					projected.phase === "final"
+						? image.rows.issued.some(
+								(row) => row.author === currencyScope.author && row.authorSequence === projected.authorSequence
+							) && image.rows.lineages.find((row) => row.author === currencyScope.author)?.pendingUnsigned === undefined
+						: image.rows.lineages.some(
+								(row) =>
+									row.author === currencyScope.author &&
+									row.pendingUnsigned?.authorSequence === projected.authorSequence &&
+									row.pendingUnsigned.phase === projected.phase
+							)
+				);
+				if (!image) throw new Error(`native phase absent: ${projected.authorSequence}/${projected.phase}`);
+				expect(projected.widths).toEqual(actual(image));
+			}
+			expect(forecast.final).toEqual(actual(final));
+			expect(
+				forecast.finalRows.issued
+					.filter((row) => row.author === currencyScope.author && row.authorSequence >= 2)
+					.every((row) => !Object.hasOwn(row, "signature"))
+			).toBe(true);
+			expect(final.rows.outbox.filter((row) => row.author === foreignAuthor)).toEqual(
+				before.rows.outbox.filter((row) => row.author === foreignAuthor)
+			);
+			expect(final.rows.plans[0]?.entries.map((entry) => entry.replacementSequence)).toEqual([3, 5]);
+			expect(
+				final.rows.plans[0]?.entries[1]?.replacementProgress?.chunks.map((chunk) => chunk.lastLogicalTime)
+			).toEqual([100, 102]);
+			expect(entered).toBe(6);
+			console.log(
+				"R9_NATIVE_CONTINUATION_WIDTHS",
+				JSON.stringify({
+					phases: forecast.phases.length,
+					final: forecast.final,
+					actualFinal: actual(final),
+					entered,
+					foreignPendingUnchanged: true,
+				})
+			);
+		} finally {
+			armed = false;
+			DatabaseSync.prototype.exec = originalExec;
+			await Promise.allSettled(observations);
+			const joined = await Promise.allSettled([store.close(), observer.close()]);
+			expect(joined.every((result) => result.status === "fulfilled")).toBe(true);
+		}
+	});
+	it("matches genuine reserved entered and paired native census encodings including a real settlement effect", async () => {
+		const primaryFilename = primary("unsigned-phase-widths");
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({ primaryFilename });
+		const observer = createNodeDurableIssuanceStore({ primaryFilename });
+		const maintenance = durableIssuancePruningMaintenanceForStore(observer);
+		if (!maintenance?.readBoundedRecoveryCensus) throw new Error("original native census missing");
+		const readCensus = maintenance.readBoundedRecoveryCensus;
+		const read = (): ReturnType<NonNullable<typeof maintenance.readBoundedRecoveryCensus>> =>
+			readCensus.call(maintenance, {
+				objectId: currencyScope.objectId,
+				limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+			});
+		const originalExec = DatabaseSync.prototype.exec;
+		let armed = false,
+			capturing = false;
+		const observations: Array<ReturnType<typeof read>> = [];
+		try {
+			DatabaseSync.prototype.exec = function (sql: string): void {
+				originalExec.call(this, sql);
+				if (!armed || capturing || sql.trim().toUpperCase() !== "COMMIT") return;
+				capturing = true;
+				try {
+					observations.push(read());
+				} finally {
+					capturing = false;
+				}
+			};
+			for (const settlement of [false, true]) {
+				if (settlement) {
+					const first = await store.readIssued(currencyScope, 0);
+					if (first === null) throw new Error("genuine prior source missing");
+					await store.transactWriteSettlementPlan({
+						expectedRevision: null,
+						scope: currencyScope,
+						plan: {
+							scope: currencyScope,
+							revision: 0,
+							fenceSequence: null,
+							entries: [
+								{
+									sourceSequence: 0,
+									sourceDigest: first.envelope.digest,
+									disposition: "rebase",
+									replacementSequence: null,
+								},
+							],
+						},
+					});
+				}
+				const before = await read();
+				observations.length = 0;
+				let widths: ReturnType<typeof issuanceUnsignedPostimageWidths> | undefined;
+				let intent: Parameters<typeof issuanceUnsignedPostimageWidths>[2] | undefined;
+				let entered = 0;
+				const planEffect = settlement ? { kind: "replacement" as const, sourceSequence: 0 } : undefined;
+				const issuer = createAdmissionBoundTransactionalVertexIssuer({
+					author: currencyScope.author,
+					preparedBlueprintAdmission: currencyPrepared,
+					publicKey: { bytes: currencyPublicKey, format: "raw" },
+					signRegisteredVertexDigest: (digest) => {
+						entered++;
+						const signature = ed25519.sign(digest, currencySeed);
+						expect(ed25519.verify(signature, digest, currencyPublicKey)).toBe(true);
+						return Promise.resolve(signature);
+					},
+					transactIssue: (scope, build) =>
+						store.transactIssue(scope, async (sequence, nativeAdmission) => {
+							const candidate = await build(sequence, (bytes, sign) => {
+								if (nativeAdmission === undefined) throw new Error("original lexical admission missing");
+								const captured = captureIssuanceNativeSignInput({ scope, exactCanonicalUnsignedVertexBytes: bytes });
+								const plan = before.rows.plans.find((p) => p.scope.author === scope.author);
+								intent = {
+									kind: "v3-issuance-pending-unsigned-1",
+									authorSequence: sequence,
+									canonicalPreimageBytes: captured.bytes,
+									digest: captured.digest,
+									...(planEffect === undefined ? {} : { planEffect, exactCanonicalPlanBytes: encodeCanonical(plan) }),
+								};
+								widths = issuanceUnsignedPostimageWidths(before.rows, scope, intent, before.control ?? null);
+								armed = true;
+								return nativeAdmission(bytes, sign, planEffect === undefined ? undefined : { planEffect });
+							});
+							return planEffect === undefined ? candidate : { ...candidate, planEffect };
+						}),
+				});
+				const committed = await issuer.issue(currencyInput);
+				armed = false;
+				const phases = await Promise.all(observations);
+				if (widths === undefined || intent === undefined) throw new Error("original width capture missing");
+				const actual = (
+					captured: Awaited<ReturnType<typeof read>>
+				): ReturnType<typeof issuanceUnsignedPostimageWidths>["reserved"] => {
+					const canonicalRowBytes = [
+						...captured.rows.lineages,
+						...captured.rows.issued,
+						...captured.rows.outbox,
+						...captured.rows.plans,
+					].map((row) => encodeCanonical(row).byteLength);
+					if (captured.control == null) throw new Error("actual born control missing");
+					return {
+						rowCount: canonicalRowBytes.length,
+						canonicalRowBytes,
+						canonicalRowsBytes: encodeCanonical(captured.rows).byteLength,
+						encodedControlBytes: encodeIssuanceRetirementControl(captured.control).byteLength,
+						nativeCensusBytes: encodeCanonical(captured).byteLength,
+					};
+				};
+				const reserved = phases.find(
+					(value) =>
+						value.rows.lineages.find((l) => l.author === currencyScope.author)?.pendingUnsigned?.phase === "reserved"
+				);
+				const marked = phases.find(
+					(value) =>
+						value.rows.lineages.find((l) => l.author === currencyScope.author)?.pendingUnsigned?.phase === "entered"
+				);
+				const final = phases.find((value) =>
+					value.rows.issued.some(
+						(row) => row.author === currencyScope.author && row.authorSequence === committed.authorSequence
+					)
+				);
+				if (reserved === undefined || marked === undefined || final === undefined)
+					throw new Error("actual committed phase absent");
+				expect(widths.reserved).toEqual(actual(reserved));
+				expect(widths.entered).toEqual(actual(marked));
+				expect(widths.final).toEqual(actual(final));
+				const inherited = issuanceUnsignedPostimageWidths(marked.rows, currencyScope, intent, marked.control ?? null);
+				expect(inherited.reserved).toEqual(actual(marked));
+				expect(inherited.entered).toEqual(actual(marked));
+				expect(inherited.final).toEqual(actual(final));
+				expect(entered).toBe(1);
+				expect(ed25519.verify(committed.envelope.signature, committed.envelope.digest, currencyPublicKey)).toBe(true);
+				if (settlement) expect(final.rows.plans[0]?.entries[0]?.replacementSequence).toBe(committed.authorSequence);
+				console.log(
+					"R8_UNSIGNED_NATIVE_PHASE_WIDTHS",
+					JSON.stringify({
+						settlement,
+						sequence: committed.authorSequence,
+						entered,
+						controlBorn: before.control == null,
+						reserved: widths.reserved,
+						enteredPhase: widths.entered,
+						final: widths.final,
+					})
+				);
+			}
+		} finally {
+			armed = false;
+			DatabaseSync.prototype.exec = originalExec;
+			await Promise.allSettled(observations);
+			const joined = await Promise.allSettled([store.close(), observer.close()]);
+			expect(joined.every((value) => value.status === "fulfilled")).toBe(true);
+		}
+	});
+});
+
+describe("R8 successor fence transient native widths", () => {
+	it("matches genuine future fence reserved entered and paired encodings without future byte placeholders", async () => {
+		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
+		for (const priorControl of [false, true]) {
+			const primaryFilename = primary(`successor-fence-widths-${Number(priorControl)}`);
+			const store = createNodeDurableIssuanceStore({ primaryFilename });
+			const observer = createNodeDurableIssuanceStore({ primaryFilename });
+			const maintenance = durableIssuancePruningMaintenanceForStore(observer);
+			if (!maintenance?.readBoundedRecoveryCensus) throw new Error("original native census missing");
+			const readCensus = maintenance.readBoundedRecoveryCensus;
+			const read = (): ReturnType<typeof readCensus> =>
+				readCensus.call(maintenance, {
+					objectId: currencyScope.objectId,
+					limits: ISSUANCE_RETIREMENT_LIMITS,
+				});
+			const originalExec = DatabaseSync.prototype.exec;
+			const observations: Array<ReturnType<typeof read>> = [];
+			let armed = false,
+				capturing = false,
+				entered = 0;
+			try {
+				const candidateIssuer = currencyIssuer(store, undefined, (digest) => {
+					const signature = ed25519.sign(digest, currencySeed);
+					expect(ed25519.verify(signature, digest, currencyPublicKey)).toBe(true);
+					return Promise.resolve(signature);
+				});
+				if (priorControl) await candidateIssuer.issue(currencyInput);
+				const foreignSeed = new Uint8Array(32).fill(9);
+				const foreignPublicKey = ed25519.getPublicKey(foreignSeed);
+				const foreignScope = { ...currencyScope, author: Buffer.from(foreignPublicKey).toString("hex") };
+				if (priorControl) {
+					const foreignIssuer = createTransactionalVertexIssuer({
+						author: foreignScope.author,
+						privateKeySeed: foreignSeed,
+						publicKey: { bytes: foreignPublicKey, format: "raw" },
+						transactIssue: (scope, build) => store.transactIssue(scope, build),
+					});
+					const foreign = await foreignIssuer.issue(currencyInput);
+					expect(ed25519.verify(foreign.envelope.signature, foreign.envelope.digest, foreignPublicKey)).toBe(true);
+				}
+				const before = await read();
+				expect(before.control == null).toBe(!priorControl);
+				const candidate = await candidateIssuer.issue(currencyInput);
+				const afterImmediate = await read();
+				if (!afterImmediate.control) throw new Error("original immediate control missing");
+				const immediateControl = afterImmediate.control;
+				const foreignBefore = before.rows.outbox.filter((row) => row.author === foreignScope.author);
+				expect(foreignBefore).toHaveLength(priorControl ? 1 : 0);
+				if (priorControl) expect(foreignBefore[0]?.publishState).toBe("pending");
+				const captured = captureIssuanceNativeSignInput({
+					scope: currencyScope,
+					exactCanonicalUnsignedVertexBytes: candidate.envelope.canonicalPreimageBytes,
+				});
+				const intent = {
+					kind: "v3-issuance-pending-unsigned-1" as const,
+					authorSequence: captured.sequence,
+					canonicalPreimageBytes: captured.bytes,
+					digest: captured.digest,
+				};
+				for (const outbox of await store.readOutboxPage({ scope: currencyScope })) {
+					await store.compareAndMarkOutboxPublished({
+						scope: currencyScope,
+						authorSequence: outbox.commit.authorSequence,
+						digest: outbox.commit.envelope.digest,
+					});
+				}
+				const plan = { scope: currencyScope, revision: 0, fenceSequence: null, entries: [] };
+				await store.transactWriteSettlementPlan({ scope: currencyScope, expectedRevision: null, plan });
+				DatabaseSync.prototype.exec = function (sql: string): void {
+					originalExec.call(this, sql);
+					if (!armed || capturing || sql.trim().toUpperCase() !== "COMMIT") return;
+					capturing = true;
+					try {
+						observations.push(read());
+					} finally {
+						capturing = false;
+					}
+				};
+				let widths: ReturnType<typeof issuanceUnsignedSuccessorFenceWidths> | undefined;
+				const fenceSequence = candidate.authorSequence + 1;
+				const fenceIssuer = createTransactionalVertexIssuer({
+					author: currencyScope.author,
+					privateKeySeed: currencySeed,
+					publicKey: { bytes: currencyPublicKey, format: "raw" },
+					transactIssue: (scope, build) =>
+						store.transactIssue(scope, async (sequence, nativeAdmission) => {
+							const commit = await build(sequence, (bytes, sign) => {
+								if (!nativeAdmission) throw new Error("original lexical admission missing");
+								const fence = captureIssuanceNativeSignInput({ scope, exactCanonicalUnsignedVertexBytes: bytes });
+								expect(fence.sequence).toBe(fenceSequence);
+								expect(fence.bytes.byteLength).toBeGreaterThanOrEqual(128);
+								widths = issuanceUnsignedSuccessorFenceWidths(before.rows, scope, intent, before.control ?? null, {
+									plan,
+									canonicalPreimageByteLength: fence.bytes.byteLength,
+								});
+								armed = true;
+								return nativeAdmission(
+									bytes,
+									async () => {
+										entered++;
+										const signature = await sign();
+										expect(ed25519.verify(signature, fence.digest, currencyPublicKey)).toBe(true);
+										return signature;
+									},
+									{ planEffect: { kind: "fence" } }
+								);
+							});
+							return { ...commit, planEffect: { kind: "fence" } };
+						}),
+				});
+				const committed = await fenceIssuer.issue({
+					...currencyInput,
+					epoch: 2,
+					dependencies: [currencyInput.anchor],
+					logicalTime: Number.MAX_SAFE_INTEGER,
+					operation: { action: "$drp.author-fence.v1", fenceSequence, version: 1 },
+				});
+				armed = false;
+				const phases = await Promise.all(observations);
+				if (!widths) throw new Error("future width projection missing");
+				const actual = (
+					image: Awaited<ReturnType<typeof read>>
+				): ReturnType<typeof issuanceUnsignedSuccessorFenceWidths>["reserved"] => {
+					if (!image.control) throw new Error("genuine native control absent");
+					return {
+						rowCount:
+							image.rows.lineages.length +
+							image.rows.issued.length +
+							image.rows.outbox.length +
+							image.rows.plans.length,
+						canonicalRowBytes: [
+							...image.rows.lineages,
+							...image.rows.issued,
+							...image.rows.outbox,
+							...image.rows.plans,
+						].map((row) => encodeCanonical(row).byteLength),
+						canonicalRowsBytes: encodeCanonical(image.rows).byteLength,
+						encodedControlBytes: encodeIssuanceRetirementControl(image.control).byteLength,
+						nativeCensusBytes: encodeCanonical(image).byteLength,
+						nativeImageBytes: encodeCanonical(image.image).byteLength,
+						controlRevisionDelta: image.control.revision - immediateControl.revision,
+					};
+				};
+				const reserved = phases.find((image) =>
+					image.rows.lineages.some((row) => row.pendingUnsigned?.phase === "reserved")
+				);
+				const marked = phases.find((image) =>
+					image.rows.lineages.some((row) => row.pendingUnsigned?.phase === "entered")
+				);
+				const final = phases.find((image) =>
+					image.rows.issued.some((row) => row.author === currencyScope.author && row.authorSequence === fenceSequence)
+				);
+				if (!reserved || !marked || !final) throw new Error("original native phase checkpoint absent");
+				expect(widths.reserved).toEqual(actual(reserved));
+				expect(widths.entered).toEqual(actual(marked));
+				expect(widths.final).toEqual(actual(final));
+				for (const image of [reserved, marked, final]) {
+					expect(image.rows.outbox.filter((row) => row.author === foreignScope.author)).toEqual(foreignBefore);
+					expect(image.rows.issued.filter((row) => row.author === foreignScope.author)).toEqual(
+						before.rows.issued.filter((row) => row.author === foreignScope.author)
+					);
+				}
+				expect(reserved.rows.plans[0]?.fenceSequence).toBeNull();
+				expect(marked.rows.plans[0]?.fenceSequence).toBeNull();
+				expect(final.rows.plans[0]?.fenceSequence).toBe(fenceSequence);
+				expect(entered).toBe(1);
+				expect(
+					verifyReceivedVertex({
+						domain: registry.domains.vertex,
+						suiteId: registry.cryptoSuites.active.find((suite) => suite.role === "identityAndVertex")?.suiteId ?? "",
+						expectedAnchor: currencyInput.anchor,
+						receivedCanonicalPreimageBytes: committed.envelope.canonicalPreimageBytes,
+						resolveAuthorPublicKey: () => ({ bytes: currencyPublicKey, format: "raw" }),
+						signature: committed.envelope.signature,
+					}).accepted
+				).toBe(true);
+				console.log(
+					"R8_SUCCESSOR_FENCE_PHASE_WIDTHS",
+					JSON.stringify({ priorControl, entered, sequence: fenceSequence, widths })
+				);
+			} finally {
+				armed = false;
+				DatabaseSync.prototype.exec = originalExec;
+				await Promise.allSettled(observations);
+				const joined = await Promise.allSettled([store.close(), observer.close()]);
+				expect(joined.every((result) => result.status === "fulfilled")).toBe(true);
+			}
 		}
 	});
 });

@@ -5,7 +5,6 @@ import type { CanonicalDecodingError, CanonicalEncodingError } from "../packages
 import type { EpochFullOutcome, LinearizationError } from "../packages/compaction/src/index.js";
 // The package is intentionally absent at the RED baseline.
 import type { DRP_ERROR_CODES, DRPError, DRPErrorCode } from "../packages/errors/src/index.js";
-import type { AdoptionCommitExhaustedError, ApplyInvariantError } from "../packages/object/src/index.js";
 import type {
 	AdmissionResult,
 	AdmissionResultCode,
@@ -87,9 +86,7 @@ const governedInstancesHaveClosedCodes: Extends<
 	| InvalidDependenciesError
 	| InvalidHashError
 	| InvalidTimestampError
-	| UnsupportedProfileError
-	| AdoptionCommitExhaustedError
-	| ApplyInvariantError,
+	| UnsupportedProfileError,
 	Error & { readonly code: DRPErrorCode }
 > = true;
 

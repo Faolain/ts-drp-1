@@ -1,6 +1,39 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
-import type { AheDurableStore } from "@ts-drp/storage";
+import type { DurableIssuanceStore } from "@ts-drp/issuance-store";
+import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
+import type { AheDurableStore, PresentHead } from "@ts-drp/storage";
 import type { SnapshotRecoveryStore, SnapshotVerificationReceipt } from "@ts-drp/storage/snapshot-transfer";
+import type { BindCreatorLiveCloseInput } from "../creator-close.js";
+import type { CreatorRollbackFloorReader } from "./creator-closed-rollback-data.js";
+import type { CreatorSuccessorGenerationMaterial } from "./creator-successor-live.js";
+
+/** Captured once by the genuine room owner. These native ports are premises,
+ * not classification authority; the protected planner authenticates all bytes. */
+export interface CreatorPendingClassificationNativeOwners {
+	readonly author: string;
+	readonly roomHeadAuthority: CreatorRollbackFloorReader;
+	readonly exactCanonicalPinnedGenesisTrustStateRecordBytes: Uint8Array;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array;
+	readonly voteStore: BindCreatorLiveCloseInput["voteStore"];
+	readonly evidenceStore: BindCreatorLiveCloseInput["evidenceStore"];
+	readonly signer: BindCreatorLiveCloseInput["signer"];
+	readonly storageIncarnation: string;
+}
+
+/** Inputs to the sole existing runtime owner's nonactivating native custody
+ * composition. Neither snapshot receipt nor this native tuple is authority. */
+export interface CreatorPendingClassificationCustodyInput {
+	readonly generation: CreatorSuccessorGenerationMaterial;
+	readonly expectedNativeHead: PresentHead;
+	readonly catalog: TrustedBlueprintCatalog;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly pinnedGenesisAnchorDigest: string;
+	readonly store: AheDurableStore;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
+	readonly owners: CreatorPendingClassificationNativeOwners;
+}
 
 export interface CreatorAdoptionRoomHead {
 	readonly currentAnchorDigest: string;
@@ -9,6 +42,8 @@ export interface CreatorAdoptionRoomHead {
 }
 
 export interface CreatorAdoptionPendingRecoveryInput {
+	/** Existing room maintenance book, not authority or a separate archive allowance. */
+	readonly proofAccounting?: import("./creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting;
 	readonly authenticationProfile: "creator-only";
 	readonly catalog: TrustedBlueprintCatalog;
 	readonly detachedSignature: Uint8Array;
@@ -19,6 +54,12 @@ export interface CreatorAdoptionPendingRecoveryInput {
 	readonly pinnedGenesisAnchorDigest: string;
 	readonly snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
 	readonly store: AheDurableStore;
+	/** Required only when the native snapshot owns received recovery custody. */
+	readonly issuanceStore?: DurableIssuanceStore;
+	readonly liveJournalStore?: DurableLiveJournalStore;
+	/** Internal room-owner composition only; public pending input capture does
+	 * not accept this tuple and cannot publish while migration remains held. */
+	readonly classificationOwners?: CreatorPendingClassificationNativeOwners;
 }
 
 export type CreatorAdoptionPendingRecoveryResult =

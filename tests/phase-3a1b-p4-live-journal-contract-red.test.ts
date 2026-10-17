@@ -25,7 +25,165 @@ import {
 	NODE_DEATH_TUPLES,
 	NODE_SCHEMA,
 } from "./fixtures/phase-3a1b-p4/live-journal-contract.js";
-import { captureLiveJournalInput } from "../packages/live-journal/src/contract.js";
+import {
+	captureLiveJournalInput,
+	createLiveJournalSnapshotValidation,
+	deriveLiveJournalSnapshot,
+	deriveLiveJournalSnapshotReadiness,
+} from "../packages/live-journal/src/contract.js";
+
+describe("live-journal readiness projection", () => {
+	function durableReceived(count: number) {
+		const material = createLiveJournalMaterial();
+		const scope = { anchorDigest: material.anchorDigest, epoch: 0, objectId: material.objectId };
+		const vertex = decodeCanonical(material.vertexBytes) as Record<string, unknown>;
+		return {
+			scope: {
+				detachedAnchorSignature: material.signature,
+				exactCanonicalAnchorPreimageBytes: material.anchorBytes,
+				exactCanonicalParametersCarrierBytes: material.parametersBytes,
+				nextJournalSequence: count,
+				parametersDigest: material.parametersDigest,
+				scope,
+			},
+			rows: Array.from({ length: count }, (_, journalSequence) => {
+				const exactCanonicalPreimageBytes = encodeCanonical({ ...vertex,
+					authorSequence: journalSequence, logicalTime: journalSequence + 1,
+					operation: { payload: "r".repeat(256 + journalSequence) },
+				});
+				return {
+					detachedSignature: new Uint8Array(material.signature),
+					exactCanonicalPreimageBytes,
+					journalSequence, scope, sourceKind: "received" as const,
+					vertexDigest: Buffer.from(hashDomain("ts-drp/vertex/v3", exactCanonicalPreimageBytes)).toString("hex"),
+				};
+			}),
+		};
+	}
+
+	it("removes exactly the discarded received-row copies while preserving exact tokens and detached replay rows", () => {
+		const durable = durableReceived(4);
+		const NativeUint8Array = globalThis.Uint8Array;
+		function measured<T>(action: () => T) {
+			let copies = 0;
+			let bytes = 0;
+			globalThis.Uint8Array = new Proxy(NativeUint8Array, {
+				construct(target, arguments_) {
+					const input = arguments_[0];
+					if (input instanceof NativeUint8Array) { copies++; bytes += input.byteLength; }
+					return Reflect.construct(target, arguments_, target);
+				},
+			});
+			try { return { value: action(), copies, bytes }; }
+			finally { globalThis.Uint8Array = NativeUint8Array; }
+		}
+		for (const highWatermark of [0, 2, 4]) {
+			const full = measured(() => deriveLiveJournalSnapshot({ durable, highWatermark }));
+			const readiness = measured(() => deriveLiveJournalSnapshotReadiness({ durable, highWatermark }));
+			expect(full.value.ok).toBe(true);
+			expect(readiness.value.ok).toBe(true);
+			if (!full.value.ok || !readiness.value.ok) throw new Error("valid fixture refused");
+			expect(readiness.value).toEqual({ ok: true, rowCount: highWatermark, token: full.value.token });
+			expect(Object.hasOwn(readiness.value, "rows")).toBe(false);
+			expect(Object.isFrozen(readiness.value)).toBe(true);
+			expect(full.copies - readiness.copies).toBe(2 * highWatermark);
+			expect(full.bytes - readiness.bytes).toBe(durable.rows.slice(0, highWatermark)
+				.reduce((sum, row) => sum + row.detachedSignature.byteLength + row.exactCanonicalPreimageBytes.byteLength, 0));
+			for (let index = 0; index < highWatermark; index++) {
+				const row = full.value.rows[index];
+				expect(Object.isFrozen(row)).toBe(true);
+				if (row.sourceKind !== "received") throw new Error("wrong row variant");
+				expect(row.detachedSignature).not.toBe(durable.rows[index].detachedSignature);
+				expect(row.exactCanonicalPreimageBytes).not.toBe(durable.rows[index].exactCanonicalPreimageBytes);
+			}
+		}
+	});
+
+	it("reuses only exact private leaf facts and preserves fresh closure/refusal laws", () => {
+		const validation = createLiveJournalSnapshotValidation();
+		const durable = durableReceived(3);
+		const fresh = () => structuredClone(durable);
+		const derive = (value: ReturnType<typeof fresh>) => deriveLiveJournalSnapshot({durable: value, validation});
+		const baseline = derive(fresh()); expect(baseline.ok).toBe(true);
+		if (!baseline.ok) throw new Error("valid fixture refused");
+		const first = baseline.rows[0];
+		if (first.sourceKind !== "received") throw new Error("wrong row kind");
+		first.exactCanonicalPreimageBytes.fill(255); first.detachedSignature.fill(255);
+		expect(derive(fresh())).toEqual(deriveLiveJournalSnapshot({durable: fresh()}));
+		const cases = [
+			(value: ReturnType<typeof fresh>) => { value.rows[0].exactCanonicalPreimageBytes.fill(255); },
+			(value: ReturnType<typeof fresh>) => { value.rows[0].detachedSignature.fill(7); },
+			(value: ReturnType<typeof fresh>) => { value.rows[0].vertexDigest = "f".repeat(64); },
+			(value: ReturnType<typeof fresh>) => { value.rows[1] = {...value.rows[0], journalSequence: 1}; },
+			(value: ReturnType<typeof fresh>) => { value.rows[1].scope = {...value.rows[1].scope, epoch: 1}; },
+			(value: ReturnType<typeof fresh>) => { value.scope.exactCanonicalAnchorPreimageBytes.fill(255); },
+			(value: ReturnType<typeof fresh>) => { value.scope.exactCanonicalParametersCarrierBytes.fill(255); },
+			(value: ReturnType<typeof fresh>) => { value.scope.detachedAnchorSignature = new Uint8Array(63); },
+			(value: ReturnType<typeof fresh>) => { value.scope.nextJournalSequence--; },
+		];
+		for (const change of cases) {
+			const value = fresh(); change(value);
+			expect(derive(value)).toEqual(deriveLiveJournalSnapshot({durable: value}));
+			expect(deriveLiveJournalSnapshotReadiness({durable: value, highWatermark: 0, validation}))
+				.toEqual(deriveLiveJournalSnapshotReadiness({durable: value, highWatermark: 0}));
+		}
+		validation.release();
+		expect(derive(fresh())).toEqual(deriveLiveJournalSnapshot({durable: fresh()}));
+		// A structural lookalike supplies no facts and cannot bypass validation.
+		const bad = fresh(); bad.rows[0].exactCanonicalPreimageBytes.fill(255);
+		expect(deriveLiveJournalSnapshot({durable: bad, validation: {release() {}}}))
+			.toEqual({ok: false, kind: "store-poisoned"});
+	});
+
+	it("keeps complete-image poison, stale-prefix and digest refusals identical", () => {
+		const durable = durableReceived(3);
+		const good = deriveLiveJournalSnapshot({ durable, highWatermark: 1 });
+		if (!good.ok) throw new Error("valid fixture refused");
+		const cases = [
+			{ input: { durable, highWatermark: 4 }, kind: "stale-snapshot" },
+			{ input: { durable, highWatermark: -1 }, kind: "store-poisoned" },
+			{ input: { durable, highWatermark: 1, supplied: { ...good.token, snapshotDigest: "f".repeat(64) } }, kind: "digest-mismatch" },
+			{ input: { durable: { ...durable, rows: durable.rows.slice(0, 2) }, highWatermark: 1 }, kind: "store-poisoned" },
+			{ input: { durable: { ...durable, rows: durable.rows.map((row, index) => index === 2
+				? { ...row, exactCanonicalPreimageBytes: new Uint8Array([0xff]) } : row) }, highWatermark: 1 }, kind: "store-poisoned" },
+			{ input: { durable: { ...durable, rows: durable.rows.map((row, index) => index === 2
+				? { ...durable.rows[0], journalSequence: index } : row) }, highWatermark: 1 }, kind: "store-poisoned" },
+		];
+		for (const { input, kind } of cases) {
+			expect(deriveLiveJournalSnapshot(input)).toEqual({ ok: false, kind });
+			expect(deriveLiveJournalSnapshotReadiness(input)).toEqual({ ok: false, kind });
+		}
+	});
+
+	it("falls back to original validation beyond retained-byte capacity instead of refusing work", () => {
+		const validation = createLiveJournalSnapshotValidation();
+		const durable = durableReceived(1);
+		const row = durable.rows[0];
+		const vertex = decodeCanonical(row.exactCanonicalPreimageBytes) as Record<string, unknown>;
+		row.exactCanonicalPreimageBytes = encodeCanonical({...vertex, operation: {payload: "r".repeat(2_097_153)}});
+		row.vertexDigest = Buffer.from(hashDomain("ts-drp/vertex/v3", row.exactCanonicalPreimageBytes)).toString("hex");
+		const expected = deriveLiveJournalSnapshotReadiness({durable}); expect(expected.ok).toBe(true);
+		for (let repeat = 0; repeat < 2; repeat++) {
+			const original = TextDecoder.prototype.decode;
+			let strings = 0;
+			TextDecoder.prototype.decode = function (...args) { strings++; return original.apply(this, args); };
+			try { expect(deriveLiveJournalSnapshotReadiness({durable, validation})).toEqual(expected); }
+			finally { TextDecoder.prototype.decode = original; }
+			expect(strings).toBeGreaterThan(0); // Oversized syntax facts are not retained.
+		}
+		validation.release();
+	});
+
+	it("never treats caller-overridden array mapping as a private validated row capture", () => {
+		const durable = durableReceived(1);
+		const original = durable.rows[0];
+		Object.defineProperty(durable.rows, "map", {value: () => [{...original, detachedSignature: new Uint8Array(0)}]});
+		const validation = createLiveJournalSnapshotValidation();
+		for (const owner of [undefined, validation])
+			expect(deriveLiveJournalSnapshotReadiness({durable, validation: owner})).toEqual({ok: false, kind: "store-poisoned"});
+		validation.release();
+	});
+});
 
 describe("current optional author-share live-journal install contract", () => {
 	const hex = (bytes: Uint8Array): string => Buffer.from(bytes).toString("hex");

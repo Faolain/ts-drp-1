@@ -568,6 +568,7 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 					ephemeralUnreliableWebRtcSnapshot: (): undefined => undefined,
 					keychain: Object.freeze({
 						localAuthorId: zoneCreatorAuthor,
+						acquireLocalAuthorFinalitySigner: () => zoneCreator.acquireLocalAuthorFinalitySigner(),
 						signWithLocalAuthor: (digestBytes: Uint8Array) => zoneCreator.signWithLocalAuthor(digestBytes),
 					}),
 					networkNode: Object.freeze({ peerId: "peer-creator" }),

@@ -19,6 +19,7 @@
 		"sealProposal": "ts-drp/seal-proposal/v3",
 		"sealQC": "ts-drp/seal-qc/v3",
 		"sealVote": "ts-drp/seal-vote/v3",
+		"settlementSourceSelection": "ts-drp/settlement-source-selection/v1",
 		"signerSet": "ts-drp/signer-set/v3",
 		"snapshotChunk": "ts-drp/snapshot-chunk/v3",
 		"snapshotManifest": "ts-drp/snapshot-manifest/v3",
@@ -252,6 +253,14 @@
 					"constraints": {},
 					"required": true,
 					"sortRule": null
+				},
+				{
+					"name": "settlementSource",
+					"type": "canonical-object",
+					"const": null,
+					"constraints": {},
+					"required": false,
+					"sortRule": null
 				}
 			],
 			"signedEnvelope": {
@@ -481,6 +490,22 @@
 					"type": "forward-promotion",
 					"const": null,
 					"constraints": { "schema": "forwardPromotion", "version": 1 },
+					"required": false,
+					"sortRule": null
+				},
+				{
+					"name": "recoveryRoles",
+					"type": "creator-snapshot-recovery-roles",
+					"const": null,
+					"constraints": { "schema": "creatorSnapshotRecoveryRoles", "version": 1 },
+					"required": false,
+					"sortRule": null
+				},
+				{
+					"name": "archiveAppend",
+					"type": "creator-archive-append",
+					"const": null,
+					"constraints": { "schema": "creatorArchiveAppendBinding", "version": 1 },
 					"required": false,
 					"sortRule": null
 				}

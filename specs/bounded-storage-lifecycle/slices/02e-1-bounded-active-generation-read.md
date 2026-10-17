@@ -1,13 +1,10 @@
 # 2e-1 — Bounded active-generation acquisition
 
-Status: independently reviewed contract accepted, 2026-10-03, under the
-[root disposition](../../../.logs/bounded-storage-lifecycle/rollback-bounded-read-contract-review-01/root-disposition.md).
-This is a native storage prerequisite, not profile-complete authenticated history
-or usable rollback. Separate RED readiness, distinct GREEN and independent product
-review/root acceptance remain required. The [live handoff](../README.md#next-agent-prompt)
-owns execution status; the [snapshot reader](02e-0-noncreating-snapshot-read.md)
-continues as an independent prerequisite. Serialize overlapping GREEN owners and
-integration; this contract does not authorize changes to that reader's frozen oracles.
+Status: CLOSED, 2026-10-06, within this fixed observer entitlement.
+The [closure audit](../closure-audit-2e-2f.md) binds the original acceptance
+requirements to accepted product and MAIN evidence, including qualified browser
+partitions and actual producer debt. Safe over-budget refusal is not sustained
+availability, profile-complete authenticated history or parent 2e closure.
 
 ## Decision and sequencing
 
@@ -90,8 +87,8 @@ retirement-only migration obligations and the older-QC authentication limitation
 
 ## Single public seam
 
-Names below are required contract names, not yet implemented exports. Add these types and
-the required method coherently to the existing contract/exports and all owners,
+Names below are implemented required contract names. The types and required
+method belong coherently to the existing contract/exports and all owners,
 including ephemeral storage. No optional method, decorator, second factory/cache,
 schema, new durable incarnation or alternate canonical decoder.
 

@@ -31,6 +31,8 @@ export interface BlueprintStateSnapshot {
 }
 
 export interface BlueprintStateMachineInput {
+	/** Negotiated encoded state/output byte ceiling; standalone callers retain the original default. */
+	readonly maxApplicationStateBytes?: number;
 	readonly exactCanonicalInitialStateBytes: Uint8Array;
 	readonly expectedBlueprintDigest: string;
 	readonly expectedInitialStateDigest: string;
@@ -69,11 +71,15 @@ function assertPreparedRuntimeProvenance(
 	throw new DRPError("BLUEPRINT_OPERATION_INVALID", "null unexpectedly matched a prepared blueprint operation");
 }
 
-function applicationStateBytes(value: unknown): Uint8Array {
+function validatedApplicationState(
+	value: unknown,
+	limits: Readonly<CanonicalLimits>
+): { readonly bytes: Uint8Array; readonly value: unknown } {
 	try {
-		const bytes = encodeCanonical(value, APPLICATION_LIMITS);
-		decodeCanonical(bytes, APPLICATION_LIMITS);
-		return bytes;
+		const bytes = encodeCanonical(value, limits);
+		// The decode is both bounded validation and a detached canonical value.
+		// Its result belongs to this apply only; it carries no admission authority.
+		return { bytes, value: decodeCanonical(bytes, limits) };
 	} catch (error) {
 		return applicationStateFailure("application value is outside the bounded canonical domain", error);
 	}
@@ -81,7 +87,8 @@ function applicationStateBytes(value: unknown): Uint8Array {
 
 function decodeInitialState(
 	input: Uint8Array,
-	expectedDigest: string
+	expectedDigest: string,
+	limits: Readonly<CanonicalLimits>
 ): { readonly bytes: Uint8Array; readonly value: unknown } {
 	let bytes: Uint8Array;
 	try {
@@ -93,8 +100,8 @@ function decodeInitialState(
 		return applicationStateFailure("initial application state digest does not match exact bytes");
 	}
 	try {
-		const value = decodeCanonical(bytes, APPLICATION_LIMITS);
-		const reencoded = encodeCanonical(value, APPLICATION_LIMITS);
+		const value = decodeCanonical(bytes, limits);
+		const reencoded = encodeCanonical(value, limits);
 		if (compareBytes(bytes, reencoded) !== 0) {
 			return applicationStateFailure("initial application state bytes are noncanonical");
 		}
@@ -109,6 +116,7 @@ function decodeInitialState(
 export class BlueprintStateMachine implements IStagedStateMachine<BlueprintStateSnapshot, unknown, unknown> {
 	readonly #expectedBlueprintDigest: string;
 	readonly #preparedBlueprintRuntime: PreparedBlueprintRuntime;
+	readonly #applicationLimits: Readonly<CanonicalLimits>;
 	#baseGeneration: object | undefined;
 	#exactCanonicalStateBytes: Uint8Array;
 	#generation: object = {};
@@ -117,7 +125,11 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 	#stateDigest: string;
 
 	constructor(input: BlueprintStateMachineInput) {
-		const initial = decodeInitialState(input.exactCanonicalInitialStateBytes, input.expectedInitialStateDigest);
+		const maxBytes = input.maxApplicationStateBytes ?? APPLICATION_LIMITS.maxBytes;
+		if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
+			applicationStateFailure("configured application byte ceiling is invalid");
+		this.#applicationLimits = Object.freeze({ ...APPLICATION_LIMITS, maxBytes });
+		const initial = decodeInitialState(input.exactCanonicalInitialStateBytes, input.expectedInitialStateDigest, this.#applicationLimits);
 		if (!/^[0-9a-f]{64}$/u.test(input.expectedBlueprintDigest)) {
 			throw new DRPError("BLUEPRINT_DIGEST_MISMATCH", "expected blueprint digest is invalid");
 		}
@@ -155,19 +167,20 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 			preparedBlueprintRuntime: this.#preparedBlueprintRuntime,
 			state: this.#state,
 		});
-		const nextStateBytes = applicationStateBytes(result.state);
-		const outputBytes = applicationStateBytes(result.output);
-		const nextState = decodeCanonical(nextStateBytes, APPLICATION_LIMITS);
-		const output = decodeCanonical(outputBytes, APPLICATION_LIMITS);
-		this.#exactCanonicalStateBytes = nextStateBytes;
-		this.#state = nextState;
-		this.#stateDigest = stateDigest(nextStateBytes);
+		// Complete both validations before publishing any machine field. State
+		// and output are independently decoded, even when the reducer aliases them.
+		const nextState = validatedApplicationState(result.state, this.#applicationLimits);
+		const output = validatedApplicationState(result.output, this.#applicationLimits);
+		this.#exactCanonicalStateBytes = nextState.bytes;
+		this.#state = nextState.value;
+		this.#stateDigest = stateDigest(nextState.bytes);
 		this.#generation = {};
-		return output;
+		return output.value;
 	}
 
 	fork(): BlueprintStateMachine {
 		const fork = new BlueprintStateMachine({
+			maxApplicationStateBytes: this.#applicationLimits.maxBytes,
 			exactCanonicalInitialStateBytes: this.#exactCanonicalStateBytes,
 			expectedBlueprintDigest: this.#expectedBlueprintDigest,
 			expectedInitialStateDigest: this.#stateDigest,

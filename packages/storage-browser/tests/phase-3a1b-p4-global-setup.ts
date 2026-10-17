@@ -21,6 +21,13 @@ function candidatePlugin(packageDirectory: string, mutateSharedDecisions = false
 				builder.onResolve({ filter: /^@ts-drp\/live-journal$/ }, ({ importer }) => ({
 					path: path.resolve(importer) === decisionMutant ? shared : decisionMutant,
 				}));
+				// The mutant must exercise the same current TS owner, not a stale
+				// adjacent generated .js sibling when its source barrel imports .js.
+				builder.onResolve({filter: /^\..*\.js$/}, ({path: requested, importer}) => {
+					if (!importer.startsWith(path.dirname(shared) + path.sep)) return undefined;
+					const source = path.resolve(path.dirname(importer), requested).replace(/\.js$/, ".ts");
+					return fs.existsSync(source) ? {path: source} : undefined;
+				});
 			}
 			builder.onResolve({ filter: /internal\/live-journal-observation(?:\.js)?$/ }, ({ importer }) =>
 				importer === candidate ? { path: testControl } : undefined
@@ -60,6 +67,7 @@ export default async function globalSetup(): Promise<() => void> {
 		format: "esm",
 		outdir: assetDirectory,
 		platform: "browser",
+		nodePaths: [path.join(packageDirectory, "node_modules")],
 		plugins: [candidatePlugin(packageDirectory)],
 		target: "es2022",
 	});
@@ -74,6 +82,7 @@ export default async function globalSetup(): Promise<() => void> {
 		format: "esm",
 		outdir: assetDirectory,
 		platform: "browser",
+		nodePaths: [path.join(packageDirectory, "node_modules")],
 		plugins: [candidatePlugin(packageDirectory, true)],
 		target: "es2022",
 	});

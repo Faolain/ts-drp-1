@@ -1,19 +1,27 @@
 /* eslint-disable import/no-unresolved -- Focused build plugin owns the causal maintenance alias. */
 import {
 	type AheDurableStore,
+	type BlobDigest,
 	createMemoryAheDurableStore,
 	decodeGenerationRecordV1,
 	decodeHeadRecordV1,
 	digestBlob,
+	encodeAheRetirementControl,
 	encodeGenerationRecordV1,
+	encodeHeadRecordV1,
 	type ExpectedHead,
 	type GenerationRecord,
+	type NativeReadReservation,
+	parseGenerationId,
+	parseHeadRevision,
+	parseStorageObjectId,
 } from "@ts-drp/storage";
 
 import {
 	D109C_BROWSER_MAINTENANCE_READY,
 	resolveBrowserAheReclamationMaintenance,
 } from "#phase-6b-ahe-reclamation-maintenance";
+import { d109cBoundedCheckpoint, d109cMust } from "../../../../tests/fixtures/phase-6b/ahe-reclamation-contract.js";
 import { createBrowserAheDurableStore } from "../../src/index.js";
 import {
 	type BrowserAheReclamationCrashEdge,
@@ -25,6 +33,7 @@ import {
 	PHASE_2D_GENERATIONS_STORE,
 	PHASE_2D_OBJECTS_STORE,
 	PHASE_2D_PROMOTIONS_STORE,
+	PHASE_5C_STORAGE_META_STORE,
 	PHASE_5E_SCHEMA_VERSION,
 } from "../../src/internal/schema-idb.js";
 
@@ -1037,10 +1046,573 @@ function workerUrl(): string {
 	return new URL("./phase-6b-ahe-reclamation-worker.js", import.meta.url).href;
 }
 
+type BoundedCheckpointCase = "shared" | "atomic" | "currency";
+type BoundedNativeRows = Record<string, unknown>[];
+
+/**
+ * Complete quiescent native image includes the original metadata store.
+ * @param databaseName - Existing original native database.
+ * @param mode - Exact native transaction mode.
+ * @param action - Test-only operation on the actual transaction.
+ * @returns Actual return after native terminal join.
+ */
+async function boundedCheckpointTransaction<T>(
+	databaseName: string,
+	mode: IDBTransactionMode,
+	action: (transaction: IDBTransaction) => Promise<T>
+): Promise<T> {
+	const db = await openDatabase(databaseName);
+	const transaction = db.transaction([...AHE_STORES, PHASE_5C_STORAGE_META_STORE], mode, { durability: "strict" });
+	const done = transactionDone(transaction);
+	try {
+		const value = await action(transaction);
+		if (mode === "readwrite") transaction.commit();
+		await done;
+		return value;
+	} catch (cause) {
+		try {
+			transaction.abort();
+		} catch {
+			/* Retain original cause after terminal. */
+		}
+		await done.catch(() => undefined);
+		throw cause;
+	} finally {
+		db.close();
+	}
+}
+
+async function boundedCheckpointImage(
+	databaseName: string
+): Promise<Record<"objects" | "generations" | "promotions" | "blobs" | "metadata", BoundedNativeRows>> {
+	return boundedCheckpointTransaction(databaseName, "readonly", async (transaction) => ({
+		objects: (await requestValue(transaction.objectStore(PHASE_2D_OBJECTS_STORE).getAll())) as BoundedNativeRows,
+		generations: (await requestValue(
+			transaction.objectStore(PHASE_2D_GENERATIONS_STORE).getAll()
+		)) as BoundedNativeRows,
+		promotions: (await requestValue(transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).getAll())) as BoundedNativeRows,
+		blobs: (await requestValue(transaction.objectStore(PHASE_2D_BLOBS_STORE).getAll())) as BoundedNativeRows,
+		metadata: (await requestValue(transaction.objectStore(PHASE_5C_STORAGE_META_STORE).getAll())) as BoundedNativeRows,
+	}));
+}
+
+function boundedCheckpointEqual(actual: unknown, expected: unknown, site: string): void {
+	if (JSON.stringify(normalized(actual)) !== JSON.stringify(normalized(expected)))
+		throw new TypeError(`D109C_BOUND_NATIVE_IMAGE:${site}`);
+}
+
+/**
+ * Native mechanical inputs only; the public rollover remains the authentic eligibility test.
+ * @param databaseName - Original native fixture database.
+ * @param kind - New selected mechanical control.
+ * @returns Actual bounded native outcomes after joined cleanup.
+ */
+async function runBoundedCheckpoint(
+	databaseName: string,
+	kind: BoundedCheckpointCase
+): Promise<Record<string, unknown>> {
+	let store = await createBrowserAheDurableStore({ databaseName });
+	const originalDelete = IDBObjectStore.prototype.delete;
+	try {
+		const fixture = await d109cBoundedCheckpoint(store, kind === "shared");
+		if (!store.acquireRetirementControl || !store.readRetirementImage) throw new TypeError("D109C_BOUND_PORT_MISSING");
+		const before = await boundedCheckpointImage(databaseName);
+		const controlKey = `ahe-retirement:${fixture.objectId}`;
+		const controlRow = before.metadata.find((row) => row.key === controlKey);
+		if (!(controlRow?.record instanceof Uint8Array)) throw new TypeError("D109C_BOUND_CONTROL_MISSING");
+		if (kind === "currency") {
+			for (const method of ["stageNominatedFutureGeneration", "publishNominatedFutureGeneration"] as const) {
+				const view = d109cMust(await store.acquireRetirementControl(fixture.objectId));
+				try {
+					boundedCheckpointEqual(await view[method]({}), { ok: false, reason: "RETIREMENT_FENCED" }, method);
+				} finally {
+					await view.release();
+				}
+				boundedCheckpointEqual(await boundedCheckpointImage(databaseName), before, method);
+			}
+			const pending = d109cMust(await store.acquireRetirementControl(fixture.objectId));
+			try {
+				boundedCheckpointEqual(
+					await pending.prepareBound({ preparation: fixture.preparation, generations: fixture.source.generations }),
+					{ ok: false, reason: "RETIREMENT_FENCED" },
+					"pending-prepare"
+				);
+			} finally {
+				await pending.release();
+			}
+			boundedCheckpointEqual(await boundedCheckpointImage(databaseName), before, "pending-prepare-image");
+			for (const mutation of ["head", "image", "incarnation", "revision", "source", "decision"] as const) {
+				const stale = d109cMust(await store.acquireRetirementControl(fixture.objectId));
+				const headRow = before.objects.find((row) => row.objectId === fixture.objectId);
+				const generationRow = before.generations.find(
+					(row) => row.objectId === fixture.objectId && row.generationId === generationId(3)
+				);
+				if (!headRow || !generationRow) throw new TypeError("D109C_BOUND_STALE_ROWS_MISSING");
+				try {
+					await boundedCheckpointTransaction(databaseName, "readwrite", async (tx) => {
+						if (mutation === "head")
+							await requestValue(
+								tx.objectStore(PHASE_2D_OBJECTS_STORE).put({
+									...headRow,
+									record: encodeHeadRecordV1({
+										...fixture.head,
+										revision: d109cMust(parseHeadRevision(fixture.head.revision + 1)),
+									}),
+								})
+							);
+						else if (mutation === "image") {
+							if (!(generationRow.record instanceof Uint8Array))
+								throw new TypeError("D109C_BOUND_STALE_GENERATION_BYTES");
+							const row = d109cMust(decodeGenerationRecordV1(generationRow.record));
+							await requestValue(
+								tx.objectStore(PHASE_2D_GENERATIONS_STORE).put({
+									...generationRow,
+									record: encodeGenerationRecordV1({
+										...row,
+										baseExpectedHead: { kind: "none", objectId: fixture.objectId },
+									}),
+								})
+							);
+						} else {
+							const control = stale.control,
+								completed = control.completed;
+							if (!completed?.generationDrain) throw new TypeError("D109C_BOUND_STALE_DRAIN_MISSING");
+							const changed =
+								mutation === "incarnation"
+									? { ...control, incarnation: "f".repeat(64) }
+									: mutation === "revision"
+										? { ...control, revision: control.revision + 1 }
+										: mutation === "decision"
+											? { ...control, completed: { ...completed, decisionDigest: "f".repeat(64) } }
+											: {
+													...control,
+													completed: {
+														...completed,
+														generationDrain: {
+															...completed.generationDrain,
+															source: { ...completed.generationDrain.source, resumeBasisDigest: "f".repeat(64) },
+														},
+													},
+												};
+							await requestValue(
+								tx
+									.objectStore(PHASE_5C_STORAGE_META_STORE)
+									.put({ ...controlRow, record: encodeAheRetirementControl(changed) })
+							);
+						}
+					});
+					const changed = await boundedCheckpointImage(databaseName);
+					boundedCheckpointEqual(
+						await stale.reclaimBoundedGeneration(),
+						{ ok: false, reason: "READ_STALE_ROLE_VIEW" },
+						mutation
+					);
+					boundedCheckpointEqual(await boundedCheckpointImage(databaseName), changed, `${mutation}-refusal`);
+				} finally {
+					await stale.release();
+					await boundedCheckpointTransaction(databaseName, "readwrite", async (tx) => {
+						await requestValue(tx.objectStore(PHASE_5C_STORAGE_META_STORE).put(controlRow));
+						await requestValue(tx.objectStore(PHASE_2D_OBJECTS_STORE).put(headRow));
+						await requestValue(tx.objectStore(PHASE_2D_GENERATIONS_STORE).put(generationRow));
+					});
+				}
+				boundedCheckpointEqual(await boundedCheckpointImage(databaseName), before, `${mutation}-restore`);
+			}
+		}
+		if (kind === "atomic") {
+			let deletes = 0;
+			IDBObjectStore.prototype.delete = function (query: IDBValidKey | IDBKeyRange): IDBRequest<undefined> {
+				const request = Reflect.apply(originalDelete, this, [query]) as IDBRequest<undefined>;
+				if (this.transaction.db.name === databaseName && ++deletes === 2)
+					request.addEventListener("success", () => this.transaction.abort(), { once: true });
+				return request;
+			};
+			const abortView = d109cMust(await store.acquireRetirementControl(fixture.objectId));
+			try {
+				const refused = await abortView.reclaimBoundedGeneration();
+				if (refused.ok || refused.reason !== "SUBSTRATE_FAILURE")
+					throw new TypeError("D109C_BOUND_REAL_ABORT_NOT_REFUSED");
+			} finally {
+				IDBObjectStore.prototype.delete = originalDelete;
+				await abortView.release();
+			}
+			if (deletes !== 2) throw new TypeError("D109C_BOUND_SECOND_DELETE_NOT_REACHED");
+			boundedCheckpointEqual(await boundedCheckpointImage(databaseName), before, "actual-delete-abort-old");
+			await store.close();
+			store = await createBrowserAheDurableStore({ databaseName });
+		}
+		if (!store.acquireRetirementControl || !store.readRetirementImage)
+			throw new TypeError("D109C_BOUND_REOPEN_PORT_MISSING");
+		const view = d109cMust(await store.acquireRetirementControl(fixture.objectId));
+		const pendingControl = view.control;
+		let deleteCount = 0;
+		IDBObjectStore.prototype.delete = function (query: IDBValidKey | IDBKeyRange): IDBRequest<undefined> {
+			if (this.transaction.db.name === databaseName) deleteCount++;
+			return Reflect.apply(originalDelete, this, [query]) as IDBRequest<undefined>;
+		};
+		let completed;
+		try {
+			const operation = view.reclaimBoundedGeneration();
+			if (kind === "atomic") {
+				const loss = new Error("test-owned joined reclaim delivery loss");
+				try {
+					await operation.then((result) => {
+						d109cMust(result);
+						throw loss;
+					});
+				} catch (cause) {
+					if (cause !== loss) throw cause;
+				}
+				// No successful mutation result is accepted after the lost delivery:
+				// recover exact NEW from an independent original point read.
+				completed = d109cMust(await store.readRetirementImage(fixture.objectId)).control;
+			} else completed = d109cMust(await operation);
+		} finally {
+			IDBObjectStore.prototype.delete = originalDelete;
+			await view.release();
+		}
+		boundedCheckpointEqual(
+			completed,
+			{
+				...pendingControl,
+				revision: pendingControl.revision + 1,
+				completed: {
+					...pendingControl.completed,
+					generationHoles: fixture.source.postGenerations.recordDigests,
+					generationIdentities: fixture.source.postGenerations.identities,
+					generationDrain: { source: fixture.source, phase: "complete" },
+				},
+			},
+			"complete-control"
+		);
+		const after = await boundedCheckpointImage(databaseName);
+		boundedCheckpointEqual(after.objects, before.objects, "head-unchanged");
+		boundedCheckpointEqual(
+			after.generations,
+			before.generations
+				.filter((row) => row.objectId !== fixture.objectId || row.generationId !== generationId(1))
+				.map((row) =>
+					row.objectId === fixture.objectId && row.generationId === generationId(2)
+						? { ...row, record: encodeGenerationRecordV1(fixture.decision.floor.rewrittenGeneration) }
+						: row
+				),
+			"exact-generation-rows"
+		);
+		boundedCheckpointEqual(
+			after.promotions,
+			before.promotions.filter((row) => row.objectId !== fixture.objectId || row.generationId !== generationId(1)),
+			"exact-promotion-rows"
+		);
+		boundedCheckpointEqual(
+			after.blobs,
+			before.blobs.filter((row) => !fixture.decision.deleteBlobDigests.includes(row.digest as BlobDigest)),
+			"exact-blob-rows"
+		);
+		boundedCheckpointEqual(
+			after.metadata,
+			before.metadata.map((row) =>
+				row.key === controlKey ? { ...row, record: encodeAheRetirementControl(completed) } : row
+			),
+			"exact-all-metadata"
+		);
+		const actualDeletes =
+			before.generations.length -
+			after.generations.length +
+			before.promotions.length -
+			after.promotions.length +
+			before.blobs.length -
+			after.blobs.length;
+		if (actualDeletes !== deleteCount || deleteCount !== (kind === "shared" ? 14 : 15))
+			throw new TypeError("D109C_BOUND_NATIVE_DELETE_COUNT");
+		if (kind === "shared")
+			boundedCheckpointEqual(
+				d109cMust(await store.getBlob(fixture.shared.digest)),
+				Uint8Array.of(1, 0, 101),
+				"foreign-shared-payload"
+			);
+		const point = d109cMust(await store.readRetirementImage(fixture.objectId));
+		if (point.imageDigest !== fixture.source.postImageDigest) throw new TypeError("D109C_BOUND_POST_IMAGE");
+		boundedCheckpointEqual(point.head, fixture.head, "post-head");
+		await store.close();
+		store = await createBrowserAheDurableStore({ databaseName });
+		if (!store.readRetirementImage || !store.acquireRetirementControl) throw new TypeError("D109C_BOUND_COLD_PORT");
+		boundedCheckpointEqual(d109cMust(await store.readRetirementImage(fixture.objectId)), point, "same-db-reopen");
+		boundedCheckpointEqual(await boundedCheckpointImage(databaseName), after, "cold-full-native-image");
+		if (kind === "currency") {
+			const fresh = d109cMust(await store.acquireRetirementControl(fixture.objectId));
+			const nextPreparation = {
+				...fixture.preparation,
+				floorEpoch: 4,
+				decisionDigest: "1".repeat(64),
+				sourceProofDigest: "2".repeat(64),
+				generationRecordDigests: fixture.source.postGenerations.recordDigests,
+			};
+			delete nextPreparation.generationSource;
+			try {
+				d109cMust(
+					await fresh.prepareBound({ preparation: nextPreparation, generations: fixture.source.postGenerations })
+				);
+			} finally {
+				await fresh.release();
+			}
+			const commit = d109cMust(await store.acquireRetirementControl(fixture.objectId));
+			try {
+				const current = d109cMust(
+					await commit.commitPrepared({
+						decisionDigest: nextPreparation.decisionDigest,
+						sourceProofDigest: nextPreparation.sourceProofDigest,
+					})
+				);
+				if (current.completed?.throughEpoch !== 4 || current.completed.generationDrain)
+					throw new TypeError("D109C_BOUND_FRESH_PREPARATION");
+			} finally {
+				await commit.release();
+			}
+			const future = d109cMust(await store.acquireRetirementControl(fixture.objectId));
+			try {
+				boundedCheckpointEqual(
+					await future.stageNominatedFutureGeneration({}),
+					{ ok: false, reason: "INVALID_ARGUMENT" },
+					"untrusted-future-after-completion"
+				);
+			} finally {
+				await future.release();
+			}
+		}
+		return {
+			kind,
+			passed: true,
+			deleteCount,
+			singleGeneration: true,
+			foreignSharedRetained: kind === "shared",
+			actualAbortOld: kind === "atomic",
+			joinedCompleteNew: true,
+			coldSameNative: true,
+			staleCases: kind === "currency" ? 6 : 0,
+			pendingRefusals: kind === "currency" ? 3 : 0,
+		};
+	} finally {
+		IDBObjectStore.prototype.delete = originalDelete;
+		await store.close();
+	}
+}
+
+/**
+ * Native noncreating absence and complete-image control, without protocol authority.
+ * @param databaseName - Fresh original IndexedDB database, reused across cold reopen.
+ * @returns Exact checks only after the original store cleanup joins.
+ */
+async function runRetirementAdmissionImage(databaseName: string): Promise<Record<string, unknown>> {
+	let store = await createBrowserAheDurableStore({ databaseName });
+	let held: NativeReadReservation | undefined;
+	let foreign: IDBDatabase | undefined;
+	let foreignDone: Promise<void> | undefined;
+	try {
+		const objectId = d109cMust(parseStorageObjectId(`admission-image:${"c".repeat(32)}`)),
+			currentId = d109cMust(parseGenerationId("c".repeat(64))),
+			stagedId = d109cMust(parseGenerationId("d".repeat(64))),
+			bytes = Uint8Array.of(1),
+			digest = d109cMust(digestBlob(bytes)),
+			stagedBytes = Uint8Array.of(2),
+			stagedDigest = d109cMust(digestBlob(stagedBytes)),
+			absent = { kind: "none" as const, objectId };
+		d109cMust(
+			await store.beginGeneration({
+				objectId,
+				generationId: currentId,
+				baseExpectedHead: absent,
+				closure: [{ digest, byteLength: bytes.byteLength }],
+			})
+		);
+		d109cMust(await store.putCachedBlob({ objectId, generationId: currentId, digest, bytes }));
+		d109cMust(await store.promoteReference({ objectId, generationId: currentId, digest }));
+		d109cMust(await store.completeGeneration({ objectId, generationId: currentId }));
+		const head = d109cMust(await store.swapHead({ objectId, generationId: currentId, expectedHead: absent })).head;
+		d109cMust(
+			await store.beginGeneration({
+				objectId,
+				generationId: stagedId,
+				baseExpectedHead: head,
+				closure: [{ digest: stagedDigest, byteLength: stagedBytes.byteLength }],
+			})
+		);
+		if (!store.readRetirementAdmissionImage || !store.readRetirementImage || !store.acquireRetirementControl)
+			throw new TypeError("R8_ABSENT_ADMISSION_IMAGE_READER_UNAVAILABLE");
+		const before = await boundedCheckpointImage(databaseName),
+			point = d109cMust(await store.readRetirementAdmissionImage(objectId));
+		const originalBlob = before.blobs.find((row) => row.digest === digest);
+		if (originalBlob === undefined) throw new TypeError("R8_ADMISSION_ORIGINAL_BLOB_UNAVAILABLE");
+		boundedCheckpointEqual(point.head, head, "admission-head");
+		if (point.control !== null || point.metadataBytes !== 0 || !/^[0-9a-f]{64}$/u.test(point.imageDigest))
+			throw new TypeError("R8_ABSENT_ADMISSION_IMAGE_METADATA");
+		if (!Object.isFrozen(point)) throw new TypeError("R8_ABSENT_ADMISSION_IMAGE_MUTABLE");
+		boundedCheckpointEqual(d109cMust(await store.readRetirementAdmissionImage(objectId)), point, "admission-repeat");
+		boundedCheckpointEqual(
+			await store.readRetirementImage(objectId),
+			{ ok: false, reason: "INVALID_ARGUMENT" },
+			"old-absent-contract"
+		);
+		boundedCheckpointEqual(await boundedCheckpointImage(databaseName), before, "admission-no-birth");
+		await boundedCheckpointTransaction(databaseName, "readwrite", async (tx) => {
+			await requestValue(tx.objectStore(PHASE_2D_BLOBS_STORE).put({ digest: stagedDigest, bytes: stagedBytes }));
+		});
+		const changed = d109cMust(await store.readRetirementAdmissionImage(objectId));
+		if (changed.imageDigest === point.imageDigest || changed.control !== null || changed.metadataBytes !== 0)
+			throw new TypeError("R8_ABSENT_ADMISSION_IMAGE_CURRENCY");
+		const changedNative = await boundedCheckpointImage(databaseName);
+		boundedCheckpointEqual(changedNative.metadata, before.metadata, "optional-blob-no-birth");
+		await boundedCheckpointTransaction(databaseName, "readwrite", async (tx) => {
+			await requestValue(tx.objectStore(PHASE_2D_BLOBS_STORE).delete(digest));
+		});
+		const missingNative = await boundedCheckpointImage(databaseName);
+		boundedCheckpointEqual(
+			await store.readRetirementAdmissionImage(objectId),
+			{ ok: false, reason: "ADOPTED_BLOB_MISSING" },
+			"absent-control-required-byte-refusal"
+		);
+		boundedCheckpointEqual(await boundedCheckpointImage(databaseName), missingNative, "missing-byte-no-mutation");
+		await boundedCheckpointTransaction(databaseName, "readwrite", async (tx) => {
+			await requestValue(tx.objectStore(PHASE_2D_BLOBS_STORE).put(originalBlob));
+		});
+		boundedCheckpointEqual(await boundedCheckpointImage(databaseName), changedNative, "required-byte-restored");
+		await store.close();
+		store = await createBrowserAheDurableStore({ databaseName });
+		if (!store.readRetirementAdmissionImage || !store.readRetirementImage || !store.acquireRetirementControl)
+			throw new TypeError("R8_ABSENT_ADMISSION_IMAGE_REOPEN_UNAVAILABLE");
+		boundedCheckpointEqual(
+			d109cMust(await store.readRetirementAdmissionImage(objectId)),
+			changed,
+			"admission-same-db-reopen"
+		);
+		const view = d109cMust(await store.acquireRetirementControl(objectId));
+		try {
+			const present = d109cMust(await store.readRetirementAdmissionImage(objectId));
+			boundedCheckpointEqual(
+				present,
+				d109cMust(await store.readRetirementImage(objectId)),
+				"admission-old-present-contract"
+			);
+			boundedCheckpointEqual(present.control, view.control, "admission-genuine-native-birth");
+			if (present.imageDigest !== changed.imageDigest || present.metadataBytes !== view.metadataBytes)
+				throw new TypeError("R8_ADMISSION_IMAGE_PRESENT_WIDTH");
+		} finally {
+			await view.release();
+		}
+		const descriptors = new Map<string, PropertyDescriptor>();
+		let measuring = false, rawReads = 0, captureLease = false;
+		const captured = {heldTransaction: undefined as IDBTransaction | undefined};
+		for (const name of ["get", "getAll", "openCursor", "getKey"]) {
+			const descriptor = Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, name);
+			if (descriptor === undefined || typeof descriptor.value !== "function") throw new TypeError("R8_HELD_NATIVE_REQUEST_UNAVAILABLE");
+			descriptors.set(name, descriptor);
+			Object.defineProperty(IDBObjectStore.prototype, name, {...descriptor, value: function (this: IDBObjectStore, ...args: unknown[]): unknown {
+				if (captureLease && name === "getKey") captured.heldTransaction = this.transaction;
+				if (measuring && name !== "getKey" && (this.name === PHASE_2D_BLOBS_STORE ||
+					this.name === PHASE_2D_GENERATIONS_STORE || this.name === PHASE_2D_PROMOTIONS_STORE)) rawReads++;
+				return Reflect.apply(descriptor.value as (...input: unknown[]) => unknown, this, args);
+			}});
+		}
+		const measured = async () => {
+			rawReads = 0; measuring = true;
+			try {return {value: await store.readRetirementAdmissionImage!(objectId), rawReads};}
+			finally {measuring = false;}
+		};
+		const acquire = async () => {
+			captureLease = true;
+			try {held = await store.acquireNativeReadReservation({objectId});}
+			finally {captureLease = false;}
+		};
+		try {
+			await acquire();
+			const first = await measured(), repeated = await measured();
+			if (first.rawReads === 0 || repeated.rawReads !== 0) throw new TypeError("R8_HELD_RAW_ADMISSION_NOT_ONCE");
+			const firstValue = d109cMust(first.value), repeatedValue = d109cMust(repeated.value);
+			boundedCheckpointEqual(firstValue, repeatedValue, "held-exact-image");
+			if (firstValue.head === repeatedValue.head || firstValue.control === repeatedValue.control || firstValue.control === null)
+				throw new TypeError("R8_HELD_PUBLIC_DTO_ALIAS");
+			Reflect.set(firstValue.control, "incarnation", "caller-mutated-incarnation");
+			boundedCheckpointEqual(d109cMust((await measured()).value), repeatedValue, "held-private-image-isolation");
+			foreign = await openDatabase(databaseName);
+			const writer = foreign.transaction([PHASE_2D_BLOBS_STORE], "readwrite", {durability: "strict"});
+			foreignDone = transactionDone(writer); void foreignDone.catch(() => undefined);
+			let writerDelivered = false;
+			writer.objectStore(PHASE_2D_BLOBS_STORE).delete(stagedDigest).addEventListener("success", () => {writerDelivered = true;}, {once: true});
+			writer.commit();
+			await held!.check();
+			boundedCheckpointEqual(d109cMust((await measured()).value), repeatedValue, "held-foreign-write-exclusion");
+			if (writerDelivered) throw new TypeError("R8_HELD_FOREIGN_WRITE_ENTERED");
+			await held!.release();
+			try {await held!.check(); throw new TypeError("R8_HELD_RELEASE_NOT_REVOKED");}
+			catch (cause) {if (cause instanceof TypeError && cause.message === "R8_HELD_RELEASE_NOT_REVOKED") throw cause;}
+			held = undefined;
+			await foreignDone; foreignDone = undefined; foreign.close(); foreign = undefined;
+			await acquire();
+			const afterWrite = await measured();
+			if (afterWrite.rawReads === 0 || d109cMust(afterWrite.value).imageDigest === repeatedValue.imageDigest)
+				throw new TypeError("R8_HELD_REACQUIRE_REUSED_OLD_IMAGE");
+			if ((await measured()).rawReads !== 0) throw new TypeError("R8_HELD_REACQUIRE_RAW_REPEAT");
+			await held!.release(); held = undefined;
+			await boundedCheckpointTransaction(databaseName, "readwrite", async tx => {
+				await requestValue(tx.objectStore(PHASE_2D_BLOBS_STORE).put({digest, bytes: Uint8Array.of(255)}));
+			});
+			const originalRefusal = await store.readRetirementAdmissionImage(objectId);
+			if (originalRefusal.ok) throw new TypeError("R8_HELD_PRELEASE_CORRUPTION_ACCEPTED");
+			await acquire();
+			const corrupt = await measured();
+			if (corrupt.rawReads === 0) throw new TypeError("R8_HELD_PRELEASE_CORRUPTION_NOT_SCANNED");
+			boundedCheckpointEqual(corrupt.value, originalRefusal, "held-original-same-count-corruption-refusal");
+			await held!.release(); held = undefined;
+			await boundedCheckpointTransaction(databaseName, "readwrite", async tx => {
+				await requestValue(tx.objectStore(PHASE_2D_BLOBS_STORE).put({digest, bytes}));
+			});
+			await acquire(); d109cMust((await measured()).value);
+			if (captured.heldTransaction === undefined) throw new TypeError("R8_HELD_NATIVE_TRANSACTION_NOT_CAPTURED");
+			captured.heldTransaction.abort();
+			let failedJoin = false;
+			try {await held!.release();} catch {failedJoin = true;}
+			if (!failedJoin) throw new TypeError("R8_HELD_UNEXPECTED_ABORT_JOIN_ACCEPTED");
+			held = undefined;
+			await acquire();
+			if ((await measured()).rawReads === 0) throw new TypeError("R8_HELD_FAILED_JOIN_REUSE");
+			await store.close();
+			let revoked = false; try {await held!.check();} catch {revoked = true;}
+			if (!revoked) throw new TypeError("R8_HELD_CLOSED_LEASE_NOT_REVOKED");
+			await held!.release(); held = undefined;
+		} finally {for (const [name, descriptor] of descriptors) Object.defineProperty(IDBObjectStore.prototype, name, descriptor);}
+		await store.close();
+		boundedCheckpointEqual(
+			await store.readRetirementAdmissionImage(objectId),
+			{ ok: false, reason: "STORE_CLOSED" },
+			"admission-closed"
+		);
+		return {
+			absentNoncreating: true,
+			completeImage: true,
+			requiredByteRefusal: true,
+			sameDatabaseReopen: true,
+			genuineBirthCompatible: true,
+			closedRefusal: true,
+			heldRawAdmissionOnce: true,
+			heldForeignWriteExclusion: true,
+			heldPublicDtoIsolation: true,
+			heldReacquireFreshImage: true,
+			heldSameCountCorruptionRefusal: true,
+			heldFailedJoinPreserved: true,
+		};
+	} finally {
+		await held?.release();
+		await foreignDone;
+		foreign?.close();
+		await store.close();
+	}
+}
+
 Reflect.set(
 	globalThis,
 	"phase6bAheReclamation",
 	Object.freeze({
+		runRetirementAdmissionImage,
+		runBoundedCheckpoint,
 		prepareSchedulingScenario,
 		ready: D109C_BROWSER_MAINTENANCE_READY,
 		run,

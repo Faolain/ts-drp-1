@@ -1,4 +1,5 @@
 import type { DurableIssuanceStore } from "@ts-drp/issuance-store";
+import type { NativeReadReservationPort } from "./internal/native-read-reservation.js";
 
 import { createBrowserDurableIssuanceStoreImplementation } from "./internal/browser-issuance-store.js";
 
@@ -13,6 +14,6 @@ export interface BrowserDurableIssuanceStoreOptions {
  */
 export async function createBrowserDurableIssuanceStore(
 	options: BrowserDurableIssuanceStoreOptions
-): Promise<DurableIssuanceStore> {
+): Promise<DurableIssuanceStore & NativeReadReservationPort> {
 	return createBrowserDurableIssuanceStoreImplementation(options);
 }

@@ -33,7 +33,6 @@ export {
 export * from "./acl.js";
 export type * from "./bitset.js";
 export * from "./drp.js";
-export type * from "./finality.js";
 export * from "./hashgraph.js";
 export type * from "./interval-runner.js";
 export * from "./constants.js";
@@ -44,7 +43,6 @@ export type * from "./message-queue.js";
 export type * from "./metrics.js";
 export type * from "./network.js";
 export type * from "./node.js";
-export type * from "./object.js";
 export type * from "./staged-state-machine.js";
 export type * from "./drp-interval-discovery.js";
 export type * from "./drp-interval-reconnect.js";

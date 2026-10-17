@@ -30,7 +30,16 @@ describe("Phase 3h-b node-owned terminal transition RED", () => {
 		expect(result.reusedResume).toMatchObject({ kind: "invalid-state", ok: false });
 		expect(result.reusedPublish).toMatchObject({ ok: false });
 		expect(result.malformedTerminal).toMatchObject({ ok: false, terminalIntent: "absent" });
-		expect(result.rejectedSignerTerminal).toMatchObject({ ok: false, terminalIntent: "absent" });
+		// Original D.93.55 requires recovery after possibly committed issuance;
+		// signer rejection alone cannot prove native/cryptographic absence.
+		expect(result.rejectedSignerTerminal).toMatchObject({ ok: false, terminalIntent: "outcome-unknown" });
+		expect(result.rejectedSignerRecovery.resumeAfterRejectedSigner).toMatchObject({ok:false,kind:"invalid-state"});
+		expect(result.rejectedSignerRecovery.warmBeginAfterRejectedSigner).toMatchObject({ok:false,kind:"already-terminal"});
+		expect(result.rejectedSignerRecovery.coldRecovery).toMatchObject({ok:true});
+		expect(result.rejectedSignerRecovery.coldBegin).toMatchObject({ok:true});
+		expect(result.rejectedSignerRecovery.nativeImagePreservedAcrossCold).toBe(true);
+		expect(result.rejectedSignerRecovery.sameIntentRetry).toMatchObject({ok:true,kind:"accepted",terminalIntent:"committed"});
+		expect(result.rejectedSignerRecovery.signerCallsAfterRetry).toBe(2);
 		expect(result.begunAgain).toMatchObject({ ok: true });
 		expect(result.publishTerminal).toMatchObject({
 			kind: "accepted",
@@ -72,6 +81,30 @@ describe("Phase 3h-b node-owned terminal transition RED", () => {
 		}
 	});
 
+	it("captures stalled native completion identity and joins only duplicate queued source work", async () => {
+		const result = await runCrossObjectActivationScenario(undefined,"stalled");
+		expect(result.recovery).toMatchObject({ok:true});
+		const value = result.stalledCompletion as {
+			beforeRelease:{firstCutFlights:number;secondCutFlights:number;distinctCuts:boolean;sourceStates:{authorSequence:number;state:string}[]};
+			firstCut:unknown[];secondCut:unknown[];wrong:unknown;afterSourceStates:{authorSequence:number;state:string}[];sourceSequence:number;
+			reentrantCompletion:unknown;reenteredPublication:unknown;afterReentry:unknown[];
+		};
+		expect(value.beforeRelease).toMatchObject({firstCutFlights:1,secondCutFlights:1,distinctCuts:true,
+			reentrantCompletionIsFresh:true,afterReentryFlights:1,afterReentryIsFresh:true});
+		expect(value.beforeRelease.sourceStates.find(row=>row.authorSequence===value.sourceSequence)?.state).toBe("pending");
+		expect(value.firstCut).toHaveLength(40);expect(value.secondCut).toHaveLength(40);
+		for(const completed of [...value.firstCut,...value.secondCut,...value.afterReentry])expect(completed).toMatchObject({ok:true,kind:"published"});
+		expect(value.reentrantCompletion).toMatchObject({ok:true,kind:"published"});
+		expect(value.reenteredPublication).toMatchObject({ok:true,kind:"published"});
+		expect(value.wrong).toMatchObject({ok:false,kind:"record-rejected"});
+		expect(value.afterSourceStates.find(row=>row.authorSequence===value.sourceSequence)?.state).toBe("published");
+		for(const prior of value.beforeRelease.sourceStates.filter(row=>row.authorSequence!==value.sourceSequence)) {
+			expect(value.afterSourceStates.find(row=>row.authorSequence===prior.authorSequence)).toEqual(prior);
+		}
+		expect(result.targetReplacement).toMatchObject({ok:true,kind:"accepted"});
+		expect(result.targetPublication).toMatchObject({ok:true,kind:"published"});
+		expect(result.reopenRecovery).toMatchObject({ok:true});
+	});
 	it("enumerates pending and published source work across the authenticated activation cut", async () => {
 		const result = await runCrossObjectActivationScenario();
 		expect(result.recovery).toMatchObject({ ok: true });

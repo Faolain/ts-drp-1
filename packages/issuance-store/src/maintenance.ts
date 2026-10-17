@@ -1,5 +1,3 @@
-import { decodeCanonical } from "@ts-drp/canonical";
-
 import {
 	assertDurableIssueScope,
 	copyDurableIssueScope,
@@ -7,7 +5,17 @@ import {
 	isClosedDurableIssuanceRecord,
 	isValidDurableAuthorSequence,
 } from "./contract.js";
+import {
+	captureIssuanceRetirementObject,
+	type DurableIssuanceRetirementControl,
+	type DurableIssuanceRetirementControlRead,
+	type DurableIssuanceRetirementImage,
+	ISSUANCE_RETIREMENT_LIMITS,
+	type IssuanceRetirementRows,
+} from "./retirement.js";
 import type { DurableIssuanceError, DurableIssuanceStore, DurableIssueScope, DurableLineage } from "./types.js";
+
+export * from "./retirement.js";
 
 const HEX_DIGEST = /^[0-9a-f]{64}$/u;
 
@@ -38,9 +46,66 @@ export interface DurableIssuancePruningReceipt {
 }
 
 export interface DurableIssuancePruningMaintenance {
+	/** Noncreating mechanical native census; no signing or retirement authority. */
+	readonly readBoundedRecoveryCensus?: DurableIssuanceRecoveryCensusReader;
+	withNativeSignAdmission?(
+		input: Readonly<{ scope: DurableIssueScope; exactCanonicalUnsignedVertexBytes: Uint8Array }>,
+		sign: () => Promise<Uint8Array>
+	): Promise<Uint8Array>;
+	acquireRetirementControl?(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead>;
 	inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
 	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
 	prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+}
+
+export interface DurableIssuanceRecoveryCensusInput {
+	readonly objectId: string;
+	readonly limits: Readonly<{ maxRows: number; maxBytes: number }>;
+}
+export interface DurableIssuanceRecoveryCensus {
+	readonly rows: IssuanceRetirementRows;
+	readonly image: DurableIssuanceRetirementImage;
+	/** Actual metadata from the same noncreating native capture; no authority. */
+	readonly control?: DurableIssuanceRetirementControl | null;
+}
+
+/** Exact held native correspondence only; carries no census, authorization or paid allowance. */
+export interface DurableIssuanceRecoveryCensusCurrentProbe {
+	checkCurrent(this: DurableIssuanceRecoveryCensusCurrentProbe): Promise<boolean>;
+}
+/** Only the original producer can enroll its exact returned observation. */
+export interface DurableIssuanceRecoveryCensusReader {
+	(input: DurableIssuanceRecoveryCensusInput): Promise<DurableIssuanceRecoveryCensus>;
+	captureCurrentProbe?(this: DurableIssuanceRecoveryCensusReader, input: DurableIssuanceRecoveryCensusInput,
+		observation: DurableIssuanceRecoveryCensus): DurableIssuanceRecoveryCensusCurrentProbe | undefined;
+}
+
+/**
+ * Captures smaller caller entitlements within the original native owner's bounds.
+ * @param input - Exact object address and smaller native read entitlement.
+ * @returns Detached, bounded mechanical read input.
+ */
+export function captureDurableIssuanceRecoveryCensusInput(input: unknown): DurableIssuanceRecoveryCensusInput {
+	if (
+		!isClosedDurableIssuanceRecord(input, ["objectId", "limits"]) ||
+		!isClosedDurableIssuanceRecord(input.limits, ["maxRows", "maxBytes"])
+	)
+		throw new DurableIssuanceInvalidArgumentError("issuance recovery census input is malformed");
+	const objectId = captureIssuanceRetirementObject({ objectId: input.objectId });
+	const { maxRows, maxBytes } = input.limits;
+	if (
+		!Number.isSafeInteger(maxRows) ||
+		(maxRows as number) <= 0 ||
+		(maxRows as number) > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+		!Number.isSafeInteger(maxBytes) ||
+		(maxBytes as number) <= 0 ||
+		(maxBytes as number) > ISSUANCE_RETIREMENT_LIMITS.maxBytes
+	)
+		throw new DurableIssuanceInvalidArgumentError("issuance recovery census limits are invalid");
+	return Object.freeze({
+		objectId,
+		limits: Object.freeze({ maxRows: maxRows as number, maxBytes: maxBytes as number }),
+	});
 }
 
 const MAINTENANCE_REGISTRY = Symbol.for("@ts-drp/issuance-store/pruning-maintenance-v1");
@@ -102,28 +167,16 @@ export function durableIssuancePruningMaintenanceForStore(
 	return maintenanceRegistry.resolve(store);
 }
 
-/**
- * Tests whether one durable settlement plan permits authenticated prefix reclamation.
- * @param plan - The transactionally observed plan, or no durable plan.
- * @returns Whether every non-expiring source and the mandatory fence are linked.
- */
-export function settlementPlanPermitsAuthenticatedPruning(
-	plan: Readonly<{
-		readonly entries: readonly Readonly<{
-			readonly disposition: "expire" | "manual-review" | "rebase" | "transform";
-			readonly replacementSequence: number | null;
-		}>[];
-		readonly fenceSequence: number | null;
-	}> | null
-): boolean {
-	return (
-		plan !== null &&
-		plan.fenceSequence !== null &&
-		plan.entries.every(
-			(entry) =>
-				entry.disposition === "expire" || (entry.disposition !== "manual-review" && entry.replacementSequence !== null)
-		)
-	);
+/** Binds native mechanical sign exclusion to this exact ordinary facade. No authorization is minted. */
+export function nativeIssuanceSignAdmissionForStore(
+	store: DurableIssuanceStore,
+	scope: DurableIssueScope
+): ((bytes: Uint8Array, sign: () => Promise<Uint8Array>) => Promise<Uint8Array>) | undefined {
+	const owner = durableIssuancePruningMaintenanceForStore(store);
+	const admit = owner?.withNativeSignAdmission;
+	if (admit === undefined) return undefined;
+	const detached = copyDurableIssueScope(scope);
+	return (bytes, sign) => admit.call(owner, { scope: detached, exactCanonicalUnsignedVertexBytes: bytes }, sign);
 }
 
 /** Exact non-poisoning evidence that a caller-known ordinal was already pruned. */
@@ -209,68 +262,6 @@ export function captureDurableIssuancePruningInput(value: unknown): DurableIssua
 	} catch (error) {
 		if (error instanceof DurableIssuanceInvalidArgumentError) throw error;
 		throw invalid("pruning input could not be inspected as a closed record");
-	}
-}
-
-/**
- * Compares two lineage CAS values.
- * @param left - First lineage value.
- * @param right - Second lineage value.
- * @returns Whether both lineage fields are equal.
- */
-export function durableIssuanceLineagesEqual(left: DurableLineage, right: DurableLineage): boolean {
-	return left.exhausted === right.exhausted && left.next === right.next;
-}
-
-/**
- * Tests whether a lineage has consumed an ordinal.
- * @param lineage - Observed durable lineage.
- * @param authorSequence - Ordinal to classify.
- * @returns Whether the lineage has consumed the ordinal.
- */
-export function durableIssuanceLineageConsumed(lineage: DurableLineage, authorSequence: number): boolean {
-	return lineage.next > authorSequence || (lineage.exhausted && lineage.next === authorSequence);
-}
-
-/**
- * Tests the explicit inclusive pruning-watermark relation.
- * @param watermark - Inclusive watermark or no pruning state.
- * @param authorSequence - Ordinal to classify.
- * @returns Whether the ordinal is at or below a real watermark.
- */
-export function durableIssuanceAddressIsPruned(watermark: number | null, authorSequence: number): boolean {
-	return watermark !== null && authorSequence <= watermark;
-}
-
-/**
- * Decodes only the closed v3 vertex fields needed by the issuance owner.
- * @param canonicalPreimageBytes - Canonical preimage bytes to decode.
- * @param scope - Expected issuance scope.
- * @param authorSequence - Expected issuance ordinal.
- * @returns The validated epoch or `undefined` for any mismatch.
- */
-export function decodeDurableIssuancePreimage(
-	canonicalPreimageBytes: Uint8Array,
-	scope: DurableIssueScope,
-	authorSequence: number
-): Readonly<{ readonly epoch: number }> | undefined {
-	try {
-		const decoded: unknown = decodeCanonical(canonicalPreimageBytes);
-		if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return undefined;
-		const record = decoded as Record<string, unknown>;
-		if (
-			record.kind === "drp-vertex" &&
-			record.protocolMajor === 3 &&
-			isValidDurableAuthorSequence(record.epoch) &&
-			record.authorSequence === authorSequence &&
-			record.author === scope.author &&
-			record.objectId === scope.objectId
-		) {
-			return Object.freeze({ epoch: record.epoch });
-		}
-		return undefined;
-	} catch {
-		return undefined;
 	}
 }
 

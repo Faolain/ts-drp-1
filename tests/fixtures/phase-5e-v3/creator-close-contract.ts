@@ -2,6 +2,8 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 import {
 	type CloseSetHistoryCommitment,
+	type CloseSetHistoryCommitmentInput,
+	type ClosedArchiveSourceRecord,
 	CompactMerkleAccumulator,
 	deriveCloseSetHistoryCommitment,
 	type EpochVertex,
@@ -106,6 +108,14 @@ interface SnapshotOracle {
 	readonly manifestDigest: string;
 	readonly payloadDigest: string;
 	readonly stateDigest: string;
+}
+
+/** A NEW unsigned closed snapshot; original source snapshots/signatures remain unchanged. */
+export function createCreatorArchiveSnapshot(source: CreatorCloseFixture, targetRoot: string): SnapshotOracle {
+	const target = buildSnapshotOracle(source.anchorDigest, targetRoot);
+	if (target.stateDigest !== source.snapshot.stateDigest || target.aclDigest !== source.snapshot.aclDigest)
+		throw new Error("archive fixture changed application or ACL state");
+	return target;
 }
 
 export interface CreatorCloseFixture {
@@ -284,11 +294,15 @@ function cutValue(
  * Builds the independent exact-byte Phase-5e creator-close fixture.
  * @returns Complete creator trust, graph, snapshot, cut and successor reference evidence.
  */
-export async function createCreatorCloseFixture(): Promise<CreatorCloseFixture> {
+export function createCreatorCloseFixture(): Promise<CreatorCloseFixture>;
+export function createCreatorCloseFixture(archiveIndexRoot: string): Promise<CreatorCloseFixture & Readonly<{
+	archiveSource: Readonly<{ close: CloseSetHistoryCommitmentInput; sourceRecords: readonly ClosedArchiveSourceRecord[] }>;
+}>>;
+export async function createCreatorCloseFixture(archiveIndexRoot?: string): Promise<CreatorCloseFixture> {
 	const previousHistory = new CompactMerkleAccumulator();
 	const currentAnchor = Object.freeze({
 		aclDigest: "2".repeat(64),
-		archiveIndexRoot: "3".repeat(64),
+		archiveIndexRoot: archiveIndexRoot ?? "3".repeat(64),
 		blueprintDigest: "8".repeat(64),
 		cryptoSuiteId: "ed25519-sha256-v3",
 		cutDigest: ZERO_DIGEST,
@@ -415,6 +429,14 @@ export async function createCreatorCloseFixture(): Promise<CreatorCloseFixture> 
 		stateDigest: snapshot.stateDigest,
 	});
 	return Object.freeze({
+		...(archiveIndexRoot === undefined ? {} : { archiveSource: Object.freeze({
+			close: { authenticatedCanonicalPreimageByteLengths: charges, exactCanonicalEpochAnchorPreimageBytes: exactCanonicalCurrentAnchorPreimageBytes,
+				frontier: [second.vertex.hash, third.vertex.hash], maxEpochBytes: PARAMETERS.maxEpochBytes,
+				maxEpochVertices: PARAMETERS.maxEpochVertices, previousHistorySnapshot: previousHistory.snapshot(), vertices },
+			sourceRecords: Object.freeze([first, second, third].map(source => Object.freeze({ vertexDigest: source.vertex.hash,
+				exactCanonicalPreimageBytes: Uint8Array.from(source.exactCanonicalPreimageBytes),
+				detachedSignature: ed25519.sign(hexBytes(source.vertex.hash), hexBytes(LOCAL_AUTHOR_PRIVATE_KEY_SEED_HEX)) }))),
+		}) }),
 		anchorDigest,
 		commitment,
 		currentAnchor,

@@ -15,7 +15,7 @@ import { type GenerationRecord, parseStorageObjectId } from "@ts-drp/storage";
 import { Message, V3Envelope } from "@ts-drp/types";
 import { readFileSync, writeSync } from "node:fs";
 import { performance } from "node:perf_hooks";
-import { expect, vi } from "vitest";
+import { afterAll, expect, vi } from "vitest";
 
 import { deliverFixtureSnapshot, readFixtureSnapshotDeclaration } from "./grid-snapshot-content-delivery.js";
 import { fakeNetwork } from "./phase-4b-v3/live-snapshot.js";
@@ -38,6 +38,7 @@ import {
 import { createBrowserAheDurableStore } from "../../packages/storage-browser/src/index.js";
 import { PHASE_5E_SCHEMA_AUTHORITY } from "../../packages/storage-browser/src/internal/schema-idb.js";
 import { createBrowserDurableIssuanceStore } from "../../packages/storage-browser/src/issuance.js";
+import { createBrowserRoomHeadAuthority } from "../../packages/storage-browser/src/room-head.js";
 
 const observed = vi.hoisted(() => ({
 	activationRealmCount: 0,
@@ -226,9 +227,12 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 			Reflect.set(store, "transactIssue", (async (scope, build) => {
 				let selected: DurableIssueCommit | undefined;
 				const ambiguity = observed.ambiguous?.database === input.primaryDatabaseName ? observed.ambiguous : undefined;
-				const result = await transactIssue(scope, async (sequence) => {
-					const candidate = await build(sequence);
-					observed.issuePlans.set(candidate, structuredClone(await store.readSettlementPlan(scope)));
+				const result = await transactIssue(scope, async (sequence, nativeJob) => {
+					// The native writer is entered by build's signing admission hook,
+					// not by transactIssue's callback entry. Observe before it is held.
+					const observedPlan = structuredClone(await store.readSettlementPlan(scope));
+					const candidate = await build(sequence, nativeJob);
+					observed.issuePlans.set(candidate, observedPlan);
 					observed.issueAttempts.push(candidate);
 					const effect = candidate.planEffect;
 					if (ambiguity !== undefined && ambiguity.kind === effect?.kind && !ambiguity.committed) {
@@ -326,7 +330,11 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
 
 const sessions = new Set<V3RoomSession>();
 
-/** Join existing recovery publishers in a frame that ends before storage observation. */
+/**
+ * Join existing recovery publishers in a frame that ends before storage observation.
+ * @param phase
+ * @param phase.terminalAccounting
+ */
 async function waitForGridStartupForDiagnostics(phase: { readonly terminalAccounting: boolean }): Promise<void> {
 	await Promise.all([...sessions].map((session) => waitForV3RoomStartupForDiagnostics(session)));
 	const creators = [...observed.planes.entries()].filter(([name]) => name.endsWith("peer-0"));
@@ -357,9 +365,15 @@ const parameters = Object.freeze({
 	maxSnapshotBytes: 268_435_456,
 	snapshotChunkBytes: 131_072,
 });
-/** Renders exact protocol bytes for evidence identity comparisons. */
+/**
+ * Renders exact protocol bytes for evidence identity comparisons.
+ * @param value
+ */
 const hex = (value: Uint8Array) => Buffer.from(value).toString("hex");
-/** Decodes a fixture-owned canonical record without changing its bytes. */
+/**
+ * Decodes a fixture-owned canonical record without changing its bytes.
+ * @param value
+ */
 const record = (value: Uint8Array) => decodeCanonical(value) as Record<string, unknown>;
 const STALE_LOCAL_HEAD_FAILURE =
 	"v3 room successor reopen failed: D110C_FLOOR_MISMATCH: creator successor differs from the authenticated room-head floor";
@@ -376,7 +390,14 @@ const wideDiagnosticState = {
 	writeFailures: 0,
 };
 
-/** Emits bounded opt-in progress without retaining sampled product objects. */
+/**
+ * Emits bounded opt-in progress without retaining sampled product objects.
+ * @param phase
+ * @param edge
+ * @param epoch
+ * @param peer
+ * @param completed
+ */
 function wideDiagnostic(
 	phase: string,
 	edge: string,
@@ -428,7 +449,10 @@ function wideDiagnostic(
 	}
 }
 
-/** Makes missing evidence a hard fixture failure rather than an optional check. */
+/**
+ * Makes missing evidence a hard fixture failure rather than an optional check.
+ * @param value
+ */
 function required<T>(value: T | undefined | null): T {
 	if (value === undefined || value === null) throw new TypeError("F5B_PRODUCT_CUSTODY_MISSING");
 	return value;
@@ -560,40 +584,60 @@ async function transferDatabase(sourceName: string, targetName: string): Promise
 	}
 }
 
-/** Models the explicitly trusted external room-head account for one fixture peer. */
-function floorOwner() {
-	let state: V3RoomHeadState | null = null;
-	const result = () => ({ ok: true as const, state: structuredClone(state) });
-	const same = (value: unknown) => hex(encodeCanonical(value)) === hex(encodeCanonical(state));
-	const authority: CreateV3RoomSessionInput["roomHeadAuthority"] = {
+// Fixture-owned native mechanics under fake-indexeddb, not browser-engine evidence.
+const nativeFloorOwners = new Set<Awaited<ReturnType<typeof createBrowserRoomHeadAuthority>>>();
+afterAll(async () => {
+	const outcomes = await Promise.allSettled([...nativeFloorOwners].map((owner) => owner.close()));
+	nativeFloorOwners.clear();
+	expect(
+		outcomes.filter((outcome) => outcome.status === "rejected"),
+		"F5B_NATIVE_FLOOR_JOINED_CLOSE"
+	).toEqual([]);
+});
+/**
+ *
+ * @param databaseName
+ * @param scope
+ * @param scope.objectId
+ * @param scope.pinnedGenesisAnchorDigest
+ */
+async function floorOwner(databaseName: string, scope: { objectId: string; pinnedGenesisAnchorDigest: string }) {
+	const authority = await createBrowserRoomHeadAuthority({
+		databaseName: `${databaseName}--room-head`,
 		initialization: { kind: "create" },
-		read: () => Promise.resolve(result()),
-		create: async (input) => {
-			await Promise.resolve();
-			if (state === null) state = { pending: null, stable: input.stable };
-			return result();
-		},
-		migrate: () => Promise.resolve({ ok: false, reason: "conflict" }),
-		begin: async (input) => {
-			await Promise.resolve();
-			if (!same(input.expected)) return { ok: false, reason: "conflict" };
-			const previous = required(state).stable;
-			state = { stable: previous, pending: { previous, next: input.next } };
-			return result();
-		},
-		commit: async (input) => {
-			await Promise.resolve();
-			if (!same(input.expected)) return { ok: false, reason: "conflict" };
-			state = { stable: required(required(state).pending).next, pending: null };
-			return result();
-		},
+	});
+	nativeFloorOwners.add(authority);
+	const read = async () => {
+		const result = await authority.read({ scope });
+		if (!result.ok) throw new TypeError("F5B_NATIVE_FLOOR_READ_CONFLICT");
+		return structuredClone(required(result.state));
 	};
 	return {
 		authority,
-		read: () => structuredClone(required(state)),
-		// Transport the exact floor already committed by the genuine creator.
-		receive: (published: V3RoomHeadState) => {
-			state = structuredClone(published);
+		read,
+		receive: async (published: V3RoomHeadState) => {
+			let state = await read();
+			const same = (left: unknown, right: unknown) => hex(encodeCanonical(left)) === hex(encodeCanonical(right));
+			if (same(state, published)) return;
+			if (state.pending !== null) {
+				if (!same(state.pending.next, published.stable)) throw new TypeError("F5B_NATIVE_FLOOR_RECEIVE_CONFLICT");
+				const committed = await authority.commit({ scope, expected: state });
+				if (!committed.ok) throw new TypeError("F5B_NATIVE_FLOOR_COMMIT_CONFLICT");
+				state = required(committed.state);
+			}
+			if (!same(state.stable, published.stable)) {
+				const begun = await authority.begin({ scope, expected: state, next: published.stable });
+				if (!begun.ok) throw new TypeError("F5B_NATIVE_FLOOR_BEGIN_CONFLICT");
+				const committed = await authority.commit({ scope, expected: required(begun.state) });
+				if (!committed.ok) throw new TypeError("F5B_NATIVE_FLOOR_COMMIT_CONFLICT");
+				state = required(committed.state);
+			}
+			if (published.pending !== null) {
+				const begun = await authority.begin({ scope, expected: state, next: published.pending.next });
+				if (!begun.ok) throw new TypeError("F5B_NATIVE_FLOOR_BEGIN_CONFLICT");
+				state = required(begun.state);
+			}
+			if (!same(state, published)) throw new TypeError("F5B_NATIVE_FLOOR_RECEIVE_CONFLICT");
 		},
 	};
 }
@@ -602,12 +646,20 @@ interface Peer {
 	readonly author: string;
 	readonly seed: Uint8Array;
 	readonly databaseName: string;
-	readonly floor: ReturnType<typeof floorOwner>;
+	readonly floor: Awaited<ReturnType<typeof floorOwner>>;
 	readonly input: CreateV3RoomSessionInput;
 	room: V3RoomSession;
 }
 
-/** Composes genuine signed peers and durable stores with an observable local transport. */
+/**
+ * Composes genuine signed peers and durable stores with an observable local transport.
+ * @param writerCount
+ * @param legacy
+ * @param secondaryAdmin
+ * @param transientPayload
+ * @param applicationFactory
+ * @param initialGroups - Optional exact genesis roles for affected ACL composition scenarios.
+ */
 async function openRoom(
 	writerCount: number,
 	legacy = false,
@@ -616,7 +668,8 @@ async function openRoom(
 	applicationFactory?: (input: {
 		identities: readonly { author: string; seed: Uint8Array }[];
 		creatorPeerId: string;
-	}) => CreateV3RoomSessionInput["application"]
+	}) => CreateV3RoomSessionInput["application"],
+	initialGroups?: readonly (readonly ("admin" | "finality" | "referee" | "writer")[])[]
 ) {
 	const id = ++ordinal;
 	const objectId = `creator:${(8000 + id).toString(16).padStart(32, "0")}`;
@@ -652,13 +705,22 @@ async function openRoom(
 			members: identities
 				.map(({ author }, index) => ({
 					author,
-					finalityKey: index === 0 ? author : null,
+					finalityKey:
+						initialGroups === undefined
+							? index === 0
+								? author
+								: null
+							: required(initialGroups[index]).includes("finality")
+								? author
+								: null,
 					groups:
-						index === 0
-							? ["admin", "finality", "writer"]
-							: secondaryAdmin && index === 1
-								? ["admin", "writer"]
-								: ["writer"],
+						initialGroups === undefined
+							? index === 0
+								? ["admin", "finality", "writer"]
+								: secondaryAdmin && index === 1
+									? ["admin", "writer"]
+									: ["writer"]
+							: required(initialGroups[index]),
 				}))
 				.sort((a, b) => (a.author < b.author ? -1 : 1)),
 		}),
@@ -676,6 +738,7 @@ async function openRoom(
 	const finality = await createRecoverableFinalitySigner({ seed: creator.seed });
 	const ingress = new Map<string, (message: Message) => void>();
 	const received = new Set<string>();
+	const admissionAcks = new Map<string, Set<{ resolve(): void; reject(error: unknown): void }>>();
 	const held = new Set<string>();
 	const publicationFailures = new Set<string>();
 	const heldApplications = new Set<string>();
@@ -731,38 +794,27 @@ async function openRoom(
 		const digest = hex(hashDomain("ts-drp/vertex/v3", envelope.canonicalPreimage));
 		if (received.has(digest)) return true;
 		const operation = record(envelope.canonicalPreimage).operation as Record<string, unknown>;
-		required(ingress.get(target.databaseName))(message);
+		const handler = required(ingress.get(target.databaseName));
+		const control =
+			operation.action === "$drp.author-fence.v1" || operation.action === "join" || operation.action === "causalJoin";
+		const admissionAck = control
+			? Promise.resolve()
+			: new Promise<void>((resolve, reject) => {
+					let waiters = admissionAcks.get(digest);
+					if (waiters === undefined) {
+						waiters = new Set();
+						admissionAcks.set(digest, waiters);
+					}
+					waiters.add({ resolve, reject });
+				});
+		handler(message);
 		// Control vertices intentionally have no application callback. A following
 		// ordinary issue causally depends on them and supplies the admission ack.
 		if (operation.action === "$drp.author-fence.v1" || operation.action === "join" || operation.action === "causalJoin")
 			return true;
-		// Bounded deterministic scheduling oracle: each real readonly IDB round
-		// yields to queued ingress/storage work, with no sleep or elapsed-time test.
-		// 256 is a fixture scheduling budget, never a product resource ceiling.
-		for (let turn = 0; turn < 256 && !received.has(digest); turn += 1)
-			await required(observed.stores.get(target.databaseName)).readLineage({ author: target.author, objectId });
-		if (!received.has(digest)) {
-			// Failure-only scalar evidence: the product intentionally hides transport exceptions.
-			// Keep the scheduling budget and thrown failure unchanged.
-			try {
-				writeSync(
-					2,
-					`${JSON.stringify({
-						kind: "GRID_TRANSPORT_ADMISSION_FAILURE",
-						sender,
-						digest,
-						action: operation.action,
-						epoch: record(envelope.canonicalPreimage).epoch,
-						receivedCount: received.size,
-						creatorIngressPresent: ingress.has(target.databaseName),
-						creatorRuntime: readV3RuntimeOwnerCensus(required(observed.planes.get(target.databaseName))),
-					})}\n`
-				);
-			} catch {
-				/* Preserve the transport failure if diagnostic output is unavailable. */
-			}
-			throw new Error(`F5B_ROUTED_OPERATION_NOT_ADMITTED:${digest}`);
-		}
+		// Actual authenticated, durable product admission; never queued ingress
+		// or an unrelated storage read used as a scheduling clock.
+		await admissionAck;
 		return true;
 	};
 	const transportFor =
@@ -775,6 +827,11 @@ async function openRoom(
 				networkNode,
 				close: () => {
 					ingress.delete(databaseName);
+					if (databaseName === `d110c-f5b-parent-${id}-peer-0`) {
+						for (const waiters of admissionAcks.values())
+							for (const waiter of waiters) waiter.reject(new Error("F5B_ADMISSION_RECIPIENT_CLOSED"));
+						admissionAcks.clear();
+					}
 				},
 				openEphemeral: () => {
 					throw new Error("F5B_EPHEMERAL_NOT_USED");
@@ -788,7 +845,10 @@ async function openRoom(
 		};
 	for (const [index, identity] of identities.entries()) {
 		const databaseName = `d110c-f5b-parent-${id}-peer-${index}`;
-		const floor = floorOwner();
+		const floor = await floorOwner(databaseName, {
+			objectId,
+			pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
+		});
 		const application =
 			applicationFactory === undefined
 				? {
@@ -814,6 +874,9 @@ async function openRoom(
 				const digest = hex(vertex.digest);
 				if (index === 0) {
 					received.add(digest);
+					const waiters = admissionAcks.get(digest);
+					admissionAcks.delete(digest);
+					for (const waiter of waiters ?? []) waiter.resolve();
 				}
 			},
 			onProjection: observeEmissions ? observeProjection(databaseName, application) : () => undefined,
@@ -854,7 +917,7 @@ async function openRoom(
 				closedEpoch,
 			});
 			wideDiagnostic("snapshot-transfer", "end", closedEpoch + 1, peer.databaseName);
-			peer.floor.receive(origin.floor.read());
+			await peer.floor.receive(await origin.floor.read());
 		} else {
 			wideDiagnostic("snapshot-declaration", "begin", closedEpoch + 1, peer.databaseName);
 			declaration = await readFixtureSnapshotDeclaration({
@@ -1075,7 +1138,10 @@ async function openRoom(
 	};
 }
 
-/** Enumerates a peer's real durable issuance lineage and outbox to exhaustion. */
+/**
+ * Enumerates a peer's real durable issuance lineage and outbox to exhaustion.
+ * @param peer
+ */
 async function durable(peer: Peer) {
 	const store = await createBrowserDurableIssuanceStore({ primaryDatabaseName: peer.databaseName });
 	try {
@@ -1102,11 +1168,17 @@ async function durable(peer: Peer) {
 	}
 }
 
-/** Reads canonical state through the application's production projection surface. */
+/**
+ * Reads canonical state through the application's production projection surface.
+ * @param peer
+ */
 function productState(peer: Peer): Uint8Array {
 	return required(peer.input.application.migration).canonicalStateBytes(peer.room.projection());
 }
-/** Reads the physical active head and generation census from durable storage. */
+/**
+ * Reads the physical active head and generation census from durable storage.
+ * @param peer
+ */
 async function aheFacts(peer: Peer) {
 	const store = await createBrowserAheDurableStore({ databaseName: `${peer.databaseName}--ahe` });
 	try {
@@ -1133,7 +1205,10 @@ async function aheFacts(peer: Peer) {
 	}
 }
 
-/** Verifies authenticated cleanup retained only the complete rollback lineage. */
+/**
+ * Verifies authenticated cleanup retained only the complete rollback lineage.
+ * @param peer
+ */
 async function assertRetainedRollbackPair(peer: Peer) {
 	const cleanup = observed.cleanup.findLast((event) => {
 		const input = event.input as { issuance?: { scope?: { author?: string } }; close?: { objectId?: string } };

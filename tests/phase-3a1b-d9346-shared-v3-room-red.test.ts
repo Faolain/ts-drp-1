@@ -43,6 +43,18 @@ beforeAll(async () => {
 		absWorkingDir: repositoryRoot,
 		bundle: true,
 		entryPoints: [gridEntry],
+		plugins: [
+			{
+				name: "existing-vite-raw-import",
+				setup(context) {
+					context.onResolve({ filter: /\?raw$/ }, ({ path, resolveDir }) => ({ path: resolve(resolveDir, path) }));
+					context.onLoad({ filter: /\?raw$/ }, ({ path }) => ({
+						contents: `export default ${JSON.stringify(readFileSync(path.slice(0, -4), "utf8"))};`,
+						loader: "js",
+					}));
+				},
+			},
+		],
 		external: [
 			"assert",
 			"buffer",

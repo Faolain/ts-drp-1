@@ -264,7 +264,8 @@ export async function roleSetup(name: RoleCase, env: Environment): Promise<Recor
 				const bytes = large
 					? n === 4
 						? [payload(11, 65536), payload(12, 65536)]
-						: [payload(13, 65536)]
+						: Array.from({ length: Math.ceil((LIMITS.maxUnionBytes - 3 * LIMITS.maxBlobBytes) / LIMITS.maxBlobBytes) }, (_, index) =>
+							payload(13 + index, Math.min(LIMITS.maxBlobBytes, LIMITS.maxUnionBytes - (3 + index) * LIMITS.maxBlobBytes)))
 					: [payload(n), payload(90)];
 				await stage(store, n, head, bytes, false);
 				must(await store.completeGeneration({ objectId: OBJECT, generationId: id(n) }));
@@ -289,8 +290,10 @@ export async function roleSetup(name: RoleCase, env: Environment): Promise<Recor
 				);
 			if (name === "U+1") {
 				// Replace noncandidate 7 with a genuine Complete candidate. The active
-				// union is only B; the full union is exactly four B plus one byte.
-				await stage(store, 8, head, [payload(14, 1)], false);
+				// union is only B; the full candidate union is exactly U plus one byte.
+				// Keep this exact one-byte carrier distinct from every bounded
+				// candidate blob above, including larger-U multi-blob remainders.
+				await stage(store, 8, head, [payload(29, 1)], false);
 				must(await store.completeGeneration({ objectId: OBJECT, generationId: id(8) }));
 			}
 		}
@@ -389,9 +392,11 @@ export async function rolePrecondition(name: RoleCase, env: Environment): Promis
 	if (name === "bounds-positive" || name === "U+1") {
 		const union = new Map(decoded.filter(candidate).flatMap((g) => g.closure.map((r) => [r.digest, r] as const)));
 		check(
-			[...union.values()].reduce((n, r) => n + r.byteLength, 0) === 262144 + (name === "U+1" ? 1 : 0),
+			[...union.values()].reduce((n, r) => n + r.byteLength, 0) === LIMITS.maxUnionBytes + (name === "U+1" ? 1 : 0),
 			"actual candidate-only exact U/U+1 union"
 		);
+		check(decoded.filter(candidate).every(g => g.closure.length <= LIMITS.maxClosureReferences &&
+			g.closure.every(r => r.byteLength <= LIMITS.maxBlobBytes)), "union boundary keeps independent F/B limits valid");
 		check(
 			decoded.find((g) => g.state === "Adopted")?.closure.reduce((n, r) => n + r.byteLength, 0) === 65536,
 			"active alone fits B/U"
@@ -722,7 +727,7 @@ export async function roleRun(name: RoleCase, env: Environment): Promise<Record<
 					{ ...input(), ancestorCount: 0 },
 					{ ...input(), [Symbol("extra")]: 1 },
 					getter,
-					{ ...input(), limits: { ...LIMITS, maxUnionBytes: 262145 } },
+					{ ...input(), limits: { ...LIMITS, maxUnionBytes: LIMITS.maxUnionBytes + 1 } },
 					{ ...input(), limits: { ...LIMITS, extra: 1 } },
 					new Proxy(input(), {
 						ownKeys(): never {
@@ -753,7 +758,7 @@ export async function roleRun(name: RoleCase, env: Environment): Promise<Record<
 			const acquired = await observe(async () => {
 				const job = acquire(mutable);
 				mutable.objectId = OTHER;
-				mutable.limits.maxUnionBytes = 262145 as 262144;
+				mutable.limits.maxUnionBytes = (LIMITS.maxUnionBytes + 1) as typeof LIMITS.maxUnionBytes;
 				return job;
 			});
 			const reader = must(acquired.value);

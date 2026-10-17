@@ -1,5 +1,8 @@
 import { build } from "esbuild";
+import { existsSync } from "node:fs";
 import { createServer, type Server } from "node:http";
+import { dirname, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface Phase4cBrowserServer {
 	readonly origin: string;
@@ -19,6 +22,24 @@ async function bundle(entryPoint: string): Promise<string> {
 	const result = await build({
 		alias: await workspaceAliases(),
 		bundle: true,
+		// Explicit .js source imports otherwise prefer stale beside-source emit.
+		// Keep the existing native host on one current TypeScript owner.
+		plugins: [
+			{
+				name: "phase4c-original-source-owner",
+				setup(builder): void {
+					const roots = [new URL("../../", import.meta.url), new URL("../../../tests/", import.meta.url)].map((root) =>
+						fileURLToPath(root)
+					);
+					builder.onResolve({ filter: /^\..*\.js$/ }, (args) => {
+						const target = resolve(dirname(args.importer), args.path.slice(0, -3) + ".ts");
+						return roots.some((root) => target.startsWith(root.endsWith(sep) ? root : root + sep)) && existsSync(target)
+							? { path: target }
+							: undefined;
+					});
+				},
+			},
+		],
 		entryPoints: [entryPoint],
 		format: "esm",
 		platform: "browser",

@@ -7,7 +7,8 @@ export default defineConfig({
 		coverage: {
 			enabled: false,
 		},
-		exclude: ["**/node_modules/**", "**/dist/**"],
+		// This original divergence control belongs to the retired HashGraph engine.
+		exclude: ["**/node_modules/**", "**/dist/**", "tests/order-exhaustive.test.ts"],
 		include: ["tests/**/*.test.ts"],
 		testTimeout: 15_000,
 	},

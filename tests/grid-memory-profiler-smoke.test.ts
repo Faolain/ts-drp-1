@@ -22,7 +22,7 @@ it.runIf(process.env.TS_DRP_GRID_MEMORY_PROFILER_SMOKE === "1")(
 				});
 			}
 		} finally {
-			profiler.close();
+			await profiler.close();
 		}
 		const records = readFileSync(join(directory, "telemetry.jsonl"), "utf8")
 			.trim()

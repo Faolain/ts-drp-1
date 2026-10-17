@@ -1,4 +1,3 @@
-import { createPermissionlessACL, DRPObject } from "@ts-drp/object";
 import { type DRPNetworkNode, Message, MessageType } from "@ts-drp/types";
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -8,7 +7,6 @@ import {
 	ControlledEphemeralBus,
 	type ControlledTransportPort,
 } from "./fixtures/track-e1-ephemeral/controlled-transport.js";
-import { Grid } from "../examples/grid/src/objects/grid.js";
 import {
 	ControlledRawBus,
 	type ControlledRawOwner,
@@ -66,22 +64,6 @@ interface EphemeralModule {
 	encodeEphemeralFrame(frame: DecodedFrame): Uint8Array;
 }
 
-interface EphemeralNode {
-	openEphemeral(
-		objectId: string,
-		options: {
-			readonly maxMessageBytes: number;
-			readonly maxSequencedKeys: number;
-			readonly maxSequencedSenders: number;
-		}
-	): EphemeralChannel;
-	put(id: string, object: DRPObject<Grid>): void;
-}
-
-interface EphemeralNodeModule {
-	DRPNode: new (config: unknown, dependencies: unknown) => EphemeralNode;
-}
-
 interface V3EphemeralAuthorizationProvider {
 	authorForPeer(peerId: string): string | undefined;
 	currentAuthority(): Readonly<{ aclDigest: string; anchorDigest: string; epoch: 0; objectId: string }> | undefined;
@@ -98,59 +80,11 @@ interface V3EphemeralAdapter {
 }
 
 interface NodeEphemeralModule {
-	NodeEphemeralAdapter: new (
-		networkNode: DRPNetworkNode,
-		getObject: (objectId: string) => undefined,
-		rawOwner: ControlledRawOwner | null
-	) => V3EphemeralAdapter;
-}
-
-interface Deferred<Value> {
-	readonly promise: Promise<Value>;
-	reject(reason?: unknown): void;
-	resolve(value: Value): void;
-}
-
-interface SessionChannel extends EphemeralChannel {
-	readonly closeCount: number;
-	completeNext(accepted: boolean): Promise<void>;
-	readonly publications: readonly { readonly x: number; readonly y: number }[];
-	setAuthorizedPeers(peers: readonly string[]): void;
-	transmit(sender: string, x: number, y: number): void;
-}
-
-interface SessionObject {
-	readonly drp: Grid;
-	readonly id: string;
-	subscribe(listener: () => void): () => void;
-}
-
-interface SessionNode {
-	readonly networkNode: { readonly peerId: string };
-	openEphemeral(objectId: string, channelOptions: ReturnType<typeof options>): SessionChannel;
-	unsubscribeObject(objectId: string): void;
-}
-
-interface GridSessionManager {
-	readonly drpObject: SessionObject | undefined;
-	readonly ephemeralChannel: SessionChannel | undefined;
-	readonly gridDRP: Grid | undefined;
-	node: SessionNode | undefined;
-	readonly transientPositions: Map<string, { x: number; y: number }>;
-	dispose(): void;
-	move(dx: number, dy: number): void;
-	reconcileEphemeralSession(): boolean;
-	requestSession(requestId: string, acquire: () => Promise<SessionObject>): Promise<boolean>;
-	setRenderNotifier(listener: () => void): void;
-}
-
-interface GridStateModule {
-	GridStateManager: new () => GridSessionManager;
+	NodeEphemeralAdapter: new (networkNode: DRPNetworkNode, rawOwner: ControlledRawOwner | null) => V3EphemeralAdapter;
 }
 
 const ephemeralSourcePath = "packages/ephemeral/src/index.ts";
 const ephemeralManifestPath = "packages/ephemeral/package.json";
-const nodeSourcePath = "packages/node/src/index.ts";
 
 const sourceExists = existsSync(ephemeralSourcePath);
 const manifestExists = existsSync(ephemeralManifestPath);
@@ -174,28 +108,12 @@ async function loadEphemeralModule(): Promise<EphemeralModule> {
 	return ephemeralModule;
 }
 
-async function loadNodeModule(): Promise<EphemeralNodeModule> {
-	const loaded: unknown = await import(pathToFileURL(nodeSourcePath).href);
-	if (typeof loaded !== "object" || loaded === null || !("DRPNode" in loaded)) {
-		throw new TypeError("node module surface differs");
-	}
-	return loaded as EphemeralNodeModule;
-}
-
 async function loadNodeEphemeralModule(): Promise<NodeEphemeralModule> {
 	const loaded: unknown = await import(pathToFileURL("packages/node/src/ephemeral.ts").href);
 	if (typeof loaded !== "object" || loaded === null || !("NodeEphemeralAdapter" in loaded)) {
 		throw new TypeError("node ephemeral adapter surface differs");
 	}
 	return loaded as NodeEphemeralModule;
-}
-
-async function loadGridStateModule(): Promise<GridStateModule> {
-	const loaded: unknown = await import(pathToFileURL("examples/grid/src/state.ts").href);
-	if (typeof loaded !== "object" || loaded === null || !("GridStateManager" in loaded)) {
-		throw new TypeError("grid session lifecycle owner is absent");
-	}
-	return loaded as GridStateModule;
 }
 
 function nodeNetwork(): object {
@@ -221,16 +139,6 @@ function options(
 	return { maxMessageBytes: 65_536, maxSequencedKeys: 1, maxSequencedSenders: 4_095, ...overrides };
 }
 
-function deferred<Value>(): Deferred<Value> {
-	let rejectPromise: (reason?: unknown) => void = () => undefined;
-	let resolvePromise: (value: Value) => void = () => undefined;
-	const promise = new Promise<Value>((resolve, reject) => {
-		rejectPromise = reject;
-		resolvePromise = resolve;
-	});
-	return { promise, reject: rejectPromise, resolve: resolvePromise };
-}
-
 let legacyBoundaryFallbackCount = 0;
 
 function createBoundaryChannel(
@@ -252,114 +160,6 @@ function createBoundaryChannel(
 			maxSequencedKeys: channelOptions.maxSequencedKeys,
 		});
 	}
-}
-
-function createSessionChannel({
-	settlePendingOnClose = true,
-}: { readonly settlePendingOnClose?: boolean } = {}): SessionChannel {
-	let authorizedPeers: readonly string[] = [];
-	let closed = false;
-	let closeCount = 0;
-	const listeners = new Set<(frame: DeliveredFrame) => void>();
-	const pending: Deferred<boolean>[] = [];
-	const publications: { readonly x: number; readonly y: number }[] = [];
-	return {
-		authorizedPeers: () => [...authorizedPeers],
-		close: (): void => {
-			closeCount += 1;
-			if (closed) return;
-			closed = true;
-			if (settlePendingOnClose) {
-				for (const result of pending.splice(0)) result.resolve(false);
-			}
-			listeners.clear();
-		},
-		get closeCount(): number {
-			return closeCount;
-		},
-		completeNext: async (accepted): Promise<void> => {
-			const result = pending.shift();
-			if (result === undefined) throw new Error("no pending controlled publication");
-			result.resolve(accepted);
-			await Promise.resolve();
-			await Promise.resolve();
-		},
-		publish: ({ payload }): Promise<boolean> => {
-			if (closed) return Promise.resolve(false);
-			const parsed: unknown = JSON.parse(new TextDecoder().decode(payload));
-			if (typeof parsed !== "object" || parsed === null) throw new TypeError("movement payload differs");
-			publications.push({ x: Reflect.get(parsed, "x") as number, y: Reflect.get(parsed, "y") as number });
-			const result = deferred<boolean>();
-			pending.push(result);
-			return result.promise;
-		},
-		publications,
-		setAuthorizedPeers: (peers): void => {
-			authorizedPeers = [...peers];
-		},
-		stats: () => ({
-			delivered: 0,
-			dropped: 0,
-			localSequencedKeys: 0,
-			malformed: 0,
-			overLimit: 0,
-			published: 0,
-			received: 0,
-			remoteSequencedKeys: 0,
-			sequencedKeys: 0,
-			sequencedSenders: 0,
-			stale: 0,
-			subscriberFailures: 0,
-			unauthorized: 0,
-		}),
-		subscribe: (listener): (() => void) => {
-			listeners.add(listener);
-			return () => listeners.delete(listener);
-		},
-		transmit: (sender, x, y): void => {
-			for (const listener of listeners) {
-				listener({
-					class: "unreliable-sequenced",
-					key: sender,
-					payload: bytes(JSON.stringify({ x, y })),
-					sender,
-					sequence: 1,
-				});
-			}
-		},
-	};
-}
-
-function createSessionObject(
-	id: string,
-	localX = 0,
-	localY = 0
-): {
-	readonly callbacks: Set<() => void>;
-	readonly dispose: ReturnType<typeof vi.fn>;
-	readonly object: SessionObject;
-} {
-	const callbacks = new Set<() => void>();
-	const dispose = vi.fn();
-	const drp = {
-		query_userPosition: () => ({ x: localX, y: localY }),
-		query_users: () => ["local:red"],
-	} as unknown as Grid;
-	return {
-		callbacks,
-		dispose,
-		object: {
-			drp,
-			id,
-			subscribe: (listener) => {
-				callbacks.add(listener);
-				return () => {
-					callbacks.delete(listener);
-					dispose();
-				};
-			},
-		},
-	};
 }
 
 function bytes(value: string): Uint8Array {
@@ -490,7 +290,7 @@ describe("Track E1 post-closure correction", () => {
 				subscribed.push(topic);
 			},
 		} as unknown as DRPNetworkNode;
-		const adapter = new NodeEphemeralAdapter(network, () => undefined, null);
+		const adapter = new NodeEphemeralAdapter(network, null);
 		const roster = new Map([
 			["peer-writer", "author-writer"],
 			["peer-reader", "author-reader"],
@@ -557,20 +357,14 @@ describe("Track E1 post-closure correction", () => {
 			}),
 			isCurrentWriter: (author) => author === "author-alice" || author === "author-bob",
 		};
-		const alice = new NodeEphemeralAdapter(network("alice", "bob", aliceReliable), () => undefined, aliceOwner);
-		const bob = new NodeEphemeralAdapter(network("bob", "alice", bobReliable), () => undefined, bobOwner);
+		const alice = new NodeEphemeralAdapter(network("alice", "bob", aliceReliable), aliceOwner);
+		const bob = new NodeEphemeralAdapter(network("bob", "alice", bobReliable), bobOwner);
 		const aliceChannel = alice.openAuthorized("zone", provider, options());
 		const bobChannel = bob.openAuthorized("zone", provider, options());
 		let delivered = 0;
 		bobChannel.subscribe(() => {
 			delivered += 1;
 		});
-		const world = new DRPObject({
-			acl: createPermissionlessACL("alice"),
-			drp: new Grid(),
-			peerId: "alice",
-		});
-		const beforeMovement = world.vertices.length;
 		for (let sample = 0; sample < 57_600; sample += 1) {
 			await expect(
 				aliceChannel.publish({
@@ -585,9 +379,6 @@ describe("Track E1 post-closure correction", () => {
 		expect(raw.sends).toHaveLength(57_600);
 		expect(aliceReliable).toHaveLength(0);
 		expect(bobReliable).toHaveLength(0);
-		expect(world.vertices).toHaveLength(beforeMovement);
-		world.drp?.addUser("alice", "blue");
-		expect(world.vertices).toHaveLength(beforeMovement + 1);
 		aliceChannel.close();
 		bobChannel.close();
 	});
@@ -637,12 +428,15 @@ describe("Track E1 post-closure correction", () => {
 				stamp(message, selected);
 				return Promise.resolve(true);
 			},
-			sendMessage: (): Promise<void> => Promise.resolve(),
+			sendMessage: (_peerId: string, message: Message): Promise<void> => {
+				published.push(message);
+				return Promise.resolve();
+			},
 			subscribe: (selected: string): void => {
 				topic = selected;
 			},
 		} as unknown as DRPNetworkNode;
-		const adapter = new NodeEphemeralAdapter(network, () => undefined, null);
+		const adapter = new NodeEphemeralAdapter(network, null);
 		const roster = new Map([
 			["peer-writer", "author-writer"],
 			["peer-reader", "author-reader"],
@@ -697,171 +491,13 @@ describe("Track E1 post-closure correction", () => {
 		channel.close();
 		expect(adapter.route(message(topic, "peer-writer", Uint8Array.of(1)))).toBe(false);
 	});
-
-	it("preserves legacy object-bound fixture acquisition and cleanup outside the grid product bundle", async () => {
-		const { GridStateManager } = await loadGridStateModule();
-		const manager = new GridStateManager();
-		const renders = vi.fn();
-		const unsubscribed: string[] = [];
-		const opened: { readonly id: string; readonly channelOptions: ReturnType<typeof options> }[] = [];
-		const channels = new Map<string, SessionChannel>();
-		manager.node = {
-			networkNode: { peerId: "local" },
-			openEphemeral: (id, channelOptions): SessionChannel => {
-				opened.push({ channelOptions, id });
-				const channel = createSessionChannel({ settlePendingOnClose: id !== "latest" });
-				channels.set(id, channel);
-				return channel;
-			},
-			unsubscribeObject: (id): void => {
-				unsubscribed.push(id);
-				channels.get(id)?.close();
-			},
-		};
-		manager.setRenderNotifier(renders);
-
-		const slow = deferred<SessionObject>();
-		const middle = deferred<SessionObject>();
-		const latest = deferred<SessionObject>();
-		const slowObject = createSessionObject("slow");
-		const latestObject = createSessionObject("latest");
-		const slowRequest = manager.requestSession("slow", () => slow.promise);
-		const middleAcquire = vi.fn(() => middle.promise);
-		const middleRequest = manager.requestSession("middle", middleAcquire);
-		const latestRequest = manager.requestSession("latest", () => latest.promise);
-		slow.resolve(slowObject.object);
-		await expect(slowRequest).resolves.toBe(false);
-		expect(unsubscribed).toEqual(["slow"]);
-		expect(middleAcquire).not.toHaveBeenCalled();
-		latest.resolve(latestObject.object);
-		await expect(middleRequest).resolves.toBe(false);
-		await expect(latestRequest).resolves.toBe(true);
-		expect(manager.drpObject?.id).toBe("latest");
-		expect(opened).toEqual([{ channelOptions: options(), id: "latest" }]);
-		const duplicateAcquire = vi.fn(() => Promise.resolve(createSessionObject("duplicate-latest").object));
-		await expect(manager.requestSession("latest", duplicateAcquire)).resolves.toBe(true);
-		expect(duplicateAcquire).not.toHaveBeenCalled();
-		expect(unsubscribed).toEqual(["slow"]);
-
-		const latestChannel = channels.get("latest");
-		if (latestChannel === undefined) throw new Error("latest session channel was not installed");
-		const staleCallback = [...latestObject.callbacks][0];
-		if (staleCallback === undefined) throw new Error("latest object callback was not installed");
-		latestChannel.transmit("old-remote", 4, 5);
-		expect(manager.transientPositions.get("old-remote")).toEqual({ x: 4, y: 5 });
-		manager.move(1, 0);
-		expect(latestChannel.publications).toHaveLength(1);
-
-		const replacement = createSessionObject("replacement");
-		await expect(manager.requestSession("replacement", () => Promise.resolve(replacement.object))).resolves.toBe(true);
-		expect(unsubscribed).toEqual(["slow", "latest"]);
-		expect(latestObject.dispose).toHaveBeenCalledTimes(1);
-		expect(latestChannel.closeCount).toBe(1);
-		expect(manager.transientPositions.has("old-remote")).toBe(false);
-		const rendersBeforeStaleWork = renders.mock.calls.length;
-		staleCallback();
-		await latestChannel.completeNext(true);
-		expect(renders).toHaveBeenCalledTimes(rendersBeforeStaleWork);
-		expect(manager.transientPositions.has("local")).toBe(false);
-
-		const failure = deferred<SessionObject>();
-		const recovered = createSessionObject("recovered");
-		const failedRequest = manager.requestSession("failure", () => failure.promise);
-		const recoveredRequest = manager.requestSession("recovered", () => Promise.resolve(recovered.object));
-		failure.reject(new Error("controlled acquisition failure"));
-		await expect(failedRequest).resolves.toBe(false);
-		await expect(recoveredRequest).resolves.toBe(true);
-		expect(manager.drpObject?.id).toBe("recovered");
-		expect(opened.map(({ channelOptions, id }) => ({ channelOptions, id }))).toEqual([
-			{ channelOptions: options(), id: "latest" },
-			{ channelOptions: options(), id: "replacement" },
-			{ channelOptions: options(), id: "recovered" },
-		]);
-		const recoveredChannel = channels.get("recovered");
-		if (recoveredChannel === undefined) throw new Error("recovered session channel was not installed");
-		manager.dispose();
-		expect(unsubscribed.at(-1)).toBe("recovered");
-		expect(recovered.dispose).toHaveBeenCalledTimes(1);
-		expect(recoveredChannel.closeCount).toBe(1);
-	});
-
-	it.each([
-		{ outcomes: [true, true] as const, positions: [11, 13], renders: 2, retained: 13 },
-		{ outcomes: [true, false] as const, positions: [11, 13], renders: 1, retained: 11 },
-		{ outcomes: [false, true] as const, positions: [11, 12], renders: 1, retained: 12 },
-		{ outcomes: [false, false] as const, positions: [11, 12], renders: 0, retained: undefined },
-	])(
-		"preserves legacy fixture movement serialization: $outcomes",
-		async ({ outcomes, positions, renders, retained }) => {
-			const { GridStateManager } = await loadGridStateModule();
-			const manager = new GridStateManager();
-			const renderNotifier = vi.fn();
-			const channel = createSessionChannel();
-			manager.node = {
-				networkNode: { peerId: "local" },
-				openEphemeral: (): SessionChannel => channel,
-				unsubscribeObject: (): void => undefined,
-			};
-			manager.setRenderNotifier(renderNotifier);
-			await manager.requestSession("movement", () => Promise.resolve(createSessionObject("movement", 10, 0).object));
-
-			manager.move(1, 0);
-			manager.move(1, 0);
-			manager.move(1, 0);
-			expect(channel.publications.map(({ x }) => x)).toEqual([positions[0]]);
-			await channel.completeNext(outcomes[0]);
-			await vi.waitFor(() => expect(channel.publications).toHaveLength(2));
-			expect(channel.publications.map(({ x }) => x)).toEqual(positions);
-			await channel.completeNext(outcomes[1]);
-			expect(channel.publications).toHaveLength(2);
-			expect(renderNotifier).toHaveBeenCalledTimes(renders);
-			expect(manager.transientPositions.get("local")?.x).toBe(retained);
-			manager.dispose();
-		}
-	);
-
-	it("preserves legacy fixture overlay reconciliation outside the product bundle", async () => {
-		const { GridStateManager } = await loadGridStateModule();
-		const manager = new GridStateManager();
-		const renderNotifier = vi.fn();
-		const channel = createSessionChannel();
-		manager.node = {
-			networkNode: { peerId: "local" },
-			openEphemeral: (): SessionChannel => channel,
-			unsubscribeObject: (): void => undefined,
-		};
-		manager.setRenderNotifier(renderNotifier);
-		await manager.requestSession("room", () => Promise.resolve(createSessionObject("room").object));
-		manager.move(1, 0);
-		await channel.completeNext(true);
-		expect(manager.transientPositions.get("local")).toEqual({ x: 1, y: 0 });
-		channel.setAuthorizedPeers(["remote"]);
-		channel.transmit("remote", 4, 5);
-		expect(manager.transientPositions.get("remote")).toEqual({ x: 4, y: 5 });
-		expect(manager.reconcileEphemeralSession()).toBe(false);
-		expect(manager.transientPositions.get("remote")).toEqual({ x: 4, y: 5 });
-		channel.setAuthorizedPeers([]);
-		expect(manager.reconcileEphemeralSession()).toBe(true);
-		expect(manager.transientPositions.has("remote")).toBe(false);
-		expect(manager.transientPositions.get("local")).toEqual({ x: 1, y: 0 });
-		expect(manager.reconcileEphemeralSession()).toBe(false);
-		manager.dispose();
-	});
 });
 
 describe.skipIf(!channelAvailable)("Track E1 shared ephemeral channel", () => {
-	it("publishes 57,600 movement samples without growing durable state", async () => {
+	it("publishes 57,600 movement samples through the ephemeral channel", async () => {
 		const module = await loadEphemeralModule();
 		const bus = new ControlledEphemeralBus();
 		const channel = createBoundaryChannel(module, bus.createPort("alice"), options());
-		const world = new DRPObject({
-			acl: createPermissionlessACL("alice"),
-			drp: new Grid(),
-			peerId: "alice",
-		});
-		world.drp?.addUser("alice", "red");
-		const afterAdmission = world.vertices.length;
-
 		for (let sample = 0; sample < 57_600; sample += 1) {
 			await channel.publish({
 				class: "unreliable-sequenced",
@@ -871,16 +507,7 @@ describe.skipIf(!channelAvailable)("Track E1 shared ephemeral channel", () => {
 		}
 
 		expect(channel.stats().published).toBe(57_600);
-		expect(world.vertices).toHaveLength(afterAdmission);
 
-		const durableControl = new DRPObject({
-			acl: createPermissionlessACL("control"),
-			drp: new Grid(),
-			peerId: "control",
-		});
-		const beforeControlAdmission = durableControl.vertices.length;
-		durableControl.drp?.addUser("control", "blue");
-		expect(durableControl.vertices).toHaveLength(beforeControlAdmission + 1);
 		channel.close();
 	});
 
@@ -1131,8 +758,8 @@ describe.skipIf(!channelAvailable)("Track E1 shared ephemeral channel", () => {
 		expect(legacyBoundaryFallbackCount).toBe(0);
 	});
 
-	it("reuses identical node channel options and rejects conflicting reopen", async () => {
-		const { DRPNode } = await loadNodeModule();
+	it("reuses identical authorized node channel options and rejects conflicting reopen", async () => {
+		const { NodeEphemeralAdapter } = await loadNodeEphemeralModule();
 		const subscribedTopics: string[] = [];
 		const getGroupPeers = vi.fn((topic: string): readonly string[] =>
 			topic === "world" ? ["durable-only"] : ["writer", "reader"]
@@ -1143,28 +770,30 @@ describe.skipIf(!channelAvailable)("Track E1 shared ephemeral channel", () => {
 			subscribe: (topic: string): void => {
 				subscribedTopics.push(topic);
 			},
+		} as unknown as DRPNetworkNode;
+		const adapter = new NodeEphemeralAdapter(network, null);
+		const provider: V3EphemeralAuthorizationProvider = {
+			authorForPeer: (peerId) =>
+				peerId === "writer" ? "author-writer" : peerId === "reader" ? "author-reader" : undefined,
+			currentAuthority: () => ({
+				objectId: "world",
+				epoch: 0,
+				aclDigest: "22".repeat(32),
+				anchorDigest: "11".repeat(32),
+			}),
+			isCurrentWriter: (author) => author === "author-writer",
 		};
-		const node = new DRPNode({ log_config: { level: "silent" } }, { networkNode: network, reconnect: false });
-		const world = new DRPObject({
-			acl: createPermissionlessACL("alice"),
-			drp: new Grid(),
-			id: "world",
-			peerId: "alice",
-		});
-		vi.spyOn(world.acl, "query_isWriter").mockImplementation((peerId) => peerId === "writer");
-		node.put("world", world);
-		const first = node.openEphemeral("world", options());
+		const first = adapter.openAuthorized("world", provider, options());
 		expect(first.authorizedPeers()).toEqual(["writer"]);
 		expect(subscribedTopics).toHaveLength(1);
 		expect(subscribedTopics[0]).not.toBe("world");
 		expect(getGroupPeers).toHaveBeenCalledWith(subscribedTopics[0]);
 		expect(getGroupPeers).not.toHaveBeenCalledWith("world");
-		expect(node.openEphemeral("world", options())).toBe(first);
-		expect(() => node.openEphemeral("world", options({ maxMessageBytes: 1_024 }))).toThrow();
-		expect(() => node.openEphemeral("world", options({ maxSequencedSenders: 4_094 }))).toThrow();
+		expect(adapter.openAuthorized("world", provider, options())).toBe(first);
+		expect(() => adapter.openAuthorized("world", provider, options({ maxMessageBytes: 1_024 }))).toThrow();
+		expect(() => adapter.openAuthorized("world", provider, options({ maxSequencedSenders: 4_094 }))).toThrow();
 		first.close();
 	});
-
 	it("retries reliable local failures but does not retry unreliable publications", async () => {
 		const module = await loadEphemeralModule();
 		const bus = new ControlledEphemeralBus();

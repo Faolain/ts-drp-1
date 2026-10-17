@@ -1,6 +1,7 @@
 import "fake-indexeddb/auto";
 
-import { decodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { Message, MessageType } from "@ts-drp/types";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -32,6 +33,7 @@ import {
 	openD109dHotFixture,
 	REPOSITORY_ROOT,
 } from "./fixtures/phase-6b/runtime-reclamation-contract.js";
+import { readV3RuntimeOwnerCensus, routeV3Ingress, type V3PlaneHandle } from "../packages/node/src/v3-live.js";
 
 const readiness = d109dReadiness();
 
@@ -58,7 +60,7 @@ function changedDigest(value: unknown): string {
 	return value === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64);
 }
 
-async function eventually(check: () => Promise<boolean>, attempts = 100): Promise<void> {
+async function eventually(check: () => boolean | Promise<boolean>, attempts = 100): Promise<void> {
 	for (let attempt = 0; attempt < attempts; attempt += 1) {
 		if (await check()) return;
 		await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 10));
@@ -315,6 +317,354 @@ describe("D.109d receipt-gated installed-v3 runtime reclamation RED", () => {
 			});
 			expect(Object.keys(result ?? {}).sort()).toEqual([...D109D_SUCCESS_KEYS].sort());
 			expect(d109dDeepFrozen(result)).toBe(true);
+		} finally {
+			await fixture.close();
+		}
+	});
+
+	it.skipIf(!readiness.ready)(
+		"bounds reclamation receipts before capture through stalled publication and joins lawful replay",
+		async () => {
+			const fixture = await openD109dHotFixture({ creator: { nativeAheOwner: true, nativeStorageOwners: true } });
+			let release!: () => void;
+			const gate = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			let enter!: () => void;
+			const entered = new Promise<void>((resolve) => {
+				enter = resolve;
+			});
+			const network = fixture.runtimeBindings.networkNode,
+				originalPublish = network.publishMessage;
+			const pending: Promise<unknown>[] = [],
+				settled: { index: number; value: Readonly<Record<string, unknown>> }[] = [];
+			try {
+				const receipts = await createD109dReceipts(fixture);
+				const candidate = await d109dCandidate();
+				if (candidate.reclaimInstalledV3Runtime === undefined) throw new TypeError("D109D_CANDIDATE_MISSING");
+				const cutBlob = await fixture.base.evidence.aheBackend.getBlob(
+					fixture.base.evidence.closeResult.cutValueRef.digest
+				);
+				if (!cutBlob.ok || cutBlob.value === null) throw new TypeError("D109D_NATIVE_CUT_MISSING");
+				const byteLimit = Number(record(record(decodeCanonical(cutBlob.value)).parameters).maxPendingBytes);
+				if (!Number.isSafeInteger(byteLimit) || byteLimit < 1) throw new TypeError("D109D_NATIVE_BYTE_LIMIT_MISSING");
+				expect(await fixture.successor.issueLocal(successorIssue(50))).toMatchObject({ ok: true });
+				network.publishMessage = async (): Promise<true> => {
+					enter();
+					await gate;
+					return true;
+				};
+				const held = fixture.successor.publishPending();
+				pending.push(held);
+				await entered;
+				let overflowElements = 0;
+				const oversized = new Proxy(new Array(Math.floor(byteLimit / 66) + 1), {
+					getOwnPropertyDescriptor(target, key): PropertyDescriptor | undefined {
+						if (key !== "length") overflowElements++;
+						return Reflect.getOwnPropertyDescriptor(target, key);
+					},
+				});
+				const oversizedReceipt = { ...receipts.aheReceipt, deletedBlobDigests: oversized };
+				expect(
+					await candidate.reclaimInstalledV3Runtime({
+						aheReceipt: oversizedReceipt,
+						issuanceReceipt: receipts.issuanceReceipt,
+						successor: fixture.successor,
+					})
+				).toMatchObject({ ok: false, code: "D109D_RUNTIME_NOT_READY" });
+				expect(overflowElements).toBe(0);
+				expect(readV3RuntimeOwnerCensus(fixture.successor as V3PlaneHandle)).toMatchObject({
+					admittedReadControlJobs: 0,
+					admittedInputBytes: 0,
+				});
+				let captures = 0;
+				const expectedBytes = encodeCanonical({
+					ahe: receipts.aheReceipt,
+					issuance: receipts.issuanceReceipt,
+				}).byteLength;
+				for (let index = 0; index < 40; index++) {
+					const caller = structuredClone(receipts.aheReceipt);
+					const aheReceipt = new Proxy(caller, {
+						ownKeys(target): (string | symbol)[] {
+							captures++;
+							return Reflect.ownKeys(target);
+						},
+					});
+					pending.push(
+						candidate
+							.reclaimInstalledV3Runtime({
+								aheReceipt,
+								issuanceReceipt: receipts.issuanceReceipt,
+								successor: fixture.successor,
+							})
+							.then((value) => {
+								settled.push({ index, value });
+								return value;
+							})
+					);
+					// The captured receipt, not this mutable caller graph, must be queued.
+					(caller.deletedGenerationIds as string[]).push("f".repeat(64));
+				}
+				await new Promise<void>((resolve) => setTimeout(resolve, 0));
+				const before = readV3RuntimeOwnerCensus(fixture.successor as V3PlaneHandle);
+				console.info(
+					JSON.stringify({
+						site: "reclamation-receipt-admission-held",
+						expectedBytes,
+						captures,
+						before,
+						earlyRefusals: settled.map((row) => row.value.code),
+					})
+				);
+				expect(before?.admittedReadControlJobs).toBe(32);
+				expect(before?.admittedInputBytes).toBe(expectedBytes * 32);
+				expect(captures).toBe(32);
+				expect(settled).toHaveLength(8);
+				for (const row of settled) expect(row.value).toMatchObject({ ok: false, code: "D109D_RUNTIME_NOT_READY" });
+				release();
+				await Promise.all(pending);
+				network.publishMessage = originalPublish;
+				expect(await held).toMatchObject({ ok: true });
+				expect(settled.filter((row) => row.value.ok).map((row) => row.index)).toEqual(
+					Array.from({ length: 32 }, (_, index) => index)
+				);
+				expect(readV3RuntimeOwnerCensus(fixture.successor as V3PlaneHandle)).toMatchObject({
+					admittedReadControlJobs: 0,
+					admittedInputBytes: 0,
+				});
+				expect(await reclaim(fixture, receipts)).toMatchObject({ ok: true, replay: true });
+				expect(await fixture.successor.issueLocal(successorIssue(51))).toMatchObject({ ok: true });
+				const continuedPublication = await fixture.successor.publishPending();
+				console.info(
+					JSON.stringify({ site: "reclamation-native-continuation", continuedPublication, held: await held })
+				);
+				if (!continuedPublication.ok)
+					console.info(
+						JSON.stringify({
+							site: "reclamation-native-continuation-refused",
+							owners: readV3RuntimeOwnerCensus(fixture.successor as V3PlaneHandle),
+							outbox: await fixture.base.evidence.issuanceStore.readOutboxPage({
+								scope: fixture.base.evidence.issuanceScope,
+								limit: 8,
+							}),
+						})
+					);
+				expect(continuedPublication, JSON.stringify(continuedPublication)).toMatchObject({ ok: true });
+				console.info(
+					JSON.stringify({
+						site: "reclamation-receipt-admission",
+						expectedBytes,
+						byteLimit,
+						overflowElements,
+						captures,
+						before,
+						accepted: 32,
+						refused: 8,
+						joined: true,
+					})
+				);
+			} finally {
+				release();
+				const joins = await Promise.allSettled(pending);
+				console.info(
+					JSON.stringify({
+						site: "reclamation-receipt-admission-joined",
+						fulfilled: joins.filter((row) => row.status === "fulfilled").length,
+						rejected: joins.filter((row) => row.status === "rejected").length,
+					})
+				);
+				network.publishMessage = originalPublish;
+				await fixture.close();
+			}
+		}
+	);
+
+	it.skipIf(!readiness.ready).each([false, true])(
+		"bounds outer room gossip through native join and close discard=%s",
+		async (discard) => {
+			const fixture = await openD109dHotFixture({ creator: { nativeAheOwner: true, nativeStorageOwners: true } });
+			const network = fixture.runtimeBindings.networkNode;
+			const originalPublish = network.publishMessage,
+				originalTopic = network.gossipTopicFor;
+			let release!: () => void, enter!: () => void;
+			const gate = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			const entered = new Promise<void>((resolve) => {
+				enter = resolve;
+			});
+			let held: Promise<unknown> | undefined;
+			let deactivation: void | Promise<void>;
+			try {
+				const issued = await fixture.successor.issueLocal(successorIssue(50));
+				expect(issued).toMatchObject({ ok: true });
+				network.publishMessage = async (): Promise<true> => {
+					enter();
+					await gate;
+					return true;
+				};
+				held = fixture.successor.publishPending();
+				await entered;
+				const remote = d108d1aRetainedMessage({
+					anchorDigest: fixture.oracle.anchorDigest,
+					author: fixture.base.evidence.issuanceScope.author,
+					authorSequence: Number(issued.authorSequence) + 1,
+					dependency: String(issued.digest),
+					objectId: fixture.oracle.objectId,
+					sender: "authenticated-native-peer",
+					topic: fixture.successor.topic,
+				});
+				// This fixture substitutes transport attribution only; the queue, wire
+				// authentication, journal, issuance and AHE owners remain genuine.
+				network.gossipTopicFor = (message): string | undefined =>
+					message.objectId === fixture.successor.topic ? fixture.successor.topic : undefined;
+				const plane = fixture.successor as V3PlaneHandle;
+				const cut = await fixture.base.evidence.aheBackend.getBlob(
+					fixture.base.evidence.closeResult.cutValueRef.digest
+				);
+				if (!cut.ok || cut.value === null) throw new TypeError("D109D_NATIVE_CUT_MISSING");
+				const byteLimit = Number(record(record(decodeCanonical(cut.value)).parameters).maxPendingBytes);
+				const oversized = Message.create({ ...remote.message, data: new Uint8Array(Math.floor(byteLimit / 2) + 1) });
+				expect(routeV3Ingress(network, oversized)).toBe(true);
+				expect(readV3RuntimeOwnerCensus(plane)).toMatchObject({
+					admittedGossipQueueJobs: 0,
+					admittedGossipQueueBytes: 0,
+				});
+				const bytes =
+					remote.message.data.byteLength * 2 +
+					encodeCanonical({
+						sender: remote.message.sender,
+						objectId: remote.message.objectId,
+						type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+					}).byteLength;
+				for (let index = 0; index < 40; index++)
+					expect(
+						routeV3Ingress(
+							network,
+							Object.freeze(Message.create({ ...remote.message, data: new Uint8Array(remote.message.data) }))
+						)
+					).toBe(true);
+				await eventually(() => readV3RuntimeOwnerCensus(plane)?.admittedInputJobs === 1);
+				expect(readV3RuntimeOwnerCensus(plane)).toMatchObject({
+					admittedGossipQueueJobs: 32,
+					admittedGossipQueueBytes: bytes * 32,
+					admittedInputJobs: 1,
+				});
+				if (discard) {
+					deactivation = fixture.successor.deactivate();
+					await eventually(() => readV3RuntimeOwnerCensus(plane)?.admittedGossipQueueJobs === 1);
+					expect(readV3RuntimeOwnerCensus(plane)).toMatchObject({
+						admittedGossipQueueBytes: bytes,
+						admittedInputJobs: 1,
+					});
+					expect(routeV3Ingress(network, remote.message)).toBe(true);
+					expect(readV3RuntimeOwnerCensus(plane)?.admittedGossipQueueJobs).toBe(1);
+				}
+				release();
+				await held;
+				await deactivation;
+				network.publishMessage = originalPublish;
+				await eventually(() => readV3RuntimeOwnerCensus(plane)?.admittedGossipQueueJobs === 0);
+				expect(readV3RuntimeOwnerCensus(plane)).toMatchObject({
+					admittedGossipQueueBytes: 0,
+					admittedInputJobs: 0,
+					admittedInputBytes: 0,
+				});
+				if (!discard) {
+					const readiness = await fixture.base.journal.readiness({
+						scope: {
+							anchorDigest: fixture.oracle.anchorDigest,
+							epoch: 1,
+							objectId: fixture.oracle.objectId,
+						},
+					});
+					if (!readiness.ok || !readiness.ready) throw new TypeError("D109D_NATIVE_JOURNAL_NOT_READY");
+					const page = await fixture.base.journal.readPage({
+						afterSequence: null,
+						limit: 32,
+						scope: readiness.scope,
+						snapshot: readiness.snapshot,
+					});
+					expect(page.ok && page.rows.some((row) => row.vertexDigest === remote.digest)).toBe(true);
+					expect(routeV3Ingress(network, remote.message)).toBe(true);
+					await eventually(() => readV3RuntimeOwnerCensus(plane)?.admittedGossipQueueJobs === 0);
+					expect(await fixture.successor.issueLocal(successorIssue(60))).toMatchObject({ ok: true });
+					expect(await fixture.successor.publishPending()).toMatchObject({ ok: true });
+				}
+				console.info(
+					JSON.stringify({
+						site: "outer-room-gossip-native-joined",
+						discard,
+						accepted: 32,
+						refused: 8,
+						bytes,
+						byteLimit,
+						owners: readV3RuntimeOwnerCensus(plane),
+					})
+				);
+			} finally {
+				release();
+				await held;
+				await deactivation;
+				network.publishMessage = originalPublish;
+				network.gossipTopicFor = originalTopic;
+				await fixture.close();
+			}
+		}
+	);
+
+	it.skipIf(!readiness.ready)("checks reclamation receipt membership linearly without skipping refusal precedence", async () => {
+		const fixture = await openD109dHotFixture();
+		try {
+			const receipts = await createD109dReceipts(fixture);
+			const candidate = await d109dCandidate();
+			if (candidate.reclaimInstalledV3Runtime === undefined) throw new TypeError("D109D_CANDIDATE_MISSING");
+			// These enlarged, self-consistent inputs exercise preparation only. They
+			// are not authenticated native deletion receipts and must never release
+			// a runtime owner. Genuine native receipts still complete below.
+			const ids = Array.from({ length: 2048 }, (_, index) => `f1${index.toString(16).padStart(62, "0")}`);
+			const ahe = { ...receipts.aheReceipt, deletedGenerationIds: [...ids], reclaimedGenerationIds: [...ids] };
+			const subject = new Set(ids);
+			const originalIncludes = Array.prototype.includes;
+			const originalHas = Set.prototype.has;
+			let membershipComparisons = 0;
+			let subsetScans = 0;
+			let captured: Promise<unknown>;
+			try {
+				Array.prototype.includes = function (search: unknown, from?: number): boolean {
+					if (from === undefined && this.length === ids.length && originalHas.call(subject, search)) {
+						subsetScans += 1;
+						for (let index = 0; index < this.length; index += 1) {
+							membershipComparisons += 1;
+							if (this[index] === search) return true;
+						}
+						return false;
+					}
+					return originalIncludes.call(this, search, from);
+					};
+				Set.prototype.has = function (search: unknown): boolean {
+					if (originalHas.call(subject, search)) membershipComparisons += 1;
+					return originalHas.call(this, search);
+				};
+				// Receipt capture and consistency checking precede the first await.
+				captured = candidate.reclaimInstalledV3Runtime({ aheReceipt: ahe, issuanceReceipt: receipts.issuanceReceipt, successor: {} });
+			} finally {
+				Array.prototype.includes = originalIncludes;
+				Set.prototype.has = originalHas;
+			}
+			expect(await captured!).toMatchObject({ ok: false, code: "D109D_IDENTITY_MISMATCH" });
+			for (const mutant of [
+				{ ...ahe, deletedGenerationIds: [...ids.slice(0, -1), "f2" + "0".repeat(62)] },
+				{ ...ahe, reclaimedGenerationIds: [...ids.slice(0, -1), ids[0]] },
+				{ ...ahe, deletedGenerationIds: [...ids.slice(0, -1), ids[0]] },
+			]) {
+				await expectCode(() => candidate.reclaimInstalledV3Runtime!({ aheReceipt: mutant, issuanceReceipt: receipts.issuanceReceipt, successor: {} }), "D109D_RECEIPT_MISMATCH");
+			}
+			await expectCode(() => candidate.reclaimInstalledV3Runtime!({ aheReceipt: { ...ahe, reclaimedGenerationIds: ["invalid"] }, issuanceReceipt: receipts.issuanceReceipt, successor: {} }), "D109D_INVALID_ARGUMENT");
+			expect(await reclaim(fixture, receipts)).toMatchObject({ ok: true, replay: false });
+			console.info(JSON.stringify({ site: "reclamation-receipt-preparation", entries: ids.length, subsetScans, membershipComparisons }));
+			expect(subsetScans).toBe(0);
+			expect(membershipComparisons).toBe(ids.length * 2);
 		} finally {
 			await fixture.close();
 		}

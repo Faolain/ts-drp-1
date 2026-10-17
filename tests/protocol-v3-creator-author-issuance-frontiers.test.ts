@@ -16,9 +16,12 @@ import {
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES,
 	openCreatorAuthorIssuanceFrontiers,
 	prepareCreatorAuthorIssuanceFrontiers,
+	readCreatorAuthorIssuanceFrontiersForSizing,
+	readCreatorAuthorSettlementForSizing,
 	resolveCreatorAuthorIssuanceFrontiers,
 } from "../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
 import { openCreatorSuccessorTrust } from "../packages/protocol-v3/src/creator-close.js";
+import { readCreatorIssuanceRetirementForSizing } from "../packages/protocol-v3/src/creator-issuance-retirement.js";
 
 interface Candidate {
 	readonly bytes: Uint8Array;
@@ -138,6 +141,70 @@ beforeAll(() => {
 });
 
 describe("D.110c-0c1f2 creator author-issuance frontier carrier", () => {
+	it("sizes original prospective retirement codecs without future QC or signature identities", async () => {
+		const observed = new Set<string>();
+		for (const creatorTrustProfileId of ["creator-trusted-v1", "creator-trusted-settlement-v1"] as const) {
+			const fixture = await openGenuineCreatorAdoptionFixture({ creatorTrustProfileId });
+			try {
+				for (const candidate of fixture.evidence.proposed.candidates) {
+					const decoded = record(candidate.bytes);
+					const codec =
+						decoded.kind === "drp-creator-issuance-retirement-state"
+							? readCreatorIssuanceRetirementForSizing
+							: decoded.kind === "drp-creator-author-issuance-frontiers-state"
+								? readCreatorAuthorIssuanceFrontiersForSizing
+								: decoded.kind === "drp-creator-author-settlement-state"
+									? readCreatorAuthorSettlementForSizing
+									: undefined;
+					if (codec === undefined) continue;
+					const {
+						closedAnchorDigest: _closedAnchor,
+						closedEpoch: _closedEpoch,
+						genesisAnchorDigest: _genesis,
+						kind,
+						objectId: _object,
+						protocolMajor: _major,
+						successorEpoch: _successorEpoch,
+						version: _version,
+						detachedCreatorSignature: _creatorSignature,
+						detachedAuthoritySignature: _authoritySignature,
+						commitQcRef,
+						...fields
+					} = decoded;
+					const input = {
+						...fields,
+						currentTrust: fixture.evidence.currentTrust,
+						commitQcByteLength: (commitQcRef as { byteLength: number }).byteLength,
+					};
+					const width = codec(input);
+					expect(width).toEqual({
+						ok: true,
+						unsignedPreimageByteLength: encodeCanonical(
+							Object.fromEntries(
+								Object.entries(decoded).filter(
+									([key]) => key !== "detachedCreatorSignature" && key !== "detachedAuthoritySignature"
+								)
+							)
+						).byteLength,
+						signedRecordByteLength: candidate.bytes.byteLength,
+					});
+					expect(Object.keys(width).sort()).toEqual(["ok", "signedRecordByteLength", "unsignedPreimageByteLength"]);
+					expect(codec({ ...input, currentTrust: Object.freeze({}) })).toMatchObject({ ok: false });
+					expect(codec({ ...input, commitQcByteLength: 0 })).toMatchObject({ ok: false });
+					expect(codec({ ...input, commitQcRef })).toMatchObject({ ok: false });
+					observed.add(kind as string);
+				}
+			} finally {
+				await fixture.close();
+			}
+		}
+		expect([...observed].sort()).toEqual([
+			"drp-creator-author-issuance-frontiers-state",
+			"drp-creator-author-settlement-state",
+			"drp-creator-issuance-retirement-state",
+		]);
+	});
+
 	it("reproduces the exact legal maximum tuple shape below the unchanged ceiling", () => {
 		const exactCanonicalRecordBytes = encodeCanonical(maximumRecord());
 		expect(exactCanonicalRecordBytes.byteLength).toBe(6_241);

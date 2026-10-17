@@ -10,6 +10,7 @@ import { type Case, type Controls, exercise } from "./exercise.js";
 import { addGenericToOldestClosure } from "./generic.js";
 import { nodeMechanism } from "./node-mechanism.js";
 import { createNodeDurableLiveJournalStore } from "../../../packages/storage-node/dist/src/live-journal.js";
+import { openNodeSealVoteStore } from "../../../packages/storage-node/dist/src/seal-vote.js";
 import { author, digest, unhex } from "../cold-discovery/application.js";
 import { nodeOwners } from "../cold-discovery/node-owners.js";
 import { provisionLegacy } from "../rollback-data-observation/integrity.js";
@@ -31,7 +32,14 @@ if (mode === "setup") {
 		await owners.close();
 	}
 	await port.writeFloor(report.floor);
-	const integrity = await provisionLegacy(port, report.bootstrap, report.floor);
+	const signing = await openNodeSealVoteStore({ filename: join(identity, "fixture-signing.sqlite"), initialization: "create" });
+	let integrity: unknown;
+	try {
+		// Retain solely the original missing-carried-ACL import representation;
+		// its existing protocol request now uses actual native signing admission.
+		integrity = await provisionLegacy(port, report.bootstrap, report.floor,
+			{ store: signing.store, incarnation: signing.observation.incarnation });
+	} finally { await signing.close(); }
 	const reopened = nodeOwners(identity);
 	try {
 		console.log(

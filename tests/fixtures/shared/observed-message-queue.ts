@@ -48,7 +48,16 @@ export class ObservedMessageQueueManager<T> extends MessageQueueManager<T> {
 	 * @param queueId - Genuine queue identifier.
 	 * @param message - Exact message reference passed through unchanged.
 	 */
-	override async enqueue(queueId: string, message: T): Promise<void> {
+	override enqueue(queueId: string, message: T): Promise<void> {
+		return this.#observeEnqueue(queueId, message, () => super.enqueue(queueId, message));
+	}
+
+	/** Observe the same FIFO occurrence while preserving the genuine joined enqueue. */
+	override enqueueJoined(queueId: string, message: T): Promise<void> {
+		return this.#observeEnqueue(queueId, message, () => super.enqueueJoined(queueId, message));
+	}
+
+	async #observeEnqueue(queueId: string, message: T, enqueue: () => Promise<void>): Promise<void> {
 		const normalized = queueId === "" ? "general" : queueId;
 		let resolve!: () => void;
 		let resolveStarted!: (value: boolean) => void;
@@ -77,7 +86,7 @@ export class ObservedMessageQueueManager<T> extends MessageQueueManager<T> {
 		const publicReceipt = this.#publicReceipt(mutable);
 		this.#waiters.shift()?.resolve(publicReceipt);
 		try {
-			await super.enqueue(queueId, message);
+			await enqueue();
 			if (mutable.remainingHandlers === 0) this.#settle(normalized, mutable, "no-handler");
 		} catch (error) {
 			this.#settle(normalized, mutable, "enqueue-rejected");

@@ -1,5 +1,5 @@
 import { resolveSealAuthorityIdentity } from "@ts-drp/protocol-v3/internal/seal-authority-identity";
-import { type SealAuthority, verifyProposalBundle, verifyRoundChange, verifySealQC } from "@ts-drp/protocol-v3/seal";
+import { captureSealObservationInput, type SealAuthority, type SealObservationKind, verifyProposalBundle, verifyRoundChange, verifySealQC } from "@ts-drp/protocol-v3/seal";
 
 import type { SealVoterHandle } from "./index.js";
 import { isSealVoterPort, resolveSealStorePort, type SealStorePort } from "./internal/seal-vote-intent.js";
@@ -9,6 +9,10 @@ export const ROUND_TIMEOUT_MAX_MS = 30_000;
 export const MAX_FUTURE_ROUND_GAP = 8;
 
 const ZERO_DIGEST = "0".repeat(64);
+// Local retryable admission policy, not a quorum/round/signature validity rule.
+// Captured payloads use original per-record limits and authenticated quorum;
+// this bound includes the active job and all admitted-but-not-entered jobs.
+const MAX_ADMITTED_JOBS = 32;
 
 export type PacemakerEventKind =
 	| "finalized"
@@ -153,6 +157,7 @@ export function createSealPacemaker(
 	let stopped = false;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let operationTail: Promise<void> = Promise.resolve();
+	let admittedJobs = 0;
 	let stopTask: Promise<void> | undefined;
 	let sequence = 0;
 
@@ -204,14 +209,38 @@ export function createSealPacemaker(
 		if (timer !== undefined) clearTimeout(timer);
 		timer = undefined;
 	};
-	const enqueue = <T>(operation: () => Promise<T>): Promise<T | Readonly<{ ok: false; reason: string }>> => {
+	const enqueue = <T>(prepare: () => (() => Promise<T>) | Readonly<{ ok: false; reason: string }>): Promise<T | Readonly<{ ok: false; reason: string }>> => {
 		if (!accepting) return Promise.resolve(failure("STOPPED"));
-		const result = operationTail.then(operation);
+		if (admittedJobs >= MAX_ADMITTED_JOBS) return Promise.resolve(failure("QUEUE_CAPACITY"));
+		admittedJobs++;
+		let operation: () => Promise<T>;
+		try {
+			// Reserve before copying input, including any reentrant observation.
+			const prepared = prepare();
+			if (typeof prepared !== "function") {
+				admittedJobs--; return Promise.resolve(prepared);
+			}
+			operation = prepared;
+		} catch {
+			admittedJobs--; return Promise.resolve(failure("malformed-input"));
+		}
+		const result = operationTail.then(async () => {
+			try { return await operation(); }
+			finally { admittedJobs--; }
+		});
 		operationTail = result.then(
 			() => undefined,
 			() => undefined
 		);
 		return result;
+	};
+	const observe = <T>(kind: SealObservationKind, value: unknown,
+		operation: (captured: Uint8Array | Readonly<Record<string, unknown>>) => Promise<T>) => {
+		return enqueue(() => {
+			const captured = captureSealObservationInput({authority, kind, value});
+			if (!captured.ok) return failure(captured.reason);
+			return () => operation(captured.value);
+		});
 	};
 	const schedule = (): void => {
 		clearTimer();
@@ -220,7 +249,7 @@ export function createSealPacemaker(
 		timer = setTimeout(() => {
 			timer = undefined;
 			if (!accepting) return;
-			void enqueue(async () => {
+			void enqueue(() => async () => {
 				const before = voterStatus();
 				if (before.enteredRound === Number.MAX_SAFE_INTEGER) {
 					phase = "terminal";
@@ -238,6 +267,9 @@ export function createSealPacemaker(
 				pruneEvidence(nextRound);
 				emit("round_entered", "round-change", nextRound, voterStatus().lockedValueDigest, null);
 				schedule();
+			}).then(result => {
+				// A full external pool cannot permanently consume the timer.
+				if (result?.ok === false && result.reason === "QUEUE_CAPACITY") schedule();
 			});
 		}, roundTimeoutMs(round));
 	};
@@ -264,7 +296,8 @@ export function createSealPacemaker(
 
 	const handle: SealPacemakerHandle = Object.freeze({
 		observeCommitQc(exactCanonicalQcBytes: Uint8Array) {
-			return enqueue(async () => {
+			return observe("qc", exactCanonicalQcBytes, async captured => {
+				const exactCanonicalQcBytes = captured as Uint8Array;
 				if (phase === "finalized") return failure("FINALIZED");
 				if (phase === "terminal") return failure("TERMINAL");
 				const verified = verifySealQC({ authority, exactCanonicalQcBytes });
@@ -288,7 +321,8 @@ export function createSealPacemaker(
 			});
 		},
 		observePrepareQc(exactCanonicalQcBytes: Uint8Array) {
-			return enqueue(async () => {
+			return observe("qc", exactCanonicalQcBytes, async captured => {
+				const exactCanonicalQcBytes = captured as Uint8Array;
 				if (phase === "finalized") return failure("FINALIZED");
 				if (phase === "terminal") return failure("TERMINAL");
 				const verified = verifySealQC({ authority, exactCanonicalQcBytes });
@@ -328,7 +362,8 @@ export function createSealPacemaker(
 			});
 		},
 		observeProposalBundle(bundle: Readonly<Record<string, unknown>>) {
-			return enqueue(async () => {
+			return observe("proposal", bundle, async captured => {
+				const bundle = captured as Readonly<Record<string, unknown>>;
 				if (phase === "finalized") return failure("FINALIZED");
 				if (phase === "terminal") return failure("TERMINAL");
 				const verified = verifyProposalBundle({ ...bundle, authority });
@@ -366,7 +401,8 @@ export function createSealPacemaker(
 			});
 		},
 		observeRoundChange(roundChange: Readonly<{ exactCanonicalRoundChangeBytes: Uint8Array; signature: Uint8Array }>) {
-			return enqueue(async () => {
+			return observe("round-change", roundChange, async captured => {
+				const roundChange = captured as Readonly<{ exactCanonicalRoundChangeBytes: Uint8Array; signature: Uint8Array }>;
 				if (phase === "finalized") return failure("FINALIZED");
 				if (phase === "terminal") return failure("TERMINAL");
 				const verified = verifyRoundChange({ authority, ...roundChange });

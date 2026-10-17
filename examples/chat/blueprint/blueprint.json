@@ -1,0 +1,116 @@
+{
+	"schemaVersion": 2,
+	"kind": "ts-drp-blueprint-authoring-source",
+	"artifactId": "v3-shipping-chat.v2",
+	"runtimeProfile": "ecmascript-2024-sync-v1",
+	"operationDiscriminator": "action",
+	"workBudgetProfile": "blueprint-work-budget-v1",
+	"operations": [
+		{
+			"name": "acl",
+			"reducerBinding": "aclReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{ "name": "group", "required": true, "type": "string" },
+					{ "name": "kind", "required": true, "type": "string" },
+					{ "name": "target", "required": true, "type": "string" }
+				]
+			}
+		},
+		{
+			"name": "applicationBatch",
+			"reducerBinding": "applicationBatchReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [{ "name": "batch", "required": true, "type": "canonical-object" }]
+			}
+		},
+		{
+			"name": "causalJoin",
+			"reducerBinding": "causalJoinReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": { "kind": "closed-record", "fields": [] }
+		},
+		{
+			"name": "message",
+			"reducerBinding": "messageReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{ "name": "clientOperationId", "required": true, "type": "string" },
+					{ "name": "displayTimeMs", "required": true, "type": "safe-integer" },
+					{ "name": "text", "required": true, "type": "string" }
+				]
+			}
+		}
+	],
+	"conformance": {
+		"corpusVersion": "shipping-chat-metadata-v2",
+		"seed": "shipping-chat-v2-2026-10-11",
+		"initialState": [],
+		"prCases": [
+			{ "id": "causal-join", "action": "causalJoin", "arguments": {} },
+			{ "id": "acl", "action": "acl", "arguments": { "group": "writer", "kind": "grant", "target": "reader" } },
+			{
+				"id": "message",
+				"action": "message",
+				"arguments": { "clientOperationId": "first", "displayTimeMs": 1791662400000, "text": "hello" },
+				"executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+			},
+			{
+				"id": "exact-retry",
+				"action": "message",
+				"arguments": { "clientOperationId": "first", "displayTimeMs": 1791662400000, "text": "hello" },
+				"executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+			},
+			{
+				"id": "batch",
+				"action": "applicationBatch",
+				"arguments": {
+					"batch": {
+						"version": 1,
+						"entries": [
+							{
+							"logicalTime": -0,
+								"operation": {
+									"action": "message",
+									"clientOperationId": "batch-0",
+									"displayTimeMs": 0,
+									"text": "first"
+								}
+							},
+							{
+								"logicalTime": 1,
+								"operation": {
+									"action": "message",
+									"clientOperationId": "batch-1",
+									"displayTimeMs": 1,
+									"text": "second"
+								}
+							}
+						]
+					}
+				},
+				"executionContext": { "author": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+			}
+		],
+		"nightlyAdditionalCases": [
+			{
+				"id": "unicode",
+				"action": "message",
+				"arguments": { "clientOperationId": "unicode", "displayTimeMs": 9007199254740991, "text": "棋 ♟ café" },
+				"executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+			},
+			{
+				"id": "same-id-other-author",
+				"action": "message",
+				"arguments": { "clientOperationId": "first", "displayTimeMs": 1791662400000, "text": "hello" },
+				"executionContext": { "author": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+			}
+		]
+	}
+}

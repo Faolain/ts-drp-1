@@ -14,6 +14,7 @@
 	},
 	"workspaces": [
 		"packages/*",
+		"!packages/object",
 		"examples/*"
 	],
 	"type": "module",
@@ -35,7 +36,6 @@
 		"e2e-test:worker-host": "pnpm exec playwright test --config packages/worker-host/playwright.phase-2f-b-handshake.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/worker-host/playwright.phase-2f-c-real-workload.config.ts --fail-on-flaky-tests",
 		"e2e-test:public-infra": "GRID_E2E_BROWSERS=chromium,firefox,webkit VITE_NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol pnpm exec playwright test --config examples/grid/playwright.public-infra.config.ts",
 		"e2e-test:fully-public": "pnpm exec playwright test --config examples/grid/playwright.fully-public.config.ts",
-		"flamegraph": "pnpm tsx packages/object/tests/hashgraph.flamegraph.ts",
 		"lint": "eslint .",
 		"lint:fix": "prettier --write '**/package.json' && eslint . --fix",
 		"postinstall": "node scripts/ensure-native-deps.mjs && pnpm build:packages",
@@ -127,7 +127,8 @@
 		],
 		"patchedDependencies": {
 			"@libp2p/webrtc@6.0.26": "patches/@libp2p__webrtc@6.0.26.patch",
-			"fake-indexeddb@6.2.5": "patches/fake-indexeddb@6.2.5.patch"
+			"fake-indexeddb@6.2.5": "patches/fake-indexeddb@6.2.5.patch",
+			"libp2p@3.3.5": "patches/libp2p@3.3.5.patch"
 		}
 	}
 }

@@ -144,7 +144,7 @@ export interface GridTransitionObserver {
 }
 
 /** Runs the identical signed workload; the observer receives no product objects. */
-export async function runGridTransitions(target: 30 | 100, observer?: GridTransitionObserver): Promise<void> {
+export async function runGridTransitions(target: 30 | 60 | 100, observer?: GridTransitionObserver): Promise<void> {
 	const TRANSITIONS = target;
 	const started = performance.now();
 	let transitions = 0;

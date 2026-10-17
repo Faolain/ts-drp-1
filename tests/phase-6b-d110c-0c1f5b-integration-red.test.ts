@@ -51,7 +51,13 @@ import {
 	snapshotStateOracle,
 } from "./fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.js";
 import type { CreateV3RoomSessionInput } from "../examples/v3-room/src/index.js";
+import { waitForV3RoomStartupForDiagnostics } from "../examples/v3-room/src/index.js";
 import { frontierFor } from "../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
+import {
+	authorizeLatchedAclOperation,
+	authorizeLatchedApplicationWrite,
+	type LatchedAclSnapshot,
+} from "../packages/protocol-v3/src/latched-acl.js";
 import { createBrowserDurableIssuanceStore } from "../packages/storage-browser/src/issuance.js";
 
 function messages(peer: Peer) {
@@ -1295,6 +1301,183 @@ afterEach(async () => {
 });
 
 describe("D.110c-0c1f5b parent genuine settlement composition", () => {
+	it.each(["same-target", "distinct-target"] as const)(
+		"activates concurrent Writer grant and Finality revoke with fixed creator seal continuity (%s)",
+		async (targetShape) => {
+			const fixture = await openRoom(
+				2,
+				false,
+				true,
+				false,
+				undefined,
+				targetShape === "same-target"
+					? [
+							["admin", "finality"],
+							["admin", "writer"],
+						]
+					: [["admin", "finality", "writer"], ["admin"]]
+			);
+			const creator = required(fixture.peers[0]);
+			const moderator = required(fixture.peers[1]);
+			await Promise.all(fixture.peers.map(({ room }) => waitForV3RoomStartupForDiagnostics(room)));
+			const assertCreatorSealContinuity = (closed: Awaited<ReturnType<typeof fixture.close>>) => {
+				const candidates = (
+					required(observed.advances.at(-1)).proposed as {
+						candidates: { bytes: Uint8Array; ref: { digest: string } }[];
+					}
+				).candidates;
+				const trust = record(
+					required(candidates.find(({ ref }) => ref.digest === closed.successorTrustRef.digest)).bytes
+				);
+				const invite = creator.input.creatorInvite as {
+					exactCanonicalSignerSetBytes: Uint8Array;
+					exactCanonicalProfileBytes: Uint8Array;
+				};
+				expect(trust.exactCanonicalSignerSetBytes).toEqual(invite.exactCanonicalSignerSetBytes);
+				expect(trust.exactCanonicalProfileBytes).toEqual(invite.exactCanonicalProfileBytes);
+				expect(trust.currentEpoch).toBe(closed.successorEpoch);
+				expect(
+					ed25519.verify(
+						trust.detachedCurrentAnchorSignature as Uint8Array,
+						Buffer.from(closed.successorAnchorDigest, "hex"),
+						ed25519.getPublicKey(creator.seed),
+						{ zip215: false }
+					)
+				).toBe(true);
+				const qc = record(required(candidates.find(({ ref }) => ref.digest === closed.commitQcRef.digest)).bytes);
+				expect(qc).toMatchObject({ epoch: closed.epoch, objectId: fixture.objectId, phase: "commit" });
+				const votes = qc.votes as { signerId: string; signature: string; voteDigest: string }[];
+				expect(votes).toHaveLength(1);
+				for (const vote of votes) {
+					expect(vote.signerId).toBe("creator");
+					const preimage = encodeCanonical({
+						epoch: qc.epoch,
+						kind: "drp-seal-vote",
+						objectId: qc.objectId,
+						phase: qc.phase,
+						proposalDigest: qc.proposalDigest,
+						proposalHash: qc.proposalHash,
+						round: qc.round,
+						signerId: vote.signerId,
+					});
+					const digest = hashDomain("ts-drp/seal-vote/v3", preimage);
+					expect(hex(digest)).toBe(vote.voteDigest);
+					expect(
+						ed25519.verify(Buffer.from(vote.signature, "hex"), digest, ed25519.getPublicKey(creator.seed), {
+							zip215: false,
+						})
+					).toBe(true);
+				}
+			};
+			const granted = targetShape === "same-target" ? creator : moderator;
+			const initial = creator.room.previewLatchedAcl().current as LatchedAclSnapshot;
+			expect(authorizeLatchedApplicationWrite({ author: granted.author, snapshot: initial })).toEqual({
+				authorized: false,
+				ok: true,
+			});
+			const beforeRefusal = {
+				commits: observed.commits.length,
+				attempts: observed.issueAttempts.length,
+				publications: observed.publications.length,
+				state: productState(creator),
+				durable: await durable(granted),
+			};
+			await expect(fixture.issue(granted, "staged-writer-does-not-authorize-current-work")).rejects.toThrow();
+			expect(observed.commits).toHaveLength(beforeRefusal.commits);
+			expect(observed.issueAttempts).toHaveLength(beforeRefusal.attempts);
+			expect(observed.publications).toHaveLength(beforeRefusal.publications);
+			expect(productState(creator)).toEqual(beforeRefusal.state);
+			expect(await durable(granted)).toEqual(beforeRefusal.durable);
+
+			// Hold only delivery so both genuine, signed controls depend on the old
+			// frontier. No source/state/database copying or synthetic authority.
+			fixture.held.add(moderator.databaseName);
+			await Promise.all([
+				moderator.room.issue({ action: "acl", group: "writer", kind: "grant", target: granted.author }),
+				creator.room.issue({ action: "acl", group: "finality", kind: "revoke", target: creator.author }),
+			]);
+			const grant = required(ownCommits(moderator).at(-1));
+			const revoke = required(ownCommits(creator).at(-1));
+			expect(record(grant.envelope.canonicalPreimageBytes).dependencies).not.toContain(hex(revoke.envelope.digest));
+			expect(record(revoke.envelope.canonicalPreimageBytes).dependencies).not.toContain(hex(grant.envelope.digest));
+			fixture.held.delete(moderator.databaseName);
+			fixture.deliver(
+				required(
+					fixture.envelopes.find(
+						(message) =>
+							hex(hashDomain("ts-drp/vertex/v3", V3Envelope.decode(message.data).canonicalPreimage)) ===
+							hex(grant.envelope.digest)
+					)
+				)
+			);
+			await vi.waitFor(() => expect(creator.room.previewLatchedAcl().stagedOperations).toHaveLength(2));
+			expect(creator.room.previewLatchedAcl().current).toEqual(initial);
+			const preview = creator.room.previewLatchedAcl();
+			const next = preview.next as LatchedAclSnapshot;
+			expect(next.members.find(({ author }) => author === granted.author)?.groups).toContain("writer");
+			expect(next.members.find(({ author }) => author === creator.author)?.groups).not.toContain("finality");
+			expect(next.members.find(({ author }) => author === creator.author)?.finalityKey).toBeNull();
+			expect(preview.nextSigners).toEqual([]);
+			// Admin revocation is authorized by the CURRENT moderator despite its
+			// ordinary Writer grant not yet being active in the distinct-target case.
+			await moderator.room.issue({ action: "acl", group: "admin", kind: "revoke", target: creator.author });
+			const expectedAcl = creator.room.previewLatchedAcl().next;
+			const first = await fixture.close();
+			expect(first.successorEpoch).toBe(1);
+			assertCreatorSealContinuity(first);
+			await creator.room.adoptCreatorSuccessor();
+			expect(creator.room.previewLatchedAcl().current).toEqual(expectedAcl);
+			const current = creator.room.previewLatchedAcl().current as LatchedAclSnapshot;
+			expect(current.members.find(({ author }) => author === creator.author)?.groups).toEqual(["writer"]);
+			expect(authorizeLatchedApplicationWrite({ author: granted.author, snapshot: current })).toEqual({
+				authorized: true,
+				ok: true,
+			});
+			expect(
+				authorizeLatchedAclOperation({
+					snapshot: current,
+					operation: { actor: creator.author, finalityKey: creator.author, kind: "set-finality-key" },
+				})
+			).toEqual({ authorized: false, ok: true });
+			const beforeAdminRefusal = {
+				commits: observed.commits.length,
+				attempts: observed.issueAttempts.length,
+				publications: observed.publications.length,
+				state: productState(creator),
+				durable: await durable(creator),
+			};
+			await expect(
+				creator.room.issue({ action: "acl", group: "admin", kind: "grant", target: creator.author })
+			).rejects.toThrow();
+			expect(observed.commits).toHaveLength(beforeAdminRefusal.commits);
+			expect(observed.issueAttempts).toHaveLength(beforeAdminRefusal.attempts);
+			expect(observed.publications).toHaveLength(beforeAdminRefusal.publications);
+			expect(productState(creator)).toEqual(beforeAdminRefusal.state);
+			expect(await durable(creator)).toEqual(beforeAdminRefusal.durable);
+			await fixture.issue(creator, "writer-after-role-activation");
+			expect(
+				messages(creator).filter(({ clientOperationId }) => clientOperationId === "writer-after-role-activation")
+			).toHaveLength(1);
+			const second = await fixture.close();
+			expect(second.successorEpoch).toBe(2);
+			assertCreatorSealContinuity(second);
+			await creator.room.adoptCreatorSuccessor();
+			await fixture.reopen(creator, 1);
+			expect(creator.room.previewLatchedAcl().current).toMatchObject({ epoch: 2 });
+			expect(
+				(creator.room.previewLatchedAcl().current as LatchedAclSnapshot).members.find(
+					({ author }) => author === creator.author
+				)?.groups
+			).toEqual(["writer"]);
+			await fixture.issue(creator, "writer-after-persisted-reopen");
+			expect(messages(creator).map(({ clientOperationId }) => clientOperationId)).toEqual([
+				"writer-after-role-activation",
+				"writer-after-persisted-reopen",
+			]);
+		},
+		120_000
+	);
+
 	it("snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect", () => {
 		const message = (id: string) => ({ action: "message", clientOperationId: id, text: id });
 		const graph = new Map<string, SnapshotOracleVertex>([

@@ -66,6 +66,26 @@ afterAll(() => {
 
 describe("Track P2-a Opus corrective causal RED", () => {
 	it.each([
+		["extra authority", { author: "1".repeat(64), creator: true }],
+		["uppercase author", { author: "A".repeat(64) }],
+		["missing author", {}],
+		["wrong author type", { author: 1 }],
+	] as const)("refuses malformed conformance execution context: %s", async (label, executionContext) => {
+		const { authoring, output } = authoringWithSource(
+			`context-${label.replaceAll(" ", "-")}`,
+			path.join(FIXTURE_ROOT, "forward-counter/blueprint.ts")
+		);
+		const filename = path.join(authoring, "blueprint.json");
+		const manifest = JSON.parse(fs.readFileSync(filename, "utf8")) as {
+			conformance: { prCases: Record<string, unknown>[] };
+		};
+		manifest.conformance.prCases[0].executionContext = executionContext;
+		fs.writeFileSync(filename, `${JSON.stringify(manifest, null, "\t")}\n`);
+		await expect(buildBlueprint(authoring, output)).rejects.toThrow(/executionContext/u);
+		expect(fs.existsSync(output)).toBe(false);
+	});
+
+	it.each([
 		["source", "state: any, key: string"],
 		["artifact", "state, key"],
 	] as const)("rejects assignment and transitive computed-callee laundering in %s", (kind, parameters) => {

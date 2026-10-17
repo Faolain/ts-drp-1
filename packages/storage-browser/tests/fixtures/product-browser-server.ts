@@ -72,6 +72,7 @@ export async function startProductBrowserServer(
 		],
 		stdin: {
 			contents: `
+import { censusGridStorage } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "tests/fixtures/grid-memory-storage-census.ts"))};
 import { createV3ChatApplication } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-chat/src/index.ts"))};
 import { createV3ZoneApplication } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/grid/src/v3-zone.ts"))};
 import { createV3RoomCreatorInviteMaterial, createV3RoomSession } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"))};
@@ -82,6 +83,7 @@ import ${JSON.stringify(entryPoint)};
 Object.defineProperty(globalThis, "__d108e3DirectRoomDependencies", {
   configurable: false,
   value: Object.freeze({
+    censusGridStorage,
     bindV3BlueprintLivePlane,
     createRecoverableFinalitySigner,
     createV3ChatApplication,

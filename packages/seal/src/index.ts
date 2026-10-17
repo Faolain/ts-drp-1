@@ -1,15 +1,29 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
+import { decodeCanonical } from "@ts-drp/canonical";
 import { type FinalitySigner, signSealRegisteredDigest } from "@ts-drp/keychain/finality";
 import { resolveSealAuthorityIdentity } from "@ts-drp/protocol-v3/internal/seal-authority-identity";
-import { prepareRoundChange, prepareSealVote, type SealAuthority, verifySealQC } from "@ts-drp/protocol-v3/seal";
+import { bindSealSigningRequest, SigningAdmissionRefusal } from "@ts-drp/protocol-v3/internal/seal-signing-request";
+import {
+	prepareRoundChange,
+	prepareSealVote,
+	type SealAuthority,
+	verifyRoundChange,
+	verifySealQC,
+	verifySealVoteCarrier,
+} from "@ts-drp/protocol-v3/seal";
 
 import {
+	mintSealDetailRetirementIntent,
 	mintSealRoundChangeIntent,
 	mintSealVoteIntent,
 	mintSealVoterEnrollment,
 	mintSealVoterPort,
+	nativeSigningAdmissionFactory,
 	resolveSealStorePort,
+	type SealDetailRetirementIntentData,
+	type SealDetailRetirementResult,
 	type SealStorePort,
+	type SigningDependencyObservation,
 } from "./internal/seal-vote-intent.js";
 
 export type { SealStorePort } from "./internal/seal-vote-intent.js";
@@ -21,6 +35,7 @@ export interface ExactSealCarrier {
 
 export interface SealVoterHandle {
 	persistQc(input: Readonly<{ exactCanonicalQcBytes: Uint8Array }>): Promise<unknown>;
+	retireDetails(input: Readonly<{ expectedRevision: number }>): Promise<SealDetailRetirementResult>;
 	roundChange(input: Readonly<{ expectedRevision: number; round: number }>): Promise<unknown>;
 	status(): Readonly<{
 		durableCommitQcCount: number;
@@ -80,7 +95,8 @@ function exactBytes(value: unknown, expectedLength?: number, maximumLength = 65_
 		if (arrayBufferResizable !== undefined && (Reflect.apply(arrayBufferResizable, buffer, []) as boolean)) {
 			throw new TypeError("resizable buffer is unsupported");
 		}
-		return Uint8Array.from(bytes);
+		// Copy the checked native backing view, not a caller-defined iterator.
+		return new Uint8Array(new Uint8Array(buffer as ArrayBuffer, 0, length));
 	} catch {
 		throw new TypeError("invalid exact byte carrier");
 	}
@@ -120,9 +136,95 @@ function failure(
 }
 
 /**
- * Opens one durable voter bound to certified signer and storage custody.
- * @param input - Seal authority, finality signer, durable port, and enrolled incarnation.
- * @returns Opaque voter handle or a typed failure.
+ * Checks the original restored QC/lock snapshot under genuine signer authority.
+ * @param authority - Original certified signer authority.
+ * @param expectedStorageIncarnation - Original enrolled storage incarnation.
+ * @param candidate - Restored native snapshot to authenticate.
+ * @returns Authenticated snapshot fields or the original typed refusal.
+ */
+export const verifySealRecoverySnapshot = (
+	authority: SealAuthority,
+	expectedStorageIncarnation: string,
+	candidate: unknown
+):
+	| Readonly<{ ok: false; reason: string }>
+	| Readonly<{
+			durableCommitQcCount: number;
+			durablePrepareQcCount: number;
+			enteredRound: number;
+			finalizedValueDigest: string | null;
+			highestPrepareQcBytes: Uint8Array | null;
+			highestPrepareQcDigest: string | null;
+			lockedValueDigest: string | null;
+			ok: true;
+			pendingRoundChangeCount: number;
+			revision: number;
+	  }> => {
+	if (
+		!plainRecord(candidate) ||
+		candidate.incarnation !== expectedStorageIncarnation ||
+		!safeNonnegative(candidate.revision) ||
+		!safeNonnegative(candidate.enteredRound)
+	) {
+		return failure(plainRecord(candidate) ? "STORAGE_LOSS" : "malformed-store-snapshot");
+	}
+	const highestPrepareQcBytes =
+		candidate.highestPrepareQcBytes instanceof Uint8Array ? exactBytes(candidate.highestPrepareQcBytes) : null;
+	const highestPrepareQcDigest =
+		typeof candidate.highestPrepareQcDigest === "string" ? candidate.highestPrepareQcDigest : null;
+	const lockedValueDigest = typeof candidate.lockedValueDigest === "string" ? candidate.lockedValueDigest : null;
+	if ((highestPrepareQcBytes === null) !== (highestPrepareQcDigest === null)) {
+		return failure("DURABLE_QC_INVALID");
+	}
+	if (highestPrepareQcBytes !== null) {
+		const verified = verifySealQC({ authority, exactCanonicalQcBytes: highestPrepareQcBytes });
+		if (
+			!verified.ok ||
+			verified.phase !== "prepare" ||
+			verified.qcDigest !== highestPrepareQcDigest ||
+			verified.valueDigest !== lockedValueDigest ||
+			verified.round > candidate.enteredRound
+		) {
+			return failure("DURABLE_QC_INVALID");
+		}
+	}
+	const finalizedValueDigest =
+		typeof candidate.finalizedValueDigest === "string" ? candidate.finalizedValueDigest : null;
+	const finalizedCommitQcBytes =
+		candidate.finalizedCommitQcBytes instanceof Uint8Array ? exactBytes(candidate.finalizedCommitQcBytes) : null;
+	if ((finalizedCommitQcBytes === null) !== (finalizedValueDigest === null)) {
+		return failure("DURABLE_QC_INVALID");
+	}
+	if (finalizedCommitQcBytes !== null) {
+		const verified = verifySealQC({ authority, exactCanonicalQcBytes: finalizedCommitQcBytes });
+		if (
+			!verified.ok ||
+			verified.phase !== "commit" ||
+			verified.valueDigest !== finalizedValueDigest ||
+			verified.valueDigest !== lockedValueDigest ||
+			verified.round > candidate.enteredRound
+		) {
+			return failure("DURABLE_QC_INVALID");
+		}
+	}
+	return Object.freeze({
+		durableCommitQcCount: safeNonnegative(candidate.durableCommitQcCount) ? candidate.durableCommitQcCount : 0,
+		durablePrepareQcCount: safeNonnegative(candidate.durablePrepareQcCount) ? candidate.durablePrepareQcCount : 0,
+		enteredRound: candidate.enteredRound,
+		finalizedValueDigest,
+		highestPrepareQcBytes,
+		highestPrepareQcDigest,
+		lockedValueDigest,
+		ok: true as const,
+		pendingRoundChangeCount: safeNonnegative(candidate.pendingRoundChangeCount) ? candidate.pendingRoundChangeCount : 0,
+		revision: candidate.revision,
+	});
+};
+
+/**
+ * Opens the original durable voter under certified authority and enrolled storage custody.
+ * @param input - Original authority, signer, durable port and enrollment.
+ * @returns Original voter handle or a typed refusal.
  */
 export async function createSealVoter(
 	input: Readonly<{
@@ -151,84 +253,8 @@ export async function createSealVoter(
 			...authorityIdentity,
 			expectedIncarnation: expectedStorageIncarnation,
 		});
-		const verifySnapshot = (
-			candidate: unknown
-		):
-			| Readonly<{ ok: false; reason: string }>
-			| Readonly<{
-					durableCommitQcCount: number;
-					durablePrepareQcCount: number;
-					enteredRound: number;
-					finalizedValueDigest: string | null;
-					highestPrepareQcBytes: Uint8Array | null;
-					highestPrepareQcDigest: string | null;
-					lockedValueDigest: string | null;
-					ok: true;
-					pendingRoundChangeCount: number;
-					revision: number;
-			  }> => {
-			if (
-				!plainRecord(candidate) ||
-				candidate.incarnation !== expectedStorageIncarnation ||
-				!safeNonnegative(candidate.revision) ||
-				!safeNonnegative(candidate.enteredRound)
-			) {
-				return failure(plainRecord(candidate) ? "STORAGE_LOSS" : "malformed-store-snapshot");
-			}
-			const highestPrepareQcBytes =
-				candidate.highestPrepareQcBytes instanceof Uint8Array ? exactBytes(candidate.highestPrepareQcBytes) : null;
-			const highestPrepareQcDigest =
-				typeof candidate.highestPrepareQcDigest === "string" ? candidate.highestPrepareQcDigest : null;
-			const lockedValueDigest = typeof candidate.lockedValueDigest === "string" ? candidate.lockedValueDigest : null;
-			if ((highestPrepareQcBytes === null) !== (highestPrepareQcDigest === null)) {
-				return failure("DURABLE_QC_INVALID");
-			}
-			if (highestPrepareQcBytes !== null) {
-				const verified = verifySealQC({ authority, exactCanonicalQcBytes: highestPrepareQcBytes });
-				if (
-					!verified.ok ||
-					verified.phase !== "prepare" ||
-					verified.qcDigest !== highestPrepareQcDigest ||
-					verified.valueDigest !== lockedValueDigest ||
-					verified.round > candidate.enteredRound
-				) {
-					return failure("DURABLE_QC_INVALID");
-				}
-			}
-			const finalizedValueDigest =
-				typeof candidate.finalizedValueDigest === "string" ? candidate.finalizedValueDigest : null;
-			const finalizedCommitQcBytes =
-				candidate.finalizedCommitQcBytes instanceof Uint8Array ? exactBytes(candidate.finalizedCommitQcBytes) : null;
-			if ((finalizedCommitQcBytes === null) !== (finalizedValueDigest === null)) {
-				return failure("DURABLE_QC_INVALID");
-			}
-			if (finalizedCommitQcBytes !== null) {
-				const verified = verifySealQC({ authority, exactCanonicalQcBytes: finalizedCommitQcBytes });
-				if (
-					!verified.ok ||
-					verified.phase !== "commit" ||
-					verified.valueDigest !== finalizedValueDigest ||
-					verified.valueDigest !== lockedValueDigest ||
-					verified.round > candidate.enteredRound
-				) {
-					return failure("DURABLE_QC_INVALID");
-				}
-			}
-			return Object.freeze({
-				durableCommitQcCount: safeNonnegative(candidate.durableCommitQcCount) ? candidate.durableCommitQcCount : 0,
-				durablePrepareQcCount: safeNonnegative(candidate.durablePrepareQcCount) ? candidate.durablePrepareQcCount : 0,
-				enteredRound: candidate.enteredRound,
-				finalizedValueDigest,
-				highestPrepareQcBytes,
-				highestPrepareQcDigest,
-				lockedValueDigest,
-				ok: true as const,
-				pendingRoundChangeCount: safeNonnegative(candidate.pendingRoundChangeCount)
-					? candidate.pendingRoundChangeCount
-					: 0,
-				revision: candidate.revision,
-			});
-		};
+		const verifySnapshot = (candidate: unknown): ReturnType<typeof verifySealRecoverySnapshot> =>
+			verifySealRecoverySnapshot(authority, expectedStorageIncarnation, candidate);
 		const initialSnapshot = verifySnapshot(await store.openSnapshot(enrollment));
 		if (!initialSnapshot.ok) return initialSnapshot;
 		let revision = initialSnapshot.revision;
@@ -242,9 +268,12 @@ export async function createSealVoter(
 		let pendingRoundChangeCount = initialSnapshot.pendingRoundChangeCount;
 		let terminal = false;
 		let active = false;
-		const refreshSnapshot = async (): Promise<string | undefined> => {
+		const refreshSnapshot = async (
+			expectedRetirement?: Readonly<{ revision: number; retiredBeforeRound: number }>
+		): Promise<string | undefined> => {
 			try {
-				const refreshed = verifySnapshot(await store.openSnapshot(enrollment));
+				const candidate = await store.openSnapshot(enrollment);
+				const refreshed = verifySnapshot(candidate);
 				if (!refreshed.ok) {
 					terminal = true;
 					return refreshed.reason;
@@ -258,6 +287,13 @@ export async function createSealVoter(
 				highestPrepareQcDigest = refreshed.highestPrepareQcDigest;
 				lockedValueDigest = refreshed.lockedValueDigest;
 				pendingRoundChangeCount = refreshed.pendingRoundChangeCount;
+				if (
+					expectedRetirement !== undefined &&
+					(refreshed.revision !== expectedRetirement.revision ||
+						!plainRecord(candidate) ||
+						candidate.retiredBeforeRound !== expectedRetirement.retiredBeforeRound)
+				)
+					return "REVALIDATION_REQUIRED";
 				return undefined;
 			} catch {
 				terminal = true;
@@ -266,6 +302,167 @@ export async function createSealVoter(
 		};
 
 		const voter: SealVoterHandle = Object.freeze({
+			async retireDetails(
+				retirementInput: Readonly<{ expectedRevision: number }>
+			): Promise<SealDetailRetirementResult> {
+				if (terminal) return failure("TERMINAL");
+				if (active) return failure("BUSY");
+				if (
+					!plainRecord(retirementInput) ||
+					Reflect.ownKeys(retirementInput).length !== 1 ||
+					!safeNonnegative(retirementInput.expectedRevision)
+				)
+					return failure("MALFORMED_INPUT");
+				if (retirementInput.expectedRevision !== revision) return failure("REVALIDATION_REQUIRED");
+				if (store.acquireSigningDependencyObservation === undefined || store.retireDetails === undefined)
+					return failure("SIGNING_DETAIL_RETIREMENT_UNSUPPORTED");
+				const acquire = store.acquireSigningDependencyObservation;
+				active = true;
+				try {
+					let held: SigningDependencyObservation | undefined;
+					let captured: SealDetailRetirementIntentData | Readonly<{ ok: false; reason: string }> | undefined;
+					let primary: unknown;
+					let failed = false;
+					try {
+						captured = await (async (): Promise<SealDetailRetirementIntentData | ReturnType<typeof failure>> => {
+							held = await acquire({ objectId: authorityIdentity.objectId });
+							// The native adapter borrows this same held reservation for its
+							// original snapshot parser; a separate queued RO is not sufficient.
+							const raw = await store.openSnapshot(enrollment);
+							const restored = verifySnapshot(raw);
+							if (!restored.ok) return restored;
+							if (restored.revision !== retirementInput.expectedRevision) return failure("REVALIDATION_REQUIRED");
+							if (
+								!plainRecord(raw) ||
+								!safeNonnegative(raw.retiredBeforeRound) ||
+								held.control.incarnation !== expectedStorageIncarnation ||
+								held.control.objectId !== authorityIdentity.objectId
+							)
+								return failure("STORAGE_LOSS");
+							const highestPrepareQcBytes = restored.highestPrepareQcBytes;
+							if (highestPrepareQcBytes === null) return failure("CURRENT_QC_REQUIRED");
+							const highest = verifySealQC({ authority, exactCanonicalQcBytes: highestPrepareQcBytes });
+							if (!highest.ok || highest.phase !== "prepare") return failure("DURABLE_QC_INVALID");
+							const finalizedCommitQcBytes =
+								raw.finalizedCommitQcBytes === null ? null : exactBytes(raw.finalizedCommitQcBytes);
+							let retiredBeforeRound = Math.min(highest.round, restored.enteredRound);
+							if (finalizedCommitQcBytes !== null) {
+								const finalized = verifySealQC({ authority, exactCanonicalQcBytes: finalizedCommitQcBytes });
+								if (!finalized.ok || finalized.phase !== "commit") return failure("DURABLE_QC_INVALID");
+								retiredBeforeRound = Math.min(retiredBeforeRound, finalized.round);
+							}
+							if (retiredBeforeRound === 0 || retiredBeforeRound < raw.retiredBeforeRound)
+								return failure("INVALID_RETIREMENT_FRONTIER");
+							// Authenticate every potentially selected carrier, not just a caller
+							// round label. Other scopes and all safety summaries remain native debt.
+							for (const bytes of held.readExactCanonicalRows()) {
+								const frame = decodeCanonical(bytes, { maxBytes: bytes.byteLength, maxItems: 65_536, maxDepth: 128 });
+								if (!Array.isArray(frame) || frame.length !== 3) return failure("DURABLE_CARRIER_INVALID");
+								const [name, key, row] = frame;
+								if (name !== "voteSlots" && name !== "voteOutbox") continue;
+								if (!Array.isArray(key) || key.length !== 5 || !plainRecord(row))
+									return failure("DURABLE_CARRIER_INVALID");
+								if (
+									key[0] !== authorityIdentity.objectId ||
+									key[1] !== authorityIdentity.epoch ||
+									key[4] !== authorityIdentity.signerId
+								)
+									continue;
+								if (
+									!safeNonnegative(row.round) ||
+									row.round !== key[2] ||
+									row.objectId !== key[0] ||
+									row.epoch !== key[1] ||
+									row.signerId !== key[4] ||
+									row.phase !== key[3]
+								)
+									return failure("DURABLE_CARRIER_INVALID");
+								if (row.round >= retiredBeforeRound) continue;
+								if (name === "voteOutbox" && row.dispatched !== true) return failure("PUBLICATION_DEBT_HELD");
+								const carrier = copyCarrier(row.carrier);
+								if (carrier === undefined) return failure("DURABLE_CARRIER_INVALID");
+								if (row.phase === "round-change") {
+									// The original bundle verifier requires RC.round == proposal.round;
+									// the original pacemaker refuses proposal.round < enteredRound.
+									// Selected RC.round < floor <= enteredRound cannot justify any
+									// locally admissible proposal or advance the current pacemaker.
+									// Authenticate its inline nested QC, not an age/phase label.
+									const verified = verifyRoundChange({
+										authority,
+										exactCanonicalRoundChangeBytes: carrier.exactCanonicalPreimageBytes,
+										signature: carrier.signature,
+									});
+									if (!verified.ok || verified.round !== row.round || verified.signerId !== authorityIdentity.signerId)
+										return failure("DURABLE_CARRIER_INVALID");
+									continue;
+								}
+								const verified = verifySealVoteCarrier({ authority, ...carrier });
+								if (
+									!verified.ok ||
+									verified.phase !== row.phase ||
+									verified.round !== row.round ||
+									verified.signerId !== authorityIdentity.signerId
+								)
+									return failure("DURABLE_CARRIER_INVALID");
+							}
+							await held.check();
+							return Object.freeze({
+								...authorityIdentity,
+								expectedIncarnation: expectedStorageIncarnation,
+								expectedRevision: restored.revision,
+								imageDigest: held.imageDigest,
+								retiredBeforeRound,
+								highestPrepareQcBytes,
+								finalizedCommitQcBytes,
+							});
+						})();
+					} catch (cause) {
+						failed = true;
+						primary = cause;
+					}
+					if (held !== undefined) {
+						try {
+							await held.release();
+						} catch (cleanup) {
+							if (failed)
+								throw new AggregateError([primary, cleanup], "signing detail capture and release failed", {
+									cause: primary,
+								});
+							throw cleanup;
+						}
+					}
+					if (failed) throw primary;
+					if (captured === undefined) return failure("REVALIDATION_REQUIRED");
+					if ("ok" in captured) return captured;
+					const selection = captured;
+					let result: SealDetailRetirementResult;
+					try {
+						result = await store.retireDetails(mintSealDetailRetirementIntent(selection));
+					} catch {
+						terminal = true;
+						return failure("AMBIGUOUS_STORAGE_OUTCOME");
+					}
+					if (!plainRecord(result) || typeof result.ok !== "boolean") {
+						terminal = true;
+						return failure("AMBIGUOUS_STORAGE_OUTCOME");
+					}
+					if (!result.ok) return result;
+					if (
+						!safeNonnegative(result.revision) ||
+						!safeNonnegative(result.deletedRows) ||
+						result.deletedRows > 16 ||
+						result.retiredBeforeRound !== selection.retiredBeforeRound ||
+						typeof result.remaining !== "boolean"
+					) {
+						terminal = true;
+						return failure("AMBIGUOUS_STORAGE_OUTCOME");
+					}
+					const refreshFailure = await refreshSnapshot(result);
+					return refreshFailure === undefined ? Object.freeze({ ...result }) : failure(refreshFailure);
+				} finally {
+					active = false;
+				}
+			},
 			async persistQc(qcInput: Readonly<{ exactCanonicalQcBytes: Uint8Array }>) {
 				if (terminal) return failure("TERMINAL");
 				if (active) return failure("BUSY");
@@ -324,6 +521,7 @@ export async function createSealVoter(
 						round: roundInput.round,
 					});
 					if (!prepared.ok) return failure(prepared.reason);
+					bindSealSigningRequest(prepared.signingRequest, nativeSigningAdmissionFactory(input.store, enrollment));
 					const signature = await signSealRegisteredDigest({
 						request: prepared.signingRequest,
 						signer,
@@ -356,7 +554,8 @@ export async function createSealVoter(
 					return refreshFailure === undefined
 						? Object.freeze({ ok: true as const, revision })
 						: failure(refreshFailure);
-				} catch {
+				} catch (cause) {
+					if (cause instanceof SigningAdmissionRefusal) return failure(cause.reason);
 					terminal = true;
 					return failure("AMBIGUOUS_STORAGE_OUTCOME");
 				} finally {
@@ -412,6 +611,7 @@ export async function createSealVoter(
 						round,
 					});
 					if (!prepared.ok) return failure(prepared.reason);
+					bindSealSigningRequest(prepared.signingRequest, nativeSigningAdmissionFactory(input.store, enrollment));
 					const signature = await signSealRegisteredDigest({
 						request: prepared.signingRequest,
 						signer,
@@ -480,6 +680,9 @@ export async function createSealVoter(
 						ok: true as const,
 						stored,
 					});
+				} catch (cause) {
+					if (cause instanceof SigningAdmissionRefusal) return failure(cause.reason);
+					throw cause;
 				} finally {
 					active = false;
 				}

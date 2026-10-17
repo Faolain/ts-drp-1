@@ -1,17 +1,38 @@
 import {
+	advanceJournalRetirementMutationControl,
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
+	captureJournalRetirementObject,
+	captureJournalClosedMembershipInput,
 	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalInput,
 	captureLiveJournalSignedAnchorReadInput,
 	captureLiveJournalSignedAnchorReadObservation,
+	captureSourceBoundJournalAppendInput,
 	classifyLiveJournalMutationObservation,
+	createJournalRetirementControlCodec,
+	createJournalRetirementImageCapture,
+	createLiveJournalSnapshotValidation,
 	decideLiveJournalDuplicate,
+	decodeJournalRetirementControl,
+	decodeJournalRetirementNativeCarriers,
+	encodeJournalRetirementNativeCarriers,
 	deriveLiveJournalSnapshot,
+	deriveLiveJournalSnapshotReadiness,
 	type DurableLiveJournalStore,
+	encodeJournalRetirementControl,
 	type InstallLiveJournalGenesisInput,
 	type InstallLiveJournalGenesisResult,
+	journalRetirementAllows,
+	journalRetirementCanonicalRow,
+	type JournalRetirementDrainRow,
+	journalRetirementFrameDigest,
+	journalRetirementDrainItemCount,
+	journalRetirementImageCountsFit,
+	journalRetirementMutationAllows,
+	LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES,
+	LIVE_JOURNAL_RETIREMENT_LIMITS,
 	type LiveJournalAcceptedRow,
 	type LiveJournalAnchorReadInput,
 	type LiveJournalAnchorReadResult,
@@ -22,15 +43,34 @@ import {
 	type LiveJournalPageResult,
 	type LiveJournalReadinessInput,
 	type LiveJournalReadinessResult,
+	type LiveJournalRetirementControl,
+	type LiveJournalRetirementControlRead,
+	type LiveJournalRetirementDrainSource,
+	type LiveJournalRetirementImage,
+	type LiveJournalRetirementImageObservation,
+	type LiveJournalRetirementImageCurrentProbe,
+	type LiveJournalRetirementImageReader,
+	type LiveJournalRetirementResult,
 	type LiveJournalScope,
 	type LiveJournalSignedAnchorReadInput,
 	type LiveJournalSignedAnchorReadResult,
 	type LiveJournalSnapshotToken,
+	reconstructJournalRetirementDrainSource,
 } from "@ts-drp/live-journal";
+import { compareBytes, encodeCanonical } from "@ts-drp/canonical";
+import type { NativeReadReservation } from "@ts-drp/storage";
+import { randomBytes } from "node:crypto";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
+
+import { SqliteNativeReadReservationOwner } from "./internal/native-read-reservation.js";
+import { iterateSqliteRows } from "./internal/sqlite-iterator.js";
+import { sqliteFilename } from "./internal/sqlite-filename.js";
+import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./internal/local-session-lifetime.js";
+import type { NodeNativeReadPort } from "./index.js";
 
 export interface NodeDurableLiveJournalStoreOptions {
 	readonly primaryFilename: string;
+	readonly initialization?: "create" | "reopen";
 }
 
 type StoredScope = Readonly<{
@@ -58,12 +98,55 @@ type VerifiedScopeWatermark = Readonly<{
 }>;
 type VersionedSnapshot = Readonly<{ readonly dataVersion: number; readonly snapshot: DurableSnapshot | null }>;
 type VersionedAddressedSnapshot = Readonly<{ readonly dataVersion: number; readonly snapshot: AddressedSnapshot }>;
+type VerifiedReplayBasis = Readonly<{
+	readonly dataVersion: number;
+	readonly scope: StoredScope;
+	readonly token: LiveJournalSnapshotToken;
+}>;
+type ReplayPage = Readonly<{
+	readonly afterSequence: number;
+	readonly limit: number;
+	readonly snapshot: LiveJournalSnapshotToken;
+}>;
 const UNSTABLE_VERSION = Symbol("unstable-data-version");
 
-const SCOPES_DDL =
+function sameNativeControl(left: Uint8Array | null, right: Uint8Array | null): boolean {
+	return left === null || right === null
+		? left === right
+		: left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+const SCOPES_V2_DDL =
 	"CREATE TABLE scopes (\n  object_id TEXT NOT NULL,\n  epoch INTEGER NOT NULL,\n  anchor_digest TEXT NOT NULL,\n  next_journal_sequence INTEGER NOT NULL,\n  exact_anchor_preimage BLOB NOT NULL,\n  detached_anchor_signature BLOB NOT NULL,\n  parameters_digest TEXT NOT NULL,\n  exact_parameters_carrier BLOB NOT NULL,\n  PRIMARY KEY (object_id, epoch, anchor_digest)\n) WITHOUT ROWID";
+// Exact spelling SQLite preserves after the supported current-v2 ADD COLUMN.
+const SCOPES_DDL = SCOPES_V2_DDL.replace(
+	"exact_parameters_carrier BLOB NOT NULL,",
+	"exact_parameters_carrier BLOB NOT NULL, closed_membership_bytes BLOB,"
+);
 const ENTRIES_DDL =
 	"CREATE TABLE accepted_entries (\n  object_id TEXT NOT NULL,\n  epoch INTEGER NOT NULL,\n  anchor_digest TEXT NOT NULL,\n  journal_sequence INTEGER NOT NULL,\n  source_kind TEXT NOT NULL,\n  vertex_digest TEXT NOT NULL,\n  received_preimage BLOB,\n  received_signature BLOB,\n  local_author TEXT,\n  local_author_sequence INTEGER,\n  PRIMARY KEY (object_id, epoch, anchor_digest, journal_sequence),\n  UNIQUE (object_id, epoch, anchor_digest, vertex_digest),\n  UNIQUE (object_id, epoch, anchor_digest, local_author, local_author_sequence),\n  CHECK (source_kind IN ('received', 'local-issued')),\n  CHECK (\n    (source_kind = 'received' AND received_preimage IS NOT NULL AND received_signature IS NOT NULL AND local_author IS NULL AND local_author_sequence IS NULL)\n    OR\n    (source_kind = 'local-issued' AND received_preimage IS NULL AND received_signature IS NULL AND local_author IS NOT NULL AND local_author_sequence IS NOT NULL)\n  )\n) WITHOUT ROWID";
+const RETIREMENT_V3_DDL =
+	"CREATE TABLE retirement_controls (object_id TEXT PRIMARY KEY, record BLOB NOT NULL) WITHOUT ROWID";
+const RETIREMENT_DDL = RETIREMENT_V3_DDL.replace("record BLOB NOT NULL)", "record BLOB NOT NULL, plan_record BLOB)");
+// The native trigger also fences an already-open legacy connection: it cannot
+// write without the current owner's connection-local predicate installed.
+const RETIREMENT_TRIGGERS = ["accepted_entries", "scopes"]
+	.flatMap((table) =>
+		["DELETE", "INSERT", "UPDATE"].map((operation) => {
+			const name = `retirement_${table}_${operation.toLowerCase()}`;
+			const refs = operation === "UPDATE" ? ["OLD", "NEW"] : [operation === "DELETE" ? "OLD" : "NEW"];
+			const conditions = refs
+				.map((ref) => `journal_retirement_allows(${ref}.object_id,${ref}.epoch,${ref}.anchor_digest)=0`)
+				.join(" OR ");
+			return {
+				name,
+				sql: `CREATE TRIGGER ${name} BEFORE ${operation} ON ${table} WHEN ${conditions} BEGIN SELECT RAISE(ABORT,'retirement-fenced'); END`,
+				tbl_name: table,
+				type: "trigger",
+			};
+		})
+	)
+	.sort((a, b) => a.name.localeCompare(b.name));
 const EXPECTED_CATALOG = [
 	{
 		name: "sqlite_autoindex_accepted_entries_2",
@@ -78,10 +161,12 @@ const EXPECTED_CATALOG = [
 		type: "index",
 	},
 	{ name: "accepted_entries", sql: ENTRIES_DDL, tbl_name: "accepted_entries", type: "table" },
+	{ name: "retirement_controls", sql: RETIREMENT_DDL, tbl_name: "retirement_controls", type: "table" },
 	{ name: "scopes", sql: SCOPES_DDL, tbl_name: "scopes", type: "table" },
+	...RETIREMENT_TRIGGERS,
 ] as const;
 
-function captureOptions(value: unknown): string {
+function captureOptions(value: unknown): { primaryFilename: string; initialization: "create" | "reopen" } {
 	try {
 		if (typeof value !== "object" || value === null || Array.isArray(value)) throw new TypeError("malformed-input");
 		const prototype = Object.getPrototypeOf(value);
@@ -89,8 +174,8 @@ function captureOptions(value: unknown): string {
 		const descriptor = Object.getOwnPropertyDescriptor(value, "primaryFilename");
 		if (
 			(prototype !== Object.prototype && prototype !== null) ||
-			keys.length !== 1 ||
-			keys[0] !== "primaryFilename" ||
+			!keys.includes("primaryFilename") ||
+			keys.some((key) => key !== "primaryFilename" && key !== "initialization") ||
 			descriptor === undefined ||
 			!("value" in descriptor) ||
 			!descriptor.enumerable ||
@@ -100,7 +185,13 @@ function captureOptions(value: unknown): string {
 		) {
 			throw new TypeError("malformed-input");
 		}
-		return descriptor.value;
+		const mode = Object.getOwnPropertyDescriptor(value, "initialization");
+		if (
+			mode !== undefined &&
+			(!("value" in mode) || !mode.enumerable || (mode.value !== "create" && mode.value !== "reopen"))
+		)
+			throw new TypeError("malformed-input");
+		return { primaryFilename: descriptor.value, initialization: mode?.value ?? "create" };
 	} catch (error) {
 		if (error instanceof TypeError && error.message === "malformed-input") throw error;
 		throw new TypeError("malformed-input");
@@ -124,21 +215,78 @@ function dataVersion(database: DatabaseSync): number {
 	return value as number;
 }
 
-function admit(database: DatabaseSync): void {
+function admit(database: DatabaseSync, initialization: "create" | "reopen" = "create"): void {
 	database.exec("PRAGMA busy_timeout=1000");
 	database.exec("PRAGMA synchronous=FULL");
-	const initial = statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all();
-	const fresh = initial.length === 0 && scalar(database, "PRAGMA user_version") === 0;
-	if (fresh) {
+	const initial = nativeLocalSessionSchemaRows(database, statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all());
+	const version = scalar(database, "PRAGMA user_version");
+	if (initialization === "reopen" && version !== 2 && version !== 3 && version !== 4)
+		throw new Error("unsupported-schema");
+	const fresh = initial.length === 0 && version === 0;
+	const v3Catalog = EXPECTED_CATALOG.map((row) =>
+		row.name === "retirement_controls" ? { ...row, sql: RETIREMENT_V3_DDL } : row
+	);
+	const currentV3 =
+		version === 3 &&
+		initial.length === v3Catalog.length &&
+		initial.every((row, index) => {
+			const expected = v3Catalog[index];
+			return expected !== undefined && Object.entries(expected).every(([key, value]) => row[key] === value);
+		});
+	const v2Catalog = v3Catalog.map((row) => (row.name === "scopes" ? { ...row, sql: SCOPES_V2_DDL } : row));
+	const currentV2 =
+		version === 2 &&
+		initial.length === v2Catalog.length &&
+		initial.every((row, index) => {
+			const expected = v2Catalog[index];
+			return expected !== undefined && Object.entries(expected).every(([key, value]) => row[key] === value);
+		});
+	const legacyCatalog = v2Catalog.filter((row) => row.type !== "trigger" && row.name !== "retirement_controls");
+	const legacy =
+		version === 1 &&
+		initial.length === legacyCatalog.length &&
+		initial.every((row, index) => {
+			const expected = legacyCatalog[index];
+			return expected !== undefined && Object.entries(expected).every(([key, value]) => row[key] === value);
+		});
+	if (fresh || legacy || currentV2 || currentV3) {
 		database.exec("PRAGMA page_size=4096");
 		if (String(scalar(database, "PRAGMA journal_mode=WAL")).toLowerCase() !== "wal") {
 			throw new Error("durability-unavailable");
 		}
 		database.exec("BEGIN IMMEDIATE");
 		try {
-			database.exec(SCOPES_DDL);
-			database.exec(ENTRIES_DDL);
-			database.exec("PRAGMA user_version=1");
+			const locked = nativeLocalSessionSchemaRows(database, statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all());
+			if (scalar(database, "PRAGMA user_version") !== version || JSON.stringify(locked) !== JSON.stringify(initial))
+				throw new Error("unsupported-schema");
+			if (fresh) {
+				database.exec(SCOPES_DDL);
+				database.exec(ENTRIES_DDL);
+			}
+			if (!fresh && !currentV3) database.exec("ALTER TABLE scopes ADD COLUMN closed_membership_bytes BLOB");
+			if (currentV2 || currentV3) database.exec("ALTER TABLE retirement_controls ADD COLUMN plan_record BLOB");
+			if (!currentV2 && !currentV3) {
+				database.exec(RETIREMENT_DDL);
+				for (const trigger of RETIREMENT_TRIGGERS) database.exec(trigger.sql);
+			}
+			if (currentV2 || currentV3) {
+				// Finish each bounded point read before rewriting that same WITHOUT ROWID
+				// record. An open table iterator can revisit the rewritten payload.
+				const old = statement(
+					database,
+					"SELECT object_id, CASE WHEN typeof(record)='blob' AND length(record)<=? THEN record ELSE NULL END AS record FROM retirement_controls WHERE object_id>? ORDER BY object_id LIMIT 1"
+				);
+				let priorObjectId = "";
+				for (;;) {
+					const row = old.get(LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, priorObjectId);
+					if (row === undefined) break;
+					const control = decodeJournalRetirementControl(row.record);
+					if (control.objectId !== row.object_id) throw new Error("store-poisoned");
+					writeRetirementControl(database, control);
+					priorObjectId = control.objectId;
+				}
+			}
+			database.exec("PRAGMA user_version=4");
 			database.exec("COMMIT");
 		} catch (error) {
 			try {
@@ -149,7 +297,7 @@ function admit(database: DatabaseSync): void {
 			throw error;
 		}
 	}
-	const catalog = statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all();
+	const catalog = nativeLocalSessionSchemaRows(database, statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all());
 	if (
 		catalog.length !== EXPECTED_CATALOG.length ||
 		catalog.some((row, index) => {
@@ -162,13 +310,240 @@ function admit(database: DatabaseSync): void {
 				row.sql !== expected.sql
 			);
 		}) ||
-		scalar(database, "PRAGMA user_version") !== 1 ||
+		scalar(database, "PRAGMA user_version") !== 4 ||
 		scalar(database, "PRAGMA page_size") !== 4096 ||
 		String(scalar(database, "PRAGMA journal_mode")).toLowerCase() !== "wal" ||
 		scalar(database, "PRAGMA synchronous") !== 2 ||
 		scalar(database, "PRAGMA busy_timeout") !== 1000
 	) {
 		throw new Error("unsupported-schema");
+	}
+}
+
+function readRetirementNativeCarriers(
+	database: DatabaseSync,
+	objectId: string
+): Readonly<{record: unknown; planRecord: unknown}> | undefined {
+	const bounded =
+		"typeof(record)='blob' AND length(record)>0 AND (plan_record IS NULL OR (typeof(plan_record)='blob' AND length(plan_record)>0)) AND length(record)+COALESCE(length(plan_record),0)<=?";
+	const row = statement(
+		database,
+		`SELECT CASE WHEN ${bounded} THEN record ELSE NULL END AS record, CASE WHEN ${bounded} THEN plan_record ELSE NULL END AS plan_record, plan_record IS NOT NULL AS has_plan FROM retirement_controls WHERE object_id=?`
+	).get(LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, objectId);
+	if (row === undefined) return undefined;
+	if (row.has_plan === 1 && row.plan_record === null) throw new Error("store-poisoned");
+	return {record: row.record, planRecord: row.plan_record === null ? undefined : row.plan_record};
+}
+function readRetirementControl(
+	database: DatabaseSync,
+	objectId: string,
+	codec?: ReturnType<typeof createJournalRetirementControlCodec>
+): LiveJournalRetirementControl | null {
+	const row = readRetirementNativeCarriers(database, objectId);
+	if (row === undefined) {codec?.clear(); return null;}
+	const control = (codec?.decode ?? decodeJournalRetirementNativeCarriers)(
+		row.record,
+		row.planRecord
+	);
+	if (control.objectId !== objectId) throw new Error("store-poisoned");
+	return control;
+}
+function writeRetirementControl(database: DatabaseSync, value: LiveJournalRetirementControl): void {
+	const carriers = encodeJournalRetirementNativeCarriers(value);
+	writeRetirementNativeCarriers(database, value.objectId, carriers);
+}
+// Only the captured one-use view postimage or the full public encoder above
+// supplies these carriers. This is syntax reuse, never a native currency check.
+function writeRetirementNativeCarriers(
+	database: DatabaseSync,
+	objectId: string,
+	carriers: Readonly<{controlBytes: Uint8Array; planBytes?: Uint8Array}>
+): void {
+	statement(
+		database,
+		"INSERT INTO retirement_controls(object_id,record,plan_record) VALUES(?,?,?) ON CONFLICT(object_id) DO UPDATE SET record=excluded.record,plan_record=CASE WHEN retirement_controls.plan_record IS excluded.plan_record THEN retirement_controls.plan_record ELSE excluded.plan_record END"
+	).run(objectId, carriers.controlBytes, carriers.planBytes ?? null);
+}
+function sameRetirementNativeCarriers(
+	a: ReturnType<typeof encodeJournalRetirementNativeCarriers>,
+	b: ReturnType<typeof encodeJournalRetirementNativeCarriers>
+): boolean {
+	return (
+		sameBytes(a.controlBytes, b.controlBytes) &&
+		(a.planBytes === undefined || b.planBytes === undefined
+			? a.planBytes === b.planBytes
+			: sameBytes(a.planBytes, b.planBytes))
+	);
+}
+function retirementImage(
+	database: DatabaseSync,
+	objectId: string,
+	frames?: Uint8Array[],
+	membershipWrite?: Readonly<{
+		scope: LiveJournalScope;
+		bytes: Uint8Array;
+		clearScopes: readonly LiveJournalScope[];
+	}>
+): LiveJournalRetirementImage {
+	const count = (table: string): number => {
+		const row = statement(database, `SELECT count(*) AS n FROM ${table} WHERE object_id=?`).get(objectId);
+		if (row === undefined || !Number.isSafeInteger(row.n)) throw new Error("store-poisoned");
+		return row.n as number;
+	};
+	if (!journalRetirementImageCountsFit(count("scopes"), count("accepted_entries")))
+		throw new Error("retirement-fenced");
+	if (
+		statement(
+			database,
+			"SELECT 1 AS invalid FROM scopes WHERE object_id=? AND closed_membership_bytes IS NOT NULL AND (typeof(closed_membership_bytes)<>'blob' OR length(closed_membership_bytes)=0 OR length(closed_membership_bytes)>?) LIMIT 1"
+		).get(objectId, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) !== undefined
+	)
+		throw new Error("retirement-fenced");
+	const capture = createJournalRetirementImageCapture();
+	const collect = (table: "scopes" | "accepted_entries"): void => {
+		// Bound native BLOB extraction, then charge each row before retaining the next.
+		const columns =
+			table === "scopes"
+				? "object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier,closed_membership_bytes"
+				: "object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence";
+		const blobs =
+			table === "scopes"
+				? ["exact_anchor_preimage", "detached_anchor_signature", "exact_parameters_carrier", "closed_membership_bytes"]
+				: ["received_preimage", "received_signature"];
+		const selected = columns
+			.split(",")
+			.map((k) =>
+				blobs.includes(k)
+					? `CASE WHEN ${k} IS NULL OR length(${k})<=${LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes} THEN ${k} ELSE NULL END AS ${k}`
+					: k
+			)
+			.join(",");
+		const query = statement(
+			database,
+			`SELECT ${selected} FROM ${table} WHERE object_id=? ORDER BY epoch,anchor_digest${table === "scopes" ? "" : ",journal_sequence"}`
+		);
+		for (const row of iterateSqliteRows(query, objectId)) {
+			if (
+				(table === "scopes" && blobs.filter((k) => k !== "closed_membership_bytes").some((k) => row[k] === null)) ||
+				(table !== "scopes" && row.source_kind === "received" && blobs.some((k) => row[k] === null))
+			)
+				throw new Error("retirement-fenced");
+			const captured = { ...row };
+			if (table === "scopes" && captured.closed_membership_bytes === null) delete captured.closed_membership_bytes;
+			if (table === "scopes" && membershipWrite !== undefined) {
+				const matches = (scope: LiveJournalScope): boolean =>
+					scope.objectId === captured.object_id &&
+					scope.epoch === captured.epoch &&
+					scope.anchorDigest === captured.anchor_digest;
+				if (membershipWrite.clearScopes.some(matches)) delete captured.closed_membership_bytes;
+				if (matches(membershipWrite.scope)) captured.closed_membership_bytes = membershipWrite.bytes;
+			}
+			let key: unknown[] | undefined;
+			if (frames !== undefined) {
+				key = [captured.object_id, captured.epoch, captured.anchor_digest];
+				if (table !== "scopes") key.push(captured.journal_sequence);
+			}
+			const frame = capture.append(table, captured, key);
+			if (frame !== undefined) frames!.push(frame);
+		}
+		// Keep the original StatementSync alive through iterator completion. The
+		// iterator alone does not own its statement on the installed Node runtime.
+		if (!query.sourceSQL.startsWith("SELECT ")) throw new Error("store-poisoned");
+	};
+	try {
+		collect("scopes");
+		collect("accepted_entries");
+		return capture.finish();
+	} finally { capture.release(); }
+}
+function admitJournalMutation(database: DatabaseSync, selected: LiveJournalScope): LiveJournalRetirementControl | null {
+	const control = readRetirementControl(database, selected.objectId);
+	if (!journalRetirementAllows(control, selected)) throw new Error("retirement-fenced");
+	if (control?.revision === Number.MAX_SAFE_INTEGER) throw new Error("retirement-exhausted");
+	return control;
+}
+function advanceJournalMutation(
+	database: DatabaseSync,
+	control: LiveJournalRetirementControl | null,
+	clearCompletedMembership: (scope: LiveJournalScope) => void
+): void {
+	if (control !== null) {
+		if (
+			control.drain != null &&
+			control.drain.cursor < journalRetirementDrainItemCount(control.drain.plan)
+		)
+			throw new Error("retirement-fenced");
+		if (control.drain != null) {
+			for (const prefix of control.drain.plan.prefixes) clearCompletedMembership(prefix.scope);
+		}
+		writeRetirementControl(database, advanceJournalRetirementMutationControl(control));
+	}
+}
+
+/** Exact received frame or original SQLite local-row codec for a drained source.
+ * The descriptor is not authentication; the original caller reauthenticates it. */
+function retirementFrame(selected: JournalRetirementDrainRow): Uint8Array {
+	const { scope, row } = selected;
+	if (row.exactCanonicalNativeFrameBytes !== undefined) return row.exactCanonicalNativeFrameBytes.slice();
+	return journalRetirementCanonicalRow("accepted_entries", [...scopeParameters(scope), row.journalSequence], {
+		object_id: scope.objectId,
+		epoch: scope.epoch,
+		anchor_digest: scope.anchorDigest,
+		journal_sequence: row.journalSequence,
+		source_kind: "local-issued",
+		vertex_digest: row.vertexDigest,
+		received_preimage: null,
+		received_signature: null,
+		local_author: row.author,
+		local_author_sequence: row.authorSequence,
+	});
+}
+
+function validateDrainNativeRows(database: DatabaseSync, control: LiveJournalRetirementControl): void {
+	const state = control.drain;
+	if (state == null) return;
+	let index = 0;
+	for (const prefix of state.plan.prefixes) {
+		const header = readScope(database, prefix.scope);
+		if (header === null || header.nextJournalSequence !== prefix.highWatermark) throw new Error("retirement-stale");
+		const removed = Math.max(0, Math.min(prefix.rows.length, state.cursor - index));
+		const count = statement(
+			database,
+			"SELECT count(*) AS n FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=?"
+		).get(...scopeParameters(prefix.scope));
+		if (count?.n !== prefix.highWatermark - removed) throw new Error("retirement-stale");
+		for (const row of prefix.rows) {
+			const selected = { scope: prefix.scope, row };
+			const expected = retirementFrame(selected);
+			if (journalRetirementFrameDigest(expected) !== row.nativeFrameDigest) throw new Error("retirement-stale");
+			const actual = statement(
+				database,
+				`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence=?`
+			).get(...scopeParameters(prefix.scope), row.journalSequence);
+			if (index++ < state.cursor) {
+				if (actual !== undefined) throw new Error("retirement-stale");
+			} else if (
+				actual === undefined ||
+				actual.source_kind !== (row.exactCanonicalNativeFrameBytes === undefined ? "local-issued" : "received") ||
+				!sameBytes(
+					journalRetirementCanonicalRow("accepted_entries", [...scopeParameters(prefix.scope), row.journalSequence], {
+						...actual,
+					}),
+					expected
+				)
+			)
+				throw new Error("retirement-stale");
+		}
+	}
+	for (const selected of state.plan.retiredEmptyHeaders ?? []) {
+		const actual = statement(database, "SELECT * FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?").get(...scopeParameters(selected.scope));
+		if (actual?.closed_membership_bytes === null) delete actual.closed_membership_bytes;
+		const count = statement(database, "SELECT count(*) AS n FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=?").get(...scopeParameters(selected.scope));
+		if (count?.n !== 0) throw new Error("retirement-stale");
+		if (index++ < state.cursor) {
+			if (actual !== undefined) throw new Error("retirement-stale");
+		} else if (actual === undefined || !sameBytes(journalRetirementCanonicalRow("scopes", scopeParameters(selected.scope), { ...actual }), selected.exactCanonicalNativeFrameBytes))
+			throw new Error("retirement-stale");
 	}
 }
 
@@ -434,34 +809,124 @@ function readVersionedAddressedSnapshotReadonly(
 
 const WRONG_SCOPE_SNAPSHOT = Symbol("wrong-scope-snapshot");
 
+type ReplayRead =
+	| Readonly<{
+			readonly kind: "complete";
+			readonly dataVersion: number | undefined;
+			readonly snapshot: DurableSnapshot | null | typeof WRONG_SCOPE_SNAPSHOT;
+	  }>
+	| Readonly<{ readonly kind: "page"; readonly rows: readonly StoredRow[] }>
+	| Readonly<{ readonly kind: "ready"; readonly token: LiveJournalSnapshotToken }>
+	| typeof UNSTABLE_VERSION;
+
+function sameReplayToken(left: LiveJournalSnapshotToken, right: LiveJournalSnapshotToken): boolean {
+	return (
+		left.kind === right.kind &&
+		left.scope.objectId === right.scope.objectId &&
+		left.scope.epoch === right.scope.epoch &&
+		left.scope.anchorDigest === right.scope.anchorDigest &&
+		left.highWatermark === right.highWatermark &&
+		left.genesisDigest === right.genesisDigest &&
+		left.parametersDigest === right.parametersDigest &&
+		left.orderedRowDigest === right.orderedRowDigest &&
+		left.snapshotDigest === right.snapshotDigest
+	);
+}
+
+function replayScopeFromSql(row: Readonly<Record<string, unknown>>): StoredScope {
+	return {
+		detachedAnchorSignature: copyBlob(row.detached_anchor_signature),
+		exactCanonicalAnchorPreimageBytes: copyBlob(row.exact_anchor_preimage),
+		exactCanonicalParametersCarrierBytes: copyBlob(row.exact_parameters_carrier),
+		nextJournalSequence: row.next_journal_sequence as number,
+		parametersDigest: row.parameters_digest as string,
+		scope: {
+			anchorDigest: row.anchor_digest as string,
+			epoch: row.epoch as number,
+			objectId: row.object_id as string,
+		},
+	};
+}
+
 function readReplaySnapshotReadonly(
 	database: DatabaseSync,
-	scope: LiveJournalScope
-): DurableSnapshot | null | typeof WRONG_SCOPE_SNAPSHOT {
+	scope: LiveJournalScope,
+	codec: ReturnType<typeof createJournalRetirementControlCodec>,
+	basis?: VerifiedReplayBasis,
+	page?: ReplayPage
+): ReplayRead {
+	const before = dataVersion(database);
 	database.exec("BEGIN");
 	try {
-		const row = statement(
-			database,
-			"SELECT object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier FROM scopes WHERE object_id=? AND epoch=? ORDER BY (anchor_digest=?) DESC LIMIT 1"
-		).get(scope.objectId, scope.epoch, scope.anchorDigest);
-		const rows = readRows(database, scope);
+		const carriers = readRetirementNativeCarriers(database, scope.objectId);
+		if (carriers === undefined) codec.clear();
+		else {
+			const fence = codec.readFence(carriers.record, carriers.planRecord, scope);
+			if (fence.objectId !== scope.objectId) throw new Error("store-poisoned");
+			if (!fence.allowed) throw new Error("retirement-fenced");
+		}
+		const inside = dataVersion(database);
+		const reusable =
+			basis !== undefined &&
+			before === inside &&
+			inside === basis.dataVersion &&
+			(page !== undefined
+				? sameReplayToken(page.snapshot, basis.token)
+				: scope.objectId === basis.token.scope.objectId &&
+					scope.epoch === basis.token.scope.epoch &&
+					scope.anchorDigest === basis.token.scope.anchorDigest &&
+					basis.token.highWatermark === basis.scope.nextJournalSequence);
+		const row = reusable
+			? statement(
+					database,
+					"SELECT object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
+				).get(...scopeParameters(scope))
+			: statement(
+					database,
+					"SELECT object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier FROM scopes WHERE object_id=? AND epoch=? ORDER BY (anchor_digest=?) DESC LIMIT 1"
+				).get(scope.objectId, scope.epoch, scope.anchorDigest);
+		const stored =
+			reusable && row !== undefined && row.anchor_digest === scope.anchorDigest ? replayScopeFromSql(row) : undefined;
+		// This is a reuse of a previously validated complete native closure, not
+		// authority from a caller token or from LIMIT alone. Own writers invalidate
+		// the basis; foreign commits invalidate SQLite's connection-local version.
+		const addressed =
+			reusable &&
+			stored !== undefined &&
+			stored.nextJournalSequence === basis.scope.nextJournalSequence &&
+			sameInstalledScope(stored, basis.scope);
+		const rows =
+			addressed && page !== undefined
+				? statement(
+						database,
+						`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence>? AND journal_sequence<? ORDER BY journal_sequence LIMIT ?`
+					)
+						.all(...scopeParameters(scope), page.afterSequence, page.snapshot.highWatermark, page.limit + 1)
+						.map(rowFromSql)
+				: addressed
+					? []
+					: readRows(database, scope);
 		database.exec("COMMIT");
-		if (row === undefined) return null;
-		if (row.anchor_digest !== scope.anchorDigest) return WRONG_SCOPE_SNAPSHOT;
+		// Preserve the original full-reader precedence: requested rows are read
+		// and joined before absence/wrong-anchor decisions, and only a selected
+		// matching header is copied. Unrelated malformed headers do not own errors.
+		if (row === undefined) return { kind: "complete", dataVersion: undefined, snapshot: null };
+		if (row.anchor_digest !== scope.anchorDigest) {
+			return { kind: "complete", dataVersion: undefined, snapshot: WRONG_SCOPE_SNAPSHOT };
+		}
+		const completeScope = stored ?? replayScopeFromSql(row);
+		const after = dataVersion(database);
+		const stable = before === inside && inside === after;
+		if (addressed)
+			return !stable
+				? UNSTABLE_VERSION
+				: page === undefined
+					? { kind: "ready", token: basis!.token }
+					: { kind: "page", rows };
 		return {
-			rows,
-			scope: {
-				detachedAnchorSignature: copyBlob(row.detached_anchor_signature),
-				exactCanonicalAnchorPreimageBytes: copyBlob(row.exact_anchor_preimage),
-				exactCanonicalParametersCarrierBytes: copyBlob(row.exact_parameters_carrier),
-				nextJournalSequence: row.next_journal_sequence as number,
-				parametersDigest: row.parameters_digest as string,
-				scope: {
-					anchorDigest: row.anchor_digest as string,
-					epoch: row.epoch as number,
-					objectId: row.object_id as string,
-				},
-			},
+			kind: "complete",
+			dataVersion: stable ? after : undefined,
+			snapshot: { rows, scope: completeScope },
 		};
 	} catch (error) {
 		try {
@@ -513,9 +978,12 @@ function failed(kind: LiveJournalFailureKind): Readonly<{ readonly kind: LiveJou
 	return Object.freeze({ kind, ok: false });
 }
 
-function captureAddressedClosure(snapshot: DurableSnapshot): DurableSnapshot | undefined {
+function captureAddressedClosure(
+	snapshot: DurableSnapshot,
+	validation?: ReturnType<typeof createLiveJournalSnapshotValidation>
+): DurableSnapshot | undefined {
 	try {
-		const captured = deriveLiveJournalSnapshot({ durable: snapshot } as never);
+		const captured = deriveLiveJournalSnapshot({ durable: snapshot, validation } as never);
 		if (captured.ok !== true) return undefined;
 		return { rows: captured.rows, scope: snapshot.scope };
 	} catch {
@@ -529,17 +997,62 @@ function captureAddressedClosure(snapshot: DurableSnapshot): DurableSnapshot | u
  * @returns The strict live-journal capability.
  */
 export function createNodeDurableLiveJournalStore(
-	options: NodeDurableLiveJournalStoreOptions
-): DurableLiveJournalStore {
-	const filename = captureOptions(options);
-	const database = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`, {
+	options: NodeDurableLiveJournalStoreOptions,
+	session?: LocalSessionLifetime
+): DurableLiveJournalStore & NodeNativeReadPort {
+	const { primaryFilename: filename, initialization } = captureOptions(options);
+	const retirementCodec = createJournalRetirementControlCodec();
+	session?.assertCurrent();
+	const database = new DatabaseSync(sqliteFilename(`${filename}.drp-live-journal-v1.sqlite`, initialization), {
 		allowExtension: false,
 		enableDoubleQuotedStringLiterals: false,
 		enableForeignKeyConstraints: false,
 		readOnly: false,
 	});
+	// Only fixed synchronous detail DELETEs and completed-prefix membership
+	// UPDATEs may cross the permanent scope fence. No callback/await or untrusted
+	// SQL runs while this gate is set; other connections retain their denying predicate.
+	let deletingScope: LiveJournalScope | undefined;
+	const advanceMutation = (control: LiveJournalRetirementControl | null): void =>
+		advanceJournalMutation(database, control, (scope) => {
+			// Only exact scopes in the completed native drain may shed this opaque
+			// witness. No callback/await crosses this fixed connection-local gate.
+			deletingScope = scope;
+			try {
+				statement(
+					database,
+					"UPDATE scopes SET closed_membership_bytes=NULL WHERE object_id=? AND epoch=? AND anchor_digest=? AND closed_membership_bytes IS NOT NULL"
+				).run(...scopeParameters(scope));
+			} finally {
+				deletingScope = undefined;
+			}
+		});
 	try {
-		admit(database);
+		enforceNativeLocalSessionFile(database, `${filename}.drp-live-journal-v1.sqlite`, session, initialization !== "reopen");
+		database.function("journal_retirement_allows", (objectId, epoch, anchorDigest) => {
+			if (
+				typeof objectId !== "string" ||
+				typeof epoch !== "number" ||
+				!Number.isSafeInteger(epoch) ||
+				epoch < 0 ||
+				typeof anchorDigest !== "string"
+			)
+				return 0;
+			if (
+				deletingScope?.objectId === objectId &&
+				deletingScope.epoch === epoch &&
+				deletingScope.anchorDigest === anchorDigest
+			)
+				return 1;
+			return journalRetirementMutationAllows(readRetirementControl(database, objectId, retirementCodec), {
+				objectId,
+				epoch,
+				anchorDigest,
+			})
+				? 1
+				: 0;
+		});
+		admit(database, initialization);
 	} catch (error) {
 		database.close();
 		throw error;
@@ -547,6 +1060,38 @@ export function createNodeDurableLiveJournalStore(
 	let closed = false;
 	let poisoned = false;
 	let closePromise: Promise<void> | undefined;
+	// Same bounded leaf-validation owner as the browser backend. Each consumer
+	// still reads actual native contents and checks complete sequence/order,
+	// duplicate identities, context, control and currency before delivery.
+	let snapshotValidation = createLiveJournalSnapshotValidation();
+	const resetSnapshotValidation = (): void => {
+		snapshotValidation.release();
+		if (!closed && !poisoned) snapshotValidation = createLiveJournalSnapshotValidation();
+	};
+	const poison = (): void => {
+		poisoned = true;
+		snapshotValidation.release();
+	};
+	const readReservations = new SqliteNativeReadReservationOwner(`${filename}.drp-live-journal-v1.sqlite`, session);
+	// Opaque identities carry no native handle or byte payload. Probes may outlive
+	// release without retaining any ended reservation or image through WeakRef's
+	// same-job keep-alive semantics (SQLite reads can all join synchronously).
+	let retirementLeaseToken: object | undefined;
+	// One bounded detached image, valid only under this owner's exact native
+	// BEGIN IMMEDIATE reservation. It is never used by mutations or readback.
+	let heldRetirementImage: Readonly<{
+		lease: NativeReadReservation;
+		objectId: string;
+		controlBytes?: Uint8Array;
+		planBytes?: Uint8Array;
+		image: LiveJournalRetirementImage;
+		frames: readonly Uint8Array[];
+		token: object;
+		enrollment: { observations: WeakMap<LiveJournalRetirementImageObservation, true> };
+	}> | undefined;
+	// One token/version and one full header (three byte carriers): no retained
+	// accepted rows or per-history cache.
+	let verifiedReplay: VerifiedReplayBasis | undefined;
 	const verifiedScopes = new Map<string, VerifiedScopeWatermark>();
 	const watermarkKey = (scope: LiveJournalScope): string =>
 		JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]);
@@ -571,8 +1116,11 @@ export function createNodeDurableLiveJournalStore(
 			watermark.scope.anchorDigest === scope.scope.anchorDigest
 		);
 	};
-	const unavailable = (): ReturnType<typeof failed> | undefined =>
-		poisoned ? failed("store-poisoned") : closed ? failed("store-closed") : undefined;
+	const unavailable = (): ReturnType<typeof failed> | undefined => {
+		session?.assertCurrent();
+		if (poisoned) retirementCodec.clear();
+		return poisoned ? failed("store-poisoned") : closed ? failed("store-closed") : undefined;
+	};
 
 	const classify = (
 		actual: unknown,
@@ -589,7 +1137,7 @@ export function createNodeDurableLiveJournalStore(
 		if (decision === "exact-old") return "substrate-failure";
 		if (decision === "unreadable") return "outcome-unknown";
 		if (decision === "mixed") {
-			poisoned = true;
+			poison();
 			return "store-poisoned";
 		}
 		return "internal-invariant";
@@ -599,6 +1147,7 @@ export function createNodeDurableLiveJournalStore(
 		operation: "install" | "installEpochAnchor",
 		input: InstallLiveJournalGenesisInput
 	): InstallLiveJournalGenesisResult => {
+		verifiedReplay = undefined;
 		const blocked = unavailable();
 		if (blocked !== undefined) return blocked;
 		let captured: ReturnType<typeof captureLiveJournalInput>;
@@ -615,6 +1164,7 @@ export function createNodeDurableLiveJournalStore(
 		let writeVersion: number | undefined;
 		try {
 			database.exec("BEGIN IMMEDIATE");
+			const retirement = admitJournalMutation(database, selected.stored.scope);
 			writeVersion = dataVersion(database);
 			const installed = readScopeWriter(database, selected.stored.scope);
 			const storedRows = readRows(database, selected.stored.scope);
@@ -630,21 +1180,27 @@ export function createNodeDurableLiveJournalStore(
 					).run(...scopeParameters(selected.stored.scope));
 				}
 			} else {
-				before = captureAddressedClosure({ rows: storedRows, scope: installed }) ?? null;
+				before = captureAddressedClosure({ rows: storedRows, scope: installed }, snapshotValidation) ?? null;
 				if (before === null) rejected = "store-poisoned";
 				else if (sameInstalledScope(before.scope, selected.stored)) idempotent = true;
 				else rejected = "genesis-conflict";
 			}
-			if (rejected === undefined) database.exec("COMMIT");
-			else database.exec("ROLLBACK");
-		} catch {
+			if (rejected === undefined) {
+				if (!idempotent) advanceMutation(retirement);
+				database.exec("COMMIT");
+			} else database.exec("ROLLBACK");
+		} catch (error) {
 			try {
 				database.exec("ROLLBACK");
 			} catch {
 				// Preserve the substrate failure.
 			}
 			invalidateWatermark(selected.stored.scope);
-			return failed("substrate-failure");
+			return failed(
+				error instanceof Error && (error.message === "retirement-fenced" || error.message === "retirement-exhausted")
+					? error.message
+					: "substrate-failure"
+			);
 		}
 		let observation: VersionedSnapshot | typeof UNSTABLE_VERSION | undefined;
 		try {
@@ -656,18 +1212,19 @@ export function createNodeDurableLiveJournalStore(
 		const actual = observation === undefined || observation === UNSTABLE_VERSION ? undefined : observation.snapshot;
 		if (rejected !== undefined) {
 			invalidateWatermark(selected.stored.scope);
-			if (rejected === "store-poisoned") poisoned = true;
+			if (rejected === "store-poisoned") poison();
 			if (actual === undefined && rejected !== "store-poisoned") return failed("outcome-unknown");
-			if (actual !== undefined && actual !== null && captureAddressedClosure(actual) === undefined) {
-				poisoned = true;
+			if (actual !== undefined && actual !== null && captureAddressedClosure(actual, snapshotValidation) === undefined) {
+				poison();
 				return failed("store-poisoned");
 			}
 			return failed(rejected);
 		}
-		const capturedActual = actual === undefined || actual === null ? actual : captureAddressedClosure(actual);
+		const capturedActual =
+			actual === undefined || actual === null ? actual : captureAddressedClosure(actual, snapshotValidation);
 		if (actual !== undefined && actual !== null && capturedActual === undefined) {
 			invalidateWatermark(selected.stored.scope);
-			poisoned = true;
+			poison();
 			return failed("store-poisoned");
 		}
 		const kind = classify(capturedActual, before, { kind: "install", scope: selected.stored });
@@ -698,11 +1255,18 @@ export function createNodeDurableLiveJournalStore(
 
 	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
 	const appendAccepted = async (input: AppendAcceptedVertexInput): Promise<AppendAcceptedVertexResult> => {
+		verifiedReplay = undefined;
 		const blocked = unavailable();
 		if (blocked !== undefined) return blocked;
 		let captured: ReturnType<typeof captureLiveJournalInput>;
+		let expectedNativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
 		try {
-			captured = captureLiveJournalInput("append", input);
+			if (Object.getOwnPropertyDescriptor(input, "expectedNativeImage") !== undefined) {
+				const source = captureSourceBoundJournalAppendInput(input);
+				if (!source.ok) return failed(source.kind);
+				expectedNativeImage = source.value.expectedNativeImage;
+				captured = Object.freeze({ ok: true, value: source.value.row });
+			} else captured = captureLiveJournalInput("append", input);
 			if (captured.ok !== true) return failed(captured.kind);
 		} catch {
 			return failed("malformed-input");
@@ -714,8 +1278,22 @@ export function createNodeDurableLiveJournalStore(
 		let rejected: LiveJournalFailureKind | undefined;
 		let writeVersion: number | undefined;
 		let addressed = false;
+		let nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
 		try {
 			database.exec("BEGIN IMMEDIATE");
+			if (expectedNativeImage !== undefined) {
+				const image = retirementImage(database, candidate.scope.objectId),
+					control = readRetirementControl(database, candidate.scope.objectId, retirementCodec);
+				const controlBytes = control === null ? null : encodeJournalRetirementControl(control);
+				if (
+					image.imageDigest !== expectedNativeImage.imageDigest ||
+					!sameNativeControl(controlBytes, expectedNativeImage.controlBytes)
+				) {
+					database.exec("ROLLBACK");
+					return failed("retirement-stale");
+				}
+			}
+			const retirement = admitJournalMutation(database, candidate.scope);
 			const scope = readScopeWriter(database, candidate.scope);
 			writeVersion = dataVersion(database);
 			let storedRows: readonly StoredRow[] | undefined;
@@ -736,7 +1314,7 @@ export function createNodeDurableLiveJournalStore(
 			} else {
 				before = addressed
 					? { kind: "append-addressed", row: null, scope }
-					: (captureAddressedClosure({ rows: storedRows ?? [], scope }) ?? null);
+					: (captureAddressedClosure({ rows: storedRows ?? [], scope }, snapshotValidation) ?? null);
 				if (before === null) rejected = "store-poisoned";
 				else {
 					const structural = captureLiveJournalInput("received", candidate);
@@ -766,7 +1344,7 @@ export function createNodeDurableLiveJournalStore(
 				} as never) as Readonly<Record<string, unknown>>;
 				if (addressed && decision.action !== "append") {
 					fullRows = readRows(database, candidate.scope);
-					before = captureAddressedClosure({ rows: fullRows, scope }) ?? null;
+					before = captureAddressedClosure({ rows: fullRows, scope }, snapshotValidation) ?? null;
 					addressed = false;
 					if (before === null) rejected = "store-poisoned";
 					else {
@@ -803,16 +1381,30 @@ export function createNodeDurableLiveJournalStore(
 					else row = { ...candidate, journalSequence } as StoredRow;
 				} else rejected = "internal-invariant";
 			}
-			if (rejected === undefined) database.exec("COMMIT");
-			else database.exec("ROLLBACK");
-		} catch {
+			if (rejected === undefined) {
+				if (!idempotent) advanceMutation(retirement);
+				if (expectedNativeImage !== undefined) {
+					const image = retirementImage(database, candidate.scope.objectId),
+						control = readRetirementControl(database, candidate.scope.objectId, retirementCodec);
+					nativeImage = Object.freeze({
+						imageDigest: image.imageDigest,
+						controlBytes: control === null ? null : encodeJournalRetirementControl(control),
+					});
+				}
+				database.exec("COMMIT");
+			} else database.exec("ROLLBACK");
+		} catch (error) {
 			try {
 				database.exec("ROLLBACK");
 			} catch {
 				// Preserve the substrate failure.
 			}
 			invalidateWatermark(candidate.scope);
-			return failed("substrate-failure");
+			return failed(
+				error instanceof Error && (error.message === "retirement-fenced" || error.message === "retirement-exhausted")
+					? error.message
+					: "substrate-failure"
+			);
 		}
 		if (rejected !== undefined) {
 			invalidateWatermark(candidate.scope);
@@ -823,10 +1415,10 @@ export function createNodeDurableLiveJournalStore(
 			} catch {
 				actual = undefined;
 			}
-			if (rejected === "store-poisoned") poisoned = true;
+			if (rejected === "store-poisoned") poison();
 			if (actual === undefined && rejected !== "store-poisoned") return failed("outcome-unknown");
-			if (actual !== undefined && actual !== null && captureAddressedClosure(actual) === undefined) {
-				poisoned = true;
+			if (actual !== undefined && actual !== null && captureAddressedClosure(actual, snapshotValidation) === undefined) {
+				poison();
 				return failed("store-poisoned");
 			}
 			return failed(rejected);
@@ -859,7 +1451,7 @@ export function createNodeDurableLiveJournalStore(
 				if (fallback === undefined || fallback === UNSTABLE_VERSION) kind = "outcome-unknown";
 				else {
 					const actual = fallback.snapshot;
-					if (actual !== null && captureAddressedClosure(actual) === undefined) kind = "store-poisoned";
+					if (actual !== null && captureAddressedClosure(actual, snapshotValidation) === undefined) kind = "store-poisoned";
 					else {
 						const targetPresent = actual?.rows.some(({ journalSequence }) => journalSequence === row.journalSequence);
 						const fallbackActual =
@@ -885,7 +1477,7 @@ export function createNodeDurableLiveJournalStore(
 			if (observed === undefined || observed === UNSTABLE_VERSION) kind = "outcome-unknown";
 			else {
 				const actual = observed.snapshot;
-				if (actual !== null && captureAddressedClosure(actual) === undefined) kind = "store-poisoned";
+				if (actual !== null && captureAddressedClosure(actual, snapshotValidation) === undefined) kind = "store-poisoned";
 				else {
 					kind = classify(actual, before, { kind: "append", row });
 					if (kind === undefined && actual !== null) establishWatermark(actual.scope, observed.dataVersion);
@@ -894,8 +1486,31 @@ export function createNodeDurableLiveJournalStore(
 		}
 		if (kind !== undefined) {
 			invalidateWatermark(candidate.scope);
-			if (kind === "store-poisoned") poisoned = true;
+			if (kind === "store-poisoned") poison();
 			return failed(kind);
+		}
+		if (expectedNativeImage !== undefined) {
+			if (nativeImage === undefined) return failed("internal-invariant");
+			let active = false;
+			try {
+				database.exec("BEGIN");
+				active = true;
+				const image = retirementImage(database, candidate.scope.objectId),
+					control = readRetirementControl(database, candidate.scope.objectId, retirementCodec);
+				const controlBytes = control === null ? null : encodeJournalRetirementControl(control);
+				database.exec("COMMIT");
+				active = false;
+				if (image.imageDigest !== nativeImage.imageDigest || !sameNativeControl(controlBytes, nativeImage.controlBytes))
+					return failed("outcome-unknown");
+			} catch {
+				if (active)
+					try {
+						database.exec("ROLLBACK");
+					} catch {
+						/* retain unknown debt */
+					}
+				return failed("outcome-unknown");
+			}
 		}
 		return Object.freeze({
 			idempotent,
@@ -903,6 +1518,7 @@ export function createNodeDurableLiveJournalStore(
 			ok: true,
 			scope: Object.freeze({ ...row.scope }),
 			sourceKind: row.sourceKind,
+			...(nativeImage === undefined ? {} : { nativeImage }),
 			vertexDigest: row.vertexDigest,
 		});
 	};
@@ -919,28 +1535,54 @@ export function createNodeDurableLiveJournalStore(
 		} catch {
 			return failed("malformed-input");
 		}
-		let durable: DurableSnapshot | null | typeof WRONG_SCOPE_SNAPSHOT;
+		let read: ReplayRead;
 		try {
-			durable = readReplaySnapshotReadonly(database, scope);
-		} catch {
-			return failed("substrate-failure");
+			read = readReplaySnapshotReadonly(database, scope, retirementCodec, verifiedReplay);
+			if (read === UNSTABLE_VERSION) {
+				verifiedReplay = undefined;
+				read = readReplaySnapshotReadonly(database, scope, retirementCodec);
+			}
+		} catch (error) {
+			return failed(
+				error instanceof Error && error.message === "retirement-fenced" ? "stale-snapshot" : "substrate-failure"
+			);
 		}
+		if (read !== UNSTABLE_VERSION && read.kind === "ready")
+			return Object.freeze({
+				ok: true,
+				ready: true,
+				rowCount: read.token.highWatermark,
+				scope: Object.freeze({ ...scope }),
+				snapshot: read.token,
+			});
+		if (read === UNSTABLE_VERSION || read.kind !== "complete") return failed("internal-invariant");
+		const durable = read.snapshot;
 		if (durable === WRONG_SCOPE_SNAPSHOT) return failed("wrong-scope");
 		if (durable === null) return Object.freeze({ kind: "not-installed", ok: true, ready: false });
 		let derived: Readonly<Record<string, unknown>>;
 		try {
-			derived = deriveLiveJournalSnapshot({ durable } as never) as Readonly<Record<string, unknown>>;
+			derived = deriveLiveJournalSnapshotReadiness({ durable, validation: snapshotValidation } as never) as Readonly<
+				Record<string, unknown>
+			>;
 			if (derived.ok !== true) {
-				poisoned = true;
+				poison();
 				return failed("store-poisoned");
 			}
 		} catch {
 			return failed("internal-invariant");
 		}
+		verifiedReplay =
+			read.dataVersion === undefined
+				? undefined
+				: {
+						dataVersion: read.dataVersion,
+						scope: durable.scope,
+						token: derived.token as LiveJournalSnapshotToken,
+					};
 		return Object.freeze({
 			ok: true,
 			ready: true,
-			rowCount: (derived.rows as readonly unknown[]).length,
+			rowCount: derived.rowCount as number,
 			scope: Object.freeze({ ...scope }),
 			snapshot: derived.token as LiveJournalSnapshotToken,
 		}) as LiveJournalReadinessResult;
@@ -959,30 +1601,64 @@ export function createNodeDurableLiveJournalStore(
 			return failed("malformed-input");
 		}
 		const scope = page.scope as LiveJournalScope;
-		let durable: DurableSnapshot | null | typeof WRONG_SCOPE_SNAPSHOT;
+		const supplied = page.snapshot as LiveJournalSnapshotToken;
+		let read: ReplayRead;
 		try {
-			durable = readReplaySnapshotReadonly(database, scope);
-		} catch {
-			return failed("substrate-failure");
+			read = readReplaySnapshotReadonly(database, scope, retirementCodec, verifiedReplay, page as ReplayPage);
+			if (read === UNSTABLE_VERSION) {
+				verifiedReplay = undefined;
+				read = readReplaySnapshotReadonly(database, scope, retirementCodec);
+			}
+		} catch (error) {
+			return failed(
+				error instanceof Error && error.message === "retirement-fenced" ? "stale-snapshot" : "substrate-failure"
+			);
 		}
+		if (read === UNSTABLE_VERSION) return failed("internal-invariant");
+		if (read.kind === "ready") return failed("internal-invariant");
+		if (read.kind === "page") {
+			const selected = Object.freeze(
+				read.rows
+					.slice(0, page.limit as number)
+					.map((row) => Object.freeze({ ...row, scope: Object.freeze({ ...row.scope }) }))
+			);
+			return Object.freeze({
+				nextSequence:
+					selected.length < read.rows.length ? (selected[selected.length - 1]?.journalSequence ?? null) : null,
+				ok: true,
+				rows: selected,
+				scope: Object.freeze({ ...scope }),
+				snapshot: supplied,
+			}) as LiveJournalPageResult;
+		}
+		verifiedReplay = undefined;
+		const durable = read.snapshot;
 		if (durable === WRONG_SCOPE_SNAPSHOT) return failed("wrong-scope");
 		if (durable === null) return failed("not-installed");
-		const supplied = page.snapshot as LiveJournalSnapshotToken;
 		let derived: Readonly<Record<string, unknown>>;
 		try {
 			derived = deriveLiveJournalSnapshot({
 				durable,
+				validation: snapshotValidation,
 				highWatermark: supplied.highWatermark,
 				supplied,
 			} as never) as Readonly<Record<string, unknown>>;
 			if (derived.ok !== true) {
 				const kind = derived.kind as LiveJournalFailureKind;
-				if (kind === "store-poisoned") poisoned = true;
+				if (kind === "store-poisoned") poison();
 				return failed(kind);
 			}
 		} catch {
 			return failed("internal-invariant");
 		}
+		verifiedReplay =
+			read.dataVersion === undefined
+				? undefined
+				: {
+						dataVersion: read.dataVersion,
+						scope: durable.scope,
+						token: derived.token as LiveJournalSnapshotToken,
+					};
 		const rows = (derived.rows as readonly StoredRow[]).filter(
 			({ journalSequence }) => journalSequence > (page.afterSequence as number)
 		);
@@ -1049,7 +1725,7 @@ export function createNodeDurableLiveJournalStore(
 			}
 			return failed("substrate-failure");
 		}
-		if (!result.ok && result.kind === "store-poisoned") poisoned = true;
+		if (!result.ok && result.kind === "store-poisoned") poison();
 		return result;
 	};
 
@@ -1077,7 +1753,7 @@ export function createNodeDurableLiveJournalStore(
 			return failed("substrate-failure");
 		}
 		if (!result.ok) {
-			if (result.kind === "store-poisoned") poisoned = true;
+			if (result.kind === "store-poisoned") poison();
 			return result;
 		}
 		if (result.stored === null) return Object.freeze({ kind: "missing", ok: true });
@@ -1100,6 +1776,7 @@ export function createNodeDurableLiveJournalStore(
 		input: LiveJournalHistoricalAnchorImportInput
 		// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
 	): Promise<LiveJournalHistoricalAnchorImportResult> => {
+		verifiedReplay = undefined;
 		const blocked = unavailable();
 		if (blocked !== undefined) return blocked;
 		const captured = captureLiveJournalHistoricalAnchorImportInput(input);
@@ -1114,6 +1791,7 @@ export function createNodeDurableLiveJournalStore(
 		let admitted = false;
 		try {
 			database.exec("BEGIN IMMEDIATE");
+			const retirement = admitJournalMutation(database, request.scope);
 			const closure = readEmptyClosure(database, request);
 			if (!closure.ok) rejected = closure;
 			else if (closure.kind === "populated") rejected = Object.freeze({ kind: "import-populated", ok: false });
@@ -1132,8 +1810,20 @@ export function createNodeDurableLiveJournalStore(
 					}
 				}
 			}
+			if (rejected === undefined && !idempotent) advanceMutation(retirement);
 			database.exec(rejected === undefined ? "COMMIT" : "ROLLBACK");
-		} catch {
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				(error.message === "retirement-fenced" || error.message === "retirement-exhausted")
+			) {
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					/* The native transaction may already be terminal; preserve primary/readback. */
+				}
+				return failed(error.message);
+			}
 			try {
 				database.exec("ROLLBACK");
 			} catch {
@@ -1142,7 +1832,7 @@ export function createNodeDurableLiveJournalStore(
 			if (!admitted && rejected === undefined) return failed("substrate-failure");
 		}
 		if (rejected !== undefined) {
-			if (rejected.kind === "store-poisoned") poisoned = true;
+			if (rejected.kind === "store-poisoned") poison();
 			return rejected;
 		}
 		let actual: DurableSnapshot | null | undefined;
@@ -1150,7 +1840,7 @@ export function createNodeDurableLiveJournalStore(
 			const closure = readEmptyClosureReadonly(database, request);
 			if (!closure.ok) {
 				if (closure.kind === "store-poisoned") {
-					poisoned = true;
+					poison();
 					return closure;
 				}
 				actual = undefined;
@@ -1164,20 +1854,494 @@ export function createNodeDurableLiveJournalStore(
 			: failed(kind);
 	};
 
+	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite mutation and joined readback are synchronous behind this port.
+	const recordClosedMembership: NonNullable<DurableLiveJournalStore["recordClosedMembership"]> = async (input) => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		let selected: ReturnType<typeof captureJournalClosedMembershipInput>;
+		try {
+			selected = captureJournalClosedMembershipInput(input);
+		} catch {
+			return failed("malformed-input");
+		}
+		verifiedReplay = undefined;
+		verifiedScopes.clear();
+		resetSnapshotValidation();
+		let active = false,
+			attempted = false,
+			idempotent = false;
+		let expectedAfter: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
+		let refusal: LiveJournalFailureKind | undefined;
+		try {
+			database.exec("BEGIN IMMEDIATE");
+			active = true;
+			const before = retirementImage(database, selected.scope.objectId, []);
+			const control = readRetirementControl(database, selected.scope.objectId, retirementCodec);
+			const bytes = control === null ? null : encodeJournalRetirementControl(control);
+			if (
+				before.imageDigest !== selected.expectedNativeImage.imageDigest ||
+				!sameNativeControl(bytes, selected.expectedNativeImage.controlBytes)
+			)
+				refusal = "retirement-stale";
+			else {
+				const installed = readScopeWriter(database, selected.scope);
+				const current = statement(
+					database,
+					"SELECT closed_membership_bytes FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
+				).get(...scopeParameters(selected.scope));
+				if (installed === null || current === undefined) refusal = "not-installed";
+				else if (current.closed_membership_bytes !== null) {
+					if (!sameBytes(copyBlob(current.closed_membership_bytes), selected.exactCanonicalMembershipBytes))
+						refusal = "evidence-conflict";
+					else {
+						idempotent = true;
+						expectedAfter = { imageDigest: before.imageDigest, controlBytes: bytes };
+					}
+				} else {
+					const mutation = admitJournalMutation(database, selected.scope);
+					if (!journalRetirementMutationAllows(mutation, selected.scope)) refusal = "retirement-fenced";
+					else {
+						const after = retirementImage(database, selected.scope.objectId, [], {
+							scope: selected.scope,
+							bytes: selected.exactCanonicalMembershipBytes,
+							clearScopes: mutation?.drain?.plan.prefixes.map((p) => p.scope) ?? [],
+						});
+						const next = mutation === null ? null : advanceJournalRetirementMutationControl(mutation);
+						expectedAfter = {
+							imageDigest: after.imageDigest,
+							controlBytes: next === null ? null : encodeJournalRetirementControl(next),
+						};
+						attempted = true;
+						statement(
+							database,
+							"UPDATE scopes SET closed_membership_bytes=? WHERE object_id=? AND epoch=? AND anchor_digest=? AND closed_membership_bytes IS NULL"
+						).run(selected.exactCanonicalMembershipBytes, ...scopeParameters(selected.scope));
+						advanceMutation(mutation);
+						if (retirementImage(database, selected.scope.objectId, []).imageDigest !== after.imageDigest)
+							throw new Error("retirement-stale");
+					}
+				}
+			}
+			if (refusal !== undefined) {
+				database.exec("ROLLBACK");
+				active = false;
+				return failed(refusal);
+			}
+			database.exec("COMMIT");
+			active = false;
+		} catch (error) {
+			if (active)
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					/* Commit may already be terminal; exact readback owns the outcome. */
+				}
+			active = false;
+			if (!attempted)
+				return failed(
+					error instanceof Error &&
+						(error.message === "retirement-fenced" ||
+							error.message === "retirement-exhausted" ||
+							error.message === "retirement-stale")
+						? error.message
+						: "substrate-failure"
+				);
+		}
+		if (expectedAfter === undefined) return failed("outcome-unknown");
+		try {
+			database.exec("BEGIN");
+			active = true;
+			const actualImage = retirementImage(database, selected.scope.objectId, []),
+				actual = readRetirementControl(database, selected.scope.objectId, retirementCodec);
+			const actualBytes = actual === null ? null : encodeJournalRetirementControl(actual);
+			database.exec("COMMIT");
+			active = false;
+			if (
+				actualImage.imageDigest === expectedAfter.imageDigest &&
+				sameNativeControl(actualBytes, expectedAfter.controlBytes)
+			)
+				return { ok: true, value: { idempotent, ...expectedAfter } };
+			if (
+				actualImage.imageDigest === selected.expectedNativeImage.imageDigest &&
+				sameNativeControl(actualBytes, selected.expectedNativeImage.controlBytes)
+			)
+				return failed("substrate-failure");
+			return failed("outcome-unknown");
+		} catch {
+			if (active)
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					/* Preserve unreadable readback. */
+				}
+			return failed("outcome-unknown");
+		}
+	};
+	const readRetirementImage: LiveJournalRetirementImageReader = async (
+		input: Readonly<{ objectId: string }>
+	): Promise<LiveJournalRetirementResult<LiveJournalRetirementImageObservation>> => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		let objectId: string;
+		try {
+			objectId = captureJournalRetirementObject(input);
+		} catch {
+			return failed("malformed-input");
+		}
+		const afterInput = unavailable();
+		if (afterInput !== undefined) return afterInput;
+		let active = false;
+		try {
+			const lease = readReservations.current();
+			if (heldRetirementImage !== undefined &&
+				(heldRetirementImage.lease !== lease || heldRetirementImage.objectId !== objectId))
+				heldRetirementImage = undefined;
+			if (lease !== undefined) {
+				await lease.check();
+				if (readReservations.current() !== lease) return failed("retirement-released");
+				const after = unavailable(); if (after !== undefined) return after;
+			}
+			const basis = heldRetirementImage;
+			let frames: Uint8Array[], image: LiveJournalRetirementImage, control: LiveJournalRetirementControl | null;
+			if (basis !== undefined) {
+				frames = basis.frames.map(bytes => bytes.slice());
+				image = Object.freeze({...basis.image});
+				control = basis.controlBytes === undefined ? null :
+					retirementCodec.decode(basis.controlBytes.slice(), basis.planBytes?.slice());
+			} else {
+				frames = [];
+				database.exec("BEGIN");
+				active = true;
+				image = retirementImage(database, objectId, frames);
+				control = readRetirementControl(database, objectId, retirementCodec);
+			}
+			const drainSource = reconstructJournalRetirementDrainSource(control, image, frames, retirementFrame);
+			if (basis === undefined) {
+				if (drainSource !== undefined && control !== null) validateDrainNativeRows(database, control);
+				database.exec("COMMIT");
+				active = false;
+			}
+			if (lease !== undefined) {
+				await lease.check();
+				if (readReservations.current() !== lease) return failed("retirement-released");
+			}
+			const after = unavailable(); if (after !== undefined) return after;
+			if (image.scopeCount === 0) return failed("not-installed");
+			if (basis === undefined && lease !== undefined) {
+				const carriers = control === null ? undefined : retirementCodec.encode(control);
+				heldRetirementImage = Object.freeze({lease, objectId,
+					...(carriers === undefined ? {} : {controlBytes: carriers.controlBytes.slice(),
+						...(carriers.planBytes === undefined ? {} : {planBytes: carriers.planBytes.slice()})}),
+					image: Object.freeze({...image}), frames: Object.freeze(frames.map(bytes => bytes.slice())), token: Object.freeze({}),
+					enrollment: {observations: new WeakMap()}});
+			}
+			const observation: LiveJournalRetirementImageObservation = Object.freeze({
+					control,
+					exactCanonicalControlCarriers: Object.freeze(
+						control === null
+							? []
+							: (() => {
+									const bytes = retirementCodec.encode(control);
+									return [bytes.controlBytes, ...(bytes.planBytes === undefined ? [] : [bytes.planBytes])];
+								})()
+					),
+					image,
+					canonicalRows: Object.freeze(frames),
+					...(drainSource === undefined ? {} : { drainSource }),
+			});
+			if (lease !== undefined && heldRetirementImage?.lease === lease && heldRetirementImage.objectId === objectId)
+				heldRetirementImage.enrollment.observations = new WeakMap([[observation, true]]);
+			return Object.freeze({ok: true, value: observation});
+		} catch (error) {
+			heldRetirementImage = undefined;
+			if (active)
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					/* Preserve the original capture failure. */
+				}
+			return failed(
+				error instanceof Error && (error.message === "retirement-fenced" || error.message === "retirement-stale")
+					? error.message
+					: "substrate-failure"
+			);
+		}
+	};
+	// Capture only lightweight tokens in escaping probes, never an old basis,
+	// returned observation or native lease (not even through a weak reference).
+	const createCurrentProbe = (token: object, leaseToken: object): LiveJournalRetirementImageCurrentProbe => {
+		const probe: LiveJournalRetirementImageCurrentProbe = Object.freeze({
+			checkCurrent: async function (this: LiveJournalRetirementImageCurrentProbe): Promise<LiveJournalRetirementResult<null>> {
+				if (this !== probe) return failed("malformed-input");
+				const blocked = unavailable(); if (blocked !== undefined) return blocked;
+				try {
+					const lease = readReservations.current();
+					if (lease === undefined || retirementLeaseToken !== leaseToken) return failed("retirement-released");
+					// Enter the original native check on every successful delivery. No
+					// previous request, encoded image or authority substitutes for it.
+					await lease.check();
+					const after = unavailable(); if (after !== undefined) return after;
+					if (readReservations.current() !== lease || retirementLeaseToken !== leaseToken) return failed("retirement-released");
+					return heldRetirementImage?.token === token
+						? Object.freeze({ok: true, value: null}) : failed("retirement-stale");
+				} catch { return failed("substrate-failure"); }
+			},
+		});
+		return probe;
+	};
+	Object.defineProperty(readRetirementImage, "captureCurrentProbe", {value: function (this: LiveJournalRetirementImageReader,
+		observation: LiveJournalRetirementImageObservation): LiveJournalRetirementImageCurrentProbe | undefined {
+		if (this !== readRetirementImage || unavailable() !== undefined) return undefined;
+		const basis = heldRetirementImage;
+		if (basis === undefined || !basis.enrollment.observations.has(observation)) return undefined;
+		basis.enrollment.observations.delete(observation);
+		try {
+			if (readReservations.current() !== basis.lease || retirementLeaseToken === undefined) return undefined;
+			const carriers = observation.control === null ? undefined : encodeJournalRetirementNativeCarriers(observation.control);
+			const expected = basis.controlBytes === undefined ? [] : [basis.controlBytes, ...(basis.planBytes === undefined ? [] : [basis.planBytes])];
+			if ((carriers === undefined) !== (basis.controlBytes === undefined) || carriers !== undefined &&
+				(!sameNativeControl(carriers.controlBytes, basis.controlBytes!) || !sameNativeControl(carriers.planBytes ?? null, basis.planBytes ?? null)) ||
+				observation.exactCanonicalControlCarriers.length !== expected.length ||
+				observation.exactCanonicalControlCarriers.some((bytes, i) => compareBytes(bytes, expected[i]!) !== 0) ||
+				observation.canonicalRows.length !== basis.frames.length ||
+				observation.canonicalRows.some((bytes, i) => compareBytes(bytes, basis.frames[i]!) !== 0) ||
+				compareBytes(encodeCanonical(observation.image), encodeCanonical(basis.image)) !== 0) return undefined;
+			const control = basis.controlBytes === undefined ? null :
+					retirementCodec.decode(basis.controlBytes.slice(), basis.planBytes?.slice());
+			const drainSource = reconstructJournalRetirementDrainSource(control, basis.image, basis.frames, retirementFrame);
+			if ((drainSource === undefined) !== (observation.drainSource === undefined) || drainSource !== undefined &&
+				compareBytes(encodeCanonical(drainSource), encodeCanonical(observation.drainSource)) !== 0) return undefined;
+		} catch { return undefined; }
+		return createCurrentProbe(basis.token, retirementLeaseToken!);
+	}});
+	Object.freeze(readRetirementImage);
+	const acquireRetirementControl = async (
+		input: Readonly<{ objectId: string }>
+		// eslint-disable-next-line @typescript-eslint/require-await -- Original SQLite work is synchronous behind the async port.
+	): Promise<LiveJournalRetirementResult<LiveJournalRetirementControlRead>> => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		let objectId: string;
+		try {
+			objectId = captureJournalRetirementObject(input);
+		} catch {
+			return failed("malformed-input");
+		}
+		const afterInput = unavailable();
+		if (afterInput !== undefined) return afterInput;
+		let current: LiveJournalRetirementControl, image: LiveJournalRetirementImage;
+		resetSnapshotValidation();
+		let drainSource: LiveJournalRetirementDrainSource | undefined;
+		const frames: Uint8Array[] = [];
+		let active = false;
+		try {
+			// Fully join the native RO image before any control-birth RW attempt.
+			database.exec("BEGIN");
+			active = true;
+			image = retirementImage(database, objectId, frames);
+			if (image.scopeCount === 0) {
+				database.exec("COMMIT");
+				active = false;
+				return failed("not-installed");
+			}
+			const prior = readRetirementControl(database, objectId, retirementCodec);
+			drainSource = reconstructJournalRetirementDrainSource(prior, image, frames, retirementFrame);
+			if (drainSource !== undefined && prior !== null) validateDrainNativeRows(database, prior);
+			database.exec("COMMIT");
+			active = false;
+			if (prior !== null) current = prior;
+			else {
+				const beforeBirth = unavailable();
+				if (beforeBirth !== undefined) return beforeBirth;
+				const born = {
+					kind: "v3-live-journal-retirement-control-1" as const,
+					objectId,
+					incarnation: randomBytes(32).toString("hex"),
+					revision: 0,
+					sequence: 0,
+					active: null,
+					completed: null,
+				};
+				database.exec("BEGIN IMMEDIATE");
+				active = true;
+				const actual = readRetirementControl(database, objectId, retirementCodec);
+				if (actual !== null || retirementImage(database, objectId).imageDigest !== image.imageDigest) {
+					database.exec("ROLLBACK");
+					active = false;
+					return failed("retirement-stale");
+				}
+				writeRetirementControl(database, born);
+				try {
+					database.exec("COMMIT");
+					active = false;
+				} catch {
+					try {
+						database.exec("ROLLBACK");
+					} catch {
+						/* The native transaction may already be terminal; preserve primary/readback. */
+					}
+					active = false;
+				}
+				database.exec("BEGIN");
+				active = true;
+				const readback = readRetirementControl(database, objectId, retirementCodec),
+					after = retirementImage(database, objectId);
+				database.exec("COMMIT");
+				active = false;
+				if (
+					readback === null ||
+					!sameBytes(encodeJournalRetirementControl(readback), encodeJournalRetirementControl(born)) ||
+					after.imageDigest !== image.imageDigest
+				)
+					return failed("outcome-unknown");
+				current = readback;
+			}
+		} catch (error) {
+			if (active)
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					/* The native transaction may already be terminal; preserve primary/readback. */
+				}
+			return failed(
+				error instanceof Error && error.message === "retirement-fenced" ? "retirement-fenced" : "substrate-failure"
+			);
+		}
+		const expected = retirementCodec.encode(current);
+		return {
+			ok: true,
+			value: retirementCodec.createRead(
+				current,
+				image,
+				// eslint-disable-next-line @typescript-eslint/require-await -- Native CAS/readback synchronously joins before delivery.
+				async (next, deletions, nextCarriers) => {
+					const blocked = unavailable();
+					if (blocked !== undefined) return blocked;
+					let active = false,
+						attempted = false;
+					try {
+						database.exec("BEGIN IMMEDIATE");
+						active = true;
+						const actual = readRetirementControl(database, objectId, retirementCodec),
+							nativeImage = retirementImage(database, objectId);
+						if (
+							actual === null ||
+							!sameRetirementNativeCarriers(retirementCodec.encode(actual), expected) ||
+							nativeImage.imageDigest !== image.imageDigest
+						) {
+							database.exec("ROLLBACK");
+							active = false;
+							return failed("retirement-stale");
+						}
+						if (deletions !== undefined && deletions.length > 0) {
+							validateDrainNativeRows(database, actual);
+							attempted = true;
+							for (const selected of deletions) {
+								try {
+									deletingScope = selected.scope;
+									const deleted = "row" in selected
+										? statement(database, "DELETE FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence=?").run(...scopeParameters(selected.scope), selected.row.journalSequence)
+										: statement(database, "DELETE FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?").run(...scopeParameters(selected.scope));
+									if (deleted.changes !== 1) throw new Error("retirement-stale");
+									invalidateWatermark(selected.scope);
+									verifiedReplay = undefined;
+								} finally {
+									deletingScope = undefined;
+								}
+							}
+							if (
+								next.drain == null ||
+								retirementImage(database, objectId).imageDigest !== next.drain.residualImageDigest
+							)
+								throw new Error("retirement-stale");
+							validateDrainNativeRows(database, next);
+						} else if (next.drain != null && actual.drain == null) validateDrainNativeRows(database, next);
+						attempted = true;
+						writeRetirementNativeCarriers(database, objectId, nextCarriers);
+						database.exec("COMMIT");
+						active = false;
+					} catch {
+						if (active)
+							try {
+								database.exec("ROLLBACK");
+							} catch {
+								/* The native transaction may already be terminal; preserve primary/readback. */
+							}
+						if (!attempted) return failed("substrate-failure");
+					}
+					// Delivery/COMMIT throws do not prove absence. Join a fresh whole native image.
+					try {
+						database.exec("BEGIN");
+						active = true;
+						const actual = readRetirementControl(database, objectId, retirementCodec),
+							nativeImage = retirementImage(database, objectId);
+						database.exec("COMMIT");
+						active = false;
+						if (actual === null) return failed("outcome-unknown");
+						const bytes = retirementCodec.encode(actual);
+						const nextImage =
+							deletions !== undefined && deletions.length > 0 ? next.drain?.residualImageDigest : image.imageDigest;
+						if (
+							sameRetirementNativeCarriers(bytes, nextCarriers) &&
+							nativeImage.imageDigest === nextImage
+						)
+							return { ok: true, value: actual };
+						if (sameRetirementNativeCarriers(bytes, expected) && nativeImage.imageDigest === image.imageDigest)
+							return failed("substrate-failure");
+						return failed("outcome-unknown");
+					} catch {
+						if (active)
+							try {
+								database.exec("ROLLBACK");
+							} catch {
+								/* The native transaction may already be terminal; preserve primary/readback. */
+							}
+						return failed("outcome-unknown");
+					}
+				},
+				frames,
+				drainSource
+			),
+		};
+	};
 	const close = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
-		closePromise = Promise.resolve().then(() => {
-			try {
-				database.close();
-			} catch {
-				// Close is idempotent and never rejects.
-			}
-		});
+		snapshotValidation.release();
+		retirementCodec.clear();
+		heldRetirementImage = undefined;
+		retirementLeaseToken = undefined;
+		verifiedReplay = undefined;
+		const readJoined = readReservations.close();
+		closePromise = Promise.resolve()
+			.then(() => {
+				try {
+					database.close();
+				} catch {
+					// Close is idempotent and never rejects.
+				}
+			})
+			.then(() => readJoined).finally(() => retirementCodec.release()).then(() => session?.closedOwner(store));
 		return closePromise;
 	};
 
-	return Object.freeze({
+	const store = Object.freeze({
+		recordClosedMembership,
+		readRetirementImage,
+		acquireRetirementControl,
+		acquireNativeReadReservation: async (input: Readonly<{ objectId: string }>) => {
+			const blocked = unavailable();
+			if (blocked !== undefined) throw new Error(blocked.kind);
+			captureJournalRetirementObject(input);
+			const lease = await readReservations.acquire();
+			const token = Object.freeze({});
+			retirementLeaseToken = token;
+			return Object.freeze({check: () => lease.check(), release: (): Promise<void> => {
+				if (heldRetirementImage?.lease === lease) heldRetirementImage = undefined;
+				if (retirementLeaseToken === token) retirementLeaseToken = undefined;
+				return lease.release();
+			}});
+		},
 		appendAccepted,
 		close,
 		installEpochAnchor,
@@ -1188,4 +2352,5 @@ export function createNodeDurableLiveJournalStore(
 		readiness,
 		readPage,
 	});
+	return store;
 }

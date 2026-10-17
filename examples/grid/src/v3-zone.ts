@@ -1,4 +1,6 @@
+import { openTrustedBlueprintCatalogBytes } from "@ts-drp/blueprint-catalog/bytes";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import type { CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import { decodeEntityDeltaBatch, encodeEntityDeltaBatch, type EphemeralChannel } from "@ts-drp/ephemeral";
 import {
 	createV3RoomCreatorInviteMaterial,
@@ -25,10 +27,9 @@ import {
 	verifyOutcomeCommitOperation,
 } from "@ts-drp/outcome-commit";
 
-import { createZoneStateKernel, emptyZoneState, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
-import zoneStateSource from "./zone-state.js?raw";
-
-const KERNEL_EXPORT_DECLARATION = "\nexport { createZoneStateKernel, emptyZoneState };\n";
+import catalogMaterial from "./zone-catalog-material.json" with { type: "json" };
+import predecessorCatalogMaterial from "./zone-catalog-predecessor-material.json" with {type:"json"};
+import { createZoneStateKernel, emptyZoneState, type ZonePlacementGrowthMaterial, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
 const PARAMETERS = Object.freeze({
 	authorShareMultiplier: 4,
 	maxEpochVertices: 8192,
@@ -66,6 +67,10 @@ export interface V3ZoneRoomHeadOpenContext {
 export type V3ZoneRoomHeadAuthorityForOpen = (
 	context: Readonly<V3ZoneRoomHeadOpenContext>
 ) => V3RoomHeadAuthority | Promise<V3RoomHeadAuthority>;
+
+export type V3ZoneSettlementSourceApproval = NonNullable<
+	Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["approveSettlementSourceSelection"]
+>;
 
 type EntityDelta = ReturnType<typeof decodeEntityDeltaBatch>[number];
 
@@ -230,6 +235,8 @@ export interface TradeApproval {
 }
 
 interface ZoneProjection {
+	readonly creatorAuthor: string;
+	readonly creatorPeerId: string;
 	readonly acceptedDigests: readonly string[];
 	readonly blocks: readonly ZoneBlock[];
 	readonly outcomes: readonly OutcomeCommitAdmissionOperation[];
@@ -303,16 +310,12 @@ interface ZoneInvite {
 	readonly zoneId: string;
 }
 
-interface ZoneOperationDescriptor {
-	readonly argumentSchema: Readonly<{
-		readonly fields: readonly Readonly<{ readonly name: string; readonly required: true; readonly type: string }>[];
-		readonly kind: "closed-record";
-	}>;
-	readonly maxCanonicalOperationBytes: 65_536;
-	readonly name: string;
-}
-
 export interface V3ZoneApi {
+	sealEpoch(): ReturnType<V3RoomSession<ZoneProjection>["sealEpoch"]>;
+	exportCreatorSuccessor(): ReturnType<V3RoomSession<ZoneProjection>["exportCreatorSuccessor"]>;
+	adoptCreatorSuccessor(): ReturnType<V3RoomSession<ZoneProjection>["adoptCreatorSuccessor"]>;
+	installCreatorSuccessor(input: Parameters<V3RoomSession<ZoneProjection>["installCreatorSuccessor"]>[0]):
+		ReturnType<V3RoomSession<ZoneProjection>["installCreatorSuccessor"]>;
 	activateMigration(receipt: V3RoomMigrationRehearsalReceipt): Promise<V3RoomMigrationActivationReceipt>;
 	approveTradeIntent(
 		input: Readonly<{ readonly exactCanonicalIntentHex: string; readonly exactCanonicalPayloadHex: string }>
@@ -368,11 +371,14 @@ export interface V3ZoneApi {
 export function createV3ZoneApi(
 	node: DRPNode,
 	onProjection: (snapshot: ZoneSnapshot) => void,
-	roomHeadAuthorityForOpen: V3ZoneRoomHeadAuthorityForOpen
+	roomHeadAuthorityForOpen: V3ZoneRoomHeadAuthorityForOpen,
+	approveSettlementSourceSelection?: V3ZoneSettlementSourceApproval
 ): V3ZoneApi {
 	if (typeof roomHeadAuthorityForOpen !== "function") {
 		throw new TypeError("v3 zone room-head authority factory is required");
 	}
+	if (approveSettlementSourceSelection !== undefined && typeof approveSettlementSourceSelection !== "function")
+		throw new TypeError("v3 zone settlement approval policy is invalid");
 	const localAuthor = node.keychain.localAuthorId;
 	const localPeerId = node.networkNode.peerId;
 	const enrollment = encodeEnrollment({ author: localAuthor, peerId: localPeerId });
@@ -384,7 +390,7 @@ export function createV3ZoneApi(
 	const transientPositions = new Map<string, Readonly<{ x: number; y: number }>>();
 	let room: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
 	let ephemeral: EphemeralChannel | undefined;
-	let projection = emptyProjection();
+	let projection = emptyProjection(localAuthor, localPeerId);
 	let migrationCreatorAuthor = "";
 	let migrationMembers: readonly Readonly<Enrollment & { readonly order: number }>[] = Object.freeze([]);
 	let invite = "";
@@ -405,7 +411,7 @@ export function createV3ZoneApi(
 		aoiSenders.clear();
 	};
 	const resetZoneState = (): void => {
-		projection = emptyProjection();
+		projection = emptyProjection(localAuthor, localPeerId);
 		migrationCreatorAuthor = "";
 		migrationMembers = Object.freeze([]);
 		clearAoiProjection();
@@ -664,13 +670,29 @@ export function createV3ZoneApi(
 			);
 			validateRoomHeadAuthority(roomHeadAuthority);
 			if (closeRequested) throw new Error("v3 zone closed during open");
-			const application = createV3ZoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor);
+			// Creator custody comes from the configured Keychain, including creator
+			// reopen. An independently enrolled recipient never acquires this authority.
+			const creatorFinalitySigner =
+				localAuthor === creatorAuthor ? await node.keychain.acquireLocalAuthorFinalitySigner() : undefined;
+			if (closeRequested) throw new Error("v3 zone closed during open");
+			const application = createV3ZoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor, blueprintDigestFromInvite(creatorInvite));
 			opened = await createV3RoomSession<ZoneProjection>({
 				application,
 				author: localAuthor,
 				creatorInvite,
+				...(approveSettlementSourceSelection === undefined ? {} : { approveSettlementSourceSelection }),
+				...(creatorFinalitySigner === undefined ? {} : { creatorFinalitySigner }),
 				createOperationAdmissionPolicy: (context) =>
-					createOutcomeCommitAdmissionPolicy({ ...context, maxEntries: PARAMETERS.maxEpochVertices }),
+					createOutcomeCommitAdmissionPolicy({
+						aclDigest: context.aclDigest,
+						anchorDigest: context.anchorDigest,
+						epoch: context.epoch,
+						objectId: context.objectId,
+						maxEntries: PARAMETERS.maxEpochVertices,
+						...(context.authenticatedApplicationStateBytes === undefined
+							? {}
+							: { authenticatedApplicationStateBytes: context.authenticatedApplicationStateBytes }),
+					}),
 				databaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
 				initialLogicalTime: 3,
 				issuanceDatabaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
@@ -942,10 +964,9 @@ export function createV3ZoneApi(
 				} catch (error) {
 					failure = error;
 				}
-				try {
-					await Promise.all([selected?.close(), ...sources.map((source) => source.close())]);
-				} catch (error) {
-					failure ??= error;
+				const closed = await Promise.allSettled([selected?.close(), ...sources.map((source) => source.close())]);
+				for (const result of closed) {
+					if (result.status === "rejected") failure ??= result.reason;
 				}
 				resetZoneState();
 				if (failure !== undefined) throw failure;
@@ -956,6 +977,29 @@ export function createV3ZoneApi(
 			});
 			closing = attempt;
 			return attempt;
+		},
+		// The application delegates to its original current room owner. These
+		// methods mint no transition authority and do not bridge the ephemeral
+		// authority gap while the original successor lifecycle is joining.
+		sealEpoch() {
+			const selected = room;
+			if (selected === undefined || closeRequested) return Promise.reject(new TypeError("v3 zone is not open"));
+			return selected.sealEpoch();
+		},
+		exportCreatorSuccessor() {
+			const selected = room;
+			if (selected === undefined || closeRequested) return Promise.reject(new TypeError("v3 zone is not open"));
+			return selected.exportCreatorSuccessor();
+		},
+		adoptCreatorSuccessor() {
+			const selected = room;
+			if (selected === undefined || closeRequested) return Promise.reject(new TypeError("v3 zone is not open"));
+			return selected.adoptCreatorSuccessor();
+		},
+		installCreatorSuccessor(request) {
+			const selected = room;
+			if (selected === undefined || closeRequested) return Promise.reject(new TypeError("v3 zone is not open"));
+			return selected.installCreatorSuccessor(request);
 		},
 		async commitTradeIntent(input): Promise<Readonly<{ readonly kind: "accepted" | "duplicate" }>> {
 			const selected = room;
@@ -1279,7 +1323,9 @@ export function createV3ZoneApi(
  */
 function canonicalZoneStateBytes(projection: ZoneProjection): Uint8Array {
 	return encodeCanonical({
-		version: 1,
+		version: 2,
+		creatorAuthor: projection.creatorAuthor,
+		creatorPeerId: projection.creatorPeerId,
 		blocks: projection.blocks,
 		outcomes: projection.outcomes,
 		roster: projection.roster,
@@ -1296,10 +1342,66 @@ function canonicalZoneStateBytes(projection: ZoneProjection): Uint8Array {
 export function createV3ZoneApplication(
 	members: readonly Readonly<Enrollment & { readonly order: number }>[],
 	creatorPeerId: string,
-	creatorAuthor: string
+	creatorAuthor: string,
+	blueprintDigest?: string
 ): Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["application"] {
-	const kernel = createZoneStateKernel(creatorAuthor, creatorPeerId);
-	const material = applicationMaterial(creatorPeerId, creatorAuthor);
+	const material = applicationMaterial(blueprintDigest);
+	const kernel = createZoneStateKernel(creatorAuthor, creatorPeerId, material.artifactVersion);
+	const resolved = material.catalog.resolve(material.blueprintDigest);
+	// Capture this application's exact resolved entry once. Public catalog/package
+	// readouts cannot mutate these private expected carriers between invocations.
+	const expectedResourceCatalog = Object.freeze({
+		blueprintDigest: resolved.blueprintDigest,
+		artifactId: resolved.artifactId,
+		artifactDigest: resolved.artifactDigest,
+		catalogDigest: resolved.evidence.catalogDigest,
+		runtimeProfile: resolved.runtimeProfile,
+		exactArtifactBytes: resolved.exactArtifactBytes.slice(),
+		canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
+	});
+	type ResourceReader = NonNullable<Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["application"]["readOrdinaryApplicationResourceBound"]>;
+	type ResourceInput<Material> = Readonly<{catalog: Parameters<ResourceReader>[0]["catalog"]; material: Material}>;
+	const captureResourceMaterial = <Material>(input: ResourceInput<Material>): Material | undefined => {
+		if (input === null || typeof input !== "object" || Reflect.ownKeys(input).length !== 2) return undefined;
+		const descriptors = Object.getOwnPropertyDescriptors(input);
+		if (descriptors.catalog === undefined || !Object.hasOwn(descriptors.catalog, "value") ||
+			descriptors.material === undefined || !Object.hasOwn(descriptors.material, "value")) return undefined;
+		const catalog = descriptors.catalog.value;
+		if (catalog === null || typeof catalog !== "object" || Reflect.ownKeys(catalog).length !== 7) return undefined;
+		const fields = Object.getOwnPropertyDescriptors(catalog);
+		const identityKeys = ["blueprintDigest", "artifactId", "artifactDigest", "catalogDigest", "runtimeProfile"] as const;
+		if (identityKeys.some(key => fields[key] === undefined || !Object.hasOwn(fields[key]!, "value") ||
+			fields[key]!.value !== expectedResourceCatalog[key])) return undefined;
+		for (const key of ["exactArtifactBytes", "canonicalBlueprintPackageBytes"] as const) {
+			if (fields[key] === undefined || !Object.hasOwn(fields[key]!, "value") ||
+				!(fields[key]!.value instanceof Uint8Array) || !sameBytes(expectedResourceCatalog[key], fields[key]!.value)) return undefined;
+		}
+		return descriptors.material.value as Material | undefined;
+	};
+	const resourceFootprint = (bound: CanonicalResourceFootprint | undefined): CanonicalResourceFootprint | undefined =>
+		bound === undefined ? undefined : Object.freeze({byteLength: bound.byteLength, items: bound.items, maxDepth: bound.maxDepth});
+	/** Local numerical policy only. The original source owner authenticates the
+	 * exact catalog/material and retains one source-bound projection. Neither
+	 * complete nor delta planning grants admission, authority or proof credit. */
+	const resourceBoundReader = Object.assign((input: ResourceInput<ZonePlacementGrowthMaterial>): CanonicalResourceFootprint | undefined => {
+		try {
+			const captured = captureResourceMaterial(input);
+			return captured === undefined ? undefined : resourceFootprint(kernel.readPlacementGrowthBound(captured));
+		} catch {return undefined;}
+	}, {
+		createIncrementalProjection: (input: ResourceInput<Omit<ZonePlacementGrowthMaterial, "candidateOperation">>) => {
+			try {
+				const captured = captureResourceMaterial(input);
+				const projection = captured === undefined ? undefined : kernel.createPlacementGrowthProjection(captured);
+				return projection === undefined ? undefined : Object.freeze({
+					advance: (operations: readonly unknown[]) => projection.advance(operations),
+					quote: (candidateOperation: unknown) => resourceFootprint(projection.quote(candidateOperation)),
+					quoteWithoutApplicationCandidate: () => resourceFootprint(projection.quoteWithoutApplicationCandidate()),
+					quoteWindow: (declaration: Parameters<typeof projection.quoteWindow>[0]) => resourceFootprint(projection.quoteWindow(declaration)),
+				});
+			} catch {return undefined;}
+		},
+	});
 	return Object.freeze({
 		batchableOperationActions: Object.freeze(["placeBlock"]),
 		bootstrapOperation: Object.freeze({
@@ -1308,6 +1410,7 @@ export function createV3ZoneApplication(
 		}),
 		canonicalBlueprintPackageBytes: material.canonicalBlueprintPackageBytes,
 		catalog: material.catalog,
+		readOrdinaryApplicationResourceBound: resourceBoundReader,
 		displacedOperationIdentity: (operation: Readonly<Record<string, unknown>>) => {
 			const identity = Reflect.get(operation, "id");
 			if (typeof identity !== "string" || identity.length === 0) {
@@ -1317,8 +1420,20 @@ export function createV3ZoneApplication(
 		},
 		displacementPolicies: Object.freeze({ placeBlock: "rebase" as const }),
 		migration: Object.freeze({
+			...(material.artifactVersion === "current" ? {inheritAuthenticatedState: true as const} : {}),
+			containsInheritedOperation: (operation: Readonly<Record<string, unknown>>, exactCanonicalStateBytes: Uint8Array) => {
+				if (operation.action !== "commit-outcome-v1") return false;
+				const exact = encodeCanonical(verifiedOutcomeCarrier(operation));
+				const projection = decodeZoneState(exactCanonicalStateBytes, kernel);
+				return projection.outcomes.some((outcome) => sameBytes(exact, encodeCanonical(outcome)));
+			},
 			canonicalStateBytes: canonicalZoneStateBytes,
-			prepare: (operations: readonly V3RoomAcceptedOperation[]) => prepareZoneMigration(operations, kernel),
+			prepare: (operations: readonly V3RoomAcceptedOperation[], exactCanonicalSourceStateBytes?: Uint8Array) => {
+				const prepared = prepareZoneMigration(operations,kernel,exactCanonicalSourceStateBytes);
+				if (material.artifactVersion === "predecessor" && decodeZoneState(prepared.exactCanonicalApplicationStateBytes,kernel).outcomes.length !== 0)
+					throw new TypeError("retained Grid blueprint has no authenticated outcome-transfer reducer");
+				return prepared;
+			},
 		}),
 		projectAcceptedOperations: (input: V3RoomProjectionInput) => {
 			const base =
@@ -1337,8 +1452,15 @@ function projectZone(
 ): ZoneProjection {
 	let state: ZoneState =
 		base === undefined
-			? emptyZoneState()
-			: { version: 1, blocks: base.blocks, outcomes: base.outcomes, roster: base.roster };
+			? kernel.emptyState()
+			: {
+					version: 2,
+					creatorAuthor: base.creatorAuthor,
+					creatorPeerId: base.creatorPeerId,
+					blocks: base.blocks,
+					outcomes: base.outcomes,
+					roster: base.roster,
+				};
 	const acceptedDigests = new Set<string>();
 	for (const accepted of operations) {
 		acceptedDigests.add(accepted.vertexDigest);
@@ -1356,6 +1478,8 @@ function projectZone(
 function zoneProjection(acceptedDigests: readonly string[], state: ZoneState): ZoneProjection {
 	return Object.freeze({
 		acceptedDigests: Object.freeze([...acceptedDigests]),
+		creatorAuthor: state.creatorAuthor,
+		creatorPeerId: state.creatorPeerId,
 		blocks: state.blocks,
 		outcomes: state.outcomes,
 		roster: state.roster,
@@ -1487,20 +1611,32 @@ function creatorAuthorFromInvite(invite: string | V3RoomCreatorInviteMaterial): 
 	return creatorAuthorFromSignerSet(signerSet);
 }
 
-function emptyProjection(): ZoneProjection {
-	return zoneProjection([], emptyZoneState());
+function blueprintDigestFromInvite(invite: string | V3RoomCreatorInviteMaterial): string {
+	const decoded = typeof invite === "string" ? decodeCanonical(bytes(invite),{maxBytes:131072,maxDepth:4,maxItems:128}) : invite;
+	if (decoded === null || typeof decoded !== "object") throw new TypeError("v3 zone creator invite is invalid");
+	const exact = Reflect.get(decoded,"exactCanonicalGenesisAnchorPreimageBytes");
+	if (!(exact instanceof Uint8Array)) throw new TypeError("v3 zone creator genesis is invalid");
+	const genesis = decodeCanonical(exact,{maxBytes:65536,maxDepth:4,maxItems:128});
+	const selected = genesis === null || typeof genesis !== "object" ? undefined : Reflect.get(genesis,"blueprintDigest");
+	if (typeof selected !== "string" || !/^[0-9a-f]{64}$/u.test(selected)) throw new TypeError("v3 zone creator blueprint is invalid");
+	return selected;
+}
+
+function emptyProjection(creatorAuthor: string, creatorPeerId: string): ZoneProjection {
+	return zoneProjection([], emptyZoneState(creatorAuthor, creatorPeerId));
 }
 
 function prepareZoneMigration(
 	operations: readonly V3RoomAcceptedOperation[],
-	kernel: ZoneStateKernel
+	kernel: ZoneStateKernel,
+	exactCanonicalSourceStateBytes?: Uint8Array
 ): V3RoomMigrationProjection {
 	const blocks = new Map<string, ZoneBlock>();
 	for (const row of operations) {
 		const action = Reflect.get(row.operation, "action");
 		if (action === "commit-outcome-v1") {
 			verifiedOutcomeCarrier(row.operation);
-			throw new TypeError("v3 zone outcome migration requires an authenticated transfer owner");
+			continue;
 		}
 		if (action !== "placeBlock") continue;
 		const block = kernel.blockForOperation(row.operation);
@@ -1508,7 +1644,10 @@ function prepareZoneMigration(
 		if (blocks.has(block.id)) throw new TypeError("v3 zone migration identity conflicts");
 		blocks.set(block.id, block);
 	}
-	const projection = projectZone(operations, kernel);
+	const projection =
+		exactCanonicalSourceStateBytes === undefined
+			? projectZone(operations, kernel)
+			: decodeZoneState(exactCanonicalSourceStateBytes, kernel);
 	return Object.freeze({
 		exactCanonicalApplicationStateBytes: canonicalZoneStateBytes(projection),
 		importOperations: Object.freeze(
@@ -1695,7 +1834,7 @@ async function createCreatorInviteMaterial(
 ): Promise<V3RoomCreatorInviteMaterial> {
 	const creator = members.find(({ author, order }) => author === node.keychain.localAuthorId && order === 0);
 	if (creator === undefined) throw new TypeError("v3 zone creator enrollment is unavailable");
-	const application = applicationMaterial(creator.peerId, node.keychain.localAuthorId);
+	const application = applicationMaterial();
 	const exactCanonicalLatchedAclBytes = encodeCanonical({
 		epoch: 0,
 		kind: "drp-v3-latched-acl",
@@ -1723,7 +1862,9 @@ async function createCreatorInviteMaterial(
 	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
 	return createV3RoomCreatorInviteMaterial({
 		blueprintDigest: application.blueprintDigest,
-		exactCanonicalApplicationStateBytes: canonicalZoneStateBytes(emptyProjection()),
+		exactCanonicalApplicationStateBytes: canonicalZoneStateBytes(
+			emptyProjection(node.keychain.localAuthorId, creator.peerId)
+		),
 		exactCanonicalLatchedAclBytes,
 		exactCanonicalParametersCarrierBytes,
 		exactCanonicalProfileBytes,
@@ -1733,99 +1874,32 @@ async function createCreatorInviteMaterial(
 	});
 }
 
-function applicationMaterial(
-	creatorPeerId: string,
-	creatorAuthor: string
-): Readonly<{
+const ZONE_CATALOG = openTrustedBlueprintCatalogBytes({
+	catalogBytes: bytes(catalogMaterial.catalogBytes),
+	assets: Object.fromEntries(
+		Object.entries(catalogMaterial.assets).map(([filename, value]) => [filename, bytes(value)])
+	),
+});
+	const PREDECESSOR_ZONE_CATALOG = openTrustedBlueprintCatalogBytes({
+		catalogBytes:bytes(predecessorCatalogMaterial.catalogBytes),
+		assets:Object.fromEntries(Object.entries(predecessorCatalogMaterial.assets).map(([filename,value])=>[filename,bytes(value)])),
+	});
+
+function applicationMaterial(selectedDigest?:string): Readonly<{
+	readonly artifactVersion:"current"|"predecessor";
 	readonly blueprintDigest: string;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["application"]["catalog"];
 }> {
-	if (!zoneStateSource.endsWith(KERNEL_EXPORT_DECLARATION)) {
-		throw new TypeError("v3 zone state kernel export differs");
-	}
-	const artifactSource = `${zoneStateSource.slice(0, -KERNEL_EXPORT_DECLARATION.length)}
-const zone = createZoneStateKernel(${JSON.stringify(creatorAuthor)}, ${JSON.stringify(creatorPeerId)});
-export const blueprint = {exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:zone.reducers};`;
-	const exactArtifactBytes = new TextEncoder().encode(artifactSource);
-	const artifactDigest = digest("ts-drp/blueprint-artifact/v3", exactArtifactBytes);
-	const operation = (
-		name: string,
-		fields: readonly Readonly<{ name: string; type: string }>[]
-	): ZoneOperationDescriptor =>
-		Object.freeze({
-			name,
-			maxCanonicalOperationBytes: 65_536,
-			argumentSchema: Object.freeze({
-				kind: "closed-record",
-				fields: Object.freeze(fields.map((field) => Object.freeze({ ...field, required: true }))),
-			}),
-		});
-	const blueprintPackage = Object.freeze({
-		kind: "drp-blueprint-admission-package",
-		protocolMajor: 3,
-		schemaVersion: 1,
-		implementation: Object.freeze({
-			artifactId: "v3-zone.v1",
-			artifactDigest,
-			runtimeProfile: "ecmascript-2024-sync-v1",
-		}),
-		manifest: Object.freeze({
-			schemaVersion: 2,
-			operationDiscriminator: "action",
-			workBudgetProfile: "blueprint-work-budget-v1",
-			operations: Object.freeze([
-				operation("applicationBatch", [Object.freeze({ name: "batch", type: "canonical-object" })]),
-				operation("causalJoin", []),
-				operation("commit-outcome-v1", [Object.freeze({ name: "proof", type: "canonical-object" })]),
-				operation("installRoster", [Object.freeze({ name: "roster", type: "canonical-object" })]),
-				operation("migrationActivation", [Object.freeze({ name: "decision", type: "canonical-object" })]),
-				operation("migrationRecord", [Object.freeze({ name: "record", type: "canonical-object" })]),
-				operation("placeBlock", [
-					Object.freeze({ name: "id", type: "string" }),
-					Object.freeze({ name: "kind", type: "string" }),
-					Object.freeze({ name: "x", type: "safe-integer" }),
-					Object.freeze({ name: "y", type: "safe-integer" }),
-				]),
-			]),
-		}),
-	});
-	const canonicalBlueprintPackageBytes = encodeCanonical(blueprintPackage);
-	const blueprintDigest = digest("ts-drp/blueprint-admission/v3", canonicalBlueprintPackageBytes);
-	const catalogDigest = digest("ts-drp/d9346-zone-catalog/v1", canonicalBlueprintPackageBytes);
-	const resolved = Object.freeze({
-		artifactDigest,
-		artifactId: "v3-zone.v1",
-		blueprintDigest,
-		canonicalBlueprintPackageBytes,
-		exactArtifactBytes,
-		runtimeProfile: "ecmascript-2024-sync-v1" as const,
-		evidence: Object.freeze({
-			catalogDigest,
-			lintEvidenceDigest: "a".repeat(64),
-			conformanceReceiptDigest: "b".repeat(64),
-			conformanceDigest: "c".repeat(64),
-			conformanceTier: "nightly" as const,
-			conformanceResult: "passed" as const,
-			engines: Object.freeze([
-				Object.freeze({ name: "node" as const, build: "d9346" }),
-				Object.freeze({ name: "chromium" as const, build: "d9346" }),
-				Object.freeze({ name: "firefox" as const, build: "d9346" }),
-				Object.freeze({ name: "webkit" as const, build: "d9346" }),
-			]),
-		}),
-	});
+	const catalog = selectedDigest === undefined || ZONE_CATALOG.blueprintDigests.includes(selectedDigest) ? ZONE_CATALOG : PREDECESSOR_ZONE_CATALOG;
+	const blueprintDigest = catalog.blueprintDigests[0];
+	if (blueprintDigest === undefined || catalog.blueprintDigests.length !== 1 || (selectedDigest !== undefined && selectedDigest !== blueprintDigest))
+		throw new TypeError("v3 zone requires its exact single-entry catalog");
 	return Object.freeze({
+		artifactVersion:catalog === ZONE_CATALOG ? "current" as const : "predecessor" as const,
 		blueprintDigest,
-		canonicalBlueprintPackageBytes,
-		catalog: Object.freeze({
-			blueprintDigests: Object.freeze([blueprintDigest]),
-			catalogDigest,
-			resolve(requested: string) {
-				if (requested !== blueprintDigest) throw new TypeError("unknown v3 zone blueprint");
-				return resolved;
-			},
-		}),
+		canonicalBlueprintPackageBytes: catalog.resolve(blueprintDigest).canonicalBlueprintPackageBytes,
+		catalog,
 	});
 }
 

@@ -1,7 +1,7 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { openCurrentAnchorTrust } from "./anchor-trust-singleton.js";
-import { openCreatorSuccessorTrust } from "./creator-close.js";
+import { openCreatorForwardPromotionSuccessorTrust, openCreatorSuccessorTrust } from "./creator-close.js";
 import { type CurrentAnchorTrust, verifyEd25519RegisteredDigest } from "./index.js";
 import {
 	mintCreatorAnchorTrustCheckpointPredecessor,
@@ -197,6 +197,19 @@ function validHead(value: unknown): value is CreatorCheckpointHead {
  * @returns Genuine predecessor/current trust capabilities or one frozen fail-closed reason.
  */
 export function openCreatorCheckpointTrust(input: unknown): OpenCreatorCheckpointTrustResult {
+	return openCheckpoint(input, false);
+}
+
+/**
+ * Opens only the explicit signed promoted variant, retaining the same independent genesis and floor checks.
+ * @param input - Exact signed adjacent checkpoint and independently trusted genesis/floor.
+ * @returns The authenticated current and predecessor trust for this explicit variant.
+ */
+export function openCreatorForwardPromotionCheckpointTrust(input: unknown): OpenCreatorCheckpointTrustResult {
+	return openCheckpoint(input, true);
+}
+
+function openCheckpoint(input: unknown, promotion: boolean): OpenCreatorCheckpointTrustResult {
 	try {
 		if (!plainRecord(input) || !exactKeys(input, INPUT_KEYS)) return failure("malformed-input");
 		const expectedObjectId = input.expectedObjectId;
@@ -287,7 +300,7 @@ export function openCreatorCheckpointTrust(input: unknown): OpenCreatorCheckpoin
 			predecessor.detachedCurrentAnchorSignature
 		);
 		if (predecessorTrust === undefined) return failure("custody-unavailable");
-		const openedCurrent = openCreatorSuccessorTrust({
+		const openedCurrent = (promotion ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({
 			currentTrust: predecessorTrust,
 			exactCanonicalCommitQcBytes: qcBytes,
 			exactCanonicalCutValueBytes: cutBytes,

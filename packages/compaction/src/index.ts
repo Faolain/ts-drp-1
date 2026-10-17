@@ -11,6 +11,24 @@ export {
 	verifyInclusion,
 } from "./ct-merkle.js";
 export { stateDigest } from "./state.js";
+export {
+	produceClosedEpochArchive,
+	measureArchiveAppendCapacityForSizing,
+	appendArchiveIndex,
+	deriveClosedEpochArchiveAppend,
+	readArchiveSegment,
+	verifyArchiveIndexEntry,
+} from "./archive.js";
+export type {
+	ArchiveLimits,
+	ClosedArchiveSourceRecord,
+	ArchiveRecord,
+	ArchiveChunk,
+	ArchiveSegment,
+	ClosedEpochArchiveInput,
+	ClosedEpochArchive,
+	ClosedEpochArchiveAppend,
+} from "./archive.js";
 export { deriveCloseSetHistoryCommitment } from "./history-commitment.js";
 export type {
 	AccumulatorSnapshot,

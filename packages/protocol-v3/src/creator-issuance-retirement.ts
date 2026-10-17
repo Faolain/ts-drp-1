@@ -6,7 +6,9 @@ import {
 	type CreatorIssuanceRetirementSigningRequest,
 	mintCreatorIssuanceRetirementSigningRequest,
 } from "./internal/creator-issuance-retirement-signing-request.js";
-import { resolveCreatorAnchorTrustMaterial } from "./internal/seal-authority-custody.js";
+import {
+	resolveCreatorAnchorTrustMaterial,
+} from "./internal/seal-authority-custody.js";
 
 export const CREATOR_ISSUANCE_RETIREMENT_KIND = "drp-creator-issuance-retirement-state" as const;
 export const CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES = 8192 as const;
@@ -173,7 +175,7 @@ function copiedIdentity(identity: CreatorIssuanceRetirementIdentity): CreatorIss
 	});
 }
 
-function validRecordFields(record: Readonly<Record<string, unknown>>): boolean {
+function validKnownRecordFields(record: Readonly<Record<string, unknown>>): boolean {
 	return (
 		record.kind === CREATOR_ISSUANCE_RETIREMENT_KIND &&
 		record.protocolMajor === 3 &&
@@ -193,7 +195,6 @@ function validRecordFields(record: Readonly<Record<string, unknown>>): boolean {
 		DIGEST.test(record.successorAnchorDigest) &&
 		typeof record.cutValueDigest === "string" &&
 		DIGEST.test(record.cutValueDigest) &&
-		validRef(record.commitQcRef) &&
 		typeof record.snapshotManifestDigest === "string" &&
 		DIGEST.test(record.snapshotManifestDigest) &&
 		typeof record.priorRetirementCandidateDigest === "string" &&
@@ -210,6 +211,114 @@ function validRecordFields(record: Readonly<Record<string, unknown>>): boolean {
 			: record.priorAdmittedAuthorSequence !== null &&
 				record.priorRetirementCandidateDigest !== CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL)
 	);
+}
+
+function validRecordFields(record: Readonly<Record<string, unknown>>): boolean {
+	return validKnownRecordFields(record) && validRef(record.commitQcRef);
+}
+
+/**
+ * Counts the original record with an unknown QC digest and registered signature.
+ * No encoded unknown value, signed record or deduplication identity is allocated.
+ * @param known - Original preimage fields excluding the future commit QC ref.
+ * @param commitQcByteLength - Exact future QC encoding length.
+ * @param signatureField - Original codec's detached signature field.
+ * @returns Complete encoding lengths, not authority or an admission decision.
+ */
+export function creatorRetirementEncodingWidths(
+	known: Readonly<Record<string, unknown>>,
+	commitQcByteLength: number,
+	signatureField: "detachedCreatorSignature" | "detachedAuthoritySignature"
+): Readonly<{ unsignedPreimageByteLength: number; signedRecordByteLength: number }> {
+	// All three frozen codecs have fewer than 126 fields. Adding QC/signature
+	// leaves their OBJECT counts in the same one-byte varuint range.
+	if (
+		!safeSequence(commitQcByteLength) ||
+		commitQcByteLength === 0 ||
+		Object.keys(known).length >= 126 ||
+		Object.hasOwn(known, "commitQcRef") ||
+		Object.hasOwn(known, signatureField)
+	)
+		throw new TypeError("invalid retirement sizing fields");
+	const unknown64Width = 1 + 1 + 64; // STRING64 digest or BYTES64 signature.
+	const qcRefWidth =
+		encodeCanonical({ byteLength: commitQcByteLength }).byteLength +
+		encodeCanonical("digest").byteLength +
+		unknown64Width;
+	const unsignedPreimageByteLength =
+		encodeCanonical(known).byteLength + encodeCanonical("commitQcRef").byteLength + qcRefWidth;
+	const signedRecordByteLength =
+		unsignedPreimageByteLength + encodeCanonical(signatureField).byteLength + unknown64Width;
+	return Object.freeze({ unsignedPreimageByteLength, signedRecordByteLength });
+}
+
+/** Original field owner for native encoding and scalar resource sizing. Field
+ * projections confer no trust, signing request, checkpoint or retirement grant. */
+export function creatorIssuanceRetirementFields(
+	input: Readonly<Record<string, unknown>>,
+	current: Readonly<{currentAnchorDigest: unknown; currentEpoch: unknown; genesisAnchorDigest: unknown; objectId: unknown}>,
+	successor: Readonly<{currentAnchorDigest: unknown; currentEpoch: unknown}>
+): Readonly<Record<string, unknown>> {
+	return Object.freeze({
+		admittedAuthorSequence: input.admittedAuthorSequence,
+		author: input.author,
+		closedAnchorDigest: current.currentAnchorDigest,
+		closedEpoch: current.currentEpoch,
+		commitQcRef: plainRecord(input.commitQcRef)
+			? Object.freeze({ byteLength: input.commitQcRef.byteLength, digest: input.commitQcRef.digest })
+			: input.commitQcRef,
+		cutValueDigest: input.cutValueDigest,
+		genesisAnchorDigest: current.genesisAnchorDigest,
+		kind: CREATOR_ISSUANCE_RETIREMENT_KIND,
+		objectId: current.objectId,
+		observedLineage: plainRecord(input.observedLineage)
+			? Object.freeze({ exhausted: input.observedLineage.exhausted, next: input.observedLineage.next })
+			: input.observedLineage,
+		priorAdmittedAuthorSequence: input.priorAdmittedAuthorSequence,
+		priorRetirementCandidateDigest: input.priorRetirementCandidateDigest,
+		protocolMajor: 3,
+		snapshotManifestDigest: input.snapshotManifestDigest,
+		successorAnchorDigest: successor.currentAnchorDigest,
+		successorEpoch: successor.currentEpoch,
+		version: 1,
+	});
+}
+
+/**
+ * Reads mechanical prospective lengths without minting future trust or signing work.
+ * @param input - Current trust, original close facts, successorAnchorDigest and commitQcByteLength.
+ * @returns Full unsigned/signed encoding lengths, or a closed schema refusal.
+ */
+export function readCreatorIssuanceRetirementForSizing(
+	input: unknown
+): Readonly<
+	{ ok: false; reason: string } | { ok: true; unsignedPreimageByteLength: number; signedRecordByteLength: number }
+> {
+	try {
+		const keys = [
+			...PREPARE_INPUT_KEYS.filter((key) => key !== "successorTrust" && key !== "commitQcRef"),
+			"successorAnchorDigest",
+			"commitQcByteLength",
+		];
+		if (!plainRecord(input) || !exactKeys(input, keys)) return failure("MALFORMED_INPUT");
+		const current = resolveCreatorAnchorTrustMaterial(input.currentTrust as CurrentAnchorTrust);
+		if (current === undefined) return failure("TRUST_INVALID");
+		const { commitQcRef: _ref, ...known } = creatorIssuanceRetirementFields(input, current, {
+			currentAnchorDigest: input.successorAnchorDigest as string,
+			currentEpoch: current.currentEpoch + 1,
+		});
+		if (!validKnownRecordFields(known)) return failure("IDENTITY_INVALID");
+		const widths = creatorRetirementEncodingWidths(
+			known,
+			input.commitQcByteLength as number,
+			"detachedCreatorSignature"
+		);
+		return widths.signedRecordByteLength > CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES
+			? failure("RECORD_TOO_LARGE")
+			: Object.freeze({ ok: true as const, ...widths });
+	} catch {
+		return failure("MALFORMED_INPUT");
+	}
 }
 
 function failure(reason: string): Readonly<{ ok: false; reason: string }> {
@@ -247,29 +356,7 @@ export function prepareCreatorIssuanceRetirement(input: unknown): Readonly<
 		) {
 			return failure("TRUST_INVALID");
 		}
-		const preimage = Object.freeze({
-			admittedAuthorSequence: input.admittedAuthorSequence,
-			author: input.author,
-			closedAnchorDigest: current.currentAnchorDigest,
-			closedEpoch: current.currentEpoch,
-			commitQcRef: plainRecord(input.commitQcRef)
-				? Object.freeze({ byteLength: input.commitQcRef.byteLength, digest: input.commitQcRef.digest })
-				: input.commitQcRef,
-			cutValueDigest: input.cutValueDigest,
-			genesisAnchorDigest: current.genesisAnchorDigest,
-			kind: CREATOR_ISSUANCE_RETIREMENT_KIND,
-			objectId: current.objectId,
-			observedLineage: plainRecord(input.observedLineage)
-				? Object.freeze({ exhausted: input.observedLineage.exhausted, next: input.observedLineage.next })
-				: input.observedLineage,
-			priorAdmittedAuthorSequence: input.priorAdmittedAuthorSequence,
-			priorRetirementCandidateDigest: input.priorRetirementCandidateDigest,
-			protocolMajor: 3,
-			snapshotManifestDigest: input.snapshotManifestDigest,
-			successorAnchorDigest: successor.currentAnchorDigest,
-			successorEpoch: successor.currentEpoch,
-			version: 1,
-		});
+		const preimage = creatorIssuanceRetirementFields(input, current, successor);
 		if (!validRecordFields(preimage)) {
 			return failure("IDENTITY_INVALID");
 		}

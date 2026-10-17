@@ -2,6 +2,8 @@ import { defineConfig } from "@playwright/test";
 import { resolve } from "node:path";
 const evidence = process.env.STARTUP_EVIDENCE;
 if (evidence === undefined) throw new Error("STARTUP_EVIDENCE_REQUIRED");
+const selectedEntry = process.env.STARTUP_ENTRY;
+if (selectedEntry !== undefined && selectedEntry !== "r8-source-binding") throw new Error("STARTUP_ENTRY_INVALID");
 export default defineConfig({
 	forbidOnly: true,
 	fullyParallel: false,
@@ -15,7 +17,7 @@ export default defineConfig({
 	reporter: [["line"], ["json", { outputFile: resolve(evidence, "report.json") }]],
 	retries: 0,
 	testDir: ".",
-	testMatch: "browser-red.pw.ts",
+	testMatch: selectedEntry === undefined ? "browser-red.pw.ts" : "r8-source-binding.pw.ts",
 	timeout: 90_000,
 	use: { headless: true },
 	workers: 1,

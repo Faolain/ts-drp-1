@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
 	testDir: "./tests",
-	testMatch: "phase-2d1-schema-lifecycle-red.pw.ts",
+	testMatch: ["phase-2d1-schema-lifecycle-red.pw.ts", "room-head-participant.pw.ts", "room-head-incarnation.pw.ts"],
 	fullyParallel: false,
 	workers: 1,
 	retries: 0,

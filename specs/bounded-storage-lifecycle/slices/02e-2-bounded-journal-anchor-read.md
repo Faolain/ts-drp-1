@@ -1,11 +1,10 @@
 # 2e-2 — Bounded exact journal-anchor observation
 
-Status: independently reviewed source contract accepted, 2026-10-03, under the
-[root disposition](../../../.logs/bounded-storage-lifecycle/rollback-journal-anchor-contract-review-01/root-disposition.md).
-Separate RED readiness, distinct GREEN and independent product review/root
-acceptance remain required. The [live handoff](../README.md#next-agent-prompt)
-owns execution status. This is safe byte access, not historical availability,
-authenticated closed ACL, protected custody or usable rollback.
+Status: CLOSED, 2026-10-06, within this exact-key safe-accessor contract.
+The [closure audit](../closure-audit-2e-2f.md) binds all original acceptance
+requirements to accepted product and MAIN evidence, preserving historical failed
+commands. This is safe byte access, not historical availability, authenticated
+closed ACL, protected custody or parent 2e usable rollback.
 
 ## Outcome and one owner
 
@@ -18,7 +17,7 @@ still requires separate historical protection and migration provenance.
 
 ## Required public seam
 
-The following are required contract names, not yet implemented exports:
+The following are the implemented required contract names:
 
 ```ts
 export const LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES = 8192 as const;

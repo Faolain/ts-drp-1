@@ -68,6 +68,8 @@ export interface SnapshotPeerAuthorization {
 }
 
 export interface SnapshotTransferStats {
+	readonly selectedConnections: readonly NonNullable<SnapshotChunkProtocolStream["connection"]>[];
+	readonly connectionObservationsTruncated: boolean;
 	readonly attemptedPeers: readonly string[];
 	readonly exactReceivedBytes: number;
 	readonly fetchedIndices: readonly number[];
@@ -98,6 +100,12 @@ export interface SnapshotActivationResult {
 }
 
 export interface V3SnapshotTransferOwner {
+	receiveBytes(
+		input: Omit<
+			Parameters<V3SnapshotTransferOwner["receive"]>[0],
+			"capability" | "messageQueueManager" | "networkNode" | "onAdmittedVertex"
+		>
+	): Promise<Omit<SnapshotTransferResult, "verified">>;
 	activateSmallSnapshot(
 		input: Readonly<{
 			readonly expectedApplicationStateDigest: string;
@@ -123,6 +131,7 @@ export interface V3SnapshotTransferOwner {
 	): Promise<SnapshotTransferResult>;
 	serve(
 		input: Readonly<{
+			control?(stream: SnapshotChunkProtocolStream, request: Uint8Array): Promise<boolean>;
 			readonly authorization: SnapshotPeerAuthorization;
 			readonly descriptors: readonly SnapshotChunkDescriptor[];
 			readonly exactCanonicalManifestBytes: Uint8Array;
@@ -372,7 +381,10 @@ function selectAuthorizedPeers(
 	return Object.freeze(selected);
 }
 
-/** Creates one bounded snapshot pull and serving owner. */
+/**
+ * Creates one bounded snapshot pull and serving owner.
+ * @param input
+ */
 export function createV3SnapshotTransferOwner(
 	input: Readonly<{ readonly transport: SnapshotChunkProtocolPort }>
 ): V3SnapshotTransferOwner {
@@ -388,7 +400,10 @@ export function createV3SnapshotTransferOwner(
 	let closed = false;
 	let stopServing: (() => void) | undefined;
 
-	const receive: V3SnapshotTransferOwner["receive"] = async (rawInput) => {
+	const receiveKernel = async (
+		rawInput: Parameters<V3SnapshotTransferOwner["receiveBytes"]>[0],
+		activation?: Parameters<V3SnapshotTransferOwner["receive"]>[0]
+	): Promise<Omit<SnapshotTransferResult, "verified"> | SnapshotTransferResult> => {
 		if (closed) throw failure("aborted", "snapshot transfer owner is closed");
 		const manifestCarrier = copyExactBytes(
 			rawInput.exactCanonicalManifestBytes,
@@ -421,9 +436,15 @@ export function createV3SnapshotTransferOwner(
 		const peers = capturePeers(rawInput.peers);
 		const authorization = captureAuthorization(rawInput.authorization);
 		const quarantine = rawInput.quarantine as SnapshotQuarantineScope<SnapshotVerificationReceipt>;
-		const messageQueueManager = rawInput.messageQueueManager;
-		const networkNode = rawInput.networkNode;
-		const onAdmittedVertex = rawInput.onAdmittedVertex as V3AdmittedVertexSink;
+		const runtime =
+			activation === undefined
+				? undefined
+				: Object.freeze({
+						capability: activation.capability,
+						messageQueueManager: activation.messageQueueManager,
+						networkNode: activation.networkNode,
+						onAdmittedVertex: activation.onAdmittedVertex as V3AdmittedVertexSink,
+					});
 		const total = linkedController(
 			rawInput.signal ?? new AbortController().signal,
 			SNAPSHOT_PULL_TOTAL_MS,
@@ -443,18 +464,32 @@ export function createV3SnapshotTransferOwner(
 			) {
 				throw failure("session-capacity", "snapshot transfer session capacity is exhausted");
 			}
-			claim = claimRecoveredV3LiveAuthority(rawInput.capability);
-			if (claim === undefined) throw failure("authorization-rejected", "recovered snapshot authority is unavailable");
+			if (runtime !== undefined) {
+				claim = claimRecoveredV3LiveAuthority(runtime.capability);
+				if (claim === undefined) throw failure("authorization-rejected", "recovered snapshot authority is unavailable");
+			}
 			activeSessionCount += 1;
 			for (const key of reservedKeys) activeScopePeers.add(key);
 			sessionReserved = true;
 			const attemptedPeers: string[] = [];
+			const selectedConnections: NonNullable<SnapshotChunkProtocolStream["connection"]>[] = [];
+			let connectionObservationsTruncated = false;
+			const observeConnection = (stream: SnapshotChunkProtocolStream): void => {
+				if (stream.connection === undefined || selectedConnections.some(({ id }) => id === stream.connection?.id))
+					return;
+				if (selectedConnections.length >= SNAPSHOT_PULL_MAX_ATTEMPTS * SNAPSHOT_PULL_MAX_OUTSTANDING) {
+					connectionObservationsTruncated = true;
+					return;
+				}
+				selectedConnections.push(stream.connection);
+			};
 			const failedPeers = new Set<string>();
 			const validatedPeers = new Set<string>();
 			let exactReceivedBytes = 0;
 			const ensureManifest = async (peerId: string): Promise<void> => {
 				if (validatedPeers.has(peerId)) return;
 				const stream = await open(peerId, { signal: total.controller.signal });
+				observeConnection(stream);
 				try {
 					await stream.write(
 						encodeCanonical({ kind: "snapshot-manifest-request", manifestDigest: expectedManifestDigest, version: 1 }),
@@ -489,6 +524,7 @@ export function createV3SnapshotTransferOwner(
 					try {
 						await ensureManifest(peerId);
 						stream = await open(peerId, { signal: total.controller.signal });
+						observeConnection(stream);
 						await stream.write(
 							encodeCanonical({
 								descriptors: [{ digest: descriptor.digest, index: descriptor.index }],
@@ -559,6 +595,18 @@ export function createV3SnapshotTransferOwner(
 			}
 			const fetched = decoded.chunks.map(({ index }) => index).filter((index) => missingBefore.includes(index));
 			const reused = decoded.chunks.map(({ index }) => index).filter((index) => !missingBefore.includes(index));
+			const result = Object.freeze({
+				reference,
+				stats: Object.freeze({
+					selectedConnections: Object.freeze(selectedConnections),
+					connectionObservationsTruncated,
+					attemptedPeers: Object.freeze(attemptedPeers),
+					exactReceivedBytes,
+					fetchedIndices: Object.freeze(fetched),
+					reusedIndices: Object.freeze(reused),
+				}),
+			});
+			if (runtime === undefined || claim === undefined) return result;
 			let exactCanonicalPayloadBytes: Uint8Array | undefined;
 			if (decoded.chunks.length === 1 && decoded.chunks[0]?.byteLength === reference.exactByteLength) {
 				const port = quarantine.verificationQuarantine.open(total.controller.signal);
@@ -575,24 +623,15 @@ export function createV3SnapshotTransferOwner(
 				Object.freeze({
 					claim,
 					exactCanonicalPayloadBytes,
-					messageQueueManager,
-					networkNode,
-					onAdmittedVertex,
+					messageQueueManager: runtime.messageQueueManager,
+					networkNode: runtime.networkNode,
+					onAdmittedVertex: runtime.onAdmittedVertex,
 					owner: ownerIdentity,
 					reference,
 				})
 			);
 			ownerTransfers.add(token);
-			return Object.freeze({
-				reference,
-				stats: Object.freeze({
-					attemptedPeers: Object.freeze(attemptedPeers),
-					exactReceivedBytes,
-					fetchedIndices: Object.freeze(fetched),
-					reusedIndices: Object.freeze(reused),
-				}),
-				verified: token,
-			});
+			return Object.freeze({ ...result, verified: token });
 		} catch (error) {
 			if (claim !== undefined) discardRecoveredV3LiveAuthorityClaim(claim);
 			const code = nestedFailureCode(error);
@@ -629,9 +668,25 @@ export function createV3SnapshotTransferOwner(
 			throw failure("manifest-invalid", "snapshot serving descriptors are invalid");
 		}
 		const authorization = captureAuthorization(rawInput.authorization);
+		const control = rawInput.control;
 		const quarantine = rawInput.quarantine;
 		const installed = installServer(async (stream) => {
 			try {
+				if (control === undefined) {
+					const author = authorization.authorForPeer(stream.peerId);
+					if (typeof author !== "string" || !authorization.isAuthorizedAuthor(author))
+						throw failure("authorization-rejected", "snapshot peer is not authorized");
+				}
+				const requestBytes = await readFrame(stream, MAX_MANIFEST_BYTES, new AbortController().signal);
+				const request = decodeRecord(requestBytes, MAX_MANIFEST_BYTES);
+				// Native chunk requests contain nested descriptors. They retain their existing
+				// decoder/schema, rather than entering the tighter flat material-frame decoder.
+				if (
+					request?.kind !== "snapshot-manifest-request" &&
+					request?.kind !== "snapshot-chunk-request" &&
+					(await control?.(stream, requestBytes))
+				)
+					return;
 				const author = authorization.authorForPeer(stream.peerId);
 				if (typeof author !== "string" || !authorization.isAuthorizedAuthor(author)) {
 					throw failure("authorization-rejected", "snapshot peer is not authorized");
@@ -640,8 +695,6 @@ export function createV3SnapshotTransferOwner(
 				if (status.kind !== "verified" || status.missingIndices.length !== 0) {
 					throw failure("quarantine-failed", "snapshot scope is not verified");
 				}
-				const requestBytes = await readFrame(stream, MAX_MANIFEST_BYTES, new AbortController().signal);
-				const request = decodeRecord(requestBytes, MAX_MANIFEST_BYTES);
 				const manifestRequest = exactRecord(request, MANIFEST_REQUEST_FIELDS);
 				if (manifestRequest !== undefined) {
 					if (
@@ -776,7 +829,13 @@ export function createV3SnapshotTransferOwner(
 			ownerTransfers.clear();
 			await closeTransport();
 		},
-		receive,
+		receive: async (request: Parameters<V3SnapshotTransferOwner["receive"]>[0]): Promise<SnapshotTransferResult> => {
+			const result = await receiveKernel(request, request);
+			if (!("verified" in result))
+				throw failure("authorization-rejected", "recovered snapshot authority is unavailable");
+			return result;
+		},
+		receiveBytes: (request: Parameters<V3SnapshotTransferOwner["receiveBytes"]>[0]) => receiveKernel(request),
 		serve,
 	});
 }

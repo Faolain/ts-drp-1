@@ -16,6 +16,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@ts-drp/example-browser-network": "workspace:*",
+		"@ts-drp/node": "workspace:*",
 		"@ts-drp/network-spike": "workspace:*",
 		"@ts-drp/relay-policy": "workspace:*",
 		"@ts-drp/routing-browser": "workspace:*"

@@ -1,5 +1,16 @@
 import { decodeCanonical } from "@ts-drp/canonical";
-import type { GenerationId, GenerationRef, PresentHead } from "@ts-drp/storage";
+import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import {
+	AHE_BOUNDED_READ_LIMITS,
+	type AheRetirementFutureMaterial,
+	createAheRetirementControlRead,
+	digestBlob,
+	encodeGenerationRecordV1,
+	type GenerationId,
+	type GenerationRecord,
+	type GenerationRef,
+	type PresentHead,
+} from "@ts-drp/storage";
 
 import type { CreatorSuccessorLiveMaterial, CreatorSuccessorLiveSeed } from "./creator-successor-live.js";
 
@@ -8,6 +19,8 @@ export type PreparedCreatorSuccessorAdoption = Readonly<Record<never, never>>;
 export type StagedCreatorSuccessorAdoption = Readonly<Record<never, never>>;
 
 export interface CreatorAdoptionIntentMaterial {
+	/** Same original custody entry after public intent consumption; not a new registry. */
+	readonly nativeIntent?: CreatorAdoptionIntent;
 	readonly activation: CreatorSuccessorLiveSeed;
 	readonly candidateReferences: readonly GenerationRef[];
 	readonly exactCanonicalProjectionBytes: Uint8Array;
@@ -33,7 +46,24 @@ export interface StagedCreatorSuccessorAdoptionMaterial {
 
 const custody = new WeakMap<
 	object,
-	Readonly<{ readonly material: CreatorAdoptionIntentMaterial; readonly owner: object }>
+	| {
+			readonly kind: "adoption";
+			readonly material: CreatorAdoptionIntentMaterial;
+			readonly owner: object;
+			consumed: boolean;
+			ready?: "stage" | "publish";
+			stageUsed: boolean;
+			publishUsed: boolean;
+	  }
+	| {
+			readonly kind: "authenticated-native-future";
+			readonly owner: object;
+			readonly store: object;
+			readonly trust: CurrentAnchorTrust;
+			readonly material: AheRetirementFutureMaterial;
+			stageUsed: boolean;
+			publishUsed: boolean;
+	  }
 >();
 const sealedFacts = new WeakMap<object, object>();
 const preparedCustody = new WeakMap<
@@ -105,6 +135,7 @@ export function createCreatorAdoptionIntent(
 	custody.set(
 		intent,
 		Object.freeze({
+			kind: "adoption" as const,
 			material: Object.freeze({
 				activation: material.activation,
 				candidateReferences: Object.freeze(material.candidateReferences.map(copiedRef)),
@@ -115,6 +146,9 @@ export function createCreatorAdoptionIntent(
 				predecessorLiveRef: copiedRef(material.predecessorLiveRef),
 			}),
 			owner,
+			consumed: false,
+			stageUsed: false,
+			publishUsed: false,
 		})
 	);
 	return intent;
@@ -132,9 +166,11 @@ export function consumeCreatorAdoptionIntent(
 ): CreatorAdoptionIntentMaterial | undefined {
 	if (intent === null || typeof intent !== "object" || owner === null || typeof owner !== "object") return undefined;
 	const retained = custody.get(intent);
-	if (retained === undefined || retained.owner !== owner) return undefined;
-	custody.delete(intent);
+	if (retained === undefined || retained.kind !== "adoption" || retained.owner !== owner || retained.consumed)
+		return undefined;
+	custody.set(intent, { ...retained, consumed: true });
 	return Object.freeze({
+		nativeIntent: intent as CreatorAdoptionIntent,
 		activation: retained.material.activation,
 		candidateReferences: Object.freeze(retained.material.candidateReferences.map(copiedRef)),
 		exactCanonicalProjectionBytes: Uint8Array.from(retained.material.exactCanonicalProjectionBytes),
@@ -144,6 +180,184 @@ export function consumeCreatorAdoptionIntent(
 		predecessorLiveRef: copiedRef(retained.material.predecessorLiveRef),
 	});
 }
+
+/**
+ * Called only after the original commit owner's authenticated terminal/staged checks.
+ * @param material
+ * @param store
+ * @param phase
+ */
+export function authorizeCreatorAdoptionNativeFuture(
+	material: CreatorAdoptionIntentMaterial,
+	store: object,
+	phase: "stage" | "publish"
+): boolean {
+	const capability = material.nativeIntent,
+		facts = capability && custody.get(capability);
+	if (
+		!capability ||
+		!facts ||
+		facts.kind !== "adoption" ||
+		!facts.consumed ||
+		facts.material.activation.store !== store ||
+		material.activation !== facts.material.activation ||
+		material.generationId !== facts.material.generationId ||
+		(phase === "stage" ? facts.stageUsed : facts.publishUsed)
+	)
+		return false;
+	const original = sealedFacts.get(facts.owner);
+	if (!original || Object.getOwnPropertyDescriptor(original, "store")?.value !== store) return false;
+	custody.set(capability, { ...facts, ready: phase });
+	return true;
+}
+
+/** Original commit owner calls only AFTER authenticatedStaged proves this exact
+ * durable nominee. Retargets the same consumed custody entry; no replay or new registry.
+ */
+export function rebindCreatorAdoptionNativeNominee(
+	material: CreatorAdoptionIntentMaterial,
+	store: object,
+	generationId: GenerationId
+): CreatorAdoptionIntentMaterial | undefined {
+	if (!authorizeCreatorAdoptionNativeFuture(material, store, "stage")) return undefined;
+	const capability = material.nativeIntent,
+		facts = capability && custody.get(capability);
+	if (!capability || !facts || facts.kind !== "adoption" || facts.publishUsed) return undefined;
+	custody.set(capability, { ...facts, ready: undefined, material: Object.freeze({ ...facts.material, generationId }) });
+	return Object.freeze({ ...material, generationId });
+}
+
+function adoptionFutureMaterial(material: CreatorAdoptionIntentMaterial, store: object): AheRetirementFutureMaterial | undefined {
+	const m = material,
+		closure = m.candidateReferences,
+		blobs = new Map<string, { ref: GenerationRef; bytes: Uint8Array }>();
+	for (const bytes of [
+		m.exactCanonicalProjectionBytes,
+		m.activation.predecessorExactCanonicalLatchedAclBytes,
+		...(m.activation.origin === "received" ? m.activation.successor.candidates.map((c) => c.bytes) : []),
+	]) {
+		const actual = digestBlob(bytes);
+		if (!actual.ok) return undefined;
+		const ref = closure.find((r) => r.digest === actual.value);
+		if (ref) {
+			if (ref.byteLength !== bytes.byteLength) return undefined;
+			blobs.set(ref.digest, { ref: copiedRef(ref), bytes: Uint8Array.from(bytes) });
+		}
+	}
+	return {
+		objectId: m.activation.store === store ? m.pendingHead.objectId : m.activation.predecessor.head.objectId,
+		epoch: m.activation.successor.trust.currentEpoch,
+		generationId: m.generationId,
+		baseExpectedHead: copiedHead(m.pendingHead),
+		closure: closure.map(copiedRef),
+		blobs: [...blobs.values()],
+	};
+}
+
+/** Reads an already-used original native intent for exact source readback only. */
+export function resolveCreatorAdoptionOwnedNomination(
+	material: CreatorAdoptionIntentMaterial,
+	store: object,
+	phase: "stage" | "publish"
+): AheRetirementFutureMaterial | undefined {
+	if (phase !== "stage" && phase !== "publish") return undefined;
+	const facts = material.nativeIntent && custody.get(material.nativeIntent);
+	if (!facts || facts.kind !== "adoption" || !facts.consumed ||
+		facts.material.activation !== material.activation || facts.material.activation.store !== store ||
+		facts.material.generationId !== material.generationId ||
+		(!(phase === "stage" ? facts.stageUsed : facts.publishUsed) && facts.ready !== phase) ||
+		Object.getOwnPropertyDescriptor(sealedFacts.get(facts.owner) ?? {}, "store")?.value !== store)
+		return undefined;
+	return adoptionFutureMaterial(facts.material, store);
+}
+
+/**
+ * Internal authenticated-owner composition only: successor trust and accepted closure
+ * were authenticated by the original close or pending-recovery path. Native adapters
+ * do not verify that premise.
+ * This retains a distinct purpose in the same custody map, without premature sealed facts.
+ * @param input
+ */
+export function createCreatorAuthenticatedNativeFuture(
+	input: Readonly<{
+		owner: object;
+		store: object;
+		successorTrust: CurrentAnchorTrust;
+		currentHead: PresentHead;
+		generationId: GenerationId;
+		acceptedClosure: readonly GenerationRef[];
+		newBlobs: readonly Readonly<{ ref: GenerationRef; bytes: Uint8Array }>[];
+		existingCompleteGeneration?: GenerationRecord;
+	}>
+): CreatorAdoptionIntent {
+	if (
+		input.acceptedClosure.length > AHE_BOUNDED_READ_LIMITS.maxClosureReferences ||
+		input.newBlobs.length > AHE_BOUNDED_READ_LIMITS.maxClosureReferences ||
+		input.newBlobs.reduce((sum, b) => sum + b.bytes.byteLength, 0) > AHE_BOUNDED_READ_LIMITS.maxUnionBytes
+	)
+		throw new TypeError("local close future material exceeds native budget");
+	const existing = input.existingCompleteGeneration;
+	const existingDigest = existing === undefined ? undefined : digestBlob(encodeGenerationRecordV1(existing));
+	if (existing !== undefined &&
+		(existing.state !== "Complete" || existing.objectId !== input.currentHead.objectId ||
+			existing.generationId !== input.generationId || input.newBlobs.length !== 0 ||
+			existingDigest?.ok !== true))
+		throw new TypeError("authenticated existing future generation differs");
+	const capability = Object.freeze({}) as CreatorAdoptionIntent;
+	custody.set(capability, {
+		kind: "authenticated-native-future",
+		owner: input.owner,
+		store: input.store,
+		trust: input.successorTrust,
+		material: Object.freeze({
+			objectId: input.currentHead.objectId,
+			epoch: input.successorTrust.currentEpoch,
+			generationId: input.generationId,
+			baseExpectedHead: copiedHead(input.currentHead),
+			closure: Object.freeze(input.acceptedClosure.map(copiedRef)),
+			blobs: Object.freeze(
+				input.newBlobs.map((b) => Object.freeze({ ref: copiedRef(b.ref), bytes: Uint8Array.from(b.bytes) }))
+			),
+			...(existingDigest?.ok === true ? {existingGenerationRecordDigest: existingDigest.value} : {}),
+		}),
+		stageUsed: false,
+		publishUsed: false,
+	});
+	return capability;
+}
+
+const installFuture = Reflect.get(createAheRetirementControlRead, "installCreatorFutureGenerationResolver");
+if (
+	typeof installFuture !== "function" ||
+	!Reflect.apply(installFuture, createAheRetirementControlRead, [
+		(capability: unknown, store: object, phase: "stage" | "publish"): AheRetirementFutureMaterial | undefined => {
+			if (capability === null || typeof capability !== "object") return undefined;
+			const facts = custody.get(capability);
+			if (facts?.kind === "authenticated-native-future") {
+				if (facts.store !== store || (phase === "stage" ? facts.stageUsed : !facts.stageUsed || facts.publishUsed))
+					return undefined;
+				custody.set(capability, { ...facts, ...(phase === "stage" ? { stageUsed: true } : { publishUsed: true }) });
+				return facts.material;
+			}
+			if (
+				!facts ||
+				facts.kind !== "adoption" ||
+				!facts.consumed ||
+				facts.ready !== phase ||
+				facts.material.activation.store !== store ||
+				(phase === "stage" ? facts.stageUsed : facts.publishUsed)
+			)
+				return undefined;
+			custody.set(capability, {
+				...facts,
+				ready: undefined,
+				...(phase === "stage" ? { stageUsed: true } : { publishUsed: true }),
+			});
+			return adoptionFutureMaterial(facts.material, store);
+		},
+	])
+)
+	throw new TypeError("creator native future resolver is unavailable or already owned");
 
 /**
  * Creates one opaque successor-preparation capability for the later activation owner.

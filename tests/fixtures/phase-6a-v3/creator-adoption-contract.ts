@@ -96,7 +96,7 @@ export interface GenuineCreatorAdoptionFixtureModules {
 	readonly verifyCreatorSuccessorAdoption: typeof verifyCreatorSuccessorAdoption;
 }
 
-async function defaultCreatorAdoptionFixtureModules(): Promise<GenuineCreatorAdoptionFixtureModules> {
+export async function defaultCreatorAdoptionFixtureModules(): Promise<GenuineCreatorAdoptionFixtureModules> {
 	const source = (relative: string): string => pathToFileURL(resolve(REPOSITORY_ROOT, relative)).href;
 	const [
 		activation,
@@ -403,6 +403,11 @@ export interface GenuineCreatorAdoptionFixture {
 }
 
 export interface GenuineCreatorAdoptionFixtureOptions {
+	/** Native participant controls require the original backend, not a diagnostic facade. */
+	readonly nativeAheOwner?: boolean;
+	/** Preserve native reservations for source-bound settlement interleavings. */
+	readonly nativeStorageOwners?: boolean;
+	readonly nativeAheFactory?: GenuineCreatorAdoptionFixtureModules["createSqliteAheDurableStore"];
 	/** Test-only producer seam; leaves original scope/receipt identity intact. */
 	createSnapshotStore?(): Promise<SnapshotQuarantineStore<SnapshotVerificationReceipt>>;
 	onCloseObservation?: Parameters<typeof bindCreatorLiveClose>[0]["onObservation"];
@@ -795,7 +800,8 @@ async function recoverWithDurableStores(
 	modules: GenuineCreatorAdoptionFixtureModules,
 	decorateIssuanceStore?: (store: DurableIssuanceStore) => DurableIssuanceStore,
 	decorateLiveJournalStore?: (store: DurableLiveJournalStore) => DurableLiveJournalStore,
-	operationAdmissionPolicy?: V3OperationAdmissionPolicy
+	operationAdmissionPolicy?: V3OperationAdmissionPolicy,
+	nativeStorageOwners = false
 ): Promise<
 	Readonly<{
 		readonly capability: RecoveredV3Live;
@@ -836,7 +842,7 @@ async function recoverWithDurableStores(
 		transactIssue: (scope, buildAndSign) => rawIssuanceStore.transactIssue(scope, buildAndSign),
 		transactWriteSettlementPlan: (input) => rawIssuanceStore.transactWriteSettlementPlan(input),
 	});
-	const issuanceStore = decorateIssuanceStore?.(baseIssuanceStore) ?? baseIssuanceStore;
+	const issuanceStore = decorateIssuanceStore?.(nativeStorageOwners ? rawIssuanceStore : baseIssuanceStore) ?? (nativeStorageOwners ? rawIssuanceStore : baseIssuanceStore);
 	const baseJournal: DurableLiveJournalStore = Object.freeze<DurableLiveJournalStore>({
 		appendAccepted: (input) => rawJournal.appendAccepted(input),
 		close: () => rawJournal.close(),
@@ -855,7 +861,7 @@ async function recoverWithDurableStores(
 				: result;
 		},
 	});
-	const journal = decorateLiveJournalStore?.(baseJournal) ?? baseJournal;
+	const journal = decorateLiveJournalStore?.(nativeStorageOwners ? rawJournal : baseJournal) ?? (nativeStorageOwners ? rawJournal : baseJournal);
 	try {
 		const scope = Object.freeze({ author: fixture.author, objectId: fixture.objectId });
 		const envelope = Object.freeze({
@@ -1143,11 +1149,11 @@ export async function prepareGenuineCreatorAdoptionFixture(
 			: { latchedAclWriterOnlyRoster: options.latchedAclWriterOnlyRoster }),
 		...(options.objectId === undefined ? {} : { objectId: options.objectId }),
 		...(options.stringPayloadOperation === undefined ? {} : { stringPayloadOperation: options.stringPayloadOperation }),
-		createSqliteAheDurableStore: modules.createSqliteAheDurableStore,
+		createSqliteAheDurableStore: options.nativeAheFactory ?? modules.createSqliteAheDurableStore,
 		prepareV3LiveGeneration: modules.prepareV3LiveGeneration,
 		storeDecorator: (backend) => {
 			aheBackend = backend;
-			aheStore = decoratedAheStore(backend, controls);
+			aheStore = options.nativeAheOwner === true ? backend : decoratedAheStore(backend, controls);
 			return aheStore;
 		},
 	});
@@ -1169,7 +1175,8 @@ export async function prepareGenuineCreatorAdoptionFixture(
 		modules,
 		options.decorateIssuanceStore,
 		options.decorateLiveJournalStore,
-		options.operationAdmissionPolicy
+		options.operationAdmissionPolicy,
+		options.nativeStorageOwners === true
 	);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);
@@ -1496,7 +1503,7 @@ export async function prepareGenuineCreatorAdoptionFixture(
 				}),
 				predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(fixture.exactCanonicalLatchedAclBytes as Uint8Array),
 				proposed,
-				snapshotStore,
+				snapshotStore: options.nativeStorageOwners === true ? rawSnapshotStore : snapshotStore,
 			}),
 			handle: bound.handle,
 			journal: recovered.journal,

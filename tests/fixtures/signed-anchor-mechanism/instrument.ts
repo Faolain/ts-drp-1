@@ -76,7 +76,7 @@ export function liveFrameObservation(root: string, archive: string): Plugin {
 					insertions: { offset: number; text: string }[] = [];
 				for (const [needle, text] of [
 					[
-						"const accounting = createCreatorClosedRollbackProofAccounting(reader.blobs);",
+						"const accounting = createCreatorClosedRollbackProofAccounting([], maintenance);\n\tchargeNativeReaderBlobs(accounting, reader.blobs);",
 						"\n__observeLedger(accounting, reader.blobs);",
 					],
 					[

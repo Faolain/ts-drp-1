@@ -23,6 +23,9 @@ function bundle(entryPoint: string): Uint8Array {
 }
 
 const MODULES = new Map([
+	["/src/room-head.js", bundle(path.join(PACKAGE_DIRECTORY, "src/room-head.ts"))],
+	["/src/room-head-contract.js", bundle(path.join(PACKAGE_DIRECTORY, "../storage/src/room-head.ts"))],
+	["/src/canonical.js", bundle(path.join(PACKAGE_DIRECTORY, "../canonical/src/index.ts"))],
 	["/src/internal/idb-adapter.js", bundle(path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts"))],
 	[
 		"/tests/assets/schema-lifecycle-entry.js",

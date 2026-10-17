@@ -45,7 +45,7 @@ export interface DurableIssuanceOutboxEntry {
 	readonly scope: DurableIssueScope;
 }
 
-export type SettlementDisposition = "expire" | "rebase" | "transform" | "manual-review";
+export type SettlementDisposition = "expire" | "rebase" | "transform" | "manual-review" | "inherited";
 
 export const SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16;
 export const SETTLEMENT_REPLACEMENT_DIGEST_LIMITS = Object.freeze({
@@ -67,12 +67,32 @@ export interface SettlementReplacementProgress {
 	readonly chunks: readonly SettlementReplacementChunk[];
 }
 
+/** Exact retained reference; authentication belongs to the shared migration owner. */
+export interface SettlementInheritance {
+	readonly sourceObjectId: string;
+	readonly targetObjectId: string;
+	readonly targetAuthor: string;
+	readonly targetAuthorSequence: number;
+	readonly targetVertexDigest: Uint8Array;
+}
+
+export interface SettlementTransformRefusal {
+	readonly version: 1;
+	readonly kind: "admission-refused";
+	readonly proposedIntentDigest: Uint8Array;
+	readonly reason: "capacity" | "identity-conflict" | "encoding";
+}
+
 export interface SettlementPlanEntry {
+	/** Original external native source; shared held migration custody authenticates it. */
+	readonly sourceObjectId?: string;
 	readonly sourceSequence: number;
 	readonly sourceDigest: Uint8Array;
 	readonly disposition: SettlementDisposition;
 	readonly replacementSequence: number | null;
 	readonly replacementProgress?: SettlementReplacementProgress;
+	readonly inheritance?: SettlementInheritance;
+	readonly transformRefusal?: SettlementTransformRefusal;
 }
 
 export interface SettlementPlan {
@@ -99,7 +119,23 @@ export interface DurableIssueCommit {
 		  }>;
 }
 
-export type DurableBuildAndSign = (authorSequence: number) => Promise<DurableIssueCommit>;
+export interface DurableIssueSignContext {
+	readonly planEffect?: NonNullable<DurableIssueCommit["planEffect"]>;
+	/** Mechanical currency from the same bounded capture; not quote authority. */
+	readonly expectedIssuanceImageDigest?: string;
+	readonly expectedIssuanceControlBytes?: Uint8Array | null;
+}
+
+export type DurableUnsignedVertexSignAdmission = (
+	exactCanonicalUnsignedVertexBytes: Uint8Array,
+	sign: () => Promise<Uint8Array>,
+	/** Existing settlement effect, captured before crypto by the original issuer. */
+	context?: DurableIssueSignContext
+) => Promise<Uint8Array>;
+export type DurableBuildAndSign = (
+	authorSequence: number,
+	nativeSignAdmission?: DurableUnsignedVertexSignAdmission
+) => Promise<DurableIssueCommit>;
 export type DurableTransactIssue = (
 	scope: DurableIssueScope,
 	buildAndSign: DurableBuildAndSign

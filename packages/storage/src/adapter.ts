@@ -191,9 +191,12 @@ export { classifyPersistedState, PersistedStorageError } from "./internal/persis
 
 export {
 	BoundedReadBudgetError,
+	BoundedReadNativeFacts,
 	boundedActiveReadSteps,
 	boundedHeadSteps,
 	boundedRecoveryRoleReadSteps,
+	boundedRetirementAdmissionSteps,
+	AHE_LOCAL_CONTROL_CENSUS_LIMITS,
 	boundedRecoveryRoleCurrencySteps,
 	createBoundedRecoveryRoleRead,
 	prepareBoundedRecoveryRoleRead,
@@ -201,7 +204,12 @@ export {
 	prepareBoundedRead,
 	isBoundedReadCorruption,
 } from "./internal/bounded-read.js";
-export type { BoundedReadRequest, BoundedReadObservation } from "./internal/bounded-read.js";
+export type {
+	BoundedReadRequest,
+	BoundedReadObservation,
+	RetirementAdmissionRequest,
+	RetirementAdmission,
+} from "./internal/bounded-read.js";
 
 function invalidPreparation(): StoreResult<PreparedStorageAdapterCommand> {
 	return { ok: false, reason: "INVALID_ARGUMENT" };

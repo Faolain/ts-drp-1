@@ -7,6 +7,9 @@
 		"url": "git+https://github.com/drp-tech/ts-drp.git"
 	},
 	"type": "module",
+	"bin": {
+		"ts-drp-node": "./dist/src/run.js"
+	},
 	"types": "./dist/src/index.d.ts",
 	"files": [
 		"src",
@@ -26,6 +29,34 @@
 		"./v3-live": {
 			"types": "./dist/src/v3-live.d.ts",
 			"import": "./dist/src/v3-live.js"
+		},
+		"./v3-room": {
+			"types": "./dist/src/v3-room.d.ts",
+			"import": "./dist/src/v3-room.js"
+		},
+		"./v3-room-host": {
+			"types": "./dist/src/v3-room-host.d.ts",
+			"import": "./dist/src/v3-room-host.js"
+		},
+		"./rpc/v3-room-registry": {
+			"types": "./dist/src/rpc/v3-room-registry.d.ts",
+			"import": "./dist/src/rpc/v3-room-registry.js"
+		},
+		"./rpc/v3-service": {
+			"types": "./dist/src/rpc/v3-service.d.ts",
+			"import": "./dist/src/rpc/v3-service.js"
+		},
+		"./rpc/v3-daemon": {
+			"types": "./dist/src/rpc/v3-daemon.d.ts",
+			"import": "./dist/src/rpc/v3-daemon.js"
+		},
+		"./applications/canvas": {
+			"types": "./dist/src/applications/canvas.d.ts",
+			"import": "./dist/src/applications/canvas.js"
+		},
+		"./cli/v3-canvas": {
+			"types": "./dist/src/cli/v3-canvas.d.ts",
+			"import": "./dist/src/cli/v3-canvas.js"
 		},
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",
@@ -55,6 +86,10 @@
 			"types": "./dist/src/creator-adoption-recover.d.ts",
 			"import": "./dist/src/creator-adoption-recover.js"
 		},
+		"./internal/creator-adoption-recover": {
+			"types": "./dist/src/internal/creator-adoption-recover.d.ts",
+			"import": "./dist/src/internal/creator-adoption-recover.js"
+		},
 		"./creator-adoption-activate": {
 			"types": "./dist/src/creator-adoption-activate.d.ts",
 			"import": "./dist/src/creator-adoption-activate.js"
@@ -75,7 +110,6 @@
 		"watch": "tsc -b -w"
 	},
 	"devDependencies": {
-		"@ts-drp/blueprint-catalog": "0.11.0",
 		"@ts-drp/test-utils": "0.11.0",
 		"@types/benchmark": "^2.1.5",
 		"benchmark": "^2.1.4",
@@ -95,6 +129,7 @@
 		"@multiformats/multiaddr": "^13.0.3",
 		"@noble/hashes": "^1.7.1",
 		"@noble/secp256k1": "^2.2.3",
+		"@ts-drp/blueprint-catalog": "0.11.0",
 		"@ts-drp/blueprints": "0.11.0",
 		"@ts-drp/canonical": "0.11.0",
 		"@ts-drp/compaction": "0.11.0",
@@ -109,7 +144,6 @@
 		"@ts-drp/logger": "0.11.0",
 		"@ts-drp/message-queue": "0.11.0",
 		"@ts-drp/network": "0.11.0",
-		"@ts-drp/object": "0.11.0",
 		"@ts-drp/protocol-v3": "0.11.0",
 		"@ts-drp/relay-policy": "workspace:*",
 		"@ts-drp/rendezvous": "workspace:*",
@@ -117,6 +151,7 @@
 		"@ts-drp/routing-node": "workspace:*",
 		"@ts-drp/seal": "0.11.0",
 		"@ts-drp/storage": "0.11.0",
+		"@ts-drp/storage-node": "0.11.0",
 		"@ts-drp/tracer": "0.11.0",
 		"@ts-drp/types": "0.11.0",
 		"@ts-drp/utils": "0.11.0",

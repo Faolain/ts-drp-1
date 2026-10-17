@@ -174,7 +174,14 @@ it("retains the real grid roster and placed block in a genuine successor snapsho
 	const writer = required(fixture.peers[1]);
 	const block = { id: "survives-real-close", kind: "stone", x: 17, y: -23 };
 	await writer.room.issue({ action: "placeBlock", ...block });
-	const expected = encodeCanonical({ version: 1, blocks: [block], outcomes: [], roster });
+	const expected = encodeCanonical({
+		version: 2,
+		creatorAuthor: required(roster[0]).author,
+		creatorPeerId: required(roster[0]).peerId,
+		blocks: [block],
+		outcomes: [],
+		roster,
+	});
 	expect(productState(creator), "GRID_SUCCESSOR_ACCEPTED_PROJECTION_BEFORE_CLOSE").toEqual(expected);
 	expect(await fixture.close()).toMatchObject({ ok: true });
 	const checkpoint = fixture.checkpoint();
@@ -217,7 +224,14 @@ it("ignores a noncreator's conflicting roster through genuine snapshot and adopt
 	await writer.room.issue({ action: "installRoster", roster: { entries: conflicting } });
 	const block = { id: "after-unauthorized-roster", kind: "stone", x: 31, y: 7 };
 	await writer.room.issue({ action: "placeBlock", ...block });
-	const expected = encodeCanonical({ version: 1, blocks: [block], outcomes: [], roster });
+	const expected = encodeCanonical({
+		version: 2,
+		creatorAuthor: required(roster[0]).author,
+		creatorPeerId: required(roster[0]).peerId,
+		blocks: [block],
+		outcomes: [],
+		roster,
+	});
 	expect(productState(creator), "GRID_UNAUTHORIZED_JOIN_NEVER_CHANGES_LIVE_AUTHORITY").toEqual(expected);
 	expect(await fixture.close()).toMatchObject({ ok: true });
 	const checkpoint = fixture.checkpoint();

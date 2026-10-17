@@ -1,6 +1,7 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { captureForwardPromotion } from "./internal/creator-forward-promotion.js";
+import { captureCreatorSnapshotRecoveryRoles, captureForwardPromotion } from "./internal/creator-forward-promotion.js";
+import { archiveAppendMatchesCut } from "./internal/creator-archive-append.js";
 
 import type { CertifiedAnchorTrust, CurrentAnchorTrust } from "./index.js";
 import {
@@ -12,6 +13,8 @@ import { mintSealSigningRequest, type SealSigningRequest } from "./internal/seal
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
 
 type SealPhase = "commit" | "prepare";
+
+export const SEAL_CANONICAL_RECORD_MAX_BYTES = 65_536;
 
 interface RegistryField {
 	readonly const: unknown;
@@ -74,7 +77,11 @@ const intrinsicByteOffset = Object.getOwnPropertyDescriptor(typedArrayPrototype,
 	this: Uint8Array
 ) => number;
 
-function copyExactBytes(value: unknown, expectedLength?: number, maximumLength = 65_536): Uint8Array {
+function copyExactBytes(
+	value: unknown,
+	expectedLength?: number,
+	maximumLength = SEAL_CANONICAL_RECORD_MAX_BYTES
+): Uint8Array {
 	try {
 		if (Object.getPrototypeOf(value) !== Uint8Array.prototype) throw new TypeError("invalid byte carrier");
 		const bytes = value as Uint8Array;
@@ -94,9 +101,77 @@ function copyExactBytes(value: unknown, expectedLength?: number, maximumLength =
 		) {
 			throw new TypeError("resizable byte buffer is unsupported");
 		}
-		return Uint8Array.from(bytes);
+		// Copy the checked native backing view, never a caller-defined iterator.
+		return new Uint8Array(new Uint8Array(buffer, 0, byteLength));
 	} catch {
 		throw new TypeError("invalid exact byte carrier");
+	}
+}
+
+export type SealObservationKind = "qc" | "proposal" | "round-change";
+
+/**
+ * Captures bounded private observation bytes before asynchronous admission.
+ * This is representation custody only: verification and durable currency checks
+ * remain at their original transition owners. Certificate cardinality is the
+ * genuine authority's quorum, not an invented smaller supported signer set.
+ */
+export function captureSealObservationInput(input: Readonly<{
+	authority: SealAuthority;
+	kind: SealObservationKind;
+	value: unknown;
+}>):
+	| Readonly<{ ok: true; value: Uint8Array | Readonly<Record<string, unknown>> }>
+	| Readonly<{ ok: false; reason: string }> {
+	try {
+		const state = authorityStates.get(input.authority);
+		if (state === undefined) return failure("untrusted-context");
+		if (input.kind === "qc") return Object.freeze({ok: true, value: copyExactBytes(input.value)});
+		const captureRecord = (value: unknown, keys: readonly string[], exact = true): Record<string, unknown> => {
+			if (!plainRecord(value) || (exact && !exactRecordKeys(value, keys))) throw new TypeError("invalid observation record");
+			const record: Record<string, unknown> = {};
+			for (const key of keys) {
+				const descriptor = Object.getOwnPropertyDescriptor(value, key);
+				if (descriptor === undefined || !("value" in descriptor)) throw new TypeError("observation accessor");
+				record[key] = descriptor.value;
+			}
+			return record;
+		};
+		const roundChange = (value: unknown, exact = true): Readonly<Record<string, unknown>> => {
+			const record = captureRecord(value, ["exactCanonicalRoundChangeBytes", "signature"], exact);
+			return Object.freeze({exactCanonicalRoundChangeBytes: copyExactBytes(record.exactCanonicalRoundChangeBytes),
+				signature: copyExactBytes(record.signature, 64, 64)});
+		};
+		if (input.kind === "round-change") return Object.freeze({ok: true, value: roundChange(input.value)});
+		if (input.kind !== "proposal") return failure("malformed-input");
+		const keys = ["exactCanonicalCutValueBytes", "exactCanonicalLeaderVotePreimageBytes",
+			"exactCanonicalProposalBytes", "leaderVoteSignature"];
+		if (Object.getOwnPropertyDescriptor(input.value, "newRoundCertificate") !== undefined) keys.push("newRoundCertificate");
+		const record = captureRecord(input.value, keys);
+		let certificate: readonly Readonly<Record<string, unknown>>[] | undefined;
+		if (keys.includes("newRoundCertificate")) {
+			const array = record.newRoundCertificate;
+			if (!Array.isArray(array) || Object.getPrototypeOf(array) !== Array.prototype || array.length !== state.quorum)
+				throw new TypeError("invalid certificate cardinality");
+			const entries: Readonly<Record<string, unknown>>[] = [];
+			for (let index = 0; index < state.quorum; index++) {
+				const descriptor = Object.getOwnPropertyDescriptor(array, String(index));
+				if (descriptor === undefined || !("value" in descriptor)) throw new TypeError("certificate accessor/hole");
+				// Original proposal verification projects only these two fields.
+				// Do not retain unrelated nested metadata or narrow valid carriers.
+				entries.push(roundChange(descriptor.value, false));
+			}
+			certificate = Object.freeze(entries);
+		}
+		return Object.freeze({ok: true, value: Object.freeze({
+			exactCanonicalCutValueBytes: copyExactBytes(record.exactCanonicalCutValueBytes),
+			exactCanonicalLeaderVotePreimageBytes: copyExactBytes(record.exactCanonicalLeaderVotePreimageBytes),
+			exactCanonicalProposalBytes: copyExactBytes(record.exactCanonicalProposalBytes),
+			leaderVoteSignature: copyExactBytes(record.leaderVoteSignature, 64, 64),
+			...(certificate === undefined ? {} : {newRoundCertificate: certificate}),
+		})});
+	} catch {
+		return failure("malformed-input");
 	}
 }
 
@@ -240,6 +315,12 @@ function validateRegisteredRecord(kindName: string, value: unknown): value is Re
 			case "forward-promotion":
 				if (captureForwardPromotion(candidate) === undefined) return false;
 				break;
+			case "creator-snapshot-recovery-roles":
+				if (captureCreatorSnapshotRecoveryRoles(candidate) === undefined) return false;
+				break;
+			case "creator-archive-append":
+				if (!archiveAppendMatchesCut(candidate, value)) return false;
+				break;
 			case "array<signed-seal-vote>":
 				if (!validateSignedVotes(candidate)) return false;
 				break;
@@ -327,6 +408,15 @@ export function openSealAuthority(
 	} catch {
 		return failure("malformed-input");
 	}
+}
+
+/**
+ * Detached recovery material only for original private current-trust custody; not an authority mint.
+ * @param trust - Original current-trust capability.
+ * @returns Detached material from the original trust owner, or no material for a foreign capability.
+ */
+export function resolveSealRecoveryTrust(trust: CurrentAnchorTrust): ReturnType<typeof resolveCreatorAnchorTrustMaterial> {
+	return resolveCreatorAnchorTrustMaterial(trust);
 }
 
 /**
@@ -424,13 +514,58 @@ export function prepareSealVote(
 					: null,
 			publicKey: Uint8Array.from(state.publicKeys.get(state.signerId) as Uint8Array),
 			registeredDigest: Uint8Array.from(registeredDigest),
-			signingRequest: mintSealSigningRequest(registeredDigest),
+			signingRequest: mintSealSigningRequest(registeredDigest, {
+				objectId: state.objectId,
+				epoch: state.epoch,
+				round: input.round,
+				signerId: state.signerId,
+				publicKey: state.publicKeys.get(state.signerId) as Uint8Array,
+			}),
 			signerId: state.signerId,
 			valueDigest,
 		});
 	} catch {
 		return failure("malformed-input");
 	}
+}
+
+function voteSignatureFailure(state: SealAuthorityState, signerId: string, bytes: Uint8Array, signature: Uint8Array): string | undefined {
+	const publicKey = state.publicKeys.get(signerId);
+	if (publicKey === undefined) return "unauthorized-signer";
+	return ed25519.verify(signature, hashDomain(registry.kinds.sealVote?.domain ?? "", bytes), publicKey, { zip215: false })
+		? undefined : "invalid-signature";
+}
+
+/**
+ * Authenticates one original registered vote without manufacturing a quorum certificate.
+ * @param input - Original authority and exact signed vote carrier.
+ * @returns Authenticated vote identity or the original typed refusal.
+ */
+export function verifySealVoteCarrier(input: Readonly<{
+	authority: SealAuthority;
+	exactCanonicalPreimageBytes: Uint8Array;
+	signature: Uint8Array;
+}>): Readonly<{ ok: false; reason: string } | { ok: true; epoch: number; objectId: string; phase: SealPhase; round: number; signerId: string; valueDigest: string }> {
+	try {
+		if (!plainRecord(input) || !exactRecordKeys(input, ["authority", "exactCanonicalPreimageBytes", "signature"]))
+			return failure("malformed-input");
+		const state = authorityStates.get(input.authority);
+		if (state === undefined) return failure("untrusted-context");
+		const bytes = copyExactBytes(input.exactCanonicalPreimageBytes);
+		const vote = decodeExactRecord(bytes, "sealVote");
+		if (vote === undefined || vote.objectId !== state.objectId || vote.epoch !== state.epoch ||
+			!safeInteger(vote.round, 0) || (vote.phase !== "prepare" && vote.phase !== "commit") ||
+			typeof vote.signerId !== "string" || typeof vote.proposalDigest !== "string")
+			return failure("vote-tuple-mismatch");
+		const expected = bytesToHex(hashDomain(registry.kinds.sealProposal?.domain ?? "", encodeCanonical({
+			epoch: state.epoch, kind: "drp-seal-proposal", objectId: state.objectId,
+			round: vote.round, valueDigest: vote.proposalDigest,
+		})));
+		if (vote.proposalHash !== expected) return failure("proposal-hash-mismatch");
+		const reason = voteSignatureFailure(state, vote.signerId, bytes, copyExactBytes(input.signature, 64, 64));
+		return reason === undefined ? Object.freeze({ok: true as const, epoch: state.epoch, objectId: state.objectId,
+			phase: vote.phase, round: vote.round, signerId: vote.signerId, valueDigest: vote.proposalDigest}) : failure(reason);
+	} catch { return failure("malformed-input"); }
 }
 
 /**
@@ -498,9 +633,8 @@ export function verifySealQC(
 			});
 			const digest = hashDomain(registry.kinds.sealVote?.domain ?? "", preimage);
 			if (bytesToHex(digest) !== vote.voteDigest) return failure("vote-tuple-mismatch");
-			if (!ed25519.verify(hexToBytes(vote.signature as string), digest, publicKey, { zip215: false })) {
-				return failure("invalid-signature");
-			}
+			const reason = voteSignatureFailure(state, vote.signerId, preimage, hexToBytes(vote.signature as string));
+			if (reason !== undefined) return failure(reason);
 		}
 		const qcDigest = bytesToHex(hashDomain(registry.kinds.sealQC?.domain ?? "", qcBytes));
 		if (qc.phase === "prepare") {
@@ -606,7 +740,13 @@ export function prepareRoundChange(
 			ok: true as const,
 			publicKey: Uint8Array.from(state.publicKeys.get(state.signerId) as Uint8Array),
 			registeredDigest: Uint8Array.from(registeredDigest),
-			signingRequest: mintSealSigningRequest(registeredDigest),
+			signingRequest: mintSealSigningRequest(registeredDigest, {
+				objectId: state.objectId,
+				epoch: state.epoch,
+				round: input.round,
+				signerId: state.signerId,
+				publicKey: state.publicKeys.get(state.signerId) as Uint8Array,
+			}),
 			signerId: state.signerId,
 		});
 	} catch {

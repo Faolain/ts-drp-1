@@ -46,6 +46,9 @@ export default async function globalSetup(): Promise<() => void> {
 			"phase-6b-ahe-reclamation-worker": resolve(packageDirectory, "tests/assets/phase-6b-ahe-reclamation-worker.ts"),
 		},
 		format: "esm",
+		// The isolated workspace has package-local links, not root aliases.
+		// Shared fixture imports must resolve the same current package exports.
+		nodePaths: [resolve(packageDirectory, "node_modules")],
 		outdir: outputDirectory,
 		platform: "browser",
 		plugins: [maintenancePlugin(packageDirectory)],

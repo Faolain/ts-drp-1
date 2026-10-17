@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, StatementSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -35,6 +35,7 @@ const armPhase3a1bP4NodeDataVersionInterleaves = (
 ).armPhase3a1bP4NodeDataVersionInterleaves;
 
 interface JournalStore {
+	acquireNativeReadReservation(input: Readonly<{ objectId: string }>): Promise<{ check(): Promise<void>; release(): Promise<void> }>;
 	appendAccepted(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
 	close(): Promise<void>;
 	installGenesis(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
@@ -140,6 +141,99 @@ async function loadDecisionMutantCandidate(label: string): Promise<Candidate> {
 		target: "node22",
 	});
 	return (await import(`${pathToFileURL(output).href}?${label}`)) as Candidate;
+}
+
+interface SnapshotValidationObservation {
+	readonly kind: "create" | "readiness" | "snapshot";
+	readonly objectId?: string;
+	readonly validation: object | undefined;
+}
+
+type SnapshotValidationComputations = Readonly<Record<"exactDecoded" | "validateReceived" | "rowCommitment", number>>;
+interface SnapshotValidationObservedCandidate extends Candidate {
+	readonly snapshotValidationComputations: SnapshotValidationComputations;
+	readonly snapshotValidationObservations: SnapshotValidationObservation[];
+}
+
+// Observe the actual shared-module boundary in an isolated native-adapter
+// bundle, using the same bundling seam as the decision-mutant fixture. Every
+// decision still delegates to the original implementation; no global mock or
+// test-supplied validation fact participates in a native read.
+async function loadSnapshotValidationObservedCandidate(label: string, omitValidation = false): Promise<SnapshotValidationObservedCandidate> {
+	const source = path.join(PACKAGE_DIRECTORY, "src/live-journal.ts");
+	const shared = path.resolve(PACKAGE_DIRECTORY, "../live-journal/src/index.ts");
+	const contract = path.resolve(PACKAGE_DIRECTORY, "../live-journal/src/contract.ts");
+	const observer = "phase-3a1b-p4-snapshot-validation-observer";
+	const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), `phase-3a1b-p4-node-${label}-`));
+	directories.push(directory);
+	const output = path.join(directory, "candidate.mjs");
+	const plugin: Plugin = {
+		name: observer,
+		setup(builder): void {
+			builder.onResolve({ filter: /^@ts-drp\/live-journal$/ }, () => ({ path: observer, namespace: observer }));
+			builder.onResolve({ filter: /^phase-3a1b-p4-snapshot-validation-observer$/ }, () => ({ path: observer, namespace: observer }));
+			builder.onResolve({ filter: /^\..*\.js$/ }, ({ path: imported, importer }) => {
+				const current = path.resolve(path.dirname(importer), `${imported.slice(0, -3)}.ts`);
+				if (current.startsWith(path.resolve(PACKAGE_DIRECTORY, "../..") + path.sep) && fs.existsSync(current))
+					return { path: current };
+				return undefined;
+			});
+			builder.onLoad({ filter: /\/live-journal\/src\/contract\.ts$/ }, ({ path: filename }) => {
+				let contents = fs.readFileSync(filename, "utf8");
+				for (const name of ["exactDecoded", "validateReceived", "rowCommitment"]) {
+					const entry = new RegExp(`(^function ${name}\\([\\s\\S]*?\\{)`, "gm");
+					if ([...contents.matchAll(entry)].length !== 1) throw new Error(`missing original computation: ${name}`);
+					contents = contents.replace(entry, `$1\n p4SnapshotValidationComputations.${name}++;`);
+				}
+				return {
+					contents: `export const p4SnapshotValidationComputations = {exactDecoded: 0, validateReceived: 0, rowCommitment: 0};\n${contents}`,
+					loader: "ts",
+					resolveDir: path.dirname(filename),
+				};
+			});
+			builder.onLoad({ filter: /.*/, namespace: observer }, () => ({
+				contents: `
+					import * as original from ${JSON.stringify(shared)};
+					export * from ${JSON.stringify(shared)};
+					export {p4SnapshotValidationComputations as snapshotValidationComputations} from ${JSON.stringify(contract)};
+					export const snapshotValidationObservations = [];
+					export function createLiveJournalSnapshotValidation(...args) {
+						const validation = original.createLiveJournalSnapshotValidation(...args);
+						snapshotValidationObservations.push({kind: "create", validation});
+						return validation;
+					}
+					export function deriveLiveJournalSnapshot(input) {
+						const originalInput = ${omitValidation} ? {...input, validation: undefined} : input;
+						snapshotValidationObservations.push({kind: "snapshot", validation: originalInput.validation,
+							objectId: input.durable?.scope?.scope?.objectId});
+						return original.deriveLiveJournalSnapshot(originalInput);
+					}
+					export function deriveLiveJournalSnapshotReadiness(input) {
+						const originalInput = ${omitValidation} ? {...input, validation: undefined} : input;
+						snapshotValidationObservations.push({kind: "readiness", validation: originalInput.validation,
+							objectId: input.durable?.scope?.scope?.objectId});
+						return original.deriveLiveJournalSnapshotReadiness(originalInput);
+					}
+				`,
+				loader: "js",
+				resolveDir: PACKAGE_DIRECTORY,
+			}));
+		},
+	};
+	await build({
+		bundle: true,
+		stdin: {
+			contents: `export {createNodeDurableLiveJournalStore} from ${JSON.stringify(source)};
+				export {snapshotValidationComputations, snapshotValidationObservations} from ${JSON.stringify(observer)};`,
+			resolveDir: PACKAGE_DIRECTORY,
+		},
+		format: "esm",
+		outfile: output,
+		platform: "node",
+		plugins: [plugin],
+		target: "node22",
+	});
+	return (await import(`${pathToFileURL(output).href}?${label}`)) as SnapshotValidationObservedCandidate;
 }
 
 function loadMaterial(): Material {
@@ -265,6 +359,645 @@ function takeQueryEvidence(): readonly QueryEvidence[] {
 		}
 	).takePhase3a1bP4NodeQueryLedger();
 }
+
+// Test-owned native materialization accounting: records original returned rows,
+// not a SQL-shape estimate or a product hook. Restored after every selected call.
+async function measuredPage(store: JournalStore, input: Readonly<Record<string, unknown>>, method: "readPage" | "readiness" = "readPage"): Promise<{
+	readonly result: Readonly<Record<string, unknown>>;
+	readonly materialized: readonly { readonly sql: string; readonly rows: number }[];
+}> {
+	const prepare = DatabaseSync.prototype.prepare;
+	const all = StatementSync.prototype.all;
+	const sql = new WeakMap<StatementSync, string>();
+	const materialized: { sql: string; rows: number }[] = [];
+	DatabaseSync.prototype.prepare = function (query: string) {
+		const value = prepare.call(this, query);
+		sql.set(value, query);
+		return value;
+	};
+	StatementSync.prototype.all = function (...args: Parameters<StatementSync["all"]>) {
+		const rows = all.apply(this, args);
+		const query = sql.get(this) ?? "";
+		if (referencesPhase3a1bP4NodeTable(query, "accepted_entries")) materialized.push({ sql: query, rows: rows.length });
+		return rows;
+	};
+	try {
+		const result = await store[method](input);
+		return { result, materialized };
+	} finally {
+		DatabaseSync.prototype.prepare = prepare;
+		StatementSync.prototype.all = all;
+	}
+}
+
+describe("bounded replay pages", () => {
+	for (const operation of ["readiness", "page"] as const) {
+		it(`preserves original absence precedence and requested-row failures for ${operation}`, async () => {
+			const candidate = await loadCandidate();
+			const name = "candidate";
+			const filename = primary(`absent-scope-${operation}-${name}`);
+			const store = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
+			const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+			const values = exactInputs();
+			try {
+				expect(await store.installGenesis(values.install)).toMatchObject({ ok: true });
+				expect(await store.appendAccepted(values.received)).toMatchObject({ ok: true });
+				const ready = await store.readiness({ scope: values.scope });
+				expect(ready).toMatchObject({ ok: true, ready: true });
+				// An orphan row is still read before the original absent-header result.
+				foreign.exec("DELETE FROM scopes");
+				const invoke = () => operation === "readiness"
+					? store.readiness({ scope: values.scope })
+					: store.readPage({ scope: values.scope, snapshot: ready.snapshot });
+				takeQueryEvidence();
+				const result = await observePhase3a1bP4NodeOperation(`absent-scope-${operation}-${name}`, invoke);
+				expect(result, name).toEqual(operation === "readiness"
+					? { kind: "not-installed", ok: true, ready: false }
+					: { kind: "not-installed", ok: false });
+				const reads = acceptedAll(takeQueryEvidence());
+				expect(reads, name).toHaveLength(1);
+				expect(reads[0].parameters, name).toEqual([values.scope.objectId, values.scope.epoch, values.scope.anchorDigest]);
+				// Requested-row decoding failures retain precedence over absence.
+				foreign.exec("UPDATE accepted_entries SET received_signature=-1");
+				expect(await invoke(), name).toEqual({ kind: "substrate-failure", ok: false });
+			} finally { foreign.close(); await store.close(); }
+		});
+		it(`preserves original wrong-scope precedence and native row-read law for ${operation}`, async () => {
+			const candidate = await loadCandidate();
+			const name = "candidate";
+			const filename = primary(`wrong-scope-${operation}-${name}`);
+			const store = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
+			const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+			const values = exactInputs();
+			try {
+				expect(await store.installGenesis(values.install)).toMatchObject({ ok: true });
+				const ready = await store.readiness({ scope: values.scope });
+				expect(ready).toMatchObject({ ok: true, ready: true });
+				// Negative native integrity fixture. BLOB affinity permits integer -1;
+				// Uint8Array(-1) throws, unlike NULL (which creates an empty array).
+				foreign.exec("UPDATE scopes SET detached_anchor_signature=-1");
+				const wrong = { ...values.scope, anchorDigest: "f".repeat(64) };
+				takeQueryEvidence();
+				const result = await observePhase3a1bP4NodeOperation(`wrong-scope-${operation}-${name}`, () => operation === "readiness"
+					? store.readiness({ scope: wrong })
+					: store.readPage({ scope: wrong, snapshot: { ...(ready.snapshot as object), scope: wrong } }));
+				expect(result, name).toEqual({ ok: false, kind: "wrong-scope" });
+				const reads = acceptedAll(takeQueryEvidence());
+				expect(reads, name).toHaveLength(1);
+				expect(reads[0].phase, name).toBe("readonly");
+				expect(reads[0].parameters, name).toEqual([wrong.objectId, wrong.epoch, wrong.anchorDigest]);
+			} finally { foreign.close(); await store.close(); }
+		});
+	}
+	async function populated(label: string, count = 64): Promise<{
+		readonly store: JournalStore;
+		readonly filename: string;
+		readonly values: ReturnType<typeof exactInputs>;
+		readonly ready: Readonly<Record<string, unknown>>;
+	}> {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const filename = primary(label);
+		const store = createNodeDurableLiveJournalStore({
+			primaryFilename: filename,
+		});
+		const values = exactInputs();
+		expect(await store.installGenesis(values.install)).toMatchObject({
+			ok: true,
+		});
+		for (let i = 0; i < count; i++) {
+			expect(
+				await store.appendAccepted({
+					...values.local,
+					authorSequence: i,
+					vertexDigest: i.toString(16).padStart(64, "0"),
+				})
+			).toMatchObject({ ok: true, journalSequence: i });
+		}
+		const ready = await store.readiness({ scope: values.scope });
+		expect(ready).toMatchObject({ ok: true, ready: true, rowCount: count });
+		return { store, filename, values, ready };
+	}
+
+	it("materializes at most limit plus one native rows after complete readiness", async () => {
+		const { store, filename, values, ready } = await populated("page-bound");
+		try {
+			for (const afterSequence of [null, 1, 61, 63]) {
+				const measured = await measuredPage(store, {
+					scope: values.scope,
+					snapshot: ready.snapshot,
+					limit: 2,
+					afterSequence,
+				});
+				const start = afterSequence === null ? 0 : afterSequence + 1;
+				expect(measured.result).toMatchObject({
+					ok: true,
+					rows: Array.from({ length: Math.min(2, 64 - start) }, (_, i) => ({
+						journalSequence: start + i,
+					})),
+				});
+				expect(measured.result.nextSequence).toBe(start + 2 < 64 ? start + 1 : null);
+				expect(
+					measured.materialized.reduce((n, x) => n + x.rows, 0),
+					JSON.stringify(measured.materialized)
+				).toBeLessThanOrEqual(3);
+				expect(measured.materialized).toHaveLength(1);
+				expect(measured.materialized[0].sql).toMatch(/LIMIT\s+\?/u);
+				const database = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`, { readOnly: true });
+				try {
+					const details = database
+						.prepare(`EXPLAIN QUERY PLAN ${measured.materialized[0].sql}`)
+						.all(values.scope.objectId, values.scope.epoch, values.scope.anchorDigest, start - 1, 64, 3)
+						.map((x) => String(x.detail));
+					expect(details.some((x) => /SEARCH/u.test(x))).toBe(true);
+					expect(details.some((x) => /SCAN|TEMP B-TREE/u.test(x))).toBe(false);
+				} finally {
+					database.close();
+				}
+			}
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("reuses complete readiness under native custody without rematerializing accepted rows", async () => {
+		const { store, values, ready } = await populated("readiness-native-reuse", 8);
+		const held = await store.acquireNativeReadReservation({ objectId: values.scope.objectId as string });
+		try {
+			for (let repeat = 0; repeat < 3; repeat++) {
+				const measured = await measuredPage(store, { scope: values.scope }, "readiness");
+				expect(measured.result).toEqual(ready);
+				expect(measured.materialized, "same fully validated native image must not scan accepted rows again").toEqual([]);
+				await held.check();
+			}
+		} finally {
+			await held.release();
+			await store.close();
+		}
+	});
+
+	it("does not reuse a validated older prefix as complete readiness after own append", async () => {
+		const { store, values, ready } = await populated("readiness-prefix-reuse", 8);
+		try {
+			expect(await store.appendAccepted({ ...values.local, authorSequence: 8,
+				vertexDigest: (8).toString(16).padStart(64, "0") })).toMatchObject({ ok: true });
+			expect(await store.readPage({scope: values.scope, snapshot: ready.snapshot, limit: 1})).toMatchObject({ok: true});
+			const refreshed = await measuredPage(store, {scope: values.scope}, "readiness");
+			expect(refreshed.result).toMatchObject({ok: true, ready: true, rowCount: 9});
+			expect(refreshed.result.snapshot).not.toEqual(ready.snapshot);
+			expect(refreshed.materialized.map(row => row.rows)).toEqual([9]);
+			const repeated = await measuredPage(store, {scope: values.scope}, "readiness");
+			expect(repeated.result).toEqual(refreshed.result);
+			expect(repeated.materialized).toEqual([]);
+		} finally { await store.close(); }
+	});
+
+	it("revalidates repeated readiness after foreign off-page corruption", async () => {
+		const { store, filename, values } = await populated("readiness-foreign-reuse", 8);
+		const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+		try {
+			// The native catalog requires each connection's own retirement predicate.
+			// This negative intentionally corrupts one unfenced row, not the fence/control.
+			foreign.function("journal_retirement_allows", (objectId, epoch, anchor) =>
+				objectId === values.scope.objectId && epoch === values.scope.epoch && anchor === values.scope.anchorDigest ? 1 : 0);
+			foreign.exec("UPDATE accepted_entries SET vertex_digest='malformed' WHERE journal_sequence=7");
+			const measured = await measuredPage(store, {scope: values.scope}, "readiness");
+			expect(measured.result).toEqual({ok: false, kind: "store-poisoned"});
+			expect(measured.materialized.map(row => row.rows)).toEqual([8]);
+			expect(await store.readiness({scope: values.scope})).toEqual({ok: false, kind: "store-poisoned"});
+		} finally { foreign.close(); await store.close(); }
+	});
+
+	it("preserves prefix tokens across own append and a second public facade append", async () => {
+		const { store, filename, values, ready } = await populated("page-prefix", 8);
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const other = createNodeDurableLiveJournalStore({
+			primaryFilename: filename,
+		});
+		try {
+			for (const [writer, sequence] of [
+				[store, 8],
+				[other, 9],
+			] as const) {
+				expect(
+					await writer.appendAccepted({
+						...values.local,
+						authorSequence: sequence,
+						vertexDigest: sequence.toString(16).padStart(64, "0"),
+					})
+				).toMatchObject({ ok: true });
+				const first = await measuredPage(store, {
+					scope: values.scope,
+					snapshot: ready.snapshot,
+					limit: 2,
+					afterSequence: 6,
+				});
+				expect(first.result).toMatchObject({
+					ok: true,
+					rows: [{ journalSequence: 7 }],
+					nextSequence: null,
+					snapshot: ready.snapshot,
+				});
+				expect(first.materialized[0].rows).toBe(sequence + 1);
+				const second = await measuredPage(store, {
+					scope: values.scope,
+					snapshot: ready.snapshot,
+					limit: 2,
+					afterSequence: 6,
+				});
+				expect(second.result).toEqual(first.result);
+				expect(second.materialized[0].rows).toBe(1);
+			}
+		} finally {
+			await Promise.all([store.close(), other.close()]);
+		}
+	});
+
+	it("invalidates the basis on native version interleaves and validates a held token after reopening", async () => {
+		for (const phase of ["outside", "readonly"] as const) {
+			const { store, filename, values, ready } = await populated(`page-interleave-${phase}`, 8);
+			try {
+				armPhase3a1bP4NodeDataVersionInterleaves([
+					{
+						phase,
+						occurrence: 1,
+						callback: () => {
+							const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+							try {
+								foreign.exec("UPDATE accepted_entries SET vertex_digest='malformed' WHERE journal_sequence=7");
+							} finally {
+								foreign.close();
+							}
+						},
+					},
+				]);
+				const result = await observePhase3a1bP4NodeOperation(`page-interleave-${phase}`, () =>
+					store.readPage({
+						scope: values.scope,
+						snapshot: ready.snapshot,
+						limit: 2,
+					})
+				);
+				expect(result, phase).toEqual({ ok: false, kind: "store-poisoned" });
+				expect(await store.readiness({ scope: values.scope })).toEqual({
+					ok: false,
+					kind: "store-poisoned",
+				});
+			} finally {
+				await store.close();
+			}
+		}
+		const { store, filename, values, ready } = await populated("page-reopen", 8);
+		await store.close();
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const reopened = createNodeDurableLiveJournalStore({
+			primaryFilename: filename,
+		});
+		try {
+			const first = await measuredPage(reopened, {
+				scope: values.scope,
+				snapshot: ready.snapshot,
+				limit: 2,
+			});
+			expect(first.result).toMatchObject({
+				ok: true,
+				rows: [{ journalSequence: 0 }, { journalSequence: 1 }],
+			});
+			expect(first.materialized[0].rows).toBe(8);
+			const second = await measuredPage(reopened, {
+				scope: values.scope,
+				snapshot: ready.snapshot,
+				limit: 2,
+			});
+			expect(second.result).toEqual(first.result);
+			expect(second.materialized[0].rows).toBe(3);
+		} finally {
+			await reopened.close();
+		}
+	});
+
+	it("does not let cached readiness hide a foreign hole, orphan, or malformed off-page row", async () => {
+		for (const [label, sql] of [
+			["hole", "DELETE FROM accepted_entries WHERE journal_sequence=7"],
+			[
+				"orphan",
+				"INSERT INTO accepted_entries SELECT object_id,epoch,anchor_digest,8,source_kind,'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',received_preimage,received_signature,local_author,8 FROM accepted_entries WHERE journal_sequence=7",
+			],
+			["malformed", "UPDATE accepted_entries SET vertex_digest='malformed' WHERE journal_sequence=7"],
+		] as const) {
+			const { store, filename, values, ready } = await populated(`page-${label}`, 8);
+			const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+			try {
+				foreign.exec(sql);
+				const measured = await measuredPage(store, {
+					scope: values.scope,
+					snapshot: ready.snapshot,
+					limit: 2,
+				});
+
+				expect(measured.result, label).toEqual({
+					ok: false,
+					kind: "store-poisoned",
+				});
+				expect(measured.materialized[0].rows).toBe(label === "hole" ? 7 : label === "orphan" ? 9 : 8);
+				expect(await store.readiness({ scope: values.scope })).toEqual({
+					ok: false,
+					kind: "store-poisoned",
+				});
+			} finally {
+				foreign.close();
+				await store.close();
+			}
+		}
+	});
+
+	it("does not hide off-page duplicate commitments when a foreign connection corrupts the catalog", async () => {
+		const { store, filename, values, ready } = await populated("page-duplicate", 8);
+		const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+		try {
+			// Negative integrity fixture only: native UNIQUE normally forbids this.
+			foreign.exec(
+				"BEGIN IMMEDIATE; CREATE TABLE corrupted_entries AS SELECT * FROM accepted_entries; DROP TABLE accepted_entries; ALTER TABLE corrupted_entries RENAME TO accepted_entries; UPDATE accepted_entries SET vertex_digest=(SELECT vertex_digest FROM accepted_entries WHERE journal_sequence=6) WHERE journal_sequence=7; COMMIT"
+			);
+			const measured = await measuredPage(store, { scope: values.scope, snapshot: ready.snapshot, limit: 2 });
+			expect(measured.result).toEqual({ ok: false, kind: "store-poisoned" });
+			expect(measured.materialized[0].rows).toBe(8);
+		} finally {
+			foreign.close();
+			await store.close();
+		}
+	});
+
+	it("detaches received bytes and frozen row graphs on every bounded page", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const store = createNodeDurableLiveJournalStore({ primaryFilename: primary("page-copies") });
+		const values = exactInputs();
+		try {
+			expect(await store.installGenesis(values.install)).toMatchObject({ ok: true });
+			expect(await store.appendAccepted(values.received)).toMatchObject({ ok: true });
+			const ready = await store.readiness({ scope: values.scope });
+			const input = { scope: values.scope, snapshot: ready.snapshot, limit: 1 };
+			const first = await measuredPage(store, input);
+			const firstRow = (first.result.rows as Record<string, unknown>[])[0];
+			const firstBytes = firstRow.exactCanonicalPreimageBytes as Uint8Array;
+			const firstSignature = firstRow.detachedSignature as Uint8Array;
+			const expectedBytes = new Uint8Array(firstBytes);
+			const expectedSignature = new Uint8Array(firstSignature);
+			expect(Object.isFrozen(firstRow)).toBe(true);
+			expect(Object.isFrozen(firstRow.scope)).toBe(true);
+			firstBytes.fill(0);
+			firstSignature.fill(0);
+			const second = await measuredPage(store, input);
+			const secondRow = (second.result.rows as Record<string, unknown>[])[0];
+			expect(secondRow).not.toBe(firstRow);
+			expect(secondRow.exactCanonicalPreimageBytes).toEqual(expectedBytes);
+			expect(secondRow.detachedSignature).toEqual(expectedSignature);
+			expect((secondRow.exactCanonicalPreimageBytes as Uint8Array).buffer).not.toBe(firstBytes.buffer);
+			expect(second.materialized[0].rows).toBe(1);
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("preserves wrong-scope, forged token, malformed input and stale high-watermark failures", async () => {
+		const { store, filename, values, ready } = await populated("page-token", 8);
+		const token = ready.snapshot as Readonly<Record<string, unknown>>;
+		const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+		try {
+			expect(
+				await store.readPage({
+					scope: values.scope,
+					snapshot: { ...token, orderedRowDigest: "f".repeat(64) },
+				})
+			).toEqual({ ok: false, kind: "digest-mismatch" });
+			expect(
+				await store.readPage({
+					scope: values.scope,
+					snapshot: { ...token, highWatermark: 9 },
+				})
+			).toEqual({ ok: false, kind: "stale-snapshot" });
+			expect(
+				await store.readPage({
+					scope: values.scope,
+					snapshot: token,
+					limit: 129,
+				})
+			).toEqual({ ok: false, kind: "malformed-input" });
+			const wrong = { ...values.scope, anchorDigest: "f".repeat(64) };
+			expect(
+				await store.readPage({
+					scope: wrong,
+					snapshot: { ...token, scope: wrong },
+				})
+			).toEqual({ ok: false, kind: "wrong-scope" });
+			foreign.exec(
+				"BEGIN IMMEDIATE; DELETE FROM accepted_entries WHERE journal_sequence=7; UPDATE scopes SET next_journal_sequence=7; COMMIT"
+			);
+			expect(await store.readPage({ scope: values.scope, snapshot: token })).toEqual({
+				ok: false,
+				kind: "stale-snapshot",
+			});
+		} finally {
+			foreign.close();
+			await store.close();
+		}
+	});
+});
+
+describe("SQLite bounded snapshot validation ownership", () => {
+	it("reuses original leaf facts across fresh SQL captures, detaches public bytes, and starts a new owner on reopen", async () => {
+		const candidate = await loadSnapshotValidationObservedCandidate("snapshot-validation-owner");
+		const filename = primary("snapshot-validation-owner");
+		const values = exactInputs();
+		const background = generatedInputs("9");
+		const store = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
+		let other: JournalStore | undefined;
+		let reopened: JournalStore | undefined;
+		try {
+			expect(await store.installGenesis(values.install)).toMatchObject({ ok: true });
+			expect(await store.appendAccepted(values.received)).toMatchObject({ ok: true, journalSequence: 0 });
+			expect(await store.appendAccepted({ ...values.local, vertexDigest: "6".repeat(64) })).toMatchObject({
+				ok: true, journalSequence: 1,
+			});
+			other = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
+			expect(await other.installGenesis(background.install)).toMatchObject({ ok: true });
+			const firstObservation = candidate.snapshotValidationObservations.length;
+			const ready = await measuredPage(store, { scope: values.scope }, "readiness");
+			expect(ready.result).toMatchObject({ ok: true, ready: true, rowCount: 2 });
+			expect(ready.materialized).toContainEqual(expect.objectContaining({ rows: 2 }));
+			const readinessObservation = candidate.snapshotValidationObservations.slice(firstObservation)
+				.find(({ kind }) => kind === "readiness");
+			const owner = readinessObservation?.validation;
+			expect(owner).toBeDefined();
+			expect(candidate.snapshotValidationObservations.some(({ kind, validation }) => kind === "create" && validation === owner)).toBe(true);
+
+			const freshPage = async (authorSequence: number): Promise<Readonly<Record<string, unknown>>> => {
+				// A legal second-facade commit in another scope changes SQLite's
+				// data_version, forcing a complete actual read of unchanged A rows.
+				expect(await other!.appendAccepted({
+					...background.local, authorSequence, vertexDigest: (authorSequence + 10).toString(16).padStart(64, "0"),
+				})).toMatchObject({ ok: true });
+				const before = { ...candidate.snapshotValidationComputations };
+				const from = candidate.snapshotValidationObservations.length;
+				const page = await measuredPage(store, { scope: values.scope, snapshot: ready.result.snapshot, limit: 2 });
+				expect(page.result).toMatchObject({ ok: true, rows: [{ journalSequence: 0 }, { journalSequence: 1 }] });
+				expect(page.materialized).toContainEqual(expect.objectContaining({ rows: 2 }));
+				expect(candidate.snapshotValidationComputations).toEqual(before);
+				expect(candidate.snapshotValidationObservations.slice(from)).toContainEqual({
+					kind: "snapshot", objectId: values.scope.objectId, validation: owner,
+				});
+				return page.result;
+			};
+			const first = await freshPage(0);
+			const firstRow = (first.rows as Readonly<Record<string, unknown>>[])[0];
+			const expectedBytes = new Uint8Array(firstRow.exactCanonicalPreimageBytes as Uint8Array);
+			const expectedSignature = new Uint8Array(firstRow.detachedSignature as Uint8Array);
+			expect(Object.isFrozen(firstRow)).toBe(true);
+			(firstRow.exactCanonicalPreimageBytes as Uint8Array).fill(0);
+			(firstRow.detachedSignature as Uint8Array).fill(0);
+			(values.received.exactCanonicalPreimageBytes as Uint8Array).fill(0);
+			(values.received.detachedSignature as Uint8Array).fill(0);
+			const second = await freshPage(1);
+			const secondRow = (second.rows as Readonly<Record<string, unknown>>[])[0];
+			expect(secondRow.exactCanonicalPreimageBytes).toEqual(expectedBytes);
+			expect(secondRow.detachedSignature).toEqual(expectedSignature);
+			expect((secondRow.exactCanonicalPreimageBytes as Uint8Array).buffer)
+				.not.toBe((firstRow.exactCanonicalPreimageBytes as Uint8Array).buffer);
+
+			expect(await other.appendAccepted({ ...background.local, authorSequence: 2, vertexDigest: "b".repeat(64) })).toMatchObject({ ok: true });
+			const beforeReadiness = { ...candidate.snapshotValidationComputations };
+			const fromReadiness = candidate.snapshotValidationObservations.length;
+			const refreshed = await measuredPage(store, { scope: values.scope }, "readiness");
+			expect(refreshed.result).toEqual(ready.result);
+			expect(refreshed.materialized).toContainEqual(expect.objectContaining({ rows: 2 }));
+			expect(candidate.snapshotValidationComputations).toEqual(beforeReadiness);
+			expect(candidate.snapshotValidationObservations.slice(fromReadiness)).toContainEqual({
+				kind: "readiness", objectId: values.scope.objectId, validation: owner,
+			});
+			const otherOwners = candidate.snapshotValidationObservations
+				.filter(({ objectId, validation }) => objectId === background.scope.objectId && validation !== undefined)
+				.map(({ validation }) => validation);
+			expect(otherOwners.length).toBeGreaterThan(0);
+			expect(otherOwners.every(validation => validation !== undefined && validation !== owner)).toBe(true);
+
+			await store.close();
+			reopened = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
+			const beforeReopen = { ...candidate.snapshotValidationComputations };
+			const fromReopen = candidate.snapshotValidationObservations.length;
+			const afterReopen = await measuredPage(reopened, { scope: values.scope, snapshot: ready.result.snapshot, limit: 2 });
+			expect(afterReopen.result).toEqual(second);
+			expect(afterReopen.materialized).toContainEqual(expect.objectContaining({ rows: 2 }));
+			const reopenedOwner = candidate.snapshotValidationObservations.slice(fromReopen)
+				.find(({ kind }) => kind === "snapshot")?.validation;
+			expect(reopenedOwner).toBeDefined();
+			expect(reopenedOwner).not.toBe(owner);
+			for (const name of ["exactDecoded", "validateReceived", "rowCommitment"] as const)
+				expect(candidate.snapshotValidationComputations[name], name).toBeGreaterThan(beforeReopen[name]);
+		} finally {
+			await reopened?.close();
+			await other?.close();
+			await store.close();
+		}
+	});
+
+	it("avoids repeated original kernel work compared with the same native fixture's uncached derivation", async () => {
+		const outcomes: {
+			readonly counts: readonly SnapshotValidationComputations[];
+			readonly results: readonly Readonly<Record<string, unknown>>[];
+		}[] = [];
+		for (const omitValidation of [false, true]) {
+			// The baseline only omits the optional fact owner at the original
+			// derivation seam. Both arms run original validation decisions and
+			// identical native writes/reads, not timing or estimated call counts.
+			const candidate = await loadSnapshotValidationObservedCandidate(`snapshot-validation-ab-${omitValidation}`, omitValidation);
+			const filename = primary(`snapshot-validation-ab-${omitValidation}`);
+			const store = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
+			const values = exactInputs();
+			const background = generatedInputs("9");
+			let other: JournalStore | undefined;
+			try {
+				expect(await store.installGenesis(values.install)).toMatchObject({ ok: true });
+				expect(await store.appendAccepted(values.received)).toMatchObject({ ok: true });
+				expect(await store.appendAccepted({ ...values.local, vertexDigest: "6".repeat(64) })).toMatchObject({ ok: true });
+				other = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
+				expect(await other.installGenesis(background.install)).toMatchObject({ ok: true });
+				const ready = await store.readiness({ scope: values.scope });
+				expect(ready).toMatchObject({ ok: true, ready: true, rowCount: 2 });
+				const counts: SnapshotValidationComputations[] = [];
+				const results: Readonly<Record<string, unknown>>[] = [];
+				for (const [authorSequence, method] of (["readPage", "readiness"] as const).entries()) {
+					expect(await other.appendAccepted({
+						...background.local, authorSequence, vertexDigest: (authorSequence + 10).toString(16).padStart(64, "0"),
+					})).toMatchObject({ ok: true });
+					const before = { ...candidate.snapshotValidationComputations };
+					const read = await measuredPage(store, method === "readiness"
+						? { scope: values.scope }
+						: { scope: values.scope, snapshot: ready.snapshot, limit: 2 }, method);
+					expect(read.result).toMatchObject({ ok: true });
+					expect(read.materialized).toContainEqual(expect.objectContaining({ rows: 2 }));
+					counts.push({
+						exactDecoded: candidate.snapshotValidationComputations.exactDecoded - before.exactDecoded,
+						validateReceived: candidate.snapshotValidationComputations.validateReceived - before.validateReceived,
+						rowCommitment: candidate.snapshotValidationComputations.rowCommitment - before.rowCommitment,
+					});
+					results.push(read.result);
+				}
+				outcomes.push({ counts, results });
+			} finally {
+				await other?.close();
+				await store.close();
+			}
+		}
+		expect(outcomes[0].results).toEqual(outcomes[1].results);
+		for (let index = 0; index < 2; index++) {
+			expect(outcomes[0].counts[index]).toEqual({ exactDecoded: 0, validateReceived: 0, rowCommitment: 0 });
+			for (const name of ["exactDecoded", "validateReceived", "rowCommitment"] as const)
+				expect(outcomes[1].counts[index][name], name).toBeGreaterThan(outcomes[0].counts[index][name]);
+		}
+	});
+
+	for (const [label, sql] of [
+		["sequence", "UPDATE accepted_entries SET journal_sequence=3 WHERE journal_sequence=1"],
+		["received-preimage", "UPDATE accepted_entries SET received_preimage=zeroblob(length(received_preimage)) WHERE journal_sequence=0"],
+		[
+			"duplicate",
+			"BEGIN IMMEDIATE; CREATE TABLE corrupted_entries AS SELECT * FROM accepted_entries; DROP TABLE accepted_entries; ALTER TABLE corrupted_entries RENAME TO accepted_entries; UPDATE accepted_entries SET vertex_digest=(SELECT vertex_digest FROM accepted_entries WHERE journal_sequence=0) WHERE journal_sequence=1; COMMIT",
+		],
+	] as const) {
+		it(`refuses fresh native ${label} corruption after successful leaf enrollment`, async () => {
+			const candidate = await loadSnapshotValidationObservedCandidate(`snapshot-validation-${label}`);
+			const filename = primary(`snapshot-validation-${label}`);
+			const store = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
+			const values = exactInputs();
+			let foreign: DatabaseSync | undefined;
+			try {
+				expect(await store.installGenesis(values.install)).toMatchObject({ ok: true });
+				expect(await store.appendAccepted(values.received)).toMatchObject({ ok: true });
+				expect(await store.appendAccepted({ ...values.local, vertexDigest: "6".repeat(64) })).toMatchObject({ ok: true });
+				expect(await store.readiness({ scope: values.scope })).toMatchObject({ ok: true, ready: true, rowCount: 2 });
+				const owner = candidate.snapshotValidationObservations
+					.findLast(({ kind }) => kind === "readiness")?.validation;
+				expect(owner).toBeDefined();
+				foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+				// Negative native integrity fixture, matching the current retirement
+				// tests' explicit UDF. Catalog replacement is only for bypassing
+				// native UNIQUE in the duplicate-corruption case.
+				foreign.function("journal_retirement_allows", (_objectId, _epoch, _anchorDigest) => 1);
+				foreign.exec(sql);
+				const from = candidate.snapshotValidationObservations.length;
+				const measured = await measuredPage(store, { scope: values.scope }, "readiness");
+				expect(measured.materialized).toContainEqual(expect.objectContaining({ rows: 2 }));
+				expect(measured.result).toEqual({ ok: false, kind: "store-poisoned" });
+				expect(candidate.snapshotValidationObservations.slice(from)).toContainEqual({
+					kind: "readiness", objectId: values.scope.objectId, validation: owner,
+				});
+				expect(await store.readiness({ scope: values.scope })).toEqual({ ok: false, kind: "store-poisoned" });
+			} finally {
+				foreign?.close();
+				await store.close();
+			}
+		});
+	}
+});
 
 function acceptedAll(evidence: readonly QueryEvidence[]): readonly QueryEvidence[] {
 	return evidence.filter(({ method, tables }) => method === "all" && tables.includes("accepted_entries"));

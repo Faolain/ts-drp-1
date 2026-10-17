@@ -5,13 +5,6 @@ import * as blueprintsRoot from "../packages/blueprints/src/index.js";
 import { CanonicalDecodingError, CanonicalEncodingError } from "../packages/canonical/src/index.js";
 import { CausalityIndex, LinearizationError, linearizeEpoch } from "../packages/compaction/src/index.js";
 import {
-	AdoptionCommitExhaustedError,
-	ApplyInvariantError,
-	isObjectACLDeterministicError,
-	ObjectACLDeterministicError,
-	RootACLMutationError,
-} from "../packages/object/src/index.js";
-import {
 	EmptyQuorumCertificateError,
 	MixedQuorumCertificateError,
 	UnsupportedProfileError,
@@ -125,10 +118,6 @@ describe("Phase 0l @ts-drp/errors public root RED", () => {
 		["InvalidHashError", new InvalidHashError(), "INVALID_HASH"],
 		["InvalidTimestampError", new InvalidTimestampError(), "INVALID_TIMESTAMP"],
 		["VertexValidationError", new VertexValidationError(new Error("graph access")), "VERTEX_VALIDATION_FAILED"],
-		["AdoptionCommitExhaustedError", new AdoptionCommitExhaustedError("vertex-hash", 3), "ADOPTION_COMMIT_EXHAUSTED"],
-		["ApplyInvariantError", new ApplyInvariantError([], "apply invariant"), "APPLY_INVARIANT"],
-		["ObjectACLDeterministicError", new ObjectACLDeterministicError(), "OBJECT_ACL_DETERMINISTIC"],
-		["RootACLMutationError", new RootACLMutationError("root ACL"), "ROOT_ACL_MUTATION_FORBIDDEN"],
 	] as const)("catalogues and recognizes %s with its exact public code", async (_name, error, code) => {
 		const errors = await loadErrorRoot();
 
@@ -156,29 +145,10 @@ describe("Phase 0l @ts-drp/errors public root RED", () => {
 		expect(errors.isDRPError(hostile)).toBe(false);
 	});
 
-	it("keeps the object ACL recognizer distinct from the generic taxonomy recognizer", async () => {
+	it("does not treat a retired Object ACL brand as the generic coded-error brand", async () => {
 		const errors = await loadErrorRoot();
-		const aclOnly = { [OBJECT_ACL_DETERMINISTIC_ERROR]: true };
-		const genericOnly = {
-			[DRP_ERROR_BRAND]: true,
-			code: "OBJECT_ACL_DETERMINISTIC",
-		};
-		const hostile = new Proxy(
-			{},
-			{
-				get(): never {
-					throw new Error("hostile ACL accessor");
-				},
-			}
-		);
-
-		expect(isObjectACLDeterministicError(new ObjectACLDeterministicError())).toBe(true);
-		expect(isObjectACLDeterministicError(aclOnly)).toBe(true);
-		expect(errors.isDRPError(aclOnly)).toBe(false);
-		expect(errors.isDRPError(genericOnly)).toBe(true);
-		expect(isObjectACLDeterministicError(genericOnly)).toBe(false);
-		expect(() => isObjectACLDeterministicError(hostile)).not.toThrow();
-		expect(isObjectACLDeterministicError(hostile)).toBe(false);
+		expect(errors.isDRPError({ [OBJECT_ACL_DETERMINISTIC_ERROR]: true })).toBe(false);
+		expect(errors.isDRPError({ [DRP_ERROR_BRAND]: true, code: "OBJECT_ACL_DETERMINISTIC" })).toBe(true);
 	});
 });
 

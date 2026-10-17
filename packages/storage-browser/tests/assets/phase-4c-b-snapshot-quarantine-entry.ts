@@ -1,15 +1,14 @@
-/* eslint-disable import/no-unresolved -- The future non-root owners are intentionally absent in RED. */
 import {
 	consumeSnapshotVerificationReceipt,
 	verifySnapshotStreamWithReceipt,
 } from "@ts-drp/compaction/snapshot-quarantine-receipt";
-import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
 
 import {
 	createSnapshotQuarantineFixture,
 	runSnapshotQuarantineBehaviorContract,
 	type SnapshotQuarantineFixture,
 } from "../../../../tests/fixtures/phase-4c-v3/snapshot-quarantine-contract.js";
+import { createBrowserSnapshotQuarantineStore } from "../../src/snapshot-transfer.js";
 
 function fixture(objectId = "phase-4c-b-browser"): SnapshotQuarantineFixture {
 	return createSnapshotQuarantineFixture({ objectId });
@@ -31,6 +30,7 @@ async function rawRows(databaseName: string): Promise<
 		schema: unknown;
 		scopeFields: readonly string[];
 		scopes: number;
+		scopeDetails: readonly Readonly<{ objectId: unknown; state: unknown; expiresAt: unknown }>[];
 	}>
 > {
 	const database = await new Promise<IDBDatabase>((resolvePromise, reject) => {
@@ -64,6 +64,7 @@ async function rawRows(databaseName: string): Promise<
 			}),
 			scopeFields: Object.freeze(Object.keys(scopeRows[0] ?? {}).sort()),
 			scopes: scopeRows.length,
+			scopeDetails: scopeRows.map(({ objectId, state, expiresAt }) => ({ objectId, state, expiresAt })),
 		});
 	} finally {
 		database.close();
@@ -138,6 +139,186 @@ async function runExpiry(): Promise<unknown> {
 	} finally {
 		Date.now = originalNow;
 		await deleteDatabase(databaseName);
+	}
+}
+
+function requiredFixtureValue<T>(value: T | undefined): T {
+	if (value === undefined) throw new TypeError("mixed expiry fixture value is absent");
+	return value;
+}
+
+async function runMixedExpiry(observeStreaming = false): Promise<unknown> {
+	const primaryDatabaseName = `phase4cb-mixed-${crypto.randomUUID()}`;
+	const databaseName = `${primaryDatabaseName}--drp-snapshot-quarantine-v1`;
+	const originalNow = Date.now;
+	const originalGetAll = IDBIndex.prototype.getAll;
+	const originalOpenCursor = IDBIndex.prototype.openCursor;
+	const expiryRequests = { bulkRequests: 0, maximumBulkRows: 0, cursorRequests: 0, cursorRows: 0 };
+	if (observeStreaming) {
+		IDBIndex.prototype.getAll = function (...args): IDBRequest<unknown[]> {
+			const request = originalGetAll.apply(this, args);
+			if (this.name === "expiryAsc" && this.objectStore.transaction.db.name === databaseName) {
+				expiryRequests.bulkRequests += 1;
+				request.addEventListener(
+					"success",
+					() => {
+						expiryRequests.maximumBulkRows = Math.max(expiryRequests.maximumBulkRows, request.result.length);
+					},
+					{ once: true }
+				);
+			}
+			return request;
+		};
+		IDBIndex.prototype.openCursor = function (...args): IDBRequest<IDBCursorWithValue | null> {
+			const request = originalOpenCursor.apply(this, args);
+			if (this.name === "expiryAsc" && this.objectStore.transaction.db.name === databaseName) {
+				expiryRequests.cursorRequests += 1;
+				request.addEventListener("success", () => {
+					if (request.result !== null) expiryRequests.cursorRows += 1;
+				});
+			}
+			return request;
+		};
+	}
+	const extraExpiredScopes = observeStreaming ? 32 : 0;
+	let now = 4_000;
+	Date.now = (): number => now;
+	let store: Awaited<ReturnType<typeof createBrowserSnapshotQuarantineStore>> | undefined;
+	const verifiedFixture = fixture("mixed-verified");
+	const interruptedFixture = fixture("mixed-interrupted");
+	const refreshedFixture = fixture("mixed-refreshed");
+	const youngerFixture = fixture("mixed-younger");
+	const verify = async (
+		scope: Awaited<ReturnType<NonNullable<typeof store>["openScope"]>>,
+		selected: SnapshotQuarantineFixture
+	): Promise<void> => {
+		const stream = verifySnapshotStreamWithReceipt({
+			exactCanonicalManifestBytes: selected.declaration.exactCanonicalManifestBytes,
+			expectedManifestDigest: selected.declaration.scope.manifestDigest,
+			expectedScope: selected.declaration.scope,
+			profile: { maxManifestBytes: 212_387, maxSnapshotBytes: 268_435_456, snapshotChunkBytes: 131_072 },
+			quarantine: scope.verificationQuarantine,
+			source: {
+				read: (descriptor) => Promise.resolve(new Uint8Array(requiredFixtureValue(selected.chunks[descriptor.index]))),
+			},
+		});
+		await scope.complete(await stream.receipt);
+		await stream.completion;
+	};
+	try {
+		store = await createBrowserSnapshotQuarantineStore({ primaryDatabaseName });
+		const verified = await store.openScope(verifiedFixture.declaration);
+		await verify(verified, verifiedFixture);
+		const verifiedStatus = await verified.status();
+		await verified.release();
+		for (let index = 0; index < extraExpiredScopes; index++) {
+			const selected = createSnapshotQuarantineFixture({
+				objectId: `mixed-extra-${index}`,
+				chunks: [new Uint8Array(16)],
+			});
+			const scope = await store.openScope(selected.declaration);
+			await scope.release();
+		}
+		const interrupted = await store.openScope(interruptedFixture.declaration);
+		await interrupted.verificationQuarantine
+			.open(new AbortController().signal)
+			.write(
+				requiredFixtureValue(interruptedFixture.declaration.chunks[0]),
+				requiredFixtureValue(interruptedFixture.chunks[0])
+			);
+		await interrupted.release();
+		const refreshed = await store.openScope(refreshedFixture.declaration);
+		const port = refreshed.verificationQuarantine.open(new AbortController().signal);
+		await port.write(
+			requiredFixtureValue(refreshedFixture.declaration.chunks[0]),
+			requiredFixtureValue(refreshedFixture.chunks[0])
+		);
+		const originalExpiry = (await refreshed.status()).expiresAt;
+		now = 4_100;
+		await port.write(
+			requiredFixtureValue(refreshedFixture.declaration.chunks[1]),
+			requiredFixtureValue(refreshedFixture.chunks[1])
+		);
+		const refreshedExpiry = (await refreshed.status()).expiresAt;
+		now = 4_200;
+		await port.write(
+			requiredFixtureValue(refreshedFixture.declaration.chunks[1]),
+			requiredFixtureValue(refreshedFixture.chunks[1])
+		);
+		const duplicateExpiry = (await refreshed.status()).expiresAt;
+		await refreshed.release();
+		now = 4_300;
+		const younger = await store.openScope(youngerFixture.declaration);
+		await younger.verificationQuarantine
+			.open(new AbortController().signal)
+			.write(
+				requiredFixtureValue(youngerFixture.declaration.chunks[0]),
+				requiredFixtureValue(youngerFixture.chunks[0])
+			);
+		const youngerExpiry = (await younger.status()).expiresAt;
+		await younger.release();
+		await store.close();
+		store = await createBrowserSnapshotQuarantineStore({ primaryDatabaseName });
+		const reopenedBeforeExpiry = await rawRows(databaseName);
+		now = originalExpiry - 1;
+		const before = await store.sweepExpired();
+		now = originalExpiry;
+		const elapsedOnly = await rawRows(databaseName);
+		const at = await store.sweepExpired();
+		const afterExplicit = await rawRows(databaseName);
+		const resumed = await store.openScope(refreshedFixture.declaration);
+		const missingBeforeResume = await resumed.missingIndices();
+		const resumedPort = resumed.verificationQuarantine.open(new AbortController().signal);
+		const exact = await resumedPort.read(requiredFixtureValue(refreshedFixture.declaration.chunks[0]));
+		const survivorExact =
+			exact?.byteLength === requiredFixtureValue(refreshedFixture.chunks[0]).byteLength &&
+			exact.every((byte, index) => byte === requiredFixtureValue(refreshedFixture.chunks[0])[index]);
+		await resumedPort.write(
+			requiredFixtureValue(refreshedFixture.declaration.chunks[2]),
+			requiredFixtureValue(refreshedFixture.chunks[2])
+		);
+		const completedExpiry = (await resumed.status()).expiresAt;
+		// A completion refresh must be distinguishable from the final chunk write.
+		now += 1;
+		await verify(resumed, refreshedFixture);
+		const resumedStatus = await resumed.status();
+		await resumed.release();
+		now = youngerExpiry;
+		await store.close();
+		store = await createBrowserSnapshotQuarantineStore({ primaryDatabaseName });
+		const openedStoreOnly = await rawRows(databaseName);
+		const maintenance = await store.openScope(fixture("mixed-maintenance").declaration);
+		const afterImplicit = await rawRows(databaseName);
+		await maintenance.release();
+		return {
+			extraExpiredScopes,
+			expiryRequests,
+			verifiedStatus,
+			originalExpiry,
+			refreshedExpiry,
+			duplicateExpiry,
+			youngerExpiry,
+			reopenedBeforeExpiry,
+			before,
+			elapsedOnly,
+			at,
+			afterExplicit,
+			missingBeforeResume,
+			survivorExact,
+			completedExpiry,
+			resumedStatus,
+			openedStoreOnly,
+			afterImplicit,
+		};
+	} finally {
+		Date.now = originalNow;
+		IDBIndex.prototype.getAll = originalGetAll;
+		IDBIndex.prototype.openCursor = originalOpenCursor;
+		try {
+			await store?.close();
+		} finally {
+			await deleteDatabase(databaseName);
+		}
 	}
 }
 
@@ -280,7 +461,16 @@ async function runUnsupportedSchema(): Promise<unknown> {
 declare global {
 	interface Window {
 		phase4cBRun(
-			caseId: "carriers" | "death-reopen" | "expiry" | "lifecycle" | "receipt" | "schema" | "unsupported-schema",
+			caseId:
+				| "carriers"
+				| "death-reopen"
+				| "expiry"
+				| "mixed-expiry"
+				| "streaming-expiry"
+				| "lifecycle"
+				| "receipt"
+				| "schema"
+				| "unsupported-schema",
 			input?: string
 		): Promise<unknown>;
 	}
@@ -293,6 +483,8 @@ window.phase4cBRun = async (caseId, input): Promise<unknown> => {
 		return runDeathReopen(input);
 	}
 	if (caseId === "expiry") return runExpiry();
+	if (caseId === "mixed-expiry") return runMixedExpiry();
+	if (caseId === "streaming-expiry") return runMixedExpiry(true);
 	if (caseId === "lifecycle") return runLifecycle();
 	if (caseId === "receipt") return runReceipt();
 	if (caseId === "unsupported-schema") return runUnsupportedSchema();

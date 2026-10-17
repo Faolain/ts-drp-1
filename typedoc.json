@@ -12,9 +12,8 @@
 		"typescript",
 		"mermaid"
 	],
-	"entryPoints": [
-		"packages/*"
-	],
+	"entryPoints": ["packages/*"],
+	"exclude": ["**/packages/object", "**/packages/object/**"],
 	"entryPointStrategy": "packages",
 	"includeVersion": true,
 	"name": "Distributed Real-Time Programs",

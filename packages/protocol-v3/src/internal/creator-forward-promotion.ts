@@ -44,10 +44,7 @@ export function capturePromotionArray(value: unknown, maximum: number): readonly
 
 export function promotionByteLength(value: unknown, maximum: number): number | undefined {
 	try {
-		if (
-			Object.getPrototypeOf(value) !== Uint8Array.prototype ||
-			Reflect.apply(tagGetter, value, []) !== "Uint8Array"
-		)
+		if (Object.getPrototypeOf(value) !== Uint8Array.prototype || Reflect.apply(tagGetter, value, []) !== "Uint8Array")
 			return undefined;
 		const length = Reflect.apply(lengthGetter, value, []) as number;
 		const offset = Reflect.apply(offsetGetter, value, []) as number;
@@ -113,6 +110,23 @@ export interface ForwardPromotion {
 		frontiers: readonly (readonly (string | number | null)[])[] | null;
 	}>;
 	readonly authorizedSuccessorAclDigest: string;
+}
+
+/** Detached signed role spelling; capture alone never grants retirement authority. */
+export interface CreatorSnapshotRecoveryScope {
+	readonly objectId: string;
+	readonly epoch: number;
+	readonly anchor: string;
+	readonly manifestDigest: string;
+}
+export interface CreatorSnapshotRecoveryRoles {
+	readonly kind: "creator-snapshot-recovery-roles";
+	readonly version: 1;
+	readonly genesisAnchorDigest: string;
+	readonly currentClose: CreatorSnapshotRecoveryScope;
+	readonly previousClose: CreatorSnapshotRecoveryScope | null;
+	readonly operationalSources: readonly PromotionSource[];
+	readonly classifiedScopes: readonly CreatorSnapshotRecoveryScope[];
 }
 const retirementKind = "drp-creator-issuance-retirement-state";
 const aggregateKind = "drp-creator-author-issuance-frontiers-state";
@@ -200,6 +214,103 @@ function source(value: unknown): PromotionSource | undefined {
 	return cutRef === undefined || commitQcRef === undefined || manifestRef === undefined || checkpointRefs === undefined
 		? undefined
 		: (Object.freeze({ ...s, cutRef, commitQcRef, manifestRef, checkpointRefs }) as unknown as PromotionSource);
+}
+
+function recoveryScope(value: unknown): CreatorSnapshotRecoveryScope | undefined {
+	const scope = capturePromotionRecord(value, ["objectId", "epoch", "anchor", "manifestDigest"]);
+	return scope === undefined ||
+		typeof scope.objectId !== "string" ||
+		scope.objectId.length < 1 ||
+		scope.objectId.length > 1024 ||
+		!integer(scope.epoch) ||
+		typeof scope.anchor !== "string" ||
+		!digest.test(scope.anchor) ||
+		typeof scope.manifestDigest !== "string" ||
+		!digest.test(scope.manifestDigest)
+		? undefined
+		: (scope as unknown as CreatorSnapshotRecoveryScope);
+}
+
+/**
+ * Captures only the bounded closed signed role shape, never caller protection policy.
+ * Consumers must authenticate the exact prior role transfer, native full inventory,
+ * whole usable data union and all journal/issuance/lifetime dependencies.
+ * @param value - Candidate nested signed CutValue field.
+ * @returns Detached role spelling or undefined, not an authorization capability.
+ */
+export function captureCreatorSnapshotRecoveryRoles(value: unknown): CreatorSnapshotRecoveryRoles | undefined {
+	const roles = capturePromotionRecord(value, [
+		"kind",
+		"version",
+		"genesisAnchorDigest",
+		"currentClose",
+		"previousClose",
+		"operationalSources",
+		"classifiedScopes",
+	]);
+	if (
+		roles?.kind !== "creator-snapshot-recovery-roles" ||
+		roles.version !== 1 ||
+		typeof roles.genesisAnchorDigest !== "string" ||
+		!digest.test(roles.genesisAnchorDigest)
+	)
+		return undefined;
+	const currentClose = recoveryScope(roles.currentClose),
+		previousClose = roles.previousClose === null ? null : recoveryScope(roles.previousClose),
+		sources = capturePromotionArray(roles.operationalSources, 2),
+		classified = capturePromotionArray(roles.classifiedScopes, 4);
+	if (
+		currentClose === undefined ||
+		previousClose === undefined ||
+		sources === undefined ||
+		classified === undefined ||
+		(currentClose.epoch === 0
+			? previousClose !== null
+			: previousClose === null || previousClose.epoch !== currentClose.epoch - 1)
+	)
+		return undefined;
+	const operationalSources = sources.map(source);
+	if (
+		operationalSources.some(
+			(source) =>
+				source === undefined ||
+				![currentClose.epoch - 1, currentClose.epoch - 2, currentClose.epoch - 3].includes(source.closedEpoch)
+		)
+	)
+		return undefined;
+	const classifiedScopes = classified.map(recoveryScope);
+	if (classifiedScopes.some((scope) => scope === undefined)) return undefined;
+	const sourceScopes = (operationalSources as PromotionSource[]).map((source) => ({
+		objectId: currentClose.objectId,
+		epoch: source.closedEpoch,
+		anchor: source.closedAnchorDigest,
+		manifestDigest: source.manifestRef.digest,
+	}));
+	const protectedScopes = [currentClose, ...(previousClose === null ? [] : [previousClose]), ...sourceScopes];
+	const all = [
+		...new Map(
+			protectedScopes.map((scope) => [JSON.stringify([scope.epoch, scope.anchor, scope.manifestDigest]), scope])
+		).values(),
+		...(classifiedScopes as CreatorSnapshotRecoveryScope[]),
+	];
+	if (
+		all.length > 4 ||
+		all.some((scope) => scope.objectId !== currentClose.objectId) ||
+		new Set(all.map((scope) => JSON.stringify([scope.epoch, scope.anchor, scope.manifestDigest]))).size !==
+			all.length ||
+		new Set(operationalSources.map((source) => source?.cutValueDigest)).size !== operationalSources.length ||
+		classifiedScopes.some((scope) => scope !== undefined && scope.epoch >= currentClose.epoch - 1)
+	)
+		return undefined;
+	return Object.freeze({
+		kind: roles.kind,
+		version: 1,
+		genesisAnchorDigest: roles.genesisAnchorDigest,
+		currentClose,
+		previousClose,
+		operationalSources: Object.freeze(operationalSources as PromotionSource[]),
+		classifiedScopes: Object.freeze(classifiedScopes as CreatorSnapshotRecoveryScope[]),
+	});
 }
 export function captureForwardPromotion(value: unknown): ForwardPromotion | undefined {
 	const p = capturePromotionRecord(value, [

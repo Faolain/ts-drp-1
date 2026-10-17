@@ -416,9 +416,17 @@ function parseAuthoring(authoringBytes, text) {
 	} catch {
 		throw new TypeError("blueprint.json is not valid JSON");
 	}
-	assertClosedRecord(value, AUTHORING_KEYS, "blueprint.json");
-	if (value.schemaVersion !== 1 || value.kind !== "ts-drp-blueprint-authoring-source") {
+	const hasWorkBudget = value !== null && typeof value === "object" && value.schemaVersion === 2;
+	assertClosedRecord(
+		value,
+		hasWorkBudget ? [...AUTHORING_KEYS, "workBudgetProfile"] : AUTHORING_KEYS,
+		"blueprint.json"
+	);
+	if ((value.schemaVersion !== 1 && value.schemaVersion !== 2) || value.kind !== "ts-drp-blueprint-authoring-source") {
 		throw new TypeError("blueprint.json has an unsupported schema or kind");
+	}
+	if (hasWorkBudget && value.workBudgetProfile !== "blueprint-work-budget-v1") {
+		throw new TypeError("workBudgetProfile is unsupported");
 	}
 	if (value.runtimeProfile !== "ecmascript-2024-sync-v1") throw new TypeError("runtimeProfile is unsupported");
 	const artifactId = requireNonemptyString(value.artifactId, "artifactId");
@@ -442,7 +450,11 @@ function parseAuthoring(authoringBytes, text) {
 	const operationsByName = new Map();
 	for (let index = 0; index < value.operations.length; index++) {
 		const operation = value.operations[index];
-		assertClosedRecord(operation, OPERATION_KEYS, `operations[${index}]`);
+		assertClosedRecord(
+			operation,
+			hasWorkBudget ? ["argumentSchema", "maxCanonicalOperationBytes", "name", "reducerBinding"] : OPERATION_KEYS,
+			`operations[${index}]`
+		);
 		const name = requireNonemptyString(operation.name, `operations[${index}].name`);
 		const reducerBinding = requireNonemptyString(operation.reducerBinding, `operations[${index}].reducerBinding`);
 		if (previousName !== undefined && compareCodePoints(previousName, name) >= 0)
@@ -456,7 +468,18 @@ function parseAuthoring(authoringBytes, text) {
 		const fields = compileArgumentSchema(operation.argumentSchema, `operations[${index}].argumentSchema`);
 		if (fields.some((field) => field.name === discriminator))
 			throw new TypeError("argument schema redeclares discriminator");
-		const compiled = { name, reducerBinding, fields };
+		if (
+			hasWorkBudget &&
+			(!Number.isSafeInteger(operation.maxCanonicalOperationBytes) || operation.maxCanonicalOperationBytes <= 0)
+		) {
+			throw new TypeError(`operations[${index}].maxCanonicalOperationBytes must be a positive safe integer`);
+		}
+		const compiled = {
+			name,
+			reducerBinding,
+			fields,
+			...(hasWorkBudget ? { maxCanonicalOperationBytes: operation.maxCanonicalOperationBytes } : {}),
+		};
 		operations.push(compiled);
 		operationsByName.set(name, compiled);
 		previousName = name;
@@ -481,7 +504,17 @@ function parseAuthoring(authoringBytes, text) {
 	]) {
 		for (let index = 0; index < cases.length; index++) {
 			const item = cases[index];
-			assertClosedRecord(item, CASE_KEYS, `${tier}Cases[${index}]`);
+			assertClosedRecord(
+				item,
+				Object.hasOwn(item, "executionContext") ? [...CASE_KEYS, "executionContext"].sort() : CASE_KEYS,
+				`${tier}Cases[${index}]`
+			);
+			if (Object.hasOwn(item, "executionContext")) {
+				assertClosedRecord(item.executionContext, ["author"], `${tier}Cases[${index}].executionContext`);
+				if (typeof item.executionContext.author !== "string" || !/^[0-9a-f]{64}$/u.test(item.executionContext.author)) {
+					throw new TypeError(`${tier}Cases[${index}].executionContext.author must be a lowercase author id`);
+				}
+			}
 			const id = requireNonemptyString(item.id, `${tier}Cases[${index}].id`);
 			if (ids.has(id)) throw new TypeError("conformance case ids must be unique");
 			ids.add(id);
@@ -490,6 +523,13 @@ function parseAuthoring(authoringBytes, text) {
 			if (operation === undefined) throw new TypeError("conformance action is undeclared");
 			validateArguments(item.arguments, operation.fields, `${tier}Cases[${index}].arguments`);
 			assertBoundedCanonical(item.arguments);
+			if (
+				hasWorkBudget &&
+				encodeCanonical({ [discriminator]: action, ...item.arguments }).byteLength >
+					operation.maxCanonicalOperationBytes
+			) {
+				throw new TypeError(`${tier}Cases[${index}] exceeds the operation byte bound`);
+			}
 		}
 	}
 	if (
@@ -516,6 +556,7 @@ function parseAuthoring(authoringBytes, text) {
 	return {
 		artifactId,
 		authoringBytes,
+		manifestSchemaVersion: hasWorkBudget ? 2 : 1,
 		conformance: {
 			corpusVersion,
 			initialState: conformance.initialState,
@@ -564,7 +605,7 @@ async function emitArtifact(source, authoring) {
 	return artifact;
 }
 
-/** @param {Uint8Array} artifact @param {{artifactId:string, operationDiscriminator:string, operations:readonly {name:string,fields:readonly {name:string,required:boolean,type:string}[]}[]}} authoring */
+/** @param {Uint8Array} artifact @param {{artifactId:string, manifestSchemaVersion:number, operationDiscriminator:string, operations:readonly {name:string,maxCanonicalOperationBytes?:number,fields:readonly {name:string,required:boolean,type:string}[]}[]}} authoring */
 async function preparePackageBinding(artifact, authoring) {
 	const blueprintPackage = {
 		implementation: {
@@ -585,8 +626,12 @@ async function preparePackageBinding(artifact, authoring) {
 					kind: "closed-record",
 				},
 				name: operation.name,
+				...(authoring.manifestSchemaVersion === 2
+					? { maxCanonicalOperationBytes: operation.maxCanonicalOperationBytes }
+					: {}),
 			})),
-			schemaVersion: 1,
+			schemaVersion: authoring.manifestSchemaVersion,
+			...(authoring.manifestSchemaVersion === 2 ? { workBudgetProfile: "blueprint-work-budget-v1" } : {}),
 		},
 		protocolMajor: 3,
 		schemaVersion: 1,
@@ -879,19 +924,21 @@ function validateChildReceipt(rawReceipt, tier, authoring, artifacts) {
 		}
 	}
 	const prOperations = /** @type {Record<string, any>[]} */ (authoring.conformance.prCases).map(
-		({ id, action, arguments: arguments_ }) => ({
+		({ id, action, arguments: arguments_, executionContext }) => ({
 			id,
 			action,
 			arguments: arguments_,
+			...(executionContext === undefined ? {} : { executionContext }),
 		})
 	);
 	const nightlyOperations = [
 		...prOperations,
 		.../** @type {Record<string, any>[]} */ (authoring.conformance.nightlyAdditionalCases).map(
-			({ id, action, arguments: arguments_ }) => ({
+			({ id, action, arguments: arguments_, executionContext }) => ({
 				id,
 				action,
 				arguments: arguments_,
+				...(executionContext === undefined ? {} : { executionContext }),
 			})
 		),
 	];
@@ -1212,17 +1259,23 @@ async function createConformanceReceipt(authoring, sourceBytes, artifact, packag
 	/** @type {Record<string, Buffer>} */
 	const artifacts = { primary: artifact };
 	const prOperations = /** @type {Record<string, any>[]} */ (authoring.conformance.prCases).map(
-		({ id, action, arguments: arguments_ }) => ({
+		({ id, action, arguments: arguments_, executionContext }) => ({
 			id,
 			action,
 			arguments: arguments_,
+			...(executionContext === undefined ? {} : { executionContext }),
 		})
 	);
 	const selectedControlAction = prOperations[0].action;
 	/** @type {Record<string, {artifact:Buffer,artifactId:string,source:string}>} */
 	const controls = {};
 	for (const name of CONTROL_NAMES) {
-		const source = CONTROL_SOURCES[name];
+		const source =
+			name === "ambientBad" && authoring.manifestSchemaVersion === 2
+				? CONTROL_SOURCES[name]
+						.replaceAll("operation.action", `operation[${JSON.stringify(authoring.operationDiscriminator)}]`)
+						.replaceAll("operation.arguments.value", "operation.value")
+				: CONTROL_SOURCES[name];
 		const artifactId = artifactIdFor(name);
 		const operations = /** @type {{name:string,reducerBinding:string}[]} */ (
 			/** @type {Record<string, any>[]} */ (authoring.operations).map((operation) => ({
@@ -1233,14 +1286,15 @@ async function createConformanceReceipt(authoring, sourceBytes, artifact, packag
 		controls[name] = { artifact: await emitArtifact(source, { artifactId, operations }), artifactId, source };
 		artifacts[name] = controls[name].artifact;
 	}
-	await proveAmbientLintRejects(CONTROL_SOURCES.ambientBad);
+	await proveAmbientLintRejects(controls.ambientBad.source);
 	const nightlyOperations = [
 		...prOperations,
 		.../** @type {Record<string, any>[]} */ (authoring.conformance.nightlyAdditionalCases).map(
-			({ id, action, arguments: arguments_ }) => ({
+			({ id, action, arguments: arguments_, executionContext }) => ({
 				id,
 				action,
 				arguments: arguments_,
+				...(executionContext === undefined ? {} : { executionContext }),
 			})
 		),
 	];
@@ -1256,8 +1310,14 @@ async function createConformanceReceipt(authoring, sourceBytes, artifact, packag
 		manifest: {
 			schemaVersion: packageTemplate.manifest.schemaVersion,
 			operationDiscriminator: packageTemplate.manifest.operationDiscriminator,
+			...(packageTemplate.manifest.schemaVersion === 2
+				? { workBudgetProfile: packageTemplate.manifest.workBudgetProfile }
+				: {}),
 			operations: /** @type {Record<string, any>[]} */ (packageTemplate.manifest.operations).map((operation) => ({
 				name: operation.name,
+				...(packageTemplate.manifest.schemaVersion === 2
+					? { maxCanonicalOperationBytes: operation.maxCanonicalOperationBytes }
+					: {}),
 				argumentSchema: {
 					kind: operation.argumentSchema.kind,
 					fields: /** @type {Record<string, any>[]} */ (operation.argumentSchema.fields).map((field) => ({

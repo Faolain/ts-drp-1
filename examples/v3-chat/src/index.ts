@@ -1,3 +1,4 @@
+import { openTrustedBlueprintCatalogBytes } from "@ts-drp/blueprint-catalog/bytes";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	createV3RoomCreatorInviteMaterial,
@@ -7,8 +8,6 @@ import {
 	type V3RoomCreatorInviteMaterial,
 	type V3RoomHead,
 	type V3RoomHeadAuthority,
-	type V3RoomHeadAuthorityResult,
-	type V3RoomHeadState,
 	type V3RoomMigrationActivationReceipt,
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
@@ -21,9 +20,10 @@ import { Keychain } from "@ts-drp/keychain";
 import { createRecoverableFinalitySigner, type FinalitySigner } from "@ts-drp/keychain/finality";
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
+import catalogMaterial from "./catalog-material.json" with { type: "json" };
+
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
 const CREATOR_FINALITY_KEYCHAIN_SEED = "d107d-v3-chat-creator-finality";
-const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","clientOperationId","text"])||entry.operation.action!=="message"||typeof entry.operation.clientOperationId!=="string"||entry.operation.clientOperationId.length===0||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;const message={clientOperationId:entry.operation.clientOperationId,text:entry.operation.text};state.push(message);output.push(message)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){if(!exactKeys(input.operation,["action","clientOperationId","text"])||typeof input.operation.clientOperationId!=="string"||input.operation.clientOperationId.length===0||typeof input.operation.text!=="string")throw new TypeError("invalid message");const message={clientOperationId:input.operation.clientOperationId,text:input.operation.text};const state=[...input.state,message];return {output:message,state}}function migrationActivationReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","decision"])||operation.action!=="migrationActivation"||operation.decision===null||typeof operation.decision!=="object"||Array.isArray(operation.decision))throw new TypeError("invalid migration activation");return {output:null,state:input.state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer,migrationActivation:migrationActivationReducer,migrationRecord:migrationRecordReducer}};`;
 const PARAMETERS = Object.freeze({
 	authorShareMultiplier: 4,
 	maxEpochVertices: 8192,
@@ -50,6 +50,7 @@ const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: s
 });
 const ACL_VIEW_CLIENT_IDS = ["alice", "bob", "dave"] as const;
 interface JoinInput {
+	readonly roomHeadAuthority: V3RoomHeadAuthority;
 	readonly channelName: string;
 	readonly clientId: ClientId;
 	readonly databaseName: string;
@@ -63,6 +64,7 @@ interface RoomJoinInput extends Omit<JoinInput, "invite"> {
 }
 
 interface CreateInput {
+	readonly roomHeadAuthority: V3RoomHeadAuthority;
 	readonly channelName: string;
 	readonly clientId: "alice";
 	readonly databaseName: string;
@@ -201,7 +203,10 @@ function migrationTargetObjectId(sourceObjectId: string, rehearsalNonce: Uint8Ar
 	return targetObjectId;
 }
 
-function prepareChatMigration(operations: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection {
+function prepareChatMigration(
+	operations: readonly V3RoomAcceptedOperation[],
+	exactCanonicalSourceStateBytes?: Uint8Array
+): V3RoomMigrationProjection {
 	const identities = new Set<string>();
 	const messages = operations
 		.flatMap((row) => {
@@ -224,8 +229,15 @@ function prepareChatMigration(operations: readonly V3RoomAcceptedOperation[]): V
 				left.row.operationIndex - right.row.operationIndex
 		);
 	const state = Object.freeze(
-		messages.map(({ clientOperationId, text }) => Object.freeze({ clientOperationId, text }))
+		(exactCanonicalSourceStateBytes === undefined ? messages : snapshotMessages(exactCanonicalSourceStateBytes)).map(
+			({ clientOperationId, text }) => Object.freeze({ clientOperationId, text })
+		)
 	);
+	const sourceIdentities = new Set<string>();
+	for (const { clientOperationId } of state) {
+		if (sourceIdentities.has(clientOperationId)) throw new TypeError("v3 chat migration identity conflicts");
+		sourceIdentities.add(clientOperationId);
+	}
 	return Object.freeze({
 		exactCanonicalApplicationStateBytes: encodeCanonical(state),
 		importOperations: Object.freeze(
@@ -338,125 +350,22 @@ function snapshot(active: ActiveChat | undefined): ChatSnapshot {
 	});
 }
 
+const CHAT_CATALOG = openTrustedBlueprintCatalogBytes({
+	catalogBytes: bytes(catalogMaterial.catalogBytes),
+	assets: Object.fromEntries(
+		Object.entries(catalogMaterial.assets).map(([filename, value]) => [filename, bytes(value)])
+	),
+});
+
 function applicationMaterial(): ApplicationMaterial {
-	const exactArtifactBytes = new TextEncoder().encode(CHAT_ARTIFACT_SOURCE);
-	const artifactDigest = digest("ts-drp/blueprint-artifact/v3", exactArtifactBytes);
-	const blueprintPackage = Object.freeze({
-		kind: "drp-blueprint-admission-package",
-		protocolMajor: 3,
-		schemaVersion: 1,
-		implementation: Object.freeze({
-			artifactId: "v3-chat.v1",
-			artifactDigest,
-			runtimeProfile: "ecmascript-2024-sync-v1",
-		}),
-		manifest: Object.freeze({
-			schemaVersion: 2,
-			operationDiscriminator: "action",
-			workBudgetProfile: "blueprint-work-budget-v1",
-			operations: Object.freeze([
-				Object.freeze({
-					name: "acl",
-					maxCanonicalOperationBytes: 65_536,
-					argumentSchema: Object.freeze({
-						kind: "closed-record",
-						fields: Object.freeze([
-							Object.freeze({ name: "group", required: true, type: "string" }),
-							Object.freeze({ name: "kind", required: true, type: "string" }),
-							Object.freeze({ name: "target", required: true, type: "string" }),
-						]),
-					}),
-				}),
-				Object.freeze({
-					name: "applicationBatch",
-					maxCanonicalOperationBytes: 65_536,
-					argumentSchema: Object.freeze({
-						kind: "closed-record",
-						fields: Object.freeze([Object.freeze({ name: "batch", required: true, type: "canonical-object" })]),
-					}),
-				}),
-				Object.freeze({
-					name: "causalJoin",
-					maxCanonicalOperationBytes: 65_536,
-					argumentSchema: Object.freeze({
-						kind: "closed-record",
-						fields: Object.freeze([]),
-					}),
-				}),
-				Object.freeze({
-					name: "join",
-					maxCanonicalOperationBytes: 65_536,
-					argumentSchema: Object.freeze({
-						kind: "closed-record",
-						fields: Object.freeze([Object.freeze({ name: "clientId", required: true, type: "string" })]),
-					}),
-				}),
-				Object.freeze({
-					name: "message",
-					maxCanonicalOperationBytes: 65_536,
-					argumentSchema: Object.freeze({
-						kind: "closed-record",
-						fields: Object.freeze([
-							Object.freeze({ name: "clientOperationId", required: true, type: "string" }),
-							Object.freeze({ name: "text", required: true, type: "string" }),
-						]),
-					}),
-				}),
-				Object.freeze({
-					name: "migrationActivation",
-					maxCanonicalOperationBytes: 65_536,
-					argumentSchema: Object.freeze({
-						kind: "closed-record",
-						fields: Object.freeze([Object.freeze({ name: "decision", required: true, type: "canonical-object" })]),
-					}),
-				}),
-				Object.freeze({
-					name: "migrationRecord",
-					maxCanonicalOperationBytes: 65_536,
-					argumentSchema: Object.freeze({
-						kind: "closed-record",
-						fields: Object.freeze([Object.freeze({ name: "record", required: true, type: "canonical-object" })]),
-					}),
-				}),
-			]),
-		}),
-	});
-	const canonicalBlueprintPackageBytes = encodeCanonical(blueprintPackage);
-	const blueprintDigest = digest("ts-drp/blueprint-admission/v3", canonicalBlueprintPackageBytes);
-	const catalogDigest = digest("ts-drp/d9336-chat-catalog/v1", canonicalBlueprintPackageBytes);
-	const resolved = Object.freeze({
-		artifactDigest,
-		artifactId: "v3-chat.v1",
-		blueprintDigest,
-		canonicalBlueprintPackageBytes,
-		exactArtifactBytes,
-		runtimeProfile: "ecmascript-2024-sync-v1" as const,
-		evidence: Object.freeze({
-			catalogDigest,
-			lintEvidenceDigest: "a".repeat(64),
-			conformanceReceiptDigest: "b".repeat(64),
-			conformanceDigest: "c".repeat(64),
-			conformanceTier: "nightly" as const,
-			conformanceResult: "passed" as const,
-			engines: Object.freeze([
-				Object.freeze({ name: "node" as const, build: "d9336" }),
-				Object.freeze({ name: "chromium" as const, build: "d9336" }),
-				Object.freeze({ name: "firefox" as const, build: "d9336" }),
-				Object.freeze({ name: "webkit" as const, build: "d9336" }),
-			]),
-		}),
-	});
+	const blueprintDigest = CHAT_CATALOG.blueprintDigests[0];
+	if (blueprintDigest === undefined || CHAT_CATALOG.blueprintDigests.length !== 1) {
+		throw new TypeError("v3 chat requires its exact single-entry catalog");
+	}
 	return Object.freeze({
 		blueprintDigest,
-		canonicalBlueprintPackageBytes,
-		catalog: Object.freeze({
-			blueprintDigests: Object.freeze([blueprintDigest]),
-			catalogDigest,
-			resolve(requested: string) {
-				if (requested !== blueprintDigest) throw new TypeError("unknown v3 chat blueprint");
-				return resolved;
-			},
-		}),
+		canonicalBlueprintPackageBytes: CHAT_CATALOG.resolve(blueprintDigest).canonicalBlueprintPackageBytes,
+		catalog: CHAT_CATALOG,
 	});
 }
 
@@ -718,13 +627,17 @@ function authenticatedSnapshotMessages(
 	input: V3RoomProjectionInput["authenticatedBase"]
 ): readonly SnapshotAcceptedMessage[] {
 	if (input === undefined) return Object.freeze([]);
+	return snapshotMessages(input.exactCanonicalApplicationStateBytes);
+}
+
+function snapshotMessages(exactCanonicalApplicationStateBytes: Uint8Array): readonly SnapshotAcceptedMessage[] {
 	let decoded: unknown;
 	try {
-		decoded = decodeCanonical(input.exactCanonicalApplicationStateBytes);
+		decoded = decodeCanonical(exactCanonicalApplicationStateBytes);
 	} catch {
 		throw new TypeError("v3 chat authenticated projection base is invalid");
 	}
-	if (!Array.isArray(decoded) || !sameBytes(encodeCanonical(decoded), input.exactCanonicalApplicationStateBytes)) {
+	if (!Array.isArray(decoded) || !sameBytes(encodeCanonical(decoded), exactCanonicalApplicationStateBytes)) {
 		throw new TypeError("v3 chat authenticated projection base is invalid");
 	}
 	return Object.freeze(
@@ -799,52 +712,6 @@ function projectChat(input: V3RoomProjectionInput): ChatProjection {
 	return projection;
 }
 
-function chatRoomHeadAuthority(migrationHead?: V3RoomHead): V3RoomHeadAuthority {
-	let state: V3RoomHeadState | null = null;
-	const same = (left: unknown, right: unknown): boolean => sameBytes(encodeCanonical(left), encodeCanonical(right));
-	const success = (): V3RoomHeadAuthorityResult => Object.freeze({ ok: true as const, state });
-	return Object.freeze({
-		initialization:
-			migrationHead === undefined
-				? Object.freeze({ kind: "create" as const })
-				: Object.freeze({ head: migrationHead, kind: "migrate" as const }),
-		begin: (input: Parameters<V3RoomHeadAuthority["begin"]>[0]) => {
-			if (state === null || !same(state, input.expected)) {
-				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
-			}
-			state = Object.freeze({
-				pending: Object.freeze({ next: input.next, previous: input.expected.stable }),
-				stable: input.expected.stable,
-			});
-			return Promise.resolve(success());
-		},
-		commit: (input: Parameters<V3RoomHeadAuthority["commit"]>[0]) => {
-			if (state === null || state.pending === null || !same(state, input.expected)) {
-				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
-			}
-			state = Object.freeze({ pending: null, stable: state.pending.next });
-			return Promise.resolve(success());
-		},
-		create: (input: Parameters<V3RoomHeadAuthority["create"]>[0]) => {
-			const desired = Object.freeze({ pending: null, stable: input.stable });
-			if (state === null) state = desired;
-			else if (!same(state, desired)) {
-				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
-			}
-			return Promise.resolve(success());
-		},
-		migrate: (input: Parameters<V3RoomHeadAuthority["migrate"]>[0]) => {
-			const desired = Object.freeze({ pending: null, stable: input.stable });
-			if (state !== null && !same(state, desired)) {
-				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
-			}
-			state = desired;
-			return Promise.resolve(success());
-		},
-		read: () => Promise.resolve(success()),
-	});
-}
-
 async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 	const application = createV3ChatApplication(input.clientId);
 	const selected = CLIENTS[input.clientId];
@@ -892,7 +759,7 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 			}
 		},
 		publicKeyBytes: bytes(author),
-		roomHeadAuthority: chatRoomHeadAuthority(input.roomHead),
+		roomHeadAuthority: input.roomHeadAuthority,
 		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
 	});
 	source.room = room;
@@ -929,6 +796,7 @@ const api = Object.freeze({
 	async join(input: JoinInput): Promise<void> {
 		if (active !== undefined) throw new TypeError("v3 chat client is already joined");
 		active = await joinRoom({
+			roomHeadAuthority: input.roomHeadAuthority,
 			channelName: input.channelName,
 			clientId: input.clientId,
 			creatorInvite: input.invite,

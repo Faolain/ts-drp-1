@@ -8,6 +8,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { chromium, firefox, webkit } from "@playwright/test";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { prepareBlueprintAdmission } from "@ts-drp/protocol-v3";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, realpathSync } from "node:fs";
@@ -83,6 +84,16 @@ function loadContract(contractPath) {
 	if (!Array.isArray(additional)) fail("nightly additional selection must be an array");
 	const prIds = prOperations.map((operation) => plainRecord(operation, "operation").id);
 	const nightlyIds = nightlyOperations.map((operation) => plainRecord(operation, "nightly operation").id);
+	for (const operation of nightlyOperations) {
+		if (!Object.hasOwn(operation, "executionContext")) continue;
+		const context = plainRecord(operation.executionContext, "execution context");
+		if (
+			Object.keys(context).sort().join(",") !== "author" ||
+			typeof context.author !== "string" ||
+			!/^[0-9a-f]{64}$/u.test(context.author)
+		)
+			fail("execution context must contain only a lowercase author id");
+	}
 	if (JSON.stringify(nightlyIds) !== JSON.stringify([...prIds, ...additional]))
 		fail("nightly selected case ids are inconsistent");
 	for (const [name, accounting, selectedIds] of [
@@ -103,12 +114,27 @@ function loadContract(contractPath) {
 		packageTemplate.kind !== "drp-blueprint-admission-package" ||
 		packageTemplate.protocolMajor !== 3 ||
 		packageTemplate.schemaVersion !== 1 ||
-		manifest.schemaVersion !== 1 ||
+		(manifest.schemaVersion !== 1 && manifest.schemaVersion !== 2) ||
 		typeof implementation.artifactId !== "string" ||
 		typeof implementation.runtimeProfile !== "string" ||
 		implementation.runtimeProfile !== contract.runtimeProfile
 	)
 		fail("packageTemplate binding is invalid");
+	if (manifest.schemaVersion === 2) {
+		// Reuse the public exact package owner for the existing work-budget contract.
+		const packageBytes = encodeCanonical(packageTemplate);
+		prepareBlueprintAdmission({
+			canonicalBlueprintPackageBytes: packageBytes,
+			expectedBlueprintDigest: artifactDigest("ts-drp/blueprint-admission/v3", packageBytes),
+		});
+		for (const operation of nightlyOperations) {
+			const schema = manifest.operations.find((candidate) => candidate.name === operation.action);
+			const wire = { [manifest.operationDiscriminator]: operation.action, ...operation.arguments };
+			if (schema === undefined || encodeCanonical(wire).byteLength > schema.maxCanonicalOperationBytes) {
+				fail("operation exceeds the manifest byte bound");
+			}
+		}
+	}
 	if (!Array.isArray(manifest.operations)) fail("packageTemplate manifest operations are invalid");
 	const manifestOperationNames = manifest.operations.map(
 		(operation) => plainRecord(operation, "manifest operation").name
@@ -386,10 +412,17 @@ async function executeInRealm(input) {
 		let state = detachCanonical(input.initialState);
 		const outputs = [];
 		let normalizedNegativeZeroOutputs = 0;
-		for (const operation of input.operations) {
-			const reducer = reducers[operation.action];
-			assert(typeof reducer === "function", `missing reducer ${operation.action}`);
-			const result = reducer({ state, operation });
+		for (const [operationIndex, operation] of input.operations.entries()) {
+			const action = input.manifestSchemaVersion === 2 ? operation[input.operationDiscriminator] : operation.action;
+			const reducer = reducers[action];
+			assert(typeof reducer === "function", `missing reducer ${action}`);
+			const reducerOperation = input.manifestSchemaVersion === 2 ? detachCanonical(operation) : operation;
+			const executionContext = input.executionContexts[operationIndex];
+			const result = reducer({
+				state,
+				operation: reducerOperation,
+				...(executionContext === null ? {} : { executionContext: Object.freeze(detachCanonical(executionContext)) }),
+			});
 			assert(
 				result && typeof result === "object" && typeof result.then !== "function",
 				"reducer result must be a synchronous non-thenable object"
@@ -534,8 +567,19 @@ async function executeInRealm(input) {
 function engineInput(loaded, engine, tier) {
 	const { contract, artifacts } = loaded;
 	const rawOperations = loaded.operations[tier];
-	const operations = canonicalDetach(rawOperations);
-	const normalizedNegativeZeroOperationArguments = countNegativeZero(rawOperations) - countNegativeZero(operations);
+	const normalizedOperations = canonicalDetach(rawOperations);
+	const normalizedNegativeZeroOperationArguments =
+		countNegativeZero(rawOperations) - countNegativeZero(normalizedOperations);
+	const manifest = contract.packageTemplate.manifest;
+	// Schema1's historical authoring-call contract remains unchanged. Schema2
+	// qualifies the flat canonical operation actually passed by the public runtime.
+	const operations =
+		manifest.schemaVersion === 2
+			? normalizedOperations.map((operation) => ({
+					[manifest.operationDiscriminator]: operation.action,
+					...operation.arguments,
+				}))
+			: normalizedOperations;
 	if (tier === "pr" && normalizedNegativeZeroOperationArguments !== 1)
 		fail("canonical operation normalization did not remove exactly one negative zero");
 	return {
@@ -551,6 +595,9 @@ function engineInput(loaded, engine, tier) {
 		sparseId: artifacts.sparseIntermediate.id,
 		sparseUrl: asDataUrl(artifacts.sparseIntermediate.bytes),
 		operations,
+		executionContexts: normalizedOperations.map((operation) => operation.executionContext ?? null),
+		manifestSchemaVersion: manifest.schemaVersion,
+		operationDiscriminator: manifest.operationDiscriminator,
 		primaryId: artifacts.primary.id,
 		primaryUrl: asDataUrl(artifacts.primary.bytes),
 		reducerNames: contract.packageTemplate.manifest.operations.map((operation) => operation.name),

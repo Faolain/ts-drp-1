@@ -8,6 +8,8 @@ import { etc, signAsync } from "@noble/secp256k1";
 import { fromString as uint8ArrayFromString } from "uint8arrays/from-string";
 import { toString as uint8ArrayToString } from "uint8arrays/to-string";
 
+import { createRecoverableFinalitySigner, type FinalitySigner, retireRecoverableFinalitySigner } from "./finality.js";
+
 export interface KeychainConfig {
 	private_key_seed?: string;
 }
@@ -158,6 +160,11 @@ export class Keychain {
 	private _blsPrivateKey?: BlsSecretKey;
 	private _localAuthorPrivateKey?: Ed25519PrivateKey;
 	private _localAuthorId?: string;
+	private _localAuthorFinalitySigner?: Promise<FinalitySigner>;
+	private _localAuthorFinalitySignerResolved?: FinalitySigner;
+	private _localAuthorRetirement: Promise<void> = Promise.resolve();
+	private readonly _localAuthorPending = new Set<Promise<Uint8Array>>();
+	private _lifecycleGeneration = 0;
 
 	/**
 	 * Constructor for Keychain
@@ -172,6 +179,7 @@ export class Keychain {
 	 */
 	async start(): Promise<void> {
 		const configuredSeed = this._config?.private_key_seed;
+		const generation = ++this._lifecycleGeneration;
 		if (configuredSeed) {
 			if (!isWellFormedUtf16Text(configuredSeed)) throw new TypeError("private_key_seed must be well-formed UTF-16");
 			const seed = sha512.create().update(configuredSeed).digest();
@@ -191,20 +199,89 @@ export class Keychain {
 				32,
 				"local author public key must be a 32-byte Uint8Array"
 			);
+			if (generation !== this._lifecycleGeneration) throw new Error("keychain lifecycle changed during start");
+			const retired = this.#retireLocalAuthorSigner();
+			const previousWork = [...this._localAuthorPending];
 
 			this._secp256k1PrivateKey = key;
 			this._blsPrivateKey = blsKey;
 			this._localAuthorPrivateKey = localAuthorKey;
 			this._localAuthorId = bytesToLowerHex(localAuthorPublicKey);
+			await Promise.all([retired, Promise.allSettled(previousWork)]);
 		} else {
 			const key = await generateKeyPair("secp256k1");
 			const blsKey = bls.SecretKey.fromKeygen();
+			if (generation !== this._lifecycleGeneration) throw new Error("keychain lifecycle changed during start");
+			const retired = this.#retireLocalAuthorSigner();
+			const previousWork = [...this._localAuthorPending];
 
 			this._secp256k1PrivateKey = key;
 			this._blsPrivateKey = blsKey;
 			this._localAuthorPrivateKey = undefined;
 			this._localAuthorId = undefined;
+			await Promise.all([retired, Promise.allSettled(previousWork)]);
 		}
+	}
+
+	/**
+	 * Acquire one genuine creator signer for the configured local author.
+	 * The private seed never leaves Keychain; repeated acquisition shares the same
+	 * revocable custody, rather than wrapping ordinary signing as wire authority.
+	 * @returns The exact local author's opaque finality signer.
+	 */
+	async acquireLocalAuthorFinalitySigner(): Promise<FinalitySigner> {
+		const key = this._localAuthorPrivateKey;
+		if (key === undefined) throw new Error(LOCAL_AUTHOR_UNAVAILABLE);
+		return (this._localAuthorFinalitySigner ??= (async (): Promise<FinalitySigner> => {
+			// The installed libp2p Ed25519 owner stores seed || public key. Capture
+			// its actual key, not the configured string or an application KDF.
+			const raw = copyExactOrdinaryBytes(key.raw, 64, "local author private key must be exactly 64 bytes");
+			const seed = raw.slice(0, 32);
+			try {
+				const { signer, publicKey } = await createRecoverableFinalitySigner({ seed });
+				if (this._localAuthorPrivateKey !== key || bytesToLowerHex(publicKey) !== this._localAuthorId) {
+					await retireRecoverableFinalitySigner({ signer });
+					throw new Error("local author identity changed during signer acquisition");
+				}
+				this._localAuthorFinalitySignerResolved = signer;
+				return signer;
+			} finally {
+				raw.fill(0);
+				seed.fill(0);
+			}
+		})());
+	}
+
+	#retireLocalAuthorSigner(): Promise<void> {
+		const pending = this._localAuthorFinalitySigner;
+		const resolved = this._localAuthorFinalitySignerResolved;
+		this._localAuthorFinalitySigner = undefined;
+		this._localAuthorFinalitySignerResolved = undefined;
+		// A delivered alias is revoked synchronously, before any promise join.
+		const retired =
+			resolved !== undefined
+				? retireRecoverableFinalitySigner({ signer: resolved })
+				: pending?.then(
+						(signer) => retireRecoverableFinalitySigner({ signer }),
+						() => undefined
+					);
+		return (this._localAuthorRetirement = Promise.all([this._localAuthorRetirement, retired]).then(() => undefined));
+	}
+
+	/**
+	 * Revoke local key acquisition immediately and join admitted author/finality work.
+	 * This is local lifetime control, not a durable signing floor or seed zeroization.
+	 * @returns Joined shutdown of this Keychain's current key custody.
+	 */
+	async stop(): Promise<void> {
+		this._lifecycleGeneration += 1;
+		const retired = this.#retireLocalAuthorSigner();
+		const previousWork = [...this._localAuthorPending];
+		this._localAuthorPrivateKey = undefined;
+		this._localAuthorId = undefined;
+		this._secp256k1PrivateKey = undefined;
+		this._blsPrivateKey = undefined;
+		await Promise.all([retired, Promise.allSettled(previousWork)]);
 	}
 
 	/**
@@ -226,7 +303,13 @@ export class Keychain {
 		if (localAuthorKey === undefined) throw new Error(LOCAL_AUTHOR_UNAVAILABLE);
 		const digest = copyExactOrdinaryBytes(registeredDigest, 32, LOCAL_AUTHOR_DIGEST_ERROR);
 		const signature = localAuthorKey.sign(digest) as unknown;
-		return capturePrivateSignerResult(signature);
+		const task = Promise.resolve(capturePrivateSignerResult(signature));
+		this._localAuthorPending.add(task);
+		void task.then(
+			() => this._localAuthorPending.delete(task),
+			() => this._localAuthorPending.delete(task)
+		);
+		return task;
 	}
 
 	/**

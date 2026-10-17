@@ -1,6 +1,7 @@
 interface Phase5cSealVoteTestControl {
 	runSchemaScenario(databaseName: string): Promise<unknown>;
 	runScopedSnapshotScenario(databaseName: string): Promise<unknown>;
+	runSnapshotScanScenario(databaseName: string, malformedRound?: boolean): Promise<unknown>;
 	runStrictVoteScenario(databaseName: string): Promise<unknown>;
 	runDispatchScenario(databaseName: string, mode: string): Promise<unknown>;
 	runDeathCheckpoint(databaseName: string, checkpoint: string): Promise<never>;

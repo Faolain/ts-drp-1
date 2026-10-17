@@ -18,6 +18,10 @@
 		"!**/*.tsbuildinfo"
 	],
 	"exports": {
+		"./internal/owned-signing-request": {
+			"types": "./dist/src/internal/owned-signing-request.d.ts",
+			"import": "./dist/src/internal/owned-signing-request.js"
+		},
 		".": {
 			"types": "./dist/src/public.d.ts",
 			"import": "./dist/src/public.js"

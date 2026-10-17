@@ -1,192 +1,108 @@
 # Bounded storage lifecycle
 
-## Next Agent Prompt
+## Current work
 
-Active pickup (2026-10-04): implement the
-[authorized forward historical promotion](../../.logs/bounded-storage-lifecycle/forward-promotion-authority-01/authorization.md)
-through the existing lifetime owner. The new authenticated
-[decision/representation law](slices/02e-4-authenticated-forward-promotion.md)
-is accepted for causal pure RED. The focused XHIGH review's
-[three causal test gaps](../../.logs/bounded-storage-lifecycle/forward-promotion-red-review-01/root-disposition.md)
-are corrected and [independently released](../../.logs/bounded-storage-lifecycle/forward-promotion-red-correction-review-01/root-disposition.md).
-The pure seam and its focused capture correction are separately XHIGH-accepted;
-[MAIN integration](../../.logs/bounded-storage-lifecycle/forward-promotion-main-01/root-disposition.md)
-passes the frozen authority/capture/ordinary controls without native acceptance. Proceed
-immediately through focused RED/GREEN
-and actual room installation/restart/continued-write gates. Keep exact historical
-checkpoint identity separate from the new operational epoch and monotone safety
-memory. A separate tests-only HIGH author froze the
-[real room-consumer RED](slices/02e-5-room-forward-promotion.md); its focused separate
-XHIGH review is running before distinct runtime HIGH GREEN;
-no runtime/product acceptance follows before its changed-product runs.
-The accepted Node/storage allocations remain closed; review only this
-new authority boundary. Standing authorization also covers authenticated recipient
-installation under the existing trust model: choose conservative protocol/API/schema/
-custody/orchestration contracts, document assumptions and implement with actual
-RED/GREEN. Do not stop for routine technical approval. Genuine requirement conflict,
-security weakening/trust-model change, irreversible user-data operations and external
-permissions/costs remain the only direction gates.
+Original **2e/2f and slices 3–8 are CLOSED** within their recorded contracts.
+The [consumer audit](closure-audit-2e-2f.md) and
+[requirement-to-evidence map](requirements-to-evidence.md) own accepted evidence
+and limitations. Preserve original failures and do not replay unchanged tests.
 
-The signed historical-anchor mechanism is implemented
-and [focused MAIN integration accepted](../../.logs/bounded-storage-lifecycle/signed-anchor-mechanism-main-01/root-disposition.md).
-The original product review's native capture/close admission finding is resolved
-by the [separately reviewed lifetime correction](../../.logs/bounded-storage-lifecycle/signed-anchor-close-correction-product-review-01/root-disposition.md).
-Actual changed-product import/observation, independent reopen and causal shutdown
-assertions pass; frozen behavioral oracles and previous evidence partitions remain
-preserved. Broader historical custody is still open. Requirements derive before
-missing-destination refusal under the same operation-private proof ledger; whole
-observer success cannot be a repair prerequisite. Exact populated destinations
-stay in place, and import is limited to genuinely absent/empty closures. No fake
-empty rows or uncapped populated scan is permitted. Exact-U acquisition still
-conservatively refuses mandatory rereads after exhausting the same ledger;
-inclusive envelope admission and genuine equality-only dedup remain supported.
+R8's original admission, maintenance, migration and native resource obligations
+are closed at their recorded domains. Accepted warm/capacity evidence and all
+historical failures remain preserved. This is not universal heap/RSS, physical
+allocation, distributed game-performance or release-device acceptance. The
+[finite R8 backlog](requirements-to-evidence.md#current-slice-8-finite-backlog)
+owns the closure and its exact evidence scope; there are no remaining original
+R8 implementation, execution or documentation-only items.
 
-The private Node current/pending role observer is implemented, independently
-[product-accepted](../../.logs/bounded-storage-lifecycle/protected-role-node-product-review-01/root-disposition.md)
-and [MAIN integration accepted](../../.logs/bounded-storage-lifecycle/protected-role-node-main-01/root-disposition.md).
-Real selected snapshots and ACLs, full native currency and whole host equality
-precede joined cleanup and the private fieldless fact. A persisted predecessor
-floor is not an invented revision-one head. This is point-observed evidence,
-not a lifetime pin, complete protected union or mutation authority.
-The [accepted allocation](../../.logs/bounded-storage-lifecycle/protected-role-node-allocation-review-01/root-disposition.md)
-stays closed. Actual changed-product SQLite/C/F/W runs own the feedback loop;
-formerly masked assertions execute, including the separately
-[corrected native fixture cases](../../.logs/bounded-storage-lifecycle/protected-role-node-native-red-review-01/root-disposition.md).
-Failed historical campaigns remain failed, with meaningful unaffected partitions
-retained rather than replayed. Continue through all Phase 6 gates and at least
-accomplished Phase 7; no broader completion follows from this Node acceptance.
-Its mechanical storage prerequisite is implemented, independently
-[product-accepted](../../.logs/bounded-storage-lifecycle/protected-role-carrier-product-review-01/root-disposition.md)
-and [MAIN integration accepted](../../.logs/bounded-storage-lifecycle/protected-role-storage-main-01/root-disposition.md).
-Existing native owners now provide bounded full physical metadata/candidate
-acquisition, complete same-head currency and joined release. Callback-free intrinsic
-validation observes the same borrowed backing without another retained byte union.
-The original accessor [P1/NO](../../.logs/bounded-storage-lifecycle/protected-role-storage-product-review-01/root-disposition.md)
-and failed runtime evidence remain preserved; the corrected reader resolves it.
-The separately [accepted certificate discriminator](../../.logs/bounded-storage-lifecycle/protected-role-certificate-red-review-01/root-disposition.md)
-recognizes genuine IDB scans in both existing laws. Final affected assertions
-execute meaningfully in SQLite/C/F/W; unchanged final assertions are retained,
-not rerun or relabelled as a clean aggregate. All fixed budgets and old reader
-semantics remain intact.
+The [MAIN receipt](../../.logs/bounded-storage-lifecycle/phase6-continuation-01/r8-native-main-integration01/receipt.json)
+is the canonical evidence home. Its `originalClosure20261010` checkpoint supersedes old
+pickup instructions, while preserving their failures, pins and accepted scopes.
+A proof entitlement bounds cumulative operation-local encoded charges—not heap,
+RSS, total scan work or physical storage. Complete conservative alternatives,
+full PRE, protected dependencies and unknown occurrences remain charged. Joined
+future acquisitions are separate lifetimes; no current-ledger refund is allowed.
 
-Keep the accepted storage and Node capabilities frozen. Mechanical acquisition
-does not grant policy availability, pin lifetime, complete the protected union or
-authorize deletion. Genuine historical source/destination custody and mandatory
-room/lifecycle consumption remain the next separate obligations. Do not repeat
-unchanged full matrices at any handoff.
-The [room-consumer investigation](../../.logs/bounded-storage-lifecycle/usable-rollback-consumer-investigation-01/proposal.md)
-identifies an actual authority conflict: historical promotion cannot lower the
-committed floor or reactivate Superseded generations under the accepted safety law.
-The user has now selected authenticated forward promotion at a new epoch, with
-exact historical checkpoint and role reconciliation and all safety watermarks
-preserved. The [authorization](../../.logs/bounded-storage-lifecycle/forward-promotion-authority-01/authorization.md)
-governs the changed authority seam; old signatures alone cannot grant it. Preserve
-the original investigation as evidence of why ordinary reopening or app restore
-cannot meet usable rollback. No literal old-epoch or Superseded reactivation follows.
-The [recipient boundary disposition](../../.logs/bounded-storage-lifecycle/recipient-retention-consumer-review-01/root-disposition.md)
-confirms genuine peer byte ingress activates only a non-writing closed replica;
-writable staging instead consumes local-close custody. Establish concrete
-authenticated incoming successor provenance and destination-bound custody before
-implementing that installer. Missing orchestration alone does not require new trust
-policy. Authenticated installation under the existing trust model is now explicitly
-authorized; changing that trust model still requires direction.
-Neither a transfer receipt nor raw fixture AHE/floor copying supplies that grant.
-These are concrete custody obligations, not permission to weaken rollback, fabricate
-local-close facts or relabel closed activation as continued-write acceptance.
+Use existing launchers, models and evidence formats. Repair a harness failure
+and return directly to its intended test. Native execution closes native
+requirements; source review, scalar arithmetic and bounded models do not replace
+it. Existing Quint safety/progress and trace checks retain their stated bounds
+and premises, not full coverage or hidden-action refinement. Authentication,
+native reservations, storage atomicity, crash and physical resource/device
+evidence remain distinct.
 
-The [protected-role prerequisite](../../.logs/bounded-storage-lifecycle/protected-role-acquisition-review-01/root-disposition.md)
-is accepted as a conditional current/pending source contract only. Actual snapshot
-payload, closed/successor ACL and adjacent/deferred policy remain mandatory. It
-does not release runtime acquisition, the complete protected union or deletion.
-Retirement-only pending advance remains unavailable pending an independently
-accepted pure forward/ACL-coverage law and genuine pending-material provenance.
-Its [source review](../../.logs/bounded-storage-lifecycle/protected-pending-retirement-policy-review-01/root-disposition.md)
-also holds non-genesis scope for an independent current-role law: unchanged
-current acceptance retains an aggregate that the proposed subcase forbids.
-The separately reviewed [joint current/pending candidate](../../.logs/bounded-storage-lifecycle/retirement-only-joint-role-policy-review-01/root-disposition.md)
-addresses that omission conditionally, but releases no executable policy. Genuine
-original aggregate-free pending custody is still unestablished; the new singleton
-candidate also needs separately allocated original older-anchor/ACL custody for
-its deeper window. The prior pending-only finding remains intact. Historical
-retirement-only acceptance is not forward-adoption authority, and these holds do
-not block supported aggregate/settlement or mechanical storage product progress.
+Original **R9 software and 6d retirement contracts are CLOSED** at their recorded
+candidate scopes. Genuine Chat/additive Canvas/Grid, SDK/CLI/RPC and network
+workbench capabilities use current-v3 owners; obsolete per-vertex activation,
+configuration, raw wire and public exports refuse. Current signatures, ACL roles,
+fixed creator certificates, settlement, protected recovery and durable debt remain
+supported. The [finite requirement map](requirements-to-evidence.md#current-slice-9--6d-finite-backlog)
+owns requirement disposition; the MAIN receipt's
+`r9CreatorSelectionNativeAndRequestedModels20261011` owns exact execution pins,
+preserved failures, affected quality checks and carry-forward qualifications.
 
-[2e-3 actual closed-cut data observation](slices/02e-3-authenticated-closed-cut-data-observation.md)
-is implemented and independently product-reviewed. Previously masked assertions
-execute and pass against changed product, including genuine supported retirement-only
-genesis and non-genesis positives. The
-[product disposition](../../.logs/bounded-storage-lifecycle/rollback-data-observation-product-review-01/root-disposition.md)
-and [MAIN integration](../../.logs/bounded-storage-lifecycle/rollback-data-observation-main-01/root-disposition.md)
-own exact scope and qualifications. The separately reviewed literal-BEGIN recorder
-correction restores affected metadata assertions without changing the oracle or product.
-Its command still fails inherited global coverage; that gate remains unwaived.
-Synthetic accounting composition is not native published pressure; that original
-demand stays held. Preserve historical readiness, intentional old metadata mode and
-all frozen evidence.
+Portable settlement authenticates accepted source membership or explicit current
+creator selection bound to original source/dependency/intent bytes and the exact
+target. Local held custody is not wire authority. Snapshot inheritance is not
+ordinary operation admission, and original Grid outcome approvals remain unchanged
+historical evidence. Chat's authenticated carried-byte entitlements retain source
+claims until lawful settlement; rollover does not replenish them. General legacy
+compatibility is not a work item: retain only current-v3 durable dependencies needed
+for supported recovery or authenticated retirement.
 
-Pending recovery and current-floor shipped startup are implemented and accepted.
-The existing native owners now provide noncreating snapshot bytes, bounded active
-AHE observation and exact bounded journal anchors. Their product and focused MAIN
-landings are accepted; formerly masked assertions execute against changed product.
-The [review ledger](review.md) owns exact dispositions, raw reports and qualifications.
-Those observations do not establish all-profile durable availability or usable
-room rollback. Next separately close genuine source/import/destination
-custody, protected roles/fences and mandatory room/lifecycle rollback consumption,
-continued safe issuance/replay and registry reconciliation. Recipient snapshot
-retention remains its own destination installation/custody seam.
+The two requested isolated authorization/continuation models are terminal
+complementary evidence, not closure gates or full coverage. Their bounds, witnesses,
+rejected mutants and unsupported crypto/native premises live in the same receipt.
+No additional formal campaign is required to advance.
 
-Prioritize product progress. Once a bounded RED correction is accepted, immediately
-release distinct GREEN within its reviewed allocation and run actual changed-product
-assertions. Additional harness work needs a demonstrated blind spot, instrumentation
-effect or unsafe cleanup. Naming, formatting or custody presentation does not reopen
-closed reviews or justify unchanged full matrices. Preserve all accepted frozen
-oracles, historical readiness/findings, unrelated dirty work and every budget.
-Only separate RED may correct a proven oracle defect. Default coverage, broader
-compiler failures and failed aggregate browser runs remain failed and unwaived;
-successful unchanged title partitions prove semantics, not a clean aggregate or
-default-harness endurance. Historical stall cause/deletion remains unknown where
-the ledger says so. Standalone native success is not a global coverage pass.
+The same-room controller remains open. The finite performance diagnosis resolved
+the input/order discrepancy and verified owner-local reuse without reusing stale
+authorization: fresh native reads, exact byte/context checks and complete charges
+remain required. Shared maintenance context preparation preserves independent
+branch accounting and fresh authority checks. The matched later-phase diagnostic
+now completes its persisted reopen, but the original full composition failed with
+a timeout and a separate proof-charge refusal. Neither a completed prefix nor an
+over-budget interruption is a pass. Full composition still requires native
+completion after the late-phase processing and accounting blockers are resolved.
 
-Product scope is greenfield **v3-only**, preserving every golden-path requirement.
-[Phase 6d](slices/06d-v3-only-finality-retirement.md) retires obsolete per-vertex
-BLS attestations, not current v3 operation signing, certificates, settlement,
-issuance safety or recovery/migration required by durable data. Do not add
-per-operation quorum receipts. The [accepted shipping ledger](../../.logs/bounded-storage-lifecycle/v3-shipping-capability-review-01/root-disposition.md)
-retains chat, additive canvas, grid/zone, CLI/RPC and SDK capabilities and accepts
-one prospective v3 room owner, not exact schemas/ports or runtime equivalence.
-Seeded chat and zone overwrite are not shipping replacements. The separately
-accepted [operation-authorization contract](../../.logs/bounded-storage-lifecycle/v3-authorization-contract-review-01/root-disposition.md)
-and [retired-wire/durable-input policy](../../.logs/bounded-storage-lifecycle/v3-wire-durable-policy-review-01/root-disposition.md)
-select prospective laws only. Genuine consumer evidence, governed signer
-prerequisites, exact app/RPC contracts and ports remain held; neither approval
-authorizes runtime retirement ahead of the recovery sequence.
+The MAIN receipt's `measuredTimeoutRepair20261012.performanceBatch20261012` owns
+the matched measurements, regressions, preserved failures and runtime decision;
+its `maintenanceCommonFacts20261012` checkpoint owns the latest follow-up.
+CPU savings under contention are not guaranteed wall time or game viability;
+cumulative parsing, proof charges, storage, heap and RSS remain distinct. Resource
+saturation, fresh-process late-window acceptance and continuous endurance remain
+separate gates.
 
-Continue in order: usable rollback and recipient retention; protected-dependency
-planning, crash-safe retirement, journal/current-v3 signing-evidence cleanup and
-bounded recovery; then one room through **at least 100 authenticated transitions**
-with restart/recovery/pruning, continued writes, exact state/operation accounting
-and bounded storage/memory. Preserve stronger thousand-epoch/64-writer obligations.
-Existing 0→1→2 controls and the older 100-transition diagnostic remain partial.
-Close every remaining Phase 6 gate, including scoped 6d, before Phase 7 archives/
-paging and full golden-path browser/device acceptance at the release SHA.
-The [full production-hardening plan](../../docs/production-hardening/production-hardening-tdd-plan-v2.md)
-remains the objective, not a smaller replacement.
+The MAIN receipt's `nativeClosureContinuation20261011Late` owns current execution
+pins and remaining gaps. Original **slice 11 is CLOSED** under the approved local
+disposable-session contract: independent bounded slot/incarnation freshness survives
+owned-file restoration; the sole protected planner authorizes only an ended local
+claim after obligations discharge; native fencing, joined release and exact recovery
+precede key/file retirement. Distinct nonempty FPS/chess, stale callbacks/packets,
+signing, restoration, four actual terminal process-kill boundaries, complete file
+censuses and MAIN integration passed. Unknown/shared obligations still refuse;
+shared account floors and other peers remain protected. This is not global revocation,
+forensic key erasure, all-authority rollback detection or a universal heap/RSS bound.
+Key ownership alone never releases protected recovery obligations. Archive
+producer/storage preparation passes do not supply certified root evolution or paging.
+The [finite next-work table](requirements-to-evidence.md#finite-next-work-separate-from-r96d)
+classifies implementation, execution and policy gaps. Ordinary close is not terminal
+retirement; shallow trials and the earlier checked prefix are not continuous
+endurance. Phase-7 archive/root evolution and paging remain implementation work,
+not capabilities supplied by codecs alone.
 
-New implementation/investigation authors are Codex 6.1 HIGH; each new independent
-reviewer is separate Codex 6.1 XHIGH. No new Kimi, Grok or Opus rounds. Preserve their
-historical verdicts and NO_VERDICT attempts honestly. Build owned dependencies
-before tests, use named strict projects, join genuine admitted native promises and
-reader releases, and keep one existing owner per decision. Verification alone does
-not install durable retention, and a source-only contract is not runtime acceptance.
+With R9/[6d](slices/06d-v3-only-finality-retirement.md) closed, continue R10,
+session and release safety, then Phase 7 archive/paging and the golden paths. The
+[production plan](../../docs/production-hardening/production-hardening-tdd-plan-v2.md)
+owns detailed exit criteria. The checked cold prefix is partial, not a continuous
+100-transition pass. Local warm simulator results do not establish distributed
+game viability. Safari/macOS is available; Android requires the user's connected
+phone, and iOS is deferred—not accepted or replaced by emulation.
 
-Accepted foundations and chronological reviews are archived in the
-[ledger](review.md), [slice contracts](slices/) and their linked root dispositions.
-The current handoff owns live status; frozen checkpoints keep their original
-framing. The [native integration evidence](evidence.md) and
-[parent recipient obligation](slices/01-recovery-snapshot-retention.md) remain open.
-The [native lifecycle investigation](../grid-memory-production/lifecycle-audit.md)
-and all diagnostic artifacts remain historical; production boundedness is unaccepted.
-Continue directly after each focused reviewed commit while any TODO remains.
+The [historical handoff](handoff-history.md) is history, not the current work order.
+Keep greenfield v3 capabilities, one authenticated retirement owner and unchanged
+safety floors. Removing the obsolete plane must preserve current-v3 signing,
+certificates, settlement and recovery/migration dependencies.
 
 - [x] Versioned owner and stale-client fence (slice 1a-0).
 - [x] Bounded atomic retention (slice 1a-1).
@@ -196,23 +112,49 @@ Continue directly after each focused reviewed commit while any TODO remains.
 - [x] Authenticated declaration-free cold recovery (slice 2b).
 - [x] Authenticated declaration-free pending recovery (slice 2c).
 - [x] Current-floor shipped startup and refresh/retry ([slice 2d](slices/02d-declaration-free-shipped-startup.md)); product and focused main landing accepted.
-- [ ] Usable rollback: [snapshot reader](slices/02e-0-noncreating-snapshot-read.md), [bounded AHE reader](slices/02e-1-bounded-active-generation-read.md), [journal-anchor access](slices/02e-2-bounded-journal-anchor-read.md), [all-target data observation](slices/02e-3-authenticated-closed-cut-data-observation.md), protected historical custody, then mandatory room/lifecycle consumption and role reconciliation.
+- [x] Noncreating snapshot reader (2e-0), within its safe-accessor contract.
+- [x] Bounded active-generation reader (2e-1), within its fixed observer entitlement.
+- [x] Exact journal-anchor reader (2e-2), within its safe-accessor contract.
+- [x] All-target observation and original native SAME-U pressure (2e-3), within its observation contract.
+- [x] Pure authenticated forward-promotion authority (2e-4).
+- [x] Historical room/lifecycle consumption (2e-5) and parent 2e usable rollback, within original supported contracts; [closure audit](closure-audit-2e-2f.md).
+- [x] Authenticated recipient installation (2f), original six causal groups and required recipient extensions; the same audit preserves exact acceptance qualifications.
 - [ ] Recipient retention and native integration for ready v2 stores (remaining slice 1 seams).
 - [ ] Declaration discovery from authenticated recovery identity (slice 2).
-- [ ] Protected-dependency planner and durable retirement protocol (slices 3–4).
+- [x] Complete bounded protected-dependency planning (original slice 3); current/rollback/pending/shared oracle, stale-head and missing-byte refusal, unchanged safety floors, no deletion.
+- [x] Original initial metadata retirement protocol (slice 4); revision/incarnation-bound intent, native fences and interruption/refusal/resumption; physical drains remain slices 5–7.
 - [ ] Authenticated legacy classification after discovery/planning/fencing (remaining slice 1 migration obligation).
-- [ ] Journal and signing retirement with stale-writer fences (slices 5–6).
-- [ ] Unified cleanup, admission budgets, bounded recovery work (slices 7–8).
-- [ ] Shipped product profile and fixed-state endurance (slices 9–10).
-- [ ] Scoped old per-vertex finality retirement and shipped activation refusal ([Phase 6d](slices/06d-v3-only-finality-retirement.md)); current-v3 evidence remains protected.
-- [ ] Short-session identity retirement and Discord archive path (slices 11–12).
+- [x] Original journal and signing retirement with stale-writer fences (slices 5–6), within the map's accepted scopes.
+- [x] Original unified cleanup and usable current/two-rollback continuation (slice 7).
+- [x] Original admission/maintenance reserve and bounded recovery work (slice 8), within the map's accepted domains.
+- [x] Original shipped v3 software profile and capability ports (slice 9), within the requirement map's accepted scopes.
+- [ ] Continuous same-room fixed-state endurance and resource acceptance (slice 10); earlier prefixes and shallow diagnostics are partial.
+- [x] Original old per-vertex finality retirement and shipped activation refusal ([Phase 6d](slices/06d-v3-only-finality-retirement.md)); current-v3 evidence remains protected. Later Phase-6 release gates remain open.
+- [x] Original short-session identity retirement (slice 11), within the approved disposable-session contract and recorded native evidence.
+- [ ] Discord archive/root evolution and paging (slice 12).
 - [ ] Full golden-path and release-device acceptance (slice 13).
 
-Only the next reviewed contract may become executable below. Reslice later high-risk
-contracts before GREEN; the roadmap is not permission to combine them into one
-patch. Preserve the [native lifecycle investigation](../grid-memory-production/lifecycle-audit.md)
+Work at coherent lifecycle-contract boundaries. Independent contracts proceed in
+parallel; bounded discovery feeds immediate implementation and a focused review
+afterward. Serialize genuine dependencies, not every finding or evidence package.
+The roadmap is not permission to weaken or omit later requirements. Preserve the
+[native lifecycle investigation](../grid-memory-production/lifecycle-audit.md)
 and existing diagnostic artifacts as historical evidence. Production storage
 and memory boundedness remain unaccepted.
+
+## Next agent prompt
+
+With slice 11 closed, measure the native R10 timeout using the existing shorter
+representative controller before the continuous acceptance workload. Separate product
+phases from assertions/logging/GC, profile the actual worker, measure relevant waits,
+then change the largest demonstrated cost and compare the same workload. Finish with
+an unprofiled run; healthy warm rollover remains separate from cold endurance.
+Read the latest execution
+artifacts and the [finite backlog](requirements-to-evidence.md#finite-next-work-separate-from-r96d)
+for the current blocker and original resource-freeze requirements. Repair only
+demonstrated harness/product defects, return to the intended test, and retain
+original failures. Keep R11 policy/implementation and Phase-7 preparation separate;
+do not reopen accepted evidence or treat diagnostics as acceptance.
 
 ## Outcome and limits
 
@@ -285,8 +227,9 @@ successor snapshot declaration. The accepted
 the chain and expected successor before discovering the exact predecessor scope;
 that does not migrate the other recovery branches.
 The existing [cleanup planner](../../packages/node/src/internal/closed-epoch-cleanup.ts)
-protects AHE lineage but does not yet establish every current, pending and rollback
-snapshot dependency. A maintenance binding is plumbing, not that missing authority.
+now establishes the original bounded read-only current, pending, rollback and
+shared dependency plan. A maintenance binding remains plumbing, not authority
+to clear legacy debt or delete the unprotected complement.
 
 Therefore minimal authenticated declaration discovery and complete protected-set
 planning must precede classification that clears the migration barrier or makes
@@ -369,7 +312,8 @@ review findings/dispositions and terminal process status at each phase.
 Pre-existing failures remain failures with attribution, never green claims.
 The native snapshot characterization is not proof of all production open paths.
 
-Prioritize product implementation once its bounded RED correction is accepted.
+Prioritize coherent product implementation after bounded discovery, with independent
+HIGH test authors working in parallel and focused XHIGH review afterward.
 GREEN must execute the previously masked product assertions against changed
 product code; harness diagnostics cannot substitute for that success. Additional
 harness work needs a demonstrated behavioral blind spot, instrumentation effect

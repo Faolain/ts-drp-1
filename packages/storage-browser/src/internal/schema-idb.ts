@@ -72,6 +72,24 @@ export const PHASE_5C_SCHEMA_AUTHORITY = Object.freeze({
 
 export const PHASE_5E_SCHEMA_AUTHORITY = PHASE_5C_SCHEMA_AUTHORITY;
 
+// Same native stores; v4 gives storageMeta addressed local-control semantics.
+export const AHE_LOCAL_CONTROL_SCHEMA_AUTHORITY = Object.freeze({
+	stores: PHASE_5E_SCHEMA_AUTHORITY.stores,
+	version: 4,
+} as const);
+// Same stores; v5 fences obsolete signing writers before a permanent round
+// frontier can be persisted in an existing signerState row.
+export const SIGNING_FRONTIER_SCHEMA_AUTHORITY = Object.freeze({
+	stores: AHE_LOCAL_CONTROL_SCHEMA_AUTHORITY.stores,
+	version: 5,
+} as const);
+// Same stores; v6 closes v5 writers which do not inspect addressed signing intents.
+export const SIGNING_PARTICIPANT_SCHEMA_AUTHORITY = Object.freeze({
+	stores: SIGNING_FRONTIER_SCHEMA_AUTHORITY.stores,
+	version: 6,
+} as const);
+export const CURRENT_BROWSER_SCHEMA_VERSION = SIGNING_PARTICIPANT_SCHEMA_AUTHORITY.version;
+
 export const PHASE_2D_SCHEMA_VERSION = PHASE_2D_SCHEMA_AUTHORITY.version;
 export const PHASE_2D_OBJECTS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[0].name;
 export const PHASE_2D_GENERATIONS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[1].name;
@@ -154,7 +172,10 @@ function hasExactSchema(
 		| typeof PHASE_2D_SCHEMA_AUTHORITY
 		| typeof PHASE_5C_LEGACY_SCHEMA_AUTHORITY
 		| typeof PHASE_5C_SCHEMA_AUTHORITY
-		| typeof PHASE_5E_SCHEMA_AUTHORITY,
+		| typeof PHASE_5E_SCHEMA_AUTHORITY
+		| typeof AHE_LOCAL_CONTROL_SCHEMA_AUTHORITY
+		| typeof SIGNING_FRONTIER_SCHEMA_AUTHORITY
+		| typeof SIGNING_PARTICIPANT_SCHEMA_AUTHORITY,
 	transaction?: IDBTransaction,
 	ignoreVersion = false
 ): boolean {
@@ -182,6 +203,81 @@ function hasExactSchema(
 	} catch {
 		return false;
 	}
+}
+
+/**
+ * Validates the live original native catalog inside the caller's transaction.
+ * @param transaction
+ */
+export function assertCurrentBrowserSchema(transaction: IDBTransaction): void {
+	if (!hasExactSchema(transaction.db, SIGNING_PARTICIPANT_SCHEMA_AUTHORITY, transaction)) {
+		throw new BrowserStorageSchemaError();
+	}
+}
+
+/** Store set for one schema-checked AHE local-control transaction, not cross-DB custody. */
+export function browserAheControlStores(): string[] {
+	return AHE_LOCAL_CONTROL_SCHEMA_AUTHORITY.stores.map((store) => store.name);
+}
+
+function validLegacyIncarnation(row: unknown): boolean {
+	if (typeof row !== "object" || row === null || Array.isArray(row)) return false;
+	const descriptors = Object.getOwnPropertyDescriptors(row);
+	const key = descriptors.key,
+		value = descriptors.value;
+	return (
+		Reflect.ownKeys(descriptors).length === 2 &&
+		key !== undefined &&
+		"value" in key &&
+		key.value === "incarnation" &&
+		value !== undefined &&
+		"value" in value &&
+		typeof value.value === "string" &&
+		/^[0-9a-f]{32}$/u.test(value.value)
+	);
+}
+
+// No native control existed in the supported legacy versions. Unknown metadata,
+// including a pre-populated kind1/kind2 namespace, is not migration entitlement.
+function validateEmptyControlMigration(transaction: IDBTransaction): void {
+	const request = transaction.objectStore(PHASE_5C_STORAGE_META_STORE).getAll(undefined, 2);
+	request.addEventListener(
+		"success",
+		() => {
+			if (request.result.length !== 1 || !validLegacyIncarnation(request.result[0])) transaction.abort();
+		},
+		{ once: true }
+	);
+}
+
+// Legacy writers never owned this field. Preserve all legacy bytes, but do not
+// adopt a seeded frontier as native retirement authority during migration.
+function validateNoLegacySigningFrontier(transaction: IDBTransaction): void {
+	const cursor = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).openCursor();
+	cursor.addEventListener("success", () => {
+		const row = cursor.result;
+		if (row === null) return;
+		if (typeof row.value !== "object" || row.value === null || Object.hasOwn(row.value, "retiredBeforeRound")) {
+			transaction.abort();
+			return;
+		}
+		row.continue();
+	});
+}
+
+// A v5 writer did not own the new namespace. Preserve legitimate round floors
+// and existing AHE metadata byte-for-byte; do not adopt a seeded signing intent.
+function validateNoLegacySigningControl(transaction: IDBTransaction): void {
+	const request = transaction.objectStore(PHASE_5C_STORAGE_META_STORE).openKeyCursor();
+	request.onsuccess = (): void => {
+		const cursor = request.result;
+		if (cursor === null) return;
+		if (typeof cursor.key !== "string" || cursor.key.startsWith("signing-retirement:")) {
+			transaction.abort();
+			return;
+		}
+		cursor.continue();
+	};
 }
 
 function createStores(
@@ -227,7 +323,7 @@ function classifyOpenError(error: DOMException | null): Error {
 
 function openDatabase(databaseName: string, onVersionChange?: () => void): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const request = indexedDB.open(databaseName, PHASE_5E_SCHEMA_VERSION);
+		const request = indexedDB.open(databaseName, CURRENT_BROWSER_SCHEMA_VERSION);
 		let blockedTimer: ReturnType<typeof setTimeout> | undefined;
 		let settled = false;
 		const clearBlockedTimer = (): void => {
@@ -240,7 +336,12 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 				if (
 					settled ||
 					transaction === null ||
-					(event.oldVersion !== 0 && event.oldVersion !== 1 && event.oldVersion !== 2)
+					(event.oldVersion !== 0 &&
+						event.oldVersion !== 1 &&
+						event.oldVersion !== 2 &&
+						event.oldVersion !== 3 &&
+						event.oldVersion !== 4 &&
+						event.oldVersion !== 5)
 				) {
 					request.transaction?.abort();
 					return;
@@ -265,7 +366,7 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 						key: "incarnation",
 						value: randomIncarnation(),
 					});
-				} else {
+				} else if (event.oldVersion === 2) {
 					if (!hasExactSchema(request.result, PHASE_5C_LEGACY_SCHEMA_AUTHORITY, transaction, true)) {
 						transaction.abort();
 						return;
@@ -274,7 +375,27 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 						request.result,
 						PHASE_5E_SCHEMA_AUTHORITY.stores.slice(PHASE_5C_LEGACY_SCHEMA_AUTHORITY.stores.length)
 					);
+					validateEmptyControlMigration(transaction);
+				} else if (event.oldVersion === 3) {
+					if (!hasExactSchema(request.result, PHASE_5E_SCHEMA_AUTHORITY, transaction, true)) {
+						transaction.abort();
+						return;
+					}
+					validateEmptyControlMigration(transaction);
+				} else if (event.oldVersion === 4) {
+					if (!hasExactSchema(request.result, AHE_LOCAL_CONTROL_SCHEMA_AUTHORITY, transaction, true)) {
+						transaction.abort();
+						return;
+					}
+					// Existing addressed AHE controls/debt are preserved, not reclassified.
+				} else {
+					if (!hasExactSchema(request.result, SIGNING_FRONTIER_SCHEMA_AUTHORITY, transaction, true)) {
+						transaction.abort();
+						return;
+					}
 				}
+				if (event.oldVersion !== 0 && event.oldVersion <= 4) validateNoLegacySigningFrontier(transaction);
+				if (event.oldVersion >= 4) validateNoLegacySigningControl(transaction);
 			},
 			{ once: true }
 		);
@@ -307,7 +428,7 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 					database.close();
 					return;
 				}
-				if (!hasExactSchema(database, PHASE_5E_SCHEMA_AUTHORITY)) {
+				if (!hasExactSchema(database, SIGNING_PARTICIPANT_SCHEMA_AUTHORITY)) {
 					database.close();
 					settled = true;
 					clearBlockedTimer();

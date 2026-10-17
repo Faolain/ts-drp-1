@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import contract from "./fixtures/phase-4a-v3/blueprint-fold-contract.json" with { type: "json" };
 import blueprintPackage from "./fixtures/phase-4a-v3/blueprint-package.json" with { type: "json" };
@@ -38,6 +38,7 @@ interface BlueprintStateMachineInstance {
 
 interface BlueprintStateMachineConstructor {
 	new (input: {
+		readonly maxApplicationStateBytes?: number;
 		readonly exactCanonicalInitialStateBytes: Uint8Array;
 		readonly expectedBlueprintDigest: string;
 		readonly expectedInitialStateDigest: string;
@@ -937,6 +938,141 @@ describe.skipIf(!phase4aReady)("Phase 4a prepared application seam", () => {
 });
 
 describe.skipIf(!phase4aReady)("Phase 4a bounded staged machine", () => {
+	it("uses the same captured operation bytes for its declared budget and detached reducer input", async () => {
+		const [{ application }, ordinaryRuntime] = await Promise.all([loadPhase4a(), prepareFixtureRuntime()]);
+		const operation = { action: "emit", value: { payload: "fresh-operation-capture" } };
+		const operationBytes = encodeCanonical(operation);
+		const budgetedPackage = {
+			...blueprintPackage,
+			manifest: {
+				schemaVersion: 2,
+				workBudgetProfile: "blueprint-work-budget-v1",
+				operationDiscriminator: "action",
+				operations: blueprintPackage.manifest.operations
+					.map((entry) => ({ ...entry, maxCanonicalOperationBytes: operationBytes.byteLength })),
+			},
+		};
+		const budgetedRuntime = await prepareRuntimeWith({ prepareBlueprintAdmission, prepareBlueprintRuntime }, budgetedPackage);
+		const nativeEncode = TextEncoder.prototype.encode;
+		let operationKeyEncodes = 0;
+		const spy = vi.spyOn(TextEncoder.prototype, "encode").mockImplementation(function (this: TextEncoder, input?: string) {
+			if (input === "action") operationKeyEncodes++;
+			return Reflect.apply(nativeEncode, this, [input]);
+		});
+		try {
+			const execute = (runtime: PreparedBlueprintRuntime) => application.applyPreparedBlueprintOperation({
+				expectedBlueprintDigest: runtime.blueprintDigest, preparedBlueprintRuntime: runtime,
+				operation, state: contract.initialState,
+			});
+			const ordinary = execute(ordinaryRuntime);
+			const ordinaryKeyEncodes = operationKeyEncodes;
+			operationKeyEncodes = 0;
+			const bounded = execute(budgetedRuntime);
+			expect(bounded).toEqual(ordinary);
+			// The byte-budget path must not encode a second discarded operation.
+			// Both paths still perform the codec's UTF-8 round-trip validation.
+			expect(operationKeyEncodes).toBe(ordinaryKeyEncodes);
+			operation.value.payload = "caller-mutated".repeat(8);
+			expect(bounded.output).toEqual({ payload: "fresh-operation-capture" });
+			(bounded.output as { payload: string }).payload = "output-mutated";
+			expect(bounded.state).toEqual(contract.initialState);
+			expect(errorCode(() => execute(budgetedRuntime))).toBe("BLUEPRINT_OPERATION_INVALID");
+			operation.value.payload = "fresh-operation-capturex";
+			expect(encodeCanonical(operation).byteLength).toBe(operationBytes.byteLength + 1);
+			expect(errorCode(() => execute(budgetedRuntime))).toBe("BLUEPRINT_OPERATION_INVALID");
+			operation.value.payload = "\uFEFF\uFEFFhello";
+			expect(execute(budgetedRuntime)).toEqual(execute(ordinaryRuntime));
+			operation.value.payload = "\uD800";
+			expect(errorCode(() => execute(budgetedRuntime))).toBe("BLUEPRINT_OPERATION_INVALID");
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it("invokes prepared reducers and authorization afresh on repeated exact folds", async () => {
+		const { fold } = await loadPhase4a();
+		// The current runtime permits module-local state. Exact input equality is
+		// therefore not authority to omit previously successful reducer calls.
+		const source = `let calls=0;const emit=({state})=>({state,output:{calls:++calls,tag:"r10-fresh-reducer-calls"}});export const blueprint={exportSchemaVersion:1,artifactId:${JSON.stringify(blueprintPackage.implementation.artifactId)},runtimeProfile:"ecmascript-2024-sync-v1",reducers:{emit}};`;
+		const exactArtifactBytes = new TextEncoder().encode(source);
+		const selectedPackage = {
+			...blueprintPackage,
+			implementation: { ...blueprintPackage.implementation,
+				artifactDigest: hex(hashDomain(contract.domains.artifact, exactArtifactBytes)) },
+			manifest: { ...blueprintPackage.manifest,
+				operations: blueprintPackage.manifest.operations.filter((entry) => entry.name === "emit") },
+		};
+		const canonicalBlueprintPackageBytes = encodeCanonical(selectedPackage);
+		const selectedDigest = hex(hashDomain(contract.domains.blueprint, canonicalBlueprintPackageBytes));
+		const runtime = await prepareBlueprintRuntime({ canonicalBlueprintPackageBytes, exactArtifactBytes,
+			expectedBlueprintDigest: selectedDigest,
+			preparedBlueprintAdmission: prepareBlueprintAdmission({ canonicalBlueprintPackageBytes,
+				expectedBlueprintDigest: selectedDigest }) });
+		const parent = new fold.BlueprintStateMachine({ exactCanonicalInitialStateBytes, expectedInitialStateDigest,
+			expectedBlueprintDigest: selectedDigest, preparedBlueprintRuntime: runtime });
+		const vertices = graph([0]);
+		const vertex = vertices.get(contract.graph.vertices[0]!.hash)!;
+		vertices.set(vertex.hash, { ...vertex, operation: { action: "emit", value: {} } });
+		let authorizations = 0;
+		const input = { anchorHash: contract.graph.anchorHash, machine: parent, vertices,
+			authorize: () => { authorizations++; return true; } };
+		const first = fold.foldBlueprintEpoch(input);
+		const second = fold.foldBlueprintEpoch(input);
+		const count = (result: FoldResult) => (result.outputs[0] as { calls: number }).calls;
+		expect(count(second)).toBe(count(first) + 1);
+		expect(authorizations).toBe(2);
+		expect(errorCode(() => fold.foldBlueprintEpoch({ ...input, authorize: () => false })))
+			.toBe("BLUEPRINT_AUTHORIZATION_REJECTED");
+		const third = fold.foldBlueprintEpoch(input);
+		expect(count(third)).toBe(count(second) + 1);
+		expect(parent.snapshot().exactCanonicalStateBytes).toEqual(exactCanonicalInitialStateBytes);
+	});
+
+	it("honors configured state bytes through fork and snapshot import without changing default depth or item limits", async () => {
+		const [{ fold }, runtime] = await Promise.all([loadPhase4a(), prepareFixtureRuntime()]);
+		const { exportBlueprintSnapshotPayload, importBlueprintSnapshotPayload } = await import("../packages/compaction/src/blueprint-snapshot.js");
+		const state = { payload: "x".repeat(33_000) };
+		const bytes = encodeCanonical(state);
+		const maximum = bytes.byteLength;
+		const base = { expectedBlueprintDigest, preparedBlueprintRuntime: runtime,
+			exactCanonicalInitialStateBytes: bytes, expectedInitialStateDigest: stateDigest(bytes) };
+		expect(errorCode(() => new fold.BlueprintStateMachine(base))).toBe("INVALID_APPLICATION_STATE");
+		for (const invalid of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])
+			expect(errorCode(() => new fold.BlueprintStateMachine({ ...base, maxApplicationStateBytes: invalid }))).toBe("INVALID_APPLICATION_STATE");
+		const selected = new fold.BlueprintStateMachine({ ...base, maxApplicationStateBytes: maximum });
+		expect(selected.snapshot().exactCanonicalStateBytes).toEqual(bytes);
+		const staged = selected.fork();
+		expect(staged.apply({ action: "emit", value: state })).toEqual(state);
+		expect(staged.apply({ action: "replace_state", value: state })).toBeNull();
+		expect(selected.adopt(staged).exactCanonicalStateBytes).toEqual(bytes);
+		const oversized = { payload: state.payload + "x" };
+		const oversizedBytes = encodeCanonical(oversized);
+		expect(oversizedBytes.byteLength).toBe(maximum + 1);
+		expect(errorCode(() => new fold.BlueprintStateMachine({ ...base, maxApplicationStateBytes: maximum,
+			exactCanonicalInitialStateBytes: oversizedBytes, expectedInitialStateDigest: stateDigest(oversizedBytes) }))).toBe("INVALID_APPLICATION_STATE");
+		for (const value of [oversized, depthBoundState(contract.limits.maxDepth + 1), itemBoundState(contract.limits.maxItems, true)]) {
+			for (const action of ["replace_state", "emit"]) {
+				const isolated = selected.fork();
+				expect(errorCode(() => isolated.apply({ action, value }))).toBe("INVALID_APPLICATION_STATE");
+				expect(isolated.snapshot().exactCanonicalStateBytes).toEqual(bytes);
+			}
+		}
+		const maximumSnapshotBytes = maximum + 4096;
+		const aclBytes = encodeCanonical({ members: [] });
+		const metadata = { anchor: "a".repeat(64), archiveIndexRoot: "b".repeat(64), epoch: 1,
+			objectId: "configured-state-bytes", schemaVersion: 1 };
+		const exported = exportBlueprintSnapshotPayload({ ...metadata, machine: selected,
+			exactCanonicalAclBytes: aclBytes, maxSnapshotBytes: maximumSnapshotBytes });
+		const imported = importBlueprintSnapshotPayload({ expectedAnchor: metadata.anchor,
+			expectedArchiveIndexRoot: metadata.archiveIndexRoot, expectedEpoch: metadata.epoch,
+			expectedObjectId: metadata.objectId, expectedSchemaVersion: metadata.schemaVersion,
+			expectedBlueprintDigest, expectedApplicationStateDigest: exported.applicationStateDigest,
+			expectedPayloadDigest: exported.payloadDigest, expectedExactCanonicalAclBytes: aclBytes,
+			exactCanonicalPayloadBytes: exported.exactCanonicalPayloadBytes, preparedBlueprintRuntime: runtime,
+			maxSnapshotBytes: maximumSnapshotBytes });
+		expect(imported.machine.fork().apply({ action: "emit", value: state })).toEqual(state);
+		expect(imported.machine.snapshot().exactCanonicalStateBytes).toEqual(bytes);
+	});
 	it("binds exact canonical genesis bytes and returns detached snapshots", async () => {
 		const [{ fold }, runtime] = await Promise.all([loadPhase4a(), prepareFixtureRuntime()]);
 		const emptyStateBytes = encodeCanonical({});
@@ -1029,6 +1165,26 @@ describe.skipIf(!phase4aReady)("Phase 4a bounded staged machine", () => {
 		] as const) {
 			expect(errorCode(() => staged.fork().apply({ action, value }))).toBe("INVALID_APPLICATION_STATE");
 		}
+	});
+
+	it("keeps validated state, output and mutable operation bytes independently detached", async () => {
+		const [{ fold }, runtime] = await Promise.all([loadPhase4a(), prepareFixtureRuntime()]);
+		const original = machine(fold.BlueprintStateMachine, runtime);
+		const value = { nested: { count: 1 }, bytes: Uint8Array.of(7, 8) };
+		original.apply({ action: "replace_state", value: { map: { alpha: value }, set: [], total: 1 } });
+		const output = original.apply({ action: "emit", value }) as typeof value;
+		const before = original.snapshot();
+		value.nested.count = 99;
+		value.bytes[0] = 99;
+		output.nested.count = 88;
+		output.bytes[1] = 88;
+		expect(original.snapshot()).toEqual(before);
+		expect(decodeCanonical(before.exactCanonicalStateBytes)).toEqual({
+			map: { alpha: { nested: { count: 1 }, bytes: Uint8Array.of(7, 8) } }, set: [], total: 1,
+		});
+		expect(original.apply({ action: "map_set", key: "beta", value: "continued" })).toBe("continued");
+		expect((decodeCanonical(original.snapshot().exactCanonicalStateBytes) as ApplicationState).map.alpha)
+			.toEqual({ nested: { count: 1 }, bytes: Uint8Array.of(7, 8) });
 	});
 
 	it("forks and adopts explicitly without sharing staged state", async () => {

@@ -296,7 +296,7 @@ describe.skipIf(!sourceExists)("Phase 0a frozen vectors and pinned-reference dif
 		const document = JSON.parse(readFileSync(vectorsPath, "utf8")) as GoldenVectorDocument;
 
 		expect(document.registryVersion).toBe(5);
-		expect(document.vectors).toHaveLength(26);
+		expect(document.vectors).toHaveLength(27);
 		for (const vector of document.vectors) {
 			const value = hydrateJsonValue(vector.value);
 			const parts = vector.partsHex.map(bytesFromHex);

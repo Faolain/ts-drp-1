@@ -1,3 +1,5 @@
+import type { SigningDependencyObservation, SigningRetirementObservation } from "./seal-vote-intent.js";
+
 export type CreatorCloseEvidencePhase =
 	| "commit-vote-pending"
 	| "commit-qc-committed"
@@ -30,6 +32,9 @@ export interface CreatorCloseEvidenceStore {
 }
 
 export interface CreatorCloseEvidenceAdapter {
+	acquireSigningDependencyObservation?(input: Readonly<{ objectId: string }>): Promise<SigningDependencyObservation>;
+	acquireRetirementObservation?(input: Readonly<{ objectId: string }>): Promise<SigningRetirementObservation>;
+	acquireRecoveryRetirementObservation?(input: Readonly<{ objectId: string }>): Promise<SigningRetirementObservation>;
 	put(
 		record: CreatorCloseEvidenceRecord,
 		expectedPhase: CreatorCloseEvidencePhase | null
@@ -69,6 +74,15 @@ export function mintCreatorCloseEvidenceStore(adapter: CreatorCloseEvidenceAdapt
 	adapters.set(
 		store,
 		Object.freeze({
+			...(adapter.acquireSigningDependencyObservation === undefined
+				? {}
+				: { acquireSigningDependencyObservation: adapter.acquireSigningDependencyObservation.bind(adapter) }),
+			...(adapter.acquireRetirementObservation === undefined
+				? {}
+				: { acquireRetirementObservation: adapter.acquireRetirementObservation.bind(adapter) }),
+			...(adapter.acquireRecoveryRetirementObservation === undefined
+				? {}
+				: { acquireRecoveryRetirementObservation: adapter.acquireRecoveryRetirementObservation.bind(adapter) }),
 			put: adapter.put.bind(adapter),
 			readAll: adapter.readAll.bind(adapter),
 		})

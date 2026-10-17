@@ -203,7 +203,7 @@ function privateGeneratedReferenceViolations(
 }
 
 async function privateSurface(): Promise<Seam3PrivateSurface> {
-	return import("../packages/node/src/v3-live.js") as Promise<Seam3PrivateSurface>;
+	return import("@ts-drp/node/v3-live") as Promise<Seam3PrivateSurface>;
 }
 
 function lowerHex(bytes: Uint8Array): string {
@@ -798,6 +798,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"record-rejected",
 			"publish-failed",
 			"publication-state-unknown",
+			"admission-rejected",
 		]);
 	});
 
@@ -1080,7 +1081,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			});
 			const queue = new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } });
 			const queueSubscribe = vi.spyOn(queue, "subscribe");
-			const queueEnqueue = vi.spyOn(queue, "enqueue");
+			const queueEnqueue = vi.spyOn(queue, "enqueueJoined");
 			const queueClose = vi.spyOn(queue, "close");
 			const sink = vi.fn();
 			const recovered = await recoverActivationCapability(surface, fixture, fixture.capability, issuanceStore);

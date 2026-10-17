@@ -17,6 +17,7 @@ const INPUT_KEYS = Object.freeze([
 	"snapshotStore",
 	"store",
 ]);
+const RECEIVED_INPUT_KEYS = Object.freeze([...INPUT_KEYS, "issuanceStore", "liveJournalStore"]);
 
 function capture(value: unknown): CreatorAdoptionPendingRecoveryInput | undefined {
 	try {
@@ -24,11 +25,15 @@ function capture(value: unknown): CreatorAdoptionPendingRecoveryInput | undefine
 			return undefined;
 		}
 		const keys = Reflect.ownKeys(value);
-		if (keys.length !== INPUT_KEYS.length || keys.some((key) => typeof key !== "string" || !INPUT_KEYS.includes(key))) {
+		const expectedKeys = keys.length === INPUT_KEYS.length ? INPUT_KEYS : RECEIVED_INPUT_KEYS;
+		if (
+			keys.length !== expectedKeys.length ||
+			keys.some((key) => typeof key !== "string" || !expectedKeys.includes(key))
+		) {
 			return undefined;
 		}
 		const output: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-		for (const key of INPUT_KEYS) {
+		for (const key of expectedKeys) {
 			const descriptor = Object.getOwnPropertyDescriptor(value, key);
 			if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
 			output[key] = descriptor.value;

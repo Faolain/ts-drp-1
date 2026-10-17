@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Test-owned native entry server with exact build custody. */
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
-import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 
@@ -13,6 +13,13 @@ export async function buildAssets(lane: "active" | "role" = "active"): Promise<v
 		workspaceAliases: Record<string, string>;
 	};
 	const alias = { ...loaded.workspaceAliases };
+	// Root imports and explicit lifecycle subpaths must share the same custody owner.
+	alias["@ts-drp/node"] = join(root, "packages/node/src/index.ts");
+	alias["@ts-drp/network/snapshot-transfer"] = join(root, "packages/network/src/snapshot-transfer.ts");
+	alias["@ts-drp/protocol-v3/internal/creator-forward-promotion"] = join(
+		root,
+		"packages/protocol-v3/src/internal/creator-forward-promotion.ts"
+	);
 	alias["@ts-drp/example-v3-room"] = join(root, "examples/v3-room/src/index.ts");
 	alias["@ts-drp/message-queue"] = join(root, "packages/message-queue/src/index.ts");
 	for (const name of [
@@ -22,6 +29,7 @@ export async function buildAssets(lane: "active" | "role" = "active"): Promise<v
 		"creator-adoption-recover",
 		"creator-adoption-stage",
 		"creator-close",
+		"snapshot-transfer",
 		"v3-live",
 	])
 		alias["@ts-drp/node/" + name] = join(root, "packages/node/src", name + ".ts");
@@ -34,6 +42,23 @@ export async function buildAssets(lane: "active" | "role" = "active"): Promise<v
 			write: false,
 			metafile: true,
 			alias,
+			plugins: [
+				{
+					name: "current-native-source-owner",
+					setup(context): void {
+						// Explicit .js imports must not select stale beside-source emit.
+						// Reuse the native launcher rule for product and owned fixture sources.
+						context.onResolve({ filter: /^\..*\.js$/ }, (args) => {
+							const target = resolve(args.resolveDir, args.path.slice(0, -3) + ".ts");
+							return (target.startsWith(join(root, "packages") + "/") ||
+								target.startsWith(join(root, "tests/fixtures") + "/")) &&
+								existsSync(target)
+								? { path: target }
+								: undefined;
+						});
+					},
+				},
+			],
 		});
 		const firstOutput = result.outputFiles[0],
 			metafile = result.metafile;

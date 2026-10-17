@@ -1466,8 +1466,9 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		expect(networkNode).toContain("this._node.getConnections()");
 		expect(nodeAdapter).toContain("DRPUnreliableWebRtcOwner");
 		const adapterArguments = nodeEphemeralAdapterArguments(nodeComposition);
-		expect(adapterArguments).toHaveLength(3);
-		const rawOwner = adapterArguments[2];
+		expect(adapterArguments).toHaveLength(2);
+		expect(adapterArguments[0]?.getText()).toBe("this.networkNode");
+		const rawOwner = adapterArguments[1];
 		expect(rawOwner !== undefined && ts.isConditionalExpression(rawOwner)).toBe(true);
 		if (rawOwner === undefined || !ts.isConditionalExpression(rawOwner)) throw new Error("raw owner selection missing");
 		expect(rawOwner.condition.getText()).toBe("this.networkNode instanceof DefaultDRPNetworkNode");

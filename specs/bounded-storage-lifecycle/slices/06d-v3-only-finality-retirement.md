@@ -1,9 +1,11 @@
 # Phase 6d — Scoped v3-only finality retirement
 
-Status: user-authorized scope replacement, 2026-10-02; planning/audit only.
-Independent contract review and separate RED/GREEN are required before product
-removal. The [live handoff](../README.md#next-agent-prompt) owns execution order;
-this slice does not interrupt the accepted 2c allocation or accept Phase 6.
+Status: original retirement contract CLOSED at the recorded candidate scopes,
+2026-10-11. The [requirement-to-evidence map](../requirements-to-evidence.md#current-slice-9--6d-finite-backlog)
+links accepted causal failures, capability ports, activation refusals, current-v3
+safety and affected quality/native verification in the existing MAIN receipt.
+Requirements below remain unchanged. This closure does not accept the later
+Phase-6 endurance/release/device gates or full Phase 6.
 
 ## Outcome and boundary
 

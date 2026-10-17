@@ -6,9 +6,22 @@ import type { NativeCase } from "./assets/snapshot-recovery-retention-entry.js";
 import { type Phase4cBrowserServer, startPhase4cBrowserServer } from "./phase-4c-browser-server.js";
 import {
 	expectedRetentionCase,
+	expectedTemporaryAdmissionCase,
 	RETENTION_CASES,
-} from "../../../tests/fixtures/snapshot-recovery-retention/contract.js";
+	TEMPORARY_ADMISSION_CASES,
+} from "../../../tests/fixtures/snapshot-recovery-retention/contract.ts";
 let server: Phase4cBrowserServer;
+for (const name of TEMPORARY_ADMISSION_CASES)
+	test(`native temporary admission ${name}`, async ({ page }, testInfo) => {
+		await page.goto(server.origin);
+		await page.waitForFunction(() => typeof window.runSnapshotRecoveryRetention === "function");
+		const result = await page.evaluate(
+			(selected) => window.runSnapshotRecoveryRetention(`temporary-${selected}`),
+			name
+		);
+		await persistObservation(testInfo, "native-temporary-admission", result);
+		expect(result).toEqual(expectedTemporaryAdmissionCase(name));
+	});
 async function persistObservation(testInfo: TestInfo, name: string, result: unknown): Promise<void> {
 	const path = testInfo.outputPath(`${name}.json`);
 	await writeFile(path, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx" });
@@ -107,6 +120,47 @@ for (const name of nativeCases)
 	});
 test.afterAll(async () => {
 	await server.close();
+});
+test("native snapshot noncreating retirement source includes temporary metadata", async ({ page }, testInfo) => {
+	await page.goto(server.origin);
+	await page.waitForFunction(() => typeof window.runSnapshotRetirementSourceImage === "function");
+	const result = await page.evaluate(() => window.runSnapshotRetirementSourceImage());
+	await persistObservation(testInfo, "snapshot-retirement-source-image", result);
+	expect(result).toEqual({
+		controlsBefore: 0,
+		nullControl: true,
+		scopeCount: 2,
+		chunkCount: 2,
+		recoveryScopeCount: 1,
+		borrowedTransactions: 0,
+		birthPreservedImage: true,
+		borrowedExactControl: true,
+		temporaryDriftChangesImage: true,
+		recoveryInventoryUnchanged: true,
+		refusal: "stale-scope",
+		refusalPreservedControl: true,
+		reopenedExact: true,
+	});
+});
+test("noncreating issuance census binds nullable and prepared completed native controls", async ({
+	page,
+}, testInfo) => {
+	await page.goto(server.origin);
+	await page.waitForFunction(() => typeof window.runIssuanceRetirementSourceControl === "function");
+	const result = await page.evaluate(() => window.runIssuanceRetirementSourceControl());
+	await persistObservation(testInfo, "issuance-retirement-source-control", result);
+	expect(result).toEqual({
+		nullableControl: true,
+		borrowedExact: true,
+		borrowedTransactions: 0,
+		birthRefusal: "ISSUANCE_RETRY_REQUIRED",
+		birthRefusalDetail: "DurableIssuanceError: join issuance native readonly reservation before retirement",
+		bornExact: true,
+		preparedExact: true,
+		completedExact: true,
+		dataUnchanged: true,
+		reopenedExact: true,
+	});
 });
 for (const name of RETENTION_CASES)
 	test(`1a-1 native retention ${name}`, async ({ page }, testInfo) => {

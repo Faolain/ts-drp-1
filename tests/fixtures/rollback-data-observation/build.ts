@@ -11,10 +11,16 @@ mkdirSync(destination);
 const root = resolve(import.meta.dirname, "../../.."),
 	hash = (b: Uint8Array | string): string => createHash("sha256").update(b).digest("hex"),
 	entries = [];
+const { workspaceAliases } = await import(new URL("../../../vite.config.mts", import.meta.url).href);
 for (const name of process.argv.slice(3)) {
 	const actual = join(root, "packages/node/src/internal/creator-closed-rollback-data.ts"),
 		available = existsSync(actual);
 	const alias = {
+		...workspaceAliases,
+		"@ts-drp/live-journal": join(root, "packages/live-journal/src/index.ts"),
+		"@ts-drp/canonical/domain-hash-stream": join(root, "packages/canonical/src/domain-hash-stream.ts"),
+		"@ts-drp/canonical": join(root, "packages/canonical/src/index.ts"),
+		"@ts-drp/seal/internal/storage-port": join(root, "packages/seal/src/storage-port.ts"),
 		"rollback-observer-under-test": available
 			? actual
 			: join(root, "tests/fixtures/rollback-data-observation/missing-api.ts"),
@@ -28,7 +34,14 @@ for (const name of process.argv.slice(3)) {
 		target: "es2022",
 		write: false,
 		metafile: true,
-		plugins: name.endsWith("recovery")
+		plugins: [{ name: "existing-current-source-resolution", setup(context) {
+			context.onResolve({ filter: /^\..*\.js$/ }, (args) => {
+				const source = resolve(args.resolveDir, args.path.slice(0, -3) + ".ts")
+					.replace(join(root, "packages/node/dist/src") + "/", join(root, "packages/node/src") + "/")
+					.replace(join(root, "packages/keychain/dist/src") + "/", join(root, "packages/keychain/src") + "/");
+				return source.startsWith(join(root, "packages") + "/") && existsSync(source) ? { path: source } : undefined;
+			});
+		}}, ...(name.endsWith("recovery")
 			? [
 					readerInstrumentation(
 						root,
@@ -37,7 +50,7 @@ for (const name of process.argv.slice(3)) {
 						name.startsWith("role-")
 					),
 				]
-			: [],
+			: [])],
 		banner: name.includes("browser")
 			? undefined
 			: {

@@ -23,6 +23,12 @@ import {
 	createRecoverableFinalitySigner,
 	signCreatorIssuanceRetirementRequest,
 } from "../../../packages/keychain/dist/src/finality.js";
+import {
+	bindCreatorIssuanceRetirementSigningRequest,
+	captureCreatorIssuanceRetirementSigningContext,
+	scopeCreatorIssuanceRetirementSigningRequest,
+} from "@ts-drp/protocol-v3/internal/creator-issuance-retirement-signing-request";
+import { mintSealVoterEnrollment, nativeSigningAdmissionFactory, type SealStorePort } from "@ts-drp/seal/internal/storage-port";
 import { seed } from "../cold-discovery/application.js";
 export function imageReader(image: NativeImage): AheBoundedActiveRead {
 	const h = decodeHeadRecordV1(image.heads[0]!.record);
@@ -140,7 +146,9 @@ export function editRefs(
 		blobs,
 	};
 }
-export async function provisionLegacy(port: NativePort, b: Bootstrap, floor: Floor): Promise<unknown> {
+export async function provisionLegacy(port: NativePort, b: Bootstrap, floor: Floor,
+	nativeSigning?: Readonly<{ store: SealStorePort; incarnation: string }>
+): Promise<unknown> {
 	let image = normalizeImage(await port.image());
 	const reader = imageReader(image),
 		pair = trustedPair(b, floor, reader),
@@ -160,6 +168,17 @@ export async function provisionLegacy(port: NativePort, b: Bootstrap, floor: Flo
 		successorTrust: pair.successor,
 	});
 	requireThat(prepared.ok, "genuine existing aggregate preparation against real pair");
+	if (nativeSigning !== undefined) {
+		const qc = image.blobs.find(blob => blob.digest === r.commitQcRef.digest);
+		requireThat(qc !== undefined, "original exact closing QC for native fixture signing");
+		const context = captureCreatorIssuanceRetirementSigningContext({
+			currentTrust: pair.current, exactCanonicalCommitQcBytes: qc.bytes, valueDigest: r.cutValueDigest,
+		});
+		scopeCreatorIssuanceRetirementSigningRequest(prepared.signingRequest, context.scope);
+		bindCreatorIssuanceRetirementSigningRequest(prepared.signingRequest,
+			nativeSigningAdmissionFactory(nativeSigning.store,
+				mintSealVoterEnrollment({ ...context.identity, expectedIncarnation: nativeSigning.incarnation })));
+	}
 	const signer = await createRecoverableFinalitySigner({ seed: Uint8Array.from(seed) });
 	const signature = await signCreatorIssuanceRetirementRequest({
 		request: prepared.signingRequest,

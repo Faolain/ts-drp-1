@@ -1,4 +1,26 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import type { SnapshotQuarantineDeclaration } from "@ts-drp/storage/snapshot-transfer";
+import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
+
+export interface NativeMemoryInput {
+	readonly name: string;
+	readonly action:
+		| "create"
+		| "reopen"
+		| "transition"
+		| "issue"
+		| "state"
+		| "census"
+		| "close"
+		| "sweep-old"
+		| "retention-declaration"
+		| "retention-head"
+		| "retention-sweep"
+		| "reopen-expired";
+	readonly epoch: number;
+	readonly nativeGrid?: boolean;
+	readonly retainedDeclaration?: SnapshotQuarantineDeclaration;
+}
 
 type PlainRecord = Readonly<Record<string, unknown>>;
 
@@ -39,6 +61,8 @@ interface DirectRoomHeadControl {
 }
 
 interface DirectRoomOpenOptions {
+	readonly observeLifetime?: boolean;
+	readonly nativeGrid?: boolean;
 	readonly control?: DirectRoomHeadControl;
 	readonly initialization?: PlainRecord;
 	onOpenTransport?(): void;
@@ -54,6 +78,9 @@ interface DirectKeychain {
 }
 
 interface DirectRoomDependencies {
+	censusGridStorage(
+		input: Readonly<{ factory: IDBFactory; databaseNames: readonly string[]; currentEpoch: number; now: number }>
+	): Promise<readonly unknown[]>;
 	readonly Keychain: new (input: Readonly<{ readonly private_key_seed: string }>) => DirectKeychain;
 	bindV3BlueprintLivePlane(input: Readonly<Record<string, unknown>>): PlainRecord;
 	createRecoverableFinalitySigner(
@@ -68,6 +95,9 @@ interface DirectRoomDependencies {
 		creatorPeerId: string,
 		creatorAuthor: string
 	): Readonly<{
+		readonly bootstrapOperation: PlainRecord;
+		readonly catalog: Readonly<{ readonly blueprintDigests: readonly string[] }>;
+		readonly migration: Readonly<{ canonicalStateBytes(projection: unknown): Uint8Array }>;
 		projectAcceptedOperations(input: Readonly<Record<string, unknown>>): unknown;
 	}>;
 	createV3RoomCreatorInviteMaterial(input: Readonly<Record<string, unknown>>): Promise<unknown>;
@@ -227,6 +257,7 @@ declare global {
 	interface Window {
 		__phase6aProductRelayPost?(packet: RelayPacket): Promise<void>;
 		phase6aCreatorSuccessorProduct: Readonly<{
+			nativeMemory(input: NativeMemoryInput): Promise<unknown>;
 			adoptSuccessor(): Promise<void>;
 			beginAdoption(): void;
 			beginActivation(): void;
@@ -234,7 +265,7 @@ declare global {
 			beginOverlappingRehearsal(): void;
 			beginRehearsal(): void;
 			beginSend(text: string): void;
-			boot(realmId: string): Promise<void>;
+			boot(realmId: string, options?: Readonly<{ nativeStorage: boolean }>): Promise<void>;
 			close(): Promise<void>;
 			cleanupLifetimeReplacements(): Promise<void>;
 			configureLifetime(
@@ -1271,21 +1302,34 @@ async function createDirectRoom(name: string, options: DirectRoomOpenOptions = {
 	const dependencies = directDependencies();
 	const authorKeychain = new dependencies.Keychain({ private_key_seed: `d108e3-direct-author-${name}` });
 	await authorKeychain.start();
-	const finalitySeed = `d108e3-direct-finality-${name}`;
+	const finalitySeed = options.nativeGrid === true ? `d108e3-direct-author-${name}` : `d108e3-direct-finality-${name}`;
 	const finalityKeychain = new dependencies.Keychain({ private_key_seed: finalitySeed });
 	await finalityKeychain.start();
 	const finality = await dependencies.createRecoverableFinalitySigner({ seed: await localAuthorSeed(finalitySeed) });
 	if (hex(finality.publicKey) !== finalityKeychain.localAuthorId) {
 		throw new TypeError("D.108e3 direct-room finality identity differs");
 	}
-	const application = dependencies.createV3ChatApplication("alice");
+	const gridApplication =
+		options.nativeGrid === true
+			? dependencies.createV3ZoneApplication(
+					[{ author: authorKeychain.localAuthorId, peerId: authorKeychain.localAuthorId, order: 0 }],
+					authorKeychain.localAuthorId,
+					authorKeychain.localAuthorId
+				)
+			: undefined;
+	const application = gridApplication ?? dependencies.createV3ChatApplication("alice");
 	const blueprintDigest = application.catalog.blueprintDigests[0];
 	if (blueprintDigest === undefined) throw new TypeError("D.108e3 direct-room blueprint is absent");
 	const signerSet = Object.freeze([Object.freeze({ publicKey: finalityKeychain.localAuthorId, signerId: "creator" })]);
 	const createInvite = (selectedObjectId: string): Promise<unknown> =>
 		dependencies.createV3RoomCreatorInviteMaterial({
 			blueprintDigest,
-			exactCanonicalApplicationStateBytes: encodeCanonical([]),
+			exactCanonicalApplicationStateBytes:
+				gridApplication === undefined
+					? encodeCanonical([])
+					: gridApplication.migration.canonicalStateBytes(
+							gridApplication.projectAcceptedOperations({ currentEpochOperations: [] })
+						),
 			exactCanonicalLatchedAclBytes: encodeCanonical({
 				epoch: 0,
 				kind: "drp-v3-latched-acl",
@@ -1298,12 +1342,12 @@ async function createDirectRoom(name: string, options: DirectRoomOpenOptions = {
 				],
 				objectId: selectedObjectId,
 				permissionless: false,
-				version: 1,
+				version: options.nativeGrid === true ? 3 : 1,
 			}),
 			exactCanonicalParametersCarrierBytes: encodeCanonical(DIRECT_PARAMETERS),
 			exactCanonicalProfileBytes: encodeCanonical({
 				cryptoSuiteId: "ed25519-sha256-v3",
-				profileId: "creator-trusted-v1",
+				profileId: options.nativeGrid === true ? "creator-trusted-settlement-v1" : "creator-trusted-v1",
 				quorum: 1,
 				signers: signerSet,
 			}),
@@ -1346,7 +1390,7 @@ async function createDirectRoom(name: string, options: DirectRoomOpenOptions = {
 		issuanceDatabaseName: databaseName,
 		migrationDatabaseNamespace: databaseName,
 		objectId,
-		onAcceptedVertex: () => instrumentation().acceptedVertex(),
+		onAcceptedVertex: () => (options.observeLifetime === false ? undefined : instrumentation().acceptedVertex()),
 		onProjection: () => undefined,
 		openTransport: () => {
 			options.onOpenTransport?.();
@@ -2313,7 +2357,239 @@ function productApi(): ProductApi {
 	return selected as ProductApi;
 }
 
+async function nativeMemoryCensus(databaseName: string, epoch: number): Promise<readonly unknown[]> {
+	const databaseNames = (await indexedDB.databases()).flatMap(({ name: database }) =>
+		database !== undefined && (database === databaseName || database.startsWith(`${databaseName}--`)) ? [database] : []
+	);
+	return directDependencies().censusGridStorage({
+		factory: indexedDB,
+		databaseNames,
+		currentEpoch: epoch,
+		now: Date.now(),
+	});
+}
+
+async function nativeMemoryDurableDigests(databaseName: string): Promise<readonly PlainRecord[]> {
+	const names = (await indexedDB.databases())
+		.flatMap(({ name }) =>
+			name !== undefined &&
+			(name === databaseName || name.startsWith(`${databaseName}--`)) &&
+			!name.endsWith("--drp-snapshot-quarantine-v1")
+				? [name]
+				: []
+		)
+		.sort();
+	return Promise.all(
+		names.map(async (name) => ({
+			name,
+			digest: hex(hashDomain("ts-drp/native-memory-durable/v1", encodeCanonical(normalize(await dumpDatabase(name))))),
+		}))
+	);
+}
+
+async function nativeMemorySweep(databaseName: string, epoch: number, all: boolean): Promise<PlainRecord> {
+	const database = await dumpDatabase(`${databaseName}--drp-snapshot-quarantine-v1`);
+	const scopeStore = database.stores.find(({ name }) => name === "scopes");
+	if (scopeStore === undefined) throw new TypeError("NATIVE_MEMORY_SCOPE_STORE_ABSENT");
+	const scopes = scopeStore.rows.map(exactRecord);
+	const selected = scopes.filter((scope) => all || Number(scope.epoch) < epoch - 2);
+	if (selected.length === 0) throw new TypeError("NATIVE_MEMORY_EXPIRY_COHORT_EMPTY");
+	const now = Math.max(...selected.map(({ expiresAt }) => Number(expiresAt)));
+	const before = await nativeMemoryCensus(databaseName, epoch);
+	const otherBefore = await nativeMemoryDurableDigests(databaseName);
+	const originalNow = Date.now;
+	let store: Awaited<ReturnType<typeof createBrowserSnapshotQuarantineStore>> | undefined;
+	let deleted: number;
+	try {
+		Date.now = (): number => now;
+		store = await createBrowserSnapshotQuarantineStore({ primaryDatabaseName: databaseName });
+		deleted = await store.sweepExpired();
+	} finally {
+		Date.now = originalNow;
+		await store?.close();
+	}
+	return {
+		now,
+		selectedEpochs: selected.map(({ epoch }) => epoch),
+		deleted,
+		before,
+		after: await nativeMemoryCensus(databaseName, epoch),
+		otherBefore,
+		otherAfter: await nativeMemoryDurableDigests(databaseName),
+		clockRestored: Date.now === originalNow,
+	};
+}
+
+function nativeMemoryRequiredSnapshot(image: DatabaseDump, declaration: SnapshotQuarantineDeclaration): PlainRecord {
+	const matches = (row: PlainRecord): boolean =>
+		row.objectId === declaration.scope.objectId &&
+		row.epoch === declaration.scope.epoch &&
+		row.anchor === declaration.scope.anchor &&
+		row.manifestDigest === declaration.scope.manifestDigest;
+	const scopes =
+		image.stores
+			.find(({ name }) => name === "scopes")
+			?.rows.map(exactRecord)
+			.filter(matches) ?? [];
+	const chunks =
+		image.stores
+			.find(({ name }) => name === "chunks")
+			?.rows.map(exactRecord)
+			.filter(matches) ?? [];
+	const scope = scopes[0];
+	const manifest = scope?.exactCanonicalManifestBytes;
+	return {
+		scope: declaration.scope,
+		scopeCount: scopes.length,
+		manifestIntegrity:
+			scopes.length === 1 &&
+			scope?.state === "verified" &&
+			scope.chunkCount === declaration.chunks.length &&
+			scope.totalBytes === declaration.totalBytes &&
+			manifest instanceof Uint8Array &&
+			hex(manifest) === hex(declaration.exactCanonicalManifestBytes) &&
+			hex(hashDomain("ts-drp/snapshot-manifest/v3", manifest)) === declaration.scope.manifestDigest,
+		chunkCount: chunks.length,
+		chunks: declaration.chunks.map((descriptor) => {
+			const selected = chunks.filter(({ index }) => index === descriptor.index);
+			const row = selected[0];
+			const bytes = row?.exactBytes;
+			return {
+				...descriptor,
+				integrity:
+					selected.length === 1 &&
+					row?.byteLength === descriptor.byteLength &&
+					row.digest === descriptor.digest &&
+					bytes instanceof Uint8Array &&
+					bytes.byteLength === descriptor.byteLength &&
+					hex(hashDomain("ts-drp/snapshot-chunk/v3", encodeCanonical(descriptor.index), bytes)) === descriptor.digest,
+			};
+		}),
+	};
+}
+
 const api = Object.freeze({
+	async nativeMemory(input: NativeMemoryInput): Promise<unknown> {
+		const { name, action, epoch } = input;
+		const databaseName = `d108e3-direct-${name}`;
+		if (action === "census") {
+			return nativeMemoryCensus(databaseName, epoch);
+		}
+		if (action === "sweep-old") return nativeMemorySweep(databaseName, epoch, false);
+		if (action === "retention-declaration") return rawSnapshotDeclarationAtEpoch(databaseName, epoch - 1);
+		if (action === "retention-sweep") {
+			const declaration = input.retainedDeclaration;
+			if (declaration === undefined) throw new TypeError("RETENTION_DECLARATION_REQUIRED");
+			const temporaryObjectId = `${declaration.scope.objectId}:unrelated-temporary`;
+			const store = await createBrowserSnapshotQuarantineStore({ primaryDatabaseName: databaseName });
+			try {
+				const source = await store.openScope(declaration);
+				const descriptor = declaration.chunks[0];
+				if (descriptor === undefined) throw new TypeError("RETENTION_SOURCE_DESCRIPTOR_ABSENT");
+				const bytes = await source.verificationQuarantine.open(new AbortController().signal).read(descriptor);
+				if (bytes === undefined) throw new TypeError("RETENTION_SOURCE_CHUNK_ABSENT");
+				await source.release();
+				const temporary = await store.openScope({
+					...declaration,
+					scope: { ...declaration.scope, objectId: temporaryObjectId },
+				});
+				await temporary.verificationQuarantine.open(new AbortController().signal).write(descriptor, bytes);
+				await temporary.release();
+			} finally {
+				await store.close();
+			}
+			const countTemporary = (image: Awaited<ReturnType<typeof dumpDatabase>>): PlainRecord =>
+				Object.fromEntries(
+					["scopes", "chunks"].map((storeName) => [
+						storeName,
+						image.stores
+							.find(({ name: storedName }) => storedName === storeName)
+							?.rows.filter((row) => exactRecord(row).objectId === temporaryObjectId).length ?? 0,
+					])
+				);
+			const before = await dumpDatabase(`${databaseName}--drp-snapshot-quarantine-v1`);
+			const temporaryBefore = countTemporary(before);
+			const maintenance = await nativeMemorySweep(databaseName, epoch, true);
+			const after = await dumpDatabase(`${databaseName}--drp-snapshot-quarantine-v1`);
+			return {
+				...maintenance,
+				temporaryObjectId,
+				temporaryBefore,
+				temporaryAfter: countTemporary(after),
+				// Read-only pre-recovery observations: never reconstruct, reopen a scope, or return payload bytes.
+				requiredBefore: nativeMemoryRequiredSnapshot(before, declaration),
+				requiredAfter: nativeMemoryRequiredSnapshot(after, declaration),
+			};
+		}
+		if (action === "reopen-expired") {
+			// Capture only the declaration from this fresh realm's durable store, never snapshot payload bytes.
+			const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, epoch - 1);
+			const maintenance = await nativeMemorySweep(databaseName, epoch, true);
+			let detail = "fulfilled";
+			let reopened: DirectRoomSession | undefined;
+			try {
+				reopened = await createDirectRoom(name, {
+					observeLifetime: false,
+					nativeGrid: input.nativeGrid === true,
+					withCreatorSigner: false,
+					roomHeadAuthority: d110cRoomHeadAuthority(name, { kind: "reopen" }),
+					successorSnapshotDeclaration: declaration,
+				});
+			} catch (error) {
+				detail = directFailureDetail(error);
+			}
+			try {
+				return {
+					detail,
+					maintenance,
+					classification: reopened === undefined ? "rejected" : "recovered",
+					state: reopened === undefined ? null : d110c0cColdRoomSnapshot(reopened),
+					otherAfterRecovery: await nativeMemoryDurableDigests(databaseName),
+					censusAfterRecovery: await nativeMemoryCensus(databaseName, epoch),
+				};
+			} finally {
+				await reopened?.close();
+			}
+		}
+		if (action === "create" || action === "reopen") {
+			const room = await createDirectRoom(name, {
+				observeLifetime: false,
+				nativeGrid: input.nativeGrid === true,
+				roomHeadAuthority: d110cRoomHeadAuthority(name, { kind: action === "create" ? "create" : "reopen" }),
+				...(action === "reopen"
+					? {
+							successorSnapshotDeclaration:
+								input.retainedDeclaration ?? (await rawSnapshotDeclarationAtEpoch(databaseName, epoch - 1)),
+							withCreatorSigner: false,
+						}
+					: {}),
+			});
+			directRooms.set(name, room);
+		}
+		const room = directRooms.get(name);
+		if (room === undefined) throw new TypeError("NATIVE_MEMORY_ROOM_ABSENT");
+		if (action === "retention-head") return room.inspectDurableHead();
+		if (action === "close") {
+			await room.close();
+			directRooms.delete(name);
+			return null;
+		}
+		if (action === "issue" || action === "transition") {
+			await room.issue(
+				input.nativeGrid === true
+					? { action: "placeBlock", id: "writer-00", kind: "stone", x: epoch % 2, y: 0 }
+					: { action: "message", clientOperationId: `native-memory-${epoch}`, text: `epoch-${epoch}` }
+			);
+			if (action === "transition") {
+				await room.sealEpoch();
+				await room.adoptCreatorSuccessor();
+			}
+		}
+		return {
+			state: d110c0cColdRoomSnapshot(room),
+			issuance: await d110c0c1IssuanceRows(databaseName),
+		};
+	},
 	async adoptSuccessor(): Promise<void> {
 		const adopt = productApi().adoptSuccessor;
 		if (typeof adopt !== "function") throw new TypeError("D.108d2 chat adoption is unavailable");
@@ -2483,7 +2759,7 @@ const api = Object.freeze({
 			true
 		);
 	},
-	async boot(selectedRealmId: string): Promise<void> {
+	async boot(selectedRealmId: string, options?: Readonly<{ nativeStorage: boolean }>): Promise<void> {
 		if (booted) return;
 		if (typeof selectedRealmId !== "string" || selectedRealmId.length === 0)
 			throw new TypeError("D.108d2 realm is invalid");
@@ -2493,10 +2769,12 @@ const api = Object.freeze({
 			value: ProductBroadcastChannel,
 			writable: true,
 		});
-		Object.defineProperty(navigator, "storage", {
-			configurable: true,
-			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
-		});
+		if (options?.nativeStorage !== true) {
+			Object.defineProperty(navigator, "storage", {
+				configurable: true,
+				value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+			});
+		}
 		await import("../../../../examples/v3-chat/src/index.js");
 		booted = true;
 	},

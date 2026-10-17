@@ -5,6 +5,10 @@ versioned-owner findings are dispositioned in the executable slice. Freeze the
 amended independent RED before assigning its distinct GREEN author; review the
 resulting implementation and these fixes together before accepting the seam.
 
+The [2e/2f closure audit](closure-audit-2e-2f.md) owns current closure decisions
+and requirement-level reconciliation. Source-bound findings below retain their
+historical verdicts; they are not automatically findings against repaired MAIN.
+
 ## Signed historical-anchor mechanism and MAIN integration accepted
 
 The existing journal and private rollback provenance owner now provide bounded

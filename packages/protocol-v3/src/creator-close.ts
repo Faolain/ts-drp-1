@@ -1,16 +1,24 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { type CurrentAnchorTrust, verifyEd25519RegisteredDigest } from "./index.js";
+import { archiveAppendMatchesCut, captureCreatorArchiveAppendBinding } from "./internal/creator-archive-append.js";
+export type { CreatorArchiveAppendBinding } from "./internal/creator-archive-append.js";
 import type { CreatorAnchorSigningRequest } from "./internal/creator-anchor-signing-request.js";
-import { captureForwardPromotion, creatorCutEffectiveState } from "./internal/creator-forward-promotion.js";
+import {
+	captureCreatorSnapshotRecoveryRoles,
+	captureForwardPromotion,
+	capturePromotionArray,
+	creatorCutEffectiveState,
+} from "./internal/creator-forward-promotion.js";
 import {
 	type CreatorAnchorTrustMaterial,
 	mintCreatorAnchorSigningRequest,
 	mintCreatorAnchorTrustSuccessor,
 	resolveCreatorAnchorTrustMaterial,
+	scopeCreatorAnchorSigningRequest,
 } from "./internal/seal-authority-custody.js";
 import { resolveSealAuthorityIdentity } from "./internal/seal-authority-identity.js";
-import { openSealAuthority, verifySealQC } from "./seal.js";
+import { openSealAuthority, SEAL_CANONICAL_RECORD_MAX_BYTES, verifySealQC } from "./seal.js";
 import { settlementProfileFor } from "./settlement-profile.js";
 import { decodeSnapshotManifest } from "./snapshot-transfer.js";
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
@@ -281,6 +289,14 @@ function exactCanonicalRecord(bytes: Uint8Array, kind: string): Readonly<Record<
 			captureForwardPromotion(decoded.forwardPromotion) === undefined
 		)
 			return undefined;
+		if (
+			kind === "cutValue" &&
+			Object.hasOwn(decoded, "recoveryRoles") &&
+			captureCreatorSnapshotRecoveryRoles(decoded.recoveryRoles) === undefined
+		)
+			return undefined;
+		if (kind === "cutValue" && Object.hasOwn(decoded, "archiveAppend") &&
+			!archiveAppendMatchesCut(decoded.archiveAppend, decoded)) return undefined;
 		return decoded;
 	} catch {
 		return undefined;
@@ -304,17 +320,20 @@ function creatorSignerId(material: CreatorAnchorTrustMaterial): string | undefin
 	}
 }
 
-function successorAnchor(
-	currentAnchor: Readonly<Record<string, unknown>>,
-	cut: Readonly<Record<string, unknown>>
-): Uint8Array {
-	return encodeCanonical({
+/** Original successor-anchor schema. Resource slots are not anchor bytes,
+ * registered trust or a signing/adoption capability. */
+export function creatorSuccessorAnchorFields(input: Readonly<{
+	currentAnchor: Readonly<Record<string, unknown>>; cut: Readonly<Record<string, unknown>>;
+	cutDigest: unknown; successorEpoch: unknown; effectiveStateDigest: unknown;
+}>): Readonly<Record<string, unknown>> {
+	const {currentAnchor, cut} = input;
+	return {
 		aclDigest: cut.aclDigest,
 		archiveIndexRoot: cut.archiveIndexRoot,
 		blueprintDigest: cut.blueprintDigest,
 		cryptoSuiteId: currentAnchor.cryptoSuiteId,
-		cutDigest: hex(hashDomain(registry.kinds.cutValue?.domain ?? "", encodeCanonical(cut))),
-		epoch: (cut.epoch as number) + 1,
+		cutDigest: input.cutDigest,
+		epoch: input.successorEpoch,
 		historyRoot: cut.historyRoot,
 		historySize: cut.historySize,
 		kind: "drp-epoch-anchor",
@@ -324,8 +343,69 @@ function successorAnchor(
 		profileDigest: currentAnchor.profileDigest,
 		protocolMajor: 3,
 		signerSetDigest: currentAnchor.signerSetDigest,
-		stateDigest: creatorCutEffectiveState(cut),
-	});
+		stateDigest: input.effectiveStateDigest,
+	};
+}
+
+/** Same Cut field owner for actual native encoding and finite scalar costs.
+ * Optional presence is preserved exactly; no validation or close is minted. */
+export function creatorCutFields(input: Readonly<{
+	values: Readonly<Record<string, unknown>>; currentAnchor: Readonly<Record<string, unknown>>;
+	currentEpoch: unknown; objectId: unknown; currentAnchorDigest: unknown;
+	nextSignerSet: unknown; parameters: unknown; availabilityPolicyDigest: unknown;
+	forwardPromotion?: unknown; recoveryRoles?: unknown; archiveAppend?: unknown;
+}>): Readonly<Record<string, unknown>> {
+	const values = input.values, currentAnchor = input.currentAnchor;
+	return {
+		...(Object.hasOwn(input, "forwardPromotion") ? {forwardPromotion: input.forwardPromotion} : {}),
+		...(Object.hasOwn(input, "recoveryRoles") ? {recoveryRoles: input.recoveryRoles} : {}),
+		...(Object.hasOwn(input, "archiveAppend") ? {archiveAppend: input.archiveAppend} : {}),
+		aclDigest: values.aclDigest,
+		archiveIndexRoot: values.archiveIndexRoot,
+		availabilityPolicyDigest: input.availabilityPolicyDigest,
+		blueprintDigest: values.blueprintDigest,
+		closeReason: values.closeReason,
+		closeSetCount: values.closeSetCount,
+		closeSetRoot: values.closeSetRoot,
+		encodingVersion: "drp-canonical-profile-1",
+		epoch: input.currentEpoch,
+		historyRoot: values.historyRoot,
+		historySize: values.historySize,
+		kind: "drp-hard-epoch-cut",
+		nextSignerSet: input.nextSignerSet,
+		objectId: input.objectId,
+		parameters: input.parameters,
+		previousAnchor: input.currentAnchorDigest,
+		previousCutDigest: currentAnchor.cutDigest,
+		previousHistoryRoot: currentAnchor.historyRoot,
+		previousHistorySize: currentAnchor.historySize,
+		protocolMajor: 3,
+		snapshotManifestDigest: values.snapshotManifestDigest,
+		stateDigest: values.stateDigest,
+	};
+}
+
+/** Same successor trust-state record schema for actual signatures and scalar
+ * resource slots. No trust wrapper, signed anchor or capability is produced. */
+export function creatorSuccessorTrustFields(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	return {
+		currentAnchorDigest: input.currentAnchorDigest, currentEpoch: input.currentEpoch,
+		detachedCurrentAnchorSignature: input.detachedCurrentAnchorSignature,
+		exactCanonicalCurrentAnchorPreimageBytes: input.exactCanonicalCurrentAnchorPreimageBytes,
+		exactCanonicalProfileBytes: input.exactCanonicalProfileBytes,
+		exactCanonicalSignerSetBytes: input.exactCanonicalSignerSetBytes,
+		genesisAnchorDigest: input.genesisAnchorDigest, kind: "drp-anchor-trust-state", objectId: input.objectId,
+		profileId: input.profileId, quorum: 1, version: 1,
+	};
+}
+
+function successorAnchor(
+	currentAnchor: Readonly<Record<string, unknown>>,
+	cut: Readonly<Record<string, unknown>>
+): Uint8Array {
+	return encodeCanonical(creatorSuccessorAnchorFields({currentAnchor, cut,
+		cutDigest: hex(hashDomain(registry.kinds.cutValue?.domain ?? "", encodeCanonical(cut))),
+		successorEpoch: (cut.epoch as number) + 1, effectiveStateDigest: creatorCutEffectiveState(cut)}));
 }
 
 function closedCutSuccessorEquation(
@@ -379,6 +459,19 @@ function closedCutSuccessorEquation(
 	]) {
 		if (typeof cut[field] !== "string" || !digestHex.test(cut[field] as string)) return undefined;
 	}
+	if (Object.hasOwn(cut, "recoveryRoles")) {
+		const roles = captureCreatorSnapshotRecoveryRoles(cut.recoveryRoles);
+		if (
+			roles === undefined ||
+			roles.genesisAnchorDigest !== material.genesisAnchorDigest ||
+			roles.currentClose.objectId !== cut.objectId ||
+			roles.currentClose.epoch !== cut.epoch ||
+			roles.currentClose.anchor !== cut.previousAnchor ||
+			roles.currentClose.manifestDigest !== cut.snapshotManifestDigest
+		)
+			return undefined;
+	}
+	if (Object.hasOwn(cut, "archiveAppend") && !archiveAppendMatchesCut(cut.archiveAppend, cut)) return undefined;
 	return cut;
 }
 
@@ -402,9 +495,13 @@ function validClosedParameters(value: Readonly<Record<string, unknown>>): boolea
 /**
  * Authenticates original historical anchor material against genuine immediate successor custody.
  * @param input - Closed successor trust and the existing exact install envelope, without caller key authority.
+ * @param authenticatedSuccessor - Existing checkpoint owner's authenticated successor material, when supplied internally.
  * @returns Frozen compact material identities or one typed refusal; never historical trust or replay authority.
  */
-export function inspectCreatorHistoricalAnchorEnvelope(input: unknown): InspectCreatorHistoricalAnchorEnvelopeResult {
+function inspectHistoricalAnchorEnvelope(
+	input: unknown,
+	authenticatedSuccessor?: CreatorAnchorTrustMaterial
+): InspectCreatorHistoricalAnchorEnvelopeResult {
 	try {
 		const captured = capturedRecord(input, ["successorTrust", "envelope"]);
 		if (captured === undefined) return failure("MALFORMED_HISTORICAL_ENVELOPE");
@@ -422,7 +519,8 @@ export function inspectCreatorHistoricalAnchorEnvelope(input: unknown): InspectC
 			byteCarrierLength(envelope.exactCanonicalParametersCarrierBytes, undefined, 65_536) === undefined
 		)
 			return failure("MALFORMED_HISTORICAL_ENVELOPE");
-		const material = resolveCreatorAnchorTrustMaterial(captured.successorTrust as CurrentAnchorTrust);
+		const material =
+			authenticatedSuccessor ?? resolveCreatorAnchorTrustMaterial(captured.successorTrust as CurrentAnchorTrust);
 		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
 		const anchorBytes = copyBytes(envelope.exactCanonicalAnchorPreimageBytes, undefined, 8192);
 		const signature = copyBytes(envelope.detachedAnchorSignature, 64, 64);
@@ -490,11 +588,88 @@ export function inspectCreatorHistoricalAnchorEnvelope(input: unknown): InspectC
 }
 
 /**
+ * Authenticates one original signed predecessor, without minting historical authority.
+ * @param input - Genuine immediate successor custody and exact original envelope.
+ * @returns Detached historical identity or the existing typed refusal.
+ */
+export function inspectCreatorHistoricalAnchorEnvelope(input: unknown): InspectCreatorHistoricalAnchorEnvelopeResult {
+	return inspectHistoricalAnchorEnvelope(input);
+}
+
+/**
+ * Checks a bounded contiguous original-anchor chain against genuine current custody.
+ * Same-key signatures on a fork never replace any exact predecessor digest link.
+ * No historical trust, issuance permission or deletion authority is minted.
+ * @param input - Genuine current trust and at most six native original predecessor envelopes.
+ * @returns Detached original identities after every link verifies, or one whole refusal.
+ */
+export function inspectCreatorHistoricalAnchorChain(
+	input: unknown
+): Readonly<
+	| { ok: false; reason: CreatorHistoricalAnchorEnvelopeFailureReason }
+	| { ok: true; identities: readonly Extract<InspectCreatorHistoricalAnchorEnvelopeResult, { ok: true }>[] }
+> {
+	try {
+		const captured = capturedRecord(input, ["currentTrust", "envelopes"]);
+		if (captured === undefined) return failure("MALFORMED_HISTORICAL_ENVELOPE");
+		let material = resolveCreatorAnchorTrustMaterial(captured.currentTrust as CurrentAnchorTrust);
+		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
+		const envelopes = capturePromotionArray(captured.envelopes, 6);
+		if (envelopes === undefined || envelopes.length === 0) return failure("MALFORMED_HISTORICAL_ENVELOPE");
+		const identities: Extract<InspectCreatorHistoricalAnchorEnvelopeResult, { ok: true }>[] = [];
+		for (const value of envelopes) {
+			const envelope = capturedRecord(value, [
+				"objectId",
+				"exactCanonicalAnchorPreimageBytes",
+				"detachedAnchorSignature",
+				"exactCanonicalParametersCarrierBytes",
+			]);
+			if (envelope === undefined) return failure("MALFORMED_HISTORICAL_ENVELOPE");
+			// Detach once before the primitive sees bytes and before the next link
+			// inherits them. Caller mutation cannot alter the authenticated chain.
+			const anchor = copyBytes(envelope.exactCanonicalAnchorPreimageBytes, undefined, 8192),
+				signature = copyBytes(envelope.detachedAnchorSignature, 64, 64),
+				parameters = copyBytes(envelope.exactCanonicalParametersCarrierBytes, undefined, 65_536);
+			if (anchor === undefined || signature === undefined || parameters === undefined)
+				return failure("MALFORMED_HISTORICAL_ENVELOPE");
+			const detached = {
+				objectId: envelope.objectId,
+				exactCanonicalAnchorPreimageBytes: anchor,
+				detachedAnchorSignature: signature,
+				exactCanonicalParametersCarrierBytes: parameters,
+			};
+			const checked = inspectHistoricalAnchorEnvelope(
+				{ successorTrust: captured.currentTrust, envelope: detached },
+				material
+			);
+			if (!checked.ok) return checked;
+			if (checked.epoch === 0 && checked.anchorDigest !== material.genesisAnchorDigest)
+				return failure("HISTORICAL_ANCHOR_MISMATCH");
+			identities.push(checked);
+			material = {
+				...material,
+				currentEpoch: checked.epoch,
+				currentAnchorDigest: checked.anchorDigest,
+				exactCanonicalCurrentAnchorPreimageBytes: anchor,
+				detachedCurrentAnchorSignature: signature,
+			};
+		}
+		return Object.freeze({ ok: true, identities: Object.freeze(identities) });
+	} catch {
+		return failure("MALFORMED_HISTORICAL_ENVELOPE");
+	}
+}
+
+/**
  * Inspects exact closed-cut binding to genuine successor custody without minting old authority.
  * @param input - Closed genuine successor trust and canonical CutValue bytes.
+ * @param promotion - Explicit promoted equation selection; never independent source authority.
  * @returns Detached identities or a frozen binding refusal.
  */
-export function inspectCreatorClosedCutSuccessorBinding(input: unknown): Readonly<
+function inspectClosedCutSuccessorBinding(
+	input: unknown,
+	promotion = false
+): Readonly<
 	| { ok: false; reason: string }
 	| {
 			ok: true;
@@ -507,11 +682,26 @@ export function inspectCreatorClosedCutSuccessorBinding(input: unknown): Readonl
 		if (!plainRecord(input) || !exactKeys(input, ["successorTrust", "exactCanonicalCutValueBytes"]))
 			return failure("CERTIFIED_VALUE_MISMATCH");
 		const material = resolveCreatorAnchorTrustMaterial(input.successorTrust as CurrentAnchorTrust);
-		const bytes = copyBytes(input.exactCanonicalCutValueBytes, undefined, 65_536);
+		const bytes = copyBytes(input.exactCanonicalCutValueBytes, undefined, SEAL_CANONICAL_RECORD_MAX_BYTES);
 		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
 		if (bytes === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
-		const cut = closedCutSuccessorEquation(material, material.exactCanonicalCurrentAnchorPreimageBytes, bytes);
+		const cut = closedCutSuccessorEquation(
+			material,
+			material.exactCanonicalCurrentAnchorPreimageBytes,
+			bytes,
+			promotion
+		);
 		const anchor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
+		if (promotion && cut !== undefined) {
+			const forward = captureForwardPromotion(cut.forwardPromotion);
+			if (
+				forward === undefined ||
+				forward.genesisAnchorDigest !== material.genesisAnchorDigest ||
+				forward.authorizedSuccessorAclDigest !== cut.aclDigest ||
+				![material.currentEpoch - 2, material.currentEpoch - 3].includes(forward.source.closedEpoch)
+			)
+				return failure("CERTIFIED_VALUE_MISMATCH");
+		}
 		return cut === undefined || anchor === undefined
 			? failure("CERTIFIED_VALUE_MISMATCH")
 			: Object.freeze({
@@ -523,6 +713,29 @@ export function inspectCreatorClosedCutSuccessorBinding(input: unknown): Readonl
 	} catch {
 		return failure("CERTIFIED_VALUE_MISMATCH");
 	}
+}
+
+/**
+ * Ordinary closed-cut observation never accepts a forward promoted base.
+ * @param input - Exact canonical CutValue and genuine successor trust.
+ * @returns Exact ordinary successor equation or a typed refusal.
+ */
+export function inspectCreatorClosedCutSuccessorBinding(
+	input: unknown
+): ReturnType<typeof inspectClosedCutSuccessorBinding> {
+	return inspectClosedCutSuccessorBinding(input);
+}
+
+/**
+ * Binds a promoted cut to genuine signed successor custody without conferring source authority.
+ * The consumer must separately authenticate the complete installed promotion and source bytes.
+ * @param input - Exact canonical cut and genuine successor trust.
+ * @returns Exact successor equation or a refusal; never a promotion capability.
+ */
+export function inspectCreatorForwardPromotionClosedCutSuccessorBinding(
+	input: unknown
+): ReturnType<typeof inspectClosedCutSuccessorBinding> {
+	return inspectClosedCutSuccessorBinding(input, true);
 }
 
 /**
@@ -626,12 +839,30 @@ function prepareClose(
 	try {
 		if (
 			!plainRecord(input) ||
-			!exactKeys(input, promotion ? [...closeInputFields, "forwardPromotion"] : closeInputFields)
+			!exactKeys(input, [
+				...closeInputFields,
+				...(promotion ? ["forwardPromotion"] : []),
+				...(Object.hasOwn(input, "recoveryRoles") ? ["recoveryRoles"] : []),
+				...(Object.hasOwn(input, "archiveAppend") ? ["archiveAppend"] : []),
+			])
 		)
 			return failure("CUT_VALUE_MISMATCH");
 		const material = resolveCreatorAnchorTrustMaterial(input.currentTrust as CurrentAnchorTrust);
 		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
 		const forwardPromotion = promotion ? captureForwardPromotion(input.forwardPromotion) : undefined;
+		const recoveryRoles = Object.hasOwn(input, "recoveryRoles")
+			? captureCreatorSnapshotRecoveryRoles(input.recoveryRoles)
+			: undefined;
+		if (
+			Object.hasOwn(input, "recoveryRoles") &&
+			(recoveryRoles === undefined ||
+				recoveryRoles.genesisAnchorDigest !== material.genesisAnchorDigest ||
+				recoveryRoles.currentClose.objectId !== material.objectId ||
+				recoveryRoles.currentClose.epoch !== material.currentEpoch ||
+				recoveryRoles.currentClose.anchor !== material.currentAnchorDigest ||
+				recoveryRoles.currentClose.manifestDigest !== input.snapshotManifestDigest)
+		)
+			return failure("CUT_VALUE_MISMATCH");
 		if (
 			promotion &&
 			(forwardPromotion === undefined ||
@@ -680,9 +911,17 @@ function prepareClose(
 		) {
 			return failure("SNAPSHOT_BINDING_MISMATCH");
 		}
+		const archiveAppend = Object.hasOwn(input, "archiveAppend")
+			? captureCreatorArchiveAppendBinding(input.archiveAppend) : undefined;
+		if (Object.hasOwn(input, "archiveAppend") && (archiveAppend === undefined ||
+			!archiveAppendMatchesCut(archiveAppend, { objectId: material.objectId, epoch: material.currentEpoch,
+				previousAnchor: material.currentAnchorDigest, previousHistorySize: currentAnchor.historySize,
+				historySize: input.historySize, historyRoot: input.historyRoot, closeSetRoot: input.closeSetRoot,
+				closeSetCount: input.closeSetCount, archiveIndexRoot: input.archiveIndexRoot }, currentAnchor.archiveIndexRoot)))
+			return failure("CUT_VALUE_MISMATCH");
 		if (
 			input.blueprintDigest !== currentAnchor.blueprintDigest ||
-			input.archiveIndexRoot !== currentAnchor.archiveIndexRoot ||
+			(archiveAppend === undefined && input.archiveIndexRoot !== currentAnchor.archiveIndexRoot) ||
 			input.closeReason !== "creator-requested" ||
 			typeof input.closeSetRoot !== "string" ||
 			!digestHex.test(input.closeSetRoot) ||
@@ -700,32 +939,15 @@ function prepareClose(
 		const nextSignerSet = decodeCanonicalValue(signerSetBytes);
 		const parameters = decodeCanonicalValue(parametersBytes);
 		decodeCanonicalValue(availabilityBytes);
-		const exactCanonicalCutValueBytes = encodeCanonical({
-			...(promotion ? { forwardPromotion } : {}),
-			aclDigest: input.aclDigest,
-			archiveIndexRoot: input.archiveIndexRoot,
+		const exactCanonicalCutValueBytes = encodeCanonical(creatorCutFields({
+			values: input, currentAnchor, currentEpoch: material.currentEpoch, objectId: material.objectId,
+			currentAnchorDigest: material.currentAnchorDigest, nextSignerSet, parameters,
 			availabilityPolicyDigest: hex(hashDomain("ts-drp/availability-policy/v3", availabilityBytes)),
-			blueprintDigest: input.blueprintDigest,
-			closeReason: input.closeReason,
-			closeSetCount: input.closeSetCount,
-			closeSetRoot: input.closeSetRoot,
-			encodingVersion: "drp-canonical-profile-1",
-			epoch: material.currentEpoch,
-			historyRoot: input.historyRoot,
-			historySize: input.historySize,
-			kind: "drp-hard-epoch-cut",
-			nextSignerSet,
-			objectId: material.objectId,
-			parameters,
-			previousAnchor: material.currentAnchorDigest,
-			previousCutDigest: currentAnchor.cutDigest,
-			previousHistoryRoot: currentAnchor.historyRoot,
-			previousHistorySize: currentAnchor.historySize,
-			protocolMajor: 3,
-			snapshotManifestDigest: input.snapshotManifestDigest,
-			stateDigest: input.stateDigest,
-		});
-		if (exactCanonicalCutValueBytes.byteLength > 65_536) return failure("CUT_VALUE_MISMATCH");
+			...(promotion ? { forwardPromotion } : {}),
+			...(recoveryRoles === undefined ? {} : { recoveryRoles }),
+			...(archiveAppend === undefined ? {} : { archiveAppend }),
+		}));
+		if (exactCanonicalCutValueBytes.byteLength > SEAL_CANONICAL_RECORD_MAX_BYTES) return failure("CUT_VALUE_MISMATCH");
 		const valueDigest = hex(hashDomain(registry.kinds.cutValue?.domain ?? "", exactCanonicalCutValueBytes));
 		const close = Object.freeze({}) as VerifiedCreatorClose;
 		closeStates.set(
@@ -744,6 +966,35 @@ function prepareClose(
 			exactCanonicalCutValueBytes: Uint8Array.from(exactCanonicalCutValueBytes),
 			ok: true as const,
 			valueDigest,
+		});
+	} catch {
+		return failure("CUT_VALUE_MISMATCH");
+	}
+}
+
+/**
+ * Reads the deterministic unsigned successor encoding for capacity accounting.
+ * This does not authenticate a successor, mint a signing request, consume close
+ * custody, or bypass the commit-QC guard in prepareSuccessor.
+ * @param input - This owner's genuine prepared ordinary or promoted close.
+ * @returns Detached sizing bytes only, never CurrentAnchorTrust or signing authority.
+ */
+export function readPreparedCreatorSuccessorAnchorForSizing(
+	input: unknown
+): Readonly<
+	{ ok: true; exactCanonicalAnchorPreimageBytes: Uint8Array; anchorDigest: string } | { ok: false; reason: string }
+> {
+	try {
+		if (!plainRecord(input) || !exactKeys(input, ["close"])) return failure("CUT_VALUE_MISMATCH");
+		const close = closeStates.get(input.close as VerifiedCreatorClose);
+		if (close === undefined) return failure("CUT_VALUE_MISMATCH");
+		const cut = exactCanonicalRecord(close.exactCanonicalCutValueBytes, "cutValue");
+		if (cut === undefined) return failure("CUT_VALUE_MISMATCH");
+		const bytes = successorAnchor(close.currentAnchor, cut);
+		return Object.freeze({
+			ok: true,
+			exactCanonicalAnchorPreimageBytes: Uint8Array.from(bytes),
+			anchorDigest: hex(hashDomain(registry.kinds.epochAnchor?.domain ?? "", bytes)),
 		});
 	} catch {
 		return failure("CUT_VALUE_MISMATCH");
@@ -777,7 +1028,7 @@ function prepareSuccessor(
 		}
 		const close = closeStates.get((promotion ? input.promotion : input.close) as object);
 		const identity = resolveSealAuthorityIdentity(input.authority);
-		const commitQcBytes = copyBytes(input.exactCanonicalCommitQcBytes, undefined, 65_536);
+		const commitQcBytes = copyBytes(input.exactCanonicalCommitQcBytes, undefined, SEAL_CANONICAL_RECORD_MAX_BYTES);
 		if (commitQcBytes === undefined || commitQcBytes.byteLength === 0) return failure("COMMIT_QC_REQUIRED");
 		if (
 			close === undefined ||
@@ -804,6 +1055,13 @@ function prepareSuccessor(
 			signerPublicKey: close.material.publicKey,
 		});
 		if (!prepared.ok) return failure("CERTIFIED_VALUE_MISMATCH");
+		scopeCreatorAnchorSigningRequest(prepared.signingRequest, {
+			objectId: identity.objectId,
+			epoch: identity.epoch,
+			round: verified.round,
+			signerId: identity.signerId,
+			publicKey: close.material.publicKey,
+		});
 		const preparation = Object.freeze({}) as CreatorAnchorPreparation;
 		preparationStates.set(
 			preparation,
@@ -856,7 +1114,7 @@ function completeSuccessor(
 		}
 		const anchor = exactCanonicalRecord(state.exactCanonicalAnchorPreimageBytes, "epochAnchor");
 		if (anchor === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
-		const exactCanonicalTrustStateRecordBytes = encodeCanonical({
+		const exactCanonicalTrustStateRecordBytes = encodeCanonical(creatorSuccessorTrustFields({
 			currentAnchorDigest: state.anchorDigest,
 			currentEpoch: anchor.epoch,
 			detachedCurrentAnchorSignature: signature,
@@ -864,12 +1122,9 @@ function completeSuccessor(
 			exactCanonicalProfileBytes: state.material.exactCanonicalProfileBytes,
 			exactCanonicalSignerSetBytes: state.material.exactCanonicalSignerSetBytes,
 			genesisAnchorDigest: state.material.genesisAnchorDigest,
-			kind: "drp-anchor-trust-state",
 			objectId: state.material.objectId,
 			profileId: (decodeCanonicalValue(state.material.exactCanonicalProfileBytes) as Record<string, unknown>).profileId,
-			quorum: 1,
-			version: 1,
-		});
+		}));
 		return Object.freeze({
 			exactCanonicalTrustStateRecordBytes: Uint8Array.from(exactCanonicalTrustStateRecordBytes),
 			ok: true as const,
@@ -947,8 +1202,8 @@ function openSuccessorTrust(
 		}
 		if ((anchor.epoch as number) !== material.currentEpoch + 1) return failure("CERTIFIED_VALUE_MISMATCH");
 
-		const cutBytes = copyBytes(input.exactCanonicalCutValueBytes, undefined, 65_536);
-		const commitQcBytes = copyBytes(input.exactCanonicalCommitQcBytes, undefined, 65_536);
+		const cutBytes = copyBytes(input.exactCanonicalCutValueBytes, undefined, SEAL_CANONICAL_RECORD_MAX_BYTES);
+		const commitQcBytes = copyBytes(input.exactCanonicalCommitQcBytes, undefined, SEAL_CANONICAL_RECORD_MAX_BYTES);
 		if (commitQcBytes === undefined || commitQcBytes.byteLength === 0) return failure("COMMIT_QC_REQUIRED");
 		if (cutBytes === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
 		const cut = exactCanonicalRecord(cutBytes, "cutValue");
@@ -974,9 +1229,11 @@ function openSuccessorTrust(
 		const currentAnchor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
 		if (
 			currentAnchor === undefined ||
+			(!Object.hasOwn(cut, "archiveAppend") && cut.archiveIndexRoot !== currentAnchor.archiveIndexRoot) ||
 			(promotion &&
 				(cut.blueprintDigest !== currentAnchor.blueprintDigest ||
-					cut.archiveIndexRoot !== currentAnchor.archiveIndexRoot)) ||
+					(!Object.hasOwn(cut, "archiveAppend") && cut.archiveIndexRoot !== currentAnchor.archiveIndexRoot))) ||
+			(Object.hasOwn(cut, "archiveAppend") && !archiveAppendMatchesCut(cut.archiveAppend, cut, currentAnchor.archiveIndexRoot)) ||
 			cut.epoch !== material.currentEpoch ||
 			cut.previousAnchor !== material.currentAnchorDigest ||
 			cut.previousCutDigest !== currentAnchor.cutDigest ||

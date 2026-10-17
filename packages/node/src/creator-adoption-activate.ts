@@ -1,5 +1,4 @@
 import "./creator-adoption.js";
-import "./v3-live.js";
 import {
 	consumePreparedCreatorSuccessorAdoption,
 	type PreparedCreatorSuccessorAdoptionMaterial,
@@ -13,6 +12,7 @@ import {
 	type CreatorSuccessorRuntimeBindings,
 } from "./internal/creator-successor-live.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
+import { captureV3LocalSettlementFloor, captureV3LocalSettlementPolicy } from "./v3-live.js";
 
 const HOT_KEYS = Object.freeze([
 	"capability",
@@ -43,7 +43,12 @@ const COLD_KEYS = Object.freeze([
 const COLD_BOOTSTRAP_POLICY_KEYS = Object.freeze([...COLD_KEYS, "exactCanonicalPinnedGenesisBootstrapOperationBytes"]);
 
 type PlainRecord = Record<string, unknown>;
-type Failure = Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }>;
+type Failure = Readonly<{
+	readonly cause?: unknown;
+	readonly detail: string;
+	readonly kind: string;
+	readonly ok: false;
+}>;
 
 interface HeldLock {
 	release(): Promise<void>;
@@ -57,6 +62,8 @@ interface ActiveHead {
 }
 
 interface ActiveOwner {
+	readonly receiveOnly: boolean;
+	readonly store: CreatorSuccessorLiveMaterial["store"];
 	readonly bindings: CreatorSuccessorRuntimeBindings;
 	handle: object;
 	readonly head: ActiveHead;
@@ -69,10 +76,22 @@ interface ActiveOwner {
 	readonly topic: string;
 }
 
-const activeOwners = new Map<string, ActiveOwner>();
+// Independent peers may follow one room using distinct native custody.
+// Conflicting bindings to the SAME store still refuse; native store fences and
+// the existing browser lock continue to govern independently opened custody.
+const activeOwners = new WeakMap<CreatorSuccessorLiveMaterial["store"], Map<string, ActiveOwner>>();
 
-function failure(kind: string, detail: string): Failure {
-	return Object.freeze({ detail, kind, ok: false as const });
+function ownersFor(store: CreatorSuccessorLiveMaterial["store"]): Map<string, ActiveOwner> {
+	let owners = activeOwners.get(store);
+	if (owners === undefined) {
+		owners = new Map<string, ActiveOwner>();
+		activeOwners.set(store, owners);
+	}
+	return owners;
+}
+
+function failure(kind: string, detail: string, cause?: unknown): Failure {
+	return Object.freeze({ ...(cause === undefined ? {} : { cause }), detail, kind, ok: false as const });
 }
 
 function capture(value: unknown, keys: readonly string[]): PlainRecord | undefined {
@@ -96,13 +115,36 @@ function capture(value: unknown, keys: readonly string[]): PlainRecord | undefin
 	}
 }
 
+function captureRuntimeInput(value: unknown, keys: readonly string[]): PlainRecord | undefined {
+	const ordinary =
+		capture(value, keys) ??
+		capture(value, [...keys, "classifyTerminalVertex"]) ??
+		capture(value, [...keys, "createOperationAdmissionPolicy"]) ??
+		capture(value, [...keys, "classifyTerminalVertex", "createOperationAdmissionPolicy"]);
+	if (ordinary !== undefined) return ordinary;
+	if (!keys.includes("authenticationProfile")) return undefined;
+	return (
+		capture(value, [...keys, "receiveOnly"]) ??
+		capture(value, [...keys, "receiveOnly", "classifyTerminalVertex"]) ??
+		capture(value, [...keys, "receiveOnly", "createOperationAdmissionPolicy"]) ??
+		capture(value, [...keys, "receiveOnly", "classifyTerminalVertex", "createOperationAdmissionPolicy"])
+	);
+}
+
 function runtimeBindings(input: PlainRecord): CreatorSuccessorRuntimeBindings | undefined {
-	return input.messageQueueManager !== null &&
+	return (input.createOperationAdmissionPolicy === undefined ||
+		typeof input.createOperationAdmissionPolicy === "function") &&
+		(input.classifyTerminalVertex === undefined || typeof input.classifyTerminalVertex === "function") &&
+		input.messageQueueManager !== null &&
 		typeof input.messageQueueManager === "object" &&
 		input.networkNode !== null &&
 		typeof input.networkNode === "object" &&
 		typeof input.onAdmittedVertex === "function"
 		? (Object.freeze({
+				...(input.createOperationAdmissionPolicy === undefined
+					? {}
+					: { createOperationAdmissionPolicy: input.createOperationAdmissionPolicy }),
+				...(input.classifyTerminalVertex === undefined ? {} : { classifyTerminalVertex: input.classifyTerminalVertex }),
 				messageQueueManager: input.messageQueueManager,
 				networkNode: input.networkNode,
 				onAdmittedVertex: input.onAdmittedVertex,
@@ -114,6 +156,8 @@ function sameBindings(left: CreatorSuccessorRuntimeBindings, right: CreatorSucce
 	return (
 		left.messageQueueManager === right.messageQueueManager &&
 		left.networkNode === right.networkNode &&
+		left.classifyTerminalVertex === right.classifyTerminalVertex &&
+		left.createOperationAdmissionPolicy === right.createOperationAdmissionPolicy &&
 		left.onAdmittedVertex === right.onAdmittedVertex
 	);
 }
@@ -180,19 +224,33 @@ function finishReplacement(owner: ActiveOwner): void {
 }
 
 function currentOwner(owner: ActiveOwner): boolean {
-	return activeOwners.get(owner.topic)?.token === owner.token;
+	return ownersFor(owner.store).get(owner.topic)?.token === owner.token;
 }
 
-async function deactivateOwner(owner: ActiveOwner): Promise<void> {
-	const deactivate = Reflect.get(owner.handle, "deactivate");
+async function joinOwnerDeactivation(owner: ActiveOwner, deactivate: () => void | Promise<void>): Promise<void> {
+	const failures: unknown[] = [];
 	try {
-		if (typeof deactivate === "function") await Reflect.apply(deactivate, owner.handle, []);
-	} finally {
-		if (currentOwner(owner)) {
-			activeOwners.delete(owner.topic);
+		await deactivate();
+	} catch (cause) {
+		failures.push(cause);
+	}
+	if (currentOwner(owner)) {
+		ownersFor(owner.store).delete(owner.topic);
+		try {
 			await owner.lock?.release();
+		} catch (cause) {
+			failures.push(cause);
 		}
 	}
+	if (failures.length === 1) throw failures[0];
+	if (failures.length > 1) throw new AggregateError(failures, "creator successor deactivation failed");
+}
+
+function deactivateOwner(owner: ActiveOwner): Promise<void> {
+	return joinOwnerDeactivation(owner, (): void | Promise<void> => {
+		const deactivate = Reflect.get(owner.handle, "deactivate");
+		if (typeof deactivate === "function") return Reflect.apply(deactivate, owner.handle, []);
+	});
 }
 
 async function abandonOwner(owner: ActiveOwner): Promise<void> {
@@ -201,8 +259,25 @@ async function abandonOwner(owner: ActiveOwner): Promise<void> {
 	await deactivateOwner(owner);
 }
 
-async function ignoreCleanupFailure(task: Promise<void>): Promise<void> {
-	await task.catch(() => undefined);
+async function failureAfterCleanup(
+	result: Failure,
+	cleanup: readonly (() => void | Promise<void>)[]
+): Promise<Failure> {
+	const failures: unknown[] = [];
+	for (const release of cleanup) {
+		try {
+			await release();
+		} catch (cause) {
+			failures.push(cause);
+		}
+	}
+	if (failures.length === 0) return result;
+	if (result.cause !== undefined) failures.unshift(result.cause);
+	return failure(
+		result.kind,
+		result.detail,
+		failures.length === 1 ? failures[0] : new AggregateError(failures, result.detail)
+	);
 }
 
 function deactivateRawHandle(handle: Readonly<{ deactivate(): void | Promise<void> }>): Promise<void> {
@@ -222,12 +297,16 @@ function wrapOwner(
 	rawHandle: Record<string, unknown> & Readonly<{ deactivate(): void | Promise<void> }>,
 	bindings: CreatorSuccessorRuntimeBindings,
 	head: ActiveHead,
-	lock: HeldLock | undefined
+	lock: HeldLock | undefined,
+	receiveOnly: boolean,
+	store: CreatorSuccessorLiveMaterial["store"]
 ): ActiveOwner {
 	const token = Object.freeze({});
 	let rawDeactivation: Promise<void> | undefined;
 	let wrapperDeactivation: Promise<void> | undefined;
 	const owner: ActiveOwner = {
+		receiveOnly,
+		store,
 		bindings,
 		handle: rawHandle,
 		head,
@@ -251,14 +330,7 @@ function wrapOwner(
 					owner.retirementRequested = true;
 					await owner.replacementSettled;
 				}
-				try {
-					await deactivateRaw();
-				} finally {
-					if (currentOwner(owner)) {
-						activeOwners.delete(topic);
-						await lock?.release();
-					}
-				}
+				await joinOwnerDeactivation(owner, deactivateRaw);
 			})();
 			return wrapperDeactivation;
 		},
@@ -354,11 +426,53 @@ async function activateMaterial(
 	material: CreatorSuccessorLiveMaterial,
 	bindings: CreatorSuccessorRuntimeBindings
 ): Promise<Readonly<Record<string, unknown>>> {
+	const dependencies = material.promotionDependencies;
+	if (dependencies === undefined) return activateMaterialOwned(material, bindings);
+	const topic = deriveV3StableTopic(material.successor.trust.objectId, material.pinnedGenesisAnchorDigest);
+	const originalOwner = ownersFor(material.store).get(topic);
+	let result: Readonly<Record<string, unknown>> | undefined;
+	let failed = false;
+	let primary: unknown;
+	try {
+		await dependencies.checkSnapshots();
+		result = await activateMaterialOwned(material, bindings);
+		await dependencies.checkSnapshots();
+	} catch (error) {
+		failed = true;
+		primary = error;
+	}
+	const cleanup = await Promise.allSettled([Promise.resolve().then(() => dependencies.release())]);
+	const errors = cleanup.flatMap((outcome) => (outcome.status === "rejected" ? [outcome.reason] : []));
+	if (failed || errors.length > 0) {
+		const causes = failed ? [primary, ...errors] : errors;
+		const cause =
+			causes.length === 1
+				? causes[0]
+				: new AggregateError(
+						causes,
+						"creator promotion activation cleanup failed",
+						failed ? { cause: primary } : undefined
+					);
+		const refusal = failure("snapshot-unavailable", "creator promotion activation dependencies changed", cause);
+		const owner = ownersFor(material.store).get(topic);
+		return owner !== undefined && owner !== originalOwner && owner.handle === result?.handle
+			? failureAfterCleanup(refusal, [(): Promise<void> => deactivateOwner(owner)])
+			: refusal;
+	}
+	return result ?? failure("internal-invariant", "creator promotion activation result is unavailable");
+}
+
+async function activateMaterialOwned(
+	material: CreatorSuccessorLiveMaterial,
+	bindings: CreatorSuccessorRuntimeBindings
+): Promise<Readonly<Record<string, unknown>>> {
 	const heads = transitionHeads(material);
 	if (heads === undefined) return failure("chain-invalid", "creator successor authority transition is invalid");
 	const topic = deriveV3StableTopic(material.successor.trust.objectId, material.pinnedGenesisAnchorDigest);
-	const existing = activeOwners.get(topic);
+	const existing = ownersFor(material.store).get(topic);
 	if (existing !== undefined) {
+		if (existing.receiveOnly !== (material.receiveOnly === true))
+			return failure("authority-unavailable", "creator successor local authoring restriction conflicts");
 		if (!sameBindings(existing.bindings, bindings)) {
 			return failure("authority-unavailable", "creator successor already has a conflicting active owner");
 		}
@@ -376,30 +490,42 @@ async function activateMaterial(
 		beginReplacement(existing);
 		const activated = await consumeCreatorSuccessorLive(material, bindings);
 		if (!activated.ok) {
-			if (failureMayFollowTransfer(activated)) await ignoreCleanupFailure(abandonOwner(existing));
-			else {
+			const result = failure(activated.kind, activated.detail, activated.cause);
+			if (failureMayFollowTransfer(activated)) {
+				return failureAfterCleanup(result, [(): Promise<void> => abandonOwner(existing)]);
+			} else {
 				const retire = existing.retirementRequested;
 				finishReplacement(existing);
-				if (retire) await ignoreCleanupFailure(deactivateOwner(existing));
+				if (retire) return failureAfterCleanup(result, [(): Promise<void> => deactivateOwner(existing)]);
 			}
-			return failure(activated.kind, activated.detail);
+			return result;
 		}
 		const rawHandle = activated.handle as Record<string, unknown> &
 			Readonly<{
 				deactivate(): void | Promise<void>;
 			}>;
-		const replacement = wrapOwner(topic, rawHandle, bindings, heads.successor, existing.lock);
+		const replacement = wrapOwner(
+			topic,
+			rawHandle,
+			bindings,
+			heads.successor,
+			existing.lock,
+			material.receiveOnly === true,
+			material.store
+		);
 		if (!consumeCreatorSuccessorHandleAlias(rawHandle, replacement.handle)) {
-			await ignoreCleanupFailure(deactivateRawHandle(rawHandle));
-			await ignoreCleanupFailure(abandonOwner(existing));
-			return failure("internal-invariant", "creator successor handle identity is unavailable");
+			return failureAfterCleanup(failure("internal-invariant", "creator successor handle identity is unavailable"), [
+				(): Promise<void> => deactivateRawHandle(rawHandle),
+				(): Promise<void> => abandonOwner(existing),
+			]);
 		}
 		if (!currentOwner(existing) || existing.retirementRequested) {
-			await ignoreCleanupFailure(deactivateRawHandle(rawHandle));
-			await ignoreCleanupFailure(abandonOwner(existing));
-			return failure("authority-unavailable", "creator successor active ownership changed during replacement");
+			return failureAfterCleanup(
+				failure("authority-unavailable", "creator successor active ownership changed during replacement"),
+				[(): Promise<void> => deactivateRawHandle(rawHandle), (): Promise<void> => abandonOwner(existing)]
+			);
 		}
-		activeOwners.set(topic, replacement);
+		ownersFor(material.store).set(topic, replacement);
 		finishReplacement(existing);
 		return success(material, replacement.handle);
 	}
@@ -408,21 +534,27 @@ async function activateMaterial(
 	const lock = held as HeldLock | undefined;
 	const activated = await consumeCreatorSuccessorLive(material, bindings);
 	if (!activated.ok) {
-		await lock?.release();
-		return failure(activated.kind, activated.detail);
+		return failureAfterCleanup(failure(activated.kind, activated.detail, activated.cause), [
+			(): Promise<void> | undefined => lock?.release(),
+		]);
 	}
 	const rawHandle = activated.handle as Record<string, unknown> & Readonly<{ deactivate(): void | Promise<void> }>;
-	const owner = wrapOwner(topic, rawHandle, bindings, heads.successor, lock);
+	const owner = wrapOwner(
+		topic,
+		rawHandle,
+		bindings,
+		heads.successor,
+		lock,
+		material.receiveOnly === true,
+		material.store
+	);
 	if (!consumeCreatorSuccessorHandleAlias(rawHandle, owner.handle)) {
-		try {
-			await Promise.resolve(rawHandle.deactivate());
-		} catch {
-			// Continue to release the sole writer lock and return a typed failure.
-		}
-		await lock?.release();
-		return failure("internal-invariant", "creator successor handle identity is unavailable");
+		return failureAfterCleanup(failure("internal-invariant", "creator successor handle identity is unavailable"), [
+			(): Promise<void> => deactivateRawHandle(rawHandle),
+			(): Promise<void> | undefined => lock?.release(),
+		]);
 	}
-	activeOwners.set(topic, owner);
+	ownersFor(material.store).set(topic, owner);
 	return success(material, owner.handle);
 }
 
@@ -432,7 +564,7 @@ async function activateMaterial(
  * @returns Active successor custody or a typed fail-closed result.
  */
 export async function activateCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
-	const captured = capture(input, HOT_KEYS);
+	const captured = captureRuntimeInput(input, HOT_KEYS);
 	if (captured === undefined) return failure("malformed-input", "creator successor activation input is invalid");
 	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
 	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
@@ -465,8 +597,26 @@ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Re
 			"creator successor reopen requires an authenticated room-head floor"
 		);
 	}
-	const captured = capture(input, COLD_KEYS) ?? capture(input, COLD_BOOTSTRAP_POLICY_KEYS);
+	const captured =
+		captureRuntimeInput(input, COLD_KEYS) ??
+		captureRuntimeInput(input, COLD_BOOTSTRAP_POLICY_KEYS) ??
+		captureRuntimeInput(input, [...COLD_KEYS, "settlementPolicy"]) ??
+		captureRuntimeInput(input, [...COLD_BOOTSTRAP_POLICY_KEYS, "settlementPolicy"]) ??
+		captureRuntimeInput(input, [...COLD_KEYS, "settlementFloor"]) ??
+		captureRuntimeInput(input, [...COLD_BOOTSTRAP_POLICY_KEYS, "settlementFloor"]) ??
+		captureRuntimeInput(input, [...COLD_KEYS, "settlementPolicy", "settlementFloor"]) ??
+		captureRuntimeInput(input, [...COLD_BOOTSTRAP_POLICY_KEYS, "settlementPolicy", "settlementFloor"]);
 	if (captured === undefined) return failure("malformed-input", "creator successor reopen input is invalid");
+	if (captured.receiveOnly !== undefined && captured.receiveOnly !== true)
+		return failure("malformed-input", "creator successor receive-only restriction is invalid");
+	const settlementPolicy =
+		captured.settlementPolicy === undefined ? undefined : captureV3LocalSettlementPolicy(captured.settlementPolicy);
+	if (captured.settlementPolicy !== undefined && settlementPolicy === undefined)
+		return failure("malformed-input", "creator successor local settlement policy is invalid");
+	const settlementFloor =
+		captured.settlementFloor === undefined ? undefined : captureV3LocalSettlementFloor(captured.settlementFloor);
+	if (captured.settlementFloor !== undefined && settlementFloor === undefined)
+		return failure("malformed-input", "creator successor local settlement floor is invalid");
 	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
 	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
 	if (captured.authenticationProfile !== "creator-only") {
@@ -497,9 +647,20 @@ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Re
 				: { exactCanonicalPinnedGenesisBootstrapOperationBytes }),
 		}) as never
 	);
-	if (!reopened.ok) return failure(reopened.kind, reopened.detail);
+	if (!reopened.ok) return failure(reopened.kind, reopened.detail, Reflect.get(reopened, "cause"));
 	if (!sameCreatorRoomHead(expectedRoomHead, reopened.material.successor.trust)) {
-		return failure("D110C_FLOOR_MISMATCH", "creator successor differs from the authenticated room-head floor");
+		const refusal = failure("D110C_FLOOR_MISMATCH", "creator successor differs from the authenticated room-head floor");
+		const dependencies = reopened.material.promotionDependencies;
+		return dependencies === undefined
+			? refusal
+			: failureAfterCleanup(refusal, [(): Promise<void> => dependencies.release()]);
 	}
-	return activateMaterial(reopened.material, bindings);
+	return activateMaterial(
+		Object.freeze({
+			...reopened.material,
+			...(settlementPolicy === undefined ? {} : { settlementPolicy }),
+			...(settlementFloor === undefined ? {} : { settlementFloor }),
+		}),
+		bindings
+	);
 }

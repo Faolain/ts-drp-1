@@ -665,9 +665,10 @@ export function createOutcomeCommitAdmissionPolicy(
 		readonly epoch: number;
 		readonly maxEntries: number;
 		readonly objectId: string;
+		readonly authenticatedApplicationStateBytes?: Uint8Array;
 	}>
 ): OutcomeCommitAdmissionPolicy {
-	const record = exactRecord(input, ADMISSION_POLICY_KEYS);
+	const record = exactRecord(input, ADMISSION_POLICY_KEYS) ?? exactRecord(input, [...ADMISSION_POLICY_KEYS, "authenticatedApplicationStateBytes"]);
 	if (
 		record === undefined ||
 		typeof record.aclDigest !== "string" ||
@@ -683,6 +684,31 @@ export function createOutcomeCommitAdmissionPolicy(
 		throw new TypeError("outcome admission policy context is invalid");
 	}
 	const registry = createOutcomeCommitRegistry({ maxEntries: record.maxEntries as number });
+	const inheritedOutcomes = (state: unknown): readonly VerifiedOutcomeCommit[] => {
+		const values = state !== null && typeof state === "object" ? Reflect.get(state, "outcomes") : undefined;
+		if (!Array.isArray(values) || values.length > (record.maxEntries as number)) throw new TypeError("outcome inherited state is invalid");
+		const ids = new Set<string>();
+		return values.map((operation) => {
+			const proof = operation !== null && typeof operation === "object" ? Reflect.get(operation, "proof") : undefined;
+			const intentBytes = proof !== null && typeof proof === "object" ? Reflect.get(proof, "exactCanonicalIntentBytes") : undefined;
+			const intent = openIntent(intentBytes)?.intent;
+			if (intent === undefined) throw new TypeError("outcome inherited intent is invalid");
+			const verified = verifyOutcomeCommitAdmissionOperation({
+				expectedAclDigest: intent.aclDigest, expectedAnchorDigest: intent.anchorDigest,
+				expectedEpoch: intent.epoch, expectedObjectId: intent.objectId, operation,
+			});
+			if (!verified.ok || ids.has(verified.verified.clientOperationId)) throw new TypeError("outcome inherited proof or identity is invalid");
+			ids.add(verified.verified.clientOperationId);
+			return verified.verified;
+		});
+	};
+	if (record.authenticatedApplicationStateBytes !== undefined) {
+		const exactState = strictBytes(record.authenticatedApplicationStateBytes);
+		if (exactState === undefined || exactState.byteLength > 32_768) throw new TypeError("outcome inherited state is unbounded");
+		for (const outcome of inheritedOutcomes(decodeCanonical(exactState))) {
+			if (registry.commit(outcome) !== "committed") throw new TypeError("outcome inherited registry is invalid");
+		}
+	}
 	const ordinaryReservation = (): Extract<OutcomeCommitAdmissionReservation, { readonly kind: "fresh" }> => {
 		let active = true;
 		return Object.freeze({
@@ -703,6 +729,22 @@ export function createOutcomeCommitAdmissionPolicy(
 		},
 		reserve(operation: Readonly<Record<string, unknown>>): OutcomeCommitAdmissionReservation {
 			const action = Reflect.get(operation, "action");
+			if (action === "migrationRecord") {
+				try {
+					const transfer = Reflect.get(operation, "record");
+					if (transfer === null || typeof transfer !== "object" || Reflect.get(transfer, "version") !== 2)
+						return Object.freeze({ kind: "rejected" as const });
+					const outcomes = inheritedOutcomes(Reflect.get(transfer, "applicationState"));
+					if (outcomes.length + registry.size > (record.maxEntries as number) ||
+						outcomes.some((outcome) => registry.classify(outcome) !== "fresh")) return Object.freeze({ kind: "conflict" as const });
+					let active = true;
+					return Object.freeze({ kind: "fresh" as const, commit(): "committed" {
+						if (!active) throw new TypeError("outcome inherited reservation was consumed");
+						for (const outcome of outcomes) if (registry.commit(outcome) !== "committed") throw new TypeError("outcome inherited registry changed");
+						active = false; return "committed";
+					}, release(): void { active = false; } });
+				} catch { return Object.freeze({ kind: "rejected" as const }); }
+			}
 			if (action === "applicationBatch") {
 				const batch = Reflect.get(operation, "batch");
 				const entries = batch !== null && typeof batch === "object" ? Reflect.get(batch, "entries") : undefined;

@@ -9,6 +9,17 @@ import {
 
 export const SNAPSHOT_MANIFEST_MAX_BYTES = 212_387 as const;
 
+/** Original manifest field owner, shared with scalar resource arithmetic.
+ * Fields are not manifest authentication, payload bytes or transfer custody. */
+export function creatorSnapshotManifestFields(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	return {
+		aclDigest: input.aclDigest, anchor: input.anchor, chunks: input.chunks,
+		encodingVersion: "drp-canonical-profile-1", epoch: input.epoch, kind: "drp-snapshot-manifest",
+		objectId: input.objectId, payloadDigest: input.payloadDigest, protocolMajor: 3,
+		schemaVersion: input.schemaVersion, stateDigest: input.stateDigest, totalBytes: input.totalBytes,
+	};
+}
+
 const MANIFEST_DOMAIN = "ts-drp/snapshot-manifest/v3";
 const CHUNK_DOMAIN = "ts-drp/snapshot-chunk/v3";
 const PAYLOAD_DOMAIN = "ts-drp/snapshot-payload/v3";
@@ -310,20 +321,9 @@ export function encodeSnapshotTransfer(input: {
 	);
 	const payloadDigest = hex(hashDomain(PAYLOAD_DOMAIN, payload));
 	const exactCanonicalManifestBytes = encodeCanonical(
-		{
-			aclDigest: values.aclDigest,
-			anchor: values.anchor,
-			chunks: descriptors,
-			encodingVersion: "drp-canonical-profile-1",
-			epoch,
-			kind: "drp-snapshot-manifest",
-			objectId: values.objectId,
-			payloadDigest,
-			protocolMajor: 3,
-			schemaVersion,
-			stateDigest: values.stateDigest,
-			totalBytes: payload.byteLength,
-		},
+		creatorSnapshotManifestFields({aclDigest: values.aclDigest, anchor: values.anchor, chunks: descriptors,
+			epoch, objectId: values.objectId, payloadDigest, schemaVersion, stateDigest: values.stateDigest,
+			totalBytes: payload.byteLength}),
 		{ maxBytes: SNAPSHOT_MANIFEST_MAX_BYTES }
 	);
 	const manifestDigest = hex(hashDomain(MANIFEST_DOMAIN, exactCanonicalManifestBytes));

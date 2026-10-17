@@ -28,6 +28,8 @@ const probe = vi.hoisted(() => ({
 	settlementPlanReads: 0,
 	settlementPlanWrites: [] as Readonly<Record<string, unknown>>[],
 	splitPrefixLength: null as number | null,
+	sourceOwners: [] as number[],
+	ownedLaterSourceFixture: false,
 }));
 
 const AUTHOR = "1".repeat(64);
@@ -158,6 +160,15 @@ vi.mock("@ts-drp/storage-browser", async (importOriginal) => ({
 	createBrowserAheDurableStore: () => Promise.resolve({ close: () => Promise.resolve() }),
 }));
 
+vi.mock("@ts-drp/node/creator-adoption", async (importOriginal) => {
+	const original = await importOriginal<typeof import("../packages/node/src/creator-adoption.js")>();
+	return {...original,
+		// Only the new functional trace declares genesis/no retained successor.
+		selectRetainedCreatorSuccessorAdoption: (...args: Parameters<typeof original.selectRetainedCreatorSuccessorAdoption>) => probe.ownedLaterSourceFixture
+			? Promise.resolve(null) : original.selectRetainedCreatorSuccessorAdoption(...args),
+	};
+});
+
 vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOriginal) => ({
 	...(await importOriginal()),
 	createBrowserDurableIssuanceStore: () =>
@@ -240,8 +251,15 @@ function acceptedVertex(
 	});
 }
 
-vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
-	...(await importOriginal()),
+vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
+	const original = await importOriginal<typeof import("../packages/node/src/v3-live.js")>();
+	return {
+	...original,
+	authorizeV3NewLocalOperation: (input: Parameters<typeof original.authorizeV3NewLocalOperation>[0]) => !probe.ownedLaterSourceFixture
+		? original.authorizeV3NewLocalOperation(input)
+		: typeof input.plane === "object" && input.plane !== null && probe.projectionHandles.has(input.plane)
+		? {ok:true}
+		: {ok:false,kind:"not-active",detail:"controlled current-Writer fixture plane is inactive"},
 	readV3ApplicationProjectionOrder: (input: { plane?: unknown }) => {
 		const plane = input?.plane;
 		const state = typeof plane === "object" && plane !== null ? probe.projectionHandles.get(plane) : undefined;
@@ -285,6 +303,7 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 		// Existing recovered rows declare no controls; settlement fence issuance below records its exact digest.
 		const controlDigests = new Set<string>();
 		probe.activationCount += 1;
+		const ownerId=probe.activationCount;
 		const sink = Reflect.get(input, "onAdmittedVertex") as
 			| ((delivery: Readonly<Record<string, unknown>>) => void | Promise<void>)
 			| undefined;
@@ -328,6 +347,13 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 							: `issue:${String(Reflect.get(planEffect ?? {}, "sourceSequence") ?? "ordinary")}:${action}`
 					);
 					const selectedOutcome = probe.issueOutcomes.shift();
+					if (selectedOutcome?.signedUnchanged === true) {
+						const sign = Reflect.get(issueInput, "signRegisteredVertexDigest") as (value: Uint8Array) => Promise<Uint8Array>;
+						await sign(new Uint8Array(32));
+						// This focused controlled trace entered signing but observed an
+						// unchanged native plan/lineage before original owner recovery.
+						probe.nextSequence = sequence;
+					}
 					if (
 						effectivePlanEffect !== undefined &&
 						(selectedOutcome?.applyEffect !== false || selectedOutcome === undefined)
@@ -369,7 +395,11 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 				},
 				readRebaseOutbox: () => {
 					probe.rebaseReads += 1;
-					return Promise.resolve(probe.rebasePages.shift() ?? { kind: "empty", ok: true });
+					const page = probe.rebasePages.shift() ?? { kind: "empty", ok: true };
+					if (typeof page !== "object" || page === null || Reflect.get(page, "kind") !== "displaced") return Promise.resolve(page);
+					const row = Reflect.get(page, "source") as Record<string, unknown>;
+					const ownedSource = Object.freeze({ ...row, issueReplacement: (input: Readonly<Record<string, unknown>>) => {probe.sourceOwners.push(ownerId);return result.handle.issueLocal(input);} });
+					return Promise.resolve(Object.freeze({ ...page, source: ownedSource }));
 				},
 				republishRetained: () => Promise.resolve({ kind: "empty", ok: true }),
 			},
@@ -380,7 +410,8 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 	},
 	routeV3Ingress: () => false,
 	routeV3RetainedIngress: () => false,
-}));
+};
+});
 
 const roomModule = import("../examples/v3-room/src/index.js");
 
@@ -568,7 +599,7 @@ function selectedActions(): readonly string[] {
 	});
 }
 
-async function openRoom(): Promise<{
+async function openRoom(withCurrentFloor=false): Promise<{
 	close(): Promise<void>;
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
 }> {
@@ -576,7 +607,7 @@ async function openRoom(): Promise<{
 		close(): Promise<void>;
 		issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
 	}>;
-	return create(roomInput());
+	return create({...roomInput(),...(withCurrentFloor?{roomHeadAuthority:{initialization:{kind:"reopen"},begin:async()=>({ok:false,reason:"conflict"}),commit:async()=>({ok:false,reason:"conflict"}),create:async()=>({ok:false,reason:"conflict"}),migrate:async()=>({ok:false,reason:"conflict"}),read:async()=>({ok:true,state:{stable:{objectId:OBJECT_ID,epoch:0,currentAnchorDigest:"b".repeat(64)},pending:null}})}}:{})});
 }
 
 async function settleRoomWork(): Promise<void> {
@@ -605,9 +636,33 @@ beforeEach(() => {
 	probe.settlementPlanReads = 0;
 	probe.settlementPlanWrites = [];
 	probe.splitPrefixLength = null;
+	probe.sourceOwners=[];
+	probe.ownedLaterSourceFixture=false;
 });
 
 describe("D.110c-0c1f5b0u room reconciliation boundaries", () => {
+	it("reacquires exact later source through the original bounded ordered owner after signed unchanged recovery", async () => {
+		probe.ownedLaterSourceFixture=true;
+		await import("fake-indexeddb/auto");
+		const first=displaced(5,"05".repeat(32),[intent("message","first-5",5)]);
+		const later=displaced(7,"07".repeat(32),[intent("message","later-7",7)]);
+		probe.rebasePages=[first,later,{kind:"empty",ok:true},first,later];
+		probe.issueOutcomes=[
+			{ok:true,kind:"accepted",authorSequence:20,digest:"14".repeat(32)},
+			{ok:true,kind:"accepted",authorSequence:21,digest:"15".repeat(32)},
+			{ok:false,kind:"issuance-rejected",applyEffect:false,signedUnchanged:true},
+		];
+		const session=await openRoom(true);
+		try {
+			await session.issue({action:"message",clientOperationId:"after-later-source-recovery"});
+			expect(probe.activationCount).toBe(2);
+			expect(probe.rebaseReads).toBe(5);
+			expect(probe.sourceOwners).toEqual([1,1,2]);
+			expect(probe.plan).toMatchObject({entries:[{sourceSequence:5,replacementSequence:21},{sourceSequence:7,replacementSequence:22}],fenceSequence:20});
+			expect(probe.issueInputs.filter(input=>Reflect.get(Reflect.get(input,"planEffect")??{},"sourceSequence")===5)).toHaveLength(1);
+			expect(probe.issueInputs.filter(input=>Reflect.get(Reflect.get(input,"planEffect")??{},"sourceSequence")===7)).toHaveLength(2);
+		} finally {await session.close();}
+	});
 	it("treats a compatible pre-sign race as durable truth without reusing the unclassified handle", async () => {
 		probe.plan = plan([entry(7, "rebase")], 20, 2) as unknown as Readonly<Record<string, unknown>>;
 		probe.rebasePages = [

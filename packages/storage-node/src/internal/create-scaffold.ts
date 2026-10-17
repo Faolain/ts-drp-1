@@ -1,3 +1,4 @@
+import { encodeCanonical } from "@ts-drp/canonical";
 import {
 	type ActiveGenerationSnapshot,
 	type AheBoundedReadAcquisition,
@@ -5,16 +6,25 @@ import {
 	type AheBoundedRecoveryRoleRead,
 	type AheBoundedRecoveryRoleReadInput,
 	type AheBoundedRecoveryRoleStore,
+	type AheRetirementAdmissionImage,
+	type AheRetirementControl,
+	type AheRetirementControlRead,
+	aheRetirementGenerationBindingMatches,
+	aheRetirementNativeCommands,
+	type AheRetirementNativeMutation,
+	aheRetirementReclamationMatches,
 	type BlobDigest,
+	createAheRetirementControlRead,
+	decodeAheRetirementControl,
 	decodeGenerationRecordV1,
 	decodeHeadRecordV1,
+	encodeAheRetirementControl,
 	type ExpectedHead,
 	type GenerationId,
 	type GenerationPage,
 	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
-	AHE_BOUNDED_READ_LIMITS as LIMITS,
 	parseGenerationId,
 	type PresentHead,
 	type StorageObjectId,
@@ -43,10 +53,22 @@ import {
 	type StorageAdapterFact,
 	type StorageAdapterWrite,
 } from "@ts-drp/storage/adapter";
+import { randomBytes } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
-import type { SqliteAheDurableStoreOptions } from "../index.js";
-import { registerNodeAheReclamationMaintenance } from "./ahe-reclamation.js";
+import type { SqliteAheDurableStoreOptions, NodeNativeReadPort } from "../index.js";
+import { applyNodeBoundedAheReclamation, registerNodeAheReclamationMaintenance } from "./ahe-reclamation.js";
+import { loadNodeBoundedReadRequest } from "./bounded-read.js";
+import { captureSqliteReadReservationObject, SqliteNativeReadReservationOwner } from "./native-read-reservation.js";
+import {
+	admitNodeRetirementControl,
+	advanceNodeRetirementControl,
+	readNodeRetirementControl,
+} from "./retirement-control.js";
+import { hasExpectedPhysicalSchema, SCHEMA } from "./schema-sqlite.js";
+import { sqliteFilename } from "./sqlite-filename.js";
+import type { LocalSessionLifetime } from "./local-session-lifetime.js";
+import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaExtraRows } from "./local-session-lifetime.js";
 
 export type SqliteMutationOperation = Exclude<
 	StorageAdapterCommand["kind"],
@@ -81,7 +103,7 @@ export type SqlitePragma = "foreign_keys" | "integrity_check" | "journal_mode" |
 export type SqliteScaffoldInstrumentation = Readonly<{
 	attemptInvalidForeignKeyInsert(): void;
 	readPragma(pragma: SqlitePragma): unknown;
-	store: AheBoundedRecoveryRoleStore;
+	store: AheBoundedRecoveryRoleStore & NodeNativeReadPort;
 }>;
 
 const STRICT_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({
@@ -89,79 +111,35 @@ const STRICT_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({
 	signingEligibility: "backend-capability-required",
 });
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS objects (
-  object_id TEXT PRIMARY KEY,
-  head_record BLOB
-);
-CREATE TABLE IF NOT EXISTS generations (
-  object_id TEXT NOT NULL,
-  generation_id TEXT NOT NULL,
-  record BLOB NOT NULL,
-  PRIMARY KEY (object_id, generation_id),
-  FOREIGN KEY (object_id) REFERENCES objects(object_id)
-);
-CREATE TABLE IF NOT EXISTS blobs (
-  digest TEXT PRIMARY KEY,
-  bytes BLOB NOT NULL
-);
-CREATE TABLE IF NOT EXISTS promotions (
-  object_id TEXT NOT NULL,
-  generation_id TEXT NOT NULL,
-  digest TEXT NOT NULL,
-  PRIMARY KEY (object_id, generation_id, digest),
-  FOREIGN KEY (object_id, generation_id) REFERENCES generations(object_id, generation_id),
-  FOREIGN KEY (digest) REFERENCES blobs(digest)
-);
-`;
-
 type DatabaseRow = Record<string, unknown>;
-const EXPECTED_COLUMNS = Object.freeze({
-	blobs: Object.freeze([
-		Object.freeze({ name: "digest", notnull: 0, pk: 1, type: "TEXT" }),
-		Object.freeze({ name: "bytes", notnull: 1, pk: 0, type: "BLOB" }),
-	]),
-	generations: Object.freeze([
-		Object.freeze({ name: "object_id", notnull: 1, pk: 1, type: "TEXT" }),
-		Object.freeze({ name: "generation_id", notnull: 1, pk: 2, type: "TEXT" }),
-		Object.freeze({ name: "record", notnull: 1, pk: 0, type: "BLOB" }),
-	]),
-	objects: Object.freeze([
-		Object.freeze({ name: "object_id", notnull: 0, pk: 1, type: "TEXT" }),
-		Object.freeze({ name: "head_record", notnull: 0, pk: 0, type: "BLOB" }),
-	]),
-	promotions: Object.freeze([
-		Object.freeze({ name: "object_id", notnull: 1, pk: 1, type: "TEXT" }),
-		Object.freeze({ name: "generation_id", notnull: 1, pk: 2, type: "TEXT" }),
-		Object.freeze({ name: "digest", notnull: 1, pk: 3, type: "TEXT" }),
-	]),
-} as const);
 
-const EXPECTED_FOREIGN_KEY_COLUMNS = Object.freeze({
-	blobs: Object.freeze([]),
-	generations: Object.freeze(["objects:object_id:object_id"]),
-	objects: Object.freeze([]),
-	promotions: Object.freeze([
-		"blobs:digest:digest",
-		"generations:generation_id:generation_id",
-		"generations:object_id:object_id",
-	]),
-} as const);
+type HeldAheRetirementAdmissionImage = Readonly<{lease: NonNullable<ReturnType<SqliteNativeReadReservationOwner["current"]>>;
+	objectId: StorageObjectId; controlBytes: Uint8Array | null; head: ExpectedHead; imageDigest: string; metadataBytes: number}>;
 
 class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
-	private closed = false;
+	private locallyClosed = false;
+	private get closed(): boolean {
+		if (this.locallyClosed) return true;
+		this.session?.assertCurrent();
+		return false;
+	}
 	private poisoned = false;
 	private boundedReads = 0;
 	private boundedClose: Promise<void> | undefined;
 	private resolveBoundedClose: (() => void) | undefined;
 	private readonly recoveryCertificates = new Map<StorageObjectId, string>();
+	private readonly readReservations: SqliteNativeReadReservationOwner;
+	#heldRetirementImage?: HeldAheRetirementAdmissionImage;
 
 	public constructor(
 		private readonly connection: DatabaseSync,
+		filename: string,
 		private readonly fault?: SqliteMutationFault,
-		private readonly crashObserver?: SqliteCrashCheckpointObserver
+		private readonly crashObserver?: SqliteCrashCheckpointObserver,
+		private readonly session?: LocalSessionLifetime
 	) {
+		this.readReservations = new SqliteNativeReadReservationOwner(filename, session);
 		registerNodeAheReclamationMaintenance(this, connection, {
 			isClosed: () => this.closed,
 			isPoisoned: () => this.poisoned,
@@ -172,8 +150,439 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		});
 	}
 
+	public async acquireNativeReadReservation(
+		input: Readonly<{ objectId: string }>
+	): ReturnType<SqliteNativeReadReservationOwner["acquire"]> {
+		const objectId = captureSqliteReadReservationObject(input);
+		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!prepared.ok) throw new TypeError("INVALID_ARGUMENT");
+		if (this.closed) throw new Error("STORE_CLOSED");
+		if (this.poisoned) throw new Error("STORE_POISONED");
+		this.#heldRetirementImage = undefined;
+		const original = await this.readReservations.acquire();
+		return Object.freeze({check: () => original.check(), release: () => {
+			this.#heldRetirementImage = undefined;
+			return original.release();
+		}});
+	}
+
+	private detachedHeldRetirementImage(image: HeldAheRetirementAdmissionImage): StoreResult<AheRetirementAdmissionImage> {
+		const control = image.controlBytes === null ? null : decodeAheRetirementControl(image.controlBytes);
+		if (control !== null && !control.ok) return control;
+		return {ok: true, value: Object.freeze({control: control?.value ?? null,
+			head: Object.freeze({...image.head}), imageDigest: image.imageDigest, metadataBytes: image.metadataBytes})};
+	}
+
 	public readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
 		return this.run(commandWithKind("readHead", { objectId })) as Promise<StoreResult<ExpectedHead>>;
+	}
+
+	public readRetirementControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControl | null>> {
+		const input = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!input.ok) return Promise.resolve(input);
+		if (this.closed) return Promise.resolve({ ok: false, reason: "STORE_CLOSED" });
+		if (this.poisoned) return Promise.resolve({ ok: false, reason: "STORE_POISONED" });
+		let active = false;
+		try {
+			this.connection.exec("BEGIN");
+			active = true;
+			const value = this.readControl(objectId);
+			this.connection.exec("COMMIT");
+			active = false;
+			return Promise.resolve({ ok: true, value });
+		} catch (cause) {
+			if (active)
+				try {
+					this.connection.exec("ROLLBACK");
+				} catch {
+					/* preserve failure */
+				}
+			return Promise.resolve({ ok: false, reason: "SUBSTRATE_FAILURE", cause });
+		}
+	}
+
+	public readRetirementImage(
+		objectId: StorageObjectId
+	): Promise<StoreResult<Pick<AheRetirementControlRead, "control" | "head" | "imageDigest" | "metadataBytes">>> {
+		return this.readRetirementImagePoint(objectId, false);
+	}
+
+	public readRetirementAdmissionImage(objectId: StorageObjectId): Promise<StoreResult<AheRetirementAdmissionImage>> {
+		return this.readRetirementImagePoint(objectId, true);
+	}
+
+	private readRetirementImagePoint(
+		objectId: StorageObjectId,
+		allowAbsent: false
+	): Promise<StoreResult<Pick<AheRetirementControlRead, "control" | "head" | "imageDigest" | "metadataBytes">>>;
+	private readRetirementImagePoint(
+		objectId: StorageObjectId,
+		allowAbsent: true
+	): Promise<StoreResult<AheRetirementAdmissionImage>>;
+	private async readRetirementImagePoint(
+		objectId: StorageObjectId,
+		allowAbsent: boolean
+	): Promise<StoreResult<AheRetirementAdmissionImage>> {
+		const input = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!input.ok) return Promise.resolve(input);
+		if (this.closed) return Promise.resolve({ ok: false, reason: "STORE_CLOSED" });
+		if (this.poisoned) return Promise.resolve({ ok: false, reason: "STORE_POISONED" });
+		let active = false;
+		try {
+			const lease = this.readReservations.current();
+			if (lease !== undefined) {
+				await lease.check();
+				if (this.readReservations.current() !== lease) throw new Error("NATIVE_READ_RESERVATION_LOST");
+				const prior = this.#heldRetirementImage;
+				if (prior?.lease === lease && prior.objectId === objectId) {
+					await lease.check();
+					if (this.closed) return {ok: false, reason: "STORE_CLOSED"};
+					if (this.poisoned) return {ok: false, reason: "STORE_POISONED"};
+					if (this.readReservations.current() !== lease) throw new Error("NATIVE_READ_RESERVATION_LOST");
+					if (!allowAbsent && prior.controlBytes === null) return {ok: false, reason: "INVALID_ARGUMENT"};
+					return this.detachedHeldRetirementImage(prior);
+				}
+			} else this.#heldRetirementImage = undefined;
+			this.connection.exec("BEGIN");
+			active = true;
+			const control = this.readControl(objectId);
+			if (control === null && !allowAbsent) {
+				this.connection.exec("COMMIT");
+				active = false;
+				return Promise.resolve({ ok: false, reason: "INVALID_ARGUMENT" });
+			}
+			const bytes = control === null ? null : encodeAheRetirementControl(control),
+				head = this.readHeadWithinTransaction(objectId),
+				image = admitNodeRetirementControl(this.connection, objectId, bytes);
+			this.connection.exec("COMMIT");
+			active = false;
+			if (!head.ok) return Promise.resolve(head);
+			if (!image.ok) return Promise.resolve(image);
+			if (lease !== undefined) {
+				await lease.check();
+				if (this.closed) return {ok: false, reason: "STORE_CLOSED"};
+				if (this.poisoned) return {ok: false, reason: "STORE_POISONED"};
+				if (this.readReservations.current() !== lease) throw new Error("NATIVE_READ_RESERVATION_LOST");
+				const admitted = Object.freeze({lease, objectId, controlBytes: bytes, head: Object.freeze({...head.value}),
+					imageDigest: image.value.imageDigest, metadataBytes: bytes?.byteLength ?? 0});
+				this.#heldRetirementImage = admitted;
+				return this.detachedHeldRetirementImage(admitted);
+			}
+			return Promise.resolve({
+				ok: true,
+				value: Object.freeze({
+					control,
+					head: head.value,
+					imageDigest: image.value.imageDigest,
+					metadataBytes: bytes?.byteLength ?? 0,
+				}),
+			});
+		} catch (cause) {
+			if (active)
+				try {
+					this.connection.exec("ROLLBACK");
+				} catch {
+					/* Preserve original failure. */
+				}
+			return Promise.resolve({ ok: false, reason: "SUBSTRATE_FAILURE", cause });
+		}
+	}
+
+	public acquireRetirementControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>> {
+		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!prepared.ok) return Promise.resolve(prepared);
+		if (this.closed) return Promise.resolve({ ok: false, reason: "STORE_CLOSED" });
+		if (this.poisoned) return Promise.resolve({ ok: false, reason: "STORE_POISONED" });
+		let active = false;
+		try {
+			this.connection.exec("BEGIN IMMEDIATE");
+			active = true;
+			const head = this.readHeadWithinTransaction(objectId);
+			if (!head.ok) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return Promise.resolve(head);
+			}
+			let control = this.readControl(objectId);
+			const absent = control === null;
+			if (control === null) {
+				control = {
+					kind: "ahe-retirement-control-2",
+					objectId,
+					incarnation: randomBytes(32).toString("hex"),
+					revision: 0,
+					sequence: 0,
+					active: null,
+					completed: null,
+				};
+			}
+			const expected = encodeAheRetirementControl(control);
+			const admitted = admitNodeRetirementControl(this.connection, objectId, expected);
+			if (!admitted.ok) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				this.latchBoundedFailure(admitted);
+				return Promise.resolve(admitted);
+			}
+			if (absent) {
+				const insert = this.connection
+					.prepare("INSERT INTO retirement_controls(object_id, record) VALUES (?, ?)")
+					.run(objectId, expected);
+				requireOneChange(insert.changes, "retirement control initialization");
+			}
+			const expectedHead = headFingerprint(head.value);
+			this.connection.exec("COMMIT");
+			active = false;
+			return Promise.resolve({
+				ok: true,
+				value: createAheRetirementControlRead(
+					control,
+					head.value,
+					admitted.value.imageDigest,
+					(next, mutation) =>
+						Promise.resolve(
+							this.compareControl(objectId, expected, expectedHead, admitted.value.imageDigest, next, mutation)
+						),
+					this
+				),
+			});
+		} catch (cause) {
+			if (active) {
+				try {
+					this.connection.exec("ROLLBACK");
+				} catch {
+					/* preserve primary */
+				}
+			}
+			if (cause instanceof PersistedStorageError) {
+				this.poisoned = true;
+				return Promise.resolve({ ok: false, reason: cause.reason });
+			}
+			return Promise.resolve({ ok: false, reason: "SUBSTRATE_FAILURE", cause });
+		}
+	}
+
+	private readControl(objectId: StorageObjectId): AheRetirementControl | null {
+		return readNodeRetirementControl(this.connection, objectId);
+	}
+
+	private compareControl(
+		objectId: StorageObjectId,
+		expected: Uint8Array,
+		expectedHead: string,
+		expectedImageDigest: string,
+		next: AheRetirementControl,
+		mutation?: AheRetirementNativeMutation
+	): StoreResult<AheRetirementControl> {
+		if (this.closed) return { ok: false, reason: "STORE_CLOSED" };
+		if (this.poisoned) return { ok: false, reason: "STORE_POISONED" };
+		let active = false;
+		let postimage: string | undefined;
+		try {
+			this.connection.exec("BEGIN IMMEDIATE");
+			active = true;
+			const current = this.readControl(objectId),
+				head = this.readHeadWithinTransaction(objectId);
+			if (!head.ok) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return head;
+			}
+			if (
+				current === null ||
+				!Buffer.from(encodeAheRetirementControl(current)).equals(expected) ||
+				headFingerprint(head.value) !== expectedHead
+			) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+			}
+			const bytes = encodeAheRetirementControl(next);
+			const admitted = admitNodeRetirementControl(this.connection, objectId, bytes);
+			if (!admitted.ok) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				this.latchBoundedFailure(admitted);
+				return admitted;
+			}
+			if (admitted.value.imageDigest !== expectedImageDigest) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+			}
+			const records = admitted.value.generations.map((g) => g.recordDigest);
+			if (
+				!aheRetirementGenerationBindingMatches(current, admitted.value.generations) ||
+				(mutation?.kind !== "reclaim" && !aheRetirementGenerationBindingMatches(next, admitted.value.generations))
+			) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+			}
+			if (mutation?.kind === "reclaim") {
+				if (
+					!aheRetirementReclamationMatches(
+						current,
+						next,
+						mutation.source,
+						admitted.value.imageDigest,
+						admitted.value.generations
+					)
+				) {
+					this.connection.exec("ROLLBACK");
+					active = false;
+					return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+				}
+				applyNodeBoundedAheReclamation(this.connection, this, mutation.source.reclamation, true);
+			} else if (mutation !== undefined) {
+				const candidate = admitted.value.generations.find((g) => g.generationId === mutation.material.generationId);
+				const resuming = mutation.kind === "stage" && current.nominee != null;
+				const existingDigest = mutation.material.existingGenerationRecordDigest;
+				const nominatingExisting = mutation.kind === "stage" && !resuming && existingDigest !== undefined;
+				if (
+					(mutation.kind === "stage" &&
+						!resuming &&
+						!nominatingExisting &&
+						(candidate !== undefined || records.length >= 7)) ||
+					(nominatingExisting &&
+						(candidate?.recordDigest !== existingDigest ||
+							next.nominee?.recordDigest !== existingDigest ||
+							mutation.material.blobs.length !== 0)) ||
+					(resuming &&
+						(candidate?.recordDigest !== current.nominee?.recordDigest ||
+							!Buffer.from(encodeCanonical(current.nominee)).equals(encodeCanonical(next.nominee)))) ||
+					(mutation.kind === "publish" && candidate?.recordDigest !== current.nominee?.recordDigest)
+				) {
+					this.connection.exec("ROLLBACK");
+					active = false;
+					return { ok: false, reason: "RETIREMENT_FENCED" };
+				}
+				if (nominatingExisting) {
+					const prepared = prepareStorageAdapterCommand({
+						kind: "completeGeneration",
+						objectId,
+						generationId: mutation.material.generationId,
+					});
+					if (!prepared.ok) throw new TypeError("existing native future command is invalid");
+					const authorized = this.verifyCandidate(
+						objectId,
+						mutation.material.generationId,
+						this.loadFacts(prepared.value)
+					);
+					if (!authorized?.ok) {
+						this.connection.exec("ROLLBACK");
+						active = false;
+						return authorized ?? { ok: false, reason: "INVALID_ARGUMENT" };
+					}
+				}
+				for (const command of resuming || nominatingExisting ? [] : aheRetirementNativeCommands(mutation)) {
+					const prepared = prepareStorageAdapterCommand(command);
+					if (!prepared.ok) {
+						this.connection.exec("ROLLBACK");
+						active = false;
+						return prepared;
+					}
+					const facts = this.loadFacts(prepared.value);
+					let evaluation = evaluateStorageAdapterCommand(prepared.value, facts);
+					if (prepared.value.command.kind === "completeGeneration" || prepared.value.command.kind === "swapHead") {
+						const authorized = this.verifyCandidate(objectId, mutation.material.generationId, facts);
+						if (!authorized?.ok) {
+							this.connection.exec("ROLLBACK");
+							active = false;
+							return authorized ?? { ok: false, reason: "INVALID_ARGUMENT" };
+						}
+						evaluation = evaluateStorageAdapterCommand(prepared.value, facts, authorized.value);
+					}
+					if (!evaluation.result.ok) {
+						this.connection.exec("ROLLBACK");
+						active = false;
+						return evaluation.result;
+					}
+					this.applyWrites(evaluation, prepared.value.command.kind as SqliteMutationOperation);
+				}
+			}
+			const after = admitNodeRetirementControl(this.connection, objectId, bytes);
+			if (!after.ok) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				this.latchBoundedFailure(after);
+				return after;
+			}
+			if (!aheRetirementGenerationBindingMatches({ ...next, binding: null }, after.value.generations)) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+			}
+			if (
+				mutation?.kind === "stage" &&
+				after.value.generations.find((g) => g.generationId === mutation.material.generationId)?.recordDigest !==
+					next.nominee?.recordDigest
+			) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return { ok: false, reason: "NON_CANONICAL_RECORD" };
+			}
+			if (mutation?.kind === "reclaim" && after.value.imageDigest !== mutation.source.postImageDigest) {
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+			}
+			postimage = after.value.imageDigest;
+			const write = this.connection
+				.prepare("UPDATE retirement_controls SET record = ? WHERE object_id = ?")
+				.run(bytes, objectId);
+			requireOneChange(write.changes, "retirement control write");
+			this.connection.exec("COMMIT");
+			active = false;
+			return this.readControlPostimage(objectId, next, postimage);
+		} catch (cause) {
+			if (active) {
+				try {
+					this.connection.exec("ROLLBACK");
+				} catch {
+					/* preserve primary */
+				}
+			}
+			if (cause instanceof PersistedStorageError) {
+				this.poisoned = true;
+				return { ok: false, reason: cause.reason };
+			}
+			if (postimage !== undefined) {
+				const recovered = this.readControlPostimage(objectId, next, postimage);
+				if (recovered.ok) return recovered;
+			}
+			return { ok: false, reason: "SUBSTRATE_FAILURE", cause };
+		}
+	}
+
+	private readControlPostimage(
+		objectId: StorageObjectId,
+		next: AheRetirementControl,
+		imageDigest: string
+	): StoreResult<AheRetirementControl> {
+		let active = false;
+		try {
+			this.connection.exec("BEGIN");
+			active = true;
+			const current = this.readControl(objectId),
+				image = admitNodeRetirementControl(this.connection, objectId, encodeAheRetirementControl(next));
+			const matches =
+				current !== null &&
+				Buffer.from(encodeAheRetirementControl(current)).equals(encodeAheRetirementControl(next)) &&
+				image.ok &&
+				image.value.imageDigest === imageDigest;
+			this.connection.exec("COMMIT");
+			active = false;
+			return matches ? { ok: true, value: next } : { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+		} catch (cause) {
+			if (active)
+				try {
+					this.connection.exec("ROLLBACK");
+				} catch {
+					/* preserve failure */
+				}
+			return { ok: false, reason: "SUBSTRATE_FAILURE", cause };
+		}
 	}
 
 	public acquireBoundedActiveRead(input: AheBoundedReadInput): Promise<StoreResult<AheBoundedReadAcquisition>> {
@@ -220,7 +629,7 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 			this.connection.exec("BEGIN");
 			active = true;
 			let step = steps.next();
-			while (!step.done) step = steps.next(this.loadBoundedRequest(step.value));
+			while (!step.done) step = steps.next(loadNodeBoundedReadRequest(this.connection, step.value));
 			this.connection.exec("COMMIT");
 			active = false;
 			this.latchBoundedFailure(step.value);
@@ -242,7 +651,7 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 			return result;
 		} finally {
 			this.boundedReads--;
-			if (this.closed && this.boundedReads === 0 && this.boundedClose !== undefined) {
+			if (this.locallyClosed && this.boundedReads === 0 && this.boundedClose !== undefined) {
 				this.connection.close();
 				this.resolveBoundedClose?.();
 				this.resolveBoundedClose = undefined;
@@ -255,63 +664,6 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 			this.poisoned = true;
 			this.recoveryCertificates.clear();
 		}
-	}
-
-	private loadBoundedRequest(request: BoundedReadRequest): unknown {
-		if (request.kind === "blob-preflight") {
-			for (const ref of request.references) {
-				const row = this.connection
-					.prepare("SELECT typeof(bytes) AS value_type,length(bytes) AS value_bytes FROM blobs WHERE digest=?")
-					.get(ref.digest) as DatabaseRow | undefined;
-				if (row?.value_type === "blob" && typeof row.value_bytes === "number" && row.value_bytes > LIMITS.maxBlobBytes)
-					return false;
-			}
-			return true;
-		}
-		if (request.kind === "keys") {
-			const rows = this.connection
-				.prepare(
-					"SELECT CASE WHEN typeof(generation_id)='text' AND length(CAST(generation_id AS BLOB))=64 THEN generation_id ELSE NULL END AS gated_key FROM generations WHERE object_id=? ORDER BY generation_id LIMIT ?"
-				)
-				.all(request.objectId, LIMITS.maxObjectGenerations + 1) as DatabaseRow[];
-			return rows.map((row) => row.gated_key);
-		}
-		if (request.kind === "promotion")
-			return (
-				this.connection
-					.prepare("SELECT 1 FROM promotions WHERE object_id=? AND generation_id=? AND digest=?")
-					.get(request.objectId, request.generationId, request.digest) !== undefined
-			);
-		const blob = request.kind === "blob";
-		const head = request.kind === "head";
-		const limit = blob ? LIMITS.maxBlobBytes : head ? LIMITS.maxHeadBytes : LIMITS.maxGenerationBytes;
-		const row = (
-			blob
-				? this.connection
-						.prepare(
-							"SELECT typeof(bytes) AS value_type,length(bytes) AS value_bytes,CASE WHEN typeof(bytes)='blob' AND length(bytes)<=? THEN bytes ELSE NULL END AS bytes FROM blobs WHERE digest=?"
-						)
-						.get(limit, request.digest)
-				: head
-					? this.connection
-							.prepare(
-								"SELECT typeof(head_record) AS value_type,length(head_record) AS value_bytes,CASE WHEN typeof(head_record)='blob' AND length(head_record)<=? THEN head_record ELSE NULL END AS head_record FROM objects WHERE object_id=?"
-							)
-							.get(limit, request.objectId)
-					: this.connection
-							.prepare(
-								"SELECT typeof(record) AS value_type,length(record) AS value_bytes,CASE WHEN typeof(generation_id)='text' AND length(CAST(generation_id AS BLOB))=64 THEN generation_id ELSE NULL END AS gated_key,CASE WHEN typeof(record)='blob' AND length(record)<=? THEN record ELSE NULL END AS record FROM generations WHERE object_id=? AND generation_id=?"
-							)
-							.get(limit, request.objectId, request.generationId)
-		) as DatabaseRow | undefined;
-		if (row === undefined || (head && row.value_type === "null")) return null;
-		if (head && row.value_type !== "blob") throw new PersistedStorageError("NON_CANONICAL_RECORD");
-		if (row.value_type === "blob" && typeof row.value_bytes === "number" && row.value_bytes > limit)
-			throw new BoundedReadBudgetError();
-		if (blob) return row.value_type === "blob" ? row.bytes : undefined;
-		return head
-			? { objectId: request.objectId, record: row.head_record }
-			: { objectId: request.objectId, generationId: row.gated_key, record: row.record };
 	}
 
 	public readGenerationPage(input: {
@@ -384,8 +736,10 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 	}
 
 	public close(): Promise<void> {
-		if (!this.closed) {
-			this.closed = true;
+		if (!this.locallyClosed) {
+			this.locallyClosed = true;
+			this.#heldRetirementImage = undefined;
+			this.readReservations.revoke();
 			this.recoveryCertificates.clear();
 			if (this.boundedReads === 0) this.connection.close();
 			else
@@ -393,7 +747,7 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 					this.resolveBoundedClose = resolve;
 				});
 		}
-		return this.boundedClose ?? Promise.resolve();
+		return (this.boundedClose ?? Promise.resolve()).then(() => this.readReservations.close()).then(() => this.session?.closedOwner(this));
 	}
 
 	private run(command: unknown): Promise<StoreResult<unknown>> {
@@ -416,6 +770,30 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 				this.connection.exec("BEGIN IMMEDIATE");
 				transactionActive = true;
 				if (!("objectId" in prepared.command)) throw new Error("mutation command lacks object scope");
+				const control = this.readControl(prepared.command.objectId);
+				if (control !== null && (control.active !== null || control.completed !== null)) {
+					this.connection.exec("ROLLBACK");
+					transactionActive = false;
+					return { ok: false, reason: "RETIREMENT_FENCED" };
+				}
+				if (control?.revision === Number.MAX_SAFE_INTEGER) {
+					this.connection.exec("ROLLBACK");
+					transactionActive = false;
+					return { ok: false, reason: "REVISION_EXHAUSTED" };
+				}
+				if (control !== null) {
+					const admitted = admitNodeRetirementControl(
+						this.connection,
+						control.objectId,
+						encodeAheRetirementControl(control)
+					);
+					if (!admitted.ok) {
+						this.connection.exec("ROLLBACK");
+						transactionActive = false;
+						this.latchBoundedFailure(admitted);
+						return admitted;
+					}
+				}
 				const recovered = this.ensureCertificate(
 					prepared.command.objectId,
 					operation === "completeGeneration" || operation === "swapHead"
@@ -452,6 +830,15 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 			}
 			if (mutation) {
 				this.applyWrites(evaluation, operation);
+				if (!("objectId" in prepared.command)) throw new Error("mutation command lacks object scope");
+				const control = this.readControl(prepared.command.objectId);
+				const advanced = advanceNodeRetirementControl(this.connection, control);
+				if (!advanced.ok) {
+					this.connection.exec("ROLLBACK");
+					transactionActive = false;
+					this.latchBoundedFailure(advanced);
+					return advanced;
+				}
 				if (this.crashObserver === undefined) {
 					if (operation === "beginGeneration") this.fault?.({ operation, edge: "before-commit" });
 				} else {
@@ -887,59 +1274,39 @@ function requireOneChange(changes: number | bigint, label: string): void {
 	if (Number(changes) !== 1) throw new Error(`${label} did not affect exactly one row`);
 }
 
-function hasExpectedPhysicalSchema(connection: DatabaseSync): boolean {
-	const tables = connection
-		.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-		.all() as DatabaseRow[];
-	const expectedNames = Object.keys(EXPECTED_COLUMNS).sort();
-	if (tables.length !== expectedNames.length || tables.some((row, index) => row.name !== expectedNames[index])) {
-		return false;
-	}
-	for (const tableName of expectedNames as (keyof typeof EXPECTED_COLUMNS)[]) {
-		const columns = connection.prepare(`PRAGMA table_info("${tableName}")`).all() as DatabaseRow[];
-		const expectedColumns = EXPECTED_COLUMNS[tableName];
-		if (
-			columns.length !== expectedColumns.length ||
-			columns.some((column, index) => {
-				const expected = expectedColumns[index];
-				return (
-					expected === undefined ||
-					column.name !== expected.name ||
-					column.type !== expected.type ||
-					Number(column.notnull) !== expected.notnull ||
-					Number(column.pk) !== expected.pk ||
-					column.dflt_value !== null
-				);
-			})
-		) {
-			return false;
-		}
-		const foreignKeyColumns = (connection.prepare(`PRAGMA foreign_key_list("${tableName}")`).all() as DatabaseRow[])
-			.map((row) => `${String(row.table)}:${String(row.from)}:${String(row.to)}`)
-			.sort();
-		const expectedForeignKeyColumns = [...EXPECTED_FOREIGN_KEY_COLUMNS[tableName]].sort();
-		if (
-			foreignKeyColumns.length !== expectedForeignKeyColumns.length ||
-			foreignKeyColumns.some((value, index) => value !== expectedForeignKeyColumns[index])
-		) {
-			return false;
-		}
-	}
-	return true;
-}
-
-function configureConnection(connection: DatabaseSync): void {
+function configureConnection(connection: DatabaseSync, initialization: "create" | "reopen" = "create"): void {
 	connection.exec("PRAGMA busy_timeout = 1000");
 	connection.exec("PRAGMA foreign_keys = ON");
+	if (initialization === "reopen") {
+		if (
+			Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 2 ||
+			!hasExpectedPhysicalSchema(connection) ||
+			String(Object.values(connection.prepare("PRAGMA journal_mode").get() ?? {})[0]).toLowerCase() !== "wal"
+		)
+			throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
+		connection.exec("PRAGMA synchronous = FULL");
+		return;
+	}
 	const tableCount = (
 		connection
 			.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
 			.get() as DatabaseRow
 	).count;
-	if (Number(tableCount) === 0) {
+	if (Number(tableCount) - nativeLocalSessionSchemaExtraRows(connection) === 0) {
+		if (Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 0)
+			throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 		connection.exec("BEGIN IMMEDIATE");
 		try {
+			const nativeTableCount = connection
+				.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+				.get() as DatabaseRow;
+			if (
+				Number(nativeTableCount.count) - nativeLocalSessionSchemaExtraRows(connection) !== 0 ||
+				Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 0
+			)
+				throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 			connection.exec(SCHEMA);
+			connection.exec("PRAGMA user_version = 2");
 			if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 			connection.exec("COMMIT");
 		} catch (error) {
@@ -951,6 +1318,52 @@ function configureConnection(connection: DatabaseSync): void {
 			throw error;
 		}
 	}
+	const version = Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]);
+	if (version === 0 && hasExpectedPhysicalSchema(connection, 0)) {
+		connection.exec("BEGIN IMMEDIATE");
+		try {
+			if (
+				!hasExpectedPhysicalSchema(connection, 0) ||
+				Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 0
+			)
+				throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
+			connection.exec(
+				"CREATE TABLE retirement_controls(object_id TEXT PRIMARY KEY, record BLOB NOT NULL) WITHOUT ROWID"
+			);
+			connection.exec("PRAGMA user_version = 2");
+			if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
+			connection.exec("COMMIT");
+		} catch (cause) {
+			try {
+				connection.exec("ROLLBACK");
+			} catch {
+				/* preserve primary */
+			}
+			throw cause;
+		}
+	}
+	if (version === 1) {
+		connection.exec("BEGIN IMMEDIATE");
+		try {
+			if (
+				!hasExpectedPhysicalSchema(connection, 1) ||
+				connection.prepare("SELECT 1 FROM retirement_controls LIMIT 1").get() !== undefined
+			)
+				throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
+			connection.exec("PRAGMA user_version = 2");
+			if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
+			connection.exec("COMMIT");
+		} catch (cause) {
+			try {
+				connection.exec("ROLLBACK");
+			} catch {
+				/* preserve primary */
+			}
+			throw cause;
+		}
+	}
+	if (Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 2)
+		throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 	if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 	connection.exec("PRAGMA journal_mode = WAL");
 	connection.exec("PRAGMA synchronous = FULL");
@@ -984,9 +1397,10 @@ function freezeRecoverySnapshot(snapshot: ActiveGenerationSnapshot): ActiveGener
  */
 export function createSqliteScaffold(
 	options: SqliteAheDurableStoreOptions,
-	fault?: SqliteMutationFault
-): AheBoundedRecoveryRoleStore {
-	return createInstrumentedSqliteScaffold(options, fault).store;
+	fault?: SqliteMutationFault,
+	session?: LocalSessionLifetime
+): AheBoundedRecoveryRoleStore & NodeNativeReadPort {
+	return createInstrumentedSqliteScaffold(options, fault, undefined, session).store;
 }
 
 /**
@@ -1000,11 +1414,14 @@ export function createSqliteScaffold(
 export function createInstrumentedSqliteScaffold(
 	options: SqliteAheDurableStoreOptions,
 	fault?: SqliteMutationFault,
-	crashObserver?: SqliteCrashCheckpointObserver
+	crashObserver?: SqliteCrashCheckpointObserver,
+	session?: LocalSessionLifetime
 ): SqliteScaffoldInstrumentation {
-	const connection = new DatabaseSync(options.filename);
+	session?.assertCurrent();
+	const connection = new DatabaseSync(sqliteFilename(options.filename, options.initialization));
 	try {
-		configureConnection(connection);
+		enforceNativeLocalSessionFile(connection, options.filename, session, options.initialization !== "reopen");
+		configureConnection(connection, options.initialization);
 	} catch (error) {
 		connection.close();
 		throw error;
@@ -1025,6 +1442,6 @@ export function createInstrumentedSqliteScaffold(
 			const row = connection.prepare(`PRAGMA ${pragma}`).get();
 			return row === undefined ? undefined : Object.values(row)[0];
 		},
-		store: new SqliteAheDurableStore(connection, fault, crashObserver),
+		store: new SqliteAheDurableStore(connection, options.filename, fault, crashObserver, session),
 	};
 }

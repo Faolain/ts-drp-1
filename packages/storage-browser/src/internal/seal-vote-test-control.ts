@@ -1,6 +1,6 @@
 import { compareBytes, encodeCanonical } from "@ts-drp/canonical";
 
-import { PHASE_2D_SCHEMA_AUTHORITY, PHASE_5C_SCHEMA_AUTHORITY } from "./schema-idb.js";
+import { CURRENT_BROWSER_SCHEMA_VERSION, PHASE_2D_SCHEMA_AUTHORITY, PHASE_5C_SCHEMA_AUTHORITY } from "./schema-idb.js";
 import { createInternalVoteDispatcher } from "./seal-vote-dispatch.js";
 import { openInternalSealVoteStore, type StoredSealCarrier } from "./seal-vote-store.js";
 
@@ -163,7 +163,7 @@ async function rawCounts(database: IDBDatabase): Promise<Record<string, number>>
 }
 
 async function openCurrentDatabase(databaseName: string): Promise<IDBDatabase> {
-	return requestResult(indexedDB.open(databaseName, PHASE_5C_SCHEMA_AUTHORITY.version));
+	return requestResult(indexedDB.open(databaseName, CURRENT_BROWSER_SCHEMA_VERSION));
 }
 
 async function runSchemaScenario(databaseName: string): Promise<unknown> {
@@ -298,6 +298,110 @@ async function runScopedSnapshotScenario(databaseName: string): Promise<unknown>
 	const secondAfter = await store.openSnapshot(secondScope);
 	store.close();
 	return Object.freeze({ advanced, firstAfter, firstBefore, secondAfter, secondBefore });
+}
+
+async function runSnapshotScanScenario(databaseName: string, malformedRound = false): Promise<unknown> {
+	const store = await openInternalSealVoteStore({ databaseName });
+	try {
+		const scope = {
+			anchor: ANCHOR,
+			epoch: 0,
+			expectedIncarnation: store.incarnation,
+			objectId: OBJECT_ID,
+			signerId: SIGNER_ID,
+		};
+		for (const selected of [
+			scope,
+			{ ...scope, signerId: "B" },
+			{ ...scope, epoch: 1 },
+			{ ...scope, objectId: "phase5:cccccccccccccccccccccccccccccccc" },
+		]) {
+			const rounds = selected === scope ? 2 : 1;
+			for (let round = 1; round <= rounds; round++) {
+				const result = await store.commitRoundChange({
+					...selected,
+					expectedRevision: round - 1,
+					round,
+					carrier: {
+						exactCanonicalPreimageBytes: encodeCanonical({
+							anchor: selected.anchor,
+							epoch: selected.epoch,
+							kind: "drp-round-change",
+							objectId: selected.objectId,
+							phase: "round-change",
+							round,
+							signerId: selected.signerId,
+						}),
+						signature: new Uint8Array(64).fill(0x42),
+					},
+				});
+				if ((result as { ok?: boolean }).ok !== true) throw new Error("round-change fixture setup failed");
+			}
+		}
+		await store.markDispatched([OBJECT_ID, 0, 1, "round-change", SIGNER_ID]);
+		const countsDatabase = await openCurrentDatabase(databaseName);
+		if (malformedRound) {
+			// Adversarial native data, not an authenticated protocol carrier: the
+			// old snapshot filter counted this plain row without validating round.
+			const transaction = countsDatabase.transaction("voteOutbox", "readwrite");
+			const completed = transactionComplete(transaction);
+			await requestResult(
+				transaction.objectStore("voteOutbox").add({
+					carrier: carrier(0),
+					dispatched: false,
+					epoch: 0,
+					objectId: OBJECT_ID,
+					phase: "round-change",
+					round: [],
+					signerId: SIGNER_ID,
+				})
+			);
+			await completed;
+		}
+		const before = await rawCounts(countsDatabase);
+		countsDatabase.close();
+		const getAll = IDBObjectStore.prototype.getAll;
+		const get = IDBObjectStore.prototype.get;
+		const openCursor = IDBObjectStore.prototype.openCursor;
+		const openKeyCursor = IDBObjectStore.prototype.openKeyCursor;
+		const observation = { keyRows: 0, selectedRowReads: 0, valueReads: 0 };
+		IDBObjectStore.prototype.get = function (...args): IDBRequest {
+			if (this.name === "voteOutbox") observation.selectedRowReads++;
+			return get.apply(this, args);
+		};
+		IDBObjectStore.prototype.getAll = function (...args): IDBRequest {
+			if (this.name === "voteOutbox") observation.valueReads++;
+			return getAll.apply(this, args);
+		};
+		IDBObjectStore.prototype.openCursor = function (...args): IDBRequest<IDBCursorWithValue | null> {
+			if (this.name === "voteOutbox") observation.valueReads++;
+			return openCursor.apply(this, args);
+		};
+		IDBObjectStore.prototype.openKeyCursor = function (...args): IDBRequest<IDBCursor | null> {
+			const request = openKeyCursor.apply(this, args);
+			if (this.name === "voteOutbox") {
+				request.addEventListener("success", () => {
+					if (request.result !== null) observation.keyRows++;
+				});
+			}
+			return request;
+		};
+		let snapshot: unknown;
+		try {
+			snapshot = await store.openSnapshot(scope);
+		} finally {
+			IDBObjectStore.prototype.getAll = getAll;
+			IDBObjectStore.prototype.get = get;
+			IDBObjectStore.prototype.openCursor = openCursor;
+			IDBObjectStore.prototype.openKeyCursor = openKeyCursor;
+		}
+		const afterDatabase = await openCurrentDatabase(databaseName);
+		const after = await rawCounts(afterDatabase);
+		afterDatabase.close();
+		return { after, before, observation, snapshot };
+	} finally {
+		store.close();
+	}
 }
 
 const VOTE_STORES = ["signerState", "storageMeta", "voteOutbox", "voteSlots"] as const;
@@ -488,6 +592,7 @@ export function createSealVoteBrowserTestControl(): Readonly<{
 	runDispatchScenario(databaseName: string, mode: string): Promise<unknown>;
 	runSchemaScenario(databaseName: string): Promise<unknown>;
 	runScopedSnapshotScenario(databaseName: string): Promise<unknown>;
+	runSnapshotScanScenario(databaseName: string, malformedRound?: boolean): Promise<unknown>;
 	runStrictVoteScenario(databaseName: string): Promise<unknown>;
 	runVersionChangeScenario(databaseName: string): Promise<unknown>;
 }> {
@@ -496,6 +601,7 @@ export function createSealVoteBrowserTestControl(): Readonly<{
 		runDispatchScenario,
 		runSchemaScenario,
 		runScopedSnapshotScenario,
+		runSnapshotScanScenario,
 		runStrictVoteScenario,
 		runVersionChangeScenario,
 	});

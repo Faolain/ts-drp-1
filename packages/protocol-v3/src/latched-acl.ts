@@ -10,6 +10,7 @@ const SNAPSHOT_KEYS = ["epoch", "kind", "members", "objectId", "permissionless",
 const MEMBER_KEYS = ["author", "finalityKey", "groups"] as const;
 const AUTHORITY_INPUT_KEYS = ["author", "snapshot"] as const;
 const STAGE_INPUT_KEYS = ["operations", "snapshot"] as const;
+const OPERATION_AUTHORITY_INPUT_KEYS = ["operation", "snapshot"] as const;
 const SIGNER_INPUT_KEYS = ["snapshot"] as const;
 const GRANT_REVOKE_KEYS = ["actor", "group", "kind", "target"] as const;
 const SET_KEY_KEYS = ["actor", "finalityKey", "kind"] as const;
@@ -379,6 +380,43 @@ export function authorizeLatchedApplicationWrite(
 	}
 }
 
+/**
+ * Checks an ACL operation's CURRENT actor authority without staging NEXT state.
+ * @param input - Exact operation and current latched snapshot.
+ * @returns Current actor/operation decision; not a staged result or effect capability.
+ */
+export function authorizeLatchedAclOperation(
+	input: Readonly<{ readonly operation: LatchedAclOperation; readonly snapshot: LatchedAclSnapshot }>
+): LatchedAclAuthorityResult {
+	try {
+		const record = exactDataRecord(input, OPERATION_AUTHORITY_INPUT_KEYS);
+		const snapshot = record === undefined ? undefined : copySnapshot(record.snapshot);
+		const operation = snapshot === undefined ? undefined : copyOperation(record?.operation, snapshot.version);
+		if (snapshot === undefined || operation === undefined) return authorityFailure();
+		return Object.freeze({
+			authorized: currentOperationAuthorityFailure(snapshot, mutableMembers(snapshot), operation) === undefined,
+			ok: true,
+		});
+	} catch {
+		return authorityFailure();
+	}
+}
+
+function currentOperationAuthorityFailure(
+	snapshot: LatchedAclSnapshot,
+	latched: ReadonlyMap<string, MutableMember>,
+	operation: LatchedAclOperation
+): "operation-not-authorized" | "operation-invalid" | undefined {
+	const actor = latched.get(operation.actor);
+	if (operation.kind === "set-finality-key") {
+		if (!actor?.groups.has("finality")) return "operation-not-authorized";
+	} else {
+		if (!actor?.groups.has("admin")) return "operation-not-authorized";
+		if (snapshot.permissionless && operation.group === "writer") return "operation-invalid";
+	}
+	return undefined;
+}
+
 function failedStage(
 	index: number,
 	reason: "last-admin" | "malformed-input" | "operation-invalid" | "operation-not-authorized"
@@ -433,15 +471,8 @@ export function stageLatchedAclOperations(
 		}
 		const latched = mutableMembers(snapshot);
 		for (const [index, operation] of operations.entries()) {
-			const actor = latched.get(operation.actor);
-			if (operation.kind === "set-finality-key") {
-				if (!actor?.groups.has("finality")) return failedStage(index, "operation-not-authorized");
-			} else {
-				if (!actor?.groups.has("admin")) return failedStage(index, "operation-not-authorized");
-				if (snapshot.permissionless && operation.group === "writer") {
-					return failedStage(index, "operation-invalid");
-				}
-			}
+			const failure = currentOperationAuthorityFailure(snapshot, latched, operation);
+			if (failure !== undefined) return failedStage(index, failure);
 		}
 
 		const nextMembers = mutableMembers(snapshot);

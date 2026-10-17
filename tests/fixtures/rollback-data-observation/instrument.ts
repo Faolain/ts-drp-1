@@ -19,7 +19,7 @@ export function readerInstrumentation(
 					if (resolve(path) !== join(root, "packages/node/src/internal/creator-closed-rollback-data.ts"))
 						return undefined;
 					const raw = readFileSync(path, "utf8");
-					const needle = "const sequences = initialBlobs.map((blob) => blob.bytes);";
+					const needle = "let chargedBytes = sequences.reduce((sum, entry) => sum + entry.bytes.byteLength, 0);";
 					const at = raw.indexOf(needle);
 					if (at < 0 || raw.indexOf(needle, at + 1) >= 0) throw new Error("ACCOUNTING_SITE_NOT_UNIQUE");
 					const insertion =
@@ -29,7 +29,7 @@ export function readerInstrumentation(
 					if (chargeAt < 0 || raw.indexOf(chargeNeedle, chargeAt + 1) >= 0)
 						throw new Error("ACCOUNTING_CHARGE_SITE_NOT_UNIQUE");
 					const chargeInsertion =
-						'\n__rollbackEvent("proof-charge",undefined,undefined,{equal:sequences.some(bytes=>compareBytes(bytes,exactBytes)===0),chargedBytes,byteLength:exactBytes.byteLength});';
+						'\n__rollbackEvent("proof-charge",undefined,undefined,{equal:sequences.some(entry=>compareBytes(entry.bytes,exactBytes)===0),chargedBytes,byteLength:exactBytes.byteLength});';
 					const insertions = [
 						{ offset: at + needle.length, text: insertion },
 						{ offset: chargeAt + chargeNeedle.length, text: chargeInsertion },

@@ -105,12 +105,14 @@ describe("Phase 2d2d private-v1 schema authority", () => {
 		expect(packageManifest.exports).toEqual({
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
+			"./room-head": { import: "./dist/src/room-head.js", types: "./dist/src/room-head.d.ts" },
 			"./issuance-maintenance": {
 				import: "./dist/src/issuance-maintenance.js",
 				types: "./dist/src/issuance-maintenance.d.ts",
 			},
 			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },
 			"./maintenance": { import: "./dist/src/maintenance.js", types: "./dist/src/maintenance.d.ts" },
+			"./seal-signing": { import: "./dist/src/seal-signing.js", types: "./dist/src/seal-signing.d.ts" },
 			"./seal-evidence": {
 				import: "./dist/src/seal-evidence.js",
 				types: "./dist/src/seal-evidence.d.ts",

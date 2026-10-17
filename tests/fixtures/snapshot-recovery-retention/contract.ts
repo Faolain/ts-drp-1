@@ -1,6 +1,9 @@
+import { decodeCanonical, encodeCanonical, hashDomain } from "../../../packages/canonical/src/index.js";
 import { consumeSnapshotVerificationReceipt } from "../../../packages/compaction/dist/src/snapshot-quarantine-receipt.js";
 import type {
+	SnapshotQuarantineDeclaration,
 	SnapshotQuarantineScope,
+	SnapshotRecoveryStore,
 	SnapshotVerificationReceipt,
 } from "../../../packages/storage/src/snapshot-transfer.js";
 import { createSnapshotQuarantineFixture } from "../phase-4c-v3/snapshot-quarantine-contract.js";
@@ -32,6 +35,298 @@ export type Fault =
 	| "owned-verified-missing";
 export interface RetentionEnvironment extends RecoveryEnvironment {
 	fault(kind: Fault, objectId: string, charge: number): Promise<void>;
+}
+
+export const TEMPORARY_ADMISSION_CASES = ["count", "declared-bytes", "protected-expiry"] as const;
+export type TemporaryAdmissionCase = (typeof TEMPORARY_ADMISSION_CASES)[number];
+
+/**
+ * Offered metadata only: no enormous payload is allocated or claimed verified.
+ * @param objectId Fixture identity.
+ * @param totalBytes Reserved declared chunk bytes.
+ * @returns An unverified offered declaration.
+ */
+function offeredDeclaration(objectId: string, totalBytes: number): SnapshotQuarantineDeclaration {
+	const original = createSnapshotQuarantineFixture({ objectId, epoch: 0, chunks: [Uint8Array.of(7)] });
+	const chunks = Array.from({ length: Math.ceil(totalBytes / 131_072) }, (_, index) => ({
+		index,
+		byteLength: Math.min(131_072, totalBytes - index * 131_072),
+		digest: "77".repeat(32),
+	}));
+	const manifest = decodeCanonical(original.declaration.exactCanonicalManifestBytes) as Record<string, unknown>;
+	const exactCanonicalManifestBytes = encodeCanonical({ ...manifest, chunks, totalBytes });
+	const manifestDigest = Array.from(hashDomain("ts-drp/snapshot-manifest/v3", exactCanonicalManifestBytes))
+		.map((byte) => byte.toString(16).padStart(2, "0"))
+		.join("");
+	return { chunks, totalBytes, exactCanonicalManifestBytes, scope: { ...original.declaration.scope, manifestDigest } };
+}
+
+/**
+ * Same original native environment and images; no policy substitution or fake storage.
+ * @param name Focused admission scenario.
+ * @param env Existing native fixture environment.
+ * @returns Native observations for the scenario.
+ */
+export async function runTemporaryAdmissionCase(
+	name: TemporaryAdmissionCase,
+	env: RetentionEnvironment
+): Promise<unknown> {
+	let store = await env.open();
+	const scopes: SnapshotQuarantineScope<SnapshotVerificationReceipt>[] = [];
+	const originalNow = Date.now;
+	try {
+		if (name === "protected-expiry") {
+			let now = originalNow();
+			Date.now = (): number => now;
+			const selected = createSnapshotQuarantineFixture({
+				objectId: "temporary-protected-expiry",
+				epoch: 0,
+				chunks: [Uint8Array.of(7)],
+			});
+			const first = await store.openScope(selected.declaration);
+			scopes.push(first);
+			await first.complete(await receiptFor(first, selected));
+			const native = store as unknown as SnapshotRecoveryStore<SnapshotVerificationReceipt>;
+			const acquire = native.acquireRetirementControl;
+			if (acquire === undefined) throw new Error("native retirement control port absent");
+			const view = await acquire({ objectId: selected.declaration.scope.objectId });
+			await view.prepareFence({
+				decisionDigest: "33".repeat(32),
+				sourceProofDigest: "44".repeat(32),
+				throughEpoch: 0,
+				protectedScopes: view.image.scopes,
+			});
+			await view.release();
+			now = (await first.status()).expiresAt + 1;
+			await first.release();
+			await store.close();
+			store = await env.open();
+			const sweptProtected = await store.sweepExpired();
+			for (let index = 0; index < 31; index++)
+				scopes.push(
+					await store.openScope(
+						createSnapshotQuarantineFixture({
+							objectId: `temporary-new-${index}`,
+							chunks: [Uint8Array.of(index + 1)],
+						}).declaration
+					)
+				);
+			const before = stable(await env.image());
+			const overflow = createSnapshotQuarantineFixture({
+				objectId: "temporary-protected-overflow",
+				chunks: [Uint8Array.of(88)],
+			});
+			const refused = await outcome(() => store.openScope(overflow.declaration));
+			const unchanged = before === stable(await env.image());
+			const exact = await store.openScope(selected.declaration);
+			scopes.push(exact);
+			const protectedCancel = await outcome(() => exact.cancel());
+			const protectedUnchanged = before === stable(await env.image());
+			const reopenedNative = store as unknown as SnapshotRecoveryStore<SnapshotVerificationReceipt>;
+			const reopenedAcquire = reopenedNative.acquireRetirementControl;
+			if (reopenedAcquire === undefined) throw new Error("native retirement control port absent");
+			const releaseHold = await reopenedAcquire({ objectId: selected.declaration.scope.objectId });
+			await releaseHold.abortPrepared({ decisionDigest: "33".repeat(32), sourceProofDigest: "44".repeat(32) });
+			await releaseHold.release();
+			const sweptAfterAbort = await store.sweepExpired();
+			scopes.push(await store.openScope(overflow.declaration));
+			return {
+				refused: refused.code,
+				unchanged,
+				protectedCancel: protectedCancel.code,
+				protectedUnchanged,
+				sweptProtected,
+				sweptAfterAbort,
+				retainedScopes: (await env.image()).durableScopes.length,
+				recoveryScopes: (await store.recoveryStatus()).recoveryScopes,
+			};
+		}
+		if (name === "declared-bytes") {
+			const half = 134_217_728;
+			const a = offeredDeclaration("temporary-byte-a", half),
+				b = offeredDeclaration("temporary-byte-b", half);
+			const overflow = offeredDeclaration("temporary-byte-overflow", 1);
+			const first = await store.openScope(a),
+				second = await store.openScope(b);
+			scopes.push(first, second);
+			await first.release();
+			const before = stable(await env.image());
+			const refused = await outcome(() => store.openScope(overflow));
+			const unchanged = before === stable(await env.image());
+			const exact = await store.openScope(a);
+			scopes.push(exact);
+			await store.close();
+			store = await env.open();
+			const coldBefore = stable(await env.image());
+			const cold = await outcome(() => store.openScope(overflow));
+			const coldUnchanged = coldBefore === stable(await env.image());
+			const canceled = await store.openScope(a);
+			scopes.push(canceled);
+			await canceled.cancel();
+			const retry = await store.openScope(offeredDeclaration("temporary-byte-retry", half));
+			scopes.push(retry);
+			const image = await env.image();
+			return {
+				refused: refused.code,
+				unchanged,
+				cold: cold.code,
+				coldUnchanged,
+				exactResume: exact.scope.manifestDigest === a.scope.manifestDigest,
+				reservedChunkBytes: image.durableScopes.reduce(
+					(sum, row) => sum + Number(row.total_bytes ?? row.totalBytes),
+					0
+				),
+				retainedScopes: image.durableScopes.length,
+				storedChunks: image.durableChunks.length,
+				policy: { maxTemporaryScopes: 32, maxTemporaryChunkBytes: 268_435_456 },
+			};
+		}
+		const fixtures = Array.from({ length: 32 }, (_, index) =>
+			createSnapshotQuarantineFixture({
+				objectId: `temporary-count-${index.toString().padStart(2, "0")}`,
+				epoch: 0,
+				chunks: [Uint8Array.of(index + 1)],
+			})
+		);
+		for (const selected of fixtures) scopes.push(await store.openScope(selected.declaration));
+		const verified = scopes[0],
+			poisoned = scopes[1],
+			released = scopes[2],
+			verifiedFixture = fixtures[0],
+			poisonedFixture = fixtures[1],
+			releasedFixture = fixtures[2];
+		if (
+			verified === undefined ||
+			poisoned === undefined ||
+			released === undefined ||
+			verifiedFixture === undefined ||
+			poisonedFixture === undefined ||
+			releasedFixture === undefined
+		)
+			throw new Error("temporary count fixture is incomplete");
+		await verified.complete(await receiptFor(verified, verifiedFixture));
+		const poisonPort = poisoned.verificationQuarantine.open(new AbortController().signal);
+		const poisonDescriptor = poisonedFixture.declaration.chunks[0],
+			poisonBytes = poisonedFixture.chunks[0];
+		if (poisonDescriptor === undefined || poisonBytes === undefined) throw new Error("poison fixture chunk absent");
+		await poisonPort.write(poisonDescriptor, poisonBytes);
+		await outcome(() => poisonPort.write(poisonDescriptor, Uint8Array.of(255)));
+		await released.release();
+		const native = store as unknown as SnapshotRecoveryStore<SnapshotVerificationReceipt>;
+		const acquire = native.acquireRetirementControl;
+		if (acquire === undefined) throw new Error("native retirement control port absent");
+		const view = await acquire({ objectId: verifiedFixture.declaration.scope.objectId });
+		await view.prepareFence({
+			decisionDigest: "33".repeat(32),
+			sourceProofDigest: "44".repeat(32),
+			throughEpoch: 0,
+			protectedScopes: view.image.scopes,
+		});
+		await view.release();
+		const before = stable(await env.image());
+		const overflow = createSnapshotQuarantineFixture({
+			objectId: "temporary-count-overflow",
+			chunks: [Uint8Array.of(99)],
+		});
+		const refused = await outcome(() => store.openScope(overflow.declaration));
+		const unchanged = before === stable(await env.image());
+		const exact = await store.openScope(verifiedFixture.declaration);
+		scopes.push(exact);
+		const protectedCancel = await outcome(() => exact.cancel());
+		const protectedUnchanged = before === stable(await env.image());
+		await store.close();
+		store = await env.open();
+		const coldBefore = stable(await env.image());
+		const cold = await outcome(() => store.openScope(overflow.declaration));
+		const coldUnchanged = coldBefore === stable(await env.image());
+		const canceled = await store.openScope(releasedFixture.declaration);
+		scopes.push(canceled);
+		await canceled.cancel();
+		const competitor = await env.open();
+		let competition: readonly string[];
+		try {
+			const candidate = createSnapshotQuarantineFixture({
+				objectId: "temporary-count-competing",
+				chunks: [Uint8Array.of(98)],
+			});
+			const results = await Promise.all([
+				outcome(() => store.openScope(overflow.declaration)),
+				outcome(() => competitor.openScope(candidate.declaration)),
+			]);
+			for (const result of results)
+				if (result.code === "none") scopes.push(result.value as SnapshotQuarantineScope<SnapshotVerificationReceipt>);
+			competition = results.map((result) => result.code).sort();
+		} finally {
+			await competitor.close();
+		}
+		const promoted = await store.openScope(verifiedFixture.declaration);
+		scopes.push(promoted);
+		await promoted.retainForRecovery();
+		const afterPromotion = await store.openScope(
+			createSnapshotQuarantineFixture({ objectId: "temporary-count-after-promotion", chunks: [Uint8Array.of(100)] })
+				.declaration
+		);
+		scopes.push(afterPromotion);
+		const image = await env.image();
+		return {
+			refused: refused.code,
+			unchanged,
+			cold: cold.code,
+			coldUnchanged,
+			protectedCancel: protectedCancel.code,
+			protectedUnchanged,
+			exactResume: exact.scope.manifestDigest === verifiedFixture.declaration.scope.manifestDigest,
+			poisoned: image.durableScopes.some((row) => row.state === "poisoned"),
+			competition,
+			temporaryScopes: image.durableScopes.filter((row) => row.retention === "temporary").length,
+			recoveryScopes: (await store.recoveryStatus()).recoveryScopes,
+			retainedScopes: image.durableScopes.length,
+			policy: { maxTemporaryScopes: 32, maxTemporaryChunkBytes: 268_435_456 },
+		};
+	} finally {
+		Date.now = originalNow;
+		for (const scope of scopes) await scope.release();
+		await store.close();
+	}
+}
+
+/**
+ * Expected native observations under the approved aggregate temporary policy.
+ * @param name Focused admission scenario.
+ * @returns Exact expected observations.
+ */
+export function expectedTemporaryAdmissionCase(name: TemporaryAdmissionCase): unknown {
+	if (name === "protected-expiry")
+		return {
+			refused: "temporary-full",
+			unchanged: true,
+			protectedCancel: "recovery-owned",
+			protectedUnchanged: true,
+			sweptProtected: 0,
+			sweptAfterAbort: 1,
+			retainedScopes: 32,
+			recoveryScopes: 0,
+		};
+	const common = {
+		refused: "temporary-full",
+		unchanged: true,
+		cold: "temporary-full",
+		coldUnchanged: true,
+		exactResume: true,
+		policy: { maxTemporaryScopes: 32, maxTemporaryChunkBytes: 268_435_456 },
+	};
+	return name === "declared-bytes"
+		? { ...common, reservedChunkBytes: 268_435_456, retainedScopes: 2, storedChunks: 0 }
+		: {
+				...common,
+				protectedCancel: "recovery-owned",
+				protectedUnchanged: true,
+				poisoned: true,
+				competition: ["none", "temporary-full"],
+				temporaryScopes: 32,
+				recoveryScopes: 1,
+				retainedScopes: 33,
+			};
 }
 export const RETENTION_CASES = [
 	"promote",

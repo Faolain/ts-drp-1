@@ -9,8 +9,10 @@ import {
 	readFileSync,
 	writeSync,
 } from "node:fs";
+import { Session } from "node:inspector/promises";
 import { join } from "node:path";
-import { getHeapSnapshot, getHeapStatistics } from "node:v8";
+import { setTimeout as delay } from "node:timers/promises";
+import { getHeapCodeStatistics, getHeapSnapshot, getHeapStatistics } from "node:v8";
 import { isMainThread, threadId } from "node:worker_threads";
 
 import { censusGridStorage } from "./grid-memory-storage-census.js";
@@ -123,11 +125,40 @@ async function writeSnapshot(path: string): Promise<void> {
 	}
 }
 
+interface GridMemoryCapturePlan {
+	readonly targetTransitions: 30 | 60;
+	readonly snapshotTransitions: readonly number[];
+	readonly idleDelaysMs: readonly number[];
+}
+
+const capturePlans: Readonly<Record<30 | 60, GridMemoryCapturePlan>> = Object.freeze({
+	30: Object.freeze({
+		targetTransitions: 30,
+		snapshotTransitions: Object.freeze([10, 20, 30]),
+		idleDelaysMs: Object.freeze([]),
+	}),
+	60: Object.freeze({
+		targetTransitions: 60,
+		snapshotTransitions: Object.freeze([10, 30, 45, 60]),
+		idleDelaysMs: Object.freeze([0, 1000, 5000, 15000]),
+	}),
+});
+
+export function gridMemoryCapturePlan(targetTransitions = 30): GridMemoryCapturePlan {
+	if (targetTransitions !== 30 && targetTransitions !== 60) throw new Error("GRID_MEMORY_CAPTURE_TARGET_REQUIRED");
+	return capturePlans[targetTransitions];
+}
+
 export function shouldCaptureGridHeap(
 	input: Pick<GridMemoryCheckpoint, "transitions" | "terminalAccounting">,
-	captured: ReadonlySet<number>
+	captured: ReadonlySet<number>,
+	targetTransitions = 30
 ): boolean {
-	return !input.terminalAccounting && [10, 20, 30].includes(input.transitions) && !captured.has(input.transitions);
+	return (
+		!input.terminalAccounting &&
+		gridMemoryCapturePlan(targetTransitions).snapshotTransitions.includes(input.transitions) &&
+		!captured.has(input.transitions)
+	);
 }
 
 async function settledGc(): Promise<void> {
@@ -145,6 +176,29 @@ function memory(): Record<string, number> {
 	return { heapUsed, heapTotal, external, arrayBuffers, rss, ownedBytes: heapUsed + arrayBuffers };
 }
 
+function codeMemory(): Readonly<Record<string, number>> {
+	const codeStatistics = getHeapCodeStatistics();
+	if (
+		!("cpu_profiler_metadata_size" in codeStatistics) ||
+		typeof codeStatistics.cpu_profiler_metadata_size !== "number" ||
+		!Number.isFinite(codeStatistics.cpu_profiler_metadata_size)
+	) {
+		throw new Error("GRID_MEMORY_CODE_STATISTICS_REQUIRED");
+	}
+	const {
+		code_and_metadata_size,
+		bytecode_and_metadata_size,
+		external_script_source_size,
+		cpu_profiler_metadata_size,
+	} = codeStatistics;
+	return {
+		code_and_metadata_size,
+		bytecode_and_metadata_size,
+		external_script_source_size,
+		cpu_profiler_metadata_size,
+	};
+}
+
 async function fileHash(path: string): Promise<string> {
 	const hash = createHash("sha256");
 	for await (const chunk of createReadStream(path)) hash.update(chunk);
@@ -152,11 +206,19 @@ async function fileHash(path: string): Promise<string> {
 }
 
 /** Worker-local diagnostics. Owns scalar summaries and files, never workload objects. */
-export function createGridMemoryProfiler(input: { readonly directory: string }): {
+export function createGridMemoryProfiler(input: {
+	readonly directory: string;
+	readonly allocationMode?: "none" | "tracking" | "sampling";
+	readonly targetTransitions?: number;
+}): {
 	checkpoint(checkpoint: GridMemoryCheckpoint): Promise<void>;
+	observeIdle(): Promise<void>;
 	finish(): void;
-	close(): void;
+	close(): Promise<void>;
 } {
+	const plan = gridMemoryCapturePlan(input.targetTransitions);
+	const baselineTransition = plan.snapshotTransitions[0];
+	const sampledTransitions = plan.snapshotTransitions.slice(1);
 	if (globalThis.gc === undefined) throw new Error("GRID_MEMORY_GC_REQUIRED");
 	if (!process.env.VITEST_WORKER_ID || !process.env.VITEST_POOL_ID)
 		throw new Error("GRID_MEMORY_WORKLOAD_WORKER_REQUIRED");
@@ -169,12 +231,94 @@ export function createGridMemoryProfiler(input: { readonly directory: string }):
 	let previousTransition = 0;
 	let terminalAccountingSeen = false;
 	let finished = false;
+	let idleStarted = false;
+	let idleCompleted = false;
+	const allocationMode = input.allocationMode ?? "none";
+	const recordingEnabled = allocationMode !== "none";
+	const samplingSettings = {
+		samplingInterval: 8192,
+		includeObjectsCollectedByMajorGC: false,
+		includeObjectsCollectedByMinorGC: false,
+	};
+	const sampled = new Set<number>();
+	let session: Session | undefined;
+	let recordingStartAttempted = false;
+	let recordingStarted = false;
+	let recordingStopped = false;
+	let closePromise: Promise<void> | undefined;
 	const captured = new Set<number>();
 	const emit = (value: Readonly<Record<string, unknown>>): void => {
-		const bytes = Buffer.from(`${JSON.stringify(value)}\n`);
+		const bytes = Buffer.from(`${JSON.stringify({ monotonicTimeMs: performance.now(), ...value })}\n`);
 		let written = 0;
 		while (written < bytes.byteLength) written += writeSync(fd, bytes, written);
 		fsyncSync(fd);
+	};
+	const recordingState = (): Record<string, boolean | string> => ({
+		allocationMode,
+		recordingStarted,
+		recordingStopped,
+		inspectorConnected: session !== undefined,
+	});
+	const stopRecording = async (reason: `transition-${30 | 60}` | "close"): Promise<void> => {
+		const current = session;
+		if (current === undefined) return;
+		const failures: unknown[] = [];
+		try {
+			if (recordingStartAttempted && !recordingStopped) {
+				if (allocationMode === "tracking") await current.post("HeapProfiler.stopTrackingHeapObjects");
+				else await current.post("HeapProfiler.stopSampling");
+				recordingStopped = true;
+				emit({ kind: `allocation-${allocationMode}-stopped`, reason, ...recordingState() });
+			}
+		} catch (error) {
+			failures.push(error);
+		} finally {
+			try {
+				current.disconnect();
+				session = undefined;
+				emit({ kind: `allocation-${allocationMode}-disconnected`, reason, ...recordingState() });
+			} catch (error) {
+				failures.push(error);
+			}
+		}
+		if (failures.length === 1) throw failures[0];
+		if (failures.length > 1) throw new AggregateError(failures, "GRID_MEMORY_ALLOCATION_CLEANUP_FAILED");
+	};
+	const startRecording = async (): Promise<void> => {
+		const current = new Session();
+		session = current;
+		current.connect();
+		await current.post("HeapProfiler.enable");
+		recordingStartAttempted = true;
+		if (allocationMode === "tracking")
+			await current.post("HeapProfiler.startTrackingHeapObjects", { trackAllocations: true });
+		else await current.post("HeapProfiler.startSampling", samplingSettings);
+		recordingStarted = true;
+		emit({ kind: `allocation-${allocationMode}-started`, afterTransition: baselineTransition, ...recordingState() });
+	};
+	const writeSamplingProfile = async (transitions: number): Promise<void> => {
+		if (!session || !recordingStarted || recordingStopped) throw new Error("GRID_MEMORY_SAMPLER_REQUIRED");
+		const { profile } = await session.post("HeapProfiler.getSamplingProfile");
+		const path = join(directory, `transition-${transitions}.heapprofile`);
+		const output = openSync(path, "wx");
+		try {
+			const bytes = Buffer.from(JSON.stringify(profile));
+			let written = 0;
+			while (written < bytes.byteLength) written += writeSync(output, bytes, written);
+			fsyncSync(output);
+		} finally {
+			closeSync(output);
+		}
+		const sha256 = await fileHash(path);
+		sampled.add(transitions);
+		emit({
+			kind: "allocation-sampling-profile",
+			transitions,
+			path,
+			sha256,
+			phase: "post-GC-before-snapshot",
+			semantics: "Statistical live-allocation stack estimates; sampling node IDs are not heap snapshot object IDs.",
+		});
 	};
 	try {
 		emit({
@@ -190,6 +334,15 @@ export function createGridMemoryProfiler(input: { readonly directory: string }):
 			execArgv: process.execArgv,
 			heapLimit: getHeapStatistics().heap_size_limit,
 			gcAvailable: true,
+			capturePlan: plan,
+			...recordingState(),
+			allocationSettings: recordingEnabled
+				? {
+						...(allocationMode === "tracking" ? { trackAllocations: true } : samplingSettings),
+						startAfterSnapshotTransition: baselineTransition,
+						stopAfterSnapshotTransition: plan.targetTransitions,
+					}
+				: null,
 			patchSha256: createHash("sha256").update(readFileSync("patches/fake-indexeddb@6.2.5.patch")).digest("hex"),
 			sourceHashes: Object.fromEntries(
 				[
@@ -232,12 +385,13 @@ export function createGridMemoryProfiler(input: { readonly directory: string }):
 		});
 	};
 	const captureCheckpoint = async (checkpoint: GridMemoryCheckpoint): Promise<void> => {
-		if (closed || busy || finished || terminalAccountingSeen) throw new Error("GRID_MEMORY_CHECKPOINT_NOT_SERIAL");
+		if (closed || closePromise !== undefined || busy || finished || terminalAccountingSeen)
+			throw new Error("GRID_MEMORY_CHECKPOINT_NOT_SERIAL");
 		if (
 			!Number.isSafeInteger(checkpoint.transitions) ||
 			checkpoint.transitions < 1 ||
-			checkpoint.transitions > 30 ||
-			(checkpoint.terminalAccounting && checkpoint.transitions !== 30) ||
+			checkpoint.transitions > plan.targetTransitions ||
+			(checkpoint.terminalAccounting && checkpoint.transitions !== plan.targetTransitions) ||
 			checkpoint.transitions !== previousTransition + (checkpoint.terminalAccounting ? 0 : 1) ||
 			checkpoint.epoch !== checkpoint.transitions - (checkpoint.terminalAccounting ? 0 : 1)
 		)
@@ -248,15 +402,23 @@ export function createGridMemoryProfiler(input: { readonly directory: string }):
 			await recordCensus(checkpoint);
 			await settledGc();
 			const before = memory();
+			const codeStatistics = codeMemory();
 			emit({
 				kind: "transition-memory",
 				epoch: checkpoint.epoch,
 				transitions: checkpoint.transitions,
 				terminalAccounting: checkpoint.terminalAccounting,
 				memory: before,
+				codeStatistics,
+				...recordingState(),
 				postGc: true,
 			});
-			if (shouldCaptureGridHeap(checkpoint, captured)) {
+			if (shouldCaptureGridHeap(checkpoint, captured, plan.targetTransitions)) {
+				if (allocationMode === "sampling" && sampledTransitions.includes(checkpoint.transitions)) {
+					await writeSamplingProfile(checkpoint.transitions);
+					// Release the inspector response and serialization frame before the heap snapshot.
+					await settledGc();
+				}
 				const path = join(directory, `transition-${checkpoint.transitions}.heapsnapshot`);
 				const started = performance.now();
 				emit({ kind: "snapshot-start", transitions: checkpoint.transitions, path, pid: process.pid, threadId });
@@ -277,6 +439,9 @@ export function createGridMemoryProfiler(input: { readonly directory: string }):
 					threadId,
 					acceptance: false,
 				});
+				if (recordingEnabled && checkpoint.transitions === baselineTransition) await startRecording();
+				if (recordingEnabled && checkpoint.transitions === plan.targetTransitions)
+					await stopRecording(`transition-${plan.targetTransitions}`);
 			}
 			previousTransition = checkpoint.transitions;
 			terminalAccountingSeen = checkpoint.terminalAccounting;
@@ -304,14 +469,60 @@ export function createGridMemoryProfiler(input: { readonly directory: string }):
 				return Promise.reject(error);
 			}
 		},
+		async observeIdle(): Promise<void> {
+			if (
+				closed ||
+				closePromise !== undefined ||
+				busy ||
+				finished ||
+				idleStarted ||
+				!terminalAccountingSeen ||
+				previousTransition !== plan.targetTransitions ||
+				plan.idleDelaysMs.length === 0 ||
+				session !== undefined
+			) {
+				throw new Error("GRID_MEMORY_IDLE_PHASE_REQUIRED");
+			}
+			idleStarted = true;
+			busy = true;
+			const started = performance.now();
+			const phase = "post-workload-before-test-cleanup";
+			try {
+				emit({ kind: "idle-observation-started", phase, requestedDelaysMs: plan.idleDelaysMs });
+				let previousDelay = 0;
+				for (const requestedDelayMs of plan.idleDelaysMs) {
+					if (requestedDelayMs > previousDelay) await delay(requestedDelayMs - previousDelay);
+					await settledGc();
+					emit({
+						kind: "idle-memory",
+						phase,
+						requestedDelayMs,
+						elapsedMs: performance.now() - started,
+						memory: memory(),
+						codeStatistics: codeMemory(),
+						postGc: true,
+						...recordingState(),
+					});
+					previousDelay = requestedDelayMs;
+				}
+				emit({ kind: "idle-observation-complete", phase, elapsedMs: performance.now() - started });
+				idleCompleted = true;
+			} finally {
+				busy = false;
+			}
+		},
 		finish(): void {
 			if (
 				closed ||
+				closePromise !== undefined ||
 				busy ||
 				finished ||
 				!terminalAccountingSeen ||
-				previousTransition !== 30 ||
-				![10, 20, 30].every((transition) => captured.has(transition))
+				previousTransition !== plan.targetTransitions ||
+				!plan.snapshotTransitions.every((transition) => captured.has(transition)) ||
+				(plan.idleDelaysMs.length > 0 && !idleCompleted) ||
+				(recordingEnabled && (!recordingStarted || !recordingStopped || session !== undefined)) ||
+				(allocationMode === "sampling" && !sampledTransitions.every((transition) => sampled.has(transition)))
 			) {
 				throw new Error("GRID_MEMORY_CAPTURE_INCOMPLETE");
 			}
@@ -319,25 +530,45 @@ export function createGridMemoryProfiler(input: { readonly directory: string }):
 				kind: "capture-complete",
 				captured: [...captured],
 				lastTransition: previousTransition,
+				...recordingState(),
 				acceptance: false,
 			});
 			finished = true;
 		},
-		close(): void {
-			if (busy) throw new Error("GRID_MEMORY_CLOSE_DURING_CHECKPOINT");
-			if (closed) return;
-			try {
-				emit({
-					kind: "profiler-closed",
-					finished,
-					captured: [...captured],
-					lastTransition: previousTransition,
-					allSnapshotsCaptured: [10, 20, 30].every((transition) => captured.has(transition)),
-				});
-			} finally {
-				closed = true;
-				closeSync(fd);
-			}
+		close(): Promise<void> {
+			if (busy) return Promise.reject(new Error("GRID_MEMORY_CLOSE_DURING_CHECKPOINT"));
+			if (closePromise !== undefined) return closePromise;
+			closePromise = Promise.resolve().then(async () => {
+				const failures: unknown[] = [];
+				try {
+					await stopRecording("close");
+				} catch (error) {
+					failures.push(error);
+				}
+				try {
+					emit({
+						kind: "profiler-closed",
+						finished,
+						captured: [...captured],
+						lastTransition: previousTransition,
+						allSnapshotsCaptured: plan.snapshotTransitions.every((transition) => captured.has(transition)),
+						...recordingState(),
+						cleanupErrors: failures.map(String),
+					});
+				} catch (error) {
+					failures.push(error);
+				} finally {
+					closed = true;
+					try {
+						closeSync(fd);
+					} catch (error) {
+						failures.push(error);
+					}
+				}
+				if (failures.length === 1) throw failures[0];
+				if (failures.length > 1) throw new AggregateError(failures, "GRID_MEMORY_CLOSE_FAILED");
+			});
+			return closePromise;
 		},
 	};
 }

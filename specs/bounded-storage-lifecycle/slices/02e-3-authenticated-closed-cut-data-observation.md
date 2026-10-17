@@ -1,6 +1,9 @@
 # 2e-3 — Authenticated actual closed-cut data observation
 
-Status: independently reviewed source contract accepted, 2026-10-03, under the
+Status: CLOSED within the all-target observation contract. Implementation, product
+review, focused MAIN landing and the original whole-native published AHE-success
+→ journal SAME-U pressure obligation are accepted. The [closure audit](../closure-audit-2e-2f.md) owns the
+requirement-by-requirement disposition. The source contract was accepted under the
 [root disposition](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-review-01/root-disposition.md).
 Tests-only RED and its bounded corrections have separate focused readiness
 [acceptance](../../../.logs/bounded-storage-lifecycle/rollback-data-bounded-delta-review-01/root-disposition.md).
@@ -8,8 +11,10 @@ Distinct GREEN and independent product review are accepted under the
 [product disposition](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-product-review-01/root-disposition.md);
 the [focused MAIN integration](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-main-01/root-disposition.md)
 owns landing gates. Previously masked product assertions actually execute and pass.
-Historical native-pressure demand remains
-held, not completed by synthetic production-owner composition. The
+The [accepted native pressure outcome](../../../.logs/bounded-storage-lifecycle/phase6-pressure-consumer-review-01/native-outcome03-and-2e3.md)
+discharges that demand with an expressly permitted integrity fixture, unchanged
+U262144 and actual native AHE success followed by journal budget refusal. It does
+not establish shipped source availability or retirement safety. The
 [live handoff](../README.md#next-agent-prompt) owns execution status. This is
 all-target byte authentication, not durable availability or usable room rollback.
 
@@ -30,8 +35,9 @@ alternate storage owner. Its required names are
 `CreatorClosedRollbackDataResult`, `VerifiedCreatorClosedRollbackData` and
 `resolveCreatorClosedRollbackDataObservation`. The
 [accepted proposal](../../../.logs/bounded-storage-lifecycle/rollback-data-observation-contract-plan-01/proposal.md#exact-private-seam-and-host-boundary)
-owns their exact prospective interfaces, closed failure union and readonly host
-port. Preserve that contract; these are not accepted product exports yet.
+owns their exact interfaces, closed failure union and readonly host port.
+Preserve that contract; the accepted implementation remains private, not public
+Node exports.
 
 Input captures exact object/pin/pinned-genesis trust bytes, admitted catalog/AHE/
 snapshot/journal owner identities, the existing trusted host-floor reader and

@@ -1,3 +1,10 @@
+import {
+	captureSigningRequestScope,
+	type CapturedSigningRequest,
+	type SigningRequestScope,
+	type SigningNativeAdmissionFactory,
+} from "./seal-signing-request.js";
+
 export interface CertifiedSealAuthorityMaterial {
 	readonly currentAnchorDigest: string;
 	readonly currentEpoch: 0;
@@ -28,6 +35,7 @@ export const creatorAnchorTrustCheckpointPredecessorMinter: unique symbol = Symb
 	"creatorAnchorTrustCheckpointPredecessorMinter"
 );
 export const creatorAnchorTrustResolver: unique symbol = Symbol("creatorAnchorTrustResolver");
+export const creatorAnchorTrustSourceContextMinter: unique symbol = Symbol("creatorAnchorTrustSourceContextMinter");
 export const creatorAnchorTrustSuccessorMinter: unique symbol = Symbol("creatorAnchorTrustSuccessorMinter");
 
 type SealAuthorityResolver = (trust: CertifiedAnchorTrust) => CertifiedSealAuthorityMaterial | undefined;
@@ -45,7 +53,8 @@ type CreatorAnchorTrustCheckpointPredecessorMinter = CreatorAnchorTrustSuccessor
 let creatorResolver: CreatorAnchorTrustResolver | undefined;
 let creatorCheckpointPredecessorMinter: CreatorAnchorTrustCheckpointPredecessorMinter | undefined;
 let creatorSuccessorMinter: CreatorAnchorTrustSuccessorMinter | undefined;
-const creatorAnchorRequestDigests = new WeakMap<CreatorAnchorSigningRequest, Uint8Array>();
+let creatorSourceContextMinter: CreatorAnchorTrustSuccessorMinter | undefined;
+const creatorAnchorRequestDigests = new WeakMap<CreatorAnchorSigningRequest, CapturedSigningRequest>();
 
 /**
  * Installs the one resolver owned by the public anchor-trust singleton.
@@ -76,18 +85,27 @@ export function resolveCertifiedSealAuthorityMaterial(
 export function installCreatorAnchorTrustCustody(
 	resolver: CreatorAnchorTrustResolver,
 	checkpointPredecessorMinter: CreatorAnchorTrustCheckpointPredecessorMinter,
-	successorMinter: CreatorAnchorTrustSuccessorMinter
+	successorMinter: CreatorAnchorTrustSuccessorMinter,
+	sourceContextMinter: CreatorAnchorTrustSuccessorMinter
 ): void {
 	if (
 		creatorResolver !== undefined ||
 		creatorCheckpointPredecessorMinter !== undefined ||
-		creatorSuccessorMinter !== undefined
+		creatorSuccessorMinter !== undefined || creatorSourceContextMinter !== undefined
 	) {
 		throw new Error("creator anchor trust custody already installed");
 	}
 	creatorResolver = resolver;
 	creatorCheckpointPredecessorMinter = checkpointPredecessorMinter;
 	creatorSuccessorMinter = successorMinter;
+	creatorSourceContextMinter = sourceContextMinter;
+}
+
+/** Authenticates a historical signed context using the genuine unchanged fixed creator. */
+export function mintCreatorAnchorTrustSourceContext(
+	currentTrust: CurrentAnchorTrust, exactCanonicalAnchorPreimageBytes: Uint8Array, detachedAnchorSignature: Uint8Array
+): CurrentAnchorTrust | undefined {
+	return creatorSourceContextMinter?.(currentTrust, exactCanonicalAnchorPreimageBytes, detachedAnchorSignature);
 }
 
 /**
@@ -144,8 +162,29 @@ export function mintCreatorAnchorTrustCheckpointPredecessor(
  */
 export function mintCreatorAnchorSigningRequest(digest: Uint8Array): CreatorAnchorSigningRequest {
 	const request = Object.freeze({}) as CreatorAnchorSigningRequest;
-	creatorAnchorRequestDigests.set(request, Uint8Array.from(digest));
+	creatorAnchorRequestDigests.set(request, { digest: Uint8Array.from(digest), scope: undefined, admission: undefined });
 	return request;
+}
+
+/** Closing scope is attached only by the original verified successor/QC owner. */
+export function scopeCreatorAnchorSigningRequest(
+	request: CreatorAnchorSigningRequest,
+	scope: SigningRequestScope
+): void {
+	const captured = creatorAnchorRequestDigests.get(request);
+	if (captured === undefined || captured.scope !== undefined) throw new TypeError("UNTRUSTED_ANCHOR_SCOPE");
+	creatorAnchorRequestDigests.set(request, { ...captured, scope: captureSigningRequestScope(scope) });
+}
+
+/** Trusted original actor binds its genuine native signing custody once. */
+export function bindCreatorAnchorSigningRequest(
+	request: CreatorAnchorSigningRequest,
+	admission: SigningNativeAdmissionFactory
+): void {
+	const captured = creatorAnchorRequestDigests.get(request);
+	if (captured?.scope === undefined || captured.admission !== undefined || typeof admission !== "function")
+		throw new TypeError("UNTRUSTED_SIGNING_ADMISSION_BINDING");
+	creatorAnchorRequestDigests.set(request, { ...captured, admission });
 }
 
 /**
@@ -153,11 +192,15 @@ export function mintCreatorAnchorSigningRequest(digest: Uint8Array): CreatorAnch
  * @param request - Candidate fieldless signing request.
  * @returns Detached anchor digest, or undefined for foreign/already-consumed input.
  */
-export function consumeCreatorAnchorSigningRequestDigest(request: unknown): Uint8Array | undefined {
+export function consumeCreatorAnchorSigningRequestDigest(request: unknown): CapturedSigningRequest | undefined {
 	if (request === null || typeof request !== "object") return undefined;
-	const digest = creatorAnchorRequestDigests.get(request as CreatorAnchorSigningRequest);
-	if (digest === undefined) return undefined;
+	const captured = creatorAnchorRequestDigests.get(request as CreatorAnchorSigningRequest);
+	if (captured === undefined) return undefined;
 	creatorAnchorRequestDigests.delete(request as CreatorAnchorSigningRequest);
-	return Uint8Array.from(digest);
+	return Object.freeze({
+		...captured,
+		digest: Uint8Array.from(captured.digest),
+		scope: captured.scope === undefined ? undefined : captureSigningRequestScope(captured.scope),
+	});
 }
 import type { CertifiedAnchorTrust, CurrentAnchorTrust } from "../index.js";

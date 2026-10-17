@@ -3,8 +3,19 @@ import "fake-indexeddb/auto";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
-import { digestBlob } from "@ts-drp/storage";
-import type { GenerationRecord, PresentHead } from "@ts-drp/storage";
+import {
+	aheRetirementGenerationIdentity,
+	digestBlob,
+	encodeGenerationRecordV1,
+	parseGenerationId,
+} from "@ts-drp/storage";
+import type {
+	AheBoundedRecoveryRoleStore,
+	AheRetirementPreparation,
+	GenerationRecord,
+	PresentHead,
+	StoreResult,
+} from "@ts-drp/storage";
 import type { SnapshotQuarantineDeclaration } from "@ts-drp/storage/snapshot-transfer";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -15,6 +26,7 @@ import { independentQc } from "./fixtures/phase-5e-v3/creator-close-contract.js"
 import {
 	bytesForRef,
 	type CandidateCreatorAdoptionModule,
+	commitGenuineCreatorAdoptionFixture,
 	CREATOR_ADOPTION_EXPORTS,
 	CREATOR_ADOPTION_FAILURE_KINDS,
 	creatorAdoptionReadiness,
@@ -25,11 +37,14 @@ import {
 	modelIntentCustody,
 	mutatedCutBlob,
 	openGenuineCreatorAdoptionFixture,
+	prepareGenuineCreatorAdoptionFixture,
 	REPOSITORY_ROOT,
 	sourceGovernance,
 	V3_LIVE_GENERATION_2_KEYS,
 } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
 import { inspectCreatorTrustAdvance } from "../packages/control-plane/src/creator-trust-advance.js";
+import { stageCreatorSuccessorAdoption } from "../packages/node/src/creator-adoption-stage.js";
+import { CREATOR_CLOSE_HISTORY_KIND, openCreatorCloseHistory } from "../packages/node/src/internal/creator-close-history.js";
 import { openCreatorSuccessorTrust } from "../packages/protocol-v3/src/creator-close.js";
 import type { CurrentAnchorTrust } from "../packages/protocol-v3/src/index.js";
 import { consumeSealSigningRequest } from "../packages/protocol-v3/src/internal/seal-signing-request.js";
@@ -54,11 +69,11 @@ function signedQc(
 	if (!opened.ok) throw new TypeError(`D.108b seal authority failed: ${opened.reason}`);
 	const prepared = prepareSealVote({ authority: opened.authority, exactCanonicalCutValueBytes, phase, round: 0 });
 	if (!prepared.ok) throw new TypeError(`D.108b ${phase} vote failed: ${prepared.reason}`);
-	const digest = consumeSealSigningRequest(prepared.signingRequest);
-	if (digest === undefined) throw new TypeError(`D.108b ${phase} signing request failed`);
+	const captured = consumeSealSigningRequest(prepared.signingRequest);
+	if (captured === undefined) throw new TypeError(`D.108b ${phase} signing request failed`);
 	return independentQc({
 		exactCanonicalPreimageBytes: prepared.exactCanonicalPreimageBytes,
-		signature: ed25519.sign(digest, hexBytes(contract.privateKeySeedHex)),
+		signature: ed25519.sign(captured.digest, hexBytes(contract.privateKeySeedHex)),
 	}).exactCanonicalQcBytes;
 }
 
@@ -227,6 +242,240 @@ afterAll(async () => {
 	await foreign?.close();
 });
 
+it("AHE genuine fresh intent resumes exact nominee after lost stage delivery", async () => {
+	function must<T>(result: StoreResult<T>): T {
+		if (!result.ok) throw new TypeError(`NOMINEE_RESUME_NATIVE_SETUP:${result.reason}`);
+		return result.value;
+	}
+	Object.defineProperty(navigator, "storage", {
+		configurable: true,
+		value: { estimate: () => Promise.resolve({ quota: 1e12, usage: 0 }) },
+	});
+	const fixture = await openGenuineCreatorAdoptionFixture({
+		nativeAheOwner: true,
+	});
+	try {
+		const store = fixture.evidence.aheBackend as AheBoundedRecoveryRoleStore,
+			objectId = fixture.evidence.proposed.head.objectId;
+		const acquireMethod = store.acquireRetirementControl;
+		if (acquireMethod === undefined) throw new TypeError("NOMINEE_RESUME_NATIVE_SETUP:missing participant");
+		const acquire = acquireMethod.bind(store);
+		const page = must(await store.readGenerationPage({ objectId, limit: 7 })),
+			recordDigests = page.generations.map((g) => must(digestBlob(encodeGenerationRecordV1(g))));
+		const preparation: AheRetirementPreparation = {
+			head: fixture.evidence.proposed.head,
+			floorEpoch: 0,
+			floorAnchor: fixture.evidence.currentTrust.currentAnchorDigest,
+			decisionDigest: "d".repeat(64),
+			sourceProofDigest: "e".repeat(64),
+			generationRecordDigests: [],
+			snapshotScopes: [],
+			protectedIndices: [],
+			retireIndices: [],
+			domains: Array.from(
+				{ length: 8 },
+				(_, i) =>
+					[2 ** i, new Uint8Array(32), new Uint8Array(32), 0, new Uint8Array(32), new Uint8Array(32), 0] as const
+			),
+		};
+		must(
+			await must(await acquire(objectId)).prepareBound({
+				preparation,
+				generations: {
+					recordDigests,
+					identities: page.generations.map((g) => ({
+						generationId: g.generationId,
+						identityDigest: aheRetirementGenerationIdentity(g),
+					})),
+					protectedIndices: recordDigests.map((_, i) => i),
+					retireIndices: [],
+				},
+			})
+		);
+		must(
+			await must(await acquire(objectId)).commitPrepared({
+				decisionDigest: preparation.decisionDigest,
+				sourceProofDigest: preparation.sourceProofDigest,
+			})
+		);
+		const first = await fixture.modules.verifyCreatorSuccessorAdoption({
+			catalog: fixture.catalog,
+			handle: fixture.handle,
+		});
+		if (!first.ok) throw new TypeError(`first genuine verification:${first.kind}`);
+		const staged = await stageCreatorSuccessorAdoption({
+			handle: fixture.handle,
+			intent: first.intent,
+		});
+		expect(staged.ok).toBe(true);
+		// Deliberately discard application staged capability; durable nominee remains.
+		const before = must(await acquire(objectId));
+		expect(before.control.nominee).not.toBe(null);
+		const nominee = before.control.nominee;
+		if (nominee == null) throw new TypeError("NOMINEE_RESUME_NATIVE_SETUP:missing durable nominee");
+		await before.release();
+		const fresh = await fixture.modules.verifyCreatorSuccessorAdoption({
+			catalog: fixture.catalog,
+			handle: fixture.handle,
+		});
+		if (!fresh.ok) throw new TypeError(`fresh genuine verification:${fresh.kind}`);
+		const adopted = await fixture.modules.commitCreatorSuccessorAdoption({
+			handle: fixture.handle,
+			intent: fresh.intent,
+		});
+		const after = must(await acquire(objectId));
+		console.log(
+			JSON.stringify({
+				case: "lost-stage-delivery-resume",
+				nominee,
+				adopted,
+				after: after.control,
+				head: after.head,
+			})
+		);
+		expect(adopted.ok).toBe(true);
+		expect(after.head.kind === "present" && after.head.generationId).toBe(nominee.generationId);
+		expect(after.control.nominee).toBe(null);
+		expect(after.control.completed).toEqual(before.control.completed);
+		await after.release();
+		expect(
+			(
+				await fixture.modules.commitCreatorSuccessorAdoption({
+					handle: fixture.handle,
+					intent: first.intent,
+				})
+			).ok
+		).toBe(false);
+		expect(
+			(
+				await fixture.modules.commitCreatorSuccessorAdoption({
+					handle: fixture.handle,
+					intent: fresh.intent,
+				})
+			).ok
+		).toBe(false);
+	} finally {
+		await fixture.close();
+	}
+}, 90_000);
+
+it("native completed retirement: genuine local close and successor adoption remain enabled", async () => {
+	const prepared = await prepareGenuineCreatorAdoptionFixture({
+		nativeAheOwner: true,
+	});
+	function must<T>(result: StoreResult<T>): T {
+		if (!result.ok) throw new TypeError(`LOCAL_CLOSE_NATIVE_SETUP:${result.reason}`);
+		return result.value;
+	}
+	try {
+		const store = prepared.aheBackend as AheBoundedRecoveryRoleStore;
+		const objectId = prepared.current.head.objectId;
+		const acquire = store.acquireRetirementControl;
+		if (acquire === undefined) throw new TypeError("LOCAL_CLOSE_NATIVE_SETUP:missing participant");
+		const control = (): ReturnType<NonNullable<typeof acquire>> => acquire.call(store, objectId);
+		const head = must(await store.readHead(objectId));
+		expect(head).toEqual(prepared.current.head);
+		const page = must(await store.readGenerationPage({ objectId, limit: 7 }));
+		expect(page.nextCursor).toBe(null);
+		expect(page.generations.length).toBeGreaterThan(0);
+		const currentRecord = decodeCanonical(bytesForRef(prepared.current, prepared.current.trustRef)) as {
+			currentAnchorDigest: string;
+			currentEpoch: number;
+		};
+		expect(currentRecord.currentEpoch).toBe(0);
+		expect(currentRecord.currentAnchorDigest).toMatch(/^[0-9a-f]{64}$/u);
+		// These are mechanical native participant commitments, not a grant of
+		// authenticated all-owner retirement eligibility. No physical row is retired.
+		const preparation: AheRetirementPreparation = {
+			head,
+			floorEpoch: 0,
+			floorAnchor: currentRecord.currentAnchorDigest,
+			decisionDigest: "d".repeat(64),
+			sourceProofDigest: "e".repeat(64),
+			generationRecordDigests: [],
+			snapshotScopes: [],
+			protectedIndices: [],
+			retireIndices: [],
+			domains: Array.from(
+				{ length: 8 },
+				(_, i) =>
+					[2 ** i, new Uint8Array(32), new Uint8Array(32), 0, new Uint8Array(32), new Uint8Array(32), 0] as const
+			),
+		};
+		const recordDigests = page.generations.map((row) => must(digestBlob(encodeGenerationRecordV1(row))));
+		must(
+			await must(await control()).prepareBound({
+				preparation,
+				generations: {
+					recordDigests,
+					identities: page.generations.map((row) => ({
+						generationId: row.generationId,
+						identityDigest: aheRetirementGenerationIdentity(row),
+					})),
+					protectedIndices: recordDigests.map((_, index) => index),
+					retireIndices: [],
+				},
+			})
+		);
+		const completed = must(
+			await must(await control()).commitPrepared({
+				decisionDigest: preparation.decisionDigest,
+				sourceProofDigest: preparation.sourceProofDigest,
+			})
+		);
+		expect(completed.completed?.throughEpoch).toBe(0);
+		const ordinary = await store.beginGeneration({
+			objectId,
+			generationId: must(parseGenerationId("f".repeat(64))),
+			baseExpectedHead: head,
+			closure: [],
+		});
+		expect(ordinary).toEqual({ ok: false, reason: "RETIREMENT_FENCED" });
+		console.log(
+			JSON.stringify({
+				case: "local-close-completed-floor",
+				boundary: "before-original-close",
+				completed,
+				ordinary,
+			})
+		);
+		const closeResult = await prepared.handle.close();
+		const sealed = await prepared.finish(closeResult);
+		expect(closeResult.epoch).toBe(0);
+		expect(closeResult.successorEpoch).toBe(1);
+		const adopted = await commitGenuineCreatorAdoptionFixture(sealed);
+		expect(adopted).toMatchObject({
+			ok: true,
+			lifecycle: "successor-prepared",
+			recovery: "active-new",
+		});
+		const after = must(await control());
+		try {
+			expect(after.control.completed).toEqual(completed.completed);
+			expect(after.control.incarnation).toBe(completed.incarnation);
+			expect(after.control.active).toBe(null);
+			expect(after.control.nominee).toBe(null);
+			expect(after.head.kind).toBe("present");
+			if (after.head.kind !== "present") throw new TypeError("LOCAL_CLOSE_NATIVE_AFTER:missing head");
+			expect(after.head.revision).toBe(prepared.current.head.revision + 2);
+			console.log(
+				JSON.stringify({
+					case: "local-close-completed-floor",
+					boundary: "after-original-adoption",
+					closeResult,
+					adopted,
+					control: after.control,
+					head: after.head,
+				})
+			);
+		} finally {
+			await after.release();
+		}
+	} finally {
+		await prepared.close();
+	}
+}, 90_000);
+
 describe("D.108b read-only creator-successor adoption RED", () => {
 	it("freezes the exact tests-only and GREEN owner rosters", () => {
 		expect(D108B_RED_PATHS).toEqual([
@@ -394,30 +643,63 @@ describe("D.108b read-only creator-successor adoption RED", () => {
 			reason: "COMMIT_QC_REJECTED",
 		});
 
-		const controlRefs = new Set(
-			first.proposed.candidates.flatMap((candidate) => {
-				const value = decodeCanonical(candidate.bytes) as Readonly<Record<string, unknown>>;
-				return value.kind === "drp-creator-issuance-retirement-state" ||
-					value.kind === "drp-creator-author-issuance-frontiers-state"
-					? [candidate.ref.digest]
-					: [];
-			})
-		);
-		const normalizedCandidates = first.proposed.candidates.filter(
-			(candidate) => !controlRefs.has(candidate.ref.digest)
-		);
+		const signedCut = decodeCanonical(cut) as Readonly<Record<string, unknown>>;
 		const advance = (
-			proposedReferences: typeof first.proposed.references
-		): ReturnType<typeof inspectCreatorTrustAdvance> =>
-			inspectCreatorTrustAdvance({
+			proposedReferences: typeof first.proposed.references,
+			candidates = first.proposed.candidates
+		): ReturnType<typeof inspectCreatorTrustAdvance> => {
+			const controlRefs = new Set(
+				candidates.flatMap((candidate) => {
+					const value = decodeCanonical(candidate.bytes) as Readonly<Record<string, unknown>>;
+					if (value.kind === CREATOR_CLOSE_HISTORY_KIND) {
+						// Only independently authenticated exact signed-Cut history is
+						// outside the bare protocol closure. Unknown companions stay in it.
+						const digest = digestBlob(candidate.bytes);
+						if (!digest.ok || digest.value !== candidate.ref.digest ||
+							candidate.bytes.byteLength !== candidate.ref.byteLength ||
+							!proposedReferences.some((ref) => ref.digest === candidate.ref.digest && ref.byteLength === candidate.ref.byteLength) ||
+							openCreatorCloseHistory({ bytes: candidate.bytes,
+								exactCanonicalCutValueBytes: cut, historyRoot: signedCut.historyRoot,
+								historySize: signedCut.historySize }) === undefined)
+							throw new TypeError("UNAUTHENTICATED_NATIVE_HISTORY_COMPANION");
+						return [candidate.ref.digest];
+					}
+					return value.kind === "drp-creator-issuance-retirement-state" ||
+						value.kind === "drp-creator-author-issuance-frontiers-state"
+						? [candidate.ref.digest] : [];
+				})
+			);
+			return inspectCreatorTrustAdvance({
 				current: { candidates: first.current.candidates, closure: first.current.references },
 				proofRefs: [first.closeResult.cutValueRef, first.closeResult.commitQcRef],
 				proposed: {
-					candidates: normalizedCandidates,
+					candidates: candidates.filter((candidate) => !controlRefs.has(candidate.ref.digest)),
 					closure: proposedReferences.filter((ref) => !controlRefs.has(ref.digest)),
 				},
 			});
+		};
 		expect(advance(first.proposed.references)).toEqual({ kind: "successor", ok: true });
+		const historyCandidates = first.proposed.candidates.filter((candidate) =>
+			(decodeCanonical(candidate.bytes) as Readonly<Record<string, unknown>>).kind === CREATOR_CLOSE_HISTORY_KIND);
+		expect(historyCandidates).toHaveLength(1);
+		const nativeHistory = historyCandidates[0]!;
+		const historyMutant = (kind: string, cutValueDigest: unknown) => {
+			const bytes = encodeCanonical({ ...(decodeCanonical(nativeHistory.bytes) as Readonly<Record<string, unknown>>), kind, cutValueDigest });
+			const digest = digestBlob(bytes);
+			if (!digest.ok) throw new TypeError("HISTORY_MUTANT_DIGEST_UNREACHED");
+			const ref = { digest: digest.value, byteLength: bytes.byteLength };
+			return {
+				candidates: first.proposed.candidates.map((candidate) => candidate === nativeHistory ? { bytes, ref } : candidate),
+				references: first.proposed.references.map((candidate) => candidate.digest === nativeHistory.ref.digest ? ref : candidate),
+			};
+		};
+		const originalHistory = decodeCanonical(nativeHistory.bytes) as Readonly<Record<string, unknown>>;
+		const unknownHistory = historyMutant("unknown-native-history-companion", originalHistory.cutValueDigest);
+		expect(advance(unknownHistory.references, unknownHistory.candidates), "unknown-history-is-not-normalized")
+			.toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+		const mismatchedHistory = historyMutant(CREATOR_CLOSE_HISTORY_KIND, "f".repeat(64));
+		expect(() => advance(mismatchedHistory.references, mismatchedHistory.candidates), "mismatched-history-is-not-normalized")
+			.toThrow("UNAUTHENTICATED_NATIVE_HISTORY_COMPANION");
 		const lengthMutant = first.proposed.references.map((ref) =>
 			ref.digest === first.closeResult.cutValueRef.digest ? { ...ref, byteLength: ref.byteLength + 1 } : ref
 		);

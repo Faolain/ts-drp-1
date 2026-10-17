@@ -1,7 +1,12 @@
 import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
-import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";
 import {
+	openCreatorForwardPromotionSuccessorTrust,
+	openCreatorSuccessorTrust,
+} from "@ts-drp/protocol-v3/creator-close";
+import {
+	AHE_BOUNDED_READ_LIMITS,
+	type AheBoundedRecoveryRoleStore,
 	type AheDurableStore,
 	digestBlob,
 	digestClosure,
@@ -13,18 +18,26 @@ import {
 
 import type { CreatorLiveCloseResult } from "./creator-close.js";
 import {
+	authorizeCreatorAdoptionNativeFuture,
 	consumeCreatorAdoptionIntent,
 	consumeStagedCreatorSuccessorAdoption,
 	createPreparedCreatorSuccessorAdoption,
 	createStagedCreatorSuccessorAdoption,
 	type CreatorAdoptionIntentMaterial,
 	type PreparedCreatorSuccessorAdoption,
+	rebindCreatorAdoptionNativeNominee,
 	resolveCreatorAdoptionFacts,
 	type StagedCreatorSuccessorAdoption,
 } from "./internal/creator-adoption-intent.js";
+import { matchesCreatorAdoptionReferences } from "./internal/creator-adoption-references.js";
 import { installCreatorAdoptionPublish, installCreatorAdoptionStage } from "./internal/creator-adoption-stage.js";
+import type { CreatorClosedRollbackProofAccounting, CreatorForwardPromotionSourceMaterial } from "./internal/creator-closed-rollback-data.js";
 import { completeCreatorSuccessorLiveMaterial } from "./internal/creator-successor-live.js";
-import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";
+import {
+	inspectCreatorTransitionAdvance,
+	resolveCreatorForwardPromotion,
+	type VerifiedCreatorForwardPromotion,
+} from "./internal/creator-transition-advance.js";
 
 type FailureKind =
 	| "malformed-input"
@@ -55,7 +68,26 @@ type StageSuccess = Readonly<{
 type PublishSuccess = CommitSuccess;
 
 interface SealedAdoptionFacts {
-	readonly closeResult: CreatorLiveCloseResult;
+	/** Original complete close/recovery ledger; grants no adoption or native authority. */
+	readonly proofAccounting?: CreatorClosedRollbackProofAccounting;
+	readonly origin: "local-close" | "received";
+	readonly receivedCandidates?: readonly Candidate[];
+	readonly promotion?: Readonly<{
+		verified: VerifiedCreatorForwardPromotion;
+		source: Pick<CreatorForwardPromotionSourceMaterial, "checkSnapshots"> &
+			Partial<Pick<CreatorForwardPromotionSourceMaterial, "rebindAfterOwnedNomination">>;
+		closedEpoch: number;
+	}>;
+	readonly transition: Pick<
+		CreatorLiveCloseResult,
+		| "commitQcRef"
+		| "currentTrustRef"
+		| "cutValueRef"
+		| "epoch"
+		| "successorAnchorDigest"
+		| "successorEpoch"
+		| "successorTrustRef"
+	>;
 	readonly currentHead: PresentHead;
 	readonly currentReferences: readonly GenerationRef[];
 	readonly currentTrust: CurrentAnchorTrust;
@@ -189,8 +221,27 @@ function exactClosureDigest(references: readonly GenerationRef[], expected: stri
 
 async function readLineage(
 	store: AheDurableStore,
-	objectId: SealedAdoptionFacts["objectId"]
+	objectId: SealedAdoptionFacts["objectId"],
+	bounded = false,
+	accounting?: CreatorClosedRollbackProofAccounting
 ): Promise<readonly GenerationRecord[] | undefined> {
+	if (bounded) {
+		const owner = store as Partial<AheBoundedRecoveryRoleStore>;
+		if (typeof owner.acquireBoundedRecoveryRoleRead !== "function") return undefined;
+		const acquired = await owner.acquireBoundedRecoveryRoleRead({ objectId, limits: AHE_BOUNDED_READ_LIMITS });
+		if (!acquired.ok) return undefined;
+		try {
+			const view = acquired.value;
+			if (accounting !== undefined) {
+				if (!accounting.charge(encodeCanonical({ head: view.head, generations: view.generations, blobs: view.blobs }))) return undefined;
+				for (const blob of view.blobs) if (!accounting.charge(blob.bytes)) return undefined;
+			}
+			const currency = await view.checkCurrency();
+			return (accounting === undefined || accounting.charge(encodeCanonical(currency))) && currency.ok ? view.generations : undefined;
+		} finally {
+			await acquired.value.release();
+		}
+	}
 	const output: GenerationRecord[] = [];
 	const cursors = new Set<GenerationPageCursor>();
 	let cursor: GenerationPageCursor | undefined;
@@ -200,6 +251,7 @@ async function readLineage(
 			limit: 128,
 			objectId,
 		});
+		if (accounting !== undefined && !accounting.charge(encodeCanonical(result))) return undefined;
 		if (!result.ok || (result.value.generations.length === 0 && result.value.nextCursor !== null)) return undefined;
 		output.push(...result.value.generations);
 		if (result.value.nextCursor === null) return Object.freeze(output);
@@ -211,14 +263,18 @@ async function readLineage(
 
 async function loadClosure(
 	store: AheDurableStore,
-	references: readonly GenerationRef[]
+	references: readonly GenerationRef[],
+	accounting?: CreatorClosedRollbackProofAccounting
 ): Promise<readonly Candidate[] | undefined> {
 	const candidates: Candidate[] = [];
+	if (accounting !== undefined && !accounting.charge(encodeCanonical(references))) return undefined;
 	for (const ref of references) {
 		const loaded = await store.getBlob(ref.digest);
+		if (accounting !== undefined && !accounting.charge(encodeCanonical(loaded))) return undefined;
 		if (!loaded.ok || loaded.value === null || loaded.value.byteLength !== ref.byteLength) return undefined;
 		const digest = digestBlob(loaded.value);
 		if (!digest.ok || digest.value !== ref.digest) return undefined;
+		if (accounting !== undefined && !accounting.charge(loaded.value)) return undefined;
 		candidates.push(Object.freeze({ bytes: Uint8Array.from(loaded.value), ref: Object.freeze({ ...ref }) }));
 	}
 	return Object.freeze(candidates);
@@ -226,6 +282,20 @@ async function loadClosure(
 
 function candidateBytes(candidates: readonly Candidate[], ref: GenerationRef): Uint8Array | undefined {
 	return candidates.find((candidate) => sameRef(candidate.ref, ref))?.bytes;
+}
+
+function validGenerationGraph(generations: readonly GenerationRecord[]): boolean {
+	const ids = new Set(generations.map(({ generationId }) => generationId));
+	return (
+		ids.size === generations.length &&
+		generations.every(
+			(generation) =>
+				new Set(generation.closure.map(({ digest }) => digest)).size === generation.closure.length &&
+				(generation.baseExpectedHead.kind !== "present" ||
+					(generation.baseExpectedHead.generationId !== generation.generationId &&
+						ids.has(generation.baseExpectedHead.generationId)))
+		)
+	);
 }
 
 function validLineage(
@@ -240,6 +310,23 @@ function validLineage(
 	const current = byId.get(facts.currentHead.generationId);
 	const pending = byId.get(facts.proposedHead.generationId);
 	const active = byId.get(activeHead.generationId);
+	if (facts.origin === "received") {
+		return (
+			current !== undefined &&
+			pending === current &&
+			active !== undefined &&
+			sameHead(facts.currentHead, facts.proposedHead) &&
+			sameClosure(current.closure, facts.currentReferences) &&
+			(activeIsCandidate
+				? current.state === "Superseded" &&
+					active.state === "Adopted" &&
+					active.baseExpectedHead.kind === "present" &&
+					sameHead(active.baseExpectedHead, facts.currentHead) &&
+					sameClosure(active.closure, material.candidateReferences)
+				: current.state === "Adopted" && active === current) &&
+			validGenerationGraph(generations)
+		);
+	}
 	if (
 		current === undefined ||
 		pending === undefined ||
@@ -266,17 +353,7 @@ function validLineage(
 	} else if (pending.state !== "Adopted" || active !== pending) {
 		return false;
 	}
-	for (const generation of generations) {
-		if (new Set(generation.closure.map(({ digest }) => digest)).size !== generation.closure.length) return false;
-		if (
-			generation.baseExpectedHead.kind === "present" &&
-			(generation.baseExpectedHead.generationId === generation.generationId ||
-				!byId.has(generation.baseExpectedHead.generationId))
-		) {
-			return false;
-		}
-	}
-	return true;
+	return validGenerationGraph(generations);
 }
 
 function validStagedLineage(
@@ -289,6 +366,21 @@ function validStagedLineage(
 	const current = byId.get(facts.currentHead.generationId);
 	const pending = byId.get(facts.proposedHead.generationId);
 	const staged = byId.get(material.generationId);
+	if (facts.origin === "received") {
+		return (
+			current !== undefined &&
+			pending === current &&
+			staged !== undefined &&
+			current.state === "Adopted" &&
+			staged.state === "Complete" &&
+			sameHead(facts.currentHead, facts.proposedHead) &&
+			sameClosure(current.closure, facts.currentReferences) &&
+			staged.baseExpectedHead.kind === "present" &&
+			sameHead(staged.baseExpectedHead, facts.currentHead) &&
+			sameClosure(staged.closure, material.candidateReferences) &&
+			validGenerationGraph(generations)
+		);
+	}
 	if (
 		current === undefined ||
 		pending === undefined ||
@@ -307,17 +399,7 @@ function validStagedLineage(
 	) {
 		return false;
 	}
-	for (const generation of generations) {
-		if (new Set(generation.closure.map(({ digest }) => digest)).size !== generation.closure.length) return false;
-		if (
-			generation.baseExpectedHead.kind === "present" &&
-			(generation.baseExpectedHead.generationId === generation.generationId ||
-				!byId.has(generation.baseExpectedHead.generationId))
-		) {
-			return false;
-		}
-	}
-	return true;
+	return validGenerationGraph(generations);
 }
 
 function validProjection(material: CreatorAdoptionIntentMaterial): Readonly<Record<string, unknown>> | undefined {
@@ -330,29 +412,22 @@ function validProjection(material: CreatorAdoptionIntentMaterial): Readonly<Reco
 	) {
 		return undefined;
 	}
-	const digest = digestBlob(material.exactCanonicalProjectionBytes);
-	if (!digest.ok) return undefined;
-	const projectionRef = Object.freeze({
-		byteLength: material.exactCanonicalProjectionBytes.byteLength,
-		digest: digest.value,
-	});
-	const predecessorAclDigest = digestBlob(material.activation.predecessorExactCanonicalLatchedAclBytes);
-	if (!predecessorAclDigest.ok) return undefined;
-	const predecessorAclRef = Object.freeze({
-		byteLength: material.activation.predecessorExactCanonicalLatchedAclBytes.byteLength,
-		digest: predecessorAclDigest.value,
-	});
-	const retained = material.pendingReferences.filter((ref) => !sameRef(ref, material.predecessorLiveRef));
-	const derived = Object.freeze(
-		[
-			...retained,
-			projectionRef,
-			...(retained.some((ref) => sameRef(ref, predecessorAclRef)) ? [] : [predecessorAclRef]),
-		].sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
+	const cuts = material.activation.successor.candidates.filter(
+		({ bytes }) => canonicalRecord(bytes)?.kind === "drp-hard-epoch-cut"
 	);
-	return material.pendingReferences.filter((ref) => sameRef(ref, material.predecessorLiveRef)).length === 1 &&
-		new Set(derived.map(({ digest: value }) => value)).size === derived.length &&
-		sameClosure(derived, material.candidateReferences)
+	const cut = cuts[0];
+	if (cuts.length !== 1 || cut === undefined) return undefined;
+	const matches = matchesCreatorAdoptionReferences(
+		{
+			pendingReferences: material.pendingReferences,
+			predecessorLiveRef: material.predecessorLiveRef,
+			exactCanonicalProjectionBytes: material.exactCanonicalProjectionBytes,
+			exactCanonicalCutValueBytes: cut.bytes,
+			predecessorExactCanonicalLatchedAclBytes: material.activation.predecessorExactCanonicalLatchedAclBytes,
+		},
+		material.candidateReferences
+	);
+	return material.pendingReferences.filter((ref) => sameRef(ref, material.predecessorLiveRef)).length === 1 && matches
 		? Object.freeze(descriptor)
 		: undefined;
 }
@@ -362,10 +437,10 @@ function validTrustChain(
 	currentCandidates: readonly Candidate[],
 	pendingCandidates: readonly Candidate[]
 ): boolean {
-	const cutBytes = candidateBytes(pendingCandidates, facts.closeResult.cutValueRef);
-	const commitBytes = candidateBytes(pendingCandidates, facts.closeResult.commitQcRef);
-	const successorTrustBytes = candidateBytes(pendingCandidates, facts.closeResult.successorTrustRef);
-	const currentTrustBytes = candidateBytes(currentCandidates, facts.closeResult.currentTrustRef);
+	const cutBytes = candidateBytes(pendingCandidates, facts.transition.cutValueRef);
+	const commitBytes = candidateBytes(pendingCandidates, facts.transition.commitQcRef);
+	const successorTrustBytes = candidateBytes(pendingCandidates, facts.transition.successorTrustRef);
+	const currentTrustBytes = candidateBytes(currentCandidates, facts.transition.currentTrustRef);
 	if (
 		cutBytes === undefined ||
 		commitBytes === undefined ||
@@ -374,7 +449,16 @@ function validTrustChain(
 	) {
 		return false;
 	}
-	const opened = openCreatorSuccessorTrust({
+	const promotion =
+		facts.promotion === undefined ? undefined : resolveCreatorForwardPromotion(facts.promotion.verified);
+	if (
+		facts.promotion !== undefined &&
+		(promotion === undefined ||
+			promotion.currentAnchorDigest !== facts.currentTrust.currentAnchorDigest ||
+			promotion.successorAnchorDigest !== facts.transition.successorAnchorDigest)
+	)
+		return false;
+	const opened = (promotion === undefined ? openCreatorSuccessorTrust : openCreatorForwardPromotionSuccessorTrust)({
 		currentTrust: facts.currentTrust,
 		exactCanonicalCommitQcBytes: commitBytes,
 		exactCanonicalCutValueBytes: cutBytes,
@@ -382,8 +466,8 @@ function validTrustChain(
 	});
 	if (
 		!opened.ok ||
-		opened.trust.currentAnchorDigest !== facts.closeResult.successorAnchorDigest ||
-		opened.trust.currentEpoch !== facts.closeResult.successorEpoch
+		opened.trust.currentAnchorDigest !== facts.transition.successorAnchorDigest ||
+		opened.trust.currentEpoch !== facts.transition.successorEpoch
 	) {
 		return false;
 	}
@@ -391,7 +475,7 @@ function validTrustChain(
 		current: { candidates: currentCandidates, closure: facts.currentReferences },
 		currentTrust: facts.currentTrust,
 		mode: "verify",
-		proofRefs: [facts.closeResult.cutValueRef, facts.closeResult.commitQcRef],
+		proofRefs: [facts.transition.cutValueRef, facts.transition.commitQcRef],
 		proposed: { candidates: pendingCandidates, closure: facts.proposedReferences },
 		successorTrust: opened.trust,
 	}).ok;
@@ -402,6 +486,7 @@ async function authenticatedTerminal(
 	material: CreatorAdoptionIntentMaterial
 ): Promise<Terminal> {
 	try {
+		await facts.promotion?.source.checkSnapshots();
 		if (
 			!sameHead(material.pendingHead, facts.proposedHead) ||
 			!sameClosure(material.pendingReferences, facts.proposedReferences) ||
@@ -410,6 +495,8 @@ async function authenticatedTerminal(
 			return Object.freeze({ kind: "chain-invalid" });
 		}
 		const recovered = await facts.store.recoverActiveGeneration(facts.objectId);
+		if (facts.proofAccounting !== undefined && !facts.proofAccounting.charge(encodeCanonical(recovered)))
+			return Object.freeze({ kind: "recovery-failed" });
 		if (!recovered.ok || recovered.value.kind !== "active") {
 			return Object.freeze({ kind: "recovery-failed" });
 		}
@@ -425,22 +512,22 @@ async function authenticatedTerminal(
 			sameClosure(active.references, material.candidateReferences) &&
 			sameClosure(active.adoptedGeneration.closure, material.candidateReferences);
 		if (!pending && !candidate) return Object.freeze({ kind: "stale-head" });
+		const pendingReferences = facts.origin === "received" ? facts.currentReferences : material.pendingReferences;
 		if (
 			active.adoptedGeneration.state !== "Adopted" ||
-			!sameClosure(active.references, pending ? material.pendingReferences : material.candidateReferences) ||
-			!sameClosure(
-				active.adoptedGeneration.closure,
-				pending ? material.pendingReferences : material.candidateReferences
-			) ||
+			!sameClosure(active.references, pending ? pendingReferences : material.candidateReferences) ||
+			!sameClosure(active.adoptedGeneration.closure, pending ? pendingReferences : material.candidateReferences) ||
 			!exactClosureDigest(active.references, active.head.closureDigest)
 		) {
 			return Object.freeze({ kind: "chain-invalid" });
 		}
 		const [generations, currentCandidates, pendingCandidates, activeCandidates] = await Promise.all([
-			readLineage(facts.store, facts.objectId),
-			loadClosure(facts.store, facts.currentReferences),
-			loadClosure(facts.store, facts.proposedReferences),
-			loadClosure(facts.store, pending ? material.pendingReferences : material.candidateReferences),
+			readLineage(facts.store, facts.objectId, facts.origin === "received", facts.proofAccounting),
+			loadClosure(facts.store, facts.currentReferences, facts.proofAccounting),
+			facts.origin === "received"
+				? Promise.resolve(facts.receivedCandidates)
+				: loadClosure(facts.store, facts.proposedReferences, facts.proofAccounting),
+			loadClosure(facts.store, pending ? pendingReferences : material.candidateReferences, facts.proofAccounting),
 		]);
 		const descriptor = validProjection(material);
 		if (
@@ -472,6 +559,7 @@ async function authenticatedStaged(
 	material: CreatorAdoptionIntentMaterial
 ): Promise<StagedTerminal> {
 	try {
+		await facts.promotion?.source.checkSnapshots();
 		if (
 			!sameHead(material.pendingHead, facts.proposedHead) ||
 			!sameClosure(material.pendingReferences, facts.proposedReferences) ||
@@ -480,24 +568,29 @@ async function authenticatedStaged(
 			return Object.freeze({ kind: "chain-invalid" });
 		}
 		const recovered = await facts.store.recoverActiveGeneration(facts.objectId);
+		if (facts.proofAccounting !== undefined && !facts.proofAccounting.charge(encodeCanonical(recovered)))
+			return Object.freeze({ kind: "recovery-failed" });
 		if (!recovered.ok || recovered.value.kind !== "active") {
 			return Object.freeze({ kind: "recovery-failed" });
 		}
 		const active = recovered.value;
 		if (!sameHead(active.head, material.pendingHead)) return Object.freeze({ kind: "stale-head" });
+		const pendingReferences = facts.origin === "received" ? facts.currentReferences : material.pendingReferences;
 		if (
 			active.adoptedGeneration.state !== "Adopted" ||
-			!sameClosure(active.references, material.pendingReferences) ||
-			!sameClosure(active.adoptedGeneration.closure, material.pendingReferences) ||
+			!sameClosure(active.references, pendingReferences) ||
+			!sameClosure(active.adoptedGeneration.closure, pendingReferences) ||
 			!exactClosureDigest(active.references, active.head.closureDigest)
 		) {
 			return Object.freeze({ kind: "chain-invalid" });
 		}
 		const [generations, currentCandidates, pendingCandidates, stagedCandidates] = await Promise.all([
-			readLineage(facts.store, facts.objectId),
-			loadClosure(facts.store, facts.currentReferences),
-			loadClosure(facts.store, facts.proposedReferences),
-			loadClosure(facts.store, material.candidateReferences),
+			readLineage(facts.store, facts.objectId, facts.origin === "received", facts.proofAccounting),
+			loadClosure(facts.store, facts.currentReferences, facts.proofAccounting),
+			facts.origin === "received"
+				? Promise.resolve(facts.receivedCandidates)
+				: loadClosure(facts.store, facts.proposedReferences, facts.proofAccounting),
+			loadClosure(facts.store, material.candidateReferences, facts.proofAccounting),
 		]);
 		const descriptor = validProjection(material);
 		if (
@@ -525,19 +618,60 @@ async function authenticatedStaged(
 	}
 }
 
-function successfulMutation(result: unknown): boolean {
+function successfulMutation(result: unknown, accounting?: CreatorClosedRollbackProofAccounting): boolean {
+	if (accounting !== undefined) {
+		// A void native acknowledgement has no encoded value. Preserve every
+		// other observed field; the original value-presence check below remains.
+		// Rich native replies and independently reopened postimages stay whole.
+		let observation = result;
+		if (record(result) && Object.hasOwn(result, "value") && result.value === undefined) {
+			const fields: Record<string, unknown> = { ...result };
+			delete fields.value;
+			observation = fields;
+		}
+		if (!accounting.charge(encodeCanonical(observation))) return false;
+	}
 	return record(result) && result.ok === true && Object.hasOwn(result, "value");
 }
 
-async function stageCandidate(facts: SealedAdoptionFacts, material: CreatorAdoptionIntentMaterial): Promise<void> {
+async function stageCandidate(
+	facts: SealedAdoptionFacts,
+	material: CreatorAdoptionIntentMaterial
+): Promise<CreatorAdoptionIntentMaterial> {
+	await facts.promotion?.source.checkSnapshots();
+	if (facts.proofAccounting !== undefined) {
+		for (const bytes of [material.exactCanonicalProjectionBytes, encodeCanonical(material.candidateReferences),
+			material.activation.predecessorExactCanonicalLatchedAclBytes,
+			...(facts.origin === "received" ? material.activation.successor.candidates.map(({ bytes }) => bytes) : [])])
+			if (!facts.proofAccounting.charge(bytes)) throw new TypeError("creator successor full proof charge is exhausted before stage");
+	}
+	const native = await nominatedFuture(facts, material, "stage");
+	if (native) return native;
 	const scope = Object.freeze({ generationId: material.generationId, objectId: facts.objectId });
+	let existing: GenerationRecord | undefined;
+	if (facts.origin === "received") {
+		const lineage = await readLineage(facts.store, facts.objectId, true, facts.proofAccounting);
+		if (lineage === undefined) throw new TypeError("creator successor bounded retry census failed");
+		existing = lineage.find(({ generationId }) => generationId === material.generationId);
+		if (
+			existing !== undefined &&
+			(existing.baseExpectedHead.kind !== "present" ||
+				!sameHead(existing.baseExpectedHead, material.pendingHead) ||
+				!sameClosure(existing.closure, material.candidateReferences) ||
+				!exactClosureDigest(existing.closure, existing.closureDigest) ||
+				(existing.state !== "Staged" && existing.state !== "Complete"))
+		)
+			throw new TypeError("creator successor retry custody conflicts");
+		if (existing?.state === "Complete") return material;
+	}
 	if (
+		existing === undefined &&
 		!successfulMutation(
 			await facts.store.beginGeneration({
 				...scope,
 				baseExpectedHead: material.pendingHead,
 				closure: material.candidateReferences,
-			})
+			}), facts.proofAccounting
 		)
 	) {
 		throw new TypeError("creator successor begin failed");
@@ -550,46 +684,106 @@ async function stageCandidate(facts: SealedAdoptionFacts, material: CreatorAdopt
 				...scope,
 				bytes: material.exactCanonicalProjectionBytes,
 				digest: projectionDigest.value,
-			})
+			}), facts.proofAccounting
 		)
 	) {
 		throw new TypeError("creator successor projection cache failed");
 	}
-	const predecessorAclBytes = material.activation.predecessorExactCanonicalLatchedAclBytes;
-	const predecessorAclDigest = digestBlob(predecessorAclBytes);
-	if (
-		!predecessorAclDigest.ok ||
-		!successfulMutation(
-			await facts.store.putCachedBlob({
-				...scope,
-				bytes: predecessorAclBytes,
-				digest: predecessorAclDigest.value,
-			})
-		)
-	) {
-		throw new TypeError("creator predecessor ACL cache failed");
+	for (const bytes of [
+		material.activation.predecessorExactCanonicalLatchedAclBytes,
+		...(facts.origin === "received" ? material.activation.successor.candidates.map(({ bytes }) => bytes) : []),
+	]) {
+		const digest = digestBlob(bytes);
+		if (!digest.ok || !successfulMutation(await facts.store.putCachedBlob({ ...scope, bytes, digest: digest.value }), facts.proofAccounting)) {
+			throw new TypeError("creator authenticated ACL cache failed");
+		}
 	}
 	for (const ref of material.candidateReferences) {
-		if (!successfulMutation(await facts.store.promoteReference({ ...scope, digest: ref.digest }))) {
+		if (!successfulMutation(await facts.store.promoteReference({ ...scope, digest: ref.digest }), facts.proofAccounting)) {
 			throw new TypeError("creator successor promotion failed");
 		}
 	}
-	if (!successfulMutation(await facts.store.completeGeneration(scope))) {
+	if (!successfulMutation(await facts.store.completeGeneration(scope), facts.proofAccounting)) {
 		throw new TypeError("creator successor completion failed");
 	}
+	return material;
 }
 
 async function publishCandidate(facts: SealedAdoptionFacts, material: CreatorAdoptionIntentMaterial): Promise<void> {
+	if (await nominatedFuture(facts, material, "publish")) return;
 	const scope = Object.freeze({ generationId: material.generationId, objectId: facts.objectId });
 	if (
 		!successfulMutation(
 			await facts.store.swapHead({
 				...scope,
 				expectedHead: material.pendingHead,
-			})
+			}), facts.proofAccounting
 		)
 	) {
 		throw new TypeError("creator successor head swap failed");
+	}
+}
+
+/**
+ * Original authenticated adoption owner composes only an existing completed native floor.
+ * @param facts
+ * @param material
+ * @param phase
+ */
+async function nominatedFuture(
+	facts: SealedAdoptionFacts,
+	material: CreatorAdoptionIntentMaterial,
+	phase: "stage" | "publish"
+): Promise<CreatorAdoptionIntentMaterial | undefined> {
+	const owner = facts.store as AheBoundedRecoveryRoleStore;
+	if (owner.readRetirementControl === undefined) return undefined;
+	const observed = await owner.readRetirementControl(facts.objectId);
+	if (facts.proofAccounting !== undefined && !facts.proofAccounting.charge(encodeCanonical(observed)))
+		throw new TypeError("creator native retirement full proof charge is exhausted");
+	if (!observed.ok) throw new TypeError("creator native retirement metadata is unavailable");
+	if (observed.value?.completed === null || observed.value === null) return undefined;
+	if (!owner.acquireRetirementControl || !material.nativeIntent)
+		throw new TypeError("creator native future admission is unavailable");
+	const current = await owner.acquireRetirementControl(facts.objectId);
+	if (!current.ok) throw new TypeError("creator native future observation refused");
+	let submitted = false;
+	let primary: unknown;
+	try {
+		if (facts.proofAccounting !== undefined && !facts.proofAccounting.charge(encodeCanonical({ control: current.value.control,
+			head: current.value.head, imageDigest: current.value.imageDigest, metadataBytes: current.value.metadataBytes })))
+			throw new TypeError("creator native observation full proof charge is exhausted");
+		const nominee = current.value.control.nominee;
+		if (phase === "stage" && nominee) {
+			const candidate = Object.freeze({ ...material, generationId: nominee.generationId });
+			if ((await authenticatedStaged(facts, candidate)).kind !== "staged")
+				throw new TypeError("creator native nominee lacks original staged authentication");
+			const rebound = rebindCreatorAdoptionNativeNominee(material, facts.store, nominee.generationId);
+			if (!rebound) throw new TypeError("creator native nominee custody refused");
+			material = rebound;
+		}
+		if (!authorizeCreatorAdoptionNativeFuture(material, facts.store, phase))
+			throw new TypeError("creator native future custody refused");
+		submitted = true;
+		const result =
+			phase === "stage"
+				? await current.value.stageNominatedFutureGeneration(material.nativeIntent)
+				: await current.value.publishNominatedFutureGeneration(material.nativeIntent);
+		if (facts.proofAccounting !== undefined && !facts.proofAccounting.charge(encodeCanonical(result)))
+			throw new TypeError("creator native stage/publication full proof charge is exhausted");
+		if (!result.ok) throw new TypeError(`creator native future ${phase} refused:${result.reason}`);
+		return material;
+	} catch (error) {
+		primary = error;
+		throw error;
+	} finally {
+		try {
+			await current.value.release();
+			// Received/installed snapshot-only sources have no whole AHE role reader to rebind.
+			if (submitted) await facts.promotion?.source.rebindAfterOwnedNomination?.(material, phase, current.value.control);
+		} catch (cleanup) {
+			if (primary !== undefined) throw new AggregateError([primary, cleanup], "creator native nomination readback failed", { cause: primary });
+			throw cleanup;
+		}
 	}
 }
 
@@ -631,7 +825,7 @@ async function stageCreatorSuccessorAdoptionKernel(input: unknown): Promise<Comm
 	const captured = captureInput(input);
 	if (captured === undefined) return failure("malformed-input", "creator adoption stage input is invalid");
 	const facts = resolveCreatorAdoptionFacts<SealedAdoptionFacts>(captured.handle);
-	const material = consumeCreatorAdoptionIntent(captured.intent, captured.handle);
+	let material = consumeCreatorAdoptionIntent(captured.intent, captured.handle);
 	if (facts === undefined || material === undefined) {
 		return failure("intent-unavailable", "creator adoption intent is unavailable");
 	}
@@ -642,17 +836,25 @@ async function stageCreatorSuccessorAdoptionKernel(input: unknown): Promise<Comm
 	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
 	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
 	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
+	let stageRequestFailed = false;
+	let stageRequestFailure: unknown;
 	try {
-		await stageCandidate(facts, material);
-	} catch {
+		material = await stageCandidate(facts, material);
+	} catch (error) {
+		stageRequestFailed = true;
+		stageRequestFailure = error;
 		// A fresh authenticated inspection below is the only authority after an ambiguous write.
 	}
 	const staged = await authenticatedStaged(facts, material);
 	if (staged.kind === "staged") return stagedSuccess(captured.handle, material, descriptor);
-	if (staged.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
-	if (staged.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
-	if (staged.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
-	return failure("pending-old", "creator successor is not durably complete");
+	const stageFailure = (kind: FailureKind, detail: string): CommitFailure =>
+		facts.origin === "received" && stageRequestFailed
+			? Object.freeze({ ...failure(kind, detail), cause: stageRequestFailure })
+			: failure(kind, detail);
+	if (staged.kind === "stale-head") return stageFailure("stale-head", "creator successor head is stale");
+	if (staged.kind === "chain-invalid") return stageFailure("chain-invalid", "creator successor chain is invalid");
+	if (staged.kind === "recovery-failed") return stageFailure("recovery-failed", "creator successor recovery failed");
+	return stageFailure("pending-old", "creator successor is not durably complete");
 }
 
 async function publishStagedCreatorSuccessorAdoptionKernel(input: unknown): Promise<CommitFailure | PublishSuccess> {
@@ -701,7 +903,7 @@ export async function commitCreatorSuccessorAdoption(input: unknown): Promise<Co
 	const captured = captureInput(input);
 	if (captured === undefined) return failure("malformed-input", "creator adoption commit input is invalid");
 	const facts = resolveCreatorAdoptionFacts<SealedAdoptionFacts>(captured.handle);
-	const material = consumeCreatorAdoptionIntent(captured.intent, captured.handle);
+	let material = consumeCreatorAdoptionIntent(captured.intent, captured.handle);
 	if (facts === undefined || material === undefined) {
 		return failure("intent-unavailable", "creator adoption intent is unavailable");
 	}
@@ -714,7 +916,7 @@ export async function commitCreatorSuccessorAdoption(input: unknown): Promise<Co
 	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
 	let stageRequestFailed = false;
 	try {
-		await stageCandidate(facts, material);
+		material = await stageCandidate(facts, material);
 	} catch {
 		stageRequestFailed = true;
 		// A fresh authenticated reopen below is the only authority after an ambiguous write.

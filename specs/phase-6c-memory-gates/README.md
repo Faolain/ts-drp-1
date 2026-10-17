@@ -2,6 +2,16 @@
 
 ## Next Agent Prompt
 
+Current pickup (2026-10-07): preserve the accepted distinct-room million-operation
+gate without rerunning it. The [bounded lifecycle handoff](../bounded-storage-lifecycle/README.md#next-agent-prompt)
+owns the subsequent repeated-room, retirement and release work. Original 2e/2f
+are closed; the checked 98-transition prefix does not close the continuous
+same-room gate. The [accepted memory backstop configuration](../bounded-storage-lifecycle/requirements-to-evidence.md#memory-trend-ci-backstop)
+already enables `fail-on-alert: true`; hosted execution and hard-command CI
+integration remain open. It is not a substitute for the native heap gate.
+
+### Historical qualification (2026-09-01)
+
 Status (2026-09-01): Phase 6b is closed at signed/pushed anchor
 `955e72f4d1a6cd70d07639708712f58b0808bb17`. Its accepted 128-step durable
 differential, complete proof-kind registry, exact durable censuses, one genuine
@@ -86,7 +96,7 @@ Global TODO:
 - [x] D.110a-x correct the demonstrated preflight variance bound without retry.
 - [x] D.110a genuine million-operation retained-heap hard gate.
 - [ ] D.110c genuine repeated same-room authenticated epoch lifecycle.
-- [ ] D.110b CI memory-trend fail-closed backstop.
+- [ ] D.110b hosted execution and hard-command CI integration; fail-closed trend configuration accepted separately as linked above.
 
 No Phase-6c RED, GREEN, workflow mutation, product change, or long workload is
 authorized by this plan alone.
@@ -101,12 +111,12 @@ semantic digest.
 
 ## Audited starting point
 
-The repository currently has three materially different memory surfaces:
+At this audit, the repository had three materially different memory surfaces:
 
 1. `.github/workflows/benchmark-memory.yml` runs the object and node RSS
    benchmarks, compares them to cached history, and explicitly sets
-   `fail-on-alert: false`. It is a reports-only trend and cannot be the hard
-   Phase-6c gate.
+   `fail-on-alert: false`. That historical reports-only setting has since been
+   corrected as linked above; neither setting makes the trend the hard Phase-6c gate.
 2. `packages/object/tests/drpobject.memory.bench.ts` and
    `packages/node/tests/node.memory.bench.ts` report process `maxRSS` for small
    legacy/object or network workloads. They do not use `--expose-gc`, sample

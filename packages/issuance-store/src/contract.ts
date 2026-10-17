@@ -9,6 +9,7 @@ import type {
 	DurableIssuedRecord,
 	DurableIssueScope,
 	DurableSignedEnvelope,
+	SettlementInheritance,
 	SettlementPlan,
 	SettlementPlanEntry,
 	SettlementReplacementChunk,
@@ -51,9 +52,12 @@ export class DurableIssuanceUnknownOutcomeError extends Error implements Durable
 	readonly code = "ISSUANCE_OUTCOME_UNKNOWN" as const;
 	readonly scope: DurableIssueScope;
 
-	/** @param scope - Caller-known scope, copied before exposure. */
-	constructor(scope: DurableIssueScope) {
-		super("durable issuance commit outcome is unknown");
+	/**
+	 * @param scope - Caller-known scope, copied before exposure.
+	 * @param options
+	 */
+	constructor(scope: DurableIssueScope, options?: ErrorOptions) {
+		super("durable issuance commit outcome is unknown", options);
 		Object.defineProperty(this, "name", { configurable: true, value: "DurableIssuanceError" });
 		this.scope = copyDurableIssueScope(scope);
 	}
@@ -242,8 +246,16 @@ export function durablePreimageMatchesScopeAndSequence(
  * @returns The positive final logical time, or undefined for an invalid preimage.
  */
 export function settlementReplacementLastLogicalTime(commit: DurableIssueCommit): number | undefined {
+	return settlementReplacementLastLogicalTimeFromPreimage(commit.envelope.canonicalPreimageBytes);
+}
+
+/**
+ * Original replacement clock derivation, usable before irreversible signing.
+ * @param exactUnsignedBytes
+ */
+export function settlementReplacementLastLogicalTimeFromPreimage(exactUnsignedBytes: Uint8Array): number | undefined {
 	try {
-		const decoded: unknown = decodeCanonical(commit.envelope.canonicalPreimageBytes);
+		const decoded: unknown = decodeCanonical(exactUnsignedBytes);
 		if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return undefined;
 		const record = decoded as Record<string, unknown>;
 		let logicalTime = record.logicalTime;
@@ -429,12 +441,53 @@ function copySettlementReplacementProgress(value: unknown): SettlementReplacemen
 	return { chunks, intentCount: value.intentCount as number, intentDigest, version: 1 };
 }
 
+/**
+ * Detaches a retained target reference without granting migration authority.
+ * @param value - Untrusted native reference.
+ * @returns The exact structural reference, or undefined.
+ */
+function copySettlementInheritance(value: unknown): SettlementInheritance | undefined {
+	if (
+		!isClosedDurableIssuanceRecord(value, [
+			"sourceObjectId",
+			"targetObjectId",
+			"targetAuthor",
+			"targetAuthorSequence",
+			"targetVertexDigest",
+		]) ||
+		!isValidDurableScopeField(value.sourceObjectId) ||
+		!isValidDurableScopeField(value.targetObjectId) ||
+		value.sourceObjectId === value.targetObjectId ||
+		!isValidDurableScopeField(value.targetAuthor) ||
+		!isValidDurableAuthorSequence(value.targetAuthorSequence)
+	)
+		return undefined;
+	const targetVertexDigest = copyDurableIssuanceBytes(value.targetVertexDigest);
+	if (targetVertexDigest?.byteLength !== 32) return undefined;
+	return {
+		sourceObjectId: value.sourceObjectId,
+		targetObjectId: value.targetObjectId,
+		targetAuthor: value.targetAuthor,
+		targetAuthorSequence: value.targetAuthorSequence,
+		targetVertexDigest,
+	};
+}
+
 function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
+	const hasSourceObjectId =
+		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "sourceObjectId");
+	const hasTransformRefusal =
+		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "transformRefusal");
 	const hasProgress =
 		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "replacementProgress");
+	const hasInheritance =
+		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "inheritance");
 	if (
 		!isClosedDurableIssuanceRecord(value, [
 			"disposition",
+			...(hasSourceObjectId ? ["sourceObjectId"] : []),
+			...(hasTransformRefusal ? ["transformRefusal"] : []),
+			...(hasInheritance ? ["inheritance"] : []),
 			...(hasProgress ? ["replacementProgress"] : []),
 			"replacementSequence",
 			"sourceDigest",
@@ -445,15 +498,44 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		(value.disposition !== "expire" &&
 			value.disposition !== "rebase" &&
 			value.disposition !== "transform" &&
-			value.disposition !== "manual-review")
+			value.disposition !== "manual-review" &&
+			value.disposition !== "inherited")
 	) {
 		return undefined;
 	}
 	const sourceDigest = copyDurableIssuanceBytes(value.sourceDigest);
 	const replacementProgress = hasProgress ? copySettlementReplacementProgress(value.replacementProgress) : undefined;
+	const inheritance = hasInheritance ? copySettlementInheritance(value.inheritance) : undefined;
+	const rawRefusal = hasTransformRefusal ? value.transformRefusal : undefined;
+	const refusalDigest =
+		rawRefusal !== undefined && typeof rawRefusal === "object" && rawRefusal !== null
+			? copyDurableIssuanceBytes(Reflect.get(rawRefusal, "proposedIntentDigest"))
+			: undefined;
+	const transformRefusal =
+		rawRefusal !== undefined &&
+		isClosedDurableIssuanceRecord(rawRefusal, ["version", "kind", "proposedIntentDigest", "reason"]) &&
+		rawRefusal.version === 1 &&
+		rawRefusal.kind === "admission-refused" &&
+		(rawRefusal.reason === "capacity" ||
+			rawRefusal.reason === "identity-conflict" ||
+			rawRefusal.reason === "encoding") &&
+		refusalDigest?.byteLength === 32
+			? {
+					version: 1 as const,
+					kind: "admission-refused" as const,
+					reason: rawRefusal.reason as "capacity" | "identity-conflict" | "encoding",
+					proposedIntentDigest: refusalDigest,
+				}
+			: undefined;
 	if (
 		sourceDigest === undefined ||
+		(hasSourceObjectId && (!isValidDurableScopeField(value.sourceObjectId) || value.disposition === "inherited")) ||
+		(hasTransformRefusal && (transformRefusal === undefined || value.disposition !== "transform")) ||
 		(hasProgress && replacementProgress === undefined) ||
+		(hasInheritance && inheritance === undefined) ||
+		(value.disposition === "inherited"
+			? inheritance === undefined || value.replacementSequence !== null || hasProgress || sourceDigest.byteLength !== 32
+			: hasInheritance) ||
 		(replacementProgress !== undefined && (value.disposition === "expire" || value.disposition === "manual-review"))
 	) {
 		return undefined;
@@ -465,6 +547,9 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 	}
 	return {
 		disposition: value.disposition,
+		...(hasSourceObjectId ? { sourceObjectId: value.sourceObjectId as string } : {}),
+		...(transformRefusal === undefined ? {} : { transformRefusal }),
+		...(inheritance === undefined ? {} : { inheritance }),
 		...(replacementProgress === undefined ? {} : { replacementProgress }),
 		replacementSequence: value.replacementSequence,
 		sourceDigest,
@@ -497,7 +582,13 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 	let prior = -1;
 	for (const rawEntry of value.entries) {
 		const entry = copySettlementPlanEntry(rawEntry);
-		if (entry === undefined || entry.sourceSequence <= prior) return undefined;
+		if (
+			entry === undefined ||
+			entry.sourceSequence <= prior ||
+			entry.sourceObjectId === scope.objectId ||
+			(entry.inheritance !== undefined && entry.inheritance.targetObjectId !== scope.objectId)
+		)
+			return undefined;
 		entries.push(entry);
 		prior = entry.sourceSequence;
 	}
@@ -518,6 +609,23 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 	return {
 		entries: plan.entries.map((entry) => ({
 			disposition: entry.disposition,
+			...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
+			...(entry.transformRefusal === undefined
+				? {}
+				: {
+						transformRefusal: {
+							...entry.transformRefusal,
+							proposedIntentDigest: new Uint8Array(entry.transformRefusal.proposedIntentDigest),
+						},
+					}),
+			...(entry.inheritance === undefined
+				? {}
+				: {
+						inheritance: {
+							...entry.inheritance,
+							targetVertexDigest: new Uint8Array(entry.inheritance.targetVertexDigest),
+						},
+					}),
 			...(entry.replacementProgress === undefined
 				? {}
 				: {
@@ -555,7 +663,27 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 		}
 		if (
 			candidate.disposition !== prior.disposition ||
+			candidate.sourceObjectId !== prior.sourceObjectId ||
+			(prior.transformRefusal !== undefined &&
+				(candidate.transformRefusal === undefined ||
+					candidate.transformRefusal.reason !== prior.transformRefusal.reason ||
+					!durableIssuanceBytesEqual(
+						candidate.transformRefusal.proposedIntentDigest,
+						prior.transformRefusal.proposedIntentDigest
+					))) ||
+			(prior.transformRefusal === undefined &&
+				candidate.transformRefusal !== undefined &&
+				(current.fenceSequence !== null ||
+					prior.replacementSequence !== null ||
+					prior.replacementProgress !== undefined)) ||
 			candidate.replacementSequence !== prior.replacementSequence ||
+			(candidate.inheritance === undefined || prior.inheritance === undefined
+				? candidate.inheritance !== prior.inheritance
+				: candidate.inheritance.targetObjectId !== prior.inheritance.targetObjectId ||
+					candidate.inheritance.sourceObjectId !== prior.inheritance.sourceObjectId ||
+					candidate.inheritance.targetAuthor !== prior.inheritance.targetAuthor ||
+					candidate.inheritance.targetAuthorSequence !== prior.inheritance.targetAuthorSequence ||
+					!durableIssuanceBytesEqual(candidate.inheritance.targetVertexDigest, prior.inheritance.targetVertexDigest)) ||
 			!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest)
 		) {
 			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement retained source changed");
@@ -645,7 +773,12 @@ export function applySettlementPlanEffect(
 	}
 	const index = plan.entries.findIndex((entry) => entry.sourceSequence === effect.sourceSequence);
 	const entry = plan.entries[index];
-	if (entry === undefined || entry.replacementSequence !== null || entry.disposition === "manual-review") {
+	if (
+		entry === undefined ||
+		entry.replacementSequence !== null ||
+		entry.disposition === "manual-review" ||
+		entry.disposition === "inherited"
+	) {
 		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement precondition changed");
 	}
 	const detached = cloneSettlementPlan(plan);

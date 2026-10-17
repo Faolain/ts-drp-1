@@ -18,6 +18,7 @@ import type { DRPNetworkNode, DRPNodeConfig } from "@ts-drp/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DRPNode } from "../src/index.js";
+import type { NodeRoomNetworkPort } from "../src/room-network.js";
 
 const NAMESPACE = `drp-network:v1:${"r".repeat(43)}`;
 const INVITE = "room-presence-fallback-fixture-invite";
@@ -36,7 +37,7 @@ interface NodeFixture {
 	readonly node: DRPNode;
 }
 
-describe("connectObject room-presence rendezvous fallback", () => {
+describe("current room-presence rendezvous fallback", () => {
 	const nodes: DRPNode[] = [];
 	const pending: Array<Promise<unknown>> = [];
 	let unhandledRejections: unknown[] = [];
@@ -68,7 +69,7 @@ describe("connectObject room-presence rendezvous fallback", () => {
 		const fixture = await startedNode(directory.ensemble);
 		nodes.push(fixture.node);
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledWith([...replica.addresses]), {
 			timeout: 500,
@@ -93,7 +94,7 @@ describe("connectObject room-presence rendezvous fallback", () => {
 		});
 		nodes.push(fixture.node);
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledWith([...creator.addresses]), {
 			timeout: 500,
@@ -118,7 +119,7 @@ describe("connectObject room-presence rendezvous fallback", () => {
 		const fixture = await startedNode(directory.ensemble, selfRecord.peerId);
 		nodes.push(fixture.node);
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 
 		await vi.waitFor(
 			() =>
@@ -141,7 +142,7 @@ describe("connectObject room-presence rendezvous fallback", () => {
 		const fixture = await startedNode(directory.ensemble, creator.peerId);
 		nodes.push(fixture.node);
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledWith([...replica.addresses]), {
 			timeout: 500,
@@ -161,7 +162,7 @@ describe("connectObject room-presence rendezvous fallback", () => {
 		const fixture = await startedNode(directory.ensemble);
 		nodes.push(fixture.node);
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledTimes(8), { timeout: 500 });
 		await flushMicrotasks();
@@ -179,7 +180,7 @@ describe("connectObject room-presence rendezvous fallback", () => {
 		const fixture = await startedNode(directory.ensemble);
 		nodes.push(fixture.node);
 
-		const connecting = fixture.node.connectObject({ id });
+		const connecting = connectRoom(fixture.node, id);
 		await vi.advanceTimersByTimeAsync(5_000);
 
 		expect(roomDiscover).toHaveBeenCalledWith(
@@ -187,7 +188,7 @@ describe("connectObject room-presence rendezvous fallback", () => {
 				namespace: roomNamespace(id),
 			})
 		);
-		await expect(connecting).resolves.toMatchObject({ id });
+		await expect(connecting).resolves.toBeUndefined();
 		expect(fixture.connect).not.toHaveBeenCalled();
 	});
 
@@ -210,11 +211,11 @@ describe("connectObject room-presence rendezvous fallback", () => {
 			fixture.connect.mockImplementationOnce(() => firstDial);
 			nodes.push(fixture.node);
 
-			pending.push(fixture.node.connectObject({ id }));
+			pending.push(connectRoom(fixture.node, id));
 			await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledTimes(1), { timeout: 500 });
 
 			if (lifecycle === "unsubscribe") {
-				fixture.node.unsubscribeObject(id);
+				closeRoom(fixture.node, id);
 			} else {
 				await fixture.node.stop();
 			}
@@ -364,4 +365,24 @@ async function flushMicrotasks(): Promise<void> {
 
 function signal(): AbortSignal {
 	return new AbortController().signal;
+}
+
+// Register the current transport lifecycle, then drive its existing creator-dial
+// owner directly to preserve exact attempt timing. Routing grants no app authority.
+const currentRoomPorts = new WeakMap<DRPNode, Map<string, NodeRoomNetworkPort>>();
+
+function connectRoom(node: DRPNode, id: string): Promise<void> {
+	let rooms = currentRoomPorts.get(node);
+	if (rooms === undefined) {
+		rooms = new Map();
+		currentRoomPorts.set(node, rooms);
+	}
+	if (!rooms.has(id)) rooms.set(id, node.openRoomNetwork(id));
+	return node["_connectRoomCreator"](id);
+}
+
+function closeRoom(node: DRPNode, id: string): void {
+	const rooms = currentRoomPorts.get(node);
+	rooms?.get(id)?.close();
+	rooms?.delete(id);
 }

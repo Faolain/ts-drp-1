@@ -1,3 +1,5 @@
+import type { AheRetirementControlRead } from "./retirement-control.js";
+
 declare const storageObjectIdBrand: unique symbol;
 declare const generationIdBrand: unique symbol;
 declare const blobDigestBrand: unique symbol;
@@ -21,6 +23,7 @@ export type StorageRejectionReason =
 	| "READ_STALE_HEAD"
 	| "READ_STALE_ROLE_VIEW"
 	| "READ_RELEASED"
+	| "RETIREMENT_FENCED"
 	| "STORE_CLOSED"
 	| "STORE_POISONED"
 	| "INVALID_ARGUMENT"
@@ -111,23 +114,42 @@ export type StoreCapabilities = {
 	readonly signingEligibility: "never" | "backend-capability-required";
 };
 
+/** Finite host-local encoded-work capacity; never protocol authority or a heap limit.
+ * Admission reserves the exact workload continuation under these ceilings. The
+ * profile is unchanged by room age and is also used by fresh recovery/reopen.
+ * The supported64-Writer protected-window candidate measured1161416 bytes
+ * including full PRE and147231 bytes of unknown runtime reservation. 1.25MiB
+ * leaves149304 bytes of headroom; lawful cleanup still requires native evidence.
+ * This is neither authenticated epoch/payload capacity nor consumed heap/RSS. */
+export const LOCAL_WORKLOAD_CAPACITY = Object.freeze({
+	kind: "bounded-local-workload-capacity-1" as const,
+	profile: "supported-64-writer-protected-window-1" as const,
+	ordinaryProofBytes: 1_310_720,
+	maintenanceProofBytes: 4_194_304,
+	journalImageBytes: 2_097_152,
+	journalRows: 24_576,
+});
+
 export type AheBoundedReadLimits = Readonly<{
 	maxObjectGenerations: 7;
 	maxHeadBytes: 3326;
 	maxGenerationBytes: 7307;
 	maxClosureReferences: 7;
 	maxBlobBytes: 65536;
-	maxUnionBytes: 262144;
+	maxUnionBytes: 786432;
 }>;
 
-/** Fixed readonly observer entitlement, not a producer admission policy. */
+/** Fixed operation-local encoded proof entitlement, also used by native image
+ * guards. The 64-Writer native continuation requires732554 bytes including all
+ * unknown census reservations; 768KiB leaves53878 bytes of measured headroom.
+ * Not a heap or total-work bound; independent request limits remain. */
 export const AHE_BOUNDED_READ_LIMITS: AheBoundedReadLimits = Object.freeze({
 	maxObjectGenerations: 7,
 	maxHeadBytes: 3326,
 	maxGenerationBytes: 7307,
 	maxClosureReferences: 7,
 	maxBlobBytes: 65536,
-	maxUnionBytes: 262144,
+	maxUnionBytes: 786432,
 });
 
 export type AheBoundedReadInput = Readonly<{
@@ -206,8 +228,33 @@ export interface AheBoundedRecoveryRoleRead {
 	release(): Promise<void>;
 }
 
+/** Complete native point observation, including real metadata absence; not held exclusion or authority. */
+export type AheRetirementAdmissionImage = Readonly<{
+	control: AheRetirementControlRead["control"] | null;
+	head: ExpectedHead;
+	imageDigest: string;
+	metadataBytes: number;
+}>;
+
 export interface AheBoundedRecoveryRoleStore extends AheDurableStore {
+	/** Reversible native AHE-local reservation only; not cross-store retirement authority. */
+	acquireRetirementControl?(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>>;
+	/** Observational native metadata only; never births a control or grants mutation. */
+	readRetirementControl?(
+		objectId: StorageObjectId
+	): Promise<StoreResult<import("./retirement-control.js").AheRetirementControl | null>>;
+	/** Complete noncreating native point read; a caller-held reservation supplies exclusion. */
+	readRetirementImage?(
+		objectId: StorageObjectId
+	): Promise<StoreResult<Pick<AheRetirementControlRead, "control" | "head" | "imageDigest" | "metadataBytes">>>;
+	/** Same complete census with noncreating metadata absence; future control birth still needs its own full charge. */
+	readRetirementAdmissionImage?(objectId: StorageObjectId): Promise<StoreResult<AheRetirementAdmissionImage>>;
 	acquireBoundedRecoveryRoleRead(
 		input: AheBoundedRecoveryRoleReadInput
 	): Promise<StoreResult<AheBoundedRecoveryRoleRead>>;
+}
+/** A held native read-only view. Neither this handle nor a check grants write authority. */
+export interface NativeReadReservation {
+	check: () => Promise<void>;
+	release: () => Promise<void>;
 }

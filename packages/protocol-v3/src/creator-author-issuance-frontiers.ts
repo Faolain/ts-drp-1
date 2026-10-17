@@ -1,12 +1,15 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
+import { creatorRetirementEncodingWidths } from "./creator-issuance-retirement.js";
 import type { CurrentAnchorTrust } from "./index.js";
 import {
 	type CreatorIssuanceRetirementSigningRequest,
 	mintCreatorIssuanceRetirementSigningRequest,
 } from "./internal/creator-issuance-retirement-signing-request.js";
-import { resolveCreatorAnchorTrustMaterial } from "./internal/seal-authority-custody.js";
+import {
+	resolveCreatorAnchorTrustMaterial,
+} from "./internal/seal-authority-custody.js";
 import { settlementProfileFor } from "./settlement-profile.js";
 
 export const CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND = "drp-creator-author-issuance-frontiers-state" as const;
@@ -185,7 +188,7 @@ function copiedFrontiers(value: unknown): readonly CreatorAuthorIssuanceFrontier
 	return Object.freeze(output);
 }
 
-function validRecordFields(record: Readonly<Record<string, unknown>>): boolean {
+function validKnownRecordFields(record: Readonly<Record<string, unknown>>): boolean {
 	return (
 		record.kind === CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND &&
 		record.protocolMajor === 3 &&
@@ -207,13 +210,16 @@ function validRecordFields(record: Readonly<Record<string, unknown>>): boolean {
 		DIGEST.test(record.successorAclDigest) &&
 		typeof record.cutValueDigest === "string" &&
 		DIGEST.test(record.cutValueDigest) &&
-		validRef(record.commitQcRef) &&
 		typeof record.snapshotManifestDigest === "string" &&
 		DIGEST.test(record.snapshotManifestDigest) &&
 		typeof record.priorAggregateCandidateDigest === "string" &&
 		DIGEST.test(record.priorAggregateCandidateDigest) &&
 		copiedFrontiers(record.frontiers) !== undefined
 	);
+}
+
+function validRecordFields(record: Readonly<Record<string, unknown>>): boolean {
+	return validKnownRecordFields(record) && validRef(record.commitQcRef);
 }
 
 function identity(record: Readonly<Record<string, unknown>>): CreatorAuthorIssuanceFrontiersIdentity {
@@ -249,6 +255,85 @@ function failure(reason: string): Readonly<{ ok: false; reason: string }> {
 	return Object.freeze({ ok: false as const, reason });
 }
 
+/** Same native field projection, also accepting scalar resource slots. It does
+ * not validate or mint trust, signatures, settlement or admitted frontiers. */
+export function creatorAuthorIssuanceFrontierFields(
+	input: Readonly<Record<string, unknown>>,
+	current: Readonly<{currentAnchorDigest: unknown; currentEpoch: unknown; genesisAnchorDigest: unknown; objectId: unknown}>,
+	successor: Readonly<{currentAnchorDigest: unknown; currentEpoch: unknown}>,
+	frontiers: unknown
+): Readonly<Record<string, unknown>> {
+	return Object.freeze({
+		closedAnchorDigest: current.currentAnchorDigest,
+		closedEpoch: current.currentEpoch,
+		commitQcRef: plainRecord(input.commitQcRef)
+			? Object.freeze({ byteLength: input.commitQcRef.byteLength, digest: input.commitQcRef.digest })
+			: input.commitQcRef,
+		currentAclDigest: input.currentAclDigest,
+		cutValueDigest: input.cutValueDigest,
+		frontiers,
+		genesisAnchorDigest: current.genesisAnchorDigest,
+		kind: CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
+		objectId: current.objectId,
+		priorAggregateCandidateDigest: input.priorAggregateCandidateDigest,
+		protocolMajor: 3,
+		snapshotManifestDigest: input.snapshotManifestDigest,
+		successorAclDigest: input.successorAclDigest,
+		successorAnchorDigest: successor.currentAnchorDigest,
+		successorEpoch: successor.currentEpoch,
+		version: 1,
+	});
+}
+
+/**
+ * Reads original codec lengths without future authority, QC or signature values.
+ * @param input - Current trust and original close facts, successorAnchorDigest and commitQcByteLength.
+ * @returns Whole encoding lengths or a closed schema refusal; never a signing capability.
+ */
+export function readCreatorAuthorIssuanceFrontiersForSizing(
+	input: unknown
+): Readonly<
+	{ ok: false; reason: string } | { ok: true; unsignedPreimageByteLength: number; signedRecordByteLength: number }
+> {
+	try {
+		const keys = [
+			...PREPARE_KEYS.filter((key) => key !== "successorTrust" && key !== "commitQcRef"),
+			"successorAnchorDigest",
+			"commitQcByteLength",
+		];
+		if (!plainRecord(input) || !exactKeys(input, keys)) return failure("MALFORMED_INPUT");
+		const currentTrust = input.currentTrust as CurrentAnchorTrust;
+		const current = resolveCreatorAnchorTrustMaterial(currentTrust);
+		const frontiers = copiedFrontiers(input.frontiers);
+		if (
+			current === undefined ||
+			frontiers === undefined ||
+			input.currentAclDigest !== anchorAclDigest(current.exactCanonicalCurrentAnchorPreimageBytes)
+		)
+			return failure("TRUST_INVALID");
+		const { commitQcRef: _ref, ...known } = creatorAuthorIssuanceFrontierFields(
+			input,
+			current,
+			{
+				currentAnchorDigest: input.successorAnchorDigest as string,
+				currentEpoch: current.currentEpoch + 1,
+			},
+			frontiers
+		);
+		if (!validKnownRecordFields(known)) return failure("IDENTITY_INVALID");
+		const widths = creatorRetirementEncodingWidths(
+			known,
+			input.commitQcByteLength as number,
+			"detachedCreatorSignature"
+		);
+		return widths.signedRecordByteLength > CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES
+			? failure("RECORD_TOO_LARGE")
+			: Object.freeze({ ok: true as const, ...widths });
+	} catch {
+		return failure("MALFORMED_INPUT");
+	}
+}
+
 /**
  * Prepares one creator-signed bounded current-writer issuance frontier.
  * @param input - Authenticated adjacent trust floors and exact close identities.
@@ -282,26 +367,7 @@ export function prepareCreatorAuthorIssuanceFrontiers(input: unknown): Readonly<
 		) {
 			return failure("TRUST_INVALID");
 		}
-		const preimage = Object.freeze({
-			closedAnchorDigest: current.currentAnchorDigest,
-			closedEpoch: current.currentEpoch,
-			commitQcRef: plainRecord(input.commitQcRef)
-				? Object.freeze({ byteLength: input.commitQcRef.byteLength, digest: input.commitQcRef.digest })
-				: input.commitQcRef,
-			currentAclDigest: input.currentAclDigest,
-			cutValueDigest: input.cutValueDigest,
-			frontiers,
-			genesisAnchorDigest: current.genesisAnchorDigest,
-			kind: CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
-			objectId: current.objectId,
-			priorAggregateCandidateDigest: input.priorAggregateCandidateDigest,
-			protocolMajor: 3,
-			snapshotManifestDigest: input.snapshotManifestDigest,
-			successorAclDigest: input.successorAclDigest,
-			successorAnchorDigest: successor.currentAnchorDigest,
-			successorEpoch: successor.currentEpoch,
-			version: 1,
-		});
+		const preimage = creatorAuthorIssuanceFrontierFields(input, current, successor, frontiers);
 		if (!validRecordFields(preimage)) return failure("IDENTITY_INVALID");
 		const exactCanonicalPreimageBytes = encodeCanonical(preimage);
 		const digest = hashDomain(DOMAIN, exactCanonicalPreimageBytes);
@@ -570,7 +636,7 @@ function copiedSettlementFrontiers(value: unknown): readonly CreatorAuthorSettle
 	return Object.freeze(output);
 }
 
-function validSettlementRecordFields(record: Readonly<Record<string, unknown>>): boolean {
+function validKnownSettlementRecordFields(record: Readonly<Record<string, unknown>>): boolean {
 	return (
 		record.kind === CREATOR_AUTHOR_SETTLEMENT_KIND &&
 		record.protocolMajor === 3 &&
@@ -592,7 +658,6 @@ function validSettlementRecordFields(record: Readonly<Record<string, unknown>>):
 		DIGEST.test(record.successorAclDigest) &&
 		typeof record.cutValueDigest === "string" &&
 		DIGEST.test(record.cutValueDigest) &&
-		validRef(record.commitQcRef) &&
 		typeof record.snapshotManifestDigest === "string" &&
 		DIGEST.test(record.snapshotManifestDigest) &&
 		typeof record.historyRoot === "string" &&
@@ -603,6 +668,10 @@ function validSettlementRecordFields(record: Readonly<Record<string, unknown>>):
 		(record.priorCheckpointKind === "genesis" || record.priorCheckpointKind === "settled-v1") &&
 		copiedSettlementFrontiers(record.frontiers) !== undefined
 	);
+}
+
+function validSettlementRecordFields(record: Readonly<Record<string, unknown>>): boolean {
+	return validKnownSettlementRecordFields(record) && validRef(record.commitQcRef);
 }
 
 function settlementIdentity(record: Readonly<Record<string, unknown>>): CreatorAuthorSettlementIdentity {
@@ -635,6 +704,89 @@ function copiedSettlementIdentity(value: CreatorAuthorSettlementIdentity): Creat
 			value.frontiers.map((entry) => Object.freeze([...entry])) as CreatorAuthorSettlementFrontier[]
 		),
 	});
+}
+
+/** Resource-only use of these fields is not a settlement capability. Native
+ * callers retain every original trust/profile/frontier/signature validator. */
+export function creatorAuthorSettlementFields(
+	input: Readonly<Record<string, unknown>>,
+	current: Readonly<{currentAnchorDigest: unknown; currentEpoch: unknown; genesisAnchorDigest: unknown; objectId: unknown}>,
+	successor: Readonly<{currentAnchorDigest: unknown; currentEpoch: unknown}>,
+	frontiers: unknown
+): Readonly<Record<string, unknown>> {
+	return Object.freeze({
+		closedAnchorDigest: current.currentAnchorDigest,
+		closedEpoch: current.currentEpoch,
+		commitQcRef: plainRecord(input.commitQcRef)
+			? Object.freeze({ byteLength: input.commitQcRef.byteLength, digest: input.commitQcRef.digest })
+			: input.commitQcRef,
+		currentAclDigest: input.currentAclDigest,
+		cutValueDigest: input.cutValueDigest,
+		frontiers,
+		genesisAnchorDigest: current.genesisAnchorDigest,
+		historyRoot: input.historyRoot,
+		historySize: input.historySize,
+		kind: CREATOR_AUTHOR_SETTLEMENT_KIND,
+		objectId: current.objectId,
+		priorCheckpointDigest: input.priorCheckpointDigest,
+		priorCheckpointKind: input.priorCheckpointKind,
+		protocolMajor: 3,
+		snapshotManifestDigest: input.snapshotManifestDigest,
+		successorAclDigest: input.successorAclDigest,
+		successorAnchorDigest: successor.currentAnchorDigest,
+		successorEpoch: successor.currentEpoch,
+		version: 1,
+	});
+}
+
+/**
+ * Reads original codec lengths without future authority, QC or signature values.
+ * @param input - Current trust and original close facts, successorAnchorDigest and commitQcByteLength.
+ * @returns Whole encoding lengths or a closed schema refusal; never a signing capability.
+ */
+export function readCreatorAuthorSettlementForSizing(
+	input: unknown
+): Readonly<
+	{ ok: false; reason: string } | { ok: true; unsignedPreimageByteLength: number; signedRecordByteLength: number }
+> {
+	try {
+		const keys = [
+			...SETTLEMENT_PREPARE_KEYS.filter((key) => key !== "successorTrust" && key !== "commitQcRef"),
+			"successorAnchorDigest",
+			"commitQcByteLength",
+		];
+		if (!plainRecord(input) || !exactKeys(input, keys)) return failure("MALFORMED_INPUT");
+		const currentTrust = input.currentTrust as CurrentAnchorTrust;
+		const current = resolveCreatorAnchorTrustMaterial(currentTrust);
+		const frontiers = copiedSettlementFrontiers(input.frontiers);
+		if (
+			current === undefined ||
+			frontiers === undefined ||
+			settlementProfileFor(currentTrust.profileId) !== "v1" ||
+			input.currentAclDigest !== anchorAclDigest(current.exactCanonicalCurrentAnchorPreimageBytes)
+		)
+			return failure("TRUST_INVALID");
+		const { commitQcRef: _ref, ...known } = creatorAuthorSettlementFields(
+			input,
+			current,
+			{
+				currentAnchorDigest: input.successorAnchorDigest as string,
+				currentEpoch: current.currentEpoch + 1,
+			},
+			frontiers
+		);
+		if (!validKnownSettlementRecordFields(known)) return failure("IDENTITY_INVALID");
+		const widths = creatorRetirementEncodingWidths(
+			known,
+			input.commitQcByteLength as number,
+			"detachedAuthoritySignature"
+		);
+		return widths.signedRecordByteLength > CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES
+			? failure("RECORD_TOO_LARGE")
+			: Object.freeze({ ok: true as const, ...widths });
+	} catch {
+		return failure("MALFORMED_INPUT");
+	}
 }
 
 /**
@@ -673,29 +825,7 @@ export function prepareCreatorAuthorSettlement(input: unknown): Readonly<
 		) {
 			return failure("TRUST_INVALID");
 		}
-		const preimage = Object.freeze({
-			closedAnchorDigest: current.currentAnchorDigest,
-			closedEpoch: current.currentEpoch,
-			commitQcRef: plainRecord(input.commitQcRef)
-				? Object.freeze({ byteLength: input.commitQcRef.byteLength, digest: input.commitQcRef.digest })
-				: input.commitQcRef,
-			currentAclDigest: input.currentAclDigest,
-			cutValueDigest: input.cutValueDigest,
-			frontiers,
-			genesisAnchorDigest: current.genesisAnchorDigest,
-			historyRoot: input.historyRoot,
-			historySize: input.historySize,
-			kind: CREATOR_AUTHOR_SETTLEMENT_KIND,
-			objectId: current.objectId,
-			priorCheckpointDigest: input.priorCheckpointDigest,
-			priorCheckpointKind: input.priorCheckpointKind,
-			protocolMajor: 3,
-			snapshotManifestDigest: input.snapshotManifestDigest,
-			successorAclDigest: input.successorAclDigest,
-			successorAnchorDigest: successor.currentAnchorDigest,
-			successorEpoch: successor.currentEpoch,
-			version: 1,
-		});
+		const preimage = creatorAuthorSettlementFields(input, current, successor, frontiers);
 		if (!validSettlementRecordFields(preimage)) return failure("IDENTITY_INVALID");
 		const exactCanonicalPreimageBytes = encodeCanonical(preimage);
 		if (

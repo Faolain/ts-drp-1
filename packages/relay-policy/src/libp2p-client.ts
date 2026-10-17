@@ -467,7 +467,18 @@ async function waitForValue<T>(
 }
 
 function isCircuitForPeer(address: string, peerId: string): boolean {
-	return address.includes(`/p2p/${peerId}/p2p-circuit`);
+	try {
+		const components = multiaddr(address).getComponents();
+		const circuit = components.findIndex(({ name }) => name === "p2p-circuit");
+		if (circuit < 1 || components[circuit - 1]?.name !== "p2p" || components[circuit - 1]?.value !== peerId)
+			return false;
+		// WebRTC listeners expose the circuit prefix too, but closing one shuts
+		// down its direct connections. Only the circuit listener belongs here.
+		const suffix = components.slice(circuit + 1);
+		return suffix.length === 0 || (suffix.length === 1 && suffix[0]?.name === "p2p");
+	} catch {
+		return false;
+	}
 }
 
 function boundedTimeout(value: number): number {

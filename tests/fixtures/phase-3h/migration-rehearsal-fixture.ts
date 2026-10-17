@@ -47,7 +47,10 @@ export const MIGRATION_ACTIVATION_DECISION_KEYS = PHASE_3H_MIGRATION_ACTIVATION_
 export interface MigrationApplication {
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly migration?: Readonly<{
-		prepare(accepted: readonly V3RoomAcceptedOperation[]): ExpectedMigrationProjection;
+		prepare(
+			accepted: readonly V3RoomAcceptedOperation[],
+			exactCanonicalSourceStateBytes?: Uint8Array
+		): ExpectedMigrationProjection;
 	}>;
 }
 

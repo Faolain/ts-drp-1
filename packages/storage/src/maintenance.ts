@@ -47,6 +47,12 @@ export type AheReclamationInput = Readonly<{
 	}>;
 	objectId: StorageObjectId;
 	rollbackGenerationIds: readonly [GenerationId, GenerationId];
+	/** Existing signed source roles retained along the actual rollback ancestry. */
+	sourceGenerationIds?: readonly GenerationId[];
+	/** Exact native signed-source rows retained independently of obsolete staging ancestry. */
+	independentSourceGenerations?: readonly GenerationRecord[];
+	/** Previously authenticated source rows classified by the same close owner. */
+	classifiedSourceGenerations?: readonly GenerationRecord[];
 }>;
 
 export type AheReclamationReceipt = Readonly<{
@@ -66,6 +72,11 @@ export type AheReclamationReceipt = Readonly<{
 	objectId: StorageObjectId;
 	reclaimedGenerationIds: readonly GenerationId[];
 	rollbackGenerationIds: readonly [GenerationId, GenerationId];
+	independentSourceFloors?: readonly Readonly<{
+		generationId: GenerationId;
+		expectedFormerBaseExpectedHead: ExpectedHead;
+		normalizedThisCall: boolean;
+	}>[];
 }>;
 
 export interface AheReclamationMaintenance {
@@ -184,6 +195,11 @@ export type AheReclamationDecision = Readonly<{
 		rewrittenGeneration: GenerationRecord;
 	}>;
 	input: AheReclamationInput;
+	independentSourceFloors?: readonly Readonly<{
+		generation: GenerationRecord;
+		rewrittenGeneration: GenerationRecord;
+		normalizedThisCall: boolean;
+	}>[];
 }>;
 
 /** Closed reclamation failure shared by the strict native owners. */
@@ -268,6 +284,15 @@ export function captureAheReclamationInput(value: unknown): AheReclamationInput 
 				"lineageFloor",
 				"objectId",
 				"rollbackGenerationIds",
+				...(typeof value === "object" && value !== null && Object.hasOwn(value, "sourceGenerationIds")
+					? ["sourceGenerationIds"]
+					: []),
+				...(typeof value === "object" && value !== null && Object.hasOwn(value, "independentSourceGenerations")
+					? ["independentSourceGenerations"]
+					: []),
+				...(typeof value === "object" && value !== null && Object.hasOwn(value, "classifiedSourceGenerations")
+					? ["classifiedSourceGenerations"]
+					: []),
 			]) ||
 			!isStorageObjectId(value.objectId) ||
 			!isGenerationId(value.activeGenerationId) ||
@@ -299,19 +324,92 @@ export function captureAheReclamationInput(value: unknown): AheReclamationInput 
 			invalid("reclamation input identities must agree");
 		}
 		const rollbackGenerationIds = copyRollbackIds(value.rollbackGenerationIds);
+		const sourceGenerationIds = Object.hasOwn(value, "sourceGenerationIds")
+			? ((): readonly GenerationId[] => {
+					if (
+						!isClosedArray(value.sourceGenerationIds) ||
+						value.sourceGenerationIds.length < 1 ||
+						value.sourceGenerationIds.length > 4 ||
+						value.sourceGenerationIds.some((id) => !isGenerationId(id))
+					)
+						invalid("source roles must be one bounded actual ancestry");
+					return Object.freeze([...value.sourceGenerationIds]) as readonly GenerationId[];
+				})()
+			: [];
 		const deleteGenerationIds = copyGenerationIds(value.lineageFloor.deleteGenerationIds);
-		if (deleteGenerationIds.length === 0 && expectedBaseExpectedHead.kind === "present") {
+		const independentSourceGenerations = Object.hasOwn(value, "independentSourceGenerations")
+			? ((): readonly GenerationRecord[] => {
+					if (
+						!isClosedArray(value.independentSourceGenerations) ||
+						sourceGenerationIds.length + value.independentSourceGenerations.length > 4
+					)
+						invalid("independent signed source roles are malformed");
+					const rows = value.independentSourceGenerations.map((row) => copyGenerationRecord(row));
+					if (
+						rows.some(
+							(row) =>
+								row === undefined ||
+								row.objectId !== value.objectId ||
+								row.state !== "Superseded" ||
+								row.closure.length > 7
+						)
+					)
+						invalid("independent signed source roles are invalid");
+					return Object.freeze(
+						rows.map((row) => {
+							if (row === undefined) invalid("source is missing");
+							return cloneGeneration(row);
+						})
+					);
+				})()
+			: undefined;
+		const classifiedSourceGenerations =
+			independentSourceGenerations === undefined
+				? undefined
+				: ((): readonly GenerationRecord[] => {
+						if (!isClosedArray(value.classifiedSourceGenerations) || value.classifiedSourceGenerations.length > 4)
+							invalid("source classification is missing or malformed");
+						const rows = value.classifiedSourceGenerations.map((row) => copyGenerationRecord(row));
+						if (
+							rows.some(
+								(row) =>
+									row === undefined ||
+									row.objectId !== value.objectId ||
+									row.state !== "Superseded" ||
+									row.closure.length > 7
+							)
+						)
+							invalid("source classification is invalid");
+						const captured = rows.map((row) => {
+							if (row === undefined) invalid("source classification is missing");
+							return cloneGeneration(row);
+						});
+						if (new Set(captured.map((row) => row.generationId)).size !== captured.length)
+							invalid("source classification repeats a generation");
+						return Object.freeze(captured);
+					})();
+		if (independentSourceGenerations === undefined && Object.hasOwn(value, "classifiedSourceGenerations"))
+			invalid("source classification has no independent source decision");
+		if (
+			independentSourceGenerations === undefined &&
+			deleteGenerationIds.length === 0 &&
+			expectedBaseExpectedHead.kind === "present"
+		) {
 			invalid("an empty reclamation prefix cannot retain a former floor parent");
 		}
 		const retained = new Set<GenerationId>([
 			value.activeGenerationId,
 			rollbackGenerationIds[0],
 			rollbackGenerationIds[1],
+			...sourceGenerationIds,
+			...(independentSourceGenerations ?? []).map((row) => row.generationId),
 		]);
 		if (
-			retained.size !== 3 ||
-			value.lineageFloor.generationId !== rollbackGenerationIds[1] ||
-			deleteGenerationIds.some((generationId) => retained.has(generationId))
+			sourceGenerationIds.length + (independentSourceGenerations?.length ?? 0) > 4 ||
+			retained.size !== 3 + sourceGenerationIds.length + (independentSourceGenerations?.length ?? 0) ||
+			value.lineageFloor.generationId !== (sourceGenerationIds.at(-1) ?? rollbackGenerationIds[1]) ||
+			deleteGenerationIds.some((generationId) => retained.has(generationId)) ||
+			classifiedSourceGenerations?.some((row) => retained.has(row.generationId))
 		) {
 			invalid("reclamation input generations must be disjoint and floor-bound");
 		}
@@ -331,6 +429,9 @@ export function captureAheReclamationInput(value: unknown): AheReclamationInput 
 			}),
 			objectId: value.objectId,
 			rollbackGenerationIds,
+			...(sourceGenerationIds.length === 0 ? {} : { sourceGenerationIds }),
+			...(independentSourceGenerations === undefined ? {} : { independentSourceGenerations }),
+			...(classifiedSourceGenerations === undefined ? {} : { classifiedSourceGenerations }),
 		});
 	} catch (error) {
 		if (error instanceof AheReclamationError) throw error;
@@ -497,37 +598,146 @@ export function classifyAheReclamation(request: unknown, snapshot: AheReclamatio
 			corrupt("active head did not bind one adopted generation");
 		}
 		const firstId = input.rollbackGenerationIds[0];
-		const floorId = input.rollbackGenerationIds[1];
+		const secondId = input.rollbackGenerationIds[1];
 		if (active.baseExpectedHead.kind !== "present") corrupt("active generation did not retain a rollback parent");
 		const first = byId.get(active.baseExpectedHead.generationId);
 		if (first === undefined || first.baseExpectedHead.kind !== "present") {
 			corrupt("retained rollback lineage contained a gap");
 		}
-		const floor = byId.get(first.baseExpectedHead.generationId);
-		if (floor === undefined) corrupt("retained rollback lineage contained a gap");
-		if (first.generationId !== firstId || floor.generationId !== floorId) {
+		const second = byId.get(first.baseExpectedHead.generationId);
+		if (second === undefined) corrupt("retained rollback lineage contained a gap");
+		if (first.generationId !== firstId || second.generationId !== secondId) {
 			retry("planned rollback generations changed before reclamation");
 		}
 		if (
 			first.state !== "Superseded" ||
-			floor.state !== "Superseded" ||
+			second.state !== "Superseded" ||
 			!parentMatches(active, first, input.expectedHead.revision) ||
-			!parentMatches(first, floor, active.baseExpectedHead.revision)
+			!parentMatches(first, second, active.baseExpectedHead.revision)
 		) {
 			corrupt("retained rollback lineage was invalid");
 		}
 
-		const retained = new Set([active.generationId, first.generationId, floor.generationId]);
+		const retained = new Set([active.generationId, first.generationId, second.generationId]);
+		let floor = second;
+		let floorRevision = first.baseExpectedHead.revision;
+		for (const id of input.sourceGenerationIds ?? []) {
+			if (floor.baseExpectedHead.kind !== "present") corrupt("signed source ancestry contained a gap");
+			const next = byId.get(floor.baseExpectedHead.generationId);
+			if (
+				next === undefined ||
+				next.generationId !== id ||
+				next.state !== "Superseded" ||
+				!parentMatches(floor, next, floorRevision) ||
+				retained.has(id)
+			)
+				corrupt("signed source ancestry was invalid");
+			floorRevision = floor.baseExpectedHead.revision;
+			floor = next;
+			retained.add(id);
+		}
 		const selected: GenerationRecord[] = [];
+		let independentSourceFloors: AheReclamationDecision["independentSourceFloors"];
 		let replay = false;
 		let normalizedThisCall = false;
-		if (headsEqual(floor.baseExpectedHead, input.lineageFloor.expectedBaseExpectedHead)) {
+		if (input.independentSourceGenerations !== undefined) {
+			independentSourceFloors = Object.freeze(
+				input.independentSourceGenerations.map((expected) => {
+					const actual = byId.get(expected.generationId);
+					if (actual === undefined) retry("independent source disappeared before reclamation");
+					const rewrittenGeneration = cloneGeneration({
+						...expected,
+						baseExpectedHead: { kind: "none", objectId: input.objectId },
+					});
+					if (
+						!headsEqual(actual.baseExpectedHead, expected.baseExpectedHead) &&
+						!headsEqual(actual.baseExpectedHead, rewrittenGeneration.baseExpectedHead)
+					)
+						retry("independent source parent changed before reclamation");
+					if (
+						JSON.stringify(cloneGeneration({ ...actual, baseExpectedHead: expected.baseExpectedHead })) !==
+						JSON.stringify(expected)
+					)
+						retry("independent source record changed before reclamation");
+					retained.add(actual.generationId);
+					return Object.freeze({
+						generation: actual,
+						rewrittenGeneration,
+						normalizedThisCall: !headsEqual(actual.baseExpectedHead, rewrittenGeneration.baseExpectedHead),
+					});
+				})
+			);
+			if (
+				!headsEqual(floor.baseExpectedHead, input.lineageFloor.expectedBaseExpectedHead) &&
+				!headsEqual(floor.baseExpectedHead, input.lineageFloor.replacementBaseExpectedHead)
+			)
+				retry("lineage floor changed before reclamation");
+			const classified = input.classifiedSourceGenerations;
+			if (classified === undefined) corrupt("source classification was not captured");
+			const allBefore =
+				headsEqual(floor.baseExpectedHead, input.lineageFloor.expectedBaseExpectedHead) &&
+				input.independentSourceGenerations.every((expected) => {
+					const actual = byId.get(expected.generationId);
+					return actual !== undefined && headsEqual(actual.baseExpectedHead, expected.baseExpectedHead);
+				}) &&
+				classified.every((expected) => byId.has(expected.generationId)) &&
+				input.lineageFloor.deleteGenerationIds.every((id) => byId.has(id));
+			const allAfter =
+				headsEqual(floor.baseExpectedHead, input.lineageFloor.replacementBaseExpectedHead) &&
+				independentSourceFloors.every((source) => !source.normalizedThisCall) &&
+				input.lineageFloor.deleteGenerationIds.every((id) => !byId.has(id));
+			if (!allBefore && !allAfter) retry("independent source retirement was not one whole old or new state");
+			for (const expected of classified) {
+				const actual = byId.get(expected.generationId);
+				if (actual === undefined) {
+					if (!input.lineageFloor.deleteGenerationIds.includes(expected.generationId))
+						retry("classified source disappearance is unproved");
+				} else if (JSON.stringify(actual) !== JSON.stringify(expected))
+					retry("classified source changed before reclamation");
+			}
+			const categorized = new Set([...retained, ...classified.map((row) => row.generationId)]);
+			let cursor = floor.baseExpectedHead,
+				revision = floorRevision;
+			const visited = new Set<GenerationId>();
+			while (cursor.kind === "present") {
+				const row = byId.get(cursor.generationId);
+				if (
+					row === undefined ||
+					visited.has(row.generationId) ||
+					row.state !== "Superseded" ||
+					cursor.closureDigest !== row.closureDigest ||
+					cursor.revision !== revision - 1
+				)
+					corrupt("independent source cleanup ancestry is invalid");
+				visited.add(row.generationId);
+				categorized.add(row.generationId);
+				revision = cursor.revision;
+				cursor = row.baseExpectedHead;
+			}
+			if (target.some((row) => !categorized.has(row.generationId)))
+				retry("uncategorized detached generation is still owned");
+			for (const generation of target)
+				if (!retained.has(generation.generationId)) {
+					if (generation.state !== "Superseded") retry("unclassified generation is still owned");
+					selected.push(generation);
+				}
+			const selectedIds = selected.map(({ generationId }) => generationId).sort();
+			if (selectedIds.length !== 0 && !sameIds(selectedIds, input.lineageFloor.deleteGenerationIds))
+				retry("complete independent source census changed before reclamation");
+			if (selectedIds.length === 0 && input.lineageFloor.deleteGenerationIds.some((id) => byId.has(id)))
+				corrupt("independent source replay retained a requested deletion");
+			normalizedThisCall =
+				selectedIds.length !== 0 ||
+				!headsEqual(floor.baseExpectedHead, input.lineageFloor.replacementBaseExpectedHead) ||
+				independentSourceFloors.some((source) => source.normalizedThisCall);
+			replay = !normalizedThisCall;
+		} else if (headsEqual(floor.baseExpectedHead, input.lineageFloor.expectedBaseExpectedHead)) {
 			normalizedThisCall = !headsEqual(
 				input.lineageFloor.expectedBaseExpectedHead,
 				input.lineageFloor.replacementBaseExpectedHead
 			);
 			let cursor = floor.baseExpectedHead;
-			let expectedRevision = first.baseExpectedHead.kind === "present" ? first.baseExpectedHead.revision : 0;
+			let expectedRevision = floorRevision;
 			const visited = new Set<GenerationId>();
 			while (cursor.kind === "present") {
 				if (visited.has(cursor.generationId)) corrupt("reclamation prefix contained a cycle");
@@ -600,6 +810,7 @@ export function classifyAheReclamation(request: unknown, snapshot: AheReclamatio
 			baseExpectedHead: input.lineageFloor.replacementBaseExpectedHead,
 		});
 		return Object.freeze({
+			...(independentSourceFloors === undefined ? {} : { independentSourceFloors }),
 			deleteBlobDigests: Object.freeze(deleteBlobDigests),
 			deleteGenerationIds: Object.freeze(normalizedThisCall ? selectedIds : []),
 			deletePromotions: Object.freeze(normalizedThisCall ? deletePromotions : []),
@@ -624,6 +835,19 @@ export function classifyAheReclamation(request: unknown, snapshot: AheReclamatio
 export function createAheReclamationReceipt(decision: AheReclamationDecision): AheReclamationReceipt {
 	const { input } = decision;
 	return Object.freeze({
+		...(decision.independentSourceFloors === undefined
+			? {}
+			: {
+					independentSourceFloors: Object.freeze(
+						decision.independentSourceFloors.map((source) =>
+							Object.freeze({
+								generationId: source.generation.generationId,
+								expectedFormerBaseExpectedHead: cloneHead(source.generation.baseExpectedHead),
+								normalizedThisCall: source.normalizedThisCall,
+							})
+						)
+					),
+				}),
 		activeGenerationId: input.activeGenerationId,
 		availabilityPolicyDigest: input.availabilityPolicyDigest,
 		closedEpoch: input.closedEpoch,

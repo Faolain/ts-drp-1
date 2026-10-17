@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const path = "examples/v3-room/src/index.ts";
+const path = "packages/node/src/v3-room.ts";
 const source = readFileSync(path, "utf8");
 
 /**
@@ -32,6 +32,27 @@ function keys(node: ts.CallExpression): ReadonlySet<string> {
 		throw new Error("CALL_ARGUMENT_UNRESOLVED");
 	const result = new Set<string>();
 	for (const property of argument.properties) {
+		if (ts.isSpreadAssignment(property)) {
+			let expression = property.expression;
+			while (ts.isParenthesizedExpression(expression)) expression = expression.expression;
+			// The existing native classification addition has two literal branches;
+			// neither can introduce an unresolved top-level recovery declaration.
+			if (!ts.isConditionalExpression(expression)) throw new Error("CALL_PROPERTY_UNRESOLVED");
+			for (const branch of [expression.whenTrue, expression.whenFalse]) {
+				if (!ts.isObjectLiteralExpression(branch)) throw new Error("CALL_PROPERTY_UNRESOLVED");
+				for (const field of branch.properties) {
+					if (
+						!ts.isPropertyAssignment(field) ||
+						!ts.isIdentifier(field.name) ||
+						field.name.text !== "classificationOwners"
+					)
+						throw new Error("CALL_PROPERTY_UNRESOLVED");
+					if (result.has(field.name.text)) throw new Error("CALL_PROPERTY_DUPLICATE");
+					result.add(field.name.text);
+				}
+			}
+			continue;
+		}
 		if (
 			(!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) ||
 			!ts.isIdentifier(property.name)
@@ -51,7 +72,7 @@ function keys(node: ts.CallExpression): ReadonlySet<string> {
 function inspect(text: string): { cold: boolean; pending: boolean; selector: boolean } {
 	const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	const cold = call(file, "reopenCreatorSuccessorAdoption");
-	const pending = call(file, "recoverPendingCreatorSuccessorAdoption");
+	const pending = call(file, "consumeCreatorAdoptionPendingRecovery");
 	const coldKeys = keys(cold);
 	const pendingKeys = keys(pending);
 	const ancestors: ts.IfStatement[] = [];
@@ -132,21 +153,21 @@ describe("declaration-free recovery room wiring (source-only)", () => {
 		expect(inspect(source).selector).toBe(true);
 	});
 	it("retained cold-key mutant kills the cold assertion", () => {
-		const omitted = mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "remove");
+		const omitted = mutateCall(source, "consumeCreatorAdoptionPendingRecovery", "remove");
 		const observed = inspect(mutateCall(omitted, "reopenCreatorSuccessorAdoption", "add"));
 		expect(observed.cold).toBe(false);
 		expect(observed.pending).toBe(true);
 		expect(() => expect(observed.cold, "MUTANT_COLD_KEY").toBe(true)).toThrow("MUTANT_COLD_KEY");
 	});
 	it("retained pending-key mutant kills the pending assertion", () => {
-		const observed = inspect(mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "add"));
+		const observed = inspect(mutateCall(source, "consumeCreatorAdoptionPendingRecovery", "add"));
 		expect(observed.pending).toBe(false);
 		expect(() => expect(observed.pending, "MUTANT_PENDING_KEY").toBe(true)).toThrow("MUTANT_PENDING_KEY");
 	});
 	it("old hint and unrelated selectors kill the actual selector assertion", () => {
 		const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const cold = call(file, "reopenCreatorSuccessorAdoption"),
-			pending = call(file, "recoverPendingCreatorSuccessorAdoption");
+			pending = call(file, "consumeCreatorAdoptionPendingRecovery");
 		const selectors: ts.IfStatement[] = [];
 		for (let node: ts.Node | undefined = cold.parent; node !== undefined; node = node.parent)
 			if (
@@ -171,7 +192,7 @@ describe("declaration-free recovery room wiring (source-only)", () => {
 		}
 	});
 	it("key omission alone cannot establish a floor-selected startup", () => {
-		const observed = inspect(mutateCall(source, "recoverPendingCreatorSuccessorAdoption", "remove"));
+		const observed = inspect(mutateCall(source, "consumeCreatorAdoptionPendingRecovery", "remove"));
 		expect(observed.cold).toBe(true);
 		expect(observed.pending).toBe(true);
 		if (source.includes("if (input.successorSnapshotDeclaration === undefined) {"))
@@ -187,17 +208,17 @@ describe("declaration-free recovery room wiring (source-only)", () => {
 		expect(() => inspect(source + "\nreopenCreatorSuccessorAdoption({});")).toThrow("CALLSITE_NOT_UNIQUE");
 	});
 	it("malformed, symbol, duplicate and unresolved pending arguments fail closed", () => {
-		const marker = "recoverPendingCreatorSuccessorAdoption({";
+		const marker = "consumeCreatorAdoptionPendingRecovery({";
 		for (const property of ["...unresolved,", "[Symbol.iterator]: unresolved,", "get unresolved() { return 0; },"]) {
 			expect(() => inspect(source.replace(marker, marker + property))).toThrow("CALL_PROPERTY_UNRESOLVED");
 		}
 		expect(() => inspect(source.replace(marker, marker + "snapshotStore: duplicate,"))).toThrow(
 			"CALL_PROPERTY_DUPLICATE"
 		);
-		expect(() => inspect(source.replace(marker, "recoverPendingCreatorSuccessorAdoption(unresolved, {"))).toThrow(
+		expect(() => inspect(source.replace(marker, "consumeCreatorAdoptionPendingRecovery(unresolved, {"))).toThrow(
 			"CALL_ARGUMENT_UNRESOLVED"
 		);
 		expect(() => inspect(source.replace(marker, "anotherFunction({"))).toThrow("CALLSITE_NOT_UNIQUE");
-		expect(() => inspect(source + "\nrecoverPendingCreatorSuccessorAdoption({});")).toThrow("CALLSITE_NOT_UNIQUE");
+		expect(() => inspect(source + "\nconsumeCreatorAdoptionPendingRecovery({});")).toThrow("CALLSITE_NOT_UNIQUE");
 	});
 });

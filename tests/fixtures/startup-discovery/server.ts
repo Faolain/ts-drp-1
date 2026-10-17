@@ -6,8 +6,11 @@ import { join } from "node:path";
  * @param directory
  */
 export async function server(directory: string): Promise<{ origin: string; close(): Promise<void> }> {
+	const selectedEntry = process.env.STARTUP_ENTRY;
+	if (selectedEntry !== undefined && selectedEntry !== "r8-source-binding") throw new Error("STARTUP_ENTRY_INVALID");
+	const entries = selectedEntry === undefined ? ["setup", "recovery", "lifecycle", "shipped"] : [selectedEntry];
 	const bundles = new Map(
-		["setup", "recovery", "lifecycle", "shipped"].map((name) => [
+		entries.map((name) => [
 			"/" + name + ".mjs",
 			readFileSync(join(directory, name, "entry.mjs")),
 		])
@@ -15,8 +18,9 @@ export async function server(directory: string): Promise<{ origin: string; close
 	const owned = createServer((request, response) => {
 		const script = bundles.get(request.url ?? "");
 		if (script !== undefined)
-			response.writeHead(200, { "content-type": "text/javascript", "cache-control": "no-store" }).end(script);
-		else if (["/setup", "/recovery", "/lifecycle", "/shipped"].includes(request.url ?? ""))
+			response.writeHead(200, { "content-type": "text/javascript", "cache-control": "no-store",
+				"content-length": script.byteLength }).end(script);
+		else if (entries.some(name => request.url === "/" + name))
 			response
 				.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" })
 				.end(`<!doctype html><script type=module src="${request.url}.mjs"></script>`);

@@ -1,4 +1,11 @@
 /* eslint-disable @typescript-eslint/method-signature-style -- mirrors the neutral function-valued port */
+export { NativeReadReservationOwner } from "./internal/native-read-reservation.js";
+export {
+	createBrowserRoomHeadAuthority,
+	type BrowserRoomHeadAuthority,
+	type BrowserRoomHeadOptions,
+} from "./room-head.js";
+export type { NativeReadReservationPort } from "./internal/native-read-reservation.js";
 export {
 	type BrowserAheDurableStore,
 	type BrowserAheDurableStoreOptions,

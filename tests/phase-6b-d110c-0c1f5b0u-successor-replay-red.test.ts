@@ -13,11 +13,11 @@ import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type CreateV3RoomSessionInput,
-	type V3RoomHeadState,
 	type V3RoomSession,
 } from "../examples/v3-room/src/index.js";
 import { createRecoverableFinalitySigner } from "../packages/keychain/src/finality.js";
 import { createBrowserDurableIssuanceStore } from "../packages/storage-browser/src/issuance.js";
+import { createBrowserRoomHeadAuthority } from "../packages/storage-browser/src/room-head.js";
 
 type Delivery = Parameters<V3AdmittedVertexSink>[0];
 const observed = vi.hoisted(() => ({
@@ -41,8 +41,8 @@ vi.mock(
 	"../packages/node/dist/src/creator-adoption-recover.js",
 	() => import("../packages/node/src/creator-adoption-recover.js")
 );
-vi.mock("../packages/node/dist/src/creator-adoption-activate.js", async () => {
-	const actual = await import("../packages/node/src/creator-adoption-activate.js");
+vi.mock("../packages/node/src/creator-adoption-activate.js", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../packages/node/src/creator-adoption-activate.js")>();
 	const observe = async (owner: typeof actual.reopenCreatorSuccessorAdoption, value: unknown) => {
 		const input = value as Record<string, unknown> & { onAdmittedVertex: V3AdmittedVertexSink };
 		const result = await owner({
@@ -80,6 +80,7 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
 });
 
 const sessions: V3RoomSession[] = [];
+const headClosers: (() => Promise<void>)[] = [];
 const seed = new Uint8Array(32).fill(73);
 const publicKey = ed25519.getPublicKey(seed);
 const author = Buffer.from(publicKey).toString("hex");
@@ -181,33 +182,12 @@ async function genuineSuccessor() {
 		objectId,
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, seed)),
 	});
-	let state: V3RoomHeadState | null = null;
-	const success = () => ({ ok: true as const, state: structuredClone(state) });
-	const roomHeadAuthority: CreateV3RoomSessionInput["roomHeadAuthority"] = {
-		initialization: { kind: "create" },
-		read: () => Promise.resolve(success()),
-		create: async (input) => {
-			await Promise.resolve();
-			if (state === null) state = { pending: null, stable: input.stable };
-			return success();
-		},
-		migrate: () => Promise.resolve({ ok: false, reason: "conflict" }),
-		begin: async (input) => {
-			await Promise.resolve();
-			if (!Buffer.from(encodeCanonical(input.expected)).equals(Buffer.from(encodeCanonical(state))))
-				return { ok: false, reason: "conflict" };
-			const previous = required(state).stable;
-			state = { stable: previous, pending: { previous, next: input.next } };
-			return success();
-		},
-		commit: async (input) => {
-			await Promise.resolve();
-			if (!Buffer.from(encodeCanonical(input.expected)).equals(Buffer.from(encodeCanonical(state))))
-				return { ok: false, reason: "conflict" };
-			state = { pending: null, stable: required(required(state).pending).next };
-			return success();
-		},
-	};
+	// Exercise the original assertions with the real whole-floor reservation
+	// owner. A hand-written floor cannot supply the native maintenance premise.
+	const roomHeadAuthority = await createBrowserRoomHeadAuthority({
+		databaseName: `${databaseName}--replay-room-head`, initialization: {kind:"create"},
+	});
+	headClosers.push(() => roomHeadAuthority.close());
 	const finality = await createRecoverableFinalitySigner({ seed });
 	const accepted: string[] = [];
 	const input: CreateV3RoomSessionInput = {
@@ -309,6 +289,7 @@ afterEach(async () => {
 	observed.fault = "none";
 	await Promise.all(sessions.splice(0).map((session) => session.close().catch(() => undefined)));
 	await Promise.all(observed.handles.map((handle) => Promise.resolve(handle.deactivate())));
+	await Promise.all(headClosers.splice(0).map(close => close()));
 	if (originalStorage === undefined) Reflect.deleteProperty(navigator, "storage");
 	else Object.defineProperty(navigator, "storage", originalStorage);
 });

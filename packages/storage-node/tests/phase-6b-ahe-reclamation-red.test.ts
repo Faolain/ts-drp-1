@@ -1,13 +1,20 @@
+import { encodeCanonical } from "@ts-drp/canonical";
 import {
+	AHE_RETIREMENT_CONTROL_LIMITS,
+	type AheBoundedRecoveryRoleStore,
 	type AheDurableStore,
+	type AheRetirementControl,
+	type AheRetirementControlRead,
 	createMemoryAheDurableStore,
 	decodeGenerationRecordV1,
 	digestBlob,
+	encodeAheRetirementControl,
 	encodeGenerationRecordV1,
 	type ExpectedHead,
 	type GenerationId,
 	type GenerationRecord,
 	type PresentHead,
+	readAheBoundRetirementControlWidthsForSizing,
 	type StoreResult,
 } from "@ts-drp/storage";
 import { fork } from "node:child_process";
@@ -27,6 +34,7 @@ import {
 	D109C_OTHER_OBJECT,
 	D109C_POLICY_DIGEST,
 	D109C_REFERENCE_CASES,
+	d109cBoundedCheckpoint,
 	d109cDeepFrozen,
 	d109cErrorCode,
 	d109cGenerationId,
@@ -42,6 +50,129 @@ const REQUIRED_NODE_OWNERS = Object.freeze([
 	"packages/storage-node/src/internal/ahe-reclamation.ts",
 ] as const);
 const directories: string[] = [];
+
+it("sizes original bound retirement controls through native completion and reclamation", async () => {
+	const candidate = await modules();
+	const store = candidate.create({ filename: databaseFilename("control-widths") }) as AheBoundedRecoveryRoleStore;
+	const observed: AheRetirementControl[] = [];
+	const originalAcquire = store.acquireRetirementControl;
+	if (originalAcquire === undefined) throw new TypeError("original retirement port unavailable");
+	// Observe the existing fixture's genuine native views. Calls and views retain
+	// their original receiver/owner; this wrapper grants no maintenance capability.
+	const fixtureStore = new Proxy(store, {
+		get(target, property): unknown {
+			if (property === "acquireRetirementControl")
+				return async (
+					objectId: Parameters<typeof originalAcquire>[0]
+				): Promise<Awaited<ReturnType<typeof originalAcquire>>> => {
+					const result = await Reflect.apply(originalAcquire, store, [objectId]);
+					if (result.ok) observed.push(result.value.control);
+					return result;
+				};
+			const value = Reflect.get(target, property, target);
+			return typeof value === "function" ? value.bind(target) : value;
+		},
+	});
+	const length = (value: unknown): number => encodeCanonical(value, AHE_RETIREMENT_CONTROL_LIMITS).byteLength;
+	const acquire = async (): Promise<AheRetirementControlRead> =>
+		successful(await Reflect.apply(originalAcquire, store, [D109C_OBJECT]), "CONTROL_WIDTH_READ");
+	try {
+		const fixture = await d109cBoundedCheckpoint(fixtureStore);
+		const old = observed[0],
+			prepared = observed[1];
+		if (old === undefined || prepared === undefined) throw new TypeError("original native checkpoints missing");
+		const binding = fixture.source.generations;
+		const quoteInput = {
+			control: old,
+			floorEpoch: fixture.preparation.floorEpoch,
+			preparationByteLength: length(fixture.preparation),
+			generationPartitionByteLength: length(binding),
+			snapshotHolesByteLength: length(
+				fixture.preparation.snapshotScopes.filter((_, i) => fixture.preparation.protectedIndices.includes(i))
+			),
+			generationHolesByteLength: length(binding.recordDigests.filter((_, i) => binding.protectedIndices.includes(i))),
+			generationIdentitiesByteLength: length(binding.identities.filter((_, i) => binding.protectedIndices.includes(i))),
+			domainsByteLength: length(fixture.preparation.domains),
+			generationSource: {
+				byteLength: length(fixture.source),
+				postGenerationHolesByteLength: length(fixture.source.postGenerations.recordDigests),
+				postGenerationIdentitiesByteLength: length(fixture.source.postGenerations.identities),
+			},
+		};
+		const quote = readAheBoundRetirementControlWidthsForSizing(quoteInput);
+		expect(quote.old).toBe(encodeAheRetirementControl(old).byteLength);
+		expect(quote.prepared).toBe(encodeAheRetirementControl(prepared).byteLength);
+		const completedRead = await acquire();
+		let completed: AheRetirementControl;
+		try {
+			completed = completedRead.control;
+			expect(quote.completed).toBe(completedRead.metadataBytes);
+			expect(() => readAheBoundRetirementControlWidthsForSizing({ ...quoteInput, control: completed })).toThrow();
+			successful(await completedRead.reclaimBoundedGeneration(), "CONTROL_WIDTH_RECLAIM");
+		} finally {
+			await completedRead.release();
+		}
+		const reclaimedRead = await acquire();
+		let reclaimed: AheRetirementControl;
+		try {
+			reclaimed = reclaimedRead.control;
+			expect(quote.reclaimed).toBe(reclaimedRead.metadataBytes);
+		} finally {
+			await reclaimedRead.release();
+		}
+		// A legitimate next metadata-only intent retains the full prior completed
+		// generation source during prepare, then replaces it on completion.
+		const { generationSource: _source, ...priorPreparation } = fixture.preparation;
+		const nextPreparation = {
+			...priorPreparation,
+			decisionDigest: "f".repeat(64),
+			generationRecordDigests: fixture.source.postGenerations.recordDigests,
+		};
+		const { generationSource: _sourceWidths, ...priorQuote } = quoteInput;
+		const nextQuote = readAheBoundRetirementControlWidthsForSizing({
+			...priorQuote,
+			control: reclaimed,
+			preparationByteLength: length(nextPreparation),
+			generationPartitionByteLength: length(fixture.source.postGenerations),
+			generationHolesByteLength: length(fixture.source.postGenerations.recordDigests),
+			generationIdentitiesByteLength: length(fixture.source.postGenerations.identities),
+		});
+		const prepareNext = await acquire();
+		try {
+			const next = successful(
+				await prepareNext.prepareBound({ preparation: nextPreparation, generations: fixture.source.postGenerations }),
+				"CONTROL_WIDTH_NEXT_PREPARE"
+			);
+			expect(nextQuote.prepared).toBe(encodeAheRetirementControl(next).byteLength);
+			expect(next.completed).toEqual(reclaimed.completed);
+		} finally {
+			await prepareNext.release();
+		}
+		const commitNext = await acquire();
+		try {
+			const next = successful(
+				await commitNext.commitPrepared({
+					decisionDigest: nextPreparation.decisionDigest,
+					sourceProofDigest: nextPreparation.sourceProofDigest,
+				}),
+				"CONTROL_WIDTH_NEXT_COMMIT"
+			);
+			expect(nextQuote.completed).toBe(encodeAheRetirementControl(next).byteLength);
+			expect(next.completed?.generationDrain).toBeUndefined();
+		} finally {
+			await commitNext.release();
+		}
+		expect(() =>
+			readAheBoundRetirementControlWidthsForSizing({ ...quoteInput, preparationByteLength: Number.MAX_SAFE_INTEGER })
+		).toThrow();
+		expect(() =>
+			readAheBoundRetirementControlWidthsForSizing({ ...quoteInput, generationPartitionByteLength: 0 })
+		).toThrow();
+		console.info(JSON.stringify({ kind: "native-ahe-control-width-conformance", quote, nextQuote }));
+	} finally {
+		await store.close();
+	}
+});
 
 function readiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
 	const missing = REQUIRED_NODE_OWNERS.filter((owner) => {

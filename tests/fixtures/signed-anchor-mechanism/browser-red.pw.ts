@@ -50,7 +50,7 @@ test.beforeAll(async () => {
 	local = await server(directory);
 });
 test.afterAll(async () => {
-	await local.close();
+	await local?.close();
 });
 for (const mode of [
 	"baseline",
@@ -132,3 +132,36 @@ for (const mode of [
 			assert.equal((checked.importerResult as { ok: boolean }).ok, true);
 		} else assert.ok(result.storageResults);
 	});
+
+test("fresh realm journal mixed empty-header retirement", async ({ context, cleanupOwner }, info) => {
+	const identity = "mixed-header-" + randomUUID();
+	await cleanupOwner.register(identity, 0);
+	const prepare = await context.newPage();
+	await prepare.goto(local.origin + "/work");
+	await prepare.waitForFunction(() => typeof Reflect.get(globalThis, "signedMixedHeaderJournal") === "function");
+	const partial = await prepare.evaluate((id) => Reflect.get(globalThis, "signedMixedHeaderJournal")(id), identity);
+	await info.attach("mixed-header-partial-exact-native", {
+		body: JSON.stringify(partial),
+		contentType: "application/json",
+	});
+	assert.equal(partial.joinedAbort, true);
+	assert.equal(partial.protectedScopes, 11);
+	assert.equal(partial.alteredRefused, true);
+	assert.equal(partial.currencyRefused, true);
+	await cleanupOwner.closeWork(prepare);
+	const reopen = await context.newPage();
+	await reopen.goto(local.origin + "/work");
+	await reopen.waitForFunction(() => typeof Reflect.get(globalThis, "signedMixedHeaderJournal") === "function");
+	const complete = await reopen.evaluate(
+		({ id, expected }) => Reflect.get(globalThis, "signedMixedHeaderJournal")(id, expected),
+		{ id: identity, expected: { source: partial.source, partial: partial.partial } }
+	);
+	await info.attach("mixed-header-fresh-reopen-complete-native", {
+		body: JSON.stringify(complete),
+		contentType: "application/json",
+	});
+	assert.notEqual(complete.realm, partial.realm);
+	assert.equal(complete.cursor, 17);
+	assert.equal(complete.advancedImage.rowCount, 1);
+	assert.equal(complete.advancedImage.scopeCount, 4);
+});

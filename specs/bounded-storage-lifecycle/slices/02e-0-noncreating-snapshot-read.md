@@ -1,12 +1,10 @@
 # 2e-0 — Non-creating snapshot byte acquisition
 
-Status: independently reviewed prerequisite contract accepted, 2026-10-03, under
-the [root disposition](../../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/root-disposition.md).
-Execution remains held behind 2d product acceptance, separate RED readiness and
-distinct GREEN. The [live handoff](../README.md#next-agent-prompt) owns execution status.
-The [prerequisite review](../../../.logs/bounded-storage-lifecycle/usable-rollback-prerequisite-review-01/public.md)
-supports this dependency cut and exact contract readiness, not implementation or
-usable rollback completion.
+Status: CLOSED, 2026-10-06, within this noncreating safe-accessor contract.
+The [closure audit](../closure-audit-2e-2f.md) maps every original acceptance
+requirement to accepted product and MAIN evidence and preserves failed aggregate
+and global gates. This is not closure of durable historical availability or
+parent 2e usable rollback. The original contract below remains unchanged.
 
 ## Outcome and one owner
 

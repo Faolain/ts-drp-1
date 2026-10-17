@@ -1,5 +1,11 @@
 import { encodeCanonical } from "@ts-drp/canonical";
 import type { DurableIssuanceStore } from "@ts-drp/issuance-store";
+import {
+	durableIssuancePruningMaintenanceForStore,
+	type DurableIssuanceRecoveryCensus,
+	ISSUANCE_RETIREMENT_LIMITS,
+	issuanceRetirementImage,
+} from "@ts-drp/issuance-store/maintenance";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -16,6 +22,7 @@ import {
 import {
 	D109B_CRASH_EDGES,
 	D109B_NODE_MIGRATION_CASES,
+	D109B_OTHER_SCOPE,
 	D109B_SCOPE,
 	d109bCommit,
 	d109bIssue,
@@ -176,6 +183,154 @@ afterEach(() => {
 });
 
 describe("D.109b Node issuance-retention RED", () => {
+	it("noncreating issuance census binds nullable and prepared completed native controls", async () => {
+		const { issuance } = await modules();
+		const primaryFilename = primary("source-control");
+		let store = issuance.createNodeDurableIssuanceStore({ primaryFilename });
+		try {
+			await d109bIssue(store, D109B_SCOPE, 1);
+			const owner = durableIssuancePruningMaintenanceForStore(store);
+			if (owner?.readBoundedRecoveryCensus === undefined || owner.acquireRetirementControl === undefined)
+				throw new Error("native census owner absent");
+			const input = { objectId: D109B_SCOPE.objectId, limits: ISSUANCE_RETIREMENT_LIMITS };
+			const original = await owner.readBoundedRecoveryCensus(input);
+			expect(original.control).toBeNull();
+			const raw = new DatabaseSync(derived(primaryFilename), { readOnly: true });
+			try {
+				expect(scalar(raw, "SELECT count(*) FROM retirement_controls")).toBe(0);
+			} finally {
+				raw.close();
+			}
+			const first = await owner.acquireRetirementControl({ objectId: input.objectId });
+			const born = await owner.readBoundedRecoveryCensus(input);
+			expect(born.control).toEqual(first.control);
+			expect(born.rows).toEqual(original.rows);
+			expect(born.image).toEqual(original.image);
+			const prepared = await first.prepareFence({
+				decisionDigest: "33".repeat(32),
+				sourceProofDigest: "44".repeat(32),
+				throughEpoch: 0,
+				protectedRecords: [],
+			});
+			await first.release();
+			expect((await owner.readBoundedRecoveryCensus(input)).control).toEqual(prepared);
+			const second = await owner.acquireRetirementControl({ objectId: input.objectId });
+			const completed = await second.commitPrepared();
+			await second.release();
+			const final = await owner.readBoundedRecoveryCensus(input);
+			expect(final).toEqual({ rows: original.rows, image: original.image, control: completed });
+			await store.close();
+			store = issuance.createNodeDurableIssuanceStore({ primaryFilename });
+			const reopened = durableIssuancePruningMaintenanceForStore(store);
+			if (reopened?.readBoundedRecoveryCensus === undefined) throw new Error("reopened census absent");
+			expect(await reopened.readBoundedRecoveryCensus(input)).toEqual(final);
+		} finally {
+			await store.close();
+		}
+	});
+	it("bounded recovery census discovers pruned lineages without control birth and refuses unknown plans", async () => {
+		// Original fixture bytes are mechanically valid, not cryptographic authority.
+		// This native test covers point-census storage behavior, not held exclusion.
+		const { issuance } = await modules();
+		const primaryFilename = primary("bounded-recovery-census");
+		const store = issuance.createNodeDurableIssuanceStore({ primaryFilename });
+		const owner = durableIssuancePruningMaintenanceForStore(store);
+		const read = owner?.readBoundedRecoveryCensus;
+		const nativeImage = (): Uint8Array => {
+			const database = new DatabaseSync(derived(primaryFilename), { readOnly: true });
+			try {
+				const tables = ["lineages", "issued_records", "issuance_outbox", "settlement_plans", "retirement_controls"];
+				return encodeCanonical({
+					catalog: catalog(database),
+					version: scalar(database, "PRAGMA user_version"),
+					tables: tables.map((table) => {
+						const query = database.prepare(
+							`SELECT * FROM ${table} ORDER BY object_id${table === "retirement_controls" ? "" : ",author"}${table === "issued_records" || table === "issuance_outbox" ? ",author_sequence" : ""}`
+						);
+						query.setReadBigInts(false);
+						return { table, rows: query.all() };
+					}),
+				});
+			} finally {
+				database.close();
+			}
+		};
+		try {
+			expect(read, "same identity-bound native census owner is required").toBeTypeOf("function");
+			if (owner === undefined || read === undefined) throw new Error("NATIVE_RECOVERY_CENSUS_MISSING");
+			const observed = (
+				objectId: string,
+				limits: Readonly<{ maxRows: number; maxBytes: number }> = ISSUANCE_RETIREMENT_LIMITS
+			): Promise<DurableIssuanceRecoveryCensus> => read.call(owner, { objectId, limits });
+			const foreignScope = D109B_OTHER_SCOPE;
+			await d109bIssue(store, D109B_SCOPE, 4);
+			const original = await owner.inspectPruningState(D109B_SCOPE);
+			await owner.prunePublishedPrefix(d109bPruningInput(original, 4, 0));
+			const foreignCommit = await d109bIssue(store, foreignScope, 4);
+			const before = nativeImage();
+			const current = await observed(D109B_SCOPE.objectId);
+			expect(current.rows).toEqual({
+				lineages: [{ ...D109B_SCOPE, exhausted: false, next: 1, prunedThroughAuthorSequence: 0 }],
+				issued: [],
+				outbox: [],
+				plans: [],
+			});
+			expect(current.image).toEqual(issuanceRetirementImage(current.rows, D109B_SCOPE.objectId));
+			expect(current.image).toMatchObject({ lineageCount: 1, issuedCount: 0, outboxCount: 0, planCount: 0 });
+			const foreign = await observed(foreignScope.objectId);
+			expect(foreign.rows.lineages).toEqual([
+				{ ...foreignScope, exhausted: false, next: 1, prunedThroughAuthorSequence: null },
+			]);
+			expect(foreign.rows.issued).toHaveLength(1);
+			expect(foreign.rows.outbox).toHaveLength(1);
+			expect(foreign.rows.issued[0]).toMatchObject({ ...foreignScope, authorSequence: foreignCommit.authorSequence });
+			expect((await observed(`creator:${"e".repeat(32)}`)).rows).toEqual({
+				lineages: [],
+				issued: [],
+				outbox: [],
+				plans: [],
+			});
+			await expect(
+				observed(foreignScope.objectId, { maxRows: 1, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes })
+			).rejects.toThrow();
+			await expect(observed(D109B_SCOPE.objectId, { maxRows: 1, maxBytes: 1 })).rejects.toThrow();
+			expect(nativeImage()).toEqual(before);
+			const controls = new DatabaseSync(derived(primaryFilename), { readOnly: true });
+			try {
+				expect(scalar(controls, "SELECT count(*) FROM retirement_controls")).toBe(0);
+			} finally {
+				controls.close();
+			}
+			const unknownScope = { objectId: D109B_SCOPE.objectId, author: "f".repeat(64) };
+			const plan = await store.transactWriteSettlementPlan({
+				expectedRevision: null,
+				scope: unknownScope,
+				plan: {
+					scope: unknownScope,
+					revision: 0,
+					fenceSequence: null,
+					entries: [
+						{
+							sourceSequence: foreignCommit.authorSequence,
+							sourceDigest: new Uint8Array(foreignCommit.envelope.digest),
+							disposition: "rebase",
+							replacementSequence: null,
+						},
+					],
+				},
+			});
+			expect(await store.readSettlementPlan(unknownScope)).toEqual(plan);
+			const withUnknownPlan = nativeImage();
+			await expect(observed(D109B_SCOPE.objectId)).rejects.toThrow("issuance retirement plan has no lineage");
+			expect(nativeImage()).toEqual(withUnknownPlan);
+			// The unrelated object remains readable: a classified refusal is not poison.
+			expect(await observed(foreignScope.objectId)).toEqual(foreign);
+			expect(nativeImage()).toEqual(withUnknownPlan);
+		} finally {
+			await store.close();
+		}
+	});
+
 	it("freezes the ten migration cases and six genuine process-death boundaries", () => {
 		expect(D109B_NODE_MIGRATION_CASES).toHaveLength(10);
 		expect(D109B_CRASH_EDGES).toEqual([

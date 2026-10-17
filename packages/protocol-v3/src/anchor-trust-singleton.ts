@@ -3,6 +3,7 @@ import {
 	certifiedSealAuthorityResolver,
 	creatorAnchorTrustCheckpointPredecessorMinter,
 	creatorAnchorTrustResolver,
+	creatorAnchorTrustSourceContextMinter,
 	creatorAnchorTrustSuccessorMinter,
 	installCertifiedSealAuthorityResolver,
 	installCreatorAnchorTrustCustody,
@@ -13,7 +14,8 @@ installCertifiedSealAuthorityResolver(anchorTrustApi[certifiedSealAuthorityResol
 installCreatorAnchorTrustCustody(
 	anchorTrustApi[creatorAnchorTrustResolver],
 	anchorTrustApi[creatorAnchorTrustCheckpointPredecessorMinter],
-	anchorTrustApi[creatorAnchorTrustSuccessorMinter]
+	anchorTrustApi[creatorAnchorTrustSuccessorMinter],
+	anchorTrustApi[creatorAnchorTrustSourceContextMinter]
 );
 
 export const {

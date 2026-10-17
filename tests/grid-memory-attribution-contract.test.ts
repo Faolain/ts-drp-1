@@ -434,7 +434,7 @@ describe("grid attribution checkpoint and profiler input contract", () => {
 			await profiler.checkpoint(validCheckpoint());
 			expect(() => profiler.finish()).toThrow(/incomplete/iu);
 		} finally {
-			profiler.close();
+			await profiler.close();
 		}
 	});
 
@@ -454,7 +454,7 @@ describe("grid attribution checkpoint and profiler input contract", () => {
 			expect(() => profiler.finish()).not.toThrow();
 			expect(() => profiler.finish()).toThrow();
 		} finally {
-			profiler.close();
+			await profiler.close();
 		}
 	});
 
@@ -475,7 +475,7 @@ describe("grid attribution checkpoint and profiler input contract", () => {
 				await expect(profiler.checkpoint(checkpoint)).rejects.toThrow();
 				expect(accessor, "VALIDATION_MUST_NOT_INVOKE_OWNER_ACCESSORS").not.toHaveBeenCalled();
 			} finally {
-				profiler.close();
+				await profiler.close();
 			}
 		}
 	);
@@ -503,13 +503,13 @@ describe("grid attribution checkpoint and profiler input contract", () => {
 		expect(existsSync(directory)).toBe(false);
 	});
 
-	it("requires a fresh exclusive output directory and preserves existing evidence", () => {
+	it("requires a fresh exclusive output directory and preserves existing evidence", async () => {
 		// Input-contract tests never select a heap checkpoint; this sentinel does not
 		// substitute for actual exposed GC in the separate profiling workload.
 		vi.stubGlobal("gc", () => undefined);
 		const directory = profilerPath();
 		const profiler = createGridMemoryProfiler({ directory });
-		profiler.close();
+		await profiler.close();
 		const before = readdirSync(directory).sort();
 		expect(() => createGridMemoryProfiler({ directory })).toThrow();
 		expect(readdirSync(directory).sort()).toEqual(before);
@@ -532,7 +532,7 @@ describe("grid attribution checkpoint and profiler input contract", () => {
 					})
 				).rejects.toThrow(/owner|scalar|finite/iu);
 			} finally {
-				profiler.close();
+				await profiler.close();
 			}
 		}
 	);

@@ -70,9 +70,13 @@ function epochStatus(epoch: string, currentEpoch: number): string {
 	return number === currentEpoch ? "current-epoch" : number < currentEpoch ? "closed-epoch" : "future-epoch";
 }
 
-/** Logical content only: string values and binary leaves, never numeric size metadata or property names. */
+/**
+ * Logical content only: string values and binary leaves, never numeric size metadata or property names.
+ * @param value
+ * @param seen
+ */
 function payloadBytes(value: unknown, seen = new WeakSet<object>()): number {
-	if (typeof value === "string") return Buffer.byteLength(value, "utf8");
+	if (typeof value === "string") return new TextEncoder().encode(value).byteLength;
 	if (value === null || typeof value !== "object" || seen.has(value)) return 0;
 	seen.add(value);
 	if (ArrayBuffer.isView(value)) return value.byteLength;
@@ -336,7 +340,10 @@ async function censusDatabase(database: IDBDatabase, input: GridStorageCensusInp
 	}
 }
 
-/** Read existing named databases only; returned facts own no row objects, views, handles, or transactions. */
+/**
+ * Read existing named databases only; returned facts own no row objects, views, handles, or transactions.
+ * @param input
+ */
 export async function censusGridStorage(input: GridStorageCensusInput): Promise<readonly GridStorageCensusRow[]> {
 	if (!Number.isSafeInteger(input.currentEpoch) || input.currentEpoch < 0 || !Number.isFinite(input.now)) {
 		throw new TypeError("GRID_CENSUS_INVALID_CLOCK_OR_EPOCH");

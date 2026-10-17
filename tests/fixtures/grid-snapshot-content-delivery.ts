@@ -81,15 +81,20 @@ async function openSource(primary: string): Promise<IDBDatabase> {
 	const database = await request(opening);
 	database.onversionchange = (): void => database.close();
 	try {
-		requireShape(database.version === 2);
-		requireShape(JSON.stringify([...database.objectStoreNames]) === JSON.stringify(["chunks", "owner", "scopes"]));
-		await readonlyTransaction(database, ["chunks", "owner", "scopes"], (transaction) => {
-			for (const name of ["chunks", "owner", "scopes"]) {
+		requireShape(database.version === 4);
+		requireShape(
+			JSON.stringify([...database.objectStoreNames]) ===
+				JSON.stringify(["chunks", "owner", "retirementControls", "scopes"])
+		);
+		await readonlyTransaction(database, ["chunks", "owner", "retirementControls", "scopes"], (transaction) => {
+			for (const name of ["chunks", "owner", "retirementControls", "scopes"]) {
 				const store = transaction.objectStore(name);
 				const keyPath =
-					name === "owner"
-						? "id"
-						: ["objectId", "epoch", "anchor", "manifestDigest", ...(name === "chunks" ? ["index"] : [])];
+					name === "retirementControls"
+						? null
+						: name === "owner"
+							? "id"
+							: ["objectId", "epoch", "anchor", "manifestDigest", ...(name === "chunks" ? ["index"] : [])];
 				requireShape(!store.autoIncrement && JSON.stringify(store.keyPath) === JSON.stringify(keyPath));
 				requireShape(JSON.stringify([...store.indexNames]) === JSON.stringify(name === "scopes" ? ["expiryAsc"] : []));
 				if (name === "scopes") {
@@ -135,8 +140,12 @@ function header(value: unknown, key: IDBValidKey, objectId: string, epoch: numbe
 		decoded.manifest.objectId === objectId && decoded.manifest.epoch === epoch && decoded.manifest.anchor === row.anchor
 	);
 	requireShape(row.totalBytes === decoded.manifest.totalBytes && row.chunkCount === decoded.chunks.length);
-	requireShape(Array.isArray(row.descriptors) && row.descriptors.length === decoded.chunks.length);
-	const descriptors: unknown[] = row.descriptors;
+	const descriptors = snapshotQuarantineContract.captureRecoveryDescriptorCarrier(
+		row.descriptors,
+		{ objectId, epoch, anchor: row.anchor, manifestDigest: row.manifestDigest },
+		row.incarnation
+	).chunks;
+	requireShape(Array.isArray(descriptors) && descriptors.length === decoded.chunks.length);
 	for (const [index, descriptor] of decoded.chunks.entries()) {
 		const stored = record(descriptors[index]);
 		requireShape(

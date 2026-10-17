@@ -156,6 +156,15 @@ function checkedPayloadBytes(payload: Readonly<Record<string, unknown>>, maximum
 	return bytes;
 }
 
+/** Original snapshot-payload field owner for actual export and scalar resource
+ * slots. application/acl remain DIRECT children, never opaque BYTES. This
+ * does not authenticate a machine/state, fold work or mint snapshot custody. */
+export function blueprintSnapshotPayloadFields(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	return {acl: input.acl, anchor: input.anchor, application: input.application,
+		archiveIndexRoot: input.archiveIndexRoot, blueprintDigest: input.blueprintDigest, epoch: input.epoch,
+		kind: "drp-snapshot-payload", objectId: input.objectId, protocolMajor: 3, schemaVersion: input.schemaVersion};
+}
+
 /** Exports one exact, bounded v3 snapshot payload without mutating the live machine. */
 export function exportBlueprintSnapshotPayload(
 	input: ExportBlueprintSnapshotPayloadInput
@@ -173,18 +182,16 @@ export function exportBlueprintSnapshotPayload(
 	assertDigest(snapshot.blueprintDigest, "blueprintDigest");
 	assertDigest(snapshot.stateDigest, "applicationStateDigest");
 	const application = decodeExactCanonical(snapshot.exactCanonicalStateBytes, "application state bytes");
-	const payload = {
+	const payload = blueprintSnapshotPayloadFields({
 		acl,
 		anchor: input.anchor,
 		application,
 		archiveIndexRoot: input.archiveIndexRoot,
 		blueprintDigest: snapshot.blueprintDigest,
 		epoch: input.epoch,
-		kind: "drp-snapshot-payload",
 		objectId: input.objectId,
-		protocolMajor: 3,
 		schemaVersion: input.schemaVersion,
-	};
+	});
 	const exactCanonicalPayloadBytes = checkedPayloadBytes(payload, input.maxSnapshotBytes);
 	return Object.freeze({
 		applicationStateDigest: snapshot.stateDigest,
@@ -246,6 +253,7 @@ export function importBlueprintSnapshotPayload(
 		throw new TypeError("snapshot application state digest does not match");
 	}
 	const machine = new BlueprintStateMachine({
+		maxApplicationStateBytes: input.maxSnapshotBytes,
 		exactCanonicalInitialStateBytes: exactCanonicalStateBytes,
 		expectedBlueprintDigest: input.expectedBlueprintDigest,
 		expectedInitialStateDigest: input.expectedApplicationStateDigest,

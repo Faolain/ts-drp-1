@@ -479,7 +479,7 @@ export async function exercise(
 		observedEvents = [...events];
 		arm(undefined);
 	}
-	requireThat(frame, "genuine requirement reached before absent destination refusal");
+	requireThat(frame, `genuine requirement reached before absent destination refusal:${JSON.stringify(observer)}`);
 	if (hookFailure) throw hookFailure;
 	if (mode === "in-place" && classification === "REACHED" && invoke)
 		postRelease = await invoke({

@@ -18,6 +18,7 @@ export const SNAPSHOT_QUARANTINE_FAILURE_CODES = Object.freeze([
 	"policy-mismatch",
 	"receipt-invalid",
 	"recovery-full",
+	"temporary-full",
 	"recovery-owned",
 	"stale-scope",
 	"storage-failed",

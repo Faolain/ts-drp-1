@@ -1,10 +1,14 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
-import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { withAuthoredOperationSigningRequest, type OwnedSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
+import { CanonicalEncodingError, compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	type AccumulatorSnapshot,
+	type ArchiveLimits,
+	type ClosedEpochArchive,
 	CausalityIndex,
 	CompactMerkleAccumulator,
 	type EpochVertex,
+	produceClosedEpochArchive,
 	topologicalOrder,
 } from "@ts-drp/compaction";
 import {
@@ -15,25 +19,48 @@ import {
 import { exportBlueprintSnapshotPayload, importBlueprintSnapshotPayload } from "@ts-drp/compaction/blueprint-snapshot";
 import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import {
+	applySettlementPlanEffect,
+	cloneSettlementPlan,
 	copySettlementPlan,
 	type DurableBuildAndSign,
 	type DurableIssuanceOutboxRecord,
 	type DurableIssuanceStore,
 	type DurableIssueCommit,
 	type DurableIssueScope,
+	type DurableIssueSignContext,
 	type DurableOutboxPageInput,
 	type DurableOutboxPublicationTransitionInput,
+	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+	type SettlementPlan,
+	settlementReplacementLastLogicalTimeFromPreimage,
 } from "@ts-drp/issuance-store";
 import {
 	bindDurableIssuancePruningMaintenance,
+	captureIssuanceNativeSignInput,
 	durableIssuanceLineageConsumed,
 	durableIssuanceLineagesEqual,
 	durableIssuancePruningMaintenanceForStore,
 	type DurableIssuancePruningReceipt,
+	type DurableIssuanceRetirementControl,
+	encodeIssuanceRetirementControl,
+	ISSUANCE_RETIREMENT_LIMITS,
+	type IssuanceRetirementRows,
+	type IssuanceUnsignedContinuationJob,
+	issuanceUnsignedContinuationWidths,
+	issuanceUnsignedPostimageWidths,
+	issuanceUnsignedSuccessorFenceWidths,
+	issuanceUnsignedSuccessorFenceRevisionDeltas,
+	issuanceOrdinaryFinishingCapacityWidths,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
-import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
+import {
+	type DurableLiveJournalStore,
+	encodeJournalRetirementControl,
+	LIVE_JOURNAL_RETIREMENT_LIMITS,
+	type LiveJournalAcceptedRow,
+	type LiveJournalScope,
+} from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import {
 	type AdmitReceivedVertexInput,
@@ -58,8 +85,17 @@ import {
 	openCreatorAuthorSettlement,
 	resolveCreatorAuthorSettlement,
 } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
-import { verifyReceivedVertex } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
+import { readPreparedCreatorSuccessorAnchorForSizing } from "@ts-drp/protocol-v3/creator-close";
 import {
+	copyCanonicalForAdmittedView,
+	openCreatorSettlementSourceTrust,
+	readCreatorSettlementSourceAnchor,
+	resolveCreatorSettlementAuthor,
+	verifyCreatorSettlementSourceSelection,
+	verifyReceivedVertex,
+} from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
+import {
+	authorizeLatchedAclOperation,
 	authorizeLatchedApplicationWrite,
 	authorizeLatchedEnvelopeAuthor,
 	deriveNextLatchedSignerSet,
@@ -71,7 +107,18 @@ import {
 import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
+	createCreatorSealActor,
+	type CreatorSigningDependencyRead,
+	type CreatorSigningRecoveryOwner,
+	type CreatorSigningRetirementOwners,
+	resolveCreatorSigningRecoveryOwner,
+} from "@ts-drp/seal/creator";
+import {
+	AHE_BOUNDED_READ_LIMITS,
+	type AheBoundedActiveRead,
+	type AheBoundedRecoveryRoleStore,
 	type AheDurableStore,
+	type AheRetirementControl,
 	type BlobDigest,
 	digestBlob,
 	digestClosure,
@@ -79,10 +126,12 @@ import {
 	type GenerationId,
 	type GenerationRecord,
 	type GenerationRef,
+	type NativeReadReservation,
 	parseGenerationId,
 	parseHeadRevision,
 	parseStorageObjectId,
 	type PresentHead,
+	type RoomHeadAuthority,
 	type StorageObjectId,
 } from "@ts-drp/storage";
 import {
@@ -91,11 +140,49 @@ import {
 	type AheReclamationReceipt,
 	captureAheReclamationInput,
 } from "@ts-drp/storage/maintenance";
+import {
+	captureRoomHeadImage,
+	ROOM_HEAD_IMAGE_LIMITS,
+	roomHeadImageDigest,
+	type RoomHeadScope,
+} from "@ts-drp/storage/room-head";
+import type {
+	SnapshotQuarantineStore,
+	SnapshotRecoveryOwnerStatus,
+	SnapshotRecoveryStore,
+	SnapshotVerificationReceipt,
+} from "@ts-drp/storage/snapshot-transfer";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
-import { bindCreatorLiveClose } from "./creator-close.js";
-import { planClosedEpochCleanup } from "./internal/closed-epoch-cleanup.js";
 import {
+	bindCreatorLiveClose,
+	deriveCreatorAuthorSettlementFrontier,
+	releaseCreatorCloseHeaderCustody,
+	type CreatorCloseGraph,
+	type CreatorIssuanceClosePreview,
+	type CreatorIssuanceMaintenanceAdmission,
+	type CreatorIssuanceMaintenanceConsumer,
+	type CreatorPostAdoptionCensusSizing,
+	type CreatorPostAdoptionSettlementSizing,
+	type CreatorRoomSettlementPreview,
+	type V3CreatorCloseRegistration,
+} from "./creator-close.js";
+import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
+import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
+import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
+	CreatorOrdinaryIssuanceSuffixForSizing, CreatorOrdinarySourceCapture } from "./internal/creator-closed-rollback-data.js";
+import {
+	consumeCreatorRecoverySourceRetirement,
+	creatorClosedRollbackRefusalDiagnostic,
+	createCreatorClosedRollbackProofAccounting,
+	resolveCreatorOrdinarySourceCapture,
+	readCreatorOrdinaryPreimageCapacityForSizing,
+	readCreatorOrdinaryCapturedJournalReplay,
+} from "./internal/creator-closed-rollback-data.js";
+import { installCreatorRecipientResolver } from "./internal/creator-recipient-provenance.js";
+import { sameCreatorRoomHead } from "./internal/creator-room-head.js";
+import {
+	assertEmptyReceiveOnlyIssuance,
 	type CreatorSuccessorGenerationMaterial,
 	type CreatorSuccessorLiveMaterial,
 	type CreatorSuccessorRuntimeBindings,
@@ -105,16 +192,40 @@ import {
 import {
 	openVerifiedCreatorHistoricalIssuance,
 	resolveVerifiedCreatorHistoricalIssuance,
+	resolveVerifiedHistoricalSourceAcl,
+	resolveVerifiedHistoricalSourceContext,
+	resolveVerifiedHistoricalSourceFrontier,
+	resolveVerifiedHistoricalSettlementFrontiers,
 	type VerifiedCreatorHistoricalIssuance,
 } from "./internal/creator-transition-advance.js";
 import {
+	acceptCreatorCloseRecoveryRetirement,
+	creatorApplicationControlOperationForSizing,
+	creatorAuthenticatedEpochVertexFields,
+	borrowCreatorCloseSigningDependencies,
+	captureCreatorCloseSigningRetirementOwners,
 	type CreatorCloseRuntimeReleaseCensus,
+	type CreatorOrdinaryIssuanceRuntimeHold,
+	type CreatorOrdinaryIssuanceRuntimeLifetime,
+	type CreatorOrdinaryIssuanceRuntimeReadout,
+	type CreatorOrdinaryIssuanceCurrentDimensions,
+	type CreatorOrdinaryPreparedCapacityDimensions,
+	type CreatorOrdinaryApplicationControlCapture,
+	type CreatorOrdinaryApplicationControlFact,
+	type CreatorSnapshotRecoveryCloseDependencyRead,
+	type CreatorSnapshotRecoveryCloseHold,
+	type CreatorSnapshotRecoveryCloseLifetime,
+	type CreatorSnapshotRecoveryCloseOwners,
 	type D109dRuntimeCensus,
 	type D109dRuntimeReclamationErrorCode,
 	type D109dRuntimeReclamationInput,
 	type D109dRuntimeReclamationResult,
 	installV3RuntimeReclamationKernel,
 	prepareCreatorCloseRuntimeRelease,
+} from "./internal/runtime-reclamation.js";
+export {
+	type CreatorSnapshotRecoveryCloseHold,
+	resolveCreatorSnapshotRecoveryCloseHold,
 } from "./internal/runtime-reclamation.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
@@ -127,6 +238,7 @@ const NumberIsSafeInteger = Number.isSafeInteger;
 const ObjectCreate = Object.create;
 const ObjectDefineProperty = Object.defineProperty;
 const ObjectFreeze = Object.freeze;
+const ObjectIsFrozen = Object.isFrozen;
 const ReflectApply = Reflect.apply;
 const ReflectOwnKeys = Reflect.ownKeys;
 const RegExpTest = RegExp.prototype.test;
@@ -151,6 +263,12 @@ const MapIteratorPrototype = ObjectGetPrototypeOf(ReflectApply(MapPrototypeEntri
 const MapIteratorNext = ObjectGetOwnPropertyDescriptor(MapIteratorPrototype, "next")?.value;
 const IntrinsicSet = Set;
 const SetPrototypeAdd = Set.prototype.add;
+const SetPrototypeDelete = Set.prototype.delete;
+const SetPrototypeValues = Set.prototype.values;
+const SetIteratorNext = ObjectGetOwnPropertyDescriptor(
+	ObjectGetPrototypeOf(ReflectApply(SetPrototypeValues, new IntrinsicSet(), [])),
+	"next"
+)?.value;
 const SetPrototypeClear = Set.prototype.clear;
 const SetPrototypeHas = Set.prototype.has;
 const SetSizeGetter = ObjectGetOwnPropertyDescriptor(Set.prototype, "size")?.get;
@@ -158,6 +276,7 @@ const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 const TypedArrayPrototype = ObjectGetPrototypeOf(Uint8Array.prototype) as object;
 const TypedArrayBufferGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "buffer")?.get;
 const TypedArrayByteLengthGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "byteLength")?.get;
+const TypedArraySet = Uint8Array.prototype.set;
 const CryptoGetRandomValues = globalThis.crypto.getRandomValues;
 const ConsoleObject = globalThis.console;
 const ConsoleWarn = ConsoleObject?.warn;
@@ -234,6 +353,7 @@ const SNAPSHOT_ACTIVATION_INPUT_KEYS = [
 const BLUEPRINT_BINDING_INPUT_KEYS = ["exactCanonicalInitialStateBytes", "plane"] as const;
 const BLUEPRINT_RETRIEVAL_INPUT_KEYS = ["plane"] as const;
 const BLUEPRINT_PROJECTION_BASE_INPUT_KEYS = ["plane", "purpose"] as const;
+const NEW_LOCAL_OPERATION_AUTHORIZATION_KEYS = ["operation", "plane"] as const;
 const LOCAL_ISSUE_INPUT_KEYS = ["operations", "signRegisteredVertexDigest"] as const;
 const LOCAL_ISSUE_WITH_PLAN_EFFECT_KEYS = ["operations", "planEffect", "signRegisteredVertexDigest"] as const;
 const PROGRESS_REPLACEMENT_EFFECT_KEYS = [
@@ -304,6 +424,40 @@ export interface PrepareV3LiveGenerationInput {
 	readonly detachedSignature: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
 	readonly catalog: TrustedBlueprintCatalog;
+	/** Trusted local application semantics, retained by this prepared owner; not wire authority. */
+	readonly settlementPolicy?: V3LocalSettlementPolicy;
+	/** Trusted local whole-floor owner, never obtained from a wire proof. */
+	readonly settlementFloor?: V3LocalSettlementFloor;
+}
+
+export type V3LocalSettlementFloor = Readonly<{
+	acquireNativeReadReservation: NonNullable<RoomHeadAuthority["acquireNativeReadReservation"]>;
+	readRetirementImage: NonNullable<RoomHeadAuthority["readRetirementImage"]>;
+}>;
+
+export interface V3LocalSettlementPolicy {
+	readonly blueprintDigest: string;
+	readonly inheritedImportActions?: readonly string[];
+	verifyInherited?(
+		input: Readonly<{
+			sourceObjectId: string;
+			sourceAuthor: string;
+			sourceEpoch: number;
+			sourceAnchorDigest: string;
+			targetObjectId: string;
+			targetEpoch: number;
+			targetAnchorDigest: string;
+			targetAuthor: string;
+			operation: Readonly<Record<string, unknown>>;
+			sourceOperations: readonly Readonly<Record<string, unknown>>[];
+			/** Local diagnostic only; never part of the signed or persisted authority. */
+			onRefusal?(reason: string): void;
+		}>
+	): boolean;
+	derive(operations: readonly Readonly<Record<string, unknown>>[]): Readonly<{
+		readonly disposition: "rebase" | "transform";
+		readonly operations: readonly Readonly<Record<string, unknown>>[];
+	}>;
 }
 
 export type PrepareV3LiveFailureKind =
@@ -409,6 +563,28 @@ export type V3AdmittedVertexSink = (
 			readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
 	  }>>;
 
+export interface V3SettlementSourceSelectionRequest {
+	readonly exactCanonicalSelectionBytes: Uint8Array;
+	readonly digest: Uint8Array;
+	readonly signal?: AbortSignal;
+}
+
+export interface V3SettlementSourceSelectionApproval {
+	readonly exactCanonicalSelectionBytes: Uint8Array;
+	readonly digest: Uint8Array;
+	readonly cancellationSignal: AbortSignal;
+	readonly preview: Readonly<{
+		sourceObjectId: string;
+		sourceAuthor: string;
+		sourceSequence: number;
+		sourceDigest: string;
+		targetObjectId: string;
+		targetEpoch: number;
+		targetAnchor: string;
+		intentCount: number;
+	}>;
+}
+
 export interface V3PlaneHandle {
 	readonly objectId: string;
 	readonly epoch: number;
@@ -420,10 +596,18 @@ export interface V3PlaneHandle {
 				readonly anchorDigest: string;
 				readonly epoch: number;
 				readonly objectId: string;
+				isCurrentMember(author: string): boolean;
 				isCurrentWriter(author: string): boolean;
 		  }
 		| undefined;
 	issueLocal(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
+	authorizeSettlementSourceSelection?(
+		input: V3SettlementSourceSelectionRequest &
+			Readonly<{
+				approve(request: V3SettlementSourceSelectionApproval): Promise<boolean>;
+				signRegisteredVertexDigest: SignRegisteredVertexDigest;
+			}>
+	): Promise<Uint8Array>;
 	readRebaseOutbox(): Promise<V3RebaseOutboxResult>;
 	completeRebaseSource(
 		input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
@@ -432,33 +616,6 @@ export interface V3PlaneHandle {
 	republishRetained(): Promise<V3EgressResult>;
 	beginTerminalTransition(): Promise<V3TerminalTransitionResult>;
 	deactivate(): void;
-}
-
-interface V3CreatorCloseRegistration {
-	abortSnapshotStage(): boolean;
-	readonly currentTrust: CurrentAnchorTrust;
-	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
-	readonly exactCanonicalLatchedAclBytes: Uint8Array;
-	readonly exactCanonicalParametersBytes: Uint8Array;
-	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
-	readonly issuanceScope: DurableIssueScope;
-	readonly issuanceStore: DurableIssuanceStore;
-	readonly liveJournalStore: DurableLiveJournalStore;
-	readonly maxEpochBytes: number;
-	readonly maxEpochVertices: number;
-	readonly objectId: StorageObjectId;
-	readonly previousHistorySnapshot: AccumulatorSnapshot;
-	readonly store: AheDurableStore;
-	captureCloseGraph():
-		| Readonly<{
-				readonly charges: ReadonlyMap<string, number>;
-				readonly frontier: readonly string[];
-				readonly vertices: ReadonlyMap<string, EpochVertex>;
-		  }>
-		| undefined;
-	stageSnapshot(): Promise<V3BlueprintSnapshotExportResult>;
-	sealDurableReplay(): Promise<Readonly<{ verify(): Promise<boolean> }> | undefined>;
-	terminalize(): boolean;
 }
 
 interface V3BlueprintLiveHandle {
@@ -553,6 +710,11 @@ export interface V3LocalIssueInput {
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 }
 
+/** A present NEW-work decision, never a transferable settlement or signing capability. */
+export type V3NewLocalOperationAuthorizationResult =
+	| Readonly<{ readonly ok: true }>
+	| Extract<V3LocalIssueResult, { readonly ok: false }>;
+
 export type V3LocalIssueResult =
 	| Readonly<{ readonly ok: true; readonly kind: "accepted"; readonly authorSequence: number; readonly digest: string }>
 	| Readonly<{
@@ -608,14 +770,34 @@ export type V3EgressResult =
 	| Readonly<{ readonly ok: true; readonly kind: "empty" | "published" }>
 	| Readonly<{
 			readonly ok: false;
-			readonly kind: "not-active" | "store-failed" | "record-rejected" | "publish-failed" | "publication-state-unknown";
+			readonly kind:
+				| "not-active"
+				| "store-failed"
+				| "record-rejected"
+				| "publish-failed"
+				| "publication-state-unknown"
+				| "admission-rejected";
 			readonly detail: string;
 	  }>;
 
 type V3RebaseSource = Readonly<{
 	readonly author: string;
 	readonly authorSequence: number;
+	issueReplacement(
+		input: V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>
+	): Promise<V3LocalIssueResult>;
 	readonly vertexDigest: string;
+	/** Current ordinary Writer authority or genuine fixed creator needs no foreign selection callback. */
+	readonly requiresCreatorSelection: boolean;
+	prepareReplacement(): Promise<NativeReplacementPreparation>;
+	/** Explicit creator selection; this never grants authority merely from the local source capability. */
+	authorizeReplacement(
+		sign: (request: Readonly<{ exactCanonicalSelectionBytes: Uint8Array; digest: Uint8Array }>) => Promise<Uint8Array>
+	): Promise<void>;
+	/** Same owning runtime's read-only census; never settlement or retirement permission. */
+	withDependencies(
+		consume: (read: CreatorSnapshotRecoveryCloseDependencyRead, proofByteCharge: number) => Promise<void>
+	): Promise<void>;
 	readonly intents: readonly Readonly<{
 		readonly logicalTime: number;
 		readonly operation: Readonly<Record<string, unknown>>;
@@ -636,7 +818,11 @@ type V3RebaseOutboxResult =
 			readonly kind: "displaced";
 			readonly source: V3RebaseSource & Readonly<{ readonly publishState: "pending" | "published" }>;
 	  }>
-	| Readonly<{ readonly ok: false; readonly kind: "not-active" | "record-rejected" | "store-failed" }>;
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "not-active" | "record-rejected" | "store-failed" | "admission-rejected";
+			readonly detail?: string;
+	  }>;
 
 type PlainRecord = Readonly<Record<string, unknown>>;
 
@@ -701,6 +887,13 @@ const OPERATION_ADMISSION_POLICY_KEY = "operationAdmissionPolicy";
 const PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY = "exactCanonicalPinnedGenesisBootstrapOperationBytes";
 const DISPLACED_LEGACY_SOURCE_KEYS = ["capability", "exactCanonicalAuthorAuthorizationBytes"] as const;
 const DISPLACED_LATCHED_SOURCE_KEYS = ["capability", "exactCanonicalLatchedAclBytes"] as const;
+const DISPLACED_NATIVE_SOURCE_KEYS = [
+	"capability",
+	"exactCanonicalLatchedAclBytes",
+	"issuanceScope",
+	"issuanceStore",
+	"liveJournalStore",
+] as const;
 const DISPLACED_CROSS_OBJECT_SOURCE_KEYS = [
 	"activationVertexDigest",
 	"capability",
@@ -721,11 +914,39 @@ export type V3TerminalVertexClassifier = (
 
 export type V3OperationAdmissionReservation =
 	| Readonly<{ readonly kind: "fresh"; commit(): "committed"; release(): void }>
-	| Readonly<{ readonly kind: "duplicate" | "conflict" | "rejected" }>;
+	| Readonly<{ readonly kind: "duplicate" | "conflict" }>
+	| Readonly<{ readonly kind: "rejected"; readonly reason?: "capacity" | "encoding" }>;
+
+type NativeReplacementPreparation = ReturnType<V3LocalSettlementPolicy["derive"]> &
+	Readonly<{
+		transformRefusal?: NonNullable<SettlementPlan["entries"][number]["transformRefusal"]>;
+	}>;
 
 export interface V3OperationAdmissionPolicy {
-	reserve(operation: Readonly<Record<string, unknown>>): V3OperationAdmissionReservation;
+	reserve(
+		operation: Readonly<Record<string, unknown>>,
+		context?: Readonly<{ author: string }>
+	): V3OperationAdmissionReservation;
 }
+export type V3OperationAdmissionPolicyFactory = (
+	context: Readonly<{
+		aclDigest: string;
+		anchorDigest: string;
+		epoch: number;
+		objectId: string;
+		authenticatedApplicationStateBytes?: Uint8Array;
+		/** Authenticated exact closed predecessor postimage, only for transcript admission validation. */
+		authenticatedClosedApplicationStateBytes?: Uint8Array;
+		/** Exact current ACL selected by native scope authentication, never the genesis invite substituted for a successor. */
+		exactCanonicalLatchedAclBytes?: Uint8Array;
+		/** Native-verified published admission incarnations; local outbox completion is not this evidence. */
+		authenticatedSettlementFrontiers?: readonly (readonly [
+			author: string,
+			admissionEpoch: number,
+			terminalThrough: number | null,
+		])[];
+	}>
+) => V3OperationAdmissionPolicy;
 
 declare const recoveredV3LiveBrand: unique symbol;
 export type RecoveredV3Live = Readonly<{ readonly [recoveredV3LiveBrand]: true }>;
@@ -754,6 +975,9 @@ type RecoverV3LiveReplicaBaseInput =
 			readonly displacedSource: Readonly<{
 				readonly capability: PreparedV3Live;
 				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				readonly issuanceScope?: DurableIssueScope;
+				readonly issuanceStore?: DurableIssuanceStore;
+				readonly liveJournalStore?: DurableLiveJournalStore;
 			}>;
 			readonly exactCanonicalLatchedAclBytes: Uint8Array;
 			readonly issuanceScope: DurableIssueScope;
@@ -804,6 +1028,7 @@ type RecoverV3LiveReplicaBaseInput =
 
 export type RecoverV3LiveReplicaInput = RecoverV3LiveReplicaBaseInput &
 	Readonly<{
+		readonly receiveOnly?: true;
 		readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 		readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
 	}>;
@@ -857,6 +1082,8 @@ interface CapturedInput {
 	readonly detachedSignature: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
 	readonly catalog: TrustedBlueprintCatalog;
+	readonly settlementPolicy?: V3LocalSettlementPolicy;
+	readonly settlementFloor?: V3LocalSettlementFloor;
 }
 
 interface CatalogSnapshot {
@@ -923,6 +1150,7 @@ interface AcceptedParameters {
 	readonly maxPendingBytes: number;
 	readonly maxPendingEntries: number;
 	readonly maxSnapshotBytes: number;
+	readonly snapshotChunkBytes: number;
 }
 
 const preparedV3LiveAuthority = new WeakMap<object, PreparedV3LivePayload>();
@@ -934,10 +1162,22 @@ const creatorSuccessorRecovery = new WeakMap<
 		readonly issuanceStore: DurableIssuanceStore;
 		readonly liveJournalStore: DurableLiveJournalStore;
 		readonly sourceCapability: PreparedV3Live;
+		readonly predecessorEpoch: number;
 	}>
 >();
 const creatorPredecessorRecoverySource = new WeakMap<object, V3DisplacedSourceAuthority>();
+// Only a genuine creator adoption may retain the original separate native root
+// after the target closes. This is not a new public/wire source permission.
+const creatorRetainedNativeBranches = new WeakSet<V3DisplacedSourceAuthority>();
 const creatorHistoricalIssuanceHandoffs = new WeakMap<object, HistoricalIssuanceContext>();
+const creatorTerminalMigrationSourceHandoffs = new WeakMap<
+	object,
+	Readonly<{
+		readonly historicalIssuance?: HistoricalIssuanceContext;
+		readonly bootstrapOperationBytes?: Uint8Array;
+		readonly migrationTarget: Readonly<{ objectId: string; epoch: 0; anchorDigest: string; blueprintDigest: string }>;
+	}>
+>();
 const creatorSuccessorRecoveredDeliveries = new WeakMap<
 	object,
 	readonly Omit<Parameters<V3AdmittedVertexSink>[0], "transportSender">[]
@@ -995,11 +1235,23 @@ function snapshotClosedRecord(value: unknown, keys: readonly string[]): PlainRec
 }
 
 function snapshotRecoveryRecord(value: unknown, keys: readonly string[]): PlainRecord | undefined {
-	return (
+	const ordinary =
 		snapshotClosedRecord(value, keys) ??
 		snapshotClosedRecord(value, [...keys, OPERATION_ADMISSION_POLICY_KEY]) ??
 		snapshotClosedRecord(value, [...keys, PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY]) ??
-		snapshotClosedRecord(value, [...keys, PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY, OPERATION_ADMISSION_POLICY_KEY])
+		snapshotClosedRecord(value, [...keys, PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY, OPERATION_ADMISSION_POLICY_KEY]);
+	if (ordinary !== undefined) return ordinary;
+	if (!keys.includes("exactCanonicalLatchedAclBytes")) return undefined;
+	return (
+		snapshotClosedRecord(value, [...keys, "receiveOnly"]) ??
+		snapshotClosedRecord(value, [...keys, "receiveOnly", OPERATION_ADMISSION_POLICY_KEY]) ??
+		snapshotClosedRecord(value, [...keys, "receiveOnly", PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY]) ??
+		snapshotClosedRecord(value, [
+			...keys,
+			"receiveOnly",
+			PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY,
+			OPERATION_ADMISSION_POLICY_KEY,
+		])
 	);
 }
 
@@ -1090,8 +1342,53 @@ function bytesToLowerHex(bytes: Uint8Array): string {
 	return output;
 }
 
+/** Copies trusted local application policy into a prepared owner's lifetime. */
+export function captureV3LocalSettlementPolicy(input: unknown): V3LocalSettlementPolicy | undefined {
+	const policy =
+		snapshotClosedRecord(input, ["blueprintDigest", "derive"]) ??
+		snapshotClosedRecord(input, ["blueprintDigest", "derive", "inheritedImportActions", "verifyInherited"]);
+	if (policy === undefined || !isDigestHex(policy.blueprintDigest) || typeof policy.derive !== "function")
+		return undefined;
+	if (
+		policy.verifyInherited !== undefined &&
+		(typeof policy.verifyInherited !== "function" ||
+			!ArrayIsArray(policy.inheritedImportActions) ||
+			policy.inheritedImportActions.length > 8192 ||
+			policy.inheritedImportActions.some((action) => typeof action !== "string"))
+	)
+		return undefined;
+	return ObjectFreeze({
+		blueprintDigest: policy.blueprintDigest,
+		derive: policy.derive as V3LocalSettlementPolicy["derive"],
+		...(policy.verifyInherited === undefined
+			? {}
+			: {
+					verifyInherited: policy.verifyInherited as NonNullable<V3LocalSettlementPolicy["verifyInherited"]>,
+					inheritedImportActions: ObjectFreeze([...(policy.inheritedImportActions as string[])]),
+				}),
+	});
+}
+
+/** Captures the existing trusted local native owner and its methods once. */
+export function captureV3LocalSettlementFloor(input: unknown): V3LocalSettlementFloor | undefined {
+	if (!isObject(input)) return undefined;
+	const acquire = Reflect.get(input, "acquireNativeReadReservation"),
+		read = Reflect.get(input, "readRetirementImage");
+	if (typeof acquire !== "function" || typeof read !== "function") return undefined;
+	return ObjectFreeze({
+		acquireNativeReadReservation: (value) =>
+			ReflectApply(acquire, input, [value]) as ReturnType<V3LocalSettlementFloor["acquireNativeReadReservation"]>,
+		readRetirementImage: (value) =>
+			ReflectApply(read, input, [value]) as ReturnType<V3LocalSettlementFloor["readRetirementImage"]>,
+	});
+}
+
 function captureInput(input: PrepareV3LiveGenerationInput): CapturedInput | undefined {
-	const record = snapshotClosedRecord(input, INPUT_KEYS);
+	const record =
+		snapshotClosedRecord(input, INPUT_KEYS) ??
+		snapshotClosedRecord(input, [...INPUT_KEYS, "settlementPolicy"]) ??
+		snapshotClosedRecord(input, [...INPUT_KEYS, "settlementFloor"]) ??
+		snapshotClosedRecord(input, [...INPUT_KEYS, "settlementPolicy", "settlementFloor"]);
 	if (record === undefined) return undefined;
 	if (record.authenticationProfile !== "creator-only") return undefined;
 	if (typeof record.objectId !== "string") return undefined;
@@ -1101,6 +1398,14 @@ function captureInput(input: PrepareV3LiveGenerationInput): CapturedInput | unde
 		return undefined;
 	}
 	if (!isObject(record.store) || !isObject(record.catalog)) return undefined;
+	let settlementPolicy: V3LocalSettlementPolicy | undefined;
+	const settlementFloor =
+		record.settlementFloor === undefined ? undefined : captureV3LocalSettlementFloor(record.settlementFloor);
+	if (record.settlementFloor !== undefined && settlementFloor === undefined) return undefined;
+	if (record.settlementPolicy !== undefined) {
+		settlementPolicy = captureV3LocalSettlementPolicy(record.settlementPolicy);
+		if (settlementPolicy === undefined) return undefined;
+	}
 	const anchorSource = record.exactCanonicalAnchorPreimageBytes;
 	const signatureSource = record.detachedSignature;
 	const parametersSource = record.exactCanonicalParametersCarrierBytes;
@@ -1146,6 +1451,8 @@ function captureInput(input: PrepareV3LiveGenerationInput): CapturedInput | unde
 		detachedSignature,
 		exactCanonicalParametersCarrierBytes,
 		catalog: record.catalog as TrustedBlueprintCatalog,
+		...(settlementPolicy === undefined ? {} : { settlementPolicy }),
+		...(settlementFloor === undefined ? {} : { settlementFloor }),
 	});
 }
 
@@ -1371,6 +1678,7 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 		const maxPendingBytes = snapshot.maxPendingBytes;
 		const maxPendingEntries = snapshot.maxPendingEntries;
 		const maxSnapshotBytes = snapshot.maxSnapshotBytes;
+		const snapshotChunkBytes = snapshot.snapshotChunkBytes;
 		return typeof authorShareMultiplier === "number" &&
 			NumberIsSafeInteger(authorShareMultiplier) &&
 			typeof maxDependencies === "number" &&
@@ -1384,7 +1692,9 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 			typeof maxPendingEntries === "number" &&
 			NumberIsSafeInteger(maxPendingEntries) &&
 			typeof maxSnapshotBytes === "number" &&
-			NumberIsSafeInteger(maxSnapshotBytes)
+			NumberIsSafeInteger(maxSnapshotBytes) &&
+			typeof snapshotChunkBytes === "number" &&
+			NumberIsSafeInteger(snapshotChunkBytes)
 			? ObjectFreeze({
 					authorShareMultiplier,
 					maxDependencies,
@@ -1393,6 +1703,7 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 					maxPendingBytes,
 					maxPendingEntries,
 					maxSnapshotBytes,
+					snapshotChunkBytes,
 				})
 			: undefined;
 	} catch {
@@ -1658,9 +1969,39 @@ function copyCloseVertices(source: Map<string, EpochVertex>): Map<string, EpochV
 	}
 }
 
+interface RetainedCloseSignedAdmission {
+	readonly payload: PreparedV3LivePayload;
+	readonly authorization?: V3LiveAuthorization;
+	readonly admitted: AdmittedReceivedVertexView;
+	readonly originalAdmitted: AdmittedReceivedVertexView;
+	readonly preimage: Uint8Array;
+	readonly signature: Uint8Array;
+	readonly key: Uint8Array;
+	readonly format: "raw";
+	readonly domain: string;
+	readonly suite: string;
+}
+/** Invocation-local output of the original verifier; never a public capability. */
+interface RetainedCloseSignedAdmissionCapture { value?: RetainedCloseSignedAdmission; }
+
+/** Detached derivative DATA from this invocation's exact original matcher.
+ * It is not admission, native currency, or a portable accepted-vertex proof. */
+interface RetainedCloseReplayDerivativeCapture {
+	readonly expectedIdentity?: CloseVertexIdentity;
+	value?: Readonly<{authenticated: AuthenticatedRecoveryVertex; exactCanonicalVertexBytes: Uint8Array}>;
+}
+
 interface CloseVertexIdentity {
 	readonly author: string;
 	readonly authorSequence: number;
+	/** Set only by this runtime after exact source authorization and native admission. */
+	readonly sourceAuthorized?: true;
+	/** Private numerical effect at the ORIGINAL accepted-close boundary. It is
+	 * never copied into census/author views or usable as admission authority. */
+	readonly applicationEffect?: Readonly<{vertex: EpochVertex; exactCanonicalEpochVertexBytes: Uint8Array}>;
+	/** Exact original signed admission; never copied into census/public views. */
+	readonly signedCurrent?: (payload: PreparedV3LivePayload, authorization: V3LiveAuthorization,
+		preimage: Uint8Array, signature: Uint8Array, derivative?: RetainedCloseReplayDerivativeCapture) => AuthenticatedRecoveryVertex | undefined;
 }
 
 function copyCloseAuthors(source: Map<string, CloseVertexIdentity>): Map<string, CloseVertexIdentity> | undefined {
@@ -1694,6 +2035,7 @@ function copyCloseAuthors(source: Map<string, CloseVertexIdentity>): Map<string,
 				ObjectFreeze({
 					author: selectedAuthor,
 					authorSequence: selectedAuthorSequence as number,
+					...(Reflect.get(selectedIdentity, "sourceAuthorized") === true ? { sourceAuthorized: true as const } : {}),
 				}),
 			]);
 		}
@@ -1702,21 +2044,126 @@ function copyCloseAuthors(source: Map<string, CloseVertexIdentity>): Map<string,
 	}
 }
 
+/** Installs only at the SAME successful retained-close boundary. Unsupported
+ * source/classification/context facts omit reuse and keep the original verifier. */
+function retainedCloseSignedCurrentAdmission(authenticated: AuthenticatedRecoveryVertex,
+	fact: RetainedCloseSignedAdmission | undefined,
+	identity?: CloseVertexIdentity): CloseVertexIdentity["signedCurrent"] {
+	try {
+	if (fact === undefined || fact.authorization === undefined || fact.admitted.settlementSource !== undefined || authenticated.admitted.settlementSource !== undefined ||
+		fact.originalAdmitted !== authenticated.admitted || authenticated.byteCharge !== fact.preimage.byteLength ||
+		authenticated.digest !== lowerHexDigest(hashDomain(fact.domain, fact.preimage)) ||
+		authenticated.author !== fact.admitted.author || authenticated.authorSequence !== fact.admitted.authorSequence ||
+		fact.preimage.byteLength > fact.payload.parameters.maxEpochBytes || fact.signature.byteLength !== 64) return undefined;
+	const payload = fact.payload, authorization = fact.authorization, admission = payload.admission,
+		objectId = payload.provenance.objectId, epoch = payload.provenance.epoch, anchor = payload.provenance.anchorDigest,
+		profile = payload.trust.trust.profileId, signedPreimage = fact.preimage, signedSignature = fact.signature,
+		signingKey = fact.key, format = fact.format, domain = fact.domain, suite = fact.suite;
+	const owned = authenticatedRecoveryVertex(fact.admitted, fact.preimage.byteLength);
+	if (owned === undefined) return undefined;
+	const originalVertexBytes = encodeCanonical(owned.vertex);
+	if (!sameBytes(originalVertexBytes, encodeCanonical(authenticated.vertex))) return undefined;
+	// Bind the SAME accepted owner's existing private byte buffer, not a later
+	// equal-looking effect/graph. Every outward delivery of these bytes copies.
+	const applicationEffect = identity?.applicationEffect;
+	const derivativeEffect = applicationEffect?.vertex === authenticated.vertex &&
+		sameBytes(applicationEffect.exactCanonicalEpochVertexBytes, originalVertexBytes) ? applicationEffect : undefined;
+	// The fact owns detached verifier inputs, not a proof/book/native child. Its
+	// retention is bounded by the existing epoch bytes/vertices and closeAuthors
+	// lifecycle. Snapshot/reclamation copies deliberately omit this matcher.
+	return (currentPayload, currentAuthorization, preimage, signature, derivative) => {
+		try {
+			if (derivative !== undefined) derivative.value = undefined;
+			if (currentPayload !== payload || currentAuthorization !== authorization || currentPayload.admission !== admission ||
+				currentPayload.provenance.objectId !== objectId || currentPayload.provenance.epoch !== epoch ||
+				currentPayload.provenance.anchorDigest !== anchor || currentPayload.trust.trust.profileId !== profile ||
+				V3_VERTEX_DOMAIN !== domain || V3_VERTEX_SUITE_ID !== suite || vertexRegistry.domain !== domain ||
+				!sameBytes(preimage, signedPreimage) || !sameBytes(signature, signedSignature)) return undefined;
+			// Authorization/key resolution remains fresh: exact signed bytes cannot
+			// authorize a removed author, a different key, ABI or source profile.
+			const key = resolveV3AuthorizedAuthor(currentAuthorization, owned.author);
+			if (key === undefined || key.format !== format || !sameBytes(key.bytes, signingKey)) return undefined;
+			// Frozen records can still contain mutable typed arrays, Maps or Sets.
+			// Deliver an original-cloner detached PARSED view, never the retained
+			// leaves. This performs no canonical decode or signature verification.
+			const verified = authenticatedRecoveryVertex(copyCanonicalForAdmittedView(owned.admitted, true) as AdmittedReceivedVertexView,
+				owned.byteCharge);
+			if (verified !== undefined && derivativeEffect !== undefined && derivative !== undefined && derivative.expectedIdentity === identity &&
+				identity?.applicationEffect === derivativeEffect)
+				derivative.value = ObjectFreeze({authenticated: verified,
+					exactCanonicalVertexBytes: new Uint8ArrayConstructor(derivativeEffect.exactCanonicalEpochVertexBytes)});
+			return verified;
+		} catch { return undefined; }
+	};
+	} catch { return undefined; } // Optional provenance cannot change original admission.
+}
+
+/** Digest is only an address into the existing owner; exact signed provenance,
+ * current registration/ACL and the SAME retained graph still decide reuse. */
+function readRetainedCloseSignedCurrentAdmission(registration: V3PlaneRegistration,
+	preimage: Uint8Array, signature: Uint8Array, digest: string,
+	derivative?: RetainedCloseReplayDerivativeCapture): AuthenticatedRecoveryVertex | undefined {
+	if (derivative !== undefined) derivative.value = undefined;
+	if (!currentRegistration(registration)) return undefined;
+	const identity = registration.closeAuthors.get(digest);
+	if (identity === undefined || identity.sourceAuthorized === true || identity.signedCurrent === undefined) return undefined;
+	const captured: RetainedCloseReplayDerivativeCapture | undefined = derivative === undefined ? undefined : {expectedIdentity: identity};
+	const verified = identity.signedCurrent(registration.payload, registration.authorization, preimage, signature, captured);
+	if (verified === undefined || verified.digest !== digest || verified.author !== identity.author ||
+		verified.authorSequence !== identity.authorSequence || registration.closeCharges.get(digest) !== verified.byteCharge ||
+		registration.closeVertices.get(digest) === undefined) return undefined;
+	if (derivative !== undefined && captured?.value?.authenticated === verified &&
+		registration.closeAuthors.get(digest) === identity && identity.applicationEffect !== undefined &&
+		registration.closeVertices.get(digest) === identity.applicationEffect.vertex)
+		derivative.value = captured.value;
+	return verified;
+}
+
 function retainCloseVertex(
 	vertices: Map<string, EpochVertex>,
 	authors: Map<string, CloseVertexIdentity>,
 	authorVertexCounts: Map<string, number>,
 	authenticated: AuthenticatedRecoveryVertex,
-	charges?: Map<string, number>
+	charges?: Map<string, number>,
+	sourceAuthorized = false,
+	signedAdmission?: RetainedCloseSignedAdmission,
+	vertexFacts?: CreatorCensusVertexFacts
 ): void {
+	let applicationEffect: CloseVertexIdentity["applicationEffect"];
+	try {
+		applicationEffect = ObjectFreeze({vertex: authenticated.vertex,
+			exactCanonicalEpochVertexBytes: encodeCanonical(authenticated.vertex)});
+	} catch { /* Optional numerical DATA cannot change original accepted work. */ }
+	const identity: CloseVertexIdentity = {
+		author: authenticated.author,
+		authorSequence: authenticated.authorSequence,
+		...(sourceAuthorized ? {sourceAuthorized: true as const} : {}),
+		...(applicationEffect === undefined ? {} : {applicationEffect}),
+	};
+	const signedCurrent = sourceAuthorized ? undefined : retainedCloseSignedCurrentAdmission(authenticated, signedAdmission, identity);
+	if (signedCurrent !== undefined) ObjectDefineProperty(identity, "signedCurrent", {value: signedCurrent, enumerable: true});
+	// Only the original successful extraction/matcher supplies this private fact.
+	// Do not serialize and retain another complete admitted operation graph.
+	if (signedCurrent !== undefined && signedAdmission !== undefined) vertexFacts?.retainVerification(signedAdmission);
 	ReflectApply(MapPrototypeSet, vertices, [authenticated.digest, authenticated.vertex]);
 	ReflectApply(MapPrototypeSet, authors, [
 		authenticated.digest,
-		ObjectFreeze({ author: authenticated.author, authorSequence: authenticated.authorSequence }),
+		ObjectFreeze(identity),
 	]);
 	const current = ReflectApply(MapPrototypeGet, authorVertexCounts, [authenticated.author]) as number | undefined;
 	ReflectApply(MapPrototypeSet, authorVertexCounts, [authenticated.author, (current ?? 0) + 1]);
 	if (charges !== undefined) ReflectApply(MapPrototypeSet, charges, [authenticated.digest, authenticated.byteCharge]);
+}
+
+/** SAME accepted vertex owner, after fresh complete journal authentication.
+ * No signature, source authorization or native currentness is inferred here. */
+function retainedCreatorApplicationEffectForSizing(registration: V3PlaneRegistration,
+	row: CreatorReplayRow): Uint8Array | undefined {
+	if (!currentRegistration(registration)) return undefined;
+	const identity = registration.closeAuthors.get(row.digest), effect = identity?.applicationEffect;
+	if (effect === undefined || registration.closeVertices.get(row.digest) !== effect.vertex ||
+		!sameBytes(effect.exactCanonicalEpochVertexBytes, row.exactCanonicalVertexBytes)) return undefined;
+	return new Uint8ArrayConstructor(effect.exactCanonicalEpochVertexBytes);
 }
 
 function intrinsicMapSize(map: Map<unknown, unknown>): number | undefined {
@@ -2018,6 +2465,11 @@ function buildPreparedV3LiveMint(
 	input: PreparedV3LiveMintInput,
 	durable: DurableStateSnapshot
 ): PreparedV3LiveMint | PrepareV3LiveResult {
+	if (
+		input.captured.settlementPolicy !== undefined &&
+		input.captured.settlementPolicy.blueprintDigest !== input.provenance.blueprintDigest
+	)
+		return failure("malformed-input", "local settlement policy belongs to a different blueprint");
 	let durableProjection: Uint8Array | undefined;
 	let index = 0;
 	while (index < durable.candidates.length) {
@@ -2071,7 +2523,12 @@ function buildPreparedV3LiveMint(
 
 async function prepareExistingCreatorGeneration(
 	generation: CreatorSuccessorGenerationMaterial,
-	material: CreatorSuccessorLiveMaterial
+	material: Pick<
+		CreatorSuccessorLiveMaterial,
+		"catalog" | "exactCanonicalParametersCarrierBytes" | "pinnedGenesisAnchorDigest" | "store"
+	>,
+	settlementPolicy?: V3LocalSettlementPolicy,
+	settlementFloor?: V3LocalSettlementFloor
 ): Promise<PreparedV3Live | undefined> {
 	try {
 		const parsedObjectId = parseStorageObjectId(generation.head.objectId);
@@ -2157,6 +2614,8 @@ async function prepareExistingCreatorGeneration(
 			objectId: parsedObjectId.value,
 			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
 			store: material.store,
+			...(settlementPolicy === undefined ? {} : { settlementPolicy }),
+			...(settlementFloor === undefined ? {} : { settlementFloor }),
 		});
 		const dependencies = ObjectFreeze([]) as unknown as string[];
 		const vertex = ObjectFreeze({
@@ -2704,6 +3163,19 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 }
 
 interface V3PlaneRegistration {
+	readonly receiveOnly: boolean;
+	snapshotReadiness?: Readonly<{
+		readonly owner: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+		read(): Promise<SnapshotRecoveryOwnerStatus>;
+	}>;
+	creatorMaintenanceBound?: boolean;
+	creatorMaintenanceAdmission?: CreatorIssuanceMaintenanceConsumer;
+	/** One nominal context sentinel and its exact ACL byte DATA, never admission authority. */
+	ordinaryIssuanceSourceIdentity?: Readonly<{ token: object; bindings: readonly unknown[]; aclBytes: Uint8Array;
+		/** Numerical byte correspondence only; never native freshness or ACL authority. */
+		immutableAcl?: LatchedAclSnapshot }>;
+	currentReplacementCustody?: LocalReplacementCustody;
+	settlementSelectionControllers?: Set<AbortController>;
 	active: boolean;
 	readonly authorVertexCounts: Map<string, number>;
 	readonly closeAuthors: Map<string, CloseVertexIdentity>;
@@ -2712,6 +3184,7 @@ interface V3PlaneRegistration {
 	readonly authorization: V3LiveAuthorization;
 	blueprintClosing: boolean;
 	blueprintFolded: boolean;
+	receivedTransition?: boolean;
 	blueprintMachine?: BlueprintStateMachine;
 	blueprintMachineIdentity?: Readonly<{
 		readonly expectedStateDigest: string;
@@ -2729,6 +3202,8 @@ interface V3PlaneRegistration {
 	handle: V3PlaneHandle;
 	hotPredecessor?: WeakRef<V3PlaneRegistration>;
 	historicalIssuance?: HistoricalIssuanceContext;
+	/** The live session's bounded exact-byte facts, also shared by its historical reads. */
+	readonly vertexFacts: CreatorCensusVertexFacts;
 	index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
@@ -2739,6 +3214,10 @@ interface V3PlaneRegistration {
 	readonly networkNode: DRPNetworkNode;
 	readonly onAdmittedVertex: V3AdmittedVertexSink;
 	operationAdmissionHalted: boolean;
+	/** Original addressed native intent, captured before activation. It permits
+	 * only the original close owner to reconstruct and resume, never new issue. */
+	retirementResumeControl?: AheRetirementControl;
+	retirementReconstruction?: CreatorSnapshotRetirementReconstructionRequest;
 	readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
 	readonly payload: PreparedV3LivePayload;
 	readonly pendingIngress: Map<string, PendingV3Ingress>;
@@ -2747,8 +3226,30 @@ interface V3PlaneRegistration {
 	readonly topic: string;
 	drainingPendingIngress: boolean;
 	gate: Promise<void> | undefined;
+	/** Entered/queued lifetimes, including barrier waits and outer gossip fanout. */
+	readonly joinedWork: Set<Promise<void>>;
+	/** Entered plus queued caller-input jobs; control/maintenance retain their original gate. */
+	admittedInputJobs: number;
+	/** Exact encoded private local/replacement operations held by those jobs. */
+	admittedInputBytes: number;
+	/** Caller-requested dependency/source reads; not mandatory transition control. */
+	admittedReadControlJobs: number;
+	/** Fresh caller-requested publication turns, retained through native join. */
+	admittedPendingPublicationJobs: number;
+	/** Distinct caller-requested retained/completion turns, not mandatory transition control. */
+	admittedEgressControlJobs: number;
+	/** Native gossip retained ahead of the runtime handler, through object fanout join. */
+	admittedGossipQueueJobs: number;
+	admittedGossipQueueBytes: number;
 	pendingIngressBytes: number;
 	publicationCursor: number | undefined;
+	/** Replayable egress joins only equal selectors at the same queued gate cut.
+	 * Entered work or intervening work requires a fresh authenticated attempt. */
+	queuedReplayableEgress?: Readonly<{
+		gate: Promise<void> | undefined;
+		result: Promise<V3EgressResult>;
+		selector: string;
+	}>;
 	rebaseCursor: number | undefined;
 	rebaseSnapshot: readonly ClassifiedRebaseRow[] | undefined;
 	retainedBootstrapHold: boolean;
@@ -2758,6 +3259,9 @@ interface V3PlaneRegistration {
 	releaseTerminalBarrier: (() => void) | undefined;
 	terminalBarrier: Promise<void> | undefined;
 	terminalState: "active" | "transition" | "terminal";
+	terminalTransitionQueued: boolean;
+	terminalPublicationEntered: boolean;
+	terminalPublicationInputBytes: number;
 }
 
 interface PendingV3Ingress {
@@ -2774,6 +3278,1766 @@ interface VerifiedV3IngressEvidence {
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
+const preparedMigrationTargetFloors = new WeakMap<V3PlaneRegistration, Readonly<{ read(): Promise<Uint8Array> }>>();
+
+/** Original runtime producer's numerical row aggregate. No proof, native hold,
+ * parsed operation, signature authority or paid balance survives a call. */
+const ordinaryRuntimeCapacityGeometry = new WeakMap<V3PlaneRegistration, Readonly<{
+	sourceIdentity: object; graphVersion: number; rowCount: number;
+	widths: CreatorOrdinaryRuntimeCapacityWidths; journalImageDigest?: string;
+	prepared?: CreatorOrdinaryPreparedAdmission;
+}>>();
+
+
+/** DATA of the existing boundary/accepted-effect owner. No proof, reader, paid
+ * book or signature/source grant is retained. Exact native captures are still
+ * owed on every call. Old graph leaves are checked, never assumed immutable. */
+interface CreatorOrdinaryPreparedAdmission {
+	readonly index: CausalityIndex;
+	readonly admission: PreparedV3LivePayload["admission"];
+	readonly rows: readonly CreatorReplayRow[];
+	readonly vertices: readonly Readonly<{digest: string; vertex: EpochVertex;
+		identity: CloseVertexIdentity | undefined; charge: number | undefined;
+		intact(): boolean; authorKey?: Readonly<{author: string; format: string; bytes: Uint8Array}>}>[];
+	readonly issued: IssuanceRetirementRows["issued"];
+	readonly issuedCarriers: readonly Uint8Array[];
+	readonly lineages: IssuanceRetirementRows["lineages"];
+	readonly controls: readonly string[];
+	readonly preimageLengths: readonly number[];
+	readonly application: NonNullable<Awaited<ReturnType<typeof captureCreatorOrdinarySourceLinkedApplicationEffects>>>;
+	readonly applicationIntact: () => boolean;
+	readonly maximumAuthorByteLength: number;
+}
+
+function captureCreatorOrdinaryPreparedVertex(registration: V3PlaneRegistration, digest: string) {
+	const vertex = registration.closeVertices.get(digest);
+	if (vertex === undefined || vertex.hash !== digest) throw new TypeError("ordinary prepared graph vertex unavailable");
+	const identity = registration.closeAuthors.get(digest);
+	const key = identity === undefined ? undefined : resolveV3AuthorizedAuthor(registration.authorization, identity.author);
+	if (vertex.kind !== "drp-epoch-anchor" && (identity === undefined || key === undefined))
+		throw new TypeError("ordinary prepared graph lacks original current authorization");
+	return ObjectFreeze({digest, vertex, identity, charge: registration.closeCharges.get(digest),
+		intact: captureCreatorOrdinaryDimensionIntegrity(vertex),
+		...(identity === undefined || key === undefined ? {} : {authorKey: ObjectFreeze({author: identity.author,
+			format: key.format, bytes: new Uint8ArrayConstructor(key.bytes)})})});
+}
+
+function creatorOrdinaryPreparedVertexCurrent(registration: V3PlaneRegistration,
+	row: CreatorOrdinaryPreparedAdmission["vertices"][number]): boolean {
+	if (registration.closeVertices.get(row.digest) !== row.vertex || registration.closeAuthors.get(row.digest) !== row.identity ||
+		registration.closeCharges.get(row.digest) !== row.charge || !row.intact()) return false;
+	if (row.authorKey !== undefined) {
+		const key = resolveV3AuthorizedAuthor(registration.authorization, row.authorKey.author);
+		if (key === undefined || key.format !== row.authorKey.format || !sameBytes(key.bytes, row.authorKey.bytes)) return false;
+	}
+	return true;
+}
+
+function captureCreatorOrdinaryPreparedAdmission(registration: V3PlaneRegistration,
+	rows: readonly CreatorReplayRow[], native: IssuanceRetirementRows,
+	application: CreatorOrdinaryPreparedAdmission["application"]): CreatorOrdinaryPreparedAdmission | undefined {
+	try {
+		// The full boundary owner has already verified COMPLETE source-positive
+		// history. Retain only isolated numerical effects; new source-authorized
+		// candidates cannot extend this state through the ordinary accepted hook.
+		const ownedApplication = copyCanonicalForAdmittedView(application, true) as typeof application;
+		const captured = ObjectFreeze(rows.map(row => ObjectFreeze({...row,
+			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+			detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
+			exactCanonicalVertexBytes: new Uint8ArrayConstructor(row.exactCanonicalVertexBytes)})));
+		return ObjectFreeze({index: registration.index, admission: registration.payload.admission, rows: captured,
+			vertices: ObjectFreeze([...registration.closeVertices.keys()].map(digest => captureCreatorOrdinaryPreparedVertex(registration, digest))),
+			issued: ObjectFreeze(native.issued.map(row => ObjectFreeze({...row,
+				canonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+				digest: new Uint8ArrayConstructor(row.digest), signature: new Uint8ArrayConstructor(row.signature)}))),
+			issuedCarriers: ObjectFreeze(native.issued.map(row => encodeCanonical(row))),
+			lineages: ObjectFreeze(native.lineages.map(row => ObjectFreeze({...row}))),
+			controls: ObjectFreeze([...registration.controlVertices]),
+			preimageLengths: ObjectFreeze(captured.map(row => row.exactCanonicalPreimageBytes.byteLength)),
+			application: ownedApplication, applicationIntact: captureCreatorOrdinaryDimensionIntegrity(ownedApplication),
+			maximumAuthorByteLength: application.currentJournalMaximumAuthorByteLength});
+	} catch { return undefined; }
+}
+
+function creatorOrdinaryPreparedGraphCurrent(registration: V3PlaneRegistration,
+	prepared: CreatorOrdinaryPreparedAdmission): boolean {
+	return prepared.applicationIntact() && prepared.admission === registration.payload.admission &&
+		vertexRegistry.domain === V3_VERTEX_DOMAIN && prepared.index === registration.index && registration.closeVertices.size === prepared.vertices.length &&
+		registration.closeCharges.size === prepared.vertices.length && prepared.vertices.every(row => creatorOrdinaryPreparedVertexCurrent(registration, row)) &&
+		registration.controlVertices.size === prepared.controls.length && prepared.controls.every(digest => registration.controlVertices.has(digest));
+}
+
+function creatorOrdinaryPreparedIssuedEqual(left: IssuanceRetirementRows["issued"][number],
+	right: IssuanceRetirementRows["issued"][number]): boolean {
+	return left.objectId === right.objectId && left.author === right.author && left.authorSequence === right.authorSequence &&
+		sameBytes(left.canonicalPreimageBytes, right.canonicalPreimageBytes) &&
+		sameBytes(left.digest, right.digest) && sameBytes(left.signature, right.signature);
+}
+
+/** Complete fresh native rows must correspond to the exact boundary plus OWN
+ * native+graph accepted effects. Revisions, digest addresses and counters alone
+ * never establish this relation. Unfamiliar/partial work uses the full route. */
+function creatorOrdinaryPreparedNativeCurrent(registration: V3PlaneRegistration,
+	prepared: CreatorOrdinaryPreparedAdmission, rows: readonly LiveJournalAcceptedRow[], native: IssuanceRetirementRows): boolean {
+	if (!creatorOrdinaryPreparedGraphCurrent(registration, prepared) || rows.length !== prepared.rows.length ||
+		native.issued.length !== prepared.issued.length || native.lineages.length !== prepared.lineages.length) return false;
+	// Native physical keys need not agree with parsed values after raw browser
+	// mutation. Exact complete correspondence is ONE-TO-ONE, not many-to-one
+	// membership under equal lengths. Reject duplicate identities on both sides.
+	const issued = new Map<string, IssuanceRetirementRows["issued"][number]>();
+	for (const prior of prepared.issued) {
+		const key = JSON.stringify([prior.objectId, prior.author, prior.authorSequence]);
+		if (issued.has(key)) return false;
+		issued.set(key, prior);
+	}
+	for (const row of native.issued) {
+		const key = JSON.stringify([row.objectId, row.author, row.authorSequence]), prior = issued.get(key);
+		if (prior === undefined || !creatorOrdinaryPreparedIssuedEqual(row, prior)) return false;
+		issued.delete(key);
+	}
+	const lineages = new Map<string, IssuanceRetirementRows["lineages"][number]>();
+	for (const prior of prepared.lineages) {
+		const key = JSON.stringify([prior.objectId, prior.author]);
+		if (lineages.has(key)) return false;
+		lineages.set(key, prior);
+	}
+	for (const row of native.lineages) {
+		const key = JSON.stringify([row.objectId, row.author]), prior = lineages.get(key);
+		if (prior === undefined || row.next !== prior.next || row.exhausted !== prior.exhausted ||
+			row.prunedThroughAuthorSequence !== prior.prunedThroughAuthorSequence ||
+			row.pendingUnsigned !== undefined || prior.pendingUnsigned !== undefined) return false;
+		lineages.delete(key);
+	}
+	const scope = liveJournalScope(registration.payload);
+	return rows.every((row, index) => {
+		const expected = prepared.rows[index]!;
+		if (!sameLiveJournalScope(row.scope, scope) || row.journalSequence !== index ||
+			expected.journalSequence !== index || row.sourceKind !== expected.sourceKind || row.vertexDigest !== expected.digest) return false;
+		if (row.sourceKind === "received") return sameBytes(row.exactCanonicalPreimageBytes, expected.exactCanonicalPreimageBytes) &&
+			sameBytes(row.detachedSignature, expected.detachedSignature);
+		const issued = native.issued.filter(value => value.objectId === scope.objectId && value.author === row.author &&
+			value.authorSequence === row.authorSequence);
+		const identity = registration.closeAuthors.get(expected.digest);
+		return issued.length === 1 && identity?.author === row.author && identity.authorSequence === row.authorSequence &&
+			lowerHexDigest(issued[0]!.digest) === expected.digest &&
+			sameBytes(issued[0]!.canonicalPreimageBytes, expected.exactCanonicalPreimageBytes) &&
+			sameBytes(issued[0]!.signature, expected.detachedSignature);
+	});
+}
+
+function advanceCreatorOrdinaryPreparedAdmission(registration: V3PlaneRegistration,
+	previous: CreatorOrdinaryPreparedAdmission, row: CreatorReplayRow,
+	issued?: IssuanceRetirementRows["issued"][number]): CreatorOrdinaryPreparedAdmission {
+	if (previous.index !== registration.index || row.journalSequence !== previous.rows.length ||
+		registration.closeVertices.size !== previous.vertices.length + 1 ||
+		row.sourceKind === "local-issued" !== (issued !== undefined) ||
+		issued !== undefined && (issued.authorSequence >= Number.MAX_SAFE_INTEGER || lowerHexDigest(issued.digest) !== row.digest ||
+			!sameBytes(issued.canonicalPreimageBytes, row.exactCanonicalPreimageBytes) || !sameBytes(issued.signature, row.detachedSignature)))
+		throw new TypeError("ordinary accepted effect is incomplete");
+	if (!previous.vertices.every(vertex => creatorOrdinaryPreparedVertexCurrent(registration, vertex)))
+		throw new TypeError("ordinary accepted prefix was changed");
+	const vertex = captureCreatorOrdinaryPreparedVertex(registration, row.digest);
+	if (vertex.identity === undefined || vertex.identity.sourceAuthorized || !sameBytes(encodeCanonical(vertex.vertex), row.exactCanonicalVertexBytes))
+		throw new TypeError("ordinary accepted derivative differs");
+	const captured = ObjectFreeze({...row, exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+		detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
+		exactCanonicalVertexBytes: new Uint8ArrayConstructor(row.exactCanonicalVertexBytes)});
+	const nextIssued = issued === undefined ? previous.issued : ObjectFreeze([...previous.issued, ObjectFreeze({...issued,
+		canonicalPreimageBytes: new Uint8ArrayConstructor(issued.canonicalPreimageBytes),
+		digest: new Uint8ArrayConstructor(issued.digest), signature: new Uint8ArrayConstructor(issued.signature)})]);
+	const lineages = issued === undefined ? previous.lineages : ObjectFreeze(previous.lineages.map(prior =>
+		prior.objectId === issued.objectId && prior.author === issued.author
+			? ObjectFreeze({...prior, next: issued.authorSequence + 1}) : prior));
+	if (issued !== undefined && !previous.lineages.some(prior => prior.objectId === issued.objectId && prior.author === issued.author &&
+		prior.next === issued.authorSequence && !prior.exhausted && prior.pendingUnsigned === undefined))
+		throw new TypeError("ordinary accepted lineage differs");
+	return ObjectFreeze({...previous, rows: ObjectFreeze([...previous.rows, captured]),
+		vertices: ObjectFreeze([...previous.vertices, vertex]), issued: nextIssued,
+		issuedCarriers: issued === undefined ? previous.issuedCarriers : ObjectFreeze([...previous.issuedCarriers, encodeCanonical(issued)]), lineages,
+		controls: ObjectFreeze([...registration.controlVertices]),
+		preimageLengths: ObjectFreeze([...previous.preimageLengths, captured.exactCanonicalPreimageBytes.byteLength]),
+		maximumAuthorByteLength: Math.max(previous.maximumAuthorByteLength, encodeCanonical(vertex.identity.author).byteLength)});
+}
+
+function advanceCreatorOrdinaryRuntimeCapacityGeometry(registration: V3PlaneRegistration,
+	acceptedRow: unknown, nativeImage: Readonly<{imageDigest: string; controlBytes: Uint8Array | null}> | undefined,
+	accepted?: CreatorReplayRow, issued?: IssuanceRetirementRows["issued"][number]): void {
+	const previous = ordinaryRuntimeCapacityGeometry.get(registration);
+	if (previous === undefined) return;
+	try {
+		if (nativeImage === undefined || !isDigestHex(nativeImage.imageDigest) ||
+			previous.sourceIdentity !== creatorOrdinaryIssuanceSourceIdentity(registration) ||
+			previous.graphVersion + 1 !== registration.graphVersion || previous.widths.advance === undefined)
+			throw new TypeError("ordinary runtime geometry lost accepted correspondence");
+		const widths = previous.widths.advance(acceptedRow);
+		const prepared = previous.prepared === undefined || accepted === undefined ? undefined :
+			advanceCreatorOrdinaryPreparedAdmission(registration, previous.prepared, accepted, issued);
+		ordinaryRuntimeCapacityGeometry.set(registration, ObjectFreeze({...previous, widths,
+			graphVersion: registration.graphVersion, rowCount: previous.rowCount + 1,
+			journalImageDigest: nativeImage.imageDigest, prepared}));
+	} catch { ordinaryRuntimeCapacityGeometry.delete(registration); }
+}
+
+/** One native target dependency on the original terminal publication lifetime, not wire authority. */
+export async function withV3TerminalMigrationTargetFloor<T>(
+	plane: V3PlaneHandle,
+	floor: V3LocalSettlementFloor,
+	scope: RoomHeadScope,
+	consume: (borrow: () => Promise<NativeReadReservation | undefined>) => Promise<T>
+): Promise<T> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (
+		registration === undefined ||
+		!currentRegistration(registration) ||
+		registration.terminalState !== "transition" ||
+		registration.terminalPublicationEntered ||
+		preparedMigrationTargetFloors.has(registration) ||
+		scope.objectId === registration.payload.provenance.objectId ||
+		!parseStorageObjectId(scope.objectId).ok ||
+		!isDigestHex(scope.pinnedGenesisAnchorDigest)
+	)
+		throw new TypeError("migration target dependency owner is unavailable");
+	const reservation = await floor.acquireNativeReadReservation({ scope });
+	let enrolled: Readonly<{ read(): Promise<Uint8Array> }> | undefined;
+	let admitting = true;
+	let finishRelease: () => void = () => {};
+	const released = new Promise<void>((resolve) => {
+		finishRelease = resolve;
+	});
+	const children = new Set<NativeReadReservation>();
+	try {
+		const readFrame = async (): Promise<Uint8Array> => {
+			await reservation.check();
+			const native = await floor.readRetirementImage({ scope });
+			const frame = encodeCanonical(
+				{ version: 1, scope: native.scope, state: native.state, control: native.control },
+				ROOM_HEAD_IMAGE_LIMITS
+			);
+			const image = captureRoomHeadImage(frame);
+			if (
+				native.metadataBytes !== frame.byteLength ||
+				native.imageDigest !== roomHeadImageDigest(image) ||
+				image.scope.objectId !== scope.objectId ||
+				image.scope.pinnedGenesisAnchorDigest !== scope.pinnedGenesisAnchorDigest ||
+				image.state.pending !== null ||
+				image.state.stable.epoch !== 0 ||
+				image.state.stable.currentAnchorDigest !== scope.pinnedGenesisAnchorDigest
+			)
+				throw new TypeError("migration target native floor differs");
+			await reservation.check();
+			return frame;
+		};
+		const sealed = await readFrame();
+		enrolled = ObjectFreeze({
+			read: async () => {
+				const current = await readFrame();
+				if (!sameBytes(sealed, current)) throw new TypeError("migration target native floor is stale");
+				return current;
+			},
+		});
+		preparedMigrationTargetFloors.set(registration, enrolled);
+		const enrolledFloor = enrolled;
+		const result = await consume(async () => {
+			if (!admitting) {
+				await released;
+				return undefined;
+			}
+			let revoked = false,
+				joined: Promise<void> | undefined;
+			const pending = new Set<Promise<void>>();
+			const child: NativeReadReservation = ObjectFreeze({
+				check: () => {
+					if (revoked) return Promise.reject(new TypeError("migration target floor read is revoked"));
+					const work = enrolledFloor.read().then(() => {});
+					pending.add(work);
+					void work.finally(() => pending.delete(work)).catch(() => {});
+					return work;
+				},
+				release: () => {
+					if (joined !== undefined) return joined;
+					revoked = true;
+					return (joined = Promise.allSettled([...pending]).then((results) => {
+						children.delete(child);
+						const failures = results.flatMap((value) => (value.status === "rejected" ? [value.reason] : []));
+						if (failures.length) throw new AggregateError(failures, "migration target floor read join failed");
+					}));
+				},
+			});
+			children.add(child);
+			return child;
+		});
+		admitting = false;
+		await Promise.all([...children].map((child) => child.release()));
+		await enrolled.read();
+		return result;
+	} finally {
+		admitting = false;
+		await Promise.allSettled([...children].map((child) => child.release()));
+		if (preparedMigrationTargetFloors.get(registration) === enrolled)
+			preparedMigrationTargetFloors.delete(registration);
+		try {
+			await reservation.release();
+		} finally {
+			finishRelease();
+		}
+	}
+}
+
+interface RecoveryCloseHoldFacts {
+	readonly kind: "full-census";
+	readonly receivedAppend?: ReceivedAppendFacts;
+	readonly context: CreatorRecoveryCensusContext;
+	readonly registration?: V3PlaneRegistration;
+	readonly closePlane?: V3PlaneHandle;
+	borrowSigning(trusts: readonly CurrentAnchorTrust[]): Promise<CreatorSigningDependencyRead>;
+	captureSigning(): CreatorSigningRetirementOwners;
+	readonly dependencyAnchors: readonly Readonly<{ epoch: number; anchorDigest: string }>[];
+	readonly sourceTrust: CurrentAnchorTrust | undefined;
+	readonly exactCanonicalCensusBytes: Uint8Array;
+	readonly pending: Set<Promise<unknown>>;
+	readonly retirementAllowed: boolean;
+	completeRetirement?(observation: object): Promise<void>;
+	enrollCurrentJournalObservation?(observation: import("@ts-drp/live-journal").LiveJournalRetirementImageObservation): void;
+	/** Cross-object native exclusions survive target writes until the parent joins. */
+	releaseSourceDependencies?(): Promise<void>;
+	check(): Promise<void>;
+	/** Enrolls this hold's actually acquired target issuance exclusion. */
+	ownIssuanceReservation?(reservation: NativeReadReservation): NativeReadReservation;
+	releasing: boolean;
+	releaseTask?: Promise<void>;
+	lifetime?: CreatorSnapshotRecoveryCloseLifetime;
+	replacementCustody?: LocalReplacementCustody;
+	continuation?: Readonly<{
+		unsignedBytes: Uint8Array;
+		jobs: readonly IssuanceUnsignedContinuationJob[];
+		widths: ReturnType<typeof issuanceUnsignedContinuationWidths>;
+		checkPreview(): boolean;
+	}>;
+	postAdoptionSizing?: Readonly<{
+		unsignedBytes: Uint8Array;
+		preparedClose: object;
+		projectionBytes: Uint8Array;
+		variants: readonly CreatorPostAdoptionCensusSizing[];
+		checkSettlementPreview?(): boolean;
+	}>;
+}
+interface OrdinaryIssuanceRuntimeHoldFacts {
+	readonly kind: "ordinary-runtime";
+	readonly registration: V3PlaneRegistration;
+	readonly closePlane: V3PlaneHandle;
+	readonly receivedAppend?: ReceivedAppendFacts;
+	readonly pending: Set<Promise<unknown>>;
+	readonly runtime: ReturnType<typeof captureCreatorRecoveryRuntime>;
+	check(): void;
+	readRuntime(): CreatorOrdinaryIssuanceRuntimeReadout;
+	readPhaseEnded: boolean;
+	endReadPhaseTask?: Promise<void>;
+	postAdoptionSizing?: Readonly<{unsignedBytes: Uint8Array; preparedClose: object; projectionBytes: Uint8Array;
+		variants: readonly CreatorPostAdoptionCensusSizing[]; exactVariantBytes: Uint8Array; checkSettlementPreview?(): boolean}>;
+	currentDimensions?: Readonly<{unsignedBytes: Uint8Array; value: CreatorOrdinaryIssuanceCurrentDimensions | CreatorOrdinaryPreparedCapacityDimensions;
+		valueIntact(): boolean; sourceIdentity: object; machine: BlueprintStateMachine;
+		machineIdentity: NonNullable<V3PlaneRegistration["blueprintMachineIdentity"]>}>;
+	releasing: boolean;
+	releaseTask?: Promise<void>;
+	lifetime?: CreatorOrdinaryIssuanceRuntimeLifetime;
+}
+const recoveryCloseHolds = new WeakMap<CreatorSnapshotRecoveryCloseHold,
+	RecoveryCloseHoldFacts | OrdinaryIssuanceRuntimeHoldFacts>();
+
+/** One original owner's DATA integrity, not validation or authorization.
+ * Original canonical validation is mandatory. Frozen containers need only leaf
+ * checks; mutable plain DATA also owes exact own-key, descriptor, prototype and
+ * ordered-value correspondence. Its detached captured representation must first
+ * equal the ACTUAL encoded baseline. Unsupported/changed structure keeps the
+ * original comparison; no successful check advances these bounded owner facts. */
+function captureCreatorOrdinaryDimensionIntegrity(value: unknown): () => boolean {
+	const exact = encodeCanonical(value);
+	const leaves: {value: Uint8Array; bytes: Uint8Array}[] = [], visited = new Set<object>();
+	const copies = new Map<object, unknown>();
+	const containers: {value: object; parent: object | null; keys: readonly PropertyKey[];
+		fields: readonly {value: unknown; enumerable: boolean; configurable: boolean; writable: boolean}[]}[] = [];
+	const prototype = Uint8ArrayConstructor.prototype, iterator = prototype[Symbol.iterator];
+	const arrayPrototype: object = ObjectGetPrototypeOf([]);
+	// Optimization work bounds ONLY. Misses keep the original codec/domain and
+	// original errors/limits; these confer no proof-byte allowance.
+	let remainingFields = 65_536, remainingByteCopies = 4_194_304;
+	const plainBytes = (bytes: Uint8Array): boolean => {
+		if (ObjectGetPrototypeOf(bytes) !== prototype || ObjectGetPrototypeOf(prototype) !== TypedArrayPrototype ||
+			ObjectGetOwnPropertyDescriptor(bytes, "byteLength") !== undefined ||
+			ObjectGetOwnPropertyDescriptor(bytes, Symbol.iterator) !== undefined ||
+			ObjectGetOwnPropertyDescriptor(prototype, "byteLength") !== undefined || prototype[Symbol.iterator] !== iterator ||
+			ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "byteLength")?.get !== TypedArrayByteLengthGetter) return false;
+		// The original codec rejects detached views, including empty ones.
+		if (bytes.byteLength === 0) {
+			if (TypedArrayBufferGetter === undefined) return false;
+			new Uint8ArrayConstructor(ReflectApply(TypedArrayBufferGetter, bytes, []) as ArrayBuffer, 0, 0);
+		}
+		return true;
+	};
+	const capturedValue = (current: unknown): unknown => current !== null && typeof current === "object" ? copies.get(current) : current;
+	const capture = (current: unknown, depth = 0): boolean => {
+		if (--remainingFields < 0 || depth > 128) return false;
+		if (current === null || typeof current !== "object") return true; // Codec validated primitive semantics.
+		if (visited.has(current)) return true;
+		visited.add(current);
+		if (current instanceof Uint8ArrayConstructor) {
+			if (!plainBytes(current) || current.byteLength > remainingByteCopies) return false;
+			remainingByteCopies -= current.byteLength;
+			const bytes = new Uint8ArrayConstructor(current);
+			leaves.push({value: current, bytes}); copies.set(current, bytes);
+			return true;
+		}
+		const parent = ObjectGetPrototypeOf(current), array = ArrayIsArray(current);
+		if (array ? parent !== arrayPrototype || ObjectGetPrototypeOf(arrayPrototype) !== ObjectPrototype
+			: parent !== null && parent !== ObjectPrototype) return false;
+		const keys = ReflectOwnKeys(current);
+		if (keys.length > remainingFields) return false;
+		const copy: object = array ? [] : {__proto__: null};
+		copies.set(current, copy);
+		const fields: {value: unknown; enumerable: boolean; configurable: boolean; writable: boolean}[] = [];
+		for (const key of keys) {
+			const descriptor = ObjectGetOwnPropertyDescriptor(current, key);
+			// No accessors are invoked by this guard, including array accessors.
+			if (descriptor === undefined || !("value" in descriptor) || !capture(descriptor.value, depth + 1)) return false;
+			fields.push({value: descriptor.value, enumerable: descriptor.enumerable === true,
+				configurable: descriptor.configurable === true, writable: descriptor.writable === true});
+			ObjectDefineProperty(copy, key, array && key === "length" ? {value: descriptor.value} :
+				{value: capturedValue(descriptor.value), enumerable: descriptor.enumerable, configurable: true, writable: true});
+		}
+		if (!ObjectIsFrozen(current)) containers.push({value: current, parent, keys, fields});
+		return true;
+	};
+	const containersCurrent = (): boolean => ObjectGetPrototypeOf(arrayPrototype) === ObjectPrototype && containers.every(container => {
+		if (ObjectGetPrototypeOf(container.value) !== container.parent) return false;
+		const keys = ReflectOwnKeys(container.value);
+		if (keys.length !== container.keys.length || !keys.every((key, index) => key === container.keys[index])) return false;
+		return keys.every((key, index) => {
+			const descriptor = ObjectGetOwnPropertyDescriptor(container.value, key), field = container.fields[index]!;
+			return descriptor !== undefined && "value" in descriptor && descriptor.value === field.value &&
+				descriptor.enumerable === field.enumerable && descriptor.configurable === field.configurable &&
+				descriptor.writable === field.writable;
+		});
+	});
+	let supported = false;
+	try {
+		supported = capture(value);
+		// Mutable descriptors must describe bytes from THIS encoder result, not
+		// a later state reached by descriptor/prototype traps during capture.
+		// The detached representation contains only captured data, never getters.
+		if (supported && containers.length !== 0) supported = sameBytes(encodeCanonical(capturedValue(value)), exact);
+		supported &&= containersCurrent() && leaves.every(leaf => plainBytes(leaf.value) && sameBytes(leaf.value, leaf.bytes));
+	} catch { supported = false; }
+	visited.clear(); copies.clear();
+	if (!supported) { leaves.length = 0; containers.length = 0; }
+	return () => {
+		try {
+			if (supported && containersCurrent() && leaves.every(leaf => plainBytes(leaf.value)))
+				return leaves.every(leaf => sameBytes(leaf.value, leaf.bytes));
+			return sameBytes(encodeCanonical(value), exact);
+		} catch { return false; }
+	};
+}
+/** Full-source consumers never reinterpret runtime-only custody as a census. */
+function fullRecoveryCloseHoldFacts(value: CreatorSnapshotRecoveryCloseHold): RecoveryCloseHoldFacts | undefined {
+	const facts = recoveryCloseHolds.get(value);
+	return facts?.kind === "full-census" ? facts : undefined;
+}
+
+/** Private admission binding, never portable wire authority. */
+interface ReceivedAppendFacts {
+	readonly registration: V3PlaneRegistration;
+	readonly evidence: VerifiedV3IngressEvidence;
+	readonly sourceAuthorized: boolean;
+	readonly custody: LocalReplacementCustody;
+	readonly graphVersion: number;
+	readonly index: CausalityIndex;
+}
+const receivedAppendReceipts = new WeakMap<object, ReceivedAppendFacts>();
+function receivedAppendFacts(registration: V3PlaneRegistration, receipt: object): ReceivedAppendFacts {
+	const facts = receivedAppendReceipts.get(receipt);
+	if (facts === undefined || facts.registration !== registration || !currentRegistration(registration) ||
+		facts.graphVersion !== registration.graphVersion || facts.index !== registration.index ||
+		registration.index.has(facts.evidence.authenticated.digest))
+		throw new TypeError("received append candidate is foreign or stale");
+	return facts;
+}
+function prospectiveAppendCandidate(registration: V3PlaneRegistration,
+	bytes: Uint8Array, hold?: CreatorSnapshotRecoveryCloseHold) {
+	if (hold !== undefined && recoveryCloseHolds.get(hold)?.kind === "ordinary-runtime")
+		throw new TypeError("runtime-only custody supplies no complete prospective census");
+	const received = hold === undefined ? undefined : fullRecoveryCloseHoldFacts(hold)?.receivedAppend;
+	if (received !== undefined) {
+		if (received.registration !== registration || received.graphVersion !== registration.graphVersion ||
+			received.index !== registration.index || !sameBytes(bytes, received.evidence.exactCanonicalPreimageBytes))
+			throw new TypeError("received append candidate changed");
+		return captureIssuanceNativeSignInput({scope: {objectId: registration.issuanceScope.objectId,
+			author: received.evidence.authenticated.author}, exactCanonicalUnsignedVertexBytes: bytes});
+	}
+	return captureIssuanceNativeSignInput({scope: registration.issuanceScope, exactCanonicalUnsignedVertexBytes: bytes});
+}
+/** Original close preview only; never a complete prospective-census input. */
+function ordinaryPreviewAppendCandidate(registration: V3PlaneRegistration,
+	bytes: Uint8Array, hold: CreatorOrdinaryIssuanceRuntimeHold) {
+	const facts = recoveryCloseHolds.get(hold);
+	if (facts?.kind !== "ordinary-runtime" || facts.registration !== registration || facts.releasing)
+		throw new TypeError("ordinary close preview custody is foreign or revoked");
+	facts.check();
+	const received = facts.receivedAppend;
+	if (received !== undefined && (received.registration !== registration ||
+		received.graphVersion !== registration.graphVersion || received.index !== registration.index ||
+		received.sourceAuthorized || received.evidence.authenticated.admitted.settlementSource !== undefined ||
+		!sameBytes(bytes, received.evidence.exactCanonicalPreimageBytes)))
+		throw new TypeError("ordinary received close preview candidate changed");
+	return captureIssuanceNativeSignInput({scope: received === undefined ? registration.issuanceScope :
+		{objectId: registration.issuanceScope.objectId, author: received.evidence.authenticated.author},
+		exactCanonicalUnsignedVertexBytes: bytes});
+}
+function ordinaryRuntimePendingIngress(facts: OrdinaryIssuanceRuntimeHoldFacts) {
+	const pendingRoots = facts.runtime.pendingIngress.map(([digest, pending]) => ({
+		dependencyKind: "authenticated-unadmitted-pending-ingress", digest,
+		exactCanonicalPreimageBytes: pending.evidence.exactCanonicalPreimageBytes, signature: pending.evidence.signature,
+		wireByteCharge: pending.pendingByteCharge,
+		missingParents: pending.evidence.authenticated.vertex.dependencies.filter(dependency => !facts.runtime.index.has(dependency)),
+		scope: liveJournalScope(facts.registration.payload),
+	}));
+	return creatorRuntimeActiveCensusFields({pendingRoots, wireByteCharge: facts.runtime.pendingIngressBytes,
+		unsettledSources: [], cursor: null, cacheSourceSequences: [], epoch: facts.runtime.currentTrust.currentEpoch}).pendingIngress;
+}
+/** Resolves exact received bytes from the noncopyable held admission owner. */
+export function resolveCreatorReceivedAppendSizing(hold: unknown, bytes: Uint8Array):
+	Readonly<{signature: Uint8Array; localIssuerBasis: Readonly<{objectId: string; author: string; nextAuthorSequence: number}>}> | undefined {
+	if (hold === null || typeof hold !== "object") return undefined;
+	const facts = fullRecoveryCloseHoldFacts(hold), received = facts?.receivedAppend;
+	if (facts === undefined || received === undefined || facts.releasing ||
+		!sameBytes(bytes, received.evidence.exactCanonicalPreimageBytes)) return undefined;
+	try {
+		prospectiveAppendCandidate(received.registration, bytes, hold);
+		const census = decodeCanonical(facts.exactCanonicalCensusBytes) as {nativeIssuance: {rows: IssuanceRetirementRows}};
+		const scope = received.registration.issuanceScope;
+		const lineage = census.nativeIssuance.rows.lineages.find(row => sameScope(row, scope));
+		if (lineage === undefined || lineage.exhausted || lineage.pendingUnsigned !== undefined) return undefined;
+		return ObjectFreeze({signature: new Uint8ArrayConstructor(received.evidence.signature),
+			localIssuerBasis: ObjectFreeze({...scope, nextAuthorSequence: lineage.next})});
+	} catch { return undefined; }
+}
+
+/** Current local future-job cursor; received input never becomes a local intent. */
+function prospectiveIssuerBasis(registration: V3PlaneRegistration, hold: CreatorSnapshotRecoveryCloseHold, bytes: Uint8Array) {
+	const append = prospectiveAppendCandidate(registration, bytes, hold);
+	const received = resolveCreatorReceivedAppendSizing(hold, bytes);
+	return received === undefined ? append : {...append, scope: registration.issuanceScope,
+		sequence: received.localIssuerBasis.nextAuthorSequence - 1};
+}
+function creatorReceivedJournalCensusFields(received: ReceivedAppendFacts, journalSequence: number) {
+	const evidence = received.evidence;
+	return creatorReceivedJournalCensusCarrierFields({journalSequence,
+		byteCharge: evidence.exactCanonicalPreimageBytes.byteLength, digest: evidence.authenticated.digest,
+		exactCanonicalPreimageBytes: evidence.exactCanonicalPreimageBytes,
+		detachedSignature: evidence.signature, exactCanonicalVertexBytes: encodeCanonical(evidence.authenticated.vertex)});
+}
+/** The original received carrier shape, also used with omitted unknown leaves
+ * by its numerical width projection. Partial fields never enter authentication. */
+function creatorReceivedJournalCensusCarrierFields(input: Readonly<{journalSequence: number; byteCharge: number;
+	digest?: string; exactCanonicalPreimageBytes?: Uint8Array; detachedSignature?: Uint8Array; exactCanonicalVertexBytes?: Uint8Array}>) {
+	return {journalSequence: input.journalSequence, sourceKind: "received", byteCharge: input.byteCharge,
+		...(input.digest === undefined ? {} : {digest: input.digest}),
+		...(input.exactCanonicalPreimageBytes === undefined ? {} : {exactCanonicalPreimageBytes: input.exactCanonicalPreimageBytes}),
+		...(input.detachedSignature === undefined ? {} : {detachedSignature: input.detachedSignature}),
+		...(input.exactCanonicalVertexBytes === undefined ? {} : {exactCanonicalVertexBytes: input.exactCanonicalVertexBytes})};
+}
+
+/**
+ * Resolves a genuine close hold only for its exact native owners and current authority.
+ * @param value - Genuine noncopyable close hold.
+ * @param owners - Exact native owners and current authority.
+ * @returns Joined native lifetime checks, or undefined for foreign custody.
+ */
+function resolveRecoveryCloseHold(
+	value: unknown,
+	owners: CreatorSnapshotRecoveryCloseOwners
+): CreatorSnapshotRecoveryCloseLifetime | undefined {
+	if (value === null || typeof value !== "object") return undefined;
+	const facts = fullRecoveryCloseHoldFacts(value);
+	if (
+		facts === undefined ||
+		facts.releasing ||
+		facts.context.payload.input.store !== owners.store ||
+		facts.context.liveJournalStore !== owners.liveJournalStore ||
+		facts.context.payload.trust.trust.objectId !== owners.currentTrust.objectId ||
+		facts.context.payload.trust.trust.currentEpoch !== owners.currentTrust.currentEpoch ||
+		facts.context.payload.trust.trust.currentAnchorDigest !== owners.currentTrust.currentAnchorDigest
+	)
+		return undefined;
+	if (facts.lifetime !== undefined) return facts.lifetime;
+	const available = (): boolean => !facts.releasing && recoveryCloseHolds.get(value) === facts;
+	const signingChildren = new Set<Awaited<ReturnType<typeof borrowCreatorCloseSigningDependencies>>>();
+	const issuanceChildren = new Set<NativeReadReservation>();
+	// Nominal custody registry for this exact hold, not parsed-data or authority
+	// reuse. A combined read retains both child admissions while the original
+	// signing owner brackets one complete census check before and after the read.
+	const signingReadBoundaries = new WeakMap<CreatorSigningDependencyRead, Readonly<{
+		available(): boolean;
+		checkWhile(read: () => Promise<void>): Promise<void>;
+		track(task: Promise<void>): void;
+	}>>();
+	const admit = <T>(operation: () => Promise<T>): Promise<T> => {
+		if (!available()) return Promise.reject(new TypeError("creator recovery close hold is unavailable"));
+		const task = Promise.resolve().then(operation);
+		facts.pending.add(task);
+		void task.then(
+			() => facts.pending.delete(task),
+			() => facts.pending.delete(task)
+		);
+		return task;
+	};
+	const lifetime: CreatorSnapshotRecoveryCloseLifetime = ObjectFreeze({
+		enrollCurrentJournalObservation: function (this: CreatorSnapshotRecoveryCloseLifetime,
+			observation: import("@ts-drp/live-journal").LiveJournalRetirementImageObservation): void {
+			if (this !== lifetime || !available()) return;
+			facts.enrollCurrentJournalObservation?.(observation);
+		},
+		...(facts.closePlane === undefined ? {} : { plane: facts.closePlane }),
+		dependencyAnchors: facts.dependencyAnchors,
+		sourceTrust: facts.sourceTrust,
+		verifyVertex: function (this: CreatorSnapshotRecoveryCloseLifetime, input: Parameters<typeof verifyReceivedVertex>[0]) {
+			if (this !== lifetime || !available()) throw new TypeError("creator recovery close hold is unavailable");
+			// Pure facts inside the original admitted source read. Its complete
+			// native/context checks and joins remain; the prefix supplies its own
+			// ORIGINAL fresh closed-ACL key resolver on every call.
+			return (facts.context.historicalIssuance?.vertexFacts?.verify ?? verifyReceivedVertex)(input);
+		},
+		captureClassificationMetadataOwners: function (this: CreatorSnapshotRecoveryCloseLifetime) {
+			if (this !== lifetime || !available()) throw new TypeError("creator classification metadata hold is unavailable");
+			const native = durableIssuancePruningMaintenanceForStore(facts.context.issuanceStore);
+			const acquire = native?.acquireRetirementControl?.bind(native);
+			if (acquire === undefined) throw new TypeError("native issuance retirement is unsupported");
+			const scope = ObjectFreeze({ objectId: facts.context.payload.trust.trust.objectId });
+			return ObjectFreeze({ signing: facts.captureSigning(), issuance: () => acquire(scope) });
+		},
+		captureIssuanceRetirementOwner: function (this: CreatorSnapshotRecoveryCloseLifetime) {
+			if (this !== lifetime || !available() || !facts.retirementAllowed)
+				throw new TypeError("creator recovery retirement hold is unavailable");
+			const native = durableIssuancePruningMaintenanceForStore(facts.context.issuanceStore);
+			const acquire = native?.acquireRetirementControl?.bind(native);
+			if (acquire === undefined) throw new TypeError("native issuance retirement is unsupported");
+			const scope = ObjectFreeze({ objectId: facts.context.payload.trust.trust.objectId });
+			// Original private maintenance binding captures the real native receiver;
+			// the eventual native view supplies CAS, not caller-selected authority.
+			return () => acquire(scope);
+		},
+		captureSigningRetirementOwners: function (this: CreatorSnapshotRecoveryCloseLifetime) {
+			if (this !== lifetime || !available() || !facts.retirementAllowed)
+				throw new TypeError("creator recovery retirement hold is unavailable");
+			// Capture before joining this hold; the original actor remains the
+			// lifecycle owner of subsequent native one-use retirement views.
+			return facts.captureSigning();
+		},
+		borrowSigningDependencies: function (
+			this: CreatorSnapshotRecoveryCloseLifetime,
+			trusts: readonly CurrentAnchorTrust[]
+		) {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator recovery close hold is foreign"));
+			return admit(async () => {
+				await facts.check();
+				const original = await facts.borrowSigning(trusts);
+				if (!available()) {
+					await original.release();
+					throw new TypeError("creator recovery close hold is unavailable");
+				}
+				let released = false;
+				let releaseTask: Promise<void> | undefined;
+				const pending = new Set<Promise<void>>();
+				const child: typeof original = ObjectFreeze({
+					dependencyAnchors: original.dependencyAnchors,
+					readExactCanonicalRows: function () {
+						if (this !== child || released || !available())
+							throw new TypeError("creator signing dependency read is unavailable");
+						return original.readExactCanonicalRows();
+					},
+					checkWhile: function (read: () => Promise<void>) {
+						if (this !== child || released || typeof read !== "function")
+							return Promise.reject(new TypeError("creator signing dependency read is unavailable"));
+						const task = admit(() =>
+							original.checkWhile(async () => {
+								await facts.check();
+								await read();
+								await facts.check();
+							})
+						);
+						pending.add(task);
+						void task.then(
+							() => pending.delete(task),
+							() => pending.delete(task)
+						);
+						return task;
+					},
+					release: function () {
+						if (this !== child) return Promise.reject(new TypeError("creator signing dependency read is foreign"));
+						if (releaseTask !== undefined) return releaseTask;
+						released = true;
+							signingReadBoundaries.delete(child);
+						releaseTask = (async (): Promise<void> => {
+							const outcomes = await Promise.allSettled([...pending]);
+							let cleanup: unknown;
+							let cleanupFailed = false;
+							try {
+								await original.release();
+							} catch (error) {
+								cleanup = error;
+								cleanupFailed = true;
+							}
+							signingChildren.delete(child);
+							const errors = outcomes.flatMap((outcome) => (outcome.status === "rejected" ? [outcome.reason] : []));
+							if (cleanupFailed) errors.push(cleanup);
+							if (errors.length !== 0)
+								throw new AggregateError(errors, "creator signing dependency release failed", { cause: errors[0] });
+						})();
+						return releaseTask;
+					},
+				});
+				signingReadBoundaries.set(child, ObjectFreeze({
+					available: (): boolean => !released && available(),
+					checkWhile: (read: () => Promise<void>): Promise<void> => original.checkWhile(read),
+					track: (task: Promise<void>): void => {
+						pending.add(task);
+						void task.then(() => pending.delete(task), () => pending.delete(task));
+					},
+				}));
+				signingChildren.add(child);
+				return child;
+			});
+		},
+		borrowDependencies: function (
+			this: CreatorSnapshotRecoveryCloseLifetime
+		): Promise<CreatorSnapshotRecoveryCloseDependencyRead> {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator recovery close hold is foreign"));
+			return admit(async () => {
+				await facts.check();
+				if (!available()) throw new TypeError("creator recovery close hold is unavailable");
+				let released = false;
+				let releaseTask: Promise<void> | undefined;
+				const pending = new Set<Promise<void>>();
+				const child: CreatorSnapshotRecoveryCloseDependencyRead = ObjectFreeze({
+					dependencyAnchors: facts.dependencyAnchors,
+					readExactCanonicalCensus: function (this: CreatorSnapshotRecoveryCloseDependencyRead): Uint8Array {
+						if (this !== child || released || !available())
+							throw new TypeError("creator close dependency read is unavailable");
+						return Uint8Array.from(facts.exactCanonicalCensusBytes);
+					},
+					checkWhile: function (
+						this: CreatorSnapshotRecoveryCloseDependencyRead,
+						read: () => Promise<void>,
+						signing?: CreatorSigningDependencyRead
+					): Promise<void> {
+						if (this !== child || released || typeof read !== "function")
+							return Promise.reject(new TypeError("creator close dependency read is unavailable"));
+						const boundary = signing === undefined ? undefined : signingReadBoundaries.get(signing);
+						if (signing !== undefined && (boundary === undefined || !boundary.available()))
+							return Promise.reject(new TypeError("creator combined dependency read is foreign or unavailable"));
+						const checkedRead = async (): Promise<void> => {
+							await facts.check();
+							await read();
+							await facts.check();
+						};
+						// Preserve native-signing/context/read/context/native-signing
+						// order. No effect or inner delivery occurs between duplicated
+						// census checks at the former nested read-only boundary.
+						const task = admit(() => boundary === undefined ? checkedRead() : boundary.checkWhile(checkedRead));
+						pending.add(task);
+						boundary?.track(task);
+						void task.then(
+							() => pending.delete(task),
+							() => pending.delete(task)
+						);
+						return task;
+					},
+					release: function (this: CreatorSnapshotRecoveryCloseDependencyRead): Promise<void> {
+						if (this !== child) return Promise.reject(new TypeError("creator close dependency read is foreign"));
+						if (releaseTask !== undefined) return releaseTask;
+						released = true;
+						releaseTask = Promise.allSettled([...pending]).then(() => undefined);
+						return releaseTask;
+					},
+				});
+				return child;
+			});
+		},
+		check: function (this: CreatorSnapshotRecoveryCloseLifetime): Promise<void> {
+			return this === lifetime
+				? admit(() => facts.check())
+				: Promise.reject(new TypeError("creator recovery close hold is foreign"));
+		},
+		// This optional method describes captured replacement custody, not current
+		// authority. Ordinary holds have none: their maintenance owner acquires
+		// independent native reservations and performs the original fresh checks.
+		// Do not reconstruct a complete census merely to discover that absence.
+		...(facts.replacementCustody === undefined ? {} : { borrowCurrentNativeReservation: function (
+			this: CreatorSnapshotRecoveryCloseLifetime,
+			owner: "ahe" | "journal" | "floor"
+		): Promise<NativeReadReservation | undefined> {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator recovery close hold is foreign"));
+			return admit(async () => {
+				await facts.check();
+				if (owner !== "ahe" && owner !== "journal" && owner !== "floor")
+					throw new TypeError("replacement native borrow role is invalid");
+				// Ordinary issuance has no replacement-owned views to borrow. Its
+				// maintenance owner acquires independent native reservations instead.
+				if (facts.replacementCustody === undefined) return undefined;
+				const nativeOwner =
+					owner === "ahe"
+						? facts.context.payload.input.store
+						: owner === "journal"
+							? facts.context.liveJournalStore
+							: owner === "floor"
+								? facts.context.payload.input.settlementFloor
+								: undefined;
+				if (nativeOwner === undefined) throw new TypeError("replacement native borrow role is unavailable");
+				return facts.replacementCustody.borrow(nativeOwner);
+			});
+		} }),
+		acquireNativeIssuanceReservation: function (
+			this: CreatorSnapshotRecoveryCloseLifetime
+		): Promise<NativeReadReservation> {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator recovery close hold is foreign"));
+			return admit(async () => {
+				const owner = facts.context.issuanceStore;
+				const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
+				if (typeof acquire !== "function") throw new TypeError("native issuance exclusion is unsupported");
+				const reservation = (await Reflect.apply(acquire, owner, [
+					{ objectId: facts.context.payload.trust.trust.objectId },
+				])) as NativeReadReservation;
+				if (!available()) {
+					await reservation.release();
+					throw new TypeError("creator recovery close hold is unavailable");
+				}
+				let owned: NativeReadReservation;
+				try { owned = facts.ownIssuanceReservation?.(reservation) ?? reservation; }
+				catch (primary) {
+					try { await reservation.release(); }
+					catch (cleanup) { throw new AggregateError([primary, cleanup], "creator issuance custody acquisition cleanup failed", {cause: primary}); }
+					throw primary;
+				}
+				if (owned === reservation) return owned;
+				let releaseTask: Promise<void> | undefined;
+				const tracked: NativeReadReservation = ObjectFreeze({
+					check: function (this: NativeReadReservation): Promise<void> {
+						return this === tracked
+							? owned.check()
+							: Promise.reject(new TypeError("creator issuance custody is foreign"));
+					},
+					release: function (this: NativeReadReservation): Promise<void> {
+						if (this !== tracked) return Promise.reject(new TypeError("creator issuance custody is foreign"));
+						if (releaseTask !== undefined) return releaseTask;
+						releaseTask = owned.release().finally(() => issuanceChildren.delete(tracked));
+						return releaseTask;
+					},
+				});
+				issuanceChildren.add(tracked);
+				return tracked;
+			});
+		},
+		completeRetirement: function (this: CreatorSnapshotRecoveryCloseLifetime, observation: object): Promise<void> {
+			const plane = facts.closePlane;
+			if (this !== lifetime || !facts.retirementAllowed || plane === undefined)
+				return Promise.reject(new TypeError("creator recovery close hold is foreign or read-only"));
+			return admit(async () => {
+				await facts.check();
+				if (!available()) throw new TypeError("creator recovery close hold is unavailable");
+				if (facts.completeRetirement !== undefined) await facts.completeRetirement(observation);
+				else await acceptCreatorCloseRecoveryRetirement(plane, observation);
+			});
+		},
+		release: function (this: CreatorSnapshotRecoveryCloseLifetime): Promise<void> {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator recovery close hold is foreign"));
+			if (facts.releaseTask !== undefined) return facts.releaseTask;
+			facts.releasing = true;
+			facts.releaseTask = Promise.allSettled([...facts.pending]).then(async () => {
+				const releases = await Promise.allSettled([
+					...[...signingChildren].map((child) => child.release()),
+					...[...issuanceChildren].map((child) => child.release()),
+					...(facts.releaseSourceDependencies === undefined ? [] : [facts.releaseSourceDependencies()]),
+				]);
+				recoveryCloseHolds.delete(value);
+				const errors = releases.flatMap((outcome) => (outcome.status === "rejected" ? [outcome.reason] : []));
+				if (errors.length !== 0)
+					throw new AggregateError(errors, "creator signing dependency parent release failed", { cause: errors[0] });
+			});
+			return facts.releaseTask;
+		},
+	});
+	facts.lifetime = lifetime;
+	return lifetime;
+}
+
+/** Resolves runtime-only children through the same nominal parent registry.
+ * checkWhile brackets native checks supplied by the original rollback owner;
+ * runtime custody alone never authenticates source bytes or authorizes a write. */
+interface OrdinaryApplicationResourceCursorFacts {
+	readonly registration: V3PlaneRegistration;
+	readonly index: V3PlaneRegistration["index"];
+	readonly sourceIdentity: object;
+	readonly graphVersion: number;
+	readonly controlDigests: readonly string[];
+	/** Signed digest binds exact PRE; the original fresh replay reader verifies
+	 * its signature/derivative correspondence before every cursor use. */
+	readonly journal: readonly Readonly<{digest: string; sequence: number; sourceKind: CreatorReplayRow["sourceKind"]}>[];
+	readonly issued: ReadonlyMap<string, string>;
+}
+const ordinaryApplicationResourceCursors = new WeakMap<object, OrdinaryApplicationResourceCursorFacts>();
+
+function ordinaryApplicationResourceCursorMatches(prior: OrdinaryApplicationResourceCursorFacts,
+	current: OrdinaryApplicationResourceCursorFacts): boolean {
+	return prior.registration === current.registration && prior.index === current.index && prior.sourceIdentity === current.sourceIdentity &&
+		prior.graphVersion <= current.graphVersion && prior.controlDigests.length <= current.controlDigests.length &&
+		prior.controlDigests.every((digest, index) => digest === current.controlDigests[index]) &&
+		prior.journal.length <= current.journal.length && prior.journal.every((row, index) => {
+			const present = current.journal[index]; return present !== undefined && present.digest === row.digest &&
+				present.sequence === row.sequence && present.sourceKind === row.sourceKind;
+		}) && [...prior.issued].every(([key, signature]) => current.issued.get(key) === signature);
+}
+
+function resolveOrdinaryIssuanceRuntimeHold(value: unknown, owners: CreatorSnapshotRecoveryCloseOwners):
+	CreatorOrdinaryIssuanceRuntimeLifetime | undefined {
+	if (value === null || typeof value !== "object") return undefined;
+	const facts = recoveryCloseHolds.get(value);
+	if (facts?.kind !== "ordinary-runtime" || facts.releasing) return undefined;
+	const registration = facts.registration, trust = facts.runtime.currentTrust;
+	if (registration.payload.input.store !== owners.store || registration.liveJournalStore !== owners.liveJournalStore ||
+		trust.objectId !== owners.currentTrust.objectId || trust.currentEpoch !== owners.currentTrust.currentEpoch ||
+		trust.currentAnchorDigest !== owners.currentTrust.currentAnchorDigest ||
+		trust.genesisAnchorDigest !== owners.currentTrust.genesisAnchorDigest || trust.profileId !== owners.currentTrust.profileId)
+		return undefined;
+	try { facts.check(); } catch { return undefined; }
+	if (facts.lifetime !== undefined) return facts.lifetime;
+	const signingChildren = new Map<CreatorSigningDependencyRead, Readonly<{ original: CreatorSigningDependencyRead;
+		pending: Set<Promise<void>>; available(): boolean }>>();
+	const nativeChildren = new Set<NativeReadReservation>();
+	// One lexical proof borrows one complete signing union and one issuer read;
+	// received custody additionally lends each of its three current owners once.
+	// Repeated borrowing is not another operation allowance or reusable pool.
+	let signingBorrowAdmitted = false, issuanceBorrowAdmitted = false;
+	let issuanceChild: NativeReadReservation | undefined;
+	let issuanceBorrowAvailable = false;
+	let nativeIssuanceCapture: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensus | undefined;
+	let nativeIssuanceCurrent: Readonly<{observation: WeakRef<import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensus>;
+		producer: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensusReader;
+		probe: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensusCurrentProbe}> | undefined;
+	let currentJournalCapture: readonly CreatorReplayRow[] | undefined;
+	let currentJournalImageDigest: string | undefined;
+	let preparedCapacityCapture: CreatorOrdinaryPreparedAdmission | undefined;
+	let sourceLinkedApplicationCapture: Awaited<ReturnType<typeof captureCreatorOrdinarySourceLinkedApplicationEffects>>;
+	const applicationCursorFacts = (): OrdinaryApplicationResourceCursorFacts | undefined => {
+		facts.check();
+		const native = nativeIssuanceCapture, current = facts.currentDimensions;
+		if (!issuanceBorrowAvailable || native === undefined || currentJournalCapture === undefined || current === undefined ||
+			current.value.runtime.graphVersion !== registration.graphVersion ||
+			// This SAME invocation's original source verifier has checked every
+			// linked current/native leaf against the whole terminal native plans.
+			// A parsed source field or merely present plan cannot establish this.
+			sourceLinkedApplicationCapture === undefined ||
+			native.rows.plans.some(plan => plan.entries.some(entry => entry.disposition === "manual-review" ||
+				entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null)) ||
+			native.rows.lineages.some(row => row.pendingUnsigned !== undefined) ||
+			registration.pendingIngress.size !== 0 || registration.pendingIngressBytes !== 0 || registration.drainingPendingIngress)
+			return undefined;
+		const issued = new Map<string, string>();
+		for (const row of native.rows.issued) {
+			const digest = lowerHexDigest(row.digest);
+			if (digest === undefined) return undefined;
+			const key = JSON.stringify([row.objectId, row.author, row.authorSequence, digest]);
+			if (issued.has(key)) return undefined;
+			issued.set(key, lowerHexDigest(hashDomain("ts-drp/ordinary-app-cursor-signature/v1", row.signature))!);
+		}
+		return ObjectFreeze({registration, index: registration.index, sourceIdentity: creatorOrdinaryIssuanceSourceIdentity(registration),
+			graphVersion: registration.graphVersion, controlDigests: ObjectFreeze([...registration.controlVertices]),
+			journal: ObjectFreeze(currentJournalCapture.map(row => ObjectFreeze({digest: row.digest,
+				sequence: row.journalSequence, sourceKind: row.sourceKind}))), issued});
+	};
+	const currentBorrowAdmitted = { ahe: false, journal: false, floor: false };
+	// A failed child cleanup stays part of this parent's terminal outcome even
+	// when that child was released explicitly before the parent joins.
+	const childReleaseTasks = new Set<Promise<void>>();
+	const observeChildRelease = (release: Promise<void>): Promise<void> => {
+		const task = release.then(() => { childReleaseTasks.delete(task); }, cause => {
+			// An uncertain cleanup revokes this whole lexical proof immediately;
+			// it cannot be caught and converted into another borrowing allowance.
+			facts.releasing = true;
+			throw cause;
+		});
+		childReleaseTasks.add(task);
+		void task.catch(() => undefined);
+		return task;
+	};
+	const admit = <T>(operation: () => Promise<T>): Promise<T> => {
+		try { facts.check(); } catch (cause) { return Promise.reject(cause); }
+		const task = Promise.resolve().then(async () => { facts.check(); const result = await operation(); facts.check(); return result; });
+		facts.pending.add(task);
+		void task.then(() => facts.pending.delete(task), () => facts.pending.delete(task));
+		return task;
+	};
+	const ownNative = (original: NativeReadReservation, onRevoke?: () => void): NativeReadReservation => {
+		let revoked = false, releaseTask: Promise<void> | undefined;
+		const pending = new Set<Promise<void>>();
+		const child: NativeReadReservation = ObjectFreeze({
+			check: function (this: NativeReadReservation): Promise<void> {
+				if (this !== child || revoked) return Promise.reject(new TypeError("creator ordinary native child is foreign or revoked"));
+				const task = admit(async () => { if (revoked) throw new TypeError("creator ordinary native child is revoked");
+					await original.check(); if (revoked) throw new TypeError("creator ordinary native child is revoked"); });
+				pending.add(task); void task.then(() => pending.delete(task), () => pending.delete(task)); return task;
+			},
+			release: function (this: NativeReadReservation): Promise<void> {
+				if (this !== child) return Promise.reject(new TypeError("creator ordinary native child is foreign"));
+				if (releaseTask !== undefined) return releaseTask;
+				revoked = true;
+				onRevoke?.();
+				releaseTask = observeChildRelease(Promise.allSettled([...pending]).then(async () => {
+					try { await original.release(); } finally { nativeChildren.delete(child); }
+				}));
+				return releaseTask;
+			},
+		});
+		nativeChildren.add(child); return child;
+	};
+	const resolveDimensions = (readout: unknown, unsignedBytes: Uint8Array) => {
+		const enrolled = facts.currentDimensions;
+		if (preparedCapacityCapture !== undefined && (!creatorOrdinaryPreparedGraphCurrent(registration, preparedCapacityCapture) ||
+			ordinaryRuntimeCapacityGeometry.get(registration)?.prepared !== preparedCapacityCapture)) return undefined;
+		if (enrolled === undefined || enrolled.value !== readout || !sameBytes(enrolled.unsignedBytes, unsignedBytes)) return undefined;
+		try {
+			facts.check();
+			if (!issuanceBorrowAvailable || registration.blueprintMachine !== enrolled.machine ||
+				registration.blueprintMachineIdentity !== enrolled.machineIdentity ||
+				creatorOrdinaryIssuanceSourceIdentity(registration) !== enrolled.sourceIdentity ||
+				!enrolled.valueIntact()) return undefined;
+			const base = enrolled.machine.snapshot();
+			return base.stateDigest === enrolled.value.blueprint.baseStateDigest &&
+				sameBytes(base.exactCanonicalStateBytes, enrolled.value.blueprint.exactCanonicalBaseStateBytes) ? enrolled.value : undefined;
+		} catch { return undefined; }
+		
+	};
+	// Candidate validation is shared. Only an explicitly prepared-purpose child
+	// omits full historical views; the full API retains its original construction.
+	const readDimensions = (unsignedBytes: Uint8Array, preparedOnly = false):
+		CreatorOrdinaryIssuanceCurrentDimensions | CreatorOrdinaryPreparedCapacityDimensions | undefined => {
+		facts.check();
+		if (!issuanceBorrowAvailable || nativeIssuanceCapture === undefined || currentJournalCapture === undefined || sourceLinkedApplicationCapture === undefined)
+			return undefined;
+		const prepared = preparedOnly ? preparedCapacityCapture : undefined;
+		if (preparedOnly && (prepared === undefined || ordinaryRuntimeCapacityGeometry.get(registration)?.prepared !== prepared ||
+			!creatorOrdinaryPreparedGraphCurrent(registration, prepared))) return undefined;
+		if (!NumberIsSafeInteger(registration.payload.parameters.snapshotChunkBytes) || registration.payload.parameters.snapshotChunkBytes <= 0)
+			return undefined;
+		const machine = registration.blueprintMachine, machineIdentity = registration.blueprintMachineIdentity;
+		const successorFenceCount = settlementProfileFor(trust.profileId) === "v1" ? 1 :
+			trust.profileId === "creator-trusted-v1" ? 0 : undefined;
+		if (machine === undefined || machineIdentity?.machine !== machine || successorFenceCount === undefined) return undefined;
+		const base = machine.snapshot();
+		if (base.blueprintDigest !== registration.payload.provenance.blueprintDigest ||
+			base.stateDigest !== machineIdentity.expectedStateDigest) return undefined;
+		const candidate = ordinaryPreviewAppendCandidate(registration, unsignedBytes, value as CreatorOrdinaryIssuanceRuntimeHold);
+		// The original canonical decoder owns a fresh null-prototype record.
+		// Adapt only those freshly decoded data fields to the existing strict
+		// plain-record capture; never relax its caller/authority boundary.
+		const decodedUnsigned = decodeCanonical(candidate.bytes);
+		const unsigned = isObject(decodedUnsigned) && ObjectGetPrototypeOf(decodedUnsigned) === null
+			? snapshotClosedRecord({...decodedUnsigned}, ["kind", "protocolMajor", "objectId",
+				"epoch", "anchor", "author", "authorSequence", "logicalTime", "dependencies", "operation"])
+			: undefined;
+		if (unsigned === undefined || unsigned.kind !== "drp-vertex" || unsigned.protocolMajor !== 3 ||
+			unsigned.objectId !== trust.objectId || unsigned.epoch !== trust.currentEpoch ||
+			unsigned.anchor !== trust.currentAnchorDigest || unsigned.author !== candidate.scope.author ||
+			unsigned.authorSequence !== candidate.sequence || typeof unsigned.logicalTime !== "number" ||
+			!NumberIsSafeInteger(unsigned.logicalTime) || unsigned.logicalTime < 1 || !ArrayIsArray(unsigned.dependencies) ||
+			unsigned.dependencies.length < 1 || unsigned.dependencies.length > registration.payload.parameters.maxDependencies ||
+			unsigned.dependencies.some(dependency => typeof dependency !== "string" || !isDigestHex(dependency) || !registration.index.has(dependency)))
+			return undefined;
+		const operation = detachedCanonicalOperation(unsigned.operation);
+		if (operation === undefined || !acceptedApplicationOperation(registration.payload, operation, unsigned.logicalTime)) return undefined;
+		const digest = lowerHexDigest(candidate.digest);
+		if (digest === undefined || registration.index.has(digest) || !hasGraphCapacity(registration, candidate.scope.author, candidate.bytes.byteLength))
+			return undefined;
+		const control = isControlOperation(operation, trust.profileId), acl = control ? null : aclOperation(candidate.scope.author, digest, operation);
+		if (!control && !validateLatchedOperation(registration.authorization, registration.latchedOperations, acl,
+			candidate.scope.author, trust.profileId, false, false)) return undefined;
+		if (facts.receivedAppend === undefined) {
+			const lineage = nativeIssuanceCapture.rows.lineages.find(row => sameScope(row, candidate.scope));
+			if (lineage === undefined || lineage.exhausted || lineage.pendingUnsigned !== undefined || lineage.next !== candidate.sequence)
+				return undefined;
+		}
+		const batch = Reflect.get(operation, "action") === APPLICATION_BATCH_ACTION ? applicationBatchEntries(registration.payload, operation) : undefined;
+		if (Reflect.get(operation, "action") === APPLICATION_BATCH_ACTION && batch === undefined) return undefined;
+		const action = ownDataValue(operation, "action"), rows = nativeIssuanceCapture.rows;
+		let applicationRows: readonly CreatorReplayRow[] | undefined, controlRows: readonly CreatorReplayRow[] | undefined;
+		if (prepared === undefined) {
+			// The prior original journal authentication establishes complete graph
+			// coverage. Spell that same vector, not a caller-selected operation subset.
+			if (registration.closeVertices.size !== currentJournalCapture.length + 1) return undefined;
+			let anchors = 0;
+			for (const [hash, vertex] of registration.closeVertices) {
+				const bytes = encodeCanonical(vertex);
+				if (vertex.hash !== hash) return undefined;
+				if (vertex.kind === "drp-epoch-anchor") {
+					if (hash !== trust.currentAnchorDigest || vertex.epoch !== trust.currentEpoch || vertex.objectId !== trust.objectId)
+					return undefined;
+					anchors++;
+				} else {
+					const original = currentJournalCapture.find(row => row.digest === hash);
+					if (original === undefined || !sameBytes(bytes, original.exactCanonicalVertexBytes)) return undefined;
+				}
+			}
+			if (anchors !== 1 || registration.payload.catalog.blueprintDigest !== base.blueprintDigest) return undefined;
+			// Metadata came from this SAME complete authenticated replay. The full
+			// original source verifier still owns every source-positive row.
+			const applicationProjection = deriveApplicationProjectionOrder(registration.payload, registration.closeVertices,
+				registration.controlVertices, registration.index);
+			if (applicationProjection === undefined) return undefined;
+			const projectedPreimages = (digests: readonly string[]) => digests.map(digest => {
+				const row = currentJournalCapture!.find(row => row.digest === digest);
+				if (row === undefined) throw new TypeError("ordinary application projection lacks original journal PRE");
+				return row;
+			});
+			applicationRows = projectedPreimages(applicationProjection.order.digests); controlRows = projectedPreimages(applicationProjection.order.controlDigests);
+		}
+		const currentSignedPreimagesHaveSettlementSource = prepared === undefined
+			? sourceLinkedApplicationCapture.currentSignedPreimagesHaveSettlementSource : prepared.application.currentSignedPreimagesHaveSettlementSource;
+		const currentJournalMaximumAuthorByteLength = prepared?.maximumAuthorByteLength ??
+			sourceLinkedApplicationCapture.currentJournalMaximumAuthorByteLength;
+		const catalog = registration.payload.catalog;
+		const dimensions: CreatorOrdinaryIssuanceCurrentDimensions | CreatorOrdinaryPreparedCapacityDimensions = ObjectFreeze({runtime: facts.readRuntime(),
+			parameters: ObjectFreeze({...registration.payload.parameters}),
+			candidate: ObjectFreeze({exactCanonicalUnsignedVertexBytes: new Uint8ArrayConstructor(candidate.bytes),
+				exactCanonicalEpochVertexBytes: encodeCanonical({anchor: unsigned.anchor, dependencies: unsigned.dependencies,
+					epoch: unsigned.epoch, hash: digest, kind: "drp-vertex", objectId: unsigned.objectId, operation}),
+				exactCanonicalOperationBytes: encodeCanonical(operation, APPLICATION_BATCH_LIMITS), digest,
+				author: candidate.scope.author, authorSequence: candidate.sequence, logicalTime: unsigned.logicalTime,
+				dependencies: ObjectFreeze([...unsigned.dependencies] as string[]), operationCount: batch?.length ?? 1,
+				...(typeof action === "string" ? {action} : {}), control}),
+			blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
+				exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
+				maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes, maxDepth: 16 as const, maxItems: 16384 as const,
+				catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
+					runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
+					canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
+			currentEpochVertexCount: registration.closeVertices.size,
+			currentSignedPreimageByteLengths: prepared?.preimageLengths ?? ObjectFreeze(currentJournalCapture.map(row => row.exactCanonicalPreimageBytes.byteLength)),
+			currentSignedPreimagesHaveSettlementSource,
+			currentJournalMaximumAuthorByteLength,
+			...(prepared !== undefined ? {preparedCapacityOnly: true as const} : {
+				currentApplicationPreimageBytes: ObjectFreeze(applicationRows!.map(row => new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes))),
+				sourceLinkedApplicationEffects: ObjectFreeze((sourceLinkedApplicationCapture?.effects ?? []).map(row => ObjectFreeze({
+					exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+					exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(row.exactCanonicalEpochVertexBytes)}))),
+				applicationControls: ObjectFreeze(controlRows!.map(row => ObjectFreeze({exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+					exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(row.exactCanonicalVertexBytes)}))),
+			}),
+			nativeCounts: ObjectFreeze({lineages: rows.lineages.length, issued: rows.issued.length, outbox: rows.outbox.length,
+				plans: rows.plans.length, currentJournalRows: currentJournalCapture.length,
+				localJournalRows: currentJournalCapture.filter(row => row.sourceKind === "local-issued").length,
+				receivedJournalRows: currentJournalCapture.filter(row => row.sourceKind === "received").length}),
+			pendingIngress: copyCanonicalForAdmittedView(ordinaryRuntimePendingIngress(facts), true), successorFenceCount});
+		facts.check();
+		facts.currentDimensions = ObjectFreeze({unsignedBytes: new Uint8ArrayConstructor(candidate.bytes), value: dimensions,
+			valueIntact: captureCreatorOrdinaryDimensionIntegrity(dimensions), sourceIdentity: creatorOrdinaryIssuanceSourceIdentity(registration),
+			machine, machineIdentity});
+		return dimensions;
+		
+	};
+	const lifetime: CreatorOrdinaryIssuanceRuntimeLifetime = ObjectFreeze({
+		captureReadinessPreparation: function (this: CreatorOrdinaryIssuanceRuntimeLifetime,
+			accounting: CreatorClosedRollbackProofAccounting) {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator ordinary runtime lifetime is foreign"));
+			return admit(async () => {
+				facts.check();
+				const native = nativeIssuanceCapture, identity = creatorOrdinaryIssuanceSourceIdentity(registration);
+				if (!issuanceBorrowAvailable || issuanceChild === undefined || !nativeChildren.has(issuanceChild) || native === undefined)
+					return undefined;
+				const prepared = await captureOrdinaryReadinessPreparationForSizing(facts, registration, identity,
+					native.rows, native.control ?? undefined, accounting);
+				facts.check();
+				if (prepared === undefined || nativeIssuanceCapture !== native ||
+					creatorOrdinaryIssuanceSourceIdentity(registration) !== identity) return undefined;
+				return ObjectFreeze({preparation: prepared.preparation, commit: (): boolean => {
+					try {
+						facts.check();
+						return issuanceBorrowAvailable && nativeIssuanceCapture === native &&
+							creatorOrdinaryIssuanceSourceIdentity(registration) === identity && prepared.commit();
+					} catch { return false; }
+				}});
+			});
+		},
+		plane: facts.closePlane,
+		readRuntime: function (this: CreatorOrdinaryIssuanceRuntimeLifetime) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			return facts.readRuntime();
+		},
+		readSourceIdentity: function (this: CreatorOrdinaryIssuanceRuntimeLifetime) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			facts.check(); return creatorOrdinaryIssuanceSourceIdentity(facts.registration);
+		},
+		readNativeIssuance: function (this: CreatorOrdinaryIssuanceRuntimeLifetime) {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator ordinary runtime lifetime is foreign"));
+			return admit(async () => {
+				if (!issuanceBorrowAvailable || issuanceChild === undefined || !nativeChildren.has(issuanceChild))
+					throw new TypeError("creator ordinary issuer image lacks native exclusion");
+				await issuanceChild.check();
+				// Probe the genuine public facade too: a held native child does not
+				// make a closed/replaced issuer usable for a new source check.
+				await registration.issuanceStore.readLineage(registration.issuanceScope);
+				const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(facts.registration));
+				if (maintenance?.readBoundedRecoveryCensus === undefined)
+					throw new TypeError("creator ordinary issuer image is unavailable");
+				const producer = maintenance.readBoundedRecoveryCensus;
+				const censusInput = {objectId: facts.registration.issuanceScope.objectId,
+					limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes}};
+				const capture = await producer.call(maintenance, censusInput);
+				nativeIssuanceCapture = copyCanonicalForAdmittedView(capture, true) as typeof capture;
+				nativeIssuanceCurrent = undefined;
+				const method = ObjectGetOwnPropertyDescriptor(producer, "captureCurrentProbe");
+				if (!facts.readPhaseEnded && !facts.releasing && Object.isFrozen(producer) && method !== undefined && "value" in method && typeof method.value === "function") {
+					const probe = producer.captureCurrentProbe?.call(producer, censusInput, capture);
+					if (probe !== undefined) nativeIssuanceCurrent = ObjectFreeze({observation: new WeakRef(capture), producer, probe});
+				}
+				return capture;
+			});
+		},
+		captureNativeIssuanceCurrentProbe: function (this: CreatorOrdinaryIssuanceRuntimeLifetime,
+			observation: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensus) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			facts.check();
+			const captured = nativeIssuanceCurrent;
+			if (captured === undefined || captured.observation.deref() !== observation || !issuanceBorrowAvailable ||
+				issuanceChild === undefined || !nativeChildren.has(issuanceChild)) return undefined;
+			const current: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensusCurrentProbe = ObjectFreeze({
+				checkCurrent: function (this: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensusCurrentProbe): Promise<boolean> {
+					if (this !== current) return Promise.reject(new TypeError("creator ordinary issuer probe is foreign"));
+					return admit(async () => {
+						if (!issuanceBorrowAvailable || issuanceChild === undefined || !nativeChildren.has(issuanceChild))
+							throw new TypeError("creator ordinary issuer image lacks native exclusion");
+						await issuanceChild.check();
+						// Preserve the original facade liveness guard even while the physical child is held.
+						await registration.issuanceStore.readLineage(registration.issuanceScope);
+						const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(facts.registration));
+						if (maintenance?.readBoundedRecoveryCensus !== captured.producer) return false;
+						return captured.probe.checkCurrent();
+					});
+				},
+			});
+			return current;
+		},
+		checkCurrentOrdinaryWork: function (this: CreatorOrdinaryIssuanceRuntimeLifetime,
+			row: Parameters<CreatorOrdinaryIssuanceRuntimeLifetime["checkCurrentOrdinaryWork"]>[0], preparedCapacityOnly?: true) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			facts.check();
+			if (row.objectId !== registration.payload.provenance.objectId) return false;
+			if (preparedCapacityOnly) {
+				const geometry = ordinaryRuntimeCapacityGeometry.get(registration), prepared = geometry?.prepared;
+				const digest = lowerHexDigest(row.digest);
+				const vertex = prepared?.vertices.find(value => value.digest === digest);
+				return prepared !== undefined && geometry?.sourceIdentity === creatorOrdinaryIssuanceSourceIdentity(registration) &&
+					geometry.graphVersion === registration.graphVersion && vertex !== undefined &&
+					creatorOrdinaryPreparedVertexCurrent(registration, vertex) &&
+					prepared.issued.some(prior => creatorOrdinaryPreparedIssuedEqual(row, prior));
+			}
+			const verified = readRetainedCloseSignedCurrentAdmission(registration, row.canonicalPreimageBytes,
+				row.signature, lowerHexDigest(row.digest) ?? "") ?? authenticateRecoveryVertex(registration.payload, registration.authorization,
+				row.canonicalPreimageBytes, row.signature);
+			if (verified === undefined || verified.digest !== lowerHexDigest(row.digest) ||
+				verified.author !== row.author || verified.authorSequence !== row.authorSequence ||
+				verified.admitted.settlementSource !== undefined || !hasBoundedDependencies(registration.payload, verified)) return false;
+			const retained = registration.closeVertices.get(verified.digest);
+			if (retained !== undefined) {
+				const identity = registration.closeAuthors.get(verified.digest);
+				return identity !== undefined && identity.author === verified.author &&
+					identity.authorSequence === verified.authorSequence && identity.sourceAuthorized !== true &&
+					registration.closeCharges.get(verified.digest) === verified.byteCharge &&
+					sameBytes(encodeCanonical(retained), encodeCanonical(verified.vertex));
+			}
+			return verified.vertex.dependencies.every(dependency => registration.index.has(dependency));
+		},
+		checkCurrentJournal: function (this: CreatorOrdinaryIssuanceRuntimeLifetime,
+			accounting: Parameters<CreatorOrdinaryIssuanceRuntimeLifetime["checkCurrentJournal"]>[0],
+			nativeRows: Parameters<CreatorOrdinaryIssuanceRuntimeLifetime["checkCurrentJournal"]>[1], preparedCapacityOnly?: true) {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator ordinary runtime lifetime is foreign"));
+			return admit(async () => {
+				if (nativeIssuanceCapture === undefined) return false;
+				const physical = readCreatorOrdinaryCapturedJournalReplay(accounting, lifetime);
+				if (physical === null) return false;
+				if (physical !== undefined && physical.nativeImageDigest !== nativeIssuanceCapture.image.imageDigest) return false;
+				if (preparedCapacityOnly) {
+					const geometry = ordinaryRuntimeCapacityGeometry.get(registration), prepared = geometry?.prepared;
+					if (physical?.preparedGeometryMatches !== true || prepared === undefined || geometry?.sourceIdentity !== creatorOrdinaryIssuanceSourceIdentity(registration) ||
+						geometry.graphVersion !== registration.graphVersion || geometry.rowCount !== nativeRows.length ||
+						geometry.journalImageDigest !== undefined && geometry.journalImageDigest !== physical.journalImageDigest ||
+						!creatorOrdinaryPreparedNativeCurrent(registration, prepared, nativeRows, nativeIssuanceCapture.rows)) return false;
+					// SAME book, original full PRE/signature/derivative and native
+					// local-issued wrapper charges. No historical observation is paid
+					// by a prior book and every UNKNOWN elsewhere remains additive.
+					for (const row of prepared.rows) {
+						if (!accounting.charge(row.exactCanonicalPreimageBytes) || !accounting.charge(row.detachedSignature) ||
+							!accounting.charge(row.exactCanonicalVertexBytes)) return false;
+						if (row.sourceKind === "local-issued") {
+							const index = prepared.issued.findIndex(value => lowerHexDigest(value.digest) === row.digest);
+							if (index < 0 || !accounting.charge(prepared.issuedCarriers[index]!)) return false;
+						}
+					}
+					preparedCapacityCapture = prepared;
+					currentJournalCapture = prepared.rows;
+					currentJournalImageDigest = physical.journalImageDigest;
+					sourceLinkedApplicationCapture = prepared.application;
+					return true;
+				}
+				const replayCapture: CreatorReplayVertexCapture = {};
+				const rows = await readCreatorReplayRows(registration, undefined, accounting, registration, nativeRows, replayCapture,
+					physical === undefined ? undefined : {rows: physical.rows, issued: nativeIssuanceCapture.rows.issued});
+				if (rows === undefined) return false;
+				const application = await captureCreatorOrdinarySourceLinkedApplicationEffects(registration, rows,
+					nativeIssuanceCapture.rows, accounting, replayCapture);
+				if (application === undefined) return false;
+				// The private replay already owns its frozen rows and detached native
+				// or signed-derivative bytes. No public caller receives this vector;
+				// outward dimension/effect deliveries still copy their byte leaves.
+				currentJournalCapture = rows;
+				currentJournalImageDigest = physical?.journalImageDigest;
+				sourceLinkedApplicationCapture = application;
+				const prepared = ordinaryRuntimeCapacityGeometry.get(registration);
+				if (prepared !== undefined && prepared.journalImageDigest === undefined && physical?.preparedGeometryMatches === true &&
+					physical.journalImageDigest !== undefined && prepared.sourceIdentity === creatorOrdinaryIssuanceSourceIdentity(registration) &&
+					prepared.graphVersion === registration.graphVersion && prepared.rowCount === rows.length) {
+					facts.check();
+					ordinaryRuntimeCapacityGeometry.set(registration, ObjectFreeze({...prepared, journalImageDigest: physical.journalImageDigest}));
+				}
+				return true;
+			});
+		},
+		readOrdinarySettlementCapacity: function (this: CreatorOrdinaryIssuanceRuntimeLifetime,
+			unsignedBytes: Uint8Array, preview: CreatorRoomSettlementPreview) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			facts.check();
+			try {
+				const enrolled = facts.currentDimensions, native = nativeIssuanceCapture;
+				if (!issuanceBorrowAvailable || issuanceChild === undefined || !nativeChildren.has(issuanceChild) ||
+					native === undefined || currentJournalCapture === undefined || enrolled === undefined ||
+					!sameBytes(enrolled.unsignedBytes, unsignedBytes) || typeof preview !== "function" ||
+					settlementProfileFor(trust.profileId) !== "v1" || enrolled.value.successorFenceCount !== 1 ||
+					enrolled.value.runtime.graphVersion !== registration.graphVersion ||
+					creatorOrdinaryIssuanceSourceIdentity(registration) !== enrolled.sourceIdentity ||
+					registration.blueprintMachine !== enrolled.machine || registration.blueprintMachineIdentity !== enrolled.machineIdentity)
+					return undefined;
+				const rows = native.rows, scope = registration.issuanceScope, epoch = trust.currentEpoch;
+				if (rows.lineages.some(row => row.pendingUnsigned !== undefined) ||
+					rows.plans.some(plan => plan.entries.some(entry => entry.disposition === "manual-review" ||
+						entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null)) ||
+					native.control?.active != null || sourceLinkedApplicationCapture === undefined)
+					return undefined;
+				const append = ordinaryPreviewAppendCandidate(registration, unsignedBytes, value as CreatorOrdinaryIssuanceRuntimeHold),
+					received = facts.receivedAppend !== undefined, lineage = rows.lineages.find(row => sameScope(row, scope));
+				if (lineage === undefined || lineage.exhausted || lineage.pendingUnsigned !== undefined ||
+					!NumberIsSafeInteger(lineage.next) || lineage.next < Number(received) ||
+					!received && (!sameScope(append.scope, scope) || lineage.next !== append.sequence)) return undefined;
+				const sequence = received ? lineage.next - 1 : append.sequence;
+				if (!NumberIsSafeInteger(sequence + 2) || sequence < 0) return undefined;
+				const history = settlementFrontierFromHistory(registration.historicalIssuance);
+				if (epoch !== 0 && (history === undefined || registration.historicalIssuance?.scopeAuthorMatches !== true ||
+					!validSettlementFrontierContext(registration.payload, history))) return undefined;
+				if (epoch === 0 && registration.historicalIssuance !== undefined) return undefined;
+				const slots = new Map<number, string>(), vertices = new Map<string, Pick<EpochVertex, "operation">>(registration.closeVertices);
+				let duplicate = false;
+				for (const [digest, identity] of registration.closeAuthors) {
+					if (identity.author !== scope.author) continue;
+					if (!vertices.has(digest) || identity.sourceAuthorized === true &&
+						!sourceLinkedApplicationCapture.completedNative.some(row => row.authorSequence === identity.authorSequence && row.digest === digest)) return undefined;
+					if (slots.has(identity.authorSequence)) duplicate = true;
+					slots.set(identity.authorSequence, digest);
+				}
+				if (!received || append.scope.author === scope.author) {
+					const digest = enrolled.value.candidate.digest;
+					const candidatePreimage = decodeCanonical(append.bytes);
+					if (!prospectiveCensusRecord(candidatePreimage) || !prospectiveCensusRecord(candidatePreimage.operation)) return undefined;
+					if (slots.has(append.sequence)) duplicate = true;
+					slots.set(append.sequence, digest);
+					// Only an operation DATA slot is needed by the shared frontier law;
+					// read it from the exact candidate, not a mutable delivered derivative.
+					vertices.set(digest, {operation: candidatePreimage.operation});
+				}
+				const frontier = deriveCreatorAuthorSettlementFrontier({author: scope.author, issuanceAuthor: scope.author,
+					admissionEpoch: history?.admissionEpoch ?? 0, boundary: history?.terminalThrough ?? null,
+					slots, duplicate, vertices});
+				const issued = new Map<number, Readonly<Record<string, unknown>>>();
+				for (const row of rows.issued) {
+					const preimage = decodeCanonical(row.canonicalPreimageBytes);
+					if (!sameScope(row, scope) || !prospectiveCensusRecord(preimage) ||
+						!NumberIsSafeInteger(preimage.epoch) || (preimage.epoch as number) < 0 || (preimage.epoch as number) > epoch ||
+						!isDigestHex(preimage.anchor) || issued.has(row.authorSequence) || Object.hasOwn(preimage, "settlementSource") &&
+						!sourceLinkedApplicationCapture.completedNative.some(original => original.authorSequence === row.authorSequence &&
+							sameBytes(original.preimage, row.canonicalPreimageBytes) && sameBytes(original.signature, row.signature)))
+						return undefined;
+					const kind = settlementOwnRowClass(preimage.epoch as number, epoch + 1, row.authorSequence, frontier[1], frontier[2]);
+					const operation = prospectiveCensusRecord(preimage.operation) ? preimage.operation : undefined;
+					const adjacentFence = preimage.epoch === epoch && operation?.action === AUTHOR_FENCE_ACTION &&
+						operation.version === 1 && operation.fenceSequence === row.authorSequence;
+					if (kind !== "terminal" && kind !== "old-incarnation" && !adjacentFence) return undefined;
+					issued.set(row.authorSequence, preimage);
+				}
+				if (!received && settlementOwnRowClass(epoch, epoch + 1, sequence, frontier[1], frontier[2]) !== "terminal") return undefined;
+				const priorPlan = rows.plans.find(plan => sameScope(plan.scope, scope)) ?? null;
+				const priorFence = priorPlan?.fenceSequence == null ? undefined : issued.get(priorPlan.fenceSequence);
+				const priorFenceEpoch = priorFence !== undefined && NumberIsSafeInteger(priorFence.epoch) ? priorFence.epoch as number : undefined;
+				const lastOwnBytes = received ? rows.issued.find(row => sameScope(row, scope) && row.authorSequence === sequence)?.canonicalPreimageBytes : append.bytes;
+				const ownLastTime = lastOwnBytes === undefined ? undefined : settlementReplacementLastLogicalTimeFromPreimage(lastOwnBytes);
+				const receivedTime = received ? settlementReplacementLastLogicalTimeFromPreimage(append.bytes) : undefined;
+				if (ownLastTime === undefined) return undefined;
+				const lastTime = Math.max(ownLastTime, receivedTime ?? ownLastTime);
+				// The callback runs only inside this genuine read phase. The combined
+				// proof owner performs complete native currency before and after it.
+				facts.check();
+				const successor = previewCreatorOrdinarySuccessorSettlement({scope, epoch, priorPlan, priorFenceEpoch, lastTime, sequence, preview});
+				facts.check();
+				const preimage = readCreatorOrdinaryPreimageCapacityForSizing(append.bytes);
+				if (preimage === undefined || !successor.checkPreview()) return undefined;
+				if (facts.currentDimensions !== enrolled || nativeIssuanceCapture !== native ||
+					!sameBytes(enrolled.unsignedBytes, unsignedBytes) || enrolled.value.runtime.graphVersion !== registration.graphVersion ||
+					creatorOrdinaryIssuanceSourceIdentity(registration) !== enrolled.sourceIdentity) return undefined;
+				const planChanged = priorPlan === null || !sameBytes(encodeCanonical(priorPlan), encodeCanonical(successor.plan));
+				const delta = issuanceUnsignedSuccessorFenceRevisionDeltas({hasImmediateIntent: !received, inheritedPhase: undefined,
+					pendingAcknowledgementCount: rows.outbox.filter(row => sameScope(row, scope) && row.publishState === "pending").length,
+					planChanged});
+				const nativeControlRevisionDelta = delta.immediate + delta.published;
+				if (native.control != null && (!NumberIsSafeInteger(native.control.revision) ||
+					native.control.revision > Number.MAX_SAFE_INTEGER - nativeControlRevisionDelta)) return undefined;
+				return ObjectFreeze({successorFenceCount: 1 as const,
+					canonicalSuccessorFencePreimageByteLength: preimage.canonicalPreimageByteLength, nativeControlRevisionDelta});
+			} catch (cause) {
+				if (cause instanceof TypeError) return undefined;
+				throw cause;
+			} finally { facts.check(); }
+		},
+		readCapacityWidths: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, input: CreatorOrdinaryRuntimeCapacityWidthInput) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			facts.check();
+			// Mixed-source windows are prepared by the complete boundary owner via
+			// its pure numerical projector, never smuggled through this genuine
+			// single-candidate lifetime. Its historical count/freshness contract is
+			// intentionally unchanged; silently dropping futureRows would mis-size
+			// the declared domain or confuse baseline versus additional issuers.
+			if (ObjectGetOwnPropertyDescriptor(input, "futureRows") !== undefined)
+				throw new TypeError("ordinary runtime window geometry requires boundary preparation");
+			if (!issuanceBorrowAvailable || nativeIssuanceCapture === undefined || currentJournalCapture === undefined ||
+				!sameScope(input.scope, registration.issuanceScope) ||
+				!sameLiveJournalScope(input.currentScope, liveJournalScope(registration.payload)))
+				throw new TypeError("ordinary runtime numerical source is unavailable");
+			const rows = nativeIssuanceCapture.rows;
+			const successorFenceCount = settlementProfileFor(trust.profileId) === "v1" ? 1 :
+				trust.profileId === "creator-trusted-v1" ? 0 : undefined;
+			if (successorFenceCount === undefined || (input.successorFenceCount === undefined ? 1 : input.successorFenceCount) !== successorFenceCount)
+				throw new TypeError("ordinary runtime fence count differs from authenticated profile");
+			const debtScopes = new Set([registration.issuanceScope, ...rows.lineages, ...rows.issued, ...rows.outbox,
+				...rows.plans.map(plan => plan.scope)].map(scope => JSON.stringify([scope.objectId, scope.author])));
+			// The original wrapper adds one descriptor itself. N prospective local
+			// suffix rows therefore need N-1 more; actual old rows stay exact below.
+			// The shared width owner validates the same finite N before delivery.
+			if (input.maxIssuerDescriptors !== rows.outbox.length + (input.maxAdditionalCurrentJournalRows ?? 1) - 1 ||
+				input.maxDebtDescriptors !== debtScopes.size ||
+				input.maxCurrentJournalRows !== currentJournalCapture.length || input.maxDependencyAnchors !== 7)
+				throw new TypeError("ordinary runtime numerical counts differ from original source");
+			const pending = ordinaryRuntimePendingIngress(facts);
+			const receivedPendingIngressByteLength = facts.receivedAppend === undefined ? undefined : encodeCanonical(pending).byteLength;
+			if (facts.receivedAppend === undefined && input.receivedPendingIngressByteLength !== undefined ||
+				receivedPendingIngressByteLength !== undefined && input.receivedPendingIngressByteLength !== undefined &&
+				input.receivedPendingIngressByteLength < receivedPendingIngressByteLength)
+				throw new TypeError("ordinary runtime pending width differs from original source");
+			const future = input.maxAdditionalCurrentJournalRows !== undefined;
+			if (future) {
+				const enrolled = facts.currentDimensions;
+				if (enrolled === undefined || enrolled.value.runtime.graphVersion !== registration.graphVersion ||
+					creatorOrdinaryIssuanceSourceIdentity(registration) !== enrolled.sourceIdentity ||
+					registration.blueprintMachine !== enrolled.machine || registration.blueprintMachineIdentity !== enrolled.machineIdentity ||
+					input.canonicalPreimageByteLength < enrolled.unsignedBytes.byteLength ||
+					input.canonicalEpochVertexByteLength < enrolled.value.candidate.exactCanonicalEpochVertexBytes.byteLength)
+					throw new TypeError("ordinary runtime future geometry differs from current candidate");
+			}
+			// The complete old journal vector remains exact below. Explicit N is
+			// NEW-row geometry, not a bound on every historical PRE/derivative.
+			const prepared = ordinaryRuntimeCapacityGeometry.get(registration);
+			const preparedCurrent = future && prepared?.sourceIdentity === creatorOrdinaryIssuanceSourceIdentity(registration) &&
+				prepared.graphVersion === registration.graphVersion && prepared.rowCount === currentJournalCapture.length &&
+				currentJournalImageDigest !== undefined && prepared.journalImageDigest === currentJournalImageDigest ? prepared.widths.project : undefined;
+			if (preparedCurrent !== undefined) {
+				const widths = preparedCurrent({maxIssuerDescriptors: input.maxIssuerDescriptors, maxDebtDescriptors: input.maxDebtDescriptors,
+					maxAdditionalCurrentJournalRows: input.maxAdditionalCurrentJournalRows!,
+					canonicalPreimageByteLength: input.canonicalPreimageByteLength,
+					canonicalEpochVertexByteLength: input.canonicalEpochVertexByteLength,
+					successorFencePreimageByteLength: input.successorFencePreimageByteLength,
+					...(receivedPendingIngressByteLength === undefined ? {} : {receivedPendingIngressByteLength})});
+				const {project: _project, advance: _advance, ...result} = widths;
+				facts.check(); return ObjectFreeze(result);
+			}
+			const journalRows = creatorJournalCensusRows(currentJournalCapture, rows, trust.objectId);
+			if (journalRows === undefined) throw new TypeError("ordinary runtime journal geometry is unavailable");
+			const widths = creatorOrdinaryRuntimeCapacityWidths({...input,
+				canonicalPreimageByteLength: future ? input.canonicalPreimageByteLength : Math.max(input.canonicalPreimageByteLength,
+					...currentJournalCapture.map(row => row.exactCanonicalPreimageBytes.byteLength)),
+				canonicalEpochVertexByteLength: future ? input.canonicalEpochVertexByteLength : Math.max(input.canonicalEpochVertexByteLength,
+					...currentJournalCapture.map(row => row.exactCanonicalVertexBytes.byteLength)),
+				...(receivedPendingIngressByteLength === undefined ? {} : {receivedPendingIngressByteLength})}, journalRows);
+			facts.check(); return widths;
+		},
+		readCapacityLeafWidths: function (this: CreatorOrdinaryIssuanceRuntimeLifetime) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			facts.check();
+			if (!issuanceBorrowAvailable || currentJournalCapture === undefined)
+				throw new TypeError("ordinary runtime leaf source is unavailable");
+			return ObjectFreeze({
+				canonicalPreimageByteLength: Math.max(0, ...currentJournalCapture.map(row => row.exactCanonicalPreimageBytes.byteLength)),
+				canonicalEpochVertexByteLength: Math.max(0, ...currentJournalCapture.map(row => row.exactCanonicalVertexBytes.byteLength)),
+			});
+		},
+		readCurrentDimensions: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, unsignedBytes: Uint8Array) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			if (preparedCapacityCapture !== undefined) return undefined;
+			const result = readDimensions(unsignedBytes);
+			return result !== undefined && !("preparedCapacityOnly" in result) ? result : undefined;
+		},
+		readPreparedCapacityDimensions: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, unsignedBytes: Uint8Array) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			const result = readDimensions(unsignedBytes, true);
+			return result !== undefined && "preparedCapacityOnly" in result ? result : undefined;
+		},
+		resolveCurrentDimensions: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, readout: unknown, unsignedBytes: Uint8Array) {
+			if (this !== lifetime) return undefined;
+			const result = resolveDimensions(readout, unsignedBytes);
+			return result !== undefined && !("preparedCapacityOnly" in result) ? result : undefined;
+		},
+		resolvePreparedCapacityDimensions: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, readout: unknown, unsignedBytes: Uint8Array) {
+			if (this !== lifetime) return undefined;
+			const result = resolveDimensions(readout, unsignedBytes);
+			return result !== undefined && "preparedCapacityOnly" in result ? result : undefined;
+		},
+		captureApplicationResourceCursor: function (this: CreatorOrdinaryIssuanceRuntimeLifetime) {
+			if (this !== lifetime) return undefined;
+			const current = applicationCursorFacts(); if (current === undefined) return undefined;
+			const cursor = ObjectFreeze({}); ordinaryApplicationResourceCursors.set(cursor, current); return cursor;
+		},
+		readApplicationResourceDelta: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, cursor: object) {
+			if (this !== lifetime) return undefined;
+			const prior = ordinaryApplicationResourceCursors.get(cursor), current = applicationCursorFacts();
+			if (prior === undefined || current === undefined || !ordinaryApplicationResourceCursorMatches(prior, current)) return undefined;
+			// Fresh original whole journal/native verification remains compulsory.
+			// Include signed native obligations even before graph/journal delivery;
+			// they may never be silently omitted or refunded as an unaccepted quote.
+			const delta = new Map<string, Uint8Array>();
+			for (const row of currentJournalCapture!.slice(prior.journal.length)) {
+				const effect = retainedCreatorApplicationEffectForSizing(registration, row);
+				if (effect === undefined) return undefined;
+				// Only original current execution classification can select no APP.
+				// The full signed PRE/native row remains in this fresh proof book.
+				if (registration.controlVertices.has(row.digest)) continue;
+				delta.set(row.digest, effect);
+			}
+			for (const row of nativeIssuanceCapture!.rows.issued) {
+				const digest = lowerHexDigest(row.digest)!;
+				const key = JSON.stringify([row.objectId, row.author, row.authorSequence, digest]);
+				if (prior.issued.has(key)) continue;
+				const verified = authenticateRecoveryVertex(registration.payload, registration.authorization, row.canonicalPreimageBytes, row.signature);
+				if (verified === undefined || verified.digest !== digest) return undefined;
+				if (verified.admitted.settlementSource !== undefined) {
+					const completed = sourceLinkedApplicationCapture!.completedNative.filter(value =>
+						value.authorSequence === row.authorSequence && value.digest === digest &&
+						sameBytes(value.preimage, row.canonicalPreimageBytes) && sameBytes(value.signature, row.signature));
+					const effects = sourceLinkedApplicationCapture!.effects.filter(value =>
+						sameBytes(value.exactCanonicalPreimageBytes, row.canonicalPreimageBytes));
+					if (completed.length !== 1 || effects.length !== 1 ||
+						!sameBytes(effects[0]!.exactCanonicalEpochVertexBytes, encodeCanonical(verified.vertex))) return undefined;
+					delta.set(digest, new Uint8ArrayConstructor(effects[0]!.exactCanonicalEpochVertexBytes));
+				} else if (isControlOperation(verified.vertex.operation, trust.profileId)) {
+					const outbox = nativeIssuanceCapture!.rows.outbox.filter(value => sameScope(value, row) &&
+						value.authorSequence === row.authorSequence && sameBytes(value.digest, row.digest));
+					if (outbox.length !== 1 || creatorOrdinaryNativeControlApplicationFactForSizing(registration,
+						nativeIssuanceCapture!.rows, outbox[0]!) === undefined) return undefined;
+				} else delta.set(digest, new Uint8ArrayConstructor(row.canonicalPreimageBytes));
+			}
+			facts.check(); return ObjectFreeze([...delta.values()]);
+		},
+		readPostAdoptionSizing: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, unsignedBytes: Uint8Array,
+			genuinePreparedClose: object, projectionBytes: Uint8Array, settlement?: CreatorPostAdoptionSettlementSizing) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			facts.check();
+			if (preparedCapacityCapture !== undefined || !issuanceBorrowAvailable || nativeIssuanceCapture === undefined || currentJournalCapture === undefined ||
+				(settlementProfileFor(trust.profileId) !== "v1" && trust.profileId !== "creator-trusted-v1")) return undefined;
+			const journalRows = creatorJournalCensusRows(currentJournalCapture, nativeIssuanceCapture.rows, trust.objectId);
+			if (journalRows === undefined) return undefined;
+			try {
+				const widths = prospectiveCreatorPostAdoptionCensusSizing(registration, undefined, unsignedBytes,
+					genuinePreparedClose, projectionBytes, settlement, {hold: value as CreatorOrdinaryIssuanceRuntimeHold,
+						native: nativeIssuanceCapture, journalRows, runtime: lifetime});
+				facts.check(); return widths;
+			} catch (cause) {
+				facts.check();
+				if (cause instanceof TypeError) return undefined;
+				throw cause;
+			}
+		},
+		resolvePostAdoptionSizing: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, readout: unknown,
+			unsignedBytes: Uint8Array, genuinePreparedClose: object, projectionBytes: Uint8Array) {
+			if (this !== lifetime) return undefined;
+			const sizing = facts.postAdoptionSizing;
+			if (sizing === undefined || sizing.variants !== readout || sizing.preparedClose !== genuinePreparedClose ||
+				!sameBytes(sizing.unsignedBytes, unsignedBytes) || !sameBytes(sizing.projectionBytes, projectionBytes)) return undefined;
+			try {
+				facts.check();
+				if (!issuanceBorrowAvailable || (sizing.checkSettlementPreview !== undefined && !sizing.checkSettlementPreview()) ||
+					!sameBytes(encodeCanonical(sizing.variants), sizing.exactVariantBytes)) return undefined;
+				return sizing.variants;
+			} catch { return undefined; }
+		},
+		readReceivedAppend: function (this: CreatorOrdinaryIssuanceRuntimeLifetime) {
+			if (this !== lifetime) throw new TypeError("creator ordinary runtime lifetime is foreign");
+			facts.check(); const received = facts.receivedAppend;
+			return received === undefined ? undefined : ObjectFreeze({
+				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(received.evidence.exactCanonicalPreimageBytes),
+				signature: new Uint8ArrayConstructor(received.evidence.signature), digest: received.evidence.authenticated.digest,
+				author: received.evidence.authenticated.author, sourceAuthorized: received.sourceAuthorized });
+		},
+		checkWhile: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, read: () => Promise<void>, signing?: CreatorSigningDependencyRead) {
+			if (this !== lifetime || typeof read !== "function") return Promise.reject(new TypeError("creator ordinary runtime read is foreign"));
+			const boundary = signing === undefined ? undefined : signingChildren.get(signing);
+			if (signing !== undefined && (boundary === undefined || !boundary.available()))
+				return Promise.reject(new TypeError("creator ordinary signing child is foreign or revoked"));
+			const checkBoundary = (): void => {
+				if (preparedCapacityCapture !== undefined && (ordinaryRuntimeCapacityGeometry.get(registration)?.prepared !== preparedCapacityCapture ||
+					!creatorOrdinaryPreparedGraphCurrent(registration, preparedCapacityCapture)))
+					throw new TypeError("creator ordinary prepared graph was changed");
+				if (signing !== undefined && (signingChildren.get(signing) !== boundary || !boundary!.available()))
+					throw new TypeError("creator ordinary signing child was revoked");
+			};
+			const check = async (): Promise<void> => { facts.check(); checkBoundary(); await read(); facts.check(); checkBoundary();
+				if (signing !== undefined && (signingChildren.get(signing) !== boundary || !boundary!.available()))
+					throw new TypeError("creator ordinary signing child was revoked"); };
+			const task = admit(() => { checkBoundary(); return boundary === undefined ? check() : boundary.original.checkWhile(check); });
+			boundary?.pending.add(task);
+			void task.then(() => boundary?.pending.delete(task), () => boundary?.pending.delete(task));
+			return task;
+		},
+		borrowSigningDependencies: function (this: CreatorOrdinaryIssuanceRuntimeLifetime, trusts: readonly CurrentAnchorTrust[]) {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator ordinary runtime lifetime is foreign"));
+			if (signingBorrowAdmitted) return Promise.reject(new TypeError("creator ordinary signing union was already enrolled"));
+			signingBorrowAdmitted = true;
+			return admit(async () => {
+				const original = await borrowCreatorCloseSigningDependencies(facts.closePlane, trusts);
+				try { facts.check(); } catch (primary) {
+					// Even an acquisition completed after revocation belongs to this
+					// parent's terminal join; do not lose its uncertain cleanup merely
+					// because delivery never reached signingChildren.
+					try { await observeChildRelease(Promise.resolve().then(() => original.release())); } catch (cleanup) {
+						throw new AggregateError([primary, cleanup], "creator ordinary signing acquisition cleanup failed", { cause: primary }); }
+					throw primary;
+				}
+				let revoked = false, releaseTask: Promise<void> | undefined;
+				const pending = new Set<Promise<void>>();
+				const child: CreatorSigningDependencyRead = ObjectFreeze({
+					dependencyAnchors: original.dependencyAnchors,
+					readExactCanonicalRows: function (this: CreatorSigningDependencyRead) {
+						if (this !== child || revoked) throw new TypeError("creator ordinary signing child is foreign or revoked");
+						facts.check(); return original.readExactCanonicalRows();
+					},
+					checkWhile: function (this: CreatorSigningDependencyRead, read: () => Promise<void>) {
+						if (this !== child || revoked || typeof read !== "function")
+							return Promise.reject(new TypeError("creator ordinary signing child is foreign or revoked"));
+						const task = admit(() => original.checkWhile(async () => { facts.check();
+							if (revoked) throw new TypeError("creator ordinary signing child is revoked");
+							await read(); facts.check(); if (revoked) throw new TypeError("creator ordinary signing child is revoked"); }));
+						pending.add(task); void task.then(() => pending.delete(task), () => pending.delete(task)); return task;
+					},
+					release: function (this: CreatorSigningDependencyRead) {
+						if (this !== child) return Promise.reject(new TypeError("creator ordinary signing child is foreign"));
+						if (releaseTask !== undefined) return releaseTask;
+						revoked = true;
+						releaseTask = observeChildRelease(Promise.allSettled([...pending]).then(() => original.release())
+							.finally(() => signingChildren.delete(child))); return releaseTask;
+					},
+				});
+				signingChildren.set(child, ObjectFreeze({ original, pending, available: () => !revoked })); return child;
+			});
+		},
+		...(facts.receivedAppend === undefined ? {} : { borrowCurrentNativeReservation: function (
+			this: CreatorOrdinaryIssuanceRuntimeLifetime, owner: "ahe" | "journal" | "floor") {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator ordinary runtime lifetime is foreign"));
+			if (owner !== "ahe" && owner !== "journal" && owner !== "floor")
+				return Promise.reject(new TypeError("creator ordinary native borrow role is unavailable"));
+			if (currentBorrowAdmitted[owner]) return Promise.reject(new TypeError("creator ordinary current owner was already enrolled"));
+			currentBorrowAdmitted[owner] = true;
+			return admit(async () => {
+				const nativeOwner = owner === "ahe" ? registration.payload.input.store : owner === "journal" ? registration.liveJournalStore :
+					owner === "floor" ? registration.payload.input.settlementFloor : undefined;
+				if (nativeOwner === undefined) throw new TypeError("creator ordinary native borrow role is unavailable");
+				const original = await facts.receivedAppend!.custody.borrow(nativeOwner);
+				if (original === undefined) return undefined;
+				return ownNative(original);
+			});
+		} }),
+		acquireNativeIssuanceReservation: function (this: CreatorOrdinaryIssuanceRuntimeLifetime) {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator ordinary runtime lifetime is foreign"));
+			if (issuanceBorrowAdmitted) return Promise.reject(new TypeError("creator ordinary issuer read was already enrolled"));
+			issuanceBorrowAdmitted = true;
+			return admit(async () => {
+				const acquire: unknown = Reflect.get(registration.issuanceStore, "acquireNativeReadReservation");
+				if (typeof acquire !== "function") throw new TypeError("native issuance exclusion is unsupported");
+				issuanceChild = ownNative(await ReflectApply(acquire, registration.issuanceStore, [{ objectId: trust.objectId }]) as NativeReadReservation,
+					() => { issuanceBorrowAvailable = false; nativeIssuanceCurrent = undefined; sourceLinkedApplicationCapture = undefined; });
+				issuanceBorrowAvailable = true;
+				return issuanceChild;
+			});
+		},
+		endReadPhase: function (this: CreatorOrdinaryIssuanceRuntimeLifetime): Promise<void> {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator ordinary runtime lifetime is foreign"));
+			if (facts.endReadPhaseTask !== undefined) return facts.endReadPhaseTask;
+			try { facts.check(); } catch (cause) { return Promise.reject(cause); }
+			// This is read-phase revocation, NOT physical protection release.
+			// The same lexical parent still owns every enrolled child through the
+			// admitted issuer/journal effect and joins them at its terminal boundary.
+			facts.readPhaseEnded = true; nativeIssuanceCurrent = undefined; sourceLinkedApplicationCapture = undefined; preparedCapacityCapture = undefined;
+			facts.endReadPhaseTask = Promise.allSettled([...facts.pending]).then(async () => {
+				facts.currentDimensions = undefined;
+				const joined = await Promise.allSettled([...childReleaseTasks]);
+				const failures = joined.flatMap(row => row.status === "rejected" ? [row.reason] : []);
+				if (failures.length) throw new AggregateError(failures, "creator ordinary read phase cleanup failed", {cause: failures[0]});
+			});
+			return facts.endReadPhaseTask;
+		},
+		release: function (this: CreatorOrdinaryIssuanceRuntimeLifetime) {
+			if (this !== lifetime) return Promise.reject(new TypeError("creator ordinary runtime lifetime is foreign"));
+			if (facts.releaseTask !== undefined) return facts.releaseTask;
+			facts.releasing = true; nativeIssuanceCurrent = undefined; sourceLinkedApplicationCapture = undefined; preparedCapacityCapture = undefined;
+			facts.releaseTask = Promise.allSettled([...facts.pending,
+				...(facts.endReadPhaseTask === undefined ? [] : [facts.endReadPhaseTask])]).then(async () => {
+				facts.currentDimensions = undefined;
+				const releases = [...signingChildren.keys()].map(child => child.release())
+					.concat([...nativeChildren].map(child => child.release()));
+				const joined = await Promise.allSettled([...new Set([...childReleaseTasks, ...releases])]);
+				const failures = joined.flatMap(row => row.status === "rejected" ? [row.reason] : []);
+				if (failures.length) throw new AggregateError(failures, "creator ordinary runtime custody release failed", { cause: failures[0] });
+				recoveryCloseHolds.delete(value);
+			});
+			return facts.releaseTask;
+		},
+	});
+	facts.lifetime = lifetime;
+	return lifetime;
+}
+
+function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
+	if (typeof value !== "object" || value === null) return Promise.resolve();
+	const facts = recoveryCloseHolds.get(value as CreatorOrdinaryIssuanceRuntimeHold);
+	if (facts?.kind !== "ordinary-runtime") return Promise.resolve();
+	if (facts.lifetime !== undefined) return facts.lifetime.release();
+	if (facts.releaseTask !== undefined) return facts.releaseTask;
+	// No children can exist before the sole lifetime has been resolved. Revoke
+	// the empty nominal hold directly; stale context must not prevent cleanup.
+	facts.releasing = true; facts.readPhaseEnded = true;
+	facts.releaseTask = Promise.allSettled([...facts.pending]).then(() => {
+		recoveryCloseHolds.delete(value as CreatorOrdinaryIssuanceRuntimeHold);
+	});
+	return facts.releaseTask;
+}
 
 /**
  * Reads scalar diagnostics from an already-owned handle without retaining owners.
@@ -2803,6 +5067,14 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		releaseTerminalBarrierPresent: Number(registration.releaseTerminalBarrier !== undefined),
 		active: Number(registration.active),
 		terminal: Number(registration.terminalState === "terminal"),
+		terminalPublicationInputBytes: registration.terminalPublicationInputBytes,
+		admittedInputJobs: registration.admittedInputJobs,
+		admittedInputBytes: registration.admittedInputBytes,
+		admittedReadControlJobs: registration.admittedReadControlJobs,
+		admittedPendingPublicationJobs: registration.admittedPendingPublicationJobs,
+		admittedEgressControlJobs: registration.admittedEgressControlJobs,
+		admittedGossipQueueJobs: registration.admittedGossipQueueJobs,
+		admittedGossipQueueBytes: registration.admittedGossipQueueBytes,
 	});
 }
 
@@ -2810,6 +5082,14 @@ const creatorSuccessorTransportHandoffs = new WeakMap<object, V3PlaneRegistratio
 const aliasedCreatorSuccessorHandles = new WeakSet<V3PlaneHandle>();
 const claimedCreatorCloseHandles = new WeakSet<V3PlaneHandle>();
 const HEX_DIGITS = "0123456789abcdef";
+
+if (
+	!installCreatorRecipientResolver((plane) => {
+		const registration = v3HandleRegistrations.get(plane as V3PlaneHandle);
+		return registration === undefined ? undefined : creatorCloseRegistration(registration, "recipient");
+	})
+)
+	throw new TypeError("v3 creator recipient registration resolver is unavailable");
 
 const installCreatorCloseResolver = Reflect.get(bindCreatorLiveClose, "installV3CreatorCloseRegistrationResolver");
 if (
@@ -2821,7 +5101,7 @@ if (
 			if (claimedCreatorCloseHandles.has(handle)) return undefined;
 			const registration = v3HandleRegistrations.get(handle);
 			if (registration === undefined) return undefined;
-			const claimed = creatorCloseRegistration(registration);
+			const claimed = creatorCloseRegistration(registration, "close", handle);
 			if (claimed !== undefined) claimedCreatorCloseHandles.add(handle);
 			return claimed;
 		},
@@ -2868,10 +5148,39 @@ function d109dFailure(code: D109dRuntimeReclamationErrorCode): D109dRuntimeRecla
 	return ObjectFreeze({ code, ok: false as const });
 }
 
-function d109dDenseDigests(value: unknown): readonly string[] | undefined {
-	const values = denseStrings(value);
-	if (values === undefined || values.some((entry) => !isDigestHex(entry))) return undefined;
-	return values;
+function d109dDenseDigests(value: unknown, custody?: InputCaptureCustody): readonly string[] | undefined {
+	try {
+		if (!ArrayIsArray(value)) return undefined;
+		const length = ObjectGetOwnPropertyDescriptor(value, "length");
+		if (
+			length === undefined ||
+			!("value" in length) ||
+			!NumberIsSafeInteger(length.value) ||
+			length.value < 0 ||
+			value.length !== length.value
+		)
+			return undefined;
+		// Canonical digest text has an exact two-byte CBOR header and64 ASCII bytes.
+		// Reserve the entire variable array before allocating its detached container.
+		const count = length.value as number;
+		const header = count < 24 ? 1 : count <= 0xff ? 2 : count <= 0xffff ? 3 : 5;
+		custody?.chargeBytes(header + count * 66);
+		const result: string[] = [];
+		for (let index = 0; index < count; index++) {
+			const descriptor = ObjectGetOwnPropertyDescriptor(value, StringConstructor(index));
+			if (descriptor === undefined || !("value" in descriptor) || !isDigestHex(descriptor.value)) return undefined;
+			ObjectDefineProperty(result, StringConstructor(index), {
+				configurable: true,
+				enumerable: true,
+				value: descriptor.value,
+				writable: true,
+			});
+		}
+		return ObjectFreeze(result);
+	} catch (error) {
+		if (error instanceof InputCaptureCapacityError) throw error;
+		return undefined;
+	}
 }
 
 function d109dIssuanceReceipt(value: unknown): DurableIssuancePruningReceipt | undefined {
@@ -2934,7 +5243,7 @@ function d109dIssuanceReceipt(value: unknown): DurableIssuancePruningReceipt | u
 	});
 }
 
-function d109dAheReceipt(value: unknown): AheReclamationReceipt | undefined {
+function d109dAheReceipt(value: unknown, custody?: InputCaptureCustody): AheReclamationReceipt | undefined {
 	const receipt = snapshotClosedRecord(value, D109D_AHE_RECEIPT_KEYS);
 	if (receipt === undefined || typeof receipt.objectId !== "string") return undefined;
 	const parsedObjectId = parseStorageObjectId(receipt.objectId);
@@ -2943,9 +5252,9 @@ function d109dAheReceipt(value: unknown): AheReclamationReceipt | undefined {
 	const floor = snapshotClosedRecord(receipt.floor, D109D_AHE_FLOOR_KEYS);
 	const expectedFormer = copiedExpectedHead(floor?.expectedFormerBaseExpectedHead, parsedObjectId.value);
 	const replacement = copiedExpectedHead(floor?.replacementBaseExpectedHead, parsedObjectId.value);
-	const deletedBlobDigests = d109dDenseDigests(receipt.deletedBlobDigests);
-	const deletedGenerationIds = d109dDenseDigests(receipt.deletedGenerationIds);
-	const reclaimedGenerationIds = d109dDenseDigests(receipt.reclaimedGenerationIds);
+	const deletedBlobDigests = d109dDenseDigests(receipt.deletedBlobDigests, custody);
+	const deletedGenerationIds = d109dDenseDigests(receipt.deletedGenerationIds, custody);
+	const reclaimedGenerationIds = d109dDenseDigests(receipt.reclaimedGenerationIds, custody);
 	const rollback = snapshotDenseArray(receipt.rollbackGenerationIds, 2);
 	if (
 		expectedHead === undefined ||
@@ -3000,9 +5309,14 @@ function d109dReceiptsInternallyConsistent(snapshot: D109dReceiptSnapshot): bool
 		!durableIssuanceLineageConsumed(issuance.observedLineage, issuance.prunedThroughAuthorSequence) ||
 		(range !== null && (range.from > range.through || range.through !== issuance.prunedThroughAuthorSequence)) ||
 		new IntrinsicSet(ahe.deletedBlobDigests).size !== ahe.deletedBlobDigests.length ||
-		new IntrinsicSet(ahe.deletedGenerationIds).size !== ahe.deletedGenerationIds.length ||
-		new IntrinsicSet(ahe.reclaimedGenerationIds).size !== ahe.reclaimedGenerationIds.length ||
-		ahe.deletedGenerationIds.some((generationId) => !ahe.reclaimedGenerationIds.includes(generationId))
+		new IntrinsicSet(ahe.deletedGenerationIds).size !== ahe.deletedGenerationIds.length
+	) {
+		return false;
+	}
+	const reclaimedGenerationIds = new IntrinsicSet(ahe.reclaimedGenerationIds);
+	if (
+		reclaimedGenerationIds.size !== ahe.reclaimedGenerationIds.length ||
+		ahe.deletedGenerationIds.some((generationId) => !reclaimedGenerationIds.has(generationId))
 	) {
 		return false;
 	}
@@ -3028,16 +5342,27 @@ function d109dReceiptsInternallyConsistent(snapshot: D109dReceiptSnapshot): bool
 }
 
 function d109dReceiptSnapshot(
-	input: D109dRuntimeReclamationInput
+	input: D109dRuntimeReclamationInput,
+	custody?: InputCaptureCustody
 ):
 	| Readonly<{ readonly ok: true; readonly value: D109dReceiptSnapshot }>
 	| Readonly<{ readonly code: "D109D_INVALID_ARGUMENT" | "D109D_RECEIPT_MISMATCH"; readonly ok: false }> {
 	const issuance = d109dIssuanceReceipt(input.issuanceReceipt);
-	const ahe = d109dAheReceipt(input.aheReceipt);
+	const ahe = d109dAheReceipt(input.aheReceipt, custody);
 	if (issuance === undefined || ahe === undefined) {
 		return ObjectFreeze({ code: "D109D_INVALID_ARGUMENT" as const, ok: false as const });
 	}
 	const value = ObjectFreeze({ ahe, issuance });
+	if (custody !== undefined) {
+		// Fixed-width metadata is bounded by the original closed validators. The
+		// three variable arrays already own their exact canonical array charges.
+		custody.chargeBytes(
+			encodeCanonical({
+				ahe: { ...ahe, deletedBlobDigests: [], deletedGenerationIds: [], reclaimedGenerationIds: [] },
+				issuance,
+			}).byteLength - 3
+		);
+	}
 	return d109dReceiptsInternallyConsistent(value)
 		? ObjectFreeze({ ok: true as const, value })
 		: ObjectFreeze({ code: "D109D_RECEIPT_MISMATCH" as const, ok: false as const });
@@ -3216,192 +5541,211 @@ function d109dAfterCensus(
 }
 
 async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Promise<D109dRuntimeReclamationResult> {
-	const receiptCapture = d109dReceiptSnapshot(input);
-	if (!receiptCapture.ok) return d109dFailure(receiptCapture.code);
 	const successor = input.successor as V3PlaneHandle;
 	const initial = v3HandleRegistrations.get(successor);
 	if (initial === undefined || initial.mode === "snapshot-closed" || !currentRegistration(initial)) {
+		// Preserve original malformed/inconsistent-receipt precedence for a
+		// foreign identity; it cannot create a queued registration lifetime.
+		const receiptCapture = d109dReceiptSnapshot(input);
+		if (!receiptCapture.ok) return d109dFailure(receiptCapture.code);
 		return d109dFailure("D109D_IDENTITY_MISMATCH");
 	}
-	return enqueueRegistrationTask(initial, (): (() => Promise<D109dRuntimeReclamationResult>) => {
-		const receipts = receiptCapture.value;
-		return async (): Promise<D109dRuntimeReclamationResult> => {
-			if (
-				v3HandleRegistrations.get(successor) !== initial ||
-				initial.mode === "snapshot-closed" ||
-				!currentRegistration(initial)
-			) {
-				return d109dFailure("D109D_IDENTITY_MISMATCH");
-			}
-			const latchBytes = d109dLatchBytes(initial, receipts);
-			if (latchBytes === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
-			if (initial.runtimeReclamationLatch !== undefined) {
-				if (!sameBytes(initial.runtimeReclamationLatch, latchBytes)) {
-					return d109dFailure("D109D_RECEIPT_MISMATCH");
+	let rawInput: D109dRuntimeReclamationInput | undefined = input;
+	return enqueueRegistrationTask(
+		initial,
+		(
+			custody
+		): (() => Promise<D109dRuntimeReclamationResult>) | Readonly<{ join: Promise<D109dRuntimeReclamationResult> }> => {
+			const selectedInput = rawInput;
+			// Only detached receipts may survive capture into the native FIFO task.
+			rawInput = undefined;
+			if (selectedInput === undefined) return { join: Promise.resolve(d109dFailure("D109D_INTERNAL_INVARIANT")) };
+			const receiptCapture = d109dReceiptSnapshot(selectedInput, custody);
+			if (!receiptCapture.ok) return { join: Promise.resolve(d109dFailure(receiptCapture.code)) };
+			const receipts = receiptCapture.value;
+			return async (): Promise<D109dRuntimeReclamationResult> => {
+				if (
+					v3HandleRegistrations.get(successor) !== initial ||
+					initial.mode === "snapshot-closed" ||
+					!currentRegistration(initial)
+				) {
+					return d109dFailure("D109D_IDENTITY_MISMATCH");
 				}
-				const first = initial.runtimeReclamationResult;
-				return first === undefined
-					? d109dFailure("D109D_INTERNAL_INVARIANT")
-					: ObjectFreeze({ ...first, replay: true as const });
-			}
-			if (!d109dRegistrationBound(initial, receipts)) {
-				return d109dFailure("D109D_RECEIPT_MISMATCH");
-			}
-			if (
-				initial.terminalState !== "active" ||
-				initial.retainedBootstrapHold ||
-				initial.terminalBarrier !== undefined ||
-				initial.blueprintClosing
-			) {
-				return d109dFailure("D109D_RUNTIME_NOT_READY");
-			}
-			if (settlementProfileFor(initial.payload.trust.trust.profileId) === "v1") {
-				const maintenance = durableIssuancePruningMaintenanceForStore(initial.issuanceStore);
-				if (maintenance === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
-				const deletedRange = receipts.issuance.deletedAuthorSequenceRange;
-				const expectedPriorWatermark =
-					deletedRange === null
-						? receipts.issuance.prunedThroughAuthorSequence
-						: deletedRange.from === 0
-							? null
-							: deletedRange.from - 1;
-				try {
-					// The receipt pair reaches this owner only after planClosedEpochCleanup(...) has
-					// authenticated adoption, rollback retention, availability and expected-head state.
-					const replay = await maintenance.pruneAuthenticatedSettledPrefix({
-						closedEpoch: receipts.issuance.closedEpoch,
-						commitQcRef: receipts.issuance.commitQcRef,
-						expectedLineage: receipts.issuance.observedLineage,
-						expectedPrunedThroughAuthorSequence: expectedPriorWatermark,
-						scope: receipts.issuance.scope,
-						snapshotManifestDigest: receipts.issuance.snapshotManifestDigest,
-						throughAuthorSequence: receipts.issuance.prunedThroughAuthorSequence,
-					});
-					if (
-						replay.deletedAuthorSequenceRange !== null ||
-						replay.prunedThroughAuthorSequence !== receipts.issuance.prunedThroughAuthorSequence ||
-						!durableIssuanceLineagesEqual(replay.observedLineage, receipts.issuance.observedLineage)
-					) {
+				const latchBytes = d109dLatchBytes(initial, receipts);
+				if (latchBytes === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
+				if (initial.runtimeReclamationLatch !== undefined) {
+					if (!sameBytes(initial.runtimeReclamationLatch, latchBytes)) {
 						return d109dFailure("D109D_RECEIPT_MISMATCH");
 					}
-				} catch {
+					const first = initial.runtimeReclamationResult;
+					return first === undefined
+						? d109dFailure("D109D_INTERNAL_INVARIANT")
+						: ObjectFreeze({ ...first, replay: true as const });
+				}
+				if (!d109dRegistrationBound(initial, receipts)) {
+					return d109dFailure("D109D_RECEIPT_MISMATCH");
+				}
+				if (
+					initial.terminalState !== "active" ||
+					initial.retainedBootstrapHold ||
+					initial.terminalBarrier !== undefined ||
+					initial.blueprintClosing
+				) {
 					return d109dFailure("D109D_RUNTIME_NOT_READY");
 				}
-			}
+				if (settlementProfileFor(initial.payload.trust.trust.profileId) === "v1") {
+					const maintenance = durableIssuancePruningMaintenanceForStore(initial.issuanceStore);
+					if (maintenance === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
+					const deletedRange = receipts.issuance.deletedAuthorSequenceRange;
+					const expectedPriorWatermark =
+						deletedRange === null
+							? receipts.issuance.prunedThroughAuthorSequence
+							: deletedRange.from === 0
+								? null
+								: deletedRange.from - 1;
+					try {
+						// The receipt pair reaches this owner only after planClosedEpochCleanup(...) has
+						// authenticated adoption, rollback retention, availability and expected-head state.
+						const replay = await maintenance.pruneAuthenticatedSettledPrefix({
+							closedEpoch: receipts.issuance.closedEpoch,
+							commitQcRef: receipts.issuance.commitQcRef,
+							expectedLineage: receipts.issuance.observedLineage,
+							expectedPrunedThroughAuthorSequence: expectedPriorWatermark,
+							scope: receipts.issuance.scope,
+							snapshotManifestDigest: receipts.issuance.snapshotManifestDigest,
+							throughAuthorSequence: receipts.issuance.prunedThroughAuthorSequence,
+						});
+						if (
+							replay.deletedAuthorSequenceRange !== null ||
+							replay.prunedThroughAuthorSequence !== receipts.issuance.prunedThroughAuthorSequence ||
+							!durableIssuanceLineagesEqual(replay.observedLineage, receipts.issuance.observedLineage)
+						) {
+							return d109dFailure("D109D_RECEIPT_MISMATCH");
+						}
+					} catch {
+						return d109dFailure("D109D_RUNTIME_NOT_READY");
+					}
+				}
 
-			const predecessorReference = initial.hotPredecessor;
-			let predecessor = predecessorReference?.deref();
-			if (predecessor?.gate !== undefined) await predecessor.gate;
-			if (predecessorReference !== undefined) {
-				const rechecked = predecessorReference.deref();
-				if (predecessor !== undefined && rechecked !== predecessor) {
+				const predecessorReference = initial.hotPredecessor;
+				let predecessor = predecessorReference?.deref();
+				if (predecessor?.gate !== undefined) await predecessor.gate;
+				if (predecessorReference !== undefined) {
+					const rechecked = predecessorReference.deref();
+					if (predecessor !== undefined && rechecked !== predecessor) {
+						return d109dFailure("D109D_RUNTIME_NOT_READY");
+					}
+					predecessor = rechecked;
+				}
+				if (
+					predecessor !== undefined &&
+					(predecessor.active ||
+						predecessor.mode === "snapshot-closed" ||
+						predecessor.topic !== initial.topic ||
+						predecessor.networkNode !== initial.networkNode ||
+						v3HandleRegistrations.get(predecessor.handle) !== predecessor ||
+						(intrinsicMapSize(predecessor.pendingIngress) ?? -1) !== 0 ||
+						predecessor.pendingIngressBytes !== 0)
+				) {
 					return d109dFailure("D109D_RUNTIME_NOT_READY");
 				}
-				predecessor = rechecked;
-			}
-			if (
-				predecessor !== undefined &&
-				(predecessor.active ||
-					predecessor.mode === "snapshot-closed" ||
-					predecessor.topic !== initial.topic ||
-					predecessor.networkNode !== initial.networkNode ||
-					v3HandleRegistrations.get(predecessor.handle) !== predecessor ||
-					(intrinsicMapSize(predecessor.pendingIngress) ?? -1) !== 0 ||
-					predecessor.pendingIngressBytes !== 0)
-			) {
-				return d109dFailure("D109D_RUNTIME_NOT_READY");
-			}
 
-			const sourceRuntimeHandle = predecessor?.handle ?? initial.sourceRuntimeHandle?.deref();
-			const closePlan =
-				sourceRuntimeHandle === undefined ? undefined : prepareCreatorCloseRuntimeRelease(sourceRuntimeHandle);
-			if (sourceRuntimeHandle !== undefined && closePlan === undefined) {
-				return d109dFailure("D109D_RUNTIME_NOT_READY");
-			}
-			const absentClose = d109dCloseCensusAbsent();
-			const before = d109dCensus(initial, predecessor, closePlan?.before ?? absentClose);
-			if (before === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
+				const sourceRuntimeHandle = predecessor?.handle ?? initial.sourceRuntimeHandle?.deref();
+				const closePlan =
+					sourceRuntimeHandle === undefined ? undefined : prepareCreatorCloseRuntimeRelease(sourceRuntimeHandle);
+				if (sourceRuntimeHandle !== undefined && closePlan === undefined) {
+					return d109dFailure("D109D_RUNTIME_NOT_READY");
+				}
+				const absentClose = d109dCloseCensusAbsent();
+				const before = d109dCensus(initial, predecessor, closePlan?.before ?? absentClose);
+				if (before === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
 
-			let anchorDigest: string | undefined;
-			let anchorVertex: EpochVertex | undefined;
-			let anchorCharge: number | undefined;
-			let replacementIndex: CausalityIndex | undefined;
-			let emptyQuarantine: ReadonlySet<string> | undefined;
-			if (predecessor !== undefined) {
-				anchorDigest = predecessor.payload.provenance.anchorDigest;
-				anchorVertex = ReflectApply(MapPrototypeGet, predecessor.closeVertices, [anchorDigest]) as
-					| EpochVertex
-					| undefined;
-				anchorCharge = ReflectApply(MapPrototypeGet, predecessor.closeCharges, [anchorDigest]) as number | undefined;
-				if (anchorVertex === undefined || !NumberIsSafeInteger(anchorCharge) || (anchorCharge as number) < 1) {
+				let anchorDigest: string | undefined;
+				let anchorVertex: EpochVertex | undefined;
+				let anchorCharge: number | undefined;
+				let replacementIndex: CausalityIndex | undefined;
+				let emptyQuarantine: ReadonlySet<string> | undefined;
+				if (predecessor !== undefined) {
+					anchorDigest = predecessor.payload.provenance.anchorDigest;
+					anchorVertex = ReflectApply(MapPrototypeGet, predecessor.closeVertices, [anchorDigest]) as
+						| EpochVertex
+						| undefined;
+					anchorCharge = ReflectApply(MapPrototypeGet, predecessor.closeCharges, [anchorDigest]) as number | undefined;
+					if (anchorVertex === undefined || !NumberIsSafeInteger(anchorCharge) || (anchorCharge as number) < 1) {
+						return d109dFailure("D109D_INTERNAL_INVARIANT");
+					}
+					try {
+						const vertices = new IntrinsicMap<string, EpochVertex>([[anchorDigest, anchorVertex]]);
+						const charges = new IntrinsicMap<string, number>([[anchorDigest, anchorCharge as number]]);
+						replacementIndex = new CausalityIndex(vertices, ObjectFreeze([anchorDigest]), {
+							initialByteCharges: charges,
+							maxEpochBytes: predecessor.payload.parameters.maxEpochBytes,
+							maxEpochVertices: predecessor.payload.parameters.maxEpochVertices,
+						});
+						emptyQuarantine = new IntrinsicSet<string>();
+					} catch {
+						return d109dFailure("D109D_INTERNAL_INVARIANT");
+					}
+				}
+				const retainedLatchCount = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.latchedOperations);
+				if (retainedLatchCount === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
+				const after = d109dAfterCensus(anchorCharge, retainedLatchCount, predecessor !== undefined);
+				const result = ObjectFreeze({
+					after,
+					before,
+					closedEpoch: receipts.issuance.closedEpoch,
+					objectId: receipts.issuance.scope.objectId,
+					ok: true as const,
+					replay: false as const,
+					successorEpoch: initial.payload.provenance.epoch,
+				});
+
+				if (closePlan !== undefined && !closePlan.release()) {
 					return d109dFailure("D109D_INTERNAL_INVARIANT");
 				}
-				try {
-					const vertices = new IntrinsicMap<string, EpochVertex>([[anchorDigest, anchorVertex]]);
-					const charges = new IntrinsicMap<string, number>([[anchorDigest, anchorCharge as number]]);
-					replacementIndex = new CausalityIndex(vertices, ObjectFreeze([anchorDigest]), {
-						initialByteCharges: charges,
-						maxEpochBytes: predecessor.payload.parameters.maxEpochBytes,
-						maxEpochVertices: predecessor.payload.parameters.maxEpochVertices,
-					});
-					emptyQuarantine = new IntrinsicSet<string>();
-				} catch {
-					return d109dFailure("D109D_INTERNAL_INVARIANT");
+				if (
+					predecessor !== undefined &&
+					anchorDigest !== undefined &&
+					anchorVertex !== undefined &&
+					anchorCharge !== undefined &&
+					replacementIndex !== undefined &&
+					emptyQuarantine !== undefined
+				) {
+					ReflectApply(MapPrototypeClear, predecessor.closeAuthors, []);
+					ReflectApply(MapPrototypeClear, predecessor.authorVertexCounts, []);
+					ReflectApply(MapPrototypeClear, predecessor.closeCharges, []);
+					ReflectApply(MapPrototypeSet, predecessor.closeCharges, [anchorDigest, anchorCharge]);
+					ReflectApply(MapPrototypeClear, predecessor.closeVertices, []);
+					ReflectApply(MapPrototypeSet, predecessor.closeVertices, [anchorDigest, anchorVertex]);
+					predecessor.controlVertices.clear();
+					predecessor.index = replacementIndex;
+					predecessor.epochBytes = anchorCharge;
+					predecessor.graphVersion = 1;
+					predecessor.blueprintMachine = undefined;
+					predecessor.blueprintMachineIdentity = undefined;
+					predecessor.blueprintHandle = undefined;
+					predecessor.quarantinedDigests = emptyQuarantine;
+					predecessor.publicationCursor = undefined;
+					predecessor.rebaseCursor = undefined;
+					predecessor.rebaseSnapshot = undefined;
 				}
-			}
-			const retainedLatchCount = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.latchedOperations);
-			if (retainedLatchCount === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
-			const after = d109dAfterCensus(anchorCharge, retainedLatchCount, predecessor !== undefined);
-			const result = ObjectFreeze({
-				after,
-				before,
-				closedEpoch: receipts.issuance.closedEpoch,
-				objectId: receipts.issuance.scope.objectId,
-				ok: true as const,
-				replay: false as const,
-				successorEpoch: initial.payload.provenance.epoch,
-			});
-
-			if (closePlan !== undefined && !closePlan.release()) {
-				return d109dFailure("D109D_INTERNAL_INVARIANT");
-			}
-			if (
-				predecessor !== undefined &&
-				anchorDigest !== undefined &&
-				anchorVertex !== undefined &&
-				anchorCharge !== undefined &&
-				replacementIndex !== undefined &&
-				emptyQuarantine !== undefined
-			) {
-				ReflectApply(MapPrototypeClear, predecessor.closeAuthors, []);
-				ReflectApply(MapPrototypeClear, predecessor.authorVertexCounts, []);
-				ReflectApply(MapPrototypeClear, predecessor.closeCharges, []);
-				ReflectApply(MapPrototypeSet, predecessor.closeCharges, [anchorDigest, anchorCharge]);
-				ReflectApply(MapPrototypeClear, predecessor.closeVertices, []);
-				ReflectApply(MapPrototypeSet, predecessor.closeVertices, [anchorDigest, anchorVertex]);
-				predecessor.controlVertices.clear();
-				predecessor.index = replacementIndex;
-				predecessor.epochBytes = anchorCharge;
-				predecessor.graphVersion = 1;
-				predecessor.blueprintMachine = undefined;
-				predecessor.blueprintMachineIdentity = undefined;
-				predecessor.blueprintHandle = undefined;
-				predecessor.quarantinedDigests = emptyQuarantine;
-				predecessor.publicationCursor = undefined;
-				predecessor.rebaseCursor = undefined;
-				predecessor.rebaseSnapshot = undefined;
-			}
-			initial.displacedSource = undefined;
-			initial.displacedIssuanceBoundary = undefined;
-			initial.rebaseCursor = undefined;
-			initial.rebaseSnapshot = undefined;
-			initial.hotPredecessor = undefined;
-			initial.runtimeReclamationLatch = latchBytes;
-			initial.runtimeReclamationResult = result;
-			initial.sourceRuntimeHandle = undefined;
-			return result;
-		};
-	});
+				initial.displacedSource = undefined;
+				initial.displacedIssuanceBoundary = undefined;
+				initial.rebaseCursor = undefined;
+				initial.rebaseSnapshot = undefined;
+				initial.hotPredecessor = undefined;
+				initial.runtimeReclamationLatch = latchBytes;
+				initial.runtimeReclamationResult = result;
+				initial.sourceRuntimeHandle = undefined;
+				return result;
+			};
+		},
+		{
+			pool: "read-control",
+			refuse: () => d109dFailure("D109D_RUNTIME_NOT_READY"),
+			refuseCapture: () => d109dFailure("D109D_RUNTIME_NOT_READY"),
+		}
+	);
 }
 
 function activationFailure(
@@ -3611,15 +5955,78 @@ function isV3ApplicationAuthorAuthorized(authorization: V3LiveAuthorization, aut
 	return authority.ok && authority.authorized;
 }
 
+/**
+ * Checks NEW public application work against its genuine current owning plane.
+ * This is a present decision only; callers must recheck at their effect boundary.
+ * Historical settlement and terminal issuance retain their separate original paths.
+ * @param input - Exact existing plane and copied application operation; no caller authority flag.
+ * @returns Current role/staging decision without signing, queueing, or native mutation.
+ */
+export function authorizeV3NewLocalOperation(
+	input: Readonly<{ readonly plane: V3PlaneHandle; readonly operation: Readonly<Record<string, unknown>> }>
+): V3NewLocalOperationAuthorizationResult {
+	try {
+		const captured = snapshotClosedRecord(input, NEW_LOCAL_OPERATION_AUTHORIZATION_KEYS);
+		const registration =
+			captured === undefined ? undefined : v3HandleRegistrations.get(captured.plane as V3PlaneHandle);
+		if (registration === undefined) {
+			return localIssueFailure("malformed-input", "v3 new operation plane has no provenance");
+		}
+		if (
+			!currentRegistration(registration) ||
+			registration.receiveOnly ||
+			registration.mode === "snapshot-closed" ||
+			registration.blueprintClosing ||
+			registration.operationAdmissionHalted ||
+			registration.terminalState !== "active" ||
+			registration.retainedBootstrapHold
+		) {
+			return localIssueFailure("not-active", "v3 plane is not accepting new application operations");
+		}
+		const operation = detachedCanonicalOperation(captured?.operation);
+		if (operation === undefined) return localIssueFailure("malformed-input", "v3 new operation is invalid");
+		const scope = copiedScope(registration.issuanceScope);
+		if (
+			scope === undefined ||
+			scope.objectId !== registration.payload.provenance.objectId ||
+			resolveV3AuthorizedAuthor(registration.authorization, scope.author) === undefined
+		) {
+			return localIssueFailure("authorization-rejected", "v3 new operation author is not a current member");
+		}
+		if (isControlOperation(operation, registration.payload.trust.trust.profileId)) {
+			return ObjectFreeze({ ok: true as const });
+		}
+		const candidate = aclOperation(scope.author, "0".repeat(64), operation);
+		if (candidate !== null) {
+			const authorized =
+				candidate === undefined || registration.authorization.kind !== "latched-acl"
+					? undefined
+					: authorizeLatchedAclOperation({
+							operation: candidate.operation,
+							snapshot: registration.authorization.value,
+						});
+			return authorized?.ok === true && authorized.authorized
+				? ObjectFreeze({ ok: true as const })
+				: localIssueFailure("authorization-rejected", "v3 new ACL operation is not authorized");
+		}
+		const action = Reflect.get(operation, "action");
+		if (typeof action !== "string") {
+			return localIssueFailure("authorization-rejected", "v3 new application operation has no action");
+		}
+		return isV3ApplicationAuthorAuthorized(registration.authorization, scope.author)
+			? ObjectFreeze({ ok: true as const })
+			: localIssueFailure("authorization-rejected", "v3 new application author is not a current Writer");
+	} catch {
+		return localIssueFailure("malformed-input", "v3 new operation authorization input is invalid");
+	}
+}
+
 function isAuthorFenceOperation(value: unknown): boolean {
 	return isObject(value) && Reflect.get(value, "action") === AUTHOR_FENCE_ACTION;
 }
 
 function isControlOperation(value: unknown, profileId: string): boolean {
-	if (settlementProfileFor(profileId) !== "v1") return false;
-	if (!isObject(value)) return false;
-	const action = Reflect.get(value, "action");
-	return action === AUTHOR_FENCE_ACTION || action === "causalJoin" || action === "join";
+	return creatorApplicationControlOperationForSizing(value, profileId);
 }
 
 function aclOperation(author: string, digest: string, value: unknown): StagedLatchedAclOperation | null | undefined {
@@ -3665,14 +6072,982 @@ function orderedLatchedOperations(
 function validateLatchedOperation(
 	authorization: V3LiveAuthorization,
 	operations: Map<string, StagedLatchedAclOperation>,
-	candidate: StagedLatchedAclOperation | null | undefined
+	candidate: StagedLatchedAclOperation | null | undefined,
+	author: string,
+	_profileId: string,
+	terminalAuthorized = false,
+	sourceAuthorized = false
 ): boolean {
+	// Preserve the original historical-settlement and separately classified
+	// terminal paths. Complete settlement-role authorization needs its authentic
+	// source binding, not an exemption based on caller-supplied planEffect.
+	if (candidate === null && (terminalAuthorized || sourceAuthorized)) return true;
+	if (!isV3OperationAuthorAuthorized(authorization, author, candidate)) return false;
 	if (candidate === null) return true;
 	if (candidate === undefined || authorization.kind !== "latched-acl" || operations.has(candidate.digest)) return false;
 	return stageLatchedAclOperations({
 		operations: orderedLatchedOperations(operations, candidate).map(({ operation }) => operation),
 		snapshot: authorization.value,
 	}).ok;
+}
+
+function isV3OperationAuthorAuthorized(
+	authorization: V3LiveAuthorization,
+	author: string,
+	candidate: StagedLatchedAclOperation | null | undefined
+): boolean {
+	if (candidate === null) return isV3ApplicationAuthorAuthorized(authorization, author);
+	if (candidate === undefined || authorization.kind !== "latched-acl" || candidate.actor !== author) return false;
+	const decision = authorizeLatchedAclOperation({ operation: candidate.operation, snapshot: authorization.value });
+	return decision.ok && decision.authorized;
+}
+
+const PORTABLE_SETTLEMENT_SOURCE_KEYS = [
+	"creatorSelectionSignature",
+	"dependencyVertices",
+	"fromIntent",
+	"intentDigest",
+	"sourceAnchor",
+	"sourceAnchorPreimage",
+	"sourceAnchorSignature",
+	"sourceAclBytes",
+	"sourceAuthor",
+	"sourceDigest",
+	"sourceEpoch",
+	"sourceObjectId",
+	"sourcePreimage",
+	"sourceSequence",
+	"sourceSignature",
+	"targetAclDigest",
+	"targetAnchor",
+	"targetBlueprintDigest",
+	"targetEpoch",
+	"targetObjectId",
+	"throughIntent",
+	"transformRefusal",
+	"version",
+] as const;
+
+function creatorSettlementSelectionBytes(record: Readonly<Record<string, unknown>>): Uint8Array {
+	const selection: Record<string, unknown> = {};
+	for (const key of PORTABLE_SETTLEMENT_SOURCE_KEYS) {
+		if (key !== "creatorSelectionSignature" && key !== "fromIntent" && key !== "throughIntent")
+			selection[key] = record[key];
+	}
+	return encodeCanonical(selection, { maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes });
+}
+type PortableSettlementContext = Pick<
+	V3PlaneRegistration,
+	"payload" | "authorization" | "displacedSource" | "historicalIssuance"
+>;
+
+/**
+ * Original ACL/frontier comes from authenticated native lineage, not supplied proof bytes.
+ * @param context - Current authenticated target and closed native source owners.
+ * @param record - Exact signed source selection.
+ * @returns Original source context and enrolled authority, if retained and current.
+ */
+function portableSettlementSourceAuthority(
+	context: PortableSettlementContext,
+	record: Readonly<Record<string, unknown>>
+): Readonly<{ payload: PreparedV3LivePayload; authorization: V3LiveAuthorization }> | undefined {
+	const source = {
+		epoch: record.sourceEpoch as number,
+		anchor: record.sourceAnchor as string,
+		objectId: record.sourceObjectId as string,
+		author: record.sourceAuthor as string,
+	};
+	const displaced = context.displacedSource;
+	if (source.objectId !== context.payload.provenance.objectId) {
+		const target = displaced?.migrationTarget;
+		if (
+			target === undefined ||
+			target.objectId !== context.payload.provenance.objectId ||
+			target.epoch !== context.payload.provenance.epoch ||
+			target.anchorDigest !== context.payload.provenance.anchorDigest ||
+			target.blueprintDigest !== context.payload.provenance.blueprintDigest
+		)
+			return undefined;
+	}
+	const history =
+		source.objectId === context.payload.provenance.objectId
+			? context.historicalIssuance
+			: displaced?.historicalIssuance;
+	const acl = history === undefined ? undefined : resolveVerifiedHistoricalSourceAcl(history.capability, source);
+	const frontier =
+		history === undefined ? undefined : resolveVerifiedHistoricalSourceFrontier(history.capability, source);
+	if (acl !== undefined && frontier !== undefined && history !== undefined) {
+		const identity = resolveVerifiedCreatorHistoricalIssuance(history.capability);
+		if (
+			source.objectId === context.payload.provenance.objectId &&
+			(identity?.successorEpoch !== context.payload.provenance.epoch ||
+				identity.successorAnchorDigest !== context.payload.provenance.anchorDigest)
+		)
+			return undefined;
+		if (
+			source.epoch < frontier.admissionEpoch ||
+			(frontier.terminalThrough !== null && (record.sourceSequence as number) <= frontier.terminalThrough)
+		)
+			return undefined;
+		const payload = source.objectId === context.payload.provenance.objectId ? context.payload : displaced?.prepared;
+		if (payload === undefined) return undefined;
+		return ObjectFreeze({
+			payload,
+			authorization: ObjectFreeze({ kind: "latched-acl" as const, value: acl, writerCount: 0 }),
+		});
+	}
+	if (
+		displaced !== undefined &&
+		source.objectId !== context.payload.provenance.objectId &&
+		displaced.prepared.provenance.objectId === source.objectId &&
+		displaced.prepared.provenance.epoch === source.epoch &&
+		displaced.prepared.provenance.anchorDigest === source.anchor
+	) {
+		// A cross-object grant exists only through original authenticated terminal migration recovery.
+		if (source.objectId !== context.payload.provenance.objectId && displaced.activationVertexDigest === undefined)
+			return undefined;
+		if (displaced.prepared.provenance.blueprintDigest !== context.payload.provenance.blueprintDigest) return undefined;
+		return ObjectFreeze({ payload: displaced.prepared, authorization: displaced.authorization });
+	}
+	if (
+		record.sourceAnchorPreimage instanceof Uint8ArrayConstructor &&
+		record.sourceAnchorSignature instanceof Uint8ArrayConstructor &&
+		record.sourceAclBytes instanceof Uint8ArrayConstructor
+	) {
+		const sourceTrustOwner =
+			source.objectId === context.payload.provenance.objectId ? context.payload : displaced?.prepared;
+		if (sourceTrustOwner === undefined) return undefined;
+		const trust = openCreatorSettlementSourceTrust(
+			sourceTrustOwner.trust.trust,
+			record.sourceAnchorPreimage,
+			record.sourceAnchorSignature,
+			source.objectId,
+			sourceTrustOwner.trust.trust.genesisAnchorDigest
+		);
+		if (trust === undefined || trust.currentAnchorDigest !== source.anchor || trust.currentEpoch !== source.epoch)
+			return undefined;
+		const anchor = decodeCanonical(record.sourceAnchorPreimage) as Record<string, unknown>;
+		const opened = openCanonicalLatchedAclSnapshot({
+			exactCanonicalLatchedAclBytes: record.sourceAclBytes,
+			expectedAclDigest: anchor.aclDigest as string,
+			expectedEpoch: source.epoch,
+			expectedObjectId: source.objectId,
+			expectedProfileId: trust.profileId,
+		});
+		if (!opened.ok || anchor.blueprintDigest !== context.payload.provenance.blueprintDigest) return undefined;
+		return ObjectFreeze({
+			payload: {
+				...sourceTrustOwner,
+				trust: { ...sourceTrustOwner.trust, trust },
+				provenance: {
+					...sourceTrustOwner.provenance,
+					epoch: source.epoch,
+					anchorDigest: source.anchor,
+					objectId: source.objectId,
+				},
+			},
+			authorization: ObjectFreeze({ kind: "latched-acl" as const, value: opened.snapshot, writerCount: 0 }),
+		});
+	}
+	return undefined;
+}
+
+/**
+ * Independently authenticates signed source, protected dependencies and exact target intents.
+ * This proves historical signed authority, not private pre-revocation wall-clock existence.
+ * @param context - Authenticated target and native lineage owners.
+ * @param target - Independently admitted target-signed carrier.
+ * @param priorVertices - Previously consumed target ranges.
+ * @returns Whether the exact signed range has genuine original source authority.
+ */
+function verifyPortableSettlementSource(
+	context: PortableSettlementContext,
+	target: AdmittedReceivedVertexView,
+	priorVertices: ReadonlyMap<string, EpochVertex>,
+	localNativeSelection = false,
+	visitedSources: Set<string> = new Set(),
+	creatorProposalValidation = false
+): boolean {
+	const value = target.settlementSource;
+	if (value === undefined) return false;
+	try {
+		if (
+			settlementProfileFor(context.payload.trust.trust.profileId) !== "v1" ||
+			target.objectId !== context.payload.provenance.objectId ||
+			target.epoch !== context.payload.provenance.epoch ||
+			target.anchor !== context.payload.provenance.anchorDigest ||
+			resolveV3AuthorizedAuthor(context.authorization, target.author) === undefined ||
+			isControlOperation(target.operation, context.payload.trust.trust.profileId) ||
+			target.operation.action === "acl"
+		)
+			return false;
+		const record = snapshotClosedRecord(value, PORTABLE_SETTLEMENT_SOURCE_KEYS);
+		if (
+			record === undefined ||
+			record.version !== 1 ||
+			record.sourceAuthor !== target.author ||
+			record.targetObjectId !== target.objectId ||
+			record.targetEpoch !== target.epoch ||
+			record.targetAnchor !== target.anchor ||
+			record.targetBlueprintDigest !== context.payload.provenance.blueprintDigest ||
+			context.authorization.kind !== "latched-acl" ||
+			record.targetAclDigest !==
+				lowerHexDigest(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(context.authorization.value))) ||
+			!isDigestHex(record.sourceAuthor) ||
+			!isDigestHex(record.sourceAnchor) ||
+			!isDigestHex(record.sourceDigest) ||
+			typeof record.sourceObjectId !== "string" ||
+			!NumberIsSafeInteger(record.sourceEpoch) ||
+			(record.sourceEpoch as number) < 0 ||
+			(record.sourceObjectId === target.objectId && (record.sourceEpoch as number) >= target.epoch) ||
+			!NumberIsSafeInteger(record.sourceSequence) ||
+			(record.sourceSequence as number) < 0 ||
+			!NumberIsSafeInteger(record.fromIntent) ||
+			(record.fromIntent as number) < 0 ||
+			!NumberIsSafeInteger(record.throughIntent) ||
+			(record.throughIntent as number) <= (record.fromIntent as number) ||
+			!isDigestHex(record.intentDigest) ||
+			!(record.sourcePreimage instanceof Uint8ArrayConstructor) ||
+			!(record.sourceSignature instanceof Uint8ArrayConstructor)
+		) {
+			ingressFailureLog("admission-rejected", "settlement-source-shape-target");
+			return false;
+		}
+		const sourceIdentity = `${String(record.sourceObjectId)}:${String(record.sourceEpoch)}:${String(record.sourceDigest)}`;
+		if (visitedSources.has(sourceIdentity) || visitedSources.size >= context.payload.parameters.maxEpochVertices)
+			return false;
+		visitedSources.add(sourceIdentity);
+		const authority = portableSettlementSourceAuthority(context, record);
+		if (
+			!localNativeSelection &&
+			!creatorProposalValidation &&
+			(!(record.creatorSelectionSignature instanceof Uint8ArrayConstructor) ||
+				!verifyCreatorSettlementSourceSelection(
+					context.payload.trust.trust,
+					creatorSettlementSelectionBytes(record),
+					record.creatorSelectionSignature
+				))
+		) {
+			ingressFailureLog("admission-rejected", "settlement-source-creator-selection");
+			return false;
+		}
+		if (
+			authority === undefined ||
+			resolveV3AuthorizedAuthor(authority.authorization, record.sourceAuthor as string) === undefined
+		) {
+			ingressFailureLog("admission-rejected", "settlement-source-authority");
+			return false;
+		}
+		if (
+			!(record.sourceAnchorPreimage instanceof Uint8ArrayConstructor) ||
+			!(record.sourceAnchorSignature instanceof Uint8ArrayConstructor) ||
+			!(record.sourceAclBytes instanceof Uint8ArrayConstructor)
+		)
+			return false;
+		const sourceTrust = openCreatorSettlementSourceTrust(
+			authority.payload.trust.trust,
+			record.sourceAnchorPreimage,
+			record.sourceAnchorSignature,
+			record.sourceObjectId as string,
+			authority.payload.trust.trust.genesisAnchorDigest
+		);
+		if (
+			sourceTrust === undefined ||
+			sourceTrust.currentEpoch !== record.sourceEpoch ||
+			sourceTrust.currentAnchorDigest !== record.sourceAnchor
+		)
+			return false;
+		const sourceAnchor = decodeCanonical(record.sourceAnchorPreimage) as Record<string, unknown>;
+		if (
+			sourceAnchor.blueprintDigest !== context.payload.provenance.blueprintDigest ||
+			authority.authorization.kind !== "latched-acl" ||
+			!sameBytes(encodeCanonical(authority.authorization.value), record.sourceAclBytes)
+		)
+			return false;
+		const rawDependencies = denseArray(record.dependencyVertices, authority.payload.parameters.maxEpochVertices);
+		if (rawDependencies === undefined || V3_VERTEX_SUITE_ID === undefined) return false;
+		const authenticate = (preimage: Uint8Array, signature: Uint8Array): AdmittedReceivedVertexView | undefined => {
+			const opened = extractAdmittedReceivedVertex({
+				domain: V3_VERTEX_DOMAIN,
+				expectedAnchor: record.sourceAnchor as string,
+				preparedBlueprintAdmission: authority.payload.admission,
+				receivedCanonicalPreimageBytes: preimage,
+				resolveAuthorPublicKey: (author) => resolveV3AuthorizedAuthor(authority.authorization, author),
+				signature,
+				suiteId: V3_VERTEX_SUITE_ID,
+			});
+			if (
+				!opened.ok ||
+				opened.vertex.objectId !== record.sourceObjectId ||
+				opened.vertex.epoch !== record.sourceEpoch ||
+				opened.vertex.dependencies.length > authority.payload.parameters.maxDependencies
+			)
+				return undefined;
+			return opened.vertex;
+		};
+		const original = authenticate(record.sourcePreimage, record.sourceSignature);
+		if (
+			original === undefined ||
+			original.author !== record.sourceAuthor ||
+			original.authorSequence !== record.sourceSequence ||
+			lowerHexDigest(original.digest) !== record.sourceDigest ||
+			original.operation.action === "acl" ||
+			isControlOperation(original.operation, authority.payload.trust.trust.profileId)
+		) {
+			ingressFailureLog("admission-rejected", "settlement-source-original");
+			return false;
+		}
+		const vertices = new Map<string, AdmittedReceivedVertexView>(),
+			identities = new Map<string, string>();
+		const add = (vertex: AdmittedReceivedVertexView): boolean => {
+			const digest = lowerHexDigest(vertex.digest),
+				identity = vertex.author + ":" + vertex.authorSequence;
+			if (digest === undefined) return false;
+			if (vertices.has(digest) || identities.has(identity)) return false;
+			vertices.set(digest, vertex);
+			identities.set(identity, digest);
+			return true;
+		};
+		if (!add(original)) return false;
+		let total = (record.sourcePreimage as Uint8Array).byteLength;
+		for (const raw of rawDependencies) {
+			const dependency = snapshotClosedRecord(raw, ["preimage", "signature"]);
+			if (
+				dependency === undefined ||
+				!(dependency.preimage instanceof Uint8ArrayConstructor) ||
+				!(dependency.signature instanceof Uint8ArrayConstructor)
+			)
+				return false;
+			total += dependency.preimage.byteLength;
+			if (total > authority.payload.parameters.maxEpochBytes) return false;
+			const opened = authenticate(dependency.preimage, dependency.signature);
+			if (opened === undefined || !add(opened)) return false;
+		}
+		const visiting = new Set<string>(),
+			visited = new Set<string>();
+		const visit = (digest: string): boolean => {
+			if (digest === record.sourceAnchor) return true;
+			if (visiting.has(digest)) return false;
+			if (visited.has(digest)) return true;
+			const vertex = vertices.get(digest);
+			if (vertex === undefined) return false;
+			visiting.add(digest);
+			for (const parent of vertex.dependencies) {
+				if (!visit(parent)) return false;
+				const predecessor = vertices.get(parent);
+				if (predecessor !== undefined && predecessor.logicalTime >= vertex.logicalTime) return false;
+			}
+			visiting.delete(digest);
+			visited.add(digest);
+			return true;
+		};
+		if (!visit(record.sourceDigest as string) || visited.size !== vertices.size) {
+			ingressFailureLog("admission-rejected", "settlement-source-dependencies");
+			return false;
+		}
+		if (
+			!isV3ApplicationAuthorAuthorized(authority.authorization, record.sourceAuthor as string) &&
+			original.settlementSource === undefined
+		)
+			return false;
+		if (original.settlementSource !== undefined && !localNativeSelection) {
+			const previousContext = {
+				...authority.payload,
+				trust: { ...authority.payload.trust, trust: sourceTrust },
+				provenance: {
+					...authority.payload.provenance,
+					objectId: original.objectId,
+					epoch: original.epoch,
+					anchorDigest: original.anchor,
+				},
+			};
+			const previous = new Map<string, EpochVertex>();
+			for (const [digest, vertex] of vertices)
+				if (digest !== record.sourceDigest)
+					previous.set(digest, { ...vertex, dependencies: [...vertex.dependencies], hash: digest, kind: "drp-vertex" });
+			if (
+				!verifyPortableSettlementSource(
+					{
+						payload: previousContext,
+						authorization: authority.authorization,
+						displacedSource: undefined,
+						historicalIssuance: undefined,
+					},
+					original,
+					previous,
+					false,
+					visitedSources
+				)
+			) {
+				ingressFailureLog("admission-rejected", "settlement-source-nested");
+				return false;
+			}
+		}
+		const originalAuthenticated = authenticatedRecoveryVertex(
+			original,
+			(record.sourcePreimage as Uint8Array).byteLength
+		);
+		const intents =
+			originalAuthenticated === undefined ? undefined : rebaseIntents(authority.payload, originalAuthenticated);
+		const policy = context.payload.input.settlementPolicy;
+		if (
+			intents === undefined ||
+			intents.length === 0 ||
+			policy === undefined ||
+			policy.blueprintDigest !== context.payload.provenance.blueprintDigest
+		) {
+			ingressFailureLog("admission-rejected", "settlement-source-policy");
+			return false;
+		}
+		const copyOperation = (value: unknown): Readonly<Record<string, unknown>> => {
+			const operation = detachedCanonicalOperation(value);
+			if (operation === undefined) throw new TypeError("portable original operation is malformed");
+			return operation;
+		};
+		const originalOperations = intents.map((intent) => copyOperation(intent.operation));
+		const derive = (): Readonly<Record<string, unknown>> | undefined =>
+			canonicalRecord(
+				decodeCanonical(
+					encodeCanonical(
+						policy.derive(ObjectFreeze(originalOperations.map((operation) => copyOperation(operation)))),
+						{ maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 16, maxItems: 65536 }
+					)
+				),
+				["operations", "disposition"]
+			);
+		const derived = derive();
+		if (
+			derived === undefined ||
+			(derived.disposition !== "rebase" && derived.disposition !== "transform") ||
+			!sameBytes(encodeCanonical(derived), encodeCanonical(derive())) ||
+			!ArrayIsArray(derived.operations) ||
+			derived.operations.length < 1 ||
+			derived.operations.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS
+		) {
+			ingressFailureLog("admission-rejected", "settlement-source-derived");
+			return false;
+		}
+		let effectiveOperations = derived.operations as readonly Readonly<Record<string, unknown>>[];
+		if (record.transformRefusal !== null) {
+			const refusal = snapshotClosedRecord(record.transformRefusal, [
+				"kind",
+				"proposedIntentDigest",
+				"reason",
+				"version",
+			]);
+			if (
+				derived.disposition !== "transform" ||
+				refusal === undefined ||
+				refusal.version !== 1 ||
+				refusal.kind !== "admission-refused" ||
+				(refusal.reason !== "capacity" && refusal.reason !== "identity-conflict" && refusal.reason !== "encoding") ||
+				!(refusal.proposedIntentDigest instanceof Uint8ArrayConstructor) ||
+				!sameBytes(
+					refusal.proposedIntentDigest,
+					hashDomain(
+						"ts-drp/settlement-transform-proposal/v1",
+						encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
+					)
+				)
+			) {
+				ingressFailureLog("admission-rejected", "settlement-source-refusal");
+				return false;
+			}
+			// The signed descriptor selects exact authenticated original intents, not portable
+			// admission authority or proof of a private past refusal. Fresh target policy and
+			// native accounting still precede delivery, including during cold replay.
+			effectiveOperations = originalOperations;
+		}
+		if (
+			(record.throughIntent as number) > effectiveOperations.length ||
+			lowerHexDigest(
+				hashDomain(
+					"ts-drp/settlement-replacement-intents/v1",
+					encodeCanonical(effectiveOperations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
+				)
+			) !== record.intentDigest
+		) {
+			ingressFailureLog("admission-rejected", "settlement-source-intent-digest");
+			return false;
+		}
+		const candidate = applicationBatchEntries(context.payload, target.operation)?.map((entry) => entry.operation) ?? [
+			target.operation,
+		];
+		if (
+			!sameBytes(
+				encodeCanonical(candidate),
+				encodeCanonical(effectiveOperations.slice(record.fromIntent as number, record.throughIntent as number))
+			)
+		) {
+			ingressFailureLog("admission-rejected", "settlement-source-candidate");
+			return false;
+		}
+		let through = 0;
+		for (const vertex of priorVertices.values()) {
+			const prior = (settlementSourceByVertex.get(vertex) ?? Reflect.get(vertex, "settlementSource")) as
+				| Readonly<Record<string, unknown>>
+				| undefined;
+			if (
+				prior?.sourceObjectId === record.sourceObjectId &&
+				prior.sourceAnchor === record.sourceAnchor &&
+				prior.sourceAuthor === record.sourceAuthor &&
+				prior.sourceSequence === record.sourceSequence
+			) {
+				if (
+					prior.sourceDigest !== record.sourceDigest ||
+					prior.intentDigest !== record.intentDigest ||
+					prior.fromIntent !== through
+				)
+					return false;
+				through = prior.throughIntent as number;
+			}
+		}
+		return record.fromIntent === through;
+	} catch {
+		ingressFailureLog("admission-rejected", "settlement-source-verifier-exception");
+		return false;
+	}
+}
+
+/** Exact original native source/plan custody is local recovery authority, never portable permission. */
+async function verifyLocalNativeSettlementSource(
+	context: PortableSettlementContext & Readonly<{ issuanceStore: DurableIssuanceStore }>,
+	target: AdmittedReceivedVertexView,
+	priorVertices: ReadonlyMap<string, EpochVertex>,
+	sharedAccounting?: CreatorClosedRollbackProofAccounting
+): Promise<boolean> {
+	const record = target.settlementSource;
+	if (record?.creatorSelectionSignature !== null || record.sourceAuthor !== target.author) return false;
+	const nativeStore = creatorOriginalIssuanceStore(context);
+	const scope = { author: target.author, objectId: target.objectId };
+	const issued = await nativeStore.readIssued(scope, target.authorSequence);
+	const originalStore = context.displacedSource?.issuanceStore ?? nativeStore;
+	const source = await originalStore.readIssued(
+		{ author: record.sourceAuthor as string, objectId: record.sourceObjectId as string },
+		record.sourceSequence as number
+	);
+	const plan = await nativeStore.readSettlementPlan(scope);
+	if (sharedAccounting !== undefined && (!sharedAccounting.charge(encodeCanonical(issued)) ||
+		!sharedAccounting.charge(encodeCanonical(source)) || !sharedAccounting.charge(encodeCanonical(plan)))) return false;
+	const entry = plan?.entries.find((row) => row.sourceSequence === record.sourceSequence);
+	const range = entry?.replacementProgress?.chunks.find((chunk) => chunk.replacementSequence === target.authorSequence);
+	if (
+		issued === null ||
+		source === null ||
+		entry === undefined ||
+		lowerHexDigest(issued.envelope.digest) !== lowerHexDigest(target.digest) ||
+		lowerHexDigest(source.envelope.digest) !== record.sourceDigest ||
+		!sameBytes(source.envelope.canonicalPreimageBytes, record.sourcePreimage as Uint8Array) ||
+		!sameBytes(source.envelope.signature, record.sourceSignature as Uint8Array) ||
+		!sameBytes(entry.sourceDigest, source.envelope.digest) ||
+		(entry.replacementSequence !== target.authorSequence && range === undefined)
+	)
+		return false;
+	const sourceRow = outboxRowSnapshot(
+		{ commit: source, publishState: "pending" },
+		{ author: record.sourceAuthor as string, objectId: record.sourceObjectId as string }
+	);
+	if (sourceRow === undefined || sharedAccounting !== undefined &&
+		(!sharedAccounting.charge(issued.envelope.canonicalPreimageBytes) || !sharedAccounting.charge(issued.envelope.signature) ||
+		!sharedAccounting.charge(sourceRow.canonicalPreimageBytes) || !sharedAccounting.charge(sourceRow.signature)) ||
+		!(await verifyNestedNativeSource(context, sourceRow, undefined, sharedAccounting))) return false;
+	return verifyPortableSettlementSource(context, target, priorVertices, true);
+}
+
+/**
+ * Bounded exact source proof selected from the original fully charged native census.
+ * @param registration - Current authenticated target owner.
+ * @param selected - Nominal native source selection.
+ * @param input - Exact owning replacement request.
+ * @param exactCensusBytes - Complete charged native dependency closure.
+ * @returns Detached target-signed source selection.
+ */
+function preparePortableSettlementSource(
+	registration: V3PlaneRegistration,
+	selected: ClassifiedRebaseRow,
+	input: Pick<CapturedLocalIssueInput, "operations" | "planEffect">,
+	exactCensusBytes: Uint8Array
+): Readonly<Record<string, unknown>> {
+	const derived = deriveOwnedReplacement(registration, selected, input),
+		effect = input.planEffect;
+	if (effect?.kind !== "replacement") throw new TypeError("portable replacement effect is missing");
+	const census = decodeCanonical(exactCensusBytes) as Record<string, unknown>;
+	const carriers = new Map<string, Readonly<{ preimage: Uint8Array; signature: Uint8Array }>>();
+	const collect = (value: unknown): void => {
+		if (value === null || typeof value !== "object" || value instanceof Uint8ArrayConstructor) return;
+		if (ArrayIsArray(value)) {
+			for (const child of value) collect(child);
+			return;
+		}
+		const row = value as Record<string, unknown>;
+		const preimage = row.canonicalPreimageBytes ?? row.exactCanonicalPreimageBytes;
+		const signature = row.signature ?? row.detachedSignature;
+		if (preimage instanceof Uint8ArrayConstructor && signature instanceof Uint8ArrayConstructor) {
+			const digest = lowerHexDigest(hashDomain(V3_VERTEX_DOMAIN, preimage));
+			if (digest === undefined) throw new TypeError("portable dependency digest is malformed");
+			const previous = carriers.get(digest);
+			if (
+				previous !== undefined &&
+				(!sameBytes(previous.preimage, preimage) || !sameBytes(previous.signature, signature))
+			)
+				throw new TypeError("portable dependency carrier conflicts");
+			carriers.set(digest, ObjectFreeze({ preimage, signature }));
+			return;
+		}
+		for (const child of Object.values(row)) collect(child);
+	};
+	collect(census);
+	carriers.set(selected.authenticated.digest, {
+		preimage: selected.row.canonicalPreimageBytes,
+		signature: selected.row.signature,
+	});
+	const dependencies: Array<Readonly<{ preimage: Uint8Array; signature: Uint8Array }>> = [],
+		visited = new Set<string>(),
+		visiting = new Set<string>();
+	const anchor = selected.authenticated.admitted.anchor;
+	const visit = (digest: string): void => {
+		if (digest === anchor || visited.has(digest)) return;
+		if (visiting.has(digest)) throw new TypeError("portable source dependency cycle");
+		const carrier = carriers.get(digest);
+		if (carrier === undefined) throw new TypeError("portable source protected dependency is unavailable");
+		visiting.add(digest);
+		const vertex = decodeCanonical(carrier.preimage) as Record<string, unknown>;
+		for (const parent of vertex.dependencies as string[]) visit(parent);
+		visiting.delete(digest);
+		visited.add(digest);
+		if (digest !== selected.authenticated.digest) dependencies.push(carrier);
+	};
+	visit(selected.authenticated.digest);
+	const authorization = ObjectFreeze({
+		version: 1,
+		creatorSelectionSignature: null,
+		sourceObjectId: selected.row.scope.objectId,
+		sourceAnchor: anchor,
+		targetObjectId: registration.payload.provenance.objectId,
+		targetEpoch: registration.payload.provenance.epoch,
+		targetAnchor: registration.payload.provenance.anchorDigest,
+		targetBlueprintDigest: registration.payload.provenance.blueprintDigest,
+		targetAclDigest:
+			registration.authorization.kind === "latched-acl"
+				? lowerHexDigest(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(registration.authorization.value)))
+				: undefined,
+		sourceEpoch: selected.authenticated.admitted.epoch,
+		sourceAuthor: selected.authenticated.author,
+		sourceSequence: selected.row.authorSequence,
+		sourceDigest: selected.authenticated.digest,
+		sourcePreimage: new Uint8ArrayConstructor(selected.row.canonicalPreimageBytes),
+		sourceSignature: new Uint8ArrayConstructor(selected.row.signature),
+		dependencyVertices: ObjectFreeze(dependencies),
+		transformRefusal: derived.transformRefusal ?? null,
+		fromIntent: "fromIntent" in effect ? effect.fromIntent : 0,
+		throughIntent: "throughIntent" in effect ? effect.throughIntent : derived.operations.length,
+		intentDigest: lowerHexDigest(
+			hashDomain(
+				"ts-drp/settlement-replacement-intents/v1",
+				encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
+			)
+		),
+	});
+	const authority = portableSettlementSourceAuthority(registration, authorization);
+	if (
+		authority === undefined ||
+		(!isV3ApplicationAuthorAuthorized(authority.authorization, selected.authenticated.author) &&
+			!verifiedNestedNativeSources.has(selected))
+	)
+		throw new TypeError("portable replacement original source/target authority is unavailable");
+	const history =
+		selected.row.scope.objectId === registration.payload.provenance.objectId
+			? registration.historicalIssuance
+			: registration.displacedSource?.historicalIssuance;
+	const retained =
+		history === undefined
+			? undefined
+			: resolveVerifiedHistoricalSourceContext(history.capability, {
+					objectId: selected.row.scope.objectId,
+					epoch: selected.authenticated.admitted.epoch,
+					anchor,
+				});
+	const direct =
+		retained === undefined && authority.payload.trust.trust.currentAnchorDigest === anchor
+			? readCreatorSettlementSourceAnchor(authority.payload.trust.trust)
+			: undefined;
+	const sourceContext =
+		retained ??
+		(direct === undefined || authority.authorization.kind !== "latched-acl"
+			? undefined
+			: { ...direct, aclBytes: encodeCanonical(authority.authorization.value) });
+	if (sourceContext === undefined)
+		throw new TypeError("portable source exact authenticated anchor/ACL bytes are unavailable");
+	return ObjectFreeze({
+		...authorization,
+		sourceAnchorPreimage: new Uint8ArrayConstructor(sourceContext.anchorPreimage),
+		sourceAnchorSignature: new Uint8ArrayConstructor(sourceContext.anchorSignature),
+		sourceAclBytes: new Uint8ArrayConstructor(sourceContext.aclBytes),
+	});
+}
+
+/** Only canonical decoder output enters this detached, bounded proposal copy. */
+function detachedSettlementSelectionValue(value: unknown): unknown {
+	if (value instanceof Uint8ArrayConstructor) return new Uint8ArrayConstructor(value);
+	if (ArrayIsArray(value)) return ObjectFreeze(value.map(detachedSettlementSelectionValue));
+	if (!isObject(value)) return value;
+	const copy: Record<string, unknown> = {};
+	for (const key of ReflectOwnKeys(value)) {
+		if (typeof key !== "string") throw new TypeError("selection key is invalid");
+		copy[key] = detachedSettlementSelectionValue(ObjectGetOwnPropertyDescriptor(value, key)?.value);
+	}
+	return ObjectFreeze(copy);
+}
+
+function creatorSelectionProposalTarget(
+	registration: V3PlaneRegistration,
+	bytes: Uint8Array
+): AdmittedReceivedVertexView {
+	const keys = PORTABLE_SETTLEMENT_SOURCE_KEYS.filter(
+		(key) => key !== "creatorSelectionSignature" && key !== "fromIntent" && key !== "throughIntent"
+	);
+	const decoded = decodeCanonical(bytes, { maxBytes: registration.payload.parameters.maxPendingBytes });
+	const selection = snapshotClosedRecord(detachedSettlementSelectionValue(decoded), keys);
+	if (
+		selection === undefined ||
+		!sameBytes(encodeCanonical(selection), bytes) ||
+		!(selection.sourcePreimage instanceof Uint8ArrayConstructor)
+	)
+		throw new TypeError("creator selection proposal canonical schema is invalid");
+	const raw = decodeCanonical(selection.sourcePreimage) as Record<string, unknown>;
+	const operation = detachedCanonicalOperation(raw.operation);
+	const policy = registration.payload.input.settlementPolicy;
+	if (operation === undefined || policy === undefined)
+		throw new TypeError("creator selection original intent is unavailable");
+	const original = applicationBatchEntries(registration.payload, operation)?.map((entry) => entry.operation) ?? [
+		operation,
+	];
+	const derived = policy.derive(ObjectFreeze(original));
+	const operations = selection.transformRefusal === null ? derived.operations : original;
+	if (operations.length < 1 || operations.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS)
+		throw new TypeError("creator selection intent count is invalid");
+	const candidate =
+		operations.length === 1
+			? operations[0]
+			: applicationBatchOperation(operations.map((operation, index) => ({ operation, logicalTime: index + 1 })));
+	if (candidate === undefined) throw new TypeError("creator selection candidate is unavailable");
+	return ObjectFreeze({
+		protocolMajor: 3 as const,
+		kind: "drp-vertex" as const,
+		objectId: registration.payload.provenance.objectId,
+		epoch: registration.payload.provenance.epoch,
+		anchor: registration.payload.provenance.anchorDigest,
+		author: selection.sourceAuthor as string,
+		authorSequence: 0,
+		logicalTime: 1,
+		dependencies: ObjectFreeze([]),
+		digest: new Uint8ArrayConstructor(32),
+		operation: candidate,
+		settlementSource: ObjectFreeze({
+			...selection,
+			creatorSelectionSignature: null,
+			fromIntent: 0,
+			throughIntent: operations.length,
+		}),
+	});
+}
+
+type OwnedCreatorSelectionAdmission = Readonly<{
+	bytes: Uint8Array;
+	digest: Uint8Array;
+	publicKey: Uint8Array;
+	checkWhile<T>(action: () => Promise<T>): Promise<T>;
+}>;
+const ownedCreatorSelectionRequests = new WeakMap<OwnedSigningRequest, OwnedCreatorSelectionAdmission>();
+
+/** Consumer only: the exact original v3-live module's lexical request registry.
+ * Neither kernel installers nor structural callback/receipt fields create entries. */
+export function consumeOwnedCreatorSelectionSigningRequest(request: unknown): OwnedCreatorSelectionAdmission | undefined {
+	if (request === null || typeof request !== "object") return undefined;
+	const admitted = ownedCreatorSelectionRequests.get(request as OwnedSigningRequest);
+	ownedCreatorSelectionRequests.delete(request as OwnedSigningRequest);
+	return admitted === undefined ? undefined : ObjectFreeze({ ...admitted, bytes: new Uint8ArrayConstructor(admitted.bytes),
+		digest: new Uint8ArrayConstructor(admitted.digest), publicKey: new Uint8ArrayConstructor(admitted.publicKey) });
+}
+
+/** Private exact semantic owner: invoked only inside its existing full charged
+ * dependency turn and original whole-floor/source native custody. */
+async function withOwnedCreatorSelectionRequest<T>(registration: V3PlaneRegistration, custody: LocalReplacementCustody,
+	read: CreatorSnapshotRecoveryCloseDependencyRead, bytes: Uint8Array, valid: () => boolean,
+	action: (request: OwnedSigningRequest) => Promise<T>): Promise<T> {
+	const creator = resolveCreatorSettlementAuthor(registration.payload.trust.trust);
+	if (creator === undefined || creator !== registration.issuanceScope.author || !valid()) throw new TypeError("creator selection exact owner is unavailable");
+	await custody.check();
+	if (!currentRegistration(registration) || !valid()) throw new TypeError("creator selection exact owner is revoked");
+	const request = ObjectFreeze({}) as OwnedSigningRequest;
+	let active = true;
+	ownedCreatorSelectionRequests.set(request, ObjectFreeze({ bytes, digest: hashDomain("ts-drp/settlement-source-selection/v1", bytes),
+		publicKey: Uint8ArrayConstructor.from(creator.match(/../gu)!.map(byte => Number.parseInt(byte, 16))),
+		checkWhile: async <Result>(consume: () => Promise<Result>): Promise<Result> => {
+			if (!active || !currentRegistration(registration) || !valid()) throw new TypeError("creator selection original owner is revoked");
+			let result!: Result;
+			await read.checkWhile(async () => {
+				await custody.check();
+				if (!active || !currentRegistration(registration) || !valid()) throw new TypeError("creator selection original owner is revoked");
+				result = await consume();
+				await custody.check();
+				if (!active || !currentRegistration(registration) || !valid()) throw new TypeError("creator selection delivery is revoked");
+			});
+			if (!active || !currentRegistration(registration) || !valid()) throw new TypeError("creator selection delivery is revoked");
+			return result;
+		},
+	}));
+	try { return await action(request); }
+	finally { active = false; ownedCreatorSelectionRequests.delete(request); }
+}
+
+function authorizeCreatorSettlementSelection(
+	registration: V3PlaneRegistration,
+	raw: V3SettlementSourceSelectionRequest &
+		Readonly<{
+			approve(request: V3SettlementSourceSelectionApproval): Promise<boolean>;
+			signRegisteredVertexDigest: SignRegisteredVertexDigest;
+		}>
+): Promise<Uint8Array> {
+	if (
+		!currentRegistration(registration) ||
+		resolveCreatorSettlementAuthor(registration.payload.trust.trust) !== registration.issuanceScope.author
+	)
+		return Promise.reject(new TypeError("creator selection approval owner is unavailable"));
+	return enqueueRegistrationTask(
+		registration,
+		(inputCustody) => {
+			const input =
+				snapshotClosedRecord(raw, [
+					"exactCanonicalSelectionBytes",
+					"digest",
+					"approve",
+					"signRegisteredVertexDigest",
+				]) ??
+				snapshotClosedRecord(raw, [
+					"exactCanonicalSelectionBytes",
+					"digest",
+					"signal",
+					"approve",
+					"signRegisteredVertexDigest",
+				]);
+			if (
+				input === undefined ||
+				typeof input.approve !== "function" ||
+				typeof input.signRegisteredVertexDigest !== "function"
+			)
+				throw new TypeError("creator selection input is invalid");
+			const length = typedArrayByteLength(input.exactCanonicalSelectionBytes);
+			if (
+				length === undefined ||
+				length === 0 ||
+				length > registration.payload.parameters.maxPendingBytes ||
+				inputCustody === undefined
+			)
+				throw new TypeError("creator selection input bytes are invalid");
+			// Retained exact request, detached proposal and result have explicit input credit.
+			inputCustody.chargeBytes(length * 2 + 32 + 64);
+			const bytes = copyDetachedBytes(input.exactCanonicalSelectionBytes),
+				digest = copyDetachedBytes(input.digest);
+			if (
+				bytes === undefined ||
+				digest?.byteLength !== 32 ||
+				!sameBytes(hashDomain("ts-drp/settlement-source-selection/v1", bytes), digest)
+			)
+				throw new TypeError("creator selection digest differs");
+			const signal = input.signal as AbortSignal | undefined;
+			if (signal !== undefined && !(signal instanceof AbortSignal))
+				throw new TypeError("creator selection cancellation signal is invalid");
+			const approve = input.approve as (request: V3SettlementSourceSelectionApproval) => Promise<boolean>;
+			const sign = input.signRegisteredVertexDigest as SignRegisteredVertexDigest;
+			return async () => {
+				const controller = new AbortController(),
+					cancel = (): void => controller.abort();
+				registration.settlementSelectionControllers ??= new Set();
+				registration.settlementSelectionControllers.add(controller);
+				signal?.addEventListener("abort", cancel, { once: true });
+				if (signal?.aborted) cancel();
+				let custody: LocalReplacementCustody | undefined;
+				try {
+					const target = creatorSelectionProposalTarget(registration, bytes);
+					const proof = target.settlementSource;
+					const valid = (): boolean =>
+						!controller.signal.aborted &&
+						currentRegistration(registration) &&
+						verifyPortableSettlementSource(registration, target, registration.closeVertices, false, new Set(), true);
+					if (!valid() || proof === undefined)
+						throw new TypeError("creator selection source/target proposal is not authenticated");
+					const floor = registration.payload.input.settlementFloor;
+					if (floor === undefined) throw new TypeError("creator selection whole-floor owner is unavailable");
+					const image = await floor.readRetirementImage({
+						scope: {
+							objectId: registration.payload.provenance.objectId,
+							pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest,
+						},
+					});
+					if (
+						image.state.pending !== null ||
+						!sameCreatorRoomHead(image.state.stable, registration.payload.trust.trust)
+					)
+						throw new TypeError("creator selection whole-floor is stale");
+					custody = await acquireLocalReplacementCustody(registration, encodeCanonical(image));
+					let signature: Uint8Array | undefined;
+					await withActiveRebaseDependencies(
+						registration,
+						undefined,
+						(read) =>
+							read.checkWhile(async () => {
+								if (!valid()) throw new TypeError("creator selection proposal currency changed");
+								const accepted = await approve(
+									ObjectFreeze({
+										exactCanonicalSelectionBytes: new Uint8ArrayConstructor(bytes),
+										digest: new Uint8ArrayConstructor(digest),
+										cancellationSignal: controller.signal,
+										preview: ObjectFreeze({
+											sourceObjectId: proof.sourceObjectId as string,
+											sourceAuthor: target.author,
+											sourceSequence: proof.sourceSequence as number,
+											sourceDigest: proof.sourceDigest as string,
+											targetObjectId: target.objectId,
+											targetEpoch: target.epoch,
+											targetAnchor: target.anchor,
+											intentCount: proof.throughIntent as number,
+										}),
+									})
+								);
+								if (accepted !== true || !valid()) throw new TypeError("creator selection approval refused or revoked");
+								signature = copyDetachedBytes(await withOwnedCreatorSelectionRequest(registration, custody!, read, bytes, valid,
+									request => sign(new Uint8ArrayConstructor(digest), request)));
+								if (
+									signature === undefined ||
+									!verifyCreatorSettlementSourceSelection(registration.payload.trust.trust, bytes, signature) ||
+									!valid()
+								)
+									throw new TypeError("creator selection signed response is invalid or stale");
+							}),
+						custody,
+						[bytes, new Uint8ArrayConstructor(64)]
+					);
+					await custody.check();
+					if (signature === undefined || !valid()) throw new TypeError("creator selection delivery is stale");
+					return signature;
+				} finally {
+					signal?.removeEventListener("abort", cancel);
+					registration.settlementSelectionControllers.delete(controller);
+					await custody?.release();
+				}
+			};
+		},
+		{
+			pool: "read-control",
+			refuse: (): never => {
+				throw new TypeError("creator selection task capacity exhausted");
+			},
+			refuseCapture: (): never => {
+				throw new TypeError("creator selection input capacity exhausted");
+			},
+		}
+	);
 }
 
 function latchedAclPreview(
@@ -3744,6 +7119,12 @@ function aliasCreatorSuccessorHandle(rawHandle: object, wrapper: object): boolea
 
 function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.active = false;
+	registration.vertexFacts.release();
+	// Numerical DATA is no longer selectable once the plane is revoked. Admitted
+	// proof closures retain their own captures through the original pending/native
+	// joins; this drops neither protected storage nor a native reservation.
+	ordinaryRuntimeCapacityGeometry.delete(registration);
+	for (const controller of registration.settlementSelectionControllers ?? []) controller.abort();
 	registration.releaseTerminalBarrier?.();
 	registration.releaseTerminalBarrier = undefined;
 	registration.terminalBarrier = undefined;
@@ -3778,6 +7159,7 @@ function sameActivation(
 	const payload = recovered.prepared;
 	return (
 		registration.active &&
+		registration.receiveOnly === recovered.receiveOnly &&
 		registration.mode ===
 			(ReflectOwnKeys(input).length === SNAPSHOT_ACTIVATION_INPUT_KEYS.length ? "snapshot-closed" : "genesis-active") &&
 		registration.messageQueueManager === input.messageQueueManager &&
@@ -3808,13 +7190,26 @@ function creatorSuccessorTransportHandoff(
 		if (registrations === undefined) return undefined;
 		for (const registration of registrations.values()) {
 			const trust = registration.payload.trust.trust;
+			const source = material.sourceRuntimeHandle?.deref();
+			const localClose =
+				material.origin === "local-close" && registration.blueprintFolded && registration.terminalState === "terminal";
+			const received =
+				material.origin === "received" &&
+				registration.receivedTransition === true &&
+				!registration.blueprintFolded &&
+				registration.terminalState === "active" &&
+				source !== undefined &&
+				v3HandleRegistrations.get(source as V3PlaneHandle) === registration;
 			if (
 				currentRegistration(registration) &&
 				registration.messageQueueManager === bindings.messageQueueManager &&
 				registration.mode === "genesis-active" &&
 				registration.blueprintClosing &&
-				registration.blueprintFolded &&
-				registration.terminalState === "terminal" &&
+				(localClose || received) &&
+				registration.payload.input.store === material.store &&
+				registration.issuanceStore === material.issuanceStore &&
+				registration.liveJournalStore === material.liveJournalStore &&
+				sameScope(registration.issuanceScope, material.issuanceScope) &&
 				registration.authorization.kind === "latched-acl" &&
 				sameBytes(
 					encodeCanonical(registration.authorization.value),
@@ -3863,9 +7258,10 @@ type V3IngressFailureCategory =
 	| "queue-rejected"
 	| "sink-rejected";
 
-function ingressFailureLog(category: V3IngressFailureCategory): void {
+function ingressFailureLog(category: V3IngressFailureCategory, stage?: string): void {
 	try {
-		if (typeof ConsoleWarn === "function") ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-ingress", category]);
+		if (typeof ConsoleWarn === "function")
+			ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-ingress", category, ...(stage === undefined ? [] : [stage])]);
 	} catch {
 		// Logging is diagnostic-only and must not escape the queue boundary.
 	}
@@ -3963,8 +7359,10 @@ async function drainPendingIngress(registration: V3PlaneRegistration): Promise<v
 			if (ready.length === 0) return;
 			for (const [digest, pending] of ready) {
 				if (!currentRegistration(registration)) return;
+				// Retain exact unadmitted work until durable delivery succeeds. A
+				// local capacity refusal must not erase it or spin a retry loop.
+				if (!(await handleV3Ingress(registration, pending.evidence))) return;
 				releasePendingIngress(registration, digest);
-				await handleV3Ingress(registration, pending.evidence);
 			}
 		}
 	} finally {
@@ -3976,20 +7374,38 @@ function extractAuthorizedV3Vertex(
 	payload: PreparedV3LivePayload,
 	receivedCanonicalPreimageBytes: Uint8Array,
 	signature: Uint8Array,
-	resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"]
+	resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"],
+	vertexFacts?: CreatorCensusVertexFacts,
+	retained?: RetainedCloseSignedAdmissionCapture
 ): ReturnType<typeof extractAdmittedReceivedVertex> | undefined {
 	if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") return undefined;
 	const domain = V3_VERTEX_DOMAIN;
 	const expectedAnchor = payload.provenance.anchorDigest;
 	const preparedBlueprintAdmission = payload.admission;
 	const suiteId = V3_VERTEX_SUITE_ID;
-	const extracted = extractAdmittedReceivedVertex({
+	let observedAuthor: string | undefined, observedKey: Uint8Array | undefined,
+		observedFormat: "raw" | undefined, keyStable = true;
+	const exactPreimage = retained === undefined ? receivedCanonicalPreimageBytes : new Uint8ArrayConstructor(receivedCanonicalPreimageBytes);
+	const exactSignature = retained === undefined ? signature : new Uint8ArrayConstructor(signature);
+	if (retained !== undefined) retained.value = undefined;
+	const originalResolve = retained === undefined ? resolveAuthorPublicKey : (author: string) => {
+		const key = resolveAuthorPublicKey(author);
+		if (key === undefined) { keyStable = false; return key; }
+		if (key.format !== "raw") { keyStable = false; return key; }
+		const bytes = copyDetachedBytes(key.bytes);
+		if (bytes === undefined) { keyStable = false; return key; }
+		if (observedAuthor !== undefined && (observedAuthor !== author || observedFormat !== key.format ||
+			observedKey === undefined || !sameBytes(observedKey, bytes))) keyStable = false;
+		observedAuthor = author; observedKey = bytes; observedFormat = key.format;
+		return key;
+	};
+	const extracted = (vertexFacts?.extract ?? extractAdmittedReceivedVertex)({
 		domain,
 		expectedAnchor,
 		preparedBlueprintAdmission,
-		receivedCanonicalPreimageBytes,
-		resolveAuthorPublicKey,
-		signature,
+		receivedCanonicalPreimageBytes: exactPreimage,
+		resolveAuthorPublicKey: originalResolve,
+		signature: exactSignature,
 		suiteId,
 	});
 	if (!extracted.ok) return extracted;
@@ -4007,6 +7423,14 @@ function extractAuthorizedV3Vertex(
 			protocolMajor: 3 as const,
 		})
 	);
+	if (retained !== undefined && classification.current && keyStable && observedAuthor === extracted.vertex.author &&
+		observedKey !== undefined && observedFormat !== undefined && exactSignature.byteLength === 64 &&
+		extracted.vertex.settlementSource === undefined) {
+		try { retained.value = ObjectFreeze({payload, admitted: copyCanonicalForAdmittedView(extracted.vertex, true) as AdmittedReceivedVertexView,
+			originalAdmitted: extracted.vertex,
+			preimage: exactPreimage, signature: exactSignature, key: observedKey, format: observedFormat, domain, suite: suiteId}); }
+		catch { retained.value = undefined; } // Unsupported optional fact keeps normal verification.
+	}
 	return classification.current
 		? extracted
 		: ObjectFreeze({ ok: false as const, reason: "admission-rejected" as const });
@@ -4014,7 +7438,82 @@ function extractAuthorizedV3Vertex(
 
 async function handleV3Ingress(
 	registration: V3PlaneRegistration,
-	evidence: VerifiedV3IngressEvidence
+	evidence: VerifiedV3IngressEvidence,
+	signedAdmission?: RetainedCloseSignedAdmission
+): Promise<boolean> {
+	if (evidence.authenticated.admitted.settlementSource === undefined) {
+		if (!registration.creatorMaintenanceBound || registration.index.has(evidence.authenticated.digest))
+			return handleV3IngressWithSource(registration, evidence, false, undefined, signedAdmission);
+		const floor = registration.payload.input.settlementFloor;
+		if (floor === undefined) return false;
+		let custody: LocalReplacementCustody | undefined;
+		try {
+			const image = await floor.readRetirementImage({scope: {objectId: registration.payload.provenance.objectId,
+				pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest}});
+			if (image.state.pending !== null || !sameCreatorRoomHead(image.state.stable, registration.payload.trust.trust))
+				throw new TypeError("received append whole-floor is stale");
+			custody = await acquireLocalReplacementCustody(registration, encodeCanonical(image));
+			return await handleV3IngressWithSource(registration, evidence, false, custody, signedAdmission);
+		} catch {
+			ingressFailureLog("admission-rejected", "received-maintenance-custody");
+			return false;
+		} finally { await custody?.release(); }
+	}
+	if (registration.index.has(evidence.authenticated.digest))
+		return handleV3IngressWithSource(registration, evidence, true);
+	let custody: LocalReplacementCustody | undefined;
+	let outcome = false;
+	try {
+		if (!verifyPortableSettlementSource(registration, evidence.authenticated.admitted, registration.closeVertices)) {
+			ingressFailureLog("admission-rejected");
+			return false;
+		}
+		const floor = registration.payload.input.settlementFloor;
+		if (floor === undefined) throw new TypeError("remote replacement whole-floor owner is unavailable");
+		const image = await floor.readRetirementImage({
+			scope: {
+				objectId: registration.payload.provenance.objectId,
+				pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest,
+			},
+		});
+		if (image.state.pending !== null || !sameCreatorRoomHead(image.state.stable, registration.payload.trust.trust))
+			throw new TypeError("remote replacement whole-floor is stale");
+		custody = await acquireLocalReplacementCustody(registration, encodeCanonical(image));
+		await withActiveRebaseDependencies(
+			registration,
+			undefined,
+			(read) =>
+				read.checkWhile(() => {
+					if (
+						!verifyPortableSettlementSource(registration, evidence.authenticated.admitted, registration.closeVertices)
+					)
+						throw new TypeError("remote replacement source changed");
+					return Promise.resolve();
+				}),
+			custody,
+			[evidence.exactCanonicalPreimageBytes, evidence.signature]
+		);
+		await custody.check();
+		outcome = await handleV3IngressWithSource(registration, evidence, true, custody);
+	} catch {
+		ingressFailureLog("admission-rejected", "settlement-source-native-custody");
+	} finally {
+		try {
+			await custody?.release();
+		} catch {
+			registration.operationAdmissionHalted = true;
+			outcome = false;
+		}
+	}
+	return outcome;
+}
+
+async function handleV3IngressWithSource(
+	registration: V3PlaneRegistration,
+	evidence: VerifiedV3IngressEvidence,
+	sourceAuthorized: boolean,
+	custody?: LocalReplacementCustody,
+	signedAdmission?: RetainedCloseSignedAdmission
 ): Promise<boolean> {
 	if (!currentRegistration(registration)) return false;
 	const authenticated = evidence.authenticated;
@@ -4073,7 +7572,15 @@ async function handleV3Ingress(
 	if (
 		!alreadyAccepted &&
 		!controlOperation &&
-		!validateLatchedOperation(registration.authorization, registration.latchedOperations, candidate)
+		!validateLatchedOperation(
+			registration.authorization,
+			registration.latchedOperations,
+			candidate,
+			authenticated.author,
+			registration.payload.trust.trust.profileId,
+			terminalClassification === "terminal-authorized",
+			sourceAuthorized
+		)
 	) {
 		ingressFailureLog("admission-rejected");
 		return false;
@@ -4088,11 +7595,38 @@ async function handleV3Ingress(
 			? undefined
 			: reserveOperation(
 					registration.operationAdmissionPolicy,
-					authenticated.vertex.operation as Readonly<Record<string, unknown>>
+					authenticated.vertex.operation as Readonly<Record<string, unknown>>,
+					authenticated.author
 				);
 	if (reservation === null) {
 		ingressFailureLog("admission-rejected");
 		return false;
+	}
+	let maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined;
+	if (!alreadyAccepted && registration.creatorMaintenanceBound) {
+		const consumer = registration.creatorMaintenanceAdmission;
+		if (consumer === undefined || custody === undefined) {
+			releaseOperationReservation(reservation);
+			ingressFailureLog("admission-rejected", "received-maintenance-unavailable");
+			return false;
+		}
+		const receipt = ObjectFreeze({});
+		receivedAppendReceipts.set(receipt, {registration, evidence, sourceAuthorized, custody,
+			graphVersion: registration.graphVersion, index: registration.index});
+		let maintenancePhase = "capture";
+		try {
+			maintenanceAdmission = await consumer({kind: "received-append", receipt});
+			maintenancePhase = "begin-write";
+			await maintenanceAdmission.beginWrite();
+		} catch (error) {
+			await maintenanceAdmission?.release();
+			releaseOperationReservation(reservation);
+			retainPendingIngress(registration, evidence, V3Envelope.encode({
+				canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
+			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${
+				creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable")}`);
+			return false;
+		} finally { receivedAppendReceipts.delete(receipt); }
 	}
 	if (!alreadyAccepted && terminalClassification === "terminal-authorized") {
 		// Once authenticated terminal evidence reaches the durable boundary, any
@@ -4102,17 +7636,33 @@ async function handleV3Ingress(
 	}
 	let appended;
 	try {
+		const custodyImage = await custody?.joinJournalReads(), maintenanceImage = maintenanceAdmission?.journalContext;
+		if (custodyImage !== undefined && maintenanceImage !== undefined &&
+			(custodyImage.imageDigest !== maintenanceImage.imageDigest ||
+				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
+			throw new TypeError("received journal contexts disagree");
+		const expectedNativeImage = custodyImage ?? maintenanceImage;
 		appended = await registration.liveJournalStore.appendAccepted({
 			detachedSignature: new Uint8ArrayConstructor(evidence.signature),
 			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
 			scope: liveJournalScope(registration.payload),
 			sourceKind: "received",
 			vertexDigest: authenticated.digest,
+			...(expectedNativeImage === undefined ? {} : { expectedNativeImage }),
 		});
+		if (custody !== undefined) {
+			if (!appended.ok || appended.nativeImage === undefined)
+				throw new TypeError("remote replacement native readback is unavailable");
+			await custody.resumeJournalReads(appended.nativeImage);
+		}
+		if (maintenanceImage !== undefined && (!appended.ok || appended.nativeImage === undefined))
+			throw new TypeError("ordinary received journal postimage is unavailable");
 	} catch {
-		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+		if (reservation !== undefined || custody !== undefined) registration.operationAdmissionHalted = true;
 		ingressFailureLog("journal-rejected");
 		return false;
+	} finally {
+		await maintenanceAdmission?.release();
 	}
 	if (
 		!appended.ok ||
@@ -4156,7 +7706,10 @@ async function handleV3Ingress(
 		registration.closeAuthors,
 		registration.authorVertexCounts,
 		authenticated,
-		registration.closeCharges
+		registration.closeCharges,
+		sourceAuthorized,
+		signedAdmission,
+		registration.vertexFacts
 	);
 	if (controlOperation) registration.controlVertices.add(authenticated.digest);
 	registration.graphVersion += 1;
@@ -4167,6 +7720,17 @@ async function handleV3Ingress(
 		ingressFailureLog("admission-rejected");
 		return true;
 	}
+	const acceptedEffect = registration.closeAuthors.get(authenticated.digest)?.applicationEffect;
+	advanceCreatorOrdinaryRuntimeCapacityGeometry(registration, acceptedEffect === undefined ? undefined : {
+		journalSequence: appended.journalSequence, sourceKind: "received", byteCharge: authenticated.byteCharge,
+		digest: authenticated.digest, exactCanonicalPreimageBytes: evidence.exactCanonicalPreimageBytes,
+		detachedSignature: evidence.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes}, appended.nativeImage,
+		acceptedEffect === undefined ? undefined : {journalSequence: appended.journalSequence, sourceKind: "received",
+			byteCharge: authenticated.byteCharge, digest: authenticated.digest, exactCanonicalPreimageBytes: evidence.exactCanonicalPreimageBytes,
+			detachedSignature: evidence.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes});
+	maintenanceAdmission?.accepted?.(acceptedEffect === undefined ? undefined : {exactCanonicalPreimageBytes: evidence.exactCanonicalPreimageBytes,
+		detachedSignature: evidence.signature, exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(acceptedEffect.exactCanonicalEpochVertexBytes),
+		...(appended.nativeImage === undefined ? {} : {nativeJournal: appended.nativeImage})});
 	releasePendingIngress(registration, authenticated.digest);
 	if (!currentRegistration(registration)) return true;
 	if (controlOperation) return true;
@@ -4178,6 +7742,7 @@ async function handleV3Ingress(
 	});
 	let disposition: Awaited<ReturnType<V3AdmittedVertexSink>> = undefined;
 	try {
+		await custody?.check();
 		disposition = await registration.onAdmittedVertex(delivery);
 	} catch {
 		ingressFailureLog("sink-rejected");
@@ -4192,31 +7757,57 @@ async function handleV3Ingress(
 	return true;
 }
 
-async function authenticateV3Ingress(
+interface CapturedV3Ingress {
+	readonly exactWireBytes: Uint8Array;
+	readonly sender: string;
+	readonly transport: "gossip" | "retained";
+}
+
+function captureV3Ingress(
 	registration: V3PlaneRegistration,
 	message: Message,
-	transport: "gossip" | "retained"
-): Promise<void> {
+	transport: "gossip" | "retained",
+	custody: InputCaptureCustody
+): CapturedV3Ingress | undefined {
+	if (message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE) return undefined;
+	// Revalidate the original message's native provenance at the handler boundary,
+	// before detaching it. A copied message cannot carry native identity evidence.
+	const gossipTopic = registration.networkNode.gossipTopicFor(message);
+	if (transport === "gossip" ? gossipTopic !== registration.topic : gossipTopic !== undefined) return undefined;
+	if (message.objectId !== registration.topic) return undefined;
+	const data = message.data;
+	const sender = message.sender;
+	const byteLength = typedArrayByteLength(data);
+	const buffer = typedArrayBuffer(data);
+	if (
+		typeof sender !== "string" ||
+		!isInstanceOf(data, Uint8ArrayConstructor) ||
+		buffer === undefined ||
+		isInstanceOf(buffer, SharedArrayBufferConstructor) ||
+		byteLength === undefined ||
+		byteLength === 0
+	) {
+		ingressFailureLog("envelope-rejected");
+		return undefined;
+	}
+	custody.chargeBytes(byteLength);
+	const exactWireBytes = new Uint8ArrayConstructor(byteLength);
+	// Intrinsic typed-array copy ignores caller iterators and selected accessors.
+	ReflectApply(TypedArraySet, exactWireBytes, [data]);
+	return ObjectFreeze({ exactWireBytes, sender, transport });
+}
+
+async function authenticateV3Ingress(registration: V3PlaneRegistration, captured: CapturedV3Ingress): Promise<void> {
 	try {
 		if (!currentRegistration(registration) || registration.blueprintClosing) return;
-		if (registration.retainedBootstrapHold && transport === "gossip") {
+		if (registration.retainedBootstrapHold && captured.transport === "gossip") {
 			ingressFailureLog("admission-rejected");
 			return;
 		}
-		if (message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE) return;
-		const gossipTopic = registration.networkNode.gossipTopicFor(message);
-		if (transport === "gossip" ? gossipTopic !== registration.topic : gossipTopic !== undefined) return;
-		if (message.objectId !== registration.topic) return;
-		let exactWireBytes: Uint8Array;
+		const exactWireBytes = captured.exactWireBytes;
 		let receivedCanonicalPreimageBytes: Uint8Array;
 		let signature: Uint8Array;
 		try {
-			const detachedWireBytes = copyDetachedBytes(message.data);
-			if (detachedWireBytes === undefined || detachedWireBytes.byteLength === 0) {
-				ingressFailureLog("envelope-rejected");
-				return;
-			}
-			exactWireBytes = detachedWireBytes;
 			const decoded = V3Envelope.decode(exactWireBytes);
 			const canonicalEnvelope = V3Envelope.encode(decoded).finish();
 			if (!sameBytes(exactWireBytes, canonicalEnvelope)) {
@@ -4236,10 +7827,12 @@ async function authenticateV3Ingress(
 			return;
 		}
 		let extracted;
+		const retained: RetainedCloseSignedAdmissionCapture = {};
 		try {
 			extracted = extractAuthorizedV3Vertex(registration.payload, receivedCanonicalPreimageBytes, signature, (author) =>
-				resolveV3AuthorizedAuthor(registration.authorization, author)
+				resolveV3AuthorizedAuthor(registration.authorization, author), undefined, retained
 			);
+			if (retained.value !== undefined) retained.value = ObjectFreeze({...retained.value, authorization: registration.authorization});
 		} catch {
 			ingressFailureLog("malformed-input");
 			return;
@@ -4259,47 +7852,206 @@ async function authenticateV3Ingress(
 			authenticated,
 			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(receivedCanonicalPreimageBytes),
 			signature: new Uint8ArrayConstructor(signature),
-			transportSender: message.sender,
+			transportSender: captured.sender,
 		});
 		if (!registration.index.has(authenticated.digest) && !hasInstalledDependencies(registration.index, authenticated)) {
 			retainPendingIngress(registration, evidence, exactWireBytes.byteLength);
 			return ingressFailureLog("graph-rejected");
 		}
-		if (await handleV3Ingress(registration, evidence)) await drainPendingIngress(registration);
+		if (await handleV3Ingress(registration, evidence, retained.value)) await drainPendingIngress(registration);
 	} catch {
 		ingressFailureLog("envelope-rejected");
 	}
 }
 
-function enqueueRegistrationTask<Result>(
+// Local input backpressure, not a protocol vertex or native proof allowance.
+// Keep mandatory control/maintenance schedulable so a full input pool cannot
+// prevent a terminal barrier or recovery operation from joining.
+const MAX_ADMITTED_INPUT_JOBS = 32;
+const MAX_ADMITTED_READ_CONTROL_JOBS = 32;
+// Explicit local admission policy; no payload is captured by publishPending.
+// Durable row/proof bytes remain charged by their original native owners.
+const MAX_ADMITTED_PENDING_PUBLICATION_JOBS = 32;
+// The same local control ceiling applies to distinct retained/completion cuts.
+// Joining an existing cut creates no additional retained native job.
+const MAX_ADMITTED_EGRESS_CONTROL_JOBS = 32;
+
+class InputCaptureCapacityError extends Error {
+	constructor(readonly capacity: "byte" | "entry") {
+		super(`input ${capacity} capacity exhausted`);
+	}
+}
+
+interface InputCaptureCustody {
+	readonly entryLimit: number;
+	remainingBytes(): number;
+	chargeBytes(bytes: number): void;
+}
+
+function trackRegistrationJoinedWork<Result>(
 	registration: V3PlaneRegistration,
-	capture: () => () => Promise<Result>
+	start: (releaseJoined: () => void) => Promise<Result>
 ): Promise<Result> {
-	const predecessor = registration.gate;
+	// Install the join before capture/entry can reenter close. Existing admission
+	// pools still own capacity; this set owns only the same admitted lifetimes.
 	let release!: () => void;
-	const reservation = new Promise<void>((resolve) => {
+	const joined = new Promise<void>((resolve) => {
 		release = resolve;
 	});
-	registration.gate = reservation;
-	let task: () => Promise<Result>;
-	try {
-		task = capture();
-	} catch (error) {
-		task = (): Promise<Result> => Promise.reject(error);
-	}
+	ReflectApply(SetPrototypeAdd, registration.joinedWork, [joined]);
+	const releaseJoined = (): void => {
+		ReflectApply(SetPrototypeDelete, registration.joinedWork, [joined]);
+		release();
+	};
 	let result: Promise<Result>;
 	try {
-		result = predecessor === undefined ? task() : predecessor.then(task);
+		result = start(releaseJoined);
 	} catch (error) {
 		result = Promise.reject(error);
 	}
-	const completion = result.then(
-		() => undefined,
-		() => undefined
-	);
-	if (registration.gate === reservation) registration.gate = completion;
-	void result.then(release, release);
-	return result;
+	return result.finally(releaseJoined);
+}
+
+function enqueueRegistrationTask<Result>(
+	registration: V3PlaneRegistration,
+	capture: (custody?: InputCaptureCustody) => (() => Promise<Result>) | Readonly<{ join: Promise<Result> }>,
+	inputAdmission?: Readonly<{
+		pool?: "input" | "read-control" | "pending-publication" | "egress-control";
+		refuse(): Result;
+		refuseCapture?(capacity: "byte" | "entry"): Result;
+		barrier?: Promise<void>;
+		captureBeforeBarrier?: boolean;
+	}>
+): Promise<Result> {
+	const counter =
+		inputAdmission?.pool === "read-control"
+			? "admittedReadControlJobs"
+			: inputAdmission?.pool === "egress-control"
+				? "admittedEgressControlJobs"
+				: inputAdmission?.pool === "pending-publication"
+					? "admittedPendingPublicationJobs"
+					: "admittedInputJobs";
+	const limit =
+		inputAdmission?.pool === "read-control"
+			? MAX_ADMITTED_READ_CONTROL_JOBS
+			: inputAdmission?.pool === "egress-control"
+				? MAX_ADMITTED_EGRESS_CONTROL_JOBS
+				: inputAdmission?.pool === "pending-publication"
+					? MAX_ADMITTED_PENDING_PUBLICATION_JOBS
+					: MAX_ADMITTED_INPUT_JOBS;
+	if (inputAdmission !== undefined) {
+		if (registration[counter] >= limit) {
+			try {
+				return Promise.resolve(inputAdmission.refuse());
+			} catch (error) {
+				return Promise.reject(error);
+			}
+		}
+		// Reserve before capture or a terminal-barrier wait, including re-entry.
+		registration[counter]++;
+	}
+	return trackRegistrationJoinedWork(registration, (releaseJoined) => {
+		let capturedBytes = 0;
+		let inputReservationReleased = false;
+		const releaseInputCapture = (): void => {
+			if (inputAdmission === undefined || inputReservationReleased) return;
+			inputReservationReleased = true;
+			registration[counter]--;
+			registration.admittedInputBytes -= capturedBytes;
+		};
+		const custody: InputCaptureCustody | undefined =
+			inputAdmission?.refuseCapture === undefined
+				? undefined
+				: {
+						entryLimit: registration.payload.parameters.maxPendingEntries,
+						remainingBytes: () => registration.payload.parameters.maxPendingBytes - registration.admittedInputBytes,
+						chargeBytes: (bytes): void => {
+							// Canonical caller inspection may reenter; use current remaining credit.
+							if (bytes > registration.payload.parameters.maxPendingBytes - registration.admittedInputBytes)
+								throw new InputCaptureCapacityError("byte");
+							registration.admittedInputBytes += bytes;
+							capturedBytes += bytes;
+						},
+					};
+		if (inputAdmission?.captureBeforeBarrier === true) {
+			// Reserve private input before waits, but not the FIFO gate: a terminal
+			// controller must remain able to release an unresolved barrier.
+			try {
+				const preparedTask = capture(custody);
+				if (typeof preparedTask !== "function") {
+					releaseInputCapture();
+					releaseJoined();
+					return preparedTask.join;
+				}
+				capture = (): (() => Promise<Result>) => preparedTask;
+			} catch (error) {
+				releaseInputCapture();
+				releaseJoined();
+				if (error instanceof InputCaptureCapacityError && inputAdmission.refuseCapture !== undefined)
+					return Promise.resolve(inputAdmission.refuseCapture(error.capacity));
+				return Promise.reject(error);
+			}
+		}
+		const enqueue = (): Promise<Result> => {
+			const predecessor = registration.gate;
+			let release!: () => void;
+			const reservation = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			registration.gate = reservation;
+			const discardReservation = (): void => {
+				if (registration.gate === reservation) registration.gate = predecessor;
+				if (predecessor === undefined) release();
+				else void predecessor.then(release, release);
+			};
+			let task: (() => Promise<Result>) | Readonly<{ join: Promise<Result> }>;
+			try {
+				task = capture(custody);
+			} catch (error) {
+				if (error instanceof InputCaptureCapacityError && inputAdmission?.refuseCapture !== undefined) {
+					// Refusal is immediate, but a reentrant queued successor still waits
+					// for this placeholder's predecessor. Never let a refusal bypass it.
+					discardReservation();
+					// No task/private operation escaped the failed capture. Partial
+					// preparation credit is reusable now, not an entered native job.
+					releaseInputCapture();
+					releaseJoined();
+					return Promise.resolve(inputAdmission.refuseCapture(error.capacity));
+				}
+				task = (): Promise<Result> => Promise.reject(error);
+			}
+			if (typeof task !== "function") {
+				// Joining existing work creates no new queued native task. A reentrant
+				// successor still waits for this placeholder's original predecessor.
+				discardReservation();
+				// The existing demand owns its native lifetime. This alias has retained
+				// no new work or private input; do not charge it as a distinct cut.
+				if (inputAdmission?.pool === "egress-control") releaseInputCapture();
+				releaseJoined();
+				return task.join;
+			}
+			let result: Promise<Result>;
+			try {
+				result = predecessor === undefined ? task() : predecessor.then(task);
+			} catch (error) {
+				result = Promise.reject(error);
+			}
+			const completion = result.then(
+				() => undefined,
+				() => undefined
+			);
+			if (registration.gate === reservation) registration.gate = completion;
+			void result.then(release, release);
+			return result;
+		};
+		let result: Promise<Result>;
+		try {
+			result = inputAdmission?.barrier === undefined ? enqueue() : inputAdmission.barrier.then(enqueue);
+		} catch (error) {
+			result = Promise.reject(error);
+		}
+		return inputAdmission === undefined || inputReservationReleased ? result : result.finally(releaseInputCapture);
+	});
 }
 
 function enqueueV3Ingress(
@@ -4307,13 +8059,35 @@ function enqueueV3Ingress(
 	message: Message,
 	transport: "gossip" | "retained" = "gossip"
 ): Promise<void> {
+	if (!currentRegistration(registration) || registration.blueprintClosing) return Promise.resolve();
 	const barrier = registration.terminalBarrier;
-	const enqueue = (): Promise<void> =>
-		enqueueRegistrationTask(
-			registration,
-			(): (() => Promise<void>) => () => authenticateV3Ingress(registration, message, transport)
-		);
-	return barrier === undefined ? enqueue() : barrier.then(enqueue);
+	let rawMessage: Message | undefined = message;
+	return enqueueRegistrationTask(
+		registration,
+		(custody): (() => Promise<void>) | Readonly<{ join: Promise<void> }> => {
+			let captured: CapturedV3Ingress | undefined;
+			try {
+				const message = rawMessage;
+				if (message === undefined || custody === undefined)
+					throw new TypeError("v3 ingress input custody is unavailable");
+				captured = captureV3Ingress(registration, message, transport, custody);
+			} catch (error) {
+				if (error instanceof InputCaptureCapacityError) throw error;
+				ingressFailureLog("envelope-rejected");
+			} finally {
+				rawMessage = undefined;
+			}
+			return captured === undefined
+				? { join: Promise.resolve() }
+				: (): Promise<void> => authenticateV3Ingress(registration, captured);
+		},
+		{
+			refuse: () => ingressFailureLog("admission-rejected"),
+			refuseCapture: () => ingressFailureLog("admission-rejected"),
+			captureBeforeBarrier: true,
+			...(barrier === undefined ? {} : { barrier }),
+		}
+	);
 }
 
 interface SnapshottedOutboxRow {
@@ -4398,13 +8172,43 @@ function outboxRowSnapshot(value: unknown, selectedScope: DurableIssueScope): Sn
 }
 
 function onePage(value: unknown): DurableIssuanceOutboxRecord | null | undefined {
+	const page = captureOutboxPage(value, 1);
+	if (page === undefined) return undefined;
+	if (page.length === 0) return null;
+	return page.read(0);
+}
+
+// One presentation owner; descriptor capture stays lazy across serial row awaits.
+// The native page is a detached readonly snapshot, never a currency capability.
+function captureOutboxPage(
+	value: unknown,
+	maximum: number
+): Readonly<{ length: number; read(index: number): DurableIssuanceOutboxRecord | undefined }> | undefined {
 	try {
 		if (!ArrayIsArray(value)) return undefined;
 		const length = ObjectGetOwnPropertyDescriptor(value, "length");
-		if (length === undefined || !("value" in length) || (length.value !== 0 && length.value !== 1)) return undefined;
-		if (length.value === 0) return null;
-		const first = ObjectGetOwnPropertyDescriptor(value, "0");
-		return first === undefined || !("value" in first) ? undefined : (first.value as DurableIssuanceOutboxRecord);
+		if (
+			length === undefined ||
+			!("value" in length) ||
+			!NumberIsSafeInteger(length.value) ||
+			length.value < 0 ||
+			length.value > maximum
+		)
+			return undefined;
+		return ObjectFreeze({
+			length: length.value as number,
+			read: (index: number): DurableIssuanceOutboxRecord | undefined => {
+				try {
+					if (!NumberIsSafeInteger(index) || index < 0 || index >= length.value) return undefined;
+					const entry = ObjectGetOwnPropertyDescriptor(value, StringConstructor(index));
+					return entry === undefined || !("value" in entry) || entry.value === null
+						? undefined
+						: (entry.value as DurableIssuanceOutboxRecord);
+				} catch {
+					return undefined;
+				}
+			},
+		});
 	} catch {
 		return undefined;
 	}
@@ -4419,6 +8223,8 @@ type V3LiveAuthorization =
 	| Readonly<{ readonly kind: "latched-acl"; readonly value: LatchedAclSnapshot; readonly writerCount: number }>;
 
 interface V3DisplacedSourceAuthority {
+	readonly migrationTarget?: Readonly<{ objectId: string; epoch: 0; anchorDigest: string; blueprintDigest: string }>;
+	readonly historicalIssuance?: HistoricalIssuanceContext;
 	readonly activationVertexDigest?: string;
 	readonly authorization: V3LiveAuthorization;
 	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
@@ -4436,6 +8242,7 @@ type StagedLatchedAclOperation = Readonly<{
 }>;
 
 interface RecoveredV3LivePayload {
+	readonly receiveOnly: boolean;
 	readonly authorVertexCounts: Map<string, number>;
 	readonly closeAuthors: Map<string, CloseVertexIdentity>;
 	readonly closeCharges: Map<string, number>;
@@ -4470,11 +8277,12 @@ function operationAdmissionPolicy(value: unknown): V3OperationAdmissionPolicy | 
 
 function reserveOperation(
 	policy: V3OperationAdmissionPolicy | undefined,
-	operation: Readonly<Record<string, unknown>>
+	operation: Readonly<Record<string, unknown>>,
+	author: string
 ): FreshOperationAdmissionReservation | null | undefined {
 	if (policy === undefined) return undefined;
 	try {
-		const reservation = policy.reserve(operation);
+		const reservation = policy.reserve(operation, ObjectFreeze({ author }));
 		const fresh = snapshotClosedRecord(reservation, ["commit", "kind", "release"]);
 		if (
 			fresh !== undefined &&
@@ -4562,10 +8370,30 @@ function settlementFrontierFromHistory(
 
 interface HistoricalIssuanceContext {
 	readonly capability: VerifiedCreatorHistoricalIssuance;
+	readonly originalIssuanceStore: DurableIssuanceStore;
+	/** Same private adoption's bounded facts, never historical/admission authority. */
+	readonly vertexFacts?: CreatorCensusVertexFacts;
+	filteredIssuanceStore?: DurableIssuanceStore;
 	readonly countedSequences: Set<number>;
 	count: number;
 	readonly maxEpochVertices: number;
 	readonly scopeAuthorMatches: boolean;
+}
+
+/**
+ * Original creator handoff owns the exact facade/source-owner pairing, never caller shape.
+ * @param registration - Original private recovery registration.
+ * @returns Its captured source owner, or the exact original store.
+ */
+function creatorOriginalIssuanceStore(
+	registration: Pick<V3PlaneRegistration, "historicalIssuance" | "issuanceStore">
+): DurableIssuanceStore {
+	const history = registration.historicalIssuance;
+	return history !== undefined &&
+		(registration.issuanceStore === history.originalIssuanceStore ||
+			registration.issuanceStore === history.filteredIssuanceStore)
+		? history.originalIssuanceStore
+		: registration.issuanceStore;
 }
 
 function beginHistoricalIssuanceScan(context: HistoricalIssuanceContext | undefined): void {
@@ -4664,156 +8492,3461 @@ function journalRowSnapshot(
 	}
 }
 
+interface CreatorCensusVertexFacts {
+	decode(bytes: Uint8Array): unknown;
+	extract(input: AdmitReceivedVertexInput): ReturnType<typeof extractAdmittedReceivedVertex>;
+	verify(input: Parameters<typeof verifyReceivedVertex>[0]): ReturnType<typeof verifyReceivedVertex>;
+	/** A detached successor owner. Carries signature facts, never admitted views or authority. */
+	forkVerification(): CreatorCensusVertexFacts;
+	/** Called only after the original private retained-admission matcher succeeds. */
+	retainVerification(fact: RetainedCloseSignedAdmission): void;
+	/** Revoke retention, not validation: later calls use the original kernels. */
+	release(): void;
+}
+
+/** One existing replay/close hold's exact-byte syntax and cryptographic facts.
+ * Native reads, pairing, frontier/plan/role decisions and admission remain fresh.
+ * Captured bytes are isolated even from private callers, so a handoff cannot
+ * associate an old successful fact with subsequently mutated input. Raw native
+ * hidden rows do not use this owner. A successor copies only successful pure
+ * verification tuples, not the predecessor's ABI, admitted views or owner.
+ * Only genuine bounded decoder/admission output reaches the existing cloner.
+ * Saturation falls back to the original functions, never capacity refusal. */
+function createCreatorCensusVertexFacts(seeds: readonly Readonly<{
+	bytes: Uint8Array; domain: string; anchor: string; suite: string;
+	key: string; format: string; signature: string; digest: Uint8Array;
+}>[] = []): CreatorCensusVertexFacts {
+	type Input = AdmitReceivedVertexInput | Parameters<typeof verifyReceivedVertex>[0];
+	type Fact = Readonly<{ purpose: "extract" | "verify"; domain: string; anchor: string; suite: string;
+		admission: unknown; key: string; format: string; signature: string; result: unknown }>;
+	type Source = { bytes: Uint8Array; parsed: unknown; facts: Fact[] };
+	const sources = new IntrinsicMap<string, Source>();
+	let retainedBytes = 0, retainedFacts = 0, released = false;
+	const source = (bytes: Uint8Array): Source | undefined => {
+		if (released) return undefined;
+		const digest = bytesToLowerHex(hashDomain(V3_VERTEX_DOMAIN, bytes));
+		const old = ReflectApply(MapPrototypeGet, sources, [digest]) as Source | undefined;
+		if (old !== undefined) return sameBytes(old.bytes, bytes) ? old : undefined;
+		if (retainedFacts >= ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+			bytes.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes - retainedBytes) return undefined;
+		const captured = copyDetachedBytes(bytes);
+		if (captured === undefined) return undefined;
+		let parsed: unknown;
+		try { parsed = decodeCanonical(captured); } catch { return undefined; }
+		const added = { bytes: captured, parsed, facts: [] };
+		ReflectApply(MapPrototypeSet, sources, [digest, added]);
+		retainedBytes += captured.byteLength;
+		retainedFacts++;
+		return added;
+	};
+	// Only this private owner's fork or original retained-admission producer
+	// supplies tuples, never a wire format or a caller's claimed acceptance.
+	const retainVerification = (seed: typeof seeds[number]): void => {
+		const row = source(seed.bytes);
+		// Extraction under more than one ABI can prove the SAME pure tuple.
+		// Do not multiply that fact across successive epoch handoffs.
+		if (row?.facts.some(fact => fact.domain === seed.domain && fact.anchor === seed.anchor && fact.suite === seed.suite &&
+			fact.key === seed.key && fact.format === seed.format && fact.signature === seed.signature)) return;
+		const result = {accepted: true, digest: new Uint8ArrayConstructor(seed.digest)};
+		const cost = seed.key.length + seed.signature.length + encodeCanonical(result).byteLength;
+		if (row === undefined || retainedFacts >= ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+			cost > AHE_BOUNDED_READ_LIMITS.maxUnionBytes - retainedBytes) return;
+		row.facts.push(ObjectFreeze({purpose: "verify", domain: seed.domain, anchor: seed.anchor,
+			suite: seed.suite, admission: undefined, key: seed.key, format: seed.format,
+			signature: seed.signature, result}));
+		retainedBytes += cost;
+		retainedFacts++;
+	};
+	for (const seed of seeds) retainVerification(seed);
+	const reuse = <T>(purpose: Fact["purpose"], input: Input, run: () => T): T => {
+		const row = source(input.receivedCanonicalPreimageBytes);
+		const author = isObject(row?.parsed) ? Reflect.get(row.parsed, "author") : undefined;
+		if (row === undefined || typeof author !== "string") return run();
+		// Resolve the real key every time. A cached signature cannot confer ACL
+		// membership, nor cross an ABI, anchor, suite, key or signature boundary.
+		let resolved: ReturnType<Input["resolveAuthorPublicKey"]>;
+		try { resolved = input.resolveAuthorPublicKey(author); } catch { return run(); }
+		const key = resolved === undefined ? undefined : copyDetachedBytes(resolved.bytes);
+		const signature = bytesToLowerHex(input.signature);
+		if (resolved === undefined || key === undefined) return run();
+		// Resolving a key is an external boundary even though production resolvers
+		// are private. It must not change which bytes the successful fact proves.
+		if (!sameBytes(row.bytes, input.receivedCanonicalPreimageBytes)) return run();
+		const admission = purpose === "extract" && "preparedBlueprintAdmission" in input ? input.preparedBlueprintAdmission : undefined;
+		for (const fact of row.facts) {
+			if (fact.domain !== input.domain || fact.anchor !== input.expectedAnchor || fact.suite !== input.suiteId ||
+				fact.format !== resolved.format || fact.key !== bytesToLowerHex(key) || fact.signature !== signature) continue;
+			if (fact.purpose === purpose && fact.admission === admission)
+				return copyCanonicalForAdmittedView(fact.result) as T;
+			// A successful ORIGINAL extraction includes exact-byte signature and
+			// registered-syntax verification. Only that pure result is reusable
+			// under a fresh closed-ACL resolver. Never turn verify into admission,
+			// or reuse an admitted view across another prepared ABI.
+			if (purpose === "verify" && fact.purpose === "extract" && isObject(fact.result) && Reflect.get(fact.result, "ok") === true) {
+				const vertex = Reflect.get(fact.result, "vertex");
+				const digest = isObject(vertex) ? Reflect.get(vertex, "digest") : undefined;
+				if (digest instanceof Uint8ArrayConstructor && digest.byteLength === 32)
+					return {accepted: true, digest: new Uint8ArrayConstructor(digest)} as unknown as T;
+			}
+		}
+		const result = run();
+		let after: ReturnType<Input["resolveAuthorPublicKey"]>;
+		try { after = input.resolveAuthorPublicKey(author); } catch { return result; }
+		// The encoded size bounds only private parsed-fact retention. It is not
+		// a new proof carrier or a refund. Unrepresentable extra wrapper depth
+		// simply leaves this result uncached; original validation is unchanged.
+		let resultBytes: number;
+		try { resultBytes = encodeCanonical(result).byteLength; } catch { return result; }
+		if (after !== undefined && after.format === resolved.format && sameBytes(after.bytes, key) &&
+			sameBytes(row.bytes, input.receivedCanonicalPreimageBytes) && signature === bytesToLowerHex(input.signature) &&
+			retainedFacts < ISSUANCE_RETIREMENT_LIMITS.maxRows &&
+			key.byteLength * 2 + signature.length + resultBytes <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes - retainedBytes) {
+			row.facts.push(ObjectFreeze({ purpose, domain: input.domain, anchor: input.expectedAnchor,
+				suite: input.suiteId, admission, key: bytesToLowerHex(key), format: resolved.format, signature,
+				result: copyCanonicalForAdmittedView(result) }));
+			retainedFacts++;
+			retainedBytes += key.byteLength * 2 + signature.length + resultBytes;
+		}
+		return result;
+	};
+	return ObjectFreeze({
+		release: (): void => { released = true; ReflectApply(MapPrototypeClear, sources, []); retainedBytes = 0; retainedFacts = 0; },
+		retainVerification: (fact: RetainedCloseSignedAdmission): void => {
+			if (released) return;
+			retainVerification({bytes: fact.preimage, domain: fact.domain, anchor: fact.payload.provenance.anchorDigest,
+				suite: fact.suite, key: bytesToLowerHex(fact.key), format: fact.format,
+				signature: bytesToLowerHex(fact.signature), digest: fact.originalAdmitted.digest});
+		},
+		forkVerification: (): CreatorCensusVertexFacts => {
+			const seeds: {bytes: Uint8Array; domain: string; anchor: string; suite: string;
+				key: string; format: string; signature: string; digest: Uint8Array}[] = [];
+			for (const [, row] of ReflectApply(MapPrototypeEntries, sources, []) as Iterable<[string, Source]>) {
+				for (const fact of row.facts) {
+					if (!isObject(fact.result)) continue;
+					const vertex = fact.purpose === "extract" && Reflect.get(fact.result, "ok") === true
+						? Reflect.get(fact.result, "vertex") : undefined;
+					const digest = fact.purpose === "verify" && Reflect.get(fact.result, "accepted") === true
+						? Reflect.get(fact.result, "digest") : isObject(vertex) ? Reflect.get(vertex, "digest") : undefined;
+					if (!(digest instanceof Uint8ArrayConstructor) || digest.byteLength !== 32) continue;
+					seeds.push({bytes: row.bytes, domain: fact.domain, anchor: fact.anchor, suite: fact.suite,
+						key: fact.key, format: fact.format, signature: fact.signature, digest});
+				}
+			}
+			// The new factory captures its own bytes/digests and applies the SAME
+			// finite caps. Saturation/release always falls back to real validation.
+			return createCreatorCensusVertexFacts(seeds);
+		},
+		decode: (bytes: Uint8Array): unknown => {
+			const row = source(bytes);
+			return row === undefined ? decodeCanonical(bytes) : copyCanonicalForAdmittedView(row.parsed, true);
+		},
+		extract: (input: AdmitReceivedVertexInput) => reuse("extract", input, () => extractAdmittedReceivedVertex(input)),
+		verify: (input: Parameters<typeof verifyReceivedVertex>[0]) => reuse("verify", input, () => verifyReceivedVertex(input)),
+	});
+}
+
 function authenticateRecoveryVertex(
 	payload: PreparedV3LivePayload,
 	authorization: V3LiveAuthorization,
 	canonicalPreimageBytes: Uint8Array,
-	signature: Uint8Array
+	signature: Uint8Array,
+	vertexFacts?: CreatorCensusVertexFacts,
+	retained?: RetainedCloseSignedAdmissionCapture
 ): AuthenticatedRecoveryVertex | undefined {
 	const extracted = extractAuthorizedV3Vertex(payload, canonicalPreimageBytes, signature, (author) => {
 		return resolveV3AuthorizedAuthor(authorization, author);
-	});
+	}, vertexFacts, retained);
+	if (retained?.value !== undefined) retained.value = ObjectFreeze({...retained.value, authorization});
 	if (extracted === undefined || !extracted.ok) return undefined;
 	return authenticatedRecoveryVertex(extracted.vertex, canonicalPreimageBytes.byteLength);
 }
 
 interface CreatorReplayRow {
+	readonly journalSequence: number;
+	readonly sourceKind: "received" | "local-issued";
+	readonly exactCanonicalPreimageBytes: Uint8Array;
+	readonly detachedSignature: Uint8Array;
 	readonly byteCharge: number;
 	readonly digest: string;
 	readonly exactCanonicalVertexBytes: Uint8Array;
 }
+/** Primitive parsed DATA of one complete original replay, never a reusable
+ * admission/signature/native capability. The exact returned rows bind its use. */
+interface CreatorReplayVertexCapture {
+	value?: Readonly<{rows: readonly CreatorReplayRow[];
+		vertices: readonly Readonly<{author: string; hasSettlementSource: boolean}>[]}>;
+}
+
+/**
+ * Local journal provenance points to the complete native issued leaf.
+ * @param journalSequence - Original journal position.
+ * @param scope - Exact native object/author identity.
+ * @param authorSequence - Original native issuance ordinal.
+ * @param byteCharge - Full signed-preimage byte charge, not reference width.
+ * @param digest - Known digest, omitted only for an unknown sizing leaf.
+ * @returns Census provenance fields; no authentication or pruning authority.
+ */
+function creatorLocalJournalCensusFields(
+	journalSequence: number,
+	scope: DurableIssueScope,
+	authorSequence: number,
+	byteCharge: number,
+	digest?: string
+): Readonly<Record<string, unknown>> {
+	return {
+		journalSequence,
+		sourceKind: "local-issued",
+		nativeIssued: { scope, authorSequence },
+		byteCharge,
+		...(digest === undefined ? {} : { digest }),
+	};
+}
+
+/**
+ * Only freshly authenticated rows may reference their exact complete native leaf.
+ * @param rows - Original replay owner's freshly verified rows.
+ * @param nativeRows - Complete native census retained in the same held proof.
+ * @param objectId - Owning current object, not caller-selected scope authority.
+ * @returns Exact journal references, or refusal if a full native leaf is missing.
+ */
+function creatorJournalCensusRows(
+	rows: readonly CreatorReplayRow[],
+	nativeRows: IssuanceRetirementRows,
+	objectId: string
+): readonly unknown[] | undefined {
+	const result: unknown[] = [];
+	for (const row of rows) {
+		if (row.sourceKind === "received") {
+			result.push(row);
+			continue;
+		}
+		const matches = nativeRows.issued.filter(
+			(issued) => issued.objectId === objectId && lowerHexDigest(issued.digest) === row.digest
+		);
+		if (matches.length !== 1) return undefined;
+		const issued = matches[0];
+		if (
+			!sameBytes(issued.canonicalPreimageBytes, row.exactCanonicalPreimageBytes) ||
+			!sameBytes(issued.signature, row.detachedSignature) ||
+			row.byteCharge !== issued.canonicalPreimageBytes.byteLength
+		)
+			return undefined;
+		result.push(
+			creatorLocalJournalCensusFields(
+				row.journalSequence,
+				{ objectId: issued.objectId, author: issued.author },
+				issued.authorSequence,
+				row.byteCharge,
+				row.digest
+			)
+		);
+	}
+	return ObjectFreeze(result);
+}
+
+/** One invocation-owned APP DATA capture through the original source verifiers.
+ * Signed PRE/source proofs remain whole and paid. This never returns an admitted
+ * vertex, selected source, rebase capability or permission to issue a replacement.
+ * Native completion is separately proved by the original whole-chunk verifier. */
+async function captureCreatorOrdinarySourceLinkedApplicationEffects(registration: V3PlaneRegistration,
+	journal: readonly CreatorReplayRow[], native: IssuanceRetirementRows,
+	accounting: CreatorClosedRollbackProofAccounting, replayCapture: CreatorReplayVertexCapture): Promise<Readonly<{
+	currentSignedPreimagesHaveSettlementSource: boolean; currentJournalMaximumAuthorByteLength: number;
+	effects: readonly Readonly<{exactCanonicalPreimageBytes: Uint8Array; exactCanonicalEpochVertexBytes: Uint8Array}>[];
+	completedNative: readonly Readonly<{authorSequence: number; digest: string; preimage: Uint8Array; signature: Uint8Array}>[]}> | undefined> {
+	const effects: {exactCanonicalPreimageBytes: Uint8Array; exactCanonicalEpochVertexBytes: Uint8Array}[] = [];
+	const completedNative: {authorSequence: number; digest: string; preimage: Uint8Array; signature: Uint8Array}[] = [];
+	const captured = replayCapture.value;
+	if (captured?.rows !== journal || captured.vertices.length !== journal.length) return undefined;
+	let currentSignedPreimagesHaveSettlementSource = false, currentJournalMaximumAuthorByteLength = 0;
+	const linked = (bytes: Uint8Array) => ObjectGetOwnPropertyDescriptor(decodeCanonical(bytes) as object, "settlementSource") !== undefined;
+	const add = (preimage: Uint8Array, signature: Uint8Array, vertex: Uint8Array): boolean => {
+		if (!accounting.charge(preimage) || !accounting.charge(signature) || !accounting.charge(vertex)) return false;
+		if (!effects.some(row => sameBytes(row.exactCanonicalPreimageBytes, preimage)))
+			effects.push(ObjectFreeze({exactCanonicalPreimageBytes: new Uint8ArrayConstructor(preimage),
+				exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(vertex)}));
+		return true;
+	};
+	for (const [index, row] of journal.entries()) {
+		const data = captured.vertices[index]!;
+		currentJournalMaximumAuthorByteLength = Math.max(currentJournalMaximumAuthorByteLength, encodeCanonical(data.author).byteLength);
+		if (!data.hasSettlementSource) continue;
+		currentSignedPreimagesHaveSettlementSource = true;
+		const authenticated = authenticateRecoveryVertex(registration.payload, registration.authorization,
+			row.exactCanonicalPreimageBytes, row.detachedSignature);
+		const identity = registration.closeAuthors.get(row.digest);
+		if (authenticated === undefined || authenticated.digest !== row.digest || identity?.sourceAuthorized !== true ||
+			identity.author !== authenticated.author || identity.authorSequence !== authenticated.authorSequence ||
+			!sameBytes(encodeCanonical(authenticated.vertex), row.exactCanonicalVertexBytes) ||
+			!verifyPortableSettlementSource(registration, authenticated.admitted, registration.closeVertices) &&
+			!(row.sourceKind === "local-issued" && authenticated.author === registration.issuanceScope.author &&
+				authenticated.admitted.settlementSource?.sourceObjectId === registration.issuanceScope.objectId &&
+				(registration.displacedSource?.issuanceStore === undefined ||
+					registration.displacedSource.issuanceStore === creatorOriginalIssuanceStore(registration)) &&
+				await verifyLocalNativeSettlementSource(registration,
+					authenticated.admitted, registration.closeVertices, accounting)) ||
+			!add(row.exactCanonicalPreimageBytes, row.detachedSignature, row.exactCanonicalVertexBytes)) return undefined;
+	}
+	const own = registration.issuanceScope, plan = native.plans.find(row => sameScope(row.scope, own)) ?? null;
+	const targets = native.issued.filter(row => linked(row.canonicalPreimageBytes));
+	if (targets.length !== 0) {
+		// Original native verification below reads complete signed source/chunk
+		// rows. Charge the already captured whole native union's actual leaves,
+		// not a sender estimate or a parsed/derived substitute for signed PRE.
+		for (const row of native.issued)
+			if (!accounting.charge(row.canonicalPreimageBytes) || !accounting.charge(row.signature)) return undefined;
+	}
+	const snapshot = async (row: IssuanceRetirementRows["issued"][number]) => {
+		const scope = {objectId: row.objectId, author: row.author};
+		const commit = await creatorOriginalIssuanceStore(registration).readIssued(scope, row.authorSequence);
+		if (!accounting.charge(encodeCanonical(commit))) return undefined;
+		const actual = outboxRowSnapshot({publishState: "published", commit}, scope);
+		return actual !== undefined && sameBytes(actual.canonicalPreimageBytes, row.canonicalPreimageBytes) &&
+			sameBytes(actual.signature, row.signature) && sameBytes(actual.digest, row.digest) ? actual : undefined;
+	};
+	const verifiedSources = new Set<number>();
+	const vertexFacts = createCreatorCensusVertexFacts();
+	for (const row of targets) {
+		if (!sameScope(row, own)) return undefined; // Local completion law is never foreign authority.
+		const target = await snapshot(row), classified = target === undefined ? undefined : classifyRebaseRow(registration, target, undefined, vertexFacts);
+		if (classified === undefined || !validRebaseRow(registration, classified)) return undefined;
+		const source = classified.authenticated.admitted.settlementSource;
+		if (source === undefined || source.sourceObjectId !== own.objectId || source.sourceAuthor !== own.author ||
+			registration.displacedSource?.issuanceStore !== undefined &&
+			registration.displacedSource.issuanceStore !== creatorOriginalIssuanceStore(registration)) return undefined;
+		const sources = native.issued.filter(original => sameScope(original, own) && original.authorSequence === source.sourceSequence);
+		if (sources.length !== 1 || !sameBytes(sources[0]!.canonicalPreimageBytes, source.sourcePreimage as Uint8Array) ||
+			!sameBytes(sources[0]!.signature, source.sourceSignature as Uint8Array)) return undefined;
+		if (!verifiedSources.has(sources[0]!.authorSequence)) {
+			const original = await snapshot(sources[0]!), selected = original === undefined ? undefined : classifyRebaseRow(registration, original, undefined, vertexFacts);
+			if (selected === undefined || !validRebaseRow(registration, selected) ||
+				!await authenticatedCompletedNativeReplacementSource(registration, selected, plan, vertexFacts, accounting)) return undefined;
+			verifiedSources.add(sources[0]!.authorSequence);
+		}
+		const entry = plan?.entries.find(entry => entry.sourceSequence === source.sourceSequence);
+		if (entry?.replacementSequence == null || entry.replacementSequence !== row.authorSequence &&
+			!entry.replacementProgress?.chunks.some(chunk => chunk.replacementSequence === row.authorSequence)) return undefined;
+		const vertex = encodeCanonical(classified.authenticated.vertex);
+		if (!add(row.canonicalPreimageBytes, row.signature, vertex)) return undefined;
+		completedNative.push(ObjectFreeze({authorSequence: row.authorSequence, digest: classified.authenticated.digest,
+			preimage: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+			signature: new Uint8ArrayConstructor(row.signature)}));
+	}
+	return ObjectFreeze({currentSignedPreimagesHaveSettlementSource, currentJournalMaximumAuthorByteLength,
+		effects: ObjectFreeze(effects), completedNative: ObjectFreeze(completedNative)});
+}
 
 async function readCreatorReplayRows(
-	registration: V3PlaneRegistration
+	registration: Pick<V3PlaneRegistration, "payload" | "authorization" | "issuanceStore" | "liveJournalStore"> &
+		Partial<Pick<V3PlaneRegistration, "closeVertices" | "closeCharges" | "vertexFacts">>,
+	sealed?: Readonly<{
+		payload: PreparedV3LivePayload;
+		authorization: V3LiveAuthorization;
+		rows: readonly CreatorReplayRow[];
+	}>,
+	sharedAccounting?: CreatorClosedRollbackProofAccounting,
+	retainedOwner?: V3PlaneRegistration,
+	nativeRows?: readonly LiveJournalAcceptedRow[],
+	vertexCapture?: CreatorReplayVertexCapture,
+	nativeReplay?: Readonly<{rows: readonly LiveJournalAcceptedRow[]; issued: IssuanceRetirementRows["issued"]}>
 ): Promise<readonly CreatorReplayRow[] | undefined> {
 	try {
+		if (vertexCapture !== undefined) vertexCapture.value = undefined;
+		// Only the ordinary proof supplies BOTH complete physical captures from
+		// its same original native holds. Recovery/sealed callers keep their
+		// existing semantic reads. The captured rows are DATA, never authority:
+		// every signed leaf, graph tuple and final native currency check remains.
+		if (nativeReplay !== undefined && (nativeRows === undefined || sealed !== undefined)) return undefined;
+		const vertexData: {author: string; hasSettlementSource: boolean}[] = [];
+		const charge = (value: unknown): boolean => sharedAccounting === undefined || sharedAccounting.charge(encodeCanonical(value));
+		// Only the private replay seal supplies these already authenticated bytes.
+		// Fresh native reads remain mandatory; equality reuses cryptographic evidence,
+		// never native currency or authority from a different payload/ACL.
+		const sameAuthorization = (): boolean => sealed === undefined ||
+			(registration.payload === sealed.payload && registration.authorization === sealed.authorization);
+		if (!sameAuthorization()) return undefined;
+		const derivative: RetainedCloseReplayDerivativeCapture = {};
+		const retained = (preimage: Uint8Array, signature: Uint8Array, digest: string) => retainedOwner !== undefined &&
+			retainedOwner.payload === registration.payload && retainedOwner.authorization === registration.authorization
+			? readRetainedCloseSignedCurrentAdmission(retainedOwner, preimage, signature, digest, derivative) : undefined;
 		const scope = liveJournalScope(registration.payload);
-		const readiness = await registration.liveJournalStore.readiness({ scope });
+		const readiness = nativeReplay === undefined ? await registration.liveJournalStore.readiness({ scope }) : undefined;
+		if (readiness !== undefined && !charge(readiness)) return undefined;
+		const rowCount = nativeReplay === undefined ? readiness?.ok && readiness.ready ? readiness.rowCount : undefined : nativeReplay.rows.length;
 		if (
-			!readiness.ok ||
-			!readiness.ready ||
-			!sameLiveJournalScope(readiness.scope, scope) ||
-			!NumberIsSafeInteger(readiness.rowCount) ||
-			readiness.rowCount < 0 ||
-			readiness.rowCount > registration.payload.parameters.maxEpochVertices
+			rowCount === undefined || !NumberIsSafeInteger(rowCount) || rowCount < 0 ||
+			rowCount > registration.payload.parameters.maxEpochVertices ||
+			(readiness !== undefined && (!readiness.ok || !readiness.ready || !sameLiveJournalScope(readiness.scope, scope))) ||
+			(nativeRows !== undefined && rowCount !== nativeRows.length) ||
+			(sealed !== undefined && rowCount !== sealed.rows.length)
 		) {
 			return undefined;
 		}
-		if (readiness.rowCount === 0) {
-			const empty = await registration.liveJournalStore.readPage({
-				afterSequence: null,
-				limit: 1,
-				scope,
-				snapshot: readiness.snapshot,
-			});
-			return empty.ok &&
+		const pageAt = async (afterSequence: number | null, limit: number) => {
+			if (nativeReplay !== undefined) {
+				const start = afterSequence === null ? 0 : afterSequence + 1, end = Math.min(rowCount, start + limit);
+				return ObjectFreeze({ok: true as const, rows: nativeReplay.rows.slice(start, end),
+					nextSequence: end < rowCount ? end - 1 : null});
+			}
+			if (readiness === undefined || !readiness.ok || !readiness.ready) return undefined;
+			const page = await registration.liveJournalStore.readPage({afterSequence, limit, scope, snapshot: readiness.snapshot});
+			return charge(page) ? page : undefined;
+		};
+		if (rowCount === 0) {
+			const empty = await pageAt(null, 1);
+			const valid = sameAuthorization() && empty !== undefined && empty.ok &&
 				empty.rows.length === 0 &&
 				empty.nextSequence === null &&
-				registration.closeVertices.size === 1 &&
-				registration.closeCharges.size === 1
-				? ObjectFreeze([])
-				: undefined;
+				(registration.closeVertices === undefined || registration.closeVertices.size === 1) &&
+				(registration.closeCharges === undefined || registration.closeCharges.size === 1);
+			if (!valid) return undefined;
+			const result = ObjectFreeze([]);
+			if (vertexCapture !== undefined) vertexCapture.value = ObjectFreeze({rows: result, vertices: ObjectFreeze([])});
+			return result;
 		}
 		const rows: CreatorReplayRow[] = [];
+		let byteCharge = registration.payload.input.exactCanonicalAnchorPreimageBytes.byteLength;
 		let afterSequence: number | null = null;
-		while (rows.length < readiness.rowCount) {
-			const remaining = readiness.rowCount - rows.length;
-			const page = await registration.liveJournalStore.readPage({
-				afterSequence,
-				limit: Math.min(128, remaining),
-				scope,
-				snapshot: readiness.snapshot,
-			});
-			if (!page.ok || page.rows.length === 0 || page.rows.length > remaining || page.rows.length > 128) {
+		while (rows.length < rowCount) {
+			const remaining = rowCount - rows.length;
+			const page = await pageAt(afterSequence, Math.min(128, remaining));
+			if (page === undefined || !page.ok || page.rows.length === 0 || page.rows.length > remaining || page.rows.length > 128) {
 				return undefined;
 			}
 			const pageStart = rows.length;
 			for (let pageIndex = 0; pageIndex < page.rows.length; pageIndex += 1) {
+				derivative.value = undefined;
 				const expectedSequence = pageStart + pageIndex;
 				const row = journalRowSnapshot(page.rows[pageIndex], scope, expectedSequence);
 				if (row === undefined) return undefined;
+				if (nativeRows !== undefined) {
+					const actual = nativeRows[expectedSequence];
+					if (actual === undefined || actual.journalSequence !== expectedSequence || !sameLiveJournalScope(actual.scope, scope) ||
+						actual.sourceKind !== row.sourceKind || actual.vertexDigest !== row.vertexDigest) return undefined;
+					if (row.sourceKind === "local-issued") {
+						if (actual.sourceKind !== "local-issued" || actual.author !== row.author || actual.authorSequence !== row.authorSequence) return undefined;
+					} else if (actual.sourceKind !== "received" ||
+						!sameBytes(actual.exactCanonicalPreimageBytes, row.exactCanonicalPreimageBytes) ||
+						!sameBytes(actual.detachedSignature, row.detachedSignature)) return undefined;
+				}
+				const expected = sealed?.rows[expectedSequence];
 
 				let authenticated: AuthenticatedRecoveryVertex | undefined;
+				let exactCanonicalPreimageBytes: Uint8Array | undefined;
+				let detachedSignature: Uint8Array | undefined;
 				if (row.sourceKind === "received") {
-					authenticated = authenticateRecoveryVertex(
+					exactCanonicalPreimageBytes = row.exactCanonicalPreimageBytes;
+					detachedSignature = row.detachedSignature;
+					if (sealed === undefined) authenticated = retained(row.exactCanonicalPreimageBytes, row.detachedSignature, row.vertexDigest) ?? authenticateRecoveryVertex(
 						registration.payload,
 						registration.authorization,
 						row.exactCanonicalPreimageBytes,
-						row.detachedSignature
+						row.detachedSignature, registration.vertexFacts
 					);
 				} else {
 					const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
-					const issued = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
-					const issuedRow = outboxRowSnapshot(
-						ObjectFreeze({ commit: issued, publishState: "published" as const }),
-						localScope
-					);
+					let issuedRow: SnapshottedOutboxRow | undefined;
+					if (nativeReplay === undefined) {
+						const issued = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
+						if (!charge(issued)) return undefined;
+						issuedRow = outboxRowSnapshot(ObjectFreeze({ commit: issued, publishState: "published" as const }), localScope);
+					} else {
+						const matches = nativeReplay.issued.filter(value => sameScope(value, localScope) && value.authorSequence === row.authorSequence);
+						if (matches.length !== 1 || !charge(matches[0])) return undefined;
+						// The complete actual native census is independently captured,
+						// checked and charged by the same proof. Capture its exact leaf,
+						// not a fabricated readIssued response or a projected signature.
+						const envelope = envelopeSnapshot({canonicalPreimageBytes: matches[0]!.canonicalPreimageBytes,
+							digest: matches[0]!.digest, signature: matches[0]!.signature});
+						if (envelope !== undefined) issuedRow = ObjectFreeze({...envelope, scope: localScope,
+							authorSequence: row.authorSequence, publishState: "published" as const});
+					}
 					if (issuedRow !== undefined && lowerHexDigest(issuedRow.digest) === row.vertexDigest) {
-						authenticated = authenticateRecoveryVertex(
+						exactCanonicalPreimageBytes = issuedRow.canonicalPreimageBytes;
+						detachedSignature = issuedRow.signature;
+						if (sealed === undefined) authenticated = retained(issuedRow.canonicalPreimageBytes, issuedRow.signature, row.vertexDigest) ?? authenticateRecoveryVertex(
 							registration.payload,
 							registration.authorization,
 							issuedRow.canonicalPreimageBytes,
-							issuedRow.signature
+							issuedRow.signature, registration.vertexFacts
 						);
-						if (authenticated?.author !== row.author || authenticated.authorSequence !== row.authorSequence) {
+						if (sealed === undefined &&
+							(authenticated?.author !== row.author || authenticated.authorSequence !== row.authorSequence)) {
 							authenticated = undefined;
 						}
 					}
 				}
-				if (authenticated === undefined || authenticated.digest !== row.vertexDigest) return undefined;
-				const retainedVertex = registration.closeVertices.get(authenticated.digest);
-				const retainedCharge = registration.closeCharges.get(authenticated.digest);
-				const exactCanonicalVertexBytes = encodeCanonical(authenticated.vertex);
+				if (exactCanonicalPreimageBytes === undefined || detachedSignature === undefined) return undefined;
+				let verified: CreatorReplayRow;
+				if (sealed !== undefined) {
+					if (expected === undefined || expected.journalSequence !== expectedSequence ||
+						expected.sourceKind !== row.sourceKind || expected.digest !== row.vertexDigest ||
+						!sameBytes(expected.exactCanonicalPreimageBytes, exactCanonicalPreimageBytes) ||
+						!sameBytes(expected.detachedSignature, detachedSignature)) return undefined;
+					if (row.sourceKind === "local-issued") {
+						const original = decodeCanonical(expected.exactCanonicalPreimageBytes) as Readonly<Record<string, unknown>>;
+						if (original.author !== row.author || original.authorSequence !== row.authorSequence) return undefined;
+					}
+					verified = expected;
+				} else {
+					if (authenticated === undefined || authenticated.digest !== row.vertexDigest) return undefined;
+					// The original retained matcher may have populated this SAME
+					// invocation cell through the call above; no prior row survives it.
+					const capturedDerivative = (derivative as RetainedCloseReplayDerivativeCapture).value;
+					if (vertexCapture !== undefined) vertexData.push(ObjectFreeze({author: authenticated.author,
+						hasSettlementSource: ObjectGetOwnPropertyDescriptor(authenticated.admitted, "settlementSource") !== undefined}));
+					verified = ObjectFreeze({
+						journalSequence: row.journalSequence,
+						sourceKind: row.sourceKind,
+						exactCanonicalPreimageBytes,
+						detachedSignature,
+						byteCharge: authenticated.byteCharge,
+						digest: authenticated.digest,
+						// Only this exact fresh signed match may lend its private
+						// derivative DATA. The actual retained graph is STILL encoded
+						// and compared below, detecting mutable operation/Map/Set leaves.
+						exactCanonicalVertexBytes: capturedDerivative?.authenticated === authenticated
+							? capturedDerivative.exactCanonicalVertexBytes : encodeCanonical(authenticated.vertex),
+					});
+				}
+				const retainedVertex = registration.closeVertices?.get(verified.digest);
+				if (sharedAccounting !== undefined &&
+					(!sharedAccounting.charge(verified.exactCanonicalPreimageBytes) ||
+						!sharedAccounting.charge(verified.detachedSignature) ||
+						!sharedAccounting.charge(verified.exactCanonicalVertexBytes))) return undefined;
+				const retainedCharge = registration.closeCharges?.get(verified.digest);
+				byteCharge += verified.byteCharge;
 				if (
-					retainedVertex === undefined ||
-					retainedCharge !== authenticated.byteCharge ||
-					!sameBytes(encodeCanonical(retainedVertex), exactCanonicalVertexBytes)
+					!NumberIsSafeInteger(byteCharge) ||
+					byteCharge > registration.payload.parameters.maxEpochBytes ||
+					(registration.closeVertices !== undefined &&
+						(retainedVertex === undefined || !sameBytes(encodeCanonical(retainedVertex), verified.exactCanonicalVertexBytes))) ||
+					(registration.closeCharges !== undefined && retainedCharge !== verified.byteCharge)
 				) {
 					return undefined;
 				}
-				rows.push(
-					ObjectFreeze({
-						byteCharge: authenticated.byteCharge,
-						digest: authenticated.digest,
-						exactCanonicalVertexBytes,
-					})
-				);
+				rows.push(verified);
 			}
-			const expectedNext = rows.length < readiness.rowCount ? rows.length - 1 : null;
+			const expectedNext = rows.length < rowCount ? rows.length - 1 : null;
 			if (page.nextSequence !== expectedNext) return undefined;
 			afterSequence = page.nextSequence;
 		}
-		return registration.closeVertices.size === rows.length + 1 && registration.closeCharges.size === rows.length + 1
-			? ObjectFreeze(rows)
-			: undefined;
+		if (!sameAuthorization() || registration.closeVertices !== undefined && registration.closeVertices.size !== rows.length + 1 ||
+			registration.closeCharges !== undefined && registration.closeCharges.size !== rows.length + 1) return undefined;
+		const result = ObjectFreeze(rows);
+		if (vertexCapture !== undefined && vertexData.length === rows.length)
+			vertexCapture.value = ObjectFreeze({rows: result, vertices: ObjectFreeze(vertexData)});
+		return result;
 	} catch {
 		return undefined;
 	}
 }
 
-async function sealCreatorDurableReplay(
-	registration: V3PlaneRegistration
-): Promise<Readonly<{ verify(): Promise<boolean> }> | undefined> {
-	const sealed = await readCreatorReplayRows(registration);
-	if (sealed === undefined) return undefined;
+// Only original replay seals supply captured authenticated rows to the census.
+// Delivery still requires a fresh native read of the entire exact tuple. The
+// captured replay rows remain private to one seal. Optional syntax/crypto
+// facts belong to the live registration, never to replay/admission authority.
+const creatorReplayReads = new WeakMap<
+	object,
+	Readonly<{
+		capturedRows: readonly CreatorReplayRow[];
+		vertexFacts: CreatorCensusVertexFacts;
+		readVerified(): Promise<readonly CreatorReplayRow[] | undefined>;
+	}>
+>();
+
+function sealCreatorReplay(
+	commitment: Readonly<{ digest: string; rowCount: number; byteCharge: number }>,
+	capturedRows: readonly CreatorReplayRow[],
+	readNative: () => Promise<readonly CreatorReplayRow[] | undefined>,
+	vertexFacts: CreatorCensusVertexFacts = createCreatorCensusVertexFacts()
+): Readonly<{
+	commitment: Readonly<{ digest: string; rowCount: number; byteCharge: number }>;
+	verify(): Promise<boolean>;
+}> {
+	const readVerified = async (): Promise<readonly CreatorReplayRow[] | undefined> => {
+		const reopened = await readNative();
+		if (reopened === undefined || reopened.length !== capturedRows.length) return undefined;
+		for (let index = 0; index < capturedRows.length; index += 1) {
+			const expected = capturedRows[index] as CreatorReplayRow;
+			const actual = reopened[index] as CreatorReplayRow;
+			// The durable reader returns the captured object only after fresh
+			// native tuple equality; do not repeat those same byte comparisons.
+			if (actual === expected) continue;
+			if (
+				actual.sourceKind !== expected.sourceKind ||
+				actual.journalSequence !== expected.journalSequence ||
+				actual.byteCharge !== expected.byteCharge ||
+				actual.digest !== expected.digest ||
+				!sameBytes(actual.exactCanonicalPreimageBytes, expected.exactCanonicalPreimageBytes) ||
+				!sameBytes(actual.detachedSignature, expected.detachedSignature) ||
+				!sameBytes(actual.exactCanonicalVertexBytes, expected.exactCanonicalVertexBytes)
+			) return undefined;
+		}
+		return reopened;
+	};
+	const seal = ObjectFreeze({ commitment, verify: async (): Promise<boolean> => (await readVerified()) !== undefined });
+	creatorReplayReads.set(seal, ObjectFreeze({ capturedRows, readVerified, vertexFacts }));
+	return seal;
+}
+
+async function sealCreatorDurableReplay(registration: V3PlaneRegistration): Promise<
+	| Readonly<{
+			commitment: Readonly<{ digest: string; rowCount: number; byteCharge: number }>;
+			verify(): Promise<boolean>;
+	  }>
+	| undefined
+> {
+	const payload = registration.payload, authorization = registration.authorization;
+	const sealed = await readCreatorReplayRows(registration, undefined, undefined, registration);
+	if (sealed === undefined || registration.payload !== payload || registration.authorization !== authorization) return undefined;
+	const authenticated = ObjectFreeze({ payload, authorization, rows: sealed });
+	return sealCreatorReplay(
+		creatorReplayCommitment(sealed),
+		sealed,
+		() => readCreatorReplayRows(registration, authenticated),
+		// The successor already owns these bounded exact-byte facts. Another
+		// read-only seal must not reconstruct them in a competing short-lived
+		// store. Every native tuple/context check above and below stays fresh;
+		// each fact lookup still resolves the current exact key/ABI/bindings.
+		registration.vertexFacts
+	);
+}
+
+function creatorReplayCommitment(
+	rows: readonly CreatorReplayRow[]
+): Readonly<{ digest: string; rowCount: number; byteCharge: number }> {
+	const descriptors = rows.map(({ digest, byteCharge }) => ({ digest, byteCharge }));
 	return ObjectFreeze({
-		verify: async (): Promise<boolean> => {
-			const reopened = await readCreatorReplayRows(registration);
-			if (reopened === undefined || reopened.length !== sealed.length) return false;
-			for (let index = 0; index < sealed.length; index += 1) {
-				const expected = sealed[index] as CreatorReplayRow;
-				const actual = reopened[index] as CreatorReplayRow;
-				if (
-					actual.byteCharge !== expected.byteCharge ||
-					actual.digest !== expected.digest ||
-					!sameBytes(actual.exactCanonicalVertexBytes, expected.exactCanonicalVertexBytes)
-				) {
-					return false;
+		digest: bytesToLowerHex(hashDomain("ts-drp/creator-durable-replay/v1", encodeCanonical(descriptors))),
+		rowCount: rows.length,
+		byteCharge: rows.reduce((sum, row) => sum + row.byteCharge, 0),
+	});
+}
+
+/** A retained reference is not authority: reopen the original signed source and target membership. */
+function authenticatedInheritedSettlement(
+	registration: Pick<V3PlaneRegistration, "payload" | "displacedSource">,
+	entry: SettlementPlan["entries"][number],
+	source: ClassifiedRebaseRow,
+	journal: readonly CreatorReplayRow[],
+	onRefusal?: (reason: string) => void
+): boolean {
+	const refuse = (reason: string): false => {
+		onRefusal?.(reason);
+		return false;
+	};
+	const ref = entry.inheritance;
+	const original = registration.displacedSource?.prepared;
+	if (
+		entry.disposition !== "inherited" ||
+		ref === undefined ||
+		original === undefined ||
+		ref.sourceObjectId !== original.provenance.objectId ||
+		ref.targetObjectId !== registration.payload.provenance.objectId ||
+		!sameBytes(entry.sourceDigest, source.row.digest)
+	)
+		return refuse("reference-context");
+	const target = journal.find((row) => row.digest === lowerHexDigest(ref.targetVertexDigest));
+	if (target === undefined) return refuse("target-record-absent");
+	try {
+		// The compaction projection intentionally omits authenticated author/ordinal.
+		// Read their original signed carrier, freshly verified by readCreatorReplayRows.
+		const vertex = decodeCanonical(target.exactCanonicalPreimageBytes) as Record<string, unknown>;
+		if (
+			vertex.author !== ref.targetAuthor ||
+			vertex.authorSequence !== ref.targetAuthorSequence ||
+			vertex.objectId !== ref.targetObjectId ||
+			vertex.epoch !== 0 ||
+			vertex.anchor !== registration.payload.trust.trust.genesisAnchorDigest
+		)
+			return refuse("target-record-context");
+		const intents = rebaseIntents(original, source.authenticated);
+		const policy = registration.payload.input.settlementPolicy;
+		if (
+			intents === undefined ||
+			policy?.verifyInherited === undefined ||
+			!policy.verifyInherited({
+				sourceObjectId: original.provenance.objectId,
+				sourceAuthor: source.authenticated.author,
+				sourceEpoch: original.provenance.epoch,
+				sourceAnchorDigest: original.provenance.anchorDigest,
+				targetObjectId: ref.targetObjectId,
+				targetEpoch: 0,
+				targetAnchorDigest: vertex.anchor as string,
+				targetAuthor: ref.targetAuthor,
+				operation: vertex.operation as Readonly<Record<string, unknown>>,
+				sourceOperations: intents.map((intent) => intent.operation),
+				onRefusal,
+			})
+		)
+			return refuse("source-policy");
+		const record = Reflect.get(vertex.operation as object, "record") as Record<string, unknown>;
+		const prefix: Readonly<Record<string, unknown>>[] = [];
+		for (const row of journal) {
+			if (row.digest === target.digest) break;
+			const prior = decodeCanonical(row.exactCanonicalPreimageBytes) as Record<string, unknown>;
+			const operation = prior.operation as Readonly<Record<string, unknown>>;
+			for (const intent of applicationBatchEntries(registration.payload, operation) ?? [{ operation }]) {
+				// The same source-bound policy owns import actions; outcomes are inherited, never ordinary imports.
+				if (policy.inheritedImportActions?.includes(intent.operation.action as string) === true) {
+					if (prior.author !== ref.targetAuthor) return false;
+					prefix.push(intent.operation);
 				}
 			}
-			return true;
+		}
+		const count = prefix.length === record.targetImportOperationCount;
+		const commitment =
+			lowerHexDigest(hashDomain("ts-drp/v3-room-migration-import/v1", encodeCanonical(prefix))) ===
+			record.targetImportOperationsDigest;
+		return (
+			(count && commitment) ||
+			refuse(
+				`target-prefix:${JSON.stringify({ count, commitment, actualCount: prefix.length, expectedCount: record.targetImportOperationCount })}`
+			)
+		);
+	} catch (error) {
+		return refuse(`decode:${error instanceof Error ? error.message : "unknown"}`);
+	}
+}
+
+/** Existing generation/replay authentication without registering or activating a writer. */
+export async function sealCreatorReceivedRecoveryReplay(
+	input: Readonly<{
+		generation: CreatorSuccessorGenerationMaterial;
+		/**
+		 * An authenticated adoption census may already have published the successor.
+		 * This guards actual native currency; it never activates the historical generation.
+		 */
+		expectedNativeHead?: PresentHead;
+		/** Same complete recovery-call accounting owner; never another allowance. */
+		sharedAccounting?: CreatorClosedRollbackProofAccounting;
+		catalog: TrustedBlueprintCatalog;
+		exactCanonicalParametersCarrierBytes: Uint8Array;
+		pinnedGenesisAnchorDigest: string;
+		store: AheDurableStore;
+		exactCanonicalLatchedAclBytes: Uint8Array;
+		issuanceStore: DurableIssuanceStore;
+		liveJournalStore: DurableLiveJournalStore;
+	}>
+): Promise<
+	| Readonly<{
+			commitment: Readonly<{ digest: string; rowCount: number; byteCharge: number }>;
+			verify(): Promise<boolean>;
+	  }>
+	| undefined
+> {
+	const capability = await prepareExistingCreatorGeneration(input.generation, input);
+	const payload = capability === undefined ? undefined : consumePreparedV3Live(capability);
+	const authorization =
+		payload === undefined
+			? undefined
+			: openRecoveryAuthorization(payload, input.exactCanonicalLatchedAclBytes, "latched-acl");
+	if (payload === undefined || authorization === undefined) return undefined;
+	const context = {
+		payload,
+		authorization,
+		issuanceStore: input.issuanceStore,
+		liveJournalStore: input.liveJournalStore,
+	};
+	const expectedNativeHead = input.expectedNativeHead ?? input.generation.head;
+	const read = async (): Promise<readonly CreatorReplayRow[] | undefined> => {
+		const head = await input.store.readHead(input.generation.head.objectId);
+		if (input.sharedAccounting !== undefined && !input.sharedAccounting.charge(encodeCanonical(head))) return undefined;
+		if (
+			expectedNativeHead.objectId !== input.generation.head.objectId ||
+			!head.ok ||
+			head.value.kind !== "present" ||
+			!sameHead(head.value, expectedNativeHead)
+		)
+			return undefined;
+		const rows = await readCreatorReplayRows(context, undefined, input.sharedAccounting);
+		const after = await input.store.readHead(input.generation.head.objectId);
+		if (input.sharedAccounting !== undefined && !input.sharedAccounting.charge(encodeCanonical(after))) return undefined;
+		return rows !== undefined && after.ok && after.value.kind === "present" && sameHead(after.value, expectedNativeHead)
+			? rows
+			: undefined;
+	};
+	const rows = await read();
+	if (rows === undefined) return undefined;
+	const commitment = creatorReplayCommitment(rows);
+	return sealCreatorReplay(commitment, rows, read);
+}
+
+/**
+ * Original issuance-dependency field constructor, with no authentication effect.
+ * @param dependencyKind - Classification already established by the owning path.
+ * @param scope - Exact original author/object scope.
+ * @param authorSequence - Exact original ordinal.
+ * @param digest - Exact original unsigned/signed-preimage digest.
+ * @param classification - Owning classifier's category.
+ * @returns The original canonical census fields, not a capability.
+ */
+const CREATOR_ISSUANCE_CENSUS_DEPENDENCY_KINDS = ObjectFreeze([
+	"current-issuance", "unsettled-issuance", "pinned-genesis", "signed-settled-issuance",
+	"source-bound-completed-issuance", "adjacent-author-fence", "separate-source-author-fence",
+	"authenticated-closed-issuance", "authenticated-covered-native-issuance",
+] as const);
+const CREATOR_ISSUANCE_CENSUS_CLASSIFICATIONS = ObjectFreeze([
+	"covered-historical", "current", "displaced", "pinned-genesis", "filtered-settlement-source",
+] as const);
+type CreatorIssuanceCensusDependencyKind = (typeof CREATOR_ISSUANCE_CENSUS_DEPENDENCY_KINDS)[number];
+type CreatorIssuanceCensusClassification = (typeof CREATOR_ISSUANCE_CENSUS_CLASSIFICATIONS)[number];
+function creatorIssuanceCensusFields(
+	dependencyKind: CreatorIssuanceCensusDependencyKind,
+	scope: DurableIssueScope,
+	authorSequence: number,
+	digest: Uint8Array | undefined,
+	classification: CreatorIssuanceCensusClassification
+): Readonly<Record<string, unknown>> {
+	return { dependencyKind, scope, authorSequence, ...(digest === undefined ? {} : {digest}), classification };
+}
+
+/**
+ * Original non-native census fields shared by capture and arithmetic projection.
+ * @param currentJournal - Original current-journal wrapper.
+ * @param rows - Complete original issuance dependency descriptors.
+ * @param debt - Original author lineage/plan indexes.
+ * @param graphVersion - Owning graph's version.
+ * @param dependencyAnchors - Original epoch/anchor dependencies.
+ * @returns Original fields; encoding grants no source or admission authority.
+ */
+function creatorRuntimeCensusFields(
+	currentJournal: unknown,
+	rows: readonly unknown[],
+	debt: readonly unknown[],
+	graphVersion: number | undefined,
+	dependencyAnchors: readonly Readonly<{ epoch: number; anchorDigest: string }>[],
+	migrationSource?: unknown
+): Readonly<Record<string, unknown>> {
+	return {
+		currentJournal,
+		rows,
+		debt,
+		...(graphVersion === undefined ? {} : { graphVersion }),
+		dependencyAnchors,
+		...(migrationSource === undefined ? {} : { migrationSource }),
+	};
+}
+
+/**
+ * Original issuance-purpose fields, shared by capture and length projection.
+ * @param input - Original active census fields, not admission authority.
+ * @returns The original pending and unsettled observation shapes.
+ */
+function creatorRuntimeActiveCensusFields(
+	input: Readonly<{
+		pendingRoots: readonly unknown[];
+		wireByteCharge: number;
+		activeSource?: Readonly<{ sourceSequence: number; sourceDigest: Uint8Array }>;
+		unsettledSources: readonly unknown[];
+		cursor: number | null;
+		cacheSourceSequences: readonly number[];
+		epoch: number;
+	}>
+): Readonly<Record<string, unknown>> {
+	return {
+		pendingIngress: {
+			roots: input.pendingRoots,
+			wireByteCharge: input.wireByteCharge,
+			admission: "unadmitted",
+			graphClosure: input.pendingRoots.length === 0 ? "no-pending-roots" : "incomplete",
 		},
+		activeUnsettled: {
+			...(input.activeSource ?? {}),
+			sources: input.unsettledSources,
+			cursor: input.cursor,
+			cacheSourceSequences: input.cacheSourceSequences,
+			availableHistoricalDepth: Math.min(2, input.epoch),
+			coverage: "active-current-and-bounded-unsettled-source-set",
+		},
+	};
+}
+
+/** Nonactivating custody for the existing pending-recovery owner. It retains
+ * only authenticated native work and cannot expose a live plane or retirement. */
+async function sealCreatorPendingClassificationDependencies(
+	input: CreatorPendingClassificationCustodyInput
+): Promise<Readonly<{ hold: CreatorSnapshotRecoveryCloseHold; stop(): Promise<void> }> | undefined> {
+	const prepared = await prepareExistingCreatorGeneration(input.generation, input);
+	const payload = prepared === undefined ? undefined : consumePreparedV3Live(prepared);
+	const authorization =
+		payload === undefined
+			? undefined
+			: openRecoveryAuthorization(payload, input.exactCanonicalLatchedAclBytes, "latched-acl");
+	if (payload === undefined || authorization === undefined) return undefined;
+	const capability = openVerifiedCreatorHistoricalIssuance({
+		author: input.owners.author,
+		closure: { candidates: input.generation.candidates, closure: input.generation.references },
+		floorTrust: input.generation.trust,
 	});
+	const identity = capability === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(capability);
+	if (
+		capability === undefined ||
+		identity === undefined ||
+		identity.objectId !== input.generation.trust.objectId ||
+		identity.successorEpoch !== input.generation.trust.currentEpoch ||
+		identity.successorAnchorDigest !== input.generation.trust.currentAnchorDigest
+	)
+		return undefined;
+	const context: CreatorRecoveryCensusContext = {
+		payload,
+		authorization,
+		issuanceStore: input.issuanceStore,
+		liveJournalStore: input.liveJournalStore,
+		issuanceScope: ObjectFreeze({ objectId: identity.objectId, author: input.owners.author }),
+		historicalIssuance: {
+			capability,
+			originalIssuanceStore: input.issuanceStore,
+			count: 0,
+			countedSequences: new IntrinsicSet(),
+			maxEpochVertices: payload.parameters.maxEpochVertices,
+			scopeAuthorMatches: identity.author === input.owners.author,
+		},
+		exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array.from(
+			input.owners.exactCanonicalPinnedGenesisBootstrapOperationBytes
+		),
+	};
+	const replay = await sealCreatorReceivedRecoveryReplay({ ...input, expectedNativeHead: input.expectedNativeHead });
+	if (replay === undefined) return undefined;
+	const opened = await createCreatorSealActor({
+		currentTrust: input.generation.trust,
+		voteStore: input.owners.voteStore,
+		evidenceStore: input.owners.evidenceStore,
+		storageIncarnation: input.owners.storageIncarnation,
+		signer: input.owners.signer,
+		onObservation: () => undefined,
+	});
+	if (!opened.ok) return undefined;
+	const actor = opened.actor;
+	let stopped = false,
+		transferred = false;
+	const live = (): boolean => !stopped && !actor.status().terminal;
+	const observation = {
+		stage: "native-pending-census",
+		currentTrust: input.generation.trust,
+		sourceTrust: undefined,
+		sourceBound: true,
+		live,
+		replay,
+	};
+	try {
+		if (!live()) return undefined;
+		const first = await readCreatorRecoveryDependencyCensus(context, observation);
+		if (first === undefined) return undefined;
+		const hold = ObjectFreeze({});
+		recoveryCloseHolds.set(hold, {
+			kind: "full-census",
+			context,
+			dependencyAnchors: first.dependencyAnchors,
+			sourceTrust: undefined,
+			exactCanonicalCensusBytes: first.exactCanonicalCensusBytes,
+			pending: new Set(),
+			retirementAllowed: false,
+			releasing: false,
+			borrowSigning: (trusts) => actor.acquireRecoveryDependencies(trusts),
+			captureSigning: () => actor.captureRetirementOwners(),
+			check: async () => {
+				const current = await readCreatorRecoveryDependencyCensus(context, observation);
+				if (current === undefined || !sameBytes(current.exactCanonicalCensusBytes, first.exactCanonicalCensusBytes))
+					throw new TypeError("creator pending dependency census is stale or unclassified");
+			},
+		});
+		transferred = true;
+		return ObjectFreeze({
+			hold,
+			stop: async () => {
+				stopped = true;
+				await actor.stop();
+			},
+		});
+	} finally {
+		if (!transferred) {
+			stopped = true;
+			await actor.stop();
+		}
+	}
+}
+
+type CreatorRecoveryCensusContext = Pick<
+	V3PlaneRegistration,
+	| "payload"
+	| "authorization"
+	| "issuanceStore"
+	| "liveJournalStore"
+	| "issuanceScope"
+	| "historicalIssuance"
+	| "exactCanonicalPinnedGenesisBootstrapOperationBytes"
+	| "displacedSource"
+>;
+
+/** A terminal migration source has its own object/head, not an adjacent target
+ * epoch. Recovery already authenticated its last activation; retain that exact
+ * source and its complete native images without granting retirement authority. */
+async function acquireCreatorDisplacedSourceDependencies(
+	source: V3DisplacedSourceAuthority,
+	sharedIssuanceStore?: DurableIssuanceStore,
+	ownedIssueCustody?: LocalReplacementCustody
+): Promise<
+	Readonly<{
+		read(): Promise<
+			Readonly<Record<string, unknown>> & Readonly<{ authenticatedJournal: readonly CreatorReplayRow[] }>
+		>;
+		release(): Promise<void>;
+	}>
+> {
+	const issuanceStore = source.issuanceStore,
+		liveJournalStore = source.liveJournalStore;
+	const floor = source.prepared.input.settlementFloor;
+	if (
+		issuanceStore === undefined ||
+		liveJournalStore === undefined ||
+		floor === undefined ||
+		(source.activationVertexDigest === undefined && issuanceStore !== sharedIssuanceStore)
+	)
+		throw new TypeError("migration source native owners are incomplete");
+	const objectId = source.prepared.provenance.objectId;
+	const parsed = parseStorageObjectId(objectId);
+	if (!parsed.ok) throw new TypeError("migration source object is invalid");
+	const floorScope = ObjectFreeze({ objectId, pinnedGenesisAnchorDigest: source.pinnedGenesisAnchorDigest });
+	const reservations: NativeReadReservation[] = [];
+	let reader: AheBoundedActiveRead | undefined,
+		released = false;
+	let releaseTask: Promise<void> | undefined;
+	const release = (): Promise<void> => {
+		if (releaseTask !== undefined) return releaseTask;
+		released = true;
+		const heldReader = reader;
+		return (releaseTask = Promise.allSettled([
+			...reservations.map((value) => Promise.resolve().then(() => value.release())),
+			...(heldReader === undefined ? [] : [Promise.resolve().then(() => heldReader.release())]),
+		]).then((outcomes) => {
+			const errors = outcomes.flatMap((value) => (value.status === "rejected" ? [value.reason] : []));
+			if (errors.length) throw new AggregateError(errors, "migration source custody joined release");
+		}));
+	};
+	try {
+		for (const owner of [source.prepared.input.store, liveJournalStore, issuanceStore]) {
+			// The original target lifetime owns the same-object native issuance
+			// reservation and complete image once. Never reserve the same native
+			// owner twice or pretend its changing postimage is a foreign source.
+			if (owner === sharedIssuanceStore) continue;
+			const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
+			if (typeof acquire !== "function") throw new TypeError("migration source exclusion is unsupported");
+			reservations.push(
+				(await ownedIssueCustody?.borrow(owner)) ??
+					((await ReflectApply(acquire, owner, [{ objectId }])) as NativeReadReservation)
+			);
+		}
+		reservations.push(
+			(await ownedIssueCustody?.borrow(floor)) ?? (await floor.acquireNativeReadReservation({ scope: floorScope }))
+		);
+		const acquired = await source.prepared.input.store.acquireBoundedActiveRead({
+			objectId: parsed.value,
+			ancestorCount: source.prepared.provenance.epoch === 0 ? 0 : 2,
+			limits: AHE_BOUNDED_READ_LIMITS,
+		});
+		if (!acquired.ok || acquired.value.kind === "empty") throw new TypeError("migration source AHE is unavailable");
+		const sourceReader = acquired.value.reader;
+		reader = sourceReader;
+		if (!sameHead(sourceReader.head, source.prepared.trust.head)) throw new TypeError("migration source head is stale");
+		const check = async (): Promise<void> => {
+			if (released) throw new TypeError("migration source custody is released");
+			for (const reservation of reservations) await reservation.check();
+			const current = await sourceReader.checkCurrent();
+			if (!current.ok) throw new TypeError("migration source AHE is stale");
+		};
+		const maintenance = durableIssuancePruningMaintenanceForStore(issuanceStore);
+		const readJournal = liveJournalStore.readRetirementImage;
+		if (maintenance?.readBoundedRecoveryCensus === undefined || readJournal === undefined)
+			throw new TypeError("migration source native census is unsupported");
+		const readRecoveryCensus = maintenance.readBoundedRecoveryCensus;
+		const read = async (): Promise<
+			Readonly<Record<string, unknown>> & Readonly<{ authenticatedJournal: readonly CreatorReplayRow[] }>
+		> => {
+			await check();
+			const rows = await readCreatorReplayRows({
+				payload: source.prepared,
+				authorization: source.authorization,
+				issuanceStore,
+				liveJournalStore,
+			});
+			// The private displaced authority is created only after original recovery
+			// authenticates this terminal-authorized final row. Recensus refuses any
+			// missing/changed signed source; it does not reinterpret target epochs.
+			if (
+				rows === undefined ||
+				rows.length === 0 ||
+				(source.activationVertexDigest !== undefined && rows[rows.length - 1].digest !== source.activationVertexDigest)
+			)
+				throw new TypeError("migration source activation is unavailable");
+			const journal = (await ReflectApply(readJournal, liveJournalStore, [{ objectId }])) as Awaited<
+				ReturnType<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>
+			>;
+			if (!journal.ok) throw new TypeError("migration source journal is unavailable");
+			const issuance =
+				issuanceStore === sharedIssuanceStore
+					? { dependencyKind: "shared-current-native-issuance", objectId }
+					: await ReflectApply(readRecoveryCensus, maintenance, [
+							{
+								objectId,
+								limits: {
+									maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+									maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes,
+								},
+							},
+						]);
+			const floorImage = await floor.readRetirementImage({ scope: floorScope });
+			if (!sameCreatorRoomHead(floorImage.state.stable, source.prepared.trust.trust))
+				throw new TypeError("migration source whole-floor is stale");
+			await check();
+			return ObjectFreeze({
+				trust: source.prepared.trust.trust,
+				...(source.activationVertexDigest === undefined
+					? {}
+					: { activationVertexDigest: source.activationVertexDigest }),
+				ahe: { head: sourceReader.head, generations: sourceReader.generations, blobs: sourceReader.blobs },
+				journal: journal.value,
+				authenticatedJournal: rows,
+				nativeIssuance: issuance,
+				floor: floorImage,
+			});
+		};
+		return ObjectFreeze({ read, release });
+	} catch (error) {
+		try {
+			await release();
+		} catch (cleanup) {
+			throw new AggregateError([error, cleanup], "migration source acquisition failed");
+		}
+		throw error;
+	}
+}
+
+export interface V3TerminalMigrationSource {
+	readonly capability: PreparedV3Live;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
+	readonly anchorDigest: string;
+	readonly blueprintDigest: string;
+	readonly objectId: string;
+	readonly signerSetDigest: string;
+}
+
+/**
+ * Derives one-use recovery custody from the authenticated current live owner.
+ * This is not caller-selected anchor material or a replacement trust root.
+ * Original native source reservations, complete dependency census and whole-floor
+ * currency are checked and joined before returning; recovery reauthenticates the
+ * terminal journal under this same generation and ACL.
+ * @param plane - Existing live source owner.
+ * @param activationVertexDigest - Exact authenticated terminal journal row.
+ * @returns One-use source capability, never source retirement permission.
+ */
+export async function prepareV3TerminalMigrationSource(
+	plane: V3PlaneHandle,
+	activationVertexDigest: string
+): Promise<V3TerminalMigrationSource> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (
+		registration === undefined ||
+		!currentRegistration(registration) ||
+		registration.authorization.kind !== "latched-acl" ||
+		(registration.terminalState !== "transition" && registration.terminalState !== "terminal") ||
+		!isDigestHex(activationVertexDigest)
+	)
+		throw new TypeError("migration source owner is unavailable");
+	const source: V3DisplacedSourceAuthority = ObjectFreeze({
+		activationVertexDigest,
+		authorization: registration.authorization,
+		issuanceScope: registration.issuanceScope,
+		issuanceStore: creatorOriginalIssuanceStore(registration),
+		liveJournalStore: registration.liveJournalStore,
+		pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest,
+		prepared: registration.payload,
+	});
+	const held = await acquireCreatorDisplacedSourceDependencies(source);
+	let migrationTarget:
+		| Readonly<{ objectId: string; epoch: 0; anchorDigest: string; blueprintDigest: string }>
+		| undefined;
+	try {
+		const image = await held.read();
+		const last = image.authenticatedJournal[image.authenticatedJournal.length - 1];
+		const authenticated =
+			last === undefined
+				? undefined
+				: authenticateRecoveryVertex(
+						registration.payload,
+						registration.authorization,
+						last.exactCanonicalPreimageBytes,
+						last.detachedSignature
+					);
+		if (
+			last === undefined ||
+			authenticated === undefined ||
+			authenticated.digest !== activationVertexDigest ||
+			registration.classifyTerminalVertex?.(
+				ObjectFreeze({
+					author: authenticated.author,
+					exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(last.exactCanonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(last.detachedSignature),
+					vertex: authenticated.admitted,
+				})
+			) !== "terminal-authorized"
+		)
+			throw new TypeError("migration source terminal authority is invalid");
+		const operation = snapshotClosedRecord(authenticated.admitted.operation, ["action", "decision"]);
+		const decision = operation?.decision as Readonly<Record<string, unknown>> | undefined;
+		if (
+			operation?.action !== "migrationActivation" ||
+			!isObject(decision) ||
+			typeof decision.targetObjectId !== "string" ||
+			!parseStorageObjectId(decision.targetObjectId).ok ||
+			!isDigestHex(decision.targetAnchorDigest) ||
+			!isDigestHex(decision.targetBlueprintDigest)
+		)
+			throw new TypeError("migration source authenticated target is unavailable");
+		// The original shared terminal classifier has authenticated the decision
+		// and signed target invitation above. Retain its exact target, not caller metadata.
+		migrationTarget = ObjectFreeze({
+			objectId: decision.targetObjectId,
+			epoch: 0 as const,
+			anchorDigest: decision.targetAnchorDigest,
+			blueprintDigest: decision.targetBlueprintDigest,
+		});
+		if (!currentRegistration(registration)) throw new TypeError("migration source owner changed");
+	} catch (primary) {
+		try {
+			await held.release();
+		} catch (cleanup) {
+			throw new AggregateError([primary, cleanup], "migration source preparation failed", { cause: primary });
+		}
+		throw primary;
+	}
+	await held.release();
+	if (!currentRegistration(registration)) throw new TypeError("migration source owner changed");
+	const capability = ObjectFreeze({}) as PreparedV3Live;
+	preparedV3LiveAuthority.set(capability, registration.payload);
+	const history = registration.historicalIssuance;
+	if (migrationTarget === undefined) throw new TypeError("migration source authenticated target is unavailable");
+	creatorTerminalMigrationSourceHandoffs.set(
+		capability,
+		ObjectFreeze({
+			migrationTarget,
+			...(history === undefined
+				? {}
+				: {
+						historicalIssuance: {
+							capability: history.capability,
+							originalIssuanceStore: history.originalIssuanceStore,
+							count: 0,
+							countedSequences: new IntrinsicSet<number>(),
+							maxEpochVertices: history.maxEpochVertices,
+							scopeAuthorMatches: history.scopeAuthorMatches,
+						},
+					}),
+			...(registration.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+				? {}
+				: {
+						bootstrapOperationBytes: new Uint8ArrayConstructor(
+							registration.exactCanonicalPinnedGenesisBootstrapOperationBytes
+						),
+					}),
+		})
+	);
+	return ObjectFreeze({
+		capability,
+		exactCanonicalLatchedAclBytes: encodeCanonical(registration.authorization.value),
+		anchorDigest: registration.payload.provenance.anchorDigest,
+		blueprintDigest: registration.payload.provenance.blueprintDigest,
+		objectId: registration.payload.provenance.objectId,
+		signerSetDigest: registration.payload.provenance.signerSetDigest,
+	});
+}
+
+/** Private read turn admitted by the SAME close hold which acquired the real
+ * target issuance reservation. It is not a native-image or authentication grant. */
+interface CreatorHeldIssuanceCensusRead {
+	readonly store: DurableIssuanceStore;
+	readonly objectId: string;
+	available(): boolean;
+	read(consume: () => Promise<Uint8Array | undefined>): Promise<Uint8Array | undefined>;
+}
+interface CreatorHeldRecoveryJournalCurrent {
+	readonly held: CreatorHeldIssuanceCensusRead;
+	readonly owner: DurableLiveJournalStore;
+	readonly producer: NonNullable<DurableLiveJournalStore["readRetirementImage"]>;
+	readonly probe: import("@ts-drp/live-journal").LiveJournalRetirementImageCurrentProbe;
+	verified: boolean;
+}
+/** Only an original fully charged image can enroll this currency fact. Its
+ * first complete replay equality still executes before the fact is enabled. */
+async function checkCreatorHeldRecoveryJournal(current: CreatorHeldRecoveryJournalCurrent | undefined,
+	held: CreatorHeldIssuanceCensusRead, registration: V3PlaneRegistration): Promise<boolean | undefined> {
+	if (current === undefined || !current.verified || current.held !== held || !held.available() ||
+		registration.liveJournalStore !== current.owner || current.owner.readRetirementImage !== current.producer) return undefined;
+	const result = await current.probe.checkCurrent();
+	// A harmless native basis eviction is not authority for changed bytes. The
+	// original complete replay read remains the fallback (including its fence,
+	// corruption, actual local issuance and current graph checks).
+	if (!result.ok) return undefined;
+	return held.available() && registration.liveJournalStore === current.owner &&
+		current.owner.readRetirementImage === current.producer ? true : undefined;
+}
+interface CreatorRecoveryCensusInputCapture {
+	readonly pages: {afterKey: DurableOutboxPageInput["afterKey"]; bytes: Uint8Array}[];
+	nativeCurrent?: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensusCurrentProbe;
+	applicationPolicyRead: boolean;
+	retainedBytes: number;
+	overCapacity: boolean;
+}
+
+/** A complete census is classified once by its original owner. Under that
+ * SAME hold's native exclusion, unchanged complete inputs need fresh currency,
+ * not another outbox/plan walk and semantic report construction. This closure
+ * is private DATA reuse, never a reservation, paid credit or admission grant.
+ * Cross-object/branch/rebase work keeps the original complete construction. */
+function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration,
+	runtime: ReturnType<typeof captureCreatorRecoveryRuntime>, replay: Readonly<{verify(): Promise<boolean>}>,
+	sealed: Uint8Array, live: () => boolean, captured: CreatorRecoveryCensusInputCapture,
+	preparedHeld: CreatorHeldIssuanceCensusRead,
+	journalCurrent?: (held: CreatorHeldIssuanceCensusRead) => Promise<boolean | undefined>
+): ((held: CreatorHeldIssuanceCensusRead) => Promise<boolean | undefined>) | undefined {
+	try {
+		if (captured.applicationPolicyRead || captured.overCapacity || captured.pages.length === 0 ||
+			!live() || !preparedHeld.available() || !runtime.sourceBound ||
+			runtime.nativeBranchSource !== undefined || runtime.migrationSource !== undefined ||
+			registration.pendingIngress.size !== 0 || registration.pendingIngressBytes !== 0 ||
+			(registration.rebaseSnapshot?.length ?? 0) !== 0 || registration.rebaseCursor !== undefined ||
+			preparedMigrationTargetFloors.has(registration)) return undefined;
+		const store = registration.issuanceStore, original = creatorOriginalIssuanceStore(registration);
+		const maintenance = durableIssuancePruningMaintenanceForStore(store), read = maintenance?.readBoundedRecoveryCensus;
+		if (maintenance === undefined || read === undefined || !ObjectIsFrozen(store) || !ObjectIsFrozen(maintenance)) return undefined;
+		const history = registration.historicalIssuance;
+		if (history !== undefined && (original !== history.originalIssuanceStore ||
+			store !== original && store !== history.filteredIssuanceStore ||
+			durableIssuancePruningMaintenanceForStore(original) !== maintenance)) return undefined;
+		const readPage = store.readOutboxPage;
+		const sourceIdentity = creatorOrdinaryIssuanceSourceIdentity(registration);
+		const historyBindings = (value: HistoricalIssuanceContext | undefined): readonly unknown[] => {
+			if (value === undefined) return [undefined];
+			const sequences: number[] = [], iterator = ReflectApply(SetPrototypeValues, value.countedSequences, []);
+			for (;;) {
+				const next = ReflectApply(SetIteratorNext, iterator, []) as IteratorResult<number>;
+				if (next.done) break;
+				if (sequences.length >= ISSUANCE_RETIREMENT_LIMITS.maxRows) throw new TypeError("held census history is over capacity");
+				sequences.push(next.value);
+			}
+			// The original resolver intentionally returns a detached identity per
+			// call. Compare its complete typed value, never its allocation identity.
+			const identity = resolveVerifiedCreatorHistoricalIssuance(value.capability);
+			return [value, value.capability, identity?.admissionEpoch, identity?.admittedAuthorSequence, identity?.author,
+				identity?.closedAnchorDigest, identity?.closedEpoch, identity?.objectId,
+				identity?.successorAnchorDigest, identity?.successorEpoch,
+				value.maxEpochVertices, value.scopeAuthorMatches, value.count, value.countedSequences, ...sequences];
+		};
+		const owners = () => {
+			const payload = registration.payload, source = registration.displacedSource, prior = source?.prepared;
+			return [payload, payload.trust, payload.trust.trust, payload.provenance, payload.parameters, registration.authorization,
+				registration.liveJournalStore, registration.liveJournalStore.readiness, registration.liveJournalStore.readPage,
+				payload.admission, payload.runtime, payload.catalog, payload.input, registration.issuanceScope,
+				registration.exactCanonicalPinnedGenesisBootstrapOperationBytes, ...historyBindings(registration.historicalIssuance),
+				source, prior, prior?.trust, prior?.trust.trust, prior?.provenance, prior?.parameters, source?.authorization,
+				prior?.admission, prior?.runtime, prior?.catalog, prior?.input, source?.issuanceScope,
+				source?.exactCanonicalPinnedGenesisBootstrapOperationBytes, ...historyBindings(source?.historicalIssuance)];
+		};
+		const capturedOwners = owners();
+		// The original replay reader compares the retained graph to every signed
+		// row. When its ORIGINAL native owner confirms that complete journal is
+		// still the same held image, reuse those immutable facts, not another
+		// full readiness/page/issued-row walk. Existing per-vertex guards retain
+		// exact mutable-leaf isolation and resolve the current author key afresh.
+		// This private vector ends with this one hold; it is never a checkpoint
+		// or authorization grant for another epoch, reader or proof lifetime.
+		let graphVertices: ReturnType<typeof captureCreatorOrdinaryPreparedVertex>[] | undefined;
+		let retainedGraphBytes = 0;
+		if (journalCurrent !== undefined) {
+			if (registration.closeVertices.size > registration.payload.parameters.maxEpochVertices + 1) return undefined;
+			graphVertices = [...registration.closeVertices.keys()].map(digest => {
+				const vertex = registration.closeVertices.get(digest);
+				const captured = captureCreatorOrdinaryPreparedVertex(registration, digest);
+				// The existing integrity guard owns an exact encoding and isolated
+				// byte leaves (at most another encoded width), plus the captured key.
+				retainedGraphBytes += encodeCanonical(vertex).byteLength * 2 + (captured.authorKey?.bytes.byteLength ?? 0);
+				if (retainedGraphBytes > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) throw new TypeError("held replay graph is over capacity");
+				return captured;
+			});
+		}
+		const verifyReplay = async (held: CreatorHeldIssuanceCensusRead): Promise<boolean> => {
+			const current = await journalCurrent?.(held);
+			if (current === undefined) return replay.verify();
+			if (!current || graphVertices === undefined || registration.closeVertices.size !== graphVertices.length ||
+				registration.closeCharges.size !== graphVertices.length) return false;
+			return graphVertices.every(vertex => creatorOrdinaryPreparedVertexCurrent(registration, vertex));
+		};
+		const context = () => {
+			const history = (value: HistoricalIssuanceContext | undefined) => {
+				if (value === undefined) return null;
+				const sequences: number[] = [], iterator = ReflectApply(SetPrototypeValues, value.countedSequences, []);
+				for (;;) {
+					const next = ReflectApply(SetIteratorNext, iterator, []) as IteratorResult<number>;
+					if (next.done) break;
+					if (sequences.length >= ISSUANCE_RETIREMENT_LIMITS.maxRows) throw new TypeError("held census history is over capacity");
+					sequences.push(next.value);
+				}
+				return {identity: resolveVerifiedCreatorHistoricalIssuance(value.capability) ?? null,
+					maxEpochVertices: value.maxEpochVertices, scopeAuthorMatches: value.scopeAuthorMatches,
+					count: value.count, countedSequences: sequences};
+			};
+			const payload = (value: PreparedV3LivePayload, authorization: V3LiveAuthorization) => ({
+				trust: value.trust.trust, provenance: value.provenance, parameters: value.parameters, authorization});
+			const source = registration.displacedSource;
+			return {current: payload(registration.payload, registration.authorization),
+				scope: registration.issuanceScope, history: history(registration.historicalIssuance),
+				bootstrap: registration.exactCanonicalPinnedGenesisBootstrapOperationBytes ?? null,
+				source: source === undefined ? null : {context: payload(source.prepared, source.authorization),
+					scope: source.issuanceScope ?? null, history: history(source.historicalIssuance),
+					bootstrap: source.exactCanonicalPinnedGenesisBootstrapOperationBytes ?? null}};
+		};
+		const contextValue = context(), expectedContext = encodeCanonical(contextValue);
+		// Reuse the existing exact-byte DATA-integrity primitive, not repeated
+		// whole-context encoding. Actual field/reference bindings and mutable
+		// history counters/Sets above remain freshly compared on every turn.
+		const contextIntact = captureCreatorOrdinaryDimensionIntegrity(contextValue);
+		const nativeCurrent = captured.nativeCurrent;
+		const expectedNative = nativeCurrent !== undefined ? undefined :
+			encodeCanonical((decodeCanonical(sealed) as {nativeIssuance: unknown}).nativeIssuance);
+		const carriers = () => [registration.payload, ...(registration.displacedSource === undefined ? [] : [registration.displacedSource.prepared])]
+			.flatMap(value => [value.exactProjectionBytes, value.catalog.canonicalBlueprintPackageBytes, value.catalog.exactArtifactBytes]);
+		const originalCarriers = carriers();
+		const retainedBytes = retainedGraphBytes + expectedContext.byteLength * 2 + (expectedNative?.byteLength ?? 0) + originalCarriers.reduce((sum, bytes) => sum + bytes.byteLength, 0) +
+			(nativeCurrent === undefined ? captured.pages.reduce((sum, page) => sum + page.bytes.byteLength, 0) : 0);
+		if (retainedBytes > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;
+		const capturedCarriers = originalCarriers.map(bytes => new Uint8ArrayConstructor(bytes));
+		const pages = (nativeCurrent === undefined ? captured.pages : []).map(page => ObjectFreeze({afterKey: page.afterKey == null ? page.afterKey : [...page.afterKey] as typeof page.afterKey,
+			bytes: new Uint8ArrayConstructor(page.bytes)}));
+		const available = (held: CreatorHeldIssuanceCensusRead): boolean => { try {return live() && held === preparedHeld && held.available() &&
+			held.store === store && held.objectId === runtime.currentTrust.objectId && registration.issuanceStore === store &&
+			creatorOriginalIssuanceStore(registration) === original &&
+			durableIssuancePruningMaintenanceForStore(store) === maintenance && maintenance.readBoundedRecoveryCensus === read &&
+			store.readOutboxPage === readPage &&
+			!preparedMigrationTargetFloors.has(registration) &&
+			creatorOrdinaryIssuanceSourceIdentity(registration) === sourceIdentity &&
+			(() => {const current = owners(); return current.length === capturedOwners.length &&
+				current.every((value, index) => value === capturedOwners[index]);})();
+		} catch {return false;} }; // Inconclusive context bindings use the original full check.
+		const intact = (): boolean => {try {return contextIntact() &&
+			carriers().every((bytes, index) => sameBytes(bytes, capturedCarriers[index]!));} catch {return false;} };
+		return async held => {
+			if (!available(held) || !intact()) return undefined;
+			if (nativeCurrent !== undefined) {
+				// Enrolled by the ORIGINAL frozen native producer on its exact
+				// observation during the complete held walk. Its fresh request checks
+				// the same all-store transaction/reservation; immutable global outbox
+				// pages cannot change inside that view. Known frozen original/filtered
+				// facades and exact context bytes bind their deterministic projection.
+				// This is currency only, not skipped authorization or paid proof credit.
+				if (!(await nativeCurrent.checkCurrent())) return undefined;
+				if (!available(held)) return undefined;
+				if (!(await verifyReplay(held))) return false;
+				return available(held) && intact() ? true : undefined;
+			}
+			if (expectedNative === undefined) return undefined;
+			// This is an ACTUAL complete native read in the same held transaction,
+			// including hidden/foreign rows, full PRE, plans, image and control.
+			const current = await ReflectApply(read, maintenance, [{objectId: runtime.currentTrust.objectId,
+				limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}}]);
+			if (!available(held)) return undefined;
+			let currentBytes: Uint8Array;
+			try {currentBytes = encodeCanonical({rows: current.rows, image: current.image,
+				...(current.control === undefined ? {} : {control: current.control})});} catch {return undefined;}
+			if (!sameBytes(currentBytes, expectedNative)) return false;
+			// Preserve the actual facade's COMPLETE global/scoped view too. Foreign
+			// object rows affect its original enumeration bound even though they do
+			// not belong to the object-only native census. No classification/plan
+			// reconstruction is needed for byte-identical pages in this SAME lease.
+			for (const page of pages) {
+				const fresh = await ReflectApply(readPage, store, [{afterKey: page.afterKey, limit: 64}]);
+				if (!available(held)) return undefined;
+				try {if (!sameBytes(encodeCanonical(fresh), page.bytes)) return undefined;} catch {return undefined;}
+			}
+			if (!(await verifyReplay(held))) return false;
+			return available(held) && intact() ? true : undefined;
+		};
+	} catch {return undefined;} // Inconclusive preparation retains the full original route.
+}
+
+/** Original categorized census owner. Runtime observations remain owned by the
+ * actual registration; a read-only native context does not invent queue/graph state. */
+async function readCreatorRecoveryDependencyCensus(
+	registration: CreatorRecoveryCensusContext,
+	observation: {
+		stage: string;
+		readonly graphVersion?: number;
+		readonly currentTrust: CurrentAnchorTrust;
+		readonly sourceTrust: CurrentAnchorTrust | undefined;
+		readonly liveRegistration?: V3PlaneRegistration;
+		readonly sourceBound: boolean;
+		live(): boolean;
+		readonly replay: Readonly<{ verify(): Promise<boolean> }>;
+		readonly active?: Readonly<{
+			enteredReceivedDigest?: string;
+			registration: V3PlaneRegistration;
+			pendingIngress: readonly (readonly [string, PendingV3Ingress])[];
+			pendingIngressBytes: number;
+			pendingCurrent(): boolean;
+			index: V3PlaneRegistration["index"];
+			activeSource: ClassifiedRebaseRow | undefined;
+			rebaseSnapshot: readonly ClassifiedRebaseRow[] | undefined;
+			rebaseCursor: number | undefined;
+		}>;
+	},
+	heldIssuance?: CreatorHeldIssuanceCensusRead,
+	capturedInputs?: CreatorRecoveryCensusInputCapture
+): Promise<
+	| Readonly<{
+			exactCanonicalCensusBytes: Uint8Array;
+			dependencyAnchors: readonly Readonly<{ epoch: number; anchorDigest: string }>[];
+	  }>
+	| undefined
+> {
+	const vertexFacts = creatorReplayReads.get(observation.replay)?.vertexFacts;
+	const { graphVersion, currentTrust, sourceTrust, sourceBound, live, replay, active } = observation;
+	const branchSource =
+		observation.liveRegistration === undefined ? undefined : nativeBranchDisplacedSource(observation.liveRegistration);
+	const sourceDependencyTrust = sourceTrust ?? branchSource?.prepared.trust.trust;
+	const displacedSource = registration.displacedSource;
+	const activeObservation = active !== undefined;
+	const pendingIngress = active?.pendingIngress ?? [];
+	const pendingIngressBytes = active?.pendingIngressBytes;
+	const pendingCurrent = (): boolean => active !== undefined && active.pendingCurrent();
+	const activeSource = active?.activeSource;
+	const rebaseSnapshot = active?.rebaseSnapshot;
+	const rebaseCursor = active?.rebaseCursor;
+
+	if (!live()) return undefined;
+	// Initial sealing already authenticated these private, detached rows. Build
+	// the full census from them, then verify fresh native equality and currency
+	// before delivering its encoding below. No final native read is omitted.
+	const currentJournal = creatorReplayReads.get(replay)?.capturedRows;
+	if (currentJournal === undefined || !live()) return undefined;
+	const pendingRoots: unknown[] = [];
+	let wireByteCharge = 0;
+	if (active !== undefined) {
+		const index = active.index;
+		if (pendingIngress.length > registration.payload.parameters.maxPendingEntries) return undefined;
+		for (const [digest, pending] of pendingIngress) {
+			const evidence = pending.evidence;
+			const authenticated = authenticateRecoveryVertex(
+				registration.payload,
+				registration.authorization,
+				evidence.exactCanonicalPreimageBytes,
+				evidence.signature,
+				vertexFacts
+			);
+			if (
+				authenticated === undefined ||
+				authenticated.digest !== digest ||
+				authenticated.digest !== evidence.authenticated.digest ||
+				!hasBoundedDependencies(registration.payload, authenticated) ||
+				active.registration.index.has(digest) ||
+				!NumberIsSafeInteger(pending.pendingByteCharge) ||
+				pending.pendingByteCharge <= 0 ||
+				V3Envelope.encode({
+					canonicalPreimage: evidence.exactCanonicalPreimageBytes,
+					signature: evidence.signature,
+				}).finish().byteLength !== pending.pendingByteCharge
+			)
+				return undefined;
+			const missingParents = authenticated.vertex.dependencies.filter((dependency) => !index.has(dependency));
+			if (missingParents.length === 0 && active.enteredReceivedDigest === undefined) return undefined;
+			wireByteCharge += pending.pendingByteCharge;
+			if (!NumberIsSafeInteger(wireByteCharge) || wireByteCharge > registration.payload.parameters.maxPendingBytes)
+				return undefined;
+			pendingRoots.push({
+				dependencyKind: "authenticated-unadmitted-pending-ingress",
+				digest,
+				exactCanonicalPreimageBytes: evidence.exactCanonicalPreimageBytes,
+				signature: evidence.signature,
+				wireByteCharge: pending.pendingByteCharge,
+				missingParents,
+				scope: liveJournalScope(registration.payload),
+			});
+		}
+		if (wireByteCharge !== pendingIngressBytes || !pendingCurrent()) return undefined;
+	}
+	if (activeSource !== undefined) {
+		const selectedStore =
+			activeSource.row.scope.objectId === registration.displacedSource?.prepared.provenance.objectId
+				? (registration.displacedSource.issuanceStore ?? registration.issuanceStore)
+				: registration.issuanceStore;
+		const actual = await authenticatedOutboxRow(
+			registration,
+			{
+				commit: await selectedStore.readIssued(activeSource.row.scope, activeSource.row.authorSequence),
+				publishState: activeSource.row.publishState,
+			},
+			selectedStore,
+			activeSource.row.scope,
+			undefined, vertexFacts
+		);
+		if (
+			actual === undefined ||
+			!validRebaseRow(registration, actual) ||
+			!matchingOutboxRows(actual.row, activeSource.row) ||
+			actual.authenticated.digest !== activeSource.authenticated.digest
+		)
+			return undefined;
+	}
+	const rows: unknown[] = [];
+	observation.stage = "object-issuance-census";
+	const maintenance = durableIssuancePruningMaintenanceForStore(registration.issuanceStore);
+	if (maintenance?.readBoundedRecoveryCensus === undefined) return undefined;
+	const objectCensus = await maintenance.readBoundedRecoveryCensus({
+		objectId: registration.payload.provenance.objectId,
+		limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes },
+	});
+	if (!live()) return undefined;
+	if (capturedInputs !== undefined && heldIssuance !== undefined) {
+		const producer = maintenance.readBoundedRecoveryCensus;
+		const method = ObjectGetOwnPropertyDescriptor(producer, "captureCurrentProbe");
+		if (ObjectIsFrozen(producer) && method !== undefined && "value" in method && typeof method.value === "function")
+			capturedInputs.nativeCurrent = producer.captureCurrentProbe?.call(producer, {
+				objectId: registration.payload.provenance.objectId,
+				limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes},
+			}, objectCensus);
+	}
+	const nativeRows = objectCensus.rows;
+	const scopes = new Map<string, DurableIssueScope>();
+	const historicalScopes = new Set<string>();
+	const plans = new Map<string, SettlementPlan | null>();
+	const reusablePlanAuthors = new Set<string>();
+	let retainedPlanBytes = 0;
+	const heldPlans = heldIssuance?.store === registration.issuanceStore &&
+		heldIssuance.objectId === registration.payload.provenance.objectId ? heldIssuance : undefined;
+	const readPlan = async (scope: DurableIssueScope): Promise<SettlementPlan | null> => {
+		if (heldPlans === undefined || scope.objectId !== heldPlans.objectId)
+			return registration.issuanceStore.readSettlementPlan(scope);
+		if (!heldPlans.available()) throw new TypeError("creator held issuance census is unavailable");
+		if (reusablePlanAuthors.has(scope.author)) {
+			const prior = plans.get(scope.author);
+			return prior == null ? null : cloneSettlementPlan(prior);
+		}
+		const raw = await registration.issuanceStore.readSettlementPlan(scope);
+		if (!heldPlans.available()) throw new TypeError("creator held issuance census is unavailable");
+		const captured = raw === null ? null : copySettlementPlan(raw, scope);
+		if (captured === undefined) return raw;
+		// Populating the existing active plans map must not bypass its original
+		// first-author entry bound. An oversized plan follows the original read
+		// and refusal path instead of becoming reusable data.
+		if (activeObservation && captured !== null &&
+			captured.entries.length > registration.payload.parameters.maxEpochVertices) return raw;
+		const native = nativeRows.plans.find(plan => sameScope(plan.scope, scope)) ?? null;
+		let bytes: Uint8Array;
+		try {
+			bytes = encodeCanonical(captured);
+			if (!sameBytes(bytes, encodeCanonical(native))) return raw;
+		} catch { return raw; }
+		// This existing per-census plans map owns detached data only. Refusal,
+		// saturation, another scope or absence of genuine same-holder custody
+		// keeps the original fresh read. Every final per-author read below remains.
+		if (reusablePlanAuthors.size >= ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+			bytes.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes - retainedPlanBytes) return raw;
+		plans.set(scope.author, captured);
+		reusablePlanAuthors.add(scope.author);
+		retainedPlanBytes += bytes.byteLength;
+		return captured === null ? null : cloneSettlementPlan(captured);
+	};
+	const unsettled = new Map<string, Map<number, ClassifiedRebaseRow>>();
+	const unsettledSources: unknown[] = [];
+	const visibleNative = new Map<string, Set<number>>();
+	const anchors = new Map<number, string>();
+	anchors.set(currentTrust.currentEpoch, currentTrust.currentAnchorDigest);
+	if (sourceTrust !== undefined) anchors.set(sourceTrust.currentEpoch, sourceTrust.currentAnchorDigest);
+	let afterKey: DurableOutboxPageInput["afterKey"] = null;
+	let scanned = 0;
+	for (;;) {
+		observation.stage = "outbox-page";
+		const page = await registration.issuanceStore.readOutboxPage({ afterKey, limit: 64 });
+		if (capturedInputs !== undefined && !capturedInputs.overCapacity) try {
+			const bytes = encodeCanonical(page);
+			if (bytes.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes - capturedInputs.retainedBytes) throw new TypeError("held census view is over capacity");
+			capturedInputs.pages.push({afterKey: afterKey == null ? afterKey : [...afterKey] as typeof afterKey, bytes});
+			capturedInputs.retainedBytes += bytes.byteLength;
+		} catch {
+			// An unsupported/oversized raw facade spelling only disables reuse.
+			// The complete original census below still decides support/refusal.
+			capturedInputs.overCapacity = true; capturedInputs.pages.length = 0; capturedInputs.retainedBytes = 0;
+		}
+		if (page.length > 64) return undefined;
+		for (const raw of page) {
+			if (++scanned > registration.payload.parameters.maxEpochVertices * 3) return undefined;
+			const scope = raw.commit.issuedRecord.scope;
+			const row = outboxRowSnapshot(raw, scope);
+			if (row === undefined) return undefined;
+			const nextKey = [scope.objectId, scope.author, row.authorSequence] as const;
+			if (
+				afterKey !== null &&
+				afterKey !== undefined &&
+				(nextKey[0] < afterKey[0] ||
+					(nextKey[0] === afterKey[0] &&
+						(nextKey[1] < afterKey[1] || (nextKey[1] === afterKey[1] && nextKey[2] <= afterKey[2]))))
+			)
+				return undefined;
+			afterKey = nextKey;
+			if (scope.objectId !== registration.payload.provenance.objectId) continue;
+			const nativeIssued = nativeRows.issued.find(
+				(value) => sameScope(value, scope) && value.authorSequence === row.authorSequence
+			);
+			let paired: SnapshottedOutboxRow | undefined;
+			if (heldPlans !== undefined) {
+				if (!heldPlans.available()) throw new TypeError("creator held issuance census is unavailable");
+				// This exact close hold acquired the real native exclusion and just
+				// read the COMPLETE object census above. Pair from that fresh capture
+				// rather than asking the same held store to reconstruct another full
+				// three-envelope commit per row. This is detached DATA, not authority:
+				// all classifications below and final direct reads remain unchanged.
+				const envelope = nativeIssued === undefined ? undefined : envelopeSnapshot({
+					canonicalPreimageBytes: nativeIssued.canonicalPreimageBytes,
+					digest: nativeIssued.digest,
+					signature: nativeIssued.signature,
+				});
+				paired = envelope === undefined ? undefined : ObjectFreeze({
+					...envelope, scope: ObjectFreeze({...scope}),
+					authorSequence: row.authorSequence, publishState: row.publishState,
+				});
+			} else {
+				const issued = await registration.issuanceStore.readIssued(scope, row.authorSequence);
+				paired = outboxRowSnapshot({ commit: issued, publishState: row.publishState }, scope);
+			}
+			if (paired === undefined || !matchingOutboxRows(row, paired)) return undefined;
+			const nativeOutbox = nativeRows.outbox.find(
+				(value) => sameScope(value, scope) && value.authorSequence === row.authorSequence
+			);
+			if (
+				nativeIssued === undefined ||
+				!sameBytes(nativeIssued.canonicalPreimageBytes, row.canonicalPreimageBytes) ||
+				!sameBytes(nativeIssued.digest, row.digest) ||
+				!sameBytes(nativeIssued.signature, row.signature) ||
+				nativeOutbox === undefined ||
+				!sameBytes(nativeOutbox.digest, row.digest) ||
+				nativeOutbox.publishState !== row.publishState
+			)
+				return undefined;
+			let visible = visibleNative.get(scope.author);
+			if (visible === undefined) visibleNative.set(scope.author, (visible = new Set()));
+			visible.add(row.authorSequence);
+			let classified = classifyPlaneVertex(
+				registration.payload,
+				registration.authorization,
+				displacedSource,
+				registration.historicalIssuance,
+				registration.payload.trust.trust.genesisAnchorDigest,
+				registration.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+				row.canonicalPreimageBytes,
+				row.signature,
+				row.digest,
+				scope.author,
+				row.authorSequence,
+				undefined, vertexFacts
+			);
+			// The exact pinned bootstrap is a protected dependency, not displaced
+			// application work. Use the same signed bootstrap owner as the hidden
+			// native census; recognizing it grants no replacement authority.
+			const pinnedBootstrapBytes = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+			if (sourceBound && classified?.kind === "displaced" && pinnedBootstrapBytes !== undefined) {
+				const pinned = authenticatedPinnedGenesisOutboxRow(
+					row,
+					scope,
+					registration.payload,
+					registration.payload.trust.trust.genesisAnchorDigest,
+					pinnedBootstrapBytes,
+					vertexFacts
+				);
+				if (pinned !== undefined) classified = ObjectFreeze({ authenticated: pinned, kind: "pinned-genesis" as const });
+			}
+			if (
+				sourceBound &&
+				branchSource !== undefined &&
+				classified?.kind === "displaced" &&
+				branchSource.exactCanonicalPinnedGenesisBootstrapOperationBytes !== undefined
+			) {
+				const pinned = authenticatedPinnedGenesisOutboxRow(
+					row,
+					scope,
+					branchSource.prepared,
+					branchSource.pinnedGenesisAnchorDigest,
+					branchSource.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+					vertexFacts
+				);
+				if (pinned !== undefined) classified = ObjectFreeze({ authenticated: pinned, kind: "pinned-genesis" as const });
+			}
+			observation.stage = `outbox-classification:${row.authorSequence}:${classified?.kind ?? "unknown"}:${row.publishState}`;
+			// Published displaced application rows need the current signed terminal
+			// frontier. An exact adjacent author fence has no application intents:
+			// it remains a retained source dependency, never "settled" by fiat.
+			let openSource = false;
+			let inheritedComplete = false;
+			const inheritancePlan = await readPlan(scope);
+			const inheritedEntry = inheritancePlan?.entries.find(
+				(entry) =>
+					entry.sourceSequence === row.authorSequence &&
+					entry.disposition === "inherited" &&
+					entry.inheritance?.sourceObjectId === row.scope.objectId &&
+					sameBytes(entry.sourceDigest, row.digest)
+			);
+			if (inheritedEntry !== undefined && classified?.kind !== "current") {
+				if (capturedInputs !== undefined) capturedInputs.applicationPolicyRead = true;
+				const selected = classified === undefined ? undefined : ObjectFreeze({ ...classified, row });
+				if (
+					selected === undefined ||
+					!authenticatedInheritedSettlement(registration, inheritedEntry, selected, currentJournal)
+				)
+					return undefined;
+				inheritedComplete = true;
+			}
+			if (activeObservation) {
+				if (!plans.has(scope.author)) {
+					const rawPlan = await readPlan(scope);
+					const plan = rawPlan === null ? null : copySettlementPlan(rawPlan, scope);
+					if (
+						plan === undefined ||
+						(plan !== null && plan.entries.length > registration.payload.parameters.maxEpochVertices)
+					)
+						return undefined;
+					plans.set(scope.author, plan);
+				}
+				const entry = plans.get(scope.author)?.entries.find((entry) => entry.sourceSequence === row.authorSequence);
+				openSource =
+					entry !== undefined &&
+					entry.disposition !== "expire" &&
+					entry.disposition !== "inherited" &&
+					entry.replacementSequence === null;
+				if (openSource) {
+					const source = classified === undefined ? undefined : ObjectFreeze({ ...classified, row });
+					if (
+						source === undefined ||
+						source.kind === "current" ||
+						!validRebaseRow(registration, source) ||
+						entry === undefined ||
+						!sameBytes(entry.sourceDigest, row.digest)
+					)
+						return undefined;
+					let sources = unsettled.get(scope.author);
+					if (sources === undefined) unsettled.set(scope.author, (sources = new Map()));
+					sources.set(row.authorSequence, source);
+				}
+			}
+			// Terminal membership inherits effects, not publication acknowledgement.
+			// Retain and charge the exact native pending row without reissuing it.
+			const terminalFrontier = settlementFrontierFromHistory(registration.historicalIssuance);
+			const terminalCoveredPending =
+				classified?.kind === "displaced" &&
+				row.publishState === "pending" &&
+				scope.author === registration.issuanceScope.author &&
+				terminalFrontier?.terminalThrough !== null &&
+				terminalFrontier?.terminalThrough !== undefined &&
+				row.authorSequence <= terminalFrontier.terminalThrough &&
+				authenticatedSettlementSourceRow(
+					registration.payload,
+					registration.authorization,
+					row.canonicalPreimageBytes,
+					row.signature,
+					row.digest,
+					scope.author,
+					row.authorSequence,
+					terminalFrontier,
+					vertexFacts
+				)?.digest === classified.authenticated.digest;
+			if (
+				classified === undefined ||
+				(classified.kind !== "current" &&
+					row.publishState !== "published" &&
+					!openSource &&
+					!inheritedComplete &&
+					!terminalCoveredPending)
+			)
+				return undefined;
+			let dependencyKind: CreatorIssuanceCensusDependencyKind = openSource
+				? "unsettled-issuance"
+				: classified.kind === "pinned-genesis"
+					? "pinned-genesis"
+					: classified.kind === "current"
+						? "current-issuance"
+						: "signed-settled-issuance";
+			if (classified.kind === "displaced" && !openSource) {
+				let completedBranch = inheritedComplete;
+				if (!completedBranch && sourceBound && observation.liveRegistration !== undefined) {
+					completedBranch = await authenticatedCompletedNativeReplacementSource(
+						observation.liveRegistration,
+						ObjectFreeze({ ...classified, row }),
+						inheritancePlan,
+						vertexFacts
+					);
+				}
+				if (sourceBound && branchSource !== undefined && observation.liveRegistration !== undefined) {
+					const plan = copySettlementPlan(await readPlan(scope), scope);
+					const entry = plan?.entries.find((entry) => entry.sourceSequence === row.authorSequence);
+					if (
+						entry !== undefined &&
+						sameBytes(entry.sourceDigest, row.digest) &&
+						plan?.fenceSequence !== null &&
+						plan?.fenceSequence !== undefined &&
+						entry.disposition !== "manual-review"
+					) {
+						if (entry.disposition === "expire") completedBranch = true;
+						else if (entry.replacementSequence !== null) {
+							const chunks = entry.replacementProgress?.chunks ?? [{ replacementSequence: entry.replacementSequence }];
+							let fromIntent = 0;
+							completedBranch = chunks.length > 0;
+							for (const chunk of chunks) {
+								const raw = await registration.issuanceStore.readIssued(scope, chunk.replacementSequence);
+								const paired = outboxRowSnapshot({ commit: raw, publishState: "published" }, scope);
+								const candidate =
+									paired === undefined
+										? undefined
+										: authenticateRecoveryVertex(
+												registration.payload,
+												registration.authorization,
+												paired.canonicalPreimageBytes,
+												paired.signature,
+												vertexFacts
+											);
+								const operation = candidate?.vertex.operation;
+								const operations =
+									operation === undefined || candidate === undefined
+										? undefined
+										: (applicationBatchEntries(registration.payload, operation) ?? [
+												{
+													operation: operation as Readonly<Record<string, unknown>>,
+													logicalTime: candidate.admitted.logicalTime,
+												},
+											]);
+								if (
+									candidate === undefined ||
+									candidate.authorSequence !== chunk.replacementSequence ||
+									candidate.author !== scope.author ||
+									paired === undefined ||
+									candidate.digest !== lowerHexDigest(paired.digest) ||
+									operations === undefined
+								)
+									return undefined;
+								const effect =
+									entry.replacementProgress === undefined
+										? { kind: "replacement" as const, sourceSequence: row.authorSequence }
+										: {
+												kind: "replacement" as const,
+												sourceSequence: row.authorSequence,
+												fromIntent,
+												throughIntent:
+													"throughIntent" in chunk ? chunk.throughIntent : entry.replacementProgress.intentCount,
+												intentDigest: entry.replacementProgress.intentDigest,
+											};
+								const derived = deriveOwnedReplacement(
+									observation.liveRegistration,
+									{ ...classified, row },
+									{ operations, planEffect: effect }
+								);
+								if (
+									derived.disposition !== entry.disposition ||
+									!sameBytes(
+										encodeCanonical(entry.transformRefusal?.proposedIntentDigest ?? null),
+										encodeCanonical(derived.transformRefusal?.proposedIntentDigest ?? null)
+									)
+								)
+									return undefined;
+								fromIntent += operations.length;
+							}
+						}
+					}
+				}
+				if (completedBranch) dependencyKind = "source-bound-completed-issuance";
+				const adjacent =
+					sourceBound && displacedSource !== undefined && sourceDependencyTrust !== undefined
+						? authenticateRecoveryVertex(
+								displacedSource.prepared,
+								displacedSource.authorization,
+								row.canonicalPreimageBytes,
+								row.signature,
+								vertexFacts
+							)
+						: undefined;
+				const fence =
+					adjacent === undefined
+						? undefined
+						: snapshotClosedRecord(adjacent.vertex.operation, ["action", "fenceSequence", "version"]);
+				const retainedAdjacentFence =
+					adjacent !== undefined &&
+					sourceDependencyTrust !== undefined &&
+					settlementProfileFor(currentTrust.profileId) === "v1" &&
+					scope.author === registration.issuanceScope.author &&
+					adjacent.author === scope.author &&
+					adjacent.authorSequence === row.authorSequence &&
+					adjacent.digest === classified.authenticated.digest &&
+					adjacent.digest === lowerHexDigest(row.digest) &&
+					adjacent.vertex.epoch === sourceDependencyTrust.currentEpoch &&
+					adjacent.vertex.anchor === sourceDependencyTrust.currentAnchorDigest &&
+					fence?.action === AUTHOR_FENCE_ACTION &&
+					fence.version === 1 &&
+					fence.fenceSequence === row.authorSequence;
+				const historicalFence = snapshotClosedRecord(classified.authenticated.vertex.operation, [
+					"action",
+					"fenceSequence",
+					"version",
+				]);
+				// No application grant: retain the exact paired native signed no-op.
+				// Its anchor is included below and authenticated by the original held
+				// signing/lineage dependency owner with the whole current floor.
+				const retainedHistoricalFence =
+					sourceBound &&
+					scope.author === registration.issuanceScope.author &&
+					settlementProfileFor(currentTrust.profileId) === "v1" &&
+					classified.authenticated.author === scope.author &&
+					classified.authenticated.authorSequence === row.authorSequence &&
+					classified.authenticated.digest === lowerHexDigest(row.digest) &&
+					classified.authenticated.vertex.epoch < currentTrust.currentEpoch &&
+					historicalFence?.action === AUTHOR_FENCE_ACTION &&
+					historicalFence.version === 1 &&
+					historicalFence.fenceSequence === row.authorSequence;
+				if (retainedAdjacentFence || retainedHistoricalFence)
+					dependencyKind = branchSource === undefined ? "adjacent-author-fence" : "separate-source-author-fence";
+				const closedCovered =
+					currentTrust.profileId === "creator-trusted-v1"
+						? authenticatedCoveredHistoricalOutboxRow(
+								row,
+								scope,
+								registration.payload,
+								registration.historicalIssuance,
+								"closed",
+								vertexFacts
+							)
+						: undefined;
+				const retainedClosedIssuance =
+					closedCovered !== undefined && closedCovered.digest === classified.authenticated.digest;
+				if (retainedClosedIssuance) dependencyKind = "authenticated-closed-issuance";
+				if (!retainedAdjacentFence && !retainedHistoricalFence && !retainedClosedIssuance && !completedBranch) {
+					const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+					if (
+						scope.author !== registration.issuanceScope.author ||
+						frontier?.terminalThrough === null ||
+						frontier?.terminalThrough === undefined ||
+						row.authorSequence > frontier.terminalThrough
+					)
+						return undefined;
+					const covered = authenticatedSettlementSourceRow(
+						registration.payload,
+						registration.authorization,
+						row.canonicalPreimageBytes,
+						row.signature,
+						row.digest,
+						scope.author,
+						row.authorSequence,
+						frontier,
+						vertexFacts
+					);
+					if (covered === undefined || covered.digest !== classified.authenticated.digest) return undefined;
+				}
+			}
+			const vertex = classified.authenticated.vertex;
+			if (typeof vertex.anchor !== "string") return undefined;
+			// Use the SAME authenticated terminal coverage as the hidden-native
+			// facade path. A covered local pair stays in full native PRE, but is no
+			// longer an operation requiring replay at its historical anchor.
+			const coveredFrontier = settlementFrontierFromHistory(registration.historicalIssuance);
+			const coveredClass = coveredFrontier === undefined ? "current" : settlementOwnRowClass(vertex.epoch,
+				coveredFrontier.currentEpoch, row.authorSequence, coveredFrontier.admissionEpoch, coveredFrontier.terminalThrough);
+			const terminallyCovered = sourceBound && !openSource && row.publishState === "published" &&
+				scope.author === registration.issuanceScope.author && vertex.epoch <= currentTrust.currentEpoch - 2 &&
+				(coveredClass === "terminal" || coveredClass === "old-incarnation") &&
+				authenticatedSettlementSourceRow(registration.payload, registration.authorization, row.canonicalPreimageBytes,
+					row.signature, row.digest, scope.author, row.authorSequence, coveredFrontier, vertexFacts)?.digest === classified.authenticated.digest;
+			const separateSourceAnchor =
+				sourceBound &&
+				branchSource !== undefined &&
+				vertex.epoch === branchSource.prepared.provenance.epoch &&
+				vertex.anchor === branchSource.prepared.provenance.anchorDigest;
+			if (!separateSourceAnchor && !terminallyCovered) {
+				if (anchors.has(vertex.epoch) && anchors.get(vertex.epoch) !== vertex.anchor) return undefined;
+				anchors.set(vertex.epoch, vertex.anchor);
+			}
+			if (anchors.size > 7) return undefined;
+			scopes.set(scope.author, scope);
+			if (
+				classified.kind !== "current" &&
+				dependencyKind !== "pinned-genesis" &&
+				dependencyKind !== "authenticated-closed-issuance"
+			)
+				historicalScopes.add(scope.author);
+			// Authentication origin is not outstanding settlement debt. Once the
+			// ORIGINAL signed frontier terminally covers this exact published pair,
+			// preserve that positive coverage in the census instead of spelling old
+			// source rows as displaced forever. This does not prune anything: the
+			// complete native preimages remain held and charged; the retirement
+			// owner still checks replay consumers and its native protected holes.
+			rows.push(creatorIssuanceCensusFields(terminallyCovered ? "authenticated-covered-native-issuance" : dependencyKind,
+				scope, row.authorSequence, row.digest, terminallyCovered ? "covered-historical" : classified.kind));
+		}
+		if (page.length < 64) break;
+	}
+	for (const native of nativeRows.outbox) {
+		if (visibleNative.get(native.author)?.has(native.authorSequence)) continue;
+		// Only the original verified facade may hide already-covered rows. Its
+		// ordinary page path above retains the original historical-count bound.
+		const historical = registration.historicalIssuance;
+		if (historical?.filteredIssuanceStore !== registration.issuanceStore) return undefined;
+		const identity = resolveVerifiedCreatorHistoricalIssuance(historical.capability);
+		if (identity === undefined || identity.author !== native.author || identity.objectId !== native.objectId)
+			return undefined;
+		const issued = nativeRows.issued.find(
+			(row) => row.author === native.author && row.authorSequence === native.authorSequence
+		);
+		if (issued === undefined || native.publishState !== "published") return undefined;
+		const scope = { objectId: native.objectId, author: native.author };
+		const row: SnapshottedOutboxRow = {
+			scope,
+			authorSequence: native.authorSequence,
+			canonicalPreimageBytes: issued.canonicalPreimageBytes,
+			digest: issued.digest,
+			signature: issued.signature,
+			publishState: native.publishState,
+		};
+		const bootstrapBytes = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		// Hidden native rows use the same exact-byte facts as visible rows.
+		// Coverage, capability and current native correspondence remain fresh.
+		const pinned =
+			bootstrapBytes === undefined
+				? undefined
+				: authenticatedPinnedGenesisOutboxRow(
+						row,
+						scope,
+						registration.payload,
+						currentTrust.genesisAnchorDigest,
+						bootstrapBytes,
+						vertexFacts
+					);
+		const covered = authenticatedCoveredHistoricalOutboxRow(
+			row, scope, registration.payload, historical, "historical", vertexFacts
+		);
+		const frontier = settlementFrontierFromHistory(historical);
+		const settled =
+			frontier === undefined
+				? undefined
+				: authenticatedSettlementSourceRow(
+						registration.payload,
+						registration.authorization,
+						row.canonicalPreimageBytes,
+						row.signature,
+						row.digest,
+						scope.author,
+						row.authorSequence,
+						frontier,
+						vertexFacts
+					);
+		const authenticated = pinned ?? covered ?? settled;
+		if (
+			authenticated === undefined ||
+			authenticated.author !== native.author ||
+			authenticated.authorSequence !== native.authorSequence ||
+			authenticated.digest !== lowerHexDigest(native.digest) ||
+			!countHistoricalIssuanceRow(historical, native.authorSequence)
+		)
+			return undefined;
+		scopes.set(scope.author, scope);
+		rows.push(
+			creatorIssuanceCensusFields(
+				"authenticated-covered-native-issuance",
+				scope,
+				native.authorSequence,
+				native.digest,
+				pinned !== undefined
+					? "pinned-genesis"
+					: covered !== undefined
+						? "covered-historical"
+						: "filtered-settlement-source"
+			)
+		);
+	}
+	for (const lineage of nativeRows.lineages) {
+		if (!scopes.has(lineage.author) && lineage.author !== registration.issuanceScope.author) {
+			// A retained, fully-pruned known author is not an absent source. Its
+			// native watermark still needs the original authenticated closed frontier.
+			const historical =
+				registration.historicalIssuance === undefined
+					? undefined
+					: resolveVerifiedCreatorHistoricalIssuance(registration.historicalIssuance.capability);
+			const through = lineage.prunedThroughAuthorSequence;
+			if (
+				historical === undefined ||
+				historical.objectId !== lineage.objectId ||
+				historical.author !== lineage.author ||
+				historical.successorEpoch !== currentTrust.currentEpoch ||
+				historical.successorAnchorDigest !== currentTrust.currentAnchorDigest ||
+				historical.admittedAuthorSequence === null ||
+				through === null ||
+				through > historical.admittedAuthorSequence ||
+				lineage.next + Number(lineage.exhausted) !== through + 1
+			)
+				return undefined;
+		}
+		scopes.set(lineage.author, { objectId: lineage.objectId, author: lineage.author });
+	}
+	scopes.set(registration.issuanceScope.author, registration.issuanceScope);
+	const debt: unknown[] = [];
+	for (const scope of [...scopes.values()].sort((a, b) => (a.author < b.author ? -1 : a.author > b.author ? 1 : 0))) {
+		observation.stage = `settlement:${scope.author}`;
+		const lineage = await registration.issuanceStore.readLineage(scope);
+		const rawPlan = await registration.issuanceStore.readSettlementPlan(scope);
+		const plan = rawPlan === null ? null : copySettlementPlan(rawPlan, scope);
+		if (
+			(activeObservation || reusablePlanAuthors.has(scope.author)) &&
+			plans.has(scope.author) &&
+			(plan === undefined || !sameBytes(encodeCanonical(plans.get(scope.author)), encodeCanonical(plan)))
+		)
+			return undefined;
+		observation.stage = `settlement:${plan === null ? "none" : plan === undefined ? "malformed" : "present"}:${Number(historicalScopes.has(scope.author))}`;
+		if (
+			plan === undefined ||
+			(plan === null
+				? historicalScopes.has(scope.author)
+				: !activeObservation && !settlementPlanPermitsAuthenticatedPruning(plan))
+		) {
+			observation.stage = `settlement-plan-eligibility:${Number(activeObservation)}:${Number(plan?.fenceSequence !== null)}:${Number(plan !== undefined && settlementPlanPermitsAuthenticatedPruning(plan))}`;
+			return undefined;
+		}
+		if (
+			activeSource !== undefined &&
+			scope.author === activeSource.row.scope.author &&
+			settlementProfileFor(currentTrust.profileId) === "v1"
+		) {
+			const entry = plan?.entries.find((row) => row.sourceSequence === activeSource.row.authorSequence);
+			if (
+				entry === undefined ||
+				!sameBytes(entry.sourceDigest, activeSource.row.digest) ||
+				entry.replacementSequence !== null
+			)
+				return undefined;
+		}
+		if (activeObservation && plan !== null) {
+			if (plan.entries.length > registration.payload.parameters.maxEpochVertices) return undefined;
+			for (const entry of plan.entries) {
+				if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
+					continue;
+				const source = unsettled.get(scope.author)?.get(entry.sourceSequence);
+				if (
+					entry.sourceObjectId === undefined
+						? source === undefined || !sameBytes(source.row.digest, entry.sourceDigest)
+						: entry.sourceObjectId !== registration.displacedSource?.prepared.provenance.objectId
+				)
+					return undefined;
+				for (const chunk of entry.replacementProgress?.chunks ?? []) {
+					const issued = await registration.issuanceStore.readIssued(scope, chunk.replacementSequence);
+					const rows = await registration.issuanceStore.readOutboxPage({
+						scope,
+						afterKey: [scope.objectId, scope.author, chunk.replacementSequence - 1],
+						limit: 1,
+					});
+					const paired =
+						rows.length === 1
+							? await authenticatedOutboxRow(registration, rows[0], registration.issuanceStore, scope, undefined, vertexFacts)
+							: undefined;
+					const nativeIssued =
+						issued === null || paired === undefined
+							? undefined
+							: outboxRowSnapshot({ commit: issued, publishState: paired.row.publishState }, scope);
+					if (
+						issued === null ||
+						paired === undefined ||
+						paired.kind !== "current" ||
+						paired.row.authorSequence !== chunk.replacementSequence ||
+						nativeIssued === undefined ||
+						!matchingOutboxRows(paired.row, nativeIssued)
+					)
+						return undefined;
+				}
+				unsettledSources.push({
+					scope,
+					...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
+					sourceSequence: entry.sourceSequence,
+					sourceDigest: entry.sourceDigest,
+					disposition: entry.disposition,
+					replacementProgress: entry.replacementProgress ?? null,
+				});
+			}
+		}
+		const nativeLineage = nativeRows.lineages.find((value) => value.author === scope.author);
+		const nativePlan = nativeRows.plans.find((value) => value.scope.author === scope.author) ?? null;
+		if (
+			(nativeLineage === undefined
+				? lineage.next !== 0 || lineage.exhausted
+				: lineage.next !== nativeLineage.next || lineage.exhausted !== nativeLineage.exhausted) ||
+			plan === undefined ||
+			!sameBytes(encodeCanonical(plan), encodeCanonical(nativePlan))
+		) {
+			observation.stage = `settlement-native-postimage:${Number(nativeLineage !== undefined)}:${Number(plan !== undefined && sameBytes(encodeCanonical(plan), encodeCanonical(nativePlan)))}`;
+			return undefined;
+		}
+		debt.push({
+			scope,
+			lineageIndex: nativeLineage === undefined ? -1 : nativeRows.lineages.indexOf(nativeLineage),
+			planIndex: nativePlan === null ? -1 : nativeRows.plans.indexOf(nativePlan),
+		});
+	}
+	const dependencyAnchors = ObjectFreeze(
+		[...anchors]
+			.sort(([left], [right]) => left - right)
+			.map(([epoch, anchorDigest]) => ObjectFreeze({ epoch, anchorDigest }))
+	);
+	const journalCensusRows = creatorJournalCensusRows(currentJournal, nativeRows, currentTrust.objectId);
+	if (journalCensusRows === undefined) return undefined;
+	const preparedTargetFloor =
+		observation.liveRegistration === undefined
+			? undefined
+			: preparedMigrationTargetFloors.get(observation.liveRegistration);
+	const preparedTargetFloorFrame = await preparedTargetFloor?.read();
+	const exactCanonicalCensusBytes =
+		live() && (await replay.verify())
+			? encodeCanonical({
+					...creatorRuntimeCensusFields(
+						{
+							dependencyKind: "current-journal",
+							scope: liveJournalScope(registration.payload),
+							rows: journalCensusRows,
+						},
+						rows,
+						debt,
+						graphVersion,
+						dependencyAnchors
+					),
+					// Original native signed material is carried once; classification and
+					// debt entries reference that same image, not duplicate payload reducers.
+					nativeIssuance: {
+						rows: nativeRows,
+						image: objectCensus.image,
+						...(objectCensus.control === undefined ? {} : { control: objectCensus.control }),
+					},
+					...(preparedTargetFloorFrame === undefined ? {} : { preparedMigrationTargetFloor: preparedTargetFloorFrame }),
+					...(!activeObservation
+						? {}
+						: creatorRuntimeActiveCensusFields({
+								pendingRoots,
+								wireByteCharge,
+								...(activeSource === undefined
+									? {}
+									: {
+											activeSource: {
+												sourceSequence: activeSource.row.authorSequence,
+												sourceDigest: activeSource.row.digest,
+											},
+										}),
+								unsettledSources,
+								cursor: rebaseCursor ?? null,
+								cacheSourceSequences: rebaseSnapshot?.map((row) => row.row.authorSequence) ?? [],
+								epoch: currentTrust.currentEpoch,
+							})),
+				})
+			: undefined;
+	return exactCanonicalCensusBytes === undefined
+		? undefined
+		: ObjectFreeze({ exactCanonicalCensusBytes, dependencyAnchors });
+}
+
+function nativeBranchDisplacedSource(registration: V3PlaneRegistration): V3DisplacedSourceAuthority | undefined {
+	const source = registration.displacedSource,
+		current = registration.payload.trust.trust,
+		trust = source?.prepared.trust.trust;
+	return source !== undefined &&
+		source.activationVertexDigest === undefined &&
+		trust?.objectId === current.objectId &&
+		trust.currentEpoch === 0 &&
+		(current.currentEpoch === 0 || creatorRetainedNativeBranches.has(source)) &&
+		trust.genesisAnchorDigest !== current.genesisAnchorDigest &&
+		source.issuanceStore === registration.issuanceStore &&
+		source.liveJournalStore !== undefined &&
+		source.liveJournalStore !== registration.liveJournalStore &&
+		source.prepared.input.store !== registration.payload.input.store &&
+		source.prepared.input.settlementFloor !== undefined
+		? source
+		: undefined;
+}
+
+/** One runtime tuple/predicate for complete census and runtime-only custody. */
+function captureCreatorRecoveryRuntime(registration: V3PlaneRegistration, activeObservation: boolean,
+	drainingReceived: boolean, terminalIssuanceObservation: boolean, quiescentBoundary?: () => boolean) {
+	const graphVersion = registration.graphVersion;
+	const index = registration.index;
+	const displacedSource = registration.displacedSource;
+	const rebaseSnapshot = registration.rebaseSnapshot;
+	const rebaseCursor = registration.rebaseCursor;
+	const pendingIngress = [...registration.pendingIngress.entries()].sort(([left], [right]) =>
+		left < right ? -1 : left > right ? 1 : 0);
+	const pendingIngressBytes = registration.pendingIngressBytes;
+	const pendingCurrent = (): boolean => registration.pendingIngress.size === pendingIngress.length &&
+		registration.pendingIngressBytes === pendingIngressBytes &&
+		pendingIngress.every(([digest, pending]) => registration.pendingIngress.get(digest) === pending);
+	const currentTrust = registration.payload.trust.trust;
+	const displacedTrust = displacedSource?.prepared.trust.trust;
+	const nativeBranchSource = nativeBranchDisplacedSource(registration);
+	const migrationSource = displacedSource?.activationVertexDigest !== undefined && displacedTrust?.objectId !== currentTrust.objectId
+		? displacedSource : undefined;
+	const sourceTrust = migrationSource === undefined && nativeBranchSource === undefined ? displacedTrust : undefined;
+	const sourceBound = displacedSource === undefined ||
+		(nativeBranchSource !== undefined && displacedTrust?.profileId === currentTrust.profileId &&
+			displacedTrust.currentAnchorDigest === nativeBranchSource.prepared.provenance.anchorDigest &&
+			nativeBranchSource.issuanceScope !== undefined && sameScope(nativeBranchSource.issuanceScope, registration.issuanceScope)) ||
+		(migrationSource !== undefined && displacedTrust !== undefined &&
+			displacedTrust.currentEpoch === migrationSource.prepared.provenance.epoch &&
+			displacedTrust.currentAnchorDigest === migrationSource.prepared.provenance.anchorDigest &&
+			migrationSource.issuanceScope?.objectId === displacedTrust.objectId &&
+			migrationSource.issuanceStore !== undefined && migrationSource.liveJournalStore !== undefined) ||
+		(sourceTrust !== undefined && sourceTrust.objectId === currentTrust.objectId &&
+			sourceTrust.profileId === currentTrust.profileId && sourceTrust.genesisAnchorDigest === currentTrust.genesisAnchorDigest &&
+			sourceTrust.currentEpoch === currentTrust.currentEpoch - 1 &&
+			sourceTrust.currentEpoch === displacedSource.prepared.provenance.epoch &&
+			sourceTrust.currentAnchorDigest === displacedSource.prepared.provenance.anchorDigest &&
+			displacedSource.prepared.input.store === registration.payload.input.store &&
+			(displacedSource.issuanceStore === undefined || displacedSource.issuanceStore === creatorOriginalIssuanceStore(registration)) &&
+			(displacedSource.liveJournalStore === undefined || displacedSource.liveJournalStore === registration.liveJournalStore));
+	// Received close and active observation have their original distinct folded gate.
+	const live = (receivedClose = false): boolean => currentRegistration(registration) &&
+		(!activeObservation ? registration.blueprintClosing &&
+			(quiescentBoundary !== undefined ? !registration.blueprintFolded && quiescentBoundary() :
+				receivedClose ? !registration.blueprintFolded && registration.receivedTransition === true : registration.blueprintFolded)
+			: !registration.blueprintFolded && !registration.blueprintClosing) &&
+		(registration.terminalState === "active" || (terminalIssuanceObservation && registration.terminalState === "transition" &&
+			registration.terminalPublicationEntered)) && registration.graphVersion === graphVersion && registration.index === index &&
+		(!activeObservation ? registration.pendingIngress.size === 0 && registration.pendingIngressBytes === 0 : pendingCurrent()) &&
+		(drainingReceived ? registration.drainingPendingIngress : !registration.drainingPendingIngress) &&
+		!registration.retainedBootstrapHold && sourceBound && registration.displacedSource === displacedSource &&
+		registration.rebaseSnapshot === rebaseSnapshot && (activeObservation || rebaseSnapshot === undefined || rebaseSnapshot.length === 0) &&
+		(!activeObservation ? registration.rebaseCursor === undefined : registration.rebaseCursor === rebaseCursor);
+	return { graphVersion, index, displacedSource, rebaseSnapshot, rebaseCursor, pendingIngress,
+		pendingIngressBytes, pendingCurrent, currentTrust, nativeBranchSource, migrationSource, sourceTrust, sourceBound, live };
+}
+
+/** Synchronous runtime capture under the original issuance/entered-receive gate.
+ * Undefined requests the complete existing proof route; it is not protocol refusal.
+ * No native image, protected-source classification or admission authority is supplied. */
+function creatorOrdinaryIssuanceRetainedSourceBindings(registration: V3PlaneRegistration): readonly unknown[] {
+	const source = registration.displacedSource, trust = source?.prepared.trust.trust;
+	const nativeBranch = nativeBranchDisplacedSource(registration);
+	const migration = source?.activationVertexDigest !== undefined && trust?.objectId !== registration.payload.trust.trust.objectId
+		? source : undefined;
+	// These are original private immutable wrappers, not retained native readers
+	// or an observation. Any predecessor/native-owner change invalidates the token.
+	return [source, source?.prepared, source?.prepared.trust, trust, source?.prepared.provenance,
+		source?.authorization, source?.prepared.input, source?.prepared.input.store,
+		source?.prepared.input.settlementFloor, source?.issuanceStore, source?.liveJournalStore,
+		source?.issuanceScope, source?.historicalIssuance, source?.historicalIssuance?.capability,
+		source?.historicalIssuance?.filteredIssuanceStore, source?.pinnedGenesisAnchorDigest,
+		source?.activationVertexDigest, source?.migrationTarget, nativeBranch, migration];
+}
+
+function creatorOrdinaryIssuanceSourceIdentity(registration: V3PlaneRegistration): object {
+	if (!currentRegistration(registration) || registration.authorization.kind !== "latched-acl")
+		throw new TypeError("creator ordinary source context is unavailable");
+	const historical = registration.historicalIssuance;
+	const trust = registration.payload.trust.trust;
+	const bindings = [registration.payload, registration.authorization, historical, historical?.capability,
+		historical?.filteredIssuanceStore, creatorOriginalIssuanceStore(registration), registration.blueprintMachine,
+		registration.blueprintMachineIdentity, registration.snapshotReadiness, registration.payload.input.store,
+		registration.liveJournalStore, registration.issuanceStore, registration.payload.input.settlementFloor,
+		trust.objectId, trust.currentEpoch, trust.currentAnchorDigest, trust.genesisAnchorDigest, trust.profileId,
+		...creatorOrdinaryIssuanceRetainedSourceBindings(registration)];
+	const prior = registration.ordinaryIssuanceSourceIdentity;
+	const sameBindings = prior !== undefined && prior.bindings.length === bindings.length &&
+		prior.bindings.every((value, index) => value === bindings[index]);
+	const acl = registration.authorization.value;
+	if (sameBindings && prior.immutableAcl !== undefined && prior.immutableAcl === acl) return prior.token;
+	// The protocol-opened ACL is a frozen graph of primitive data. Establish
+	// only that structural DATA premise here, not another ACL validator. Do it
+	// BEFORE encoding: mutable input cannot change and freeze during encoding
+	// and thereby enroll bytes from an earlier value. Unsupported inputs retain
+	// the original full encoding/comparison on every call.
+	const visited = new WeakSet<object>();
+	let remaining = 8192; // Optimization work bound only; misses still use the original codec.
+	const immutable = (value: unknown): boolean => {
+		if (--remaining < 0) return false;
+		if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return true;
+		if (typeof value !== "object" || !ObjectIsFrozen(value)) return false;
+		const prototype = ObjectGetPrototypeOf(value);
+		if (ArrayIsArray(value) ? prototype !== ArrayPrototype : prototype !== ObjectPrototype && prototype !== null) return false;
+		if (visited.has(value)) return true;
+		visited.add(value);
+		return ReflectOwnKeys(value).every(key => {
+			const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
+			return descriptor !== undefined && "value" in descriptor && immutable(descriptor.value);
+		});
+	};
+	let immutableAcl: LatchedAclSnapshot | undefined;
+	try { if (immutable(acl)) immutableAcl = acl; } catch { /* A structural miss never replaces the original codec result. */ }
+	const aclBytes = encodeCanonical(acl);
+	if (sameBindings && compareBytes(prior.aclBytes, aclBytes) === 0) {
+		if (prior.immutableAcl !== immutableAcl) registration.ordinaryIssuanceSourceIdentity = ObjectFreeze({token: prior.token,
+			bindings: prior.bindings, aclBytes: prior.aclBytes, ...(immutableAcl === undefined ? {} : {immutableAcl})});
+		return prior.token;
+	}
+	const token = ObjectFreeze({});
+	registration.ordinaryIssuanceSourceIdentity = ObjectFreeze({ token, bindings: ObjectFreeze(bindings),
+		aclBytes: new Uint8ArrayConstructor(aclBytes), ...(immutableAcl === undefined ? {} : {immutableAcl}) });
+	return token;
+}
+
+async function captureOrdinaryIssuanceRuntimeSourceIdentity(value: unknown, capture?: CreatorOrdinarySourceCapture): Promise<object | undefined> {
+	if (typeof value !== "object" || value === null) return undefined;
+	const facts = fullRecoveryCloseHoldFacts(value as CreatorSnapshotRecoveryCloseHold);
+	if (facts === undefined || facts.registration === undefined || facts.retirementAllowed || facts.releasing) return undefined;
+	try {
+		if (capture === undefined) await facts.check();
+		else {
+			const compound = resolveCreatorOrdinarySourceCapture(capture, value);
+			if (compound === undefined) return undefined;
+			compound.checkAvailable();
+		}
+		if (facts.releasing || fullRecoveryCloseHoldFacts(value as CreatorSnapshotRecoveryCloseHold) !== facts) return undefined;
+		return creatorOrdinaryIssuanceSourceIdentity(facts.registration);
+	}
+	catch { return undefined; }
+}
+
+/** Captures only original authenticated, non-APP execution facts from the
+ * already held cold census. No raw kind/profile spelling is an authority. */
+function creatorOrdinaryNativeControlApplicationFactForSizing(context: CreatorRecoveryCensusContext,
+	native: IssuanceRetirementRows, outbox: IssuanceRetirementRows["outbox"][number]): CreatorOrdinaryApplicationControlFact | undefined {
+	const matching = native.issued.filter(row => row.objectId === outbox.objectId && row.author === outbox.author &&
+		row.authorSequence === outbox.authorSequence && sameBytes(row.digest, outbox.digest));
+	if (matching.length !== 1) return undefined;
+	const issued = matching[0]!;
+	const row: SnapshottedOutboxRow = ObjectFreeze({scope: ObjectFreeze({objectId: issued.objectId, author: issued.author}),
+		authorSequence: issued.authorSequence, canonicalPreimageBytes: issued.canonicalPreimageBytes,
+		digest: issued.digest, signature: issued.signature, publishState: outbox.publishState});
+	const classified = classifyRebaseRow(context, row);
+	if (classified === undefined || classified.authenticated.admitted.settlementSource !== undefined ||
+		!validRebaseRow(context, classified)) return undefined;
+	const payload = classified.kind === "displaced" ? context.displacedSource?.prepared ?? context.payload : context.payload;
+	if (!isControlOperation(classified.authenticated.vertex.operation, payload.trust.trust.profileId) ||
+		rebaseIntents(payload, classified.authenticated)?.length !== 0) return undefined;
+	return ObjectFreeze({exactCanonicalPreimageBytes: new Uint8ArrayConstructor(issued.canonicalPreimageBytes),
+		exactCanonicalEpochVertexBytes: encodeCanonical(classified.authenticated.vertex)});
+}
+
+/** Boundary-only DATA capture. The genuine full hold, original replay/source
+ * verifiers and calling proof's SAME book own all reads. Numerical seed widths
+ * are neither an operation limit nor an authorization for a future candidate. */
+async function captureOrdinaryReadinessPreparationForSizing(facts: Pick<RecoveryCloseHoldFacts, "releasing">,
+	registration: V3PlaneRegistration, identity: object,
+	native: IssuanceRetirementRows, control: DurableIssuanceRetirementControl | undefined,
+	accounting: CreatorClosedRollbackProofAccounting):
+	Promise<Readonly<{ preparation: NonNullable<CreatorOrdinaryApplicationControlCapture["preparation"]>;
+		commit(): boolean }> | undefined> {
+	const runtime = captureCreatorRecoveryRuntime(registration, true, false, false);
+	const trust = runtime.currentTrust, machine = registration.blueprintMachine, machineIdentity = registration.blueprintMachineIdentity;
+	const successorFenceCount = settlementProfileFor(trust.profileId) === "v1" ? 1 :
+		trust.profileId === "creator-trusted-v1" ? 0 : undefined;
+	if (!runtime.live() || !runtime.sourceBound || runtime.nativeBranchSource !== undefined || runtime.migrationSource !== undefined ||
+		registration.mode !== "genesis-active" || registration.receiveOnly || registration.authorization.kind !== "latched-acl" ||
+		registration.pendingIngress.size !== 0 || registration.pendingIngressBytes !== 0 || registration.drainingPendingIngress ||
+		(registration.rebaseSnapshot?.length ?? 0) !== 0 || registration.rebaseCursor !== undefined ||
+		registration.currentReplacementCustody !== undefined || registration.operationAdmissionHalted ||
+		registration.terminalTransitionQueued || registration.terminalPublicationEntered || registration.terminalBarrier !== undefined ||
+		preparedMigrationTargetFloors.has(registration) || machine === undefined || machineIdentity?.machine !== machine ||
+		successorFenceCount === undefined || native.lineages.some(row => row.pendingUnsigned !== undefined) ||
+		native.plans.some(plan => plan.entries.some(entry => entry.disposition === "manual-review" ||
+			entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null))) return undefined;
+	const replayCapture: CreatorReplayVertexCapture = {};
+	const journal = await readCreatorReplayRows(registration, undefined, accounting, registration, undefined, replayCapture);
+	if (journal === undefined || registration.closeVertices.size !== journal.length + 1) return undefined;
+	const application = await captureCreatorOrdinarySourceLinkedApplicationEffects(registration, journal, native, accounting, replayCapture);
+	if (application === undefined) return undefined;
+	const base = machine.snapshot();
+	if (base.blueprintDigest !== registration.payload.provenance.blueprintDigest ||
+		base.stateDigest !== machineIdentity.expectedStateDigest || registration.payload.catalog.blueprintDigest !== base.blueprintDigest ||
+		!NumberIsSafeInteger(registration.payload.parameters.snapshotChunkBytes) || registration.payload.parameters.snapshotChunkBytes <= 0) return undefined;
+	let anchors = 0;
+	for (const [hash, vertex] of registration.closeVertices) {
+		if (vertex.hash !== hash) return undefined;
+		if (vertex.kind === "drp-epoch-anchor") {
+			if (hash !== trust.currentAnchorDigest || vertex.epoch !== trust.currentEpoch || vertex.objectId !== trust.objectId) return undefined;
+			anchors++;
+		} else {
+			const row = journal.find(row => row.digest === hash);
+			if (row === undefined || !sameBytes(encodeCanonical(vertex), row.exactCanonicalVertexBytes)) return undefined;
+		}
+	}
+	if (anchors !== 1) return undefined;
+	const {currentSignedPreimagesHaveSettlementSource, currentJournalMaximumAuthorByteLength} = application;
+	const projection = deriveApplicationProjectionOrder(registration.payload, registration.closeVertices, registration.controlVertices, registration.index);
+	if (projection === undefined) return undefined;
+	const rowsFor = (digests: readonly string[]) => digests.map(digest => {
+		const row = journal.find(row => row.digest === digest);
+		if (row === undefined) throw new TypeError("ordinary readiness projection lacks original journal PRE");
+		return row;
+	});
+	const applicationRows = rowsFor(projection.order.digests), controlRows = rowsFor(projection.order.controlDigests), catalog = registration.payload.catalog;
+	const current: NonNullable<CreatorOrdinaryApplicationControlCapture["preparation"]>["current"] = ObjectFreeze({
+		runtime: ObjectFreeze({objectId: trust.objectId, epoch: trust.currentEpoch, anchorDigest: trust.currentAnchorDigest,
+			genesisAnchorDigest: trust.genesisAnchorDigest, profileId: trust.profileId,
+			issuanceScope: ObjectFreeze({...registration.issuanceScope}), graphVersion: runtime.graphVersion,
+			epochBytes: registration.epochBytes, vertexCount: registration.closeVertices.size, controlVertexCount: registration.controlVertices.size,
+			latchedOperationCount: registration.latchedOperations.size, pendingIngressCount: 0, pendingIngressBytes: 0, drainingPendingIngress: false,
+			authorVertexCounts: ObjectFreeze([...registration.authorVertexCounts].map(([author, count]) => ObjectFreeze({author, count}))),
+			exactCanonicalLatchedAclBytes: new Uint8ArrayConstructor(encodeCanonical(registration.authorization.value))}),
+		parameters: ObjectFreeze({...registration.payload.parameters}),
+		blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
+			exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
+			maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes, maxDepth: 16 as const, maxItems: 16384 as const,
+			catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
+				runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
+				canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
+		currentEpochVertexCount: registration.closeVertices.size,
+		currentSignedPreimageByteLengths: ObjectFreeze(journal.map(row => row.exactCanonicalPreimageBytes.byteLength)),
+		currentSignedPreimagesHaveSettlementSource,
+		currentJournalMaximumAuthorByteLength,
+		currentApplicationPreimageBytes: ObjectFreeze(applicationRows.map(row => new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes))),
+		sourceLinkedApplicationEffects: application.effects,
+		applicationControls: ObjectFreeze(controlRows.map(row => ObjectFreeze({exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+			exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(row.exactCanonicalVertexBytes)}))),
+		nativeCounts: ObjectFreeze({lineages: native.lineages.length, issued: native.issued.length, outbox: native.outbox.length, plans: native.plans.length,
+			currentJournalRows: journal.length, localJournalRows: journal.filter(row => row.sourceKind === "local-issued").length,
+			receivedJournalRows: journal.filter(row => row.sourceKind === "received").length}),
+		pendingIngress: creatorRuntimeActiveCensusFields({pendingRoots: [], wireByteCharge: 0, unsettledSources: [], cursor: null,
+			cacheSourceSequences: [], epoch: trust.currentEpoch}).pendingIngress, successorFenceCount,
+	});
+	const receivedPreimages = ObjectFreeze(journal.filter(row => row.sourceKind === "received").map(row => new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes)));
+	// Only the NEW symbolic row/fence sample is 512. The original width owners
+	// still receive every actual OLD native/replay row below. Actual quotes and
+	// whole-suffix preflight replace these sample parameters with their genuine
+	// candidate/fence widths and re-evaluate every native constraint before use.
+	const preimage = 512, vertexWidth = 512;
+	const fencePreimage = successorFenceCount === 0 ? 0 : preimage;
+	const journalRows = creatorJournalCensusRows(journal, native, trust.objectId);
+	if (journalRows === undefined) return undefined;
+	const debtScopes = new Set([registration.issuanceScope, ...native.lineages, ...native.issued, ...native.outbox, ...native.plans.map(plan => plan.scope)]
+		.map(scope => JSON.stringify([scope.objectId, scope.author])));
+	const runtimeWidths = creatorOrdinaryRuntimeCapacityWidths({scope: registration.issuanceScope,
+		currentScope: liveJournalScope(registration.payload), maxIssuerDescriptors: native.outbox.length, maxDebtDescriptors: debtScopes.size,
+		maxCurrentJournalRows: journal.length, maxDependencyAnchors: 7, canonicalPreimageByteLength: preimage,
+		canonicalEpochVertexByteLength: vertexWidth, successorFencePreimageByteLength: fencePreimage, successorFenceCount}, journalRows, undefined, true);
+	const issuance = issuanceOrdinaryFinishingCapacityWidths({rows: native, scope: registration.issuanceScope, control: control ?? null,
+		maxAdditionalCurrentIssued: 1, maxCanonicalPreimageByteLength: preimage, successorFenceCount});
+	const issued = new Map<string, string>();
+	for (const row of native.issued) {
+		const digest = lowerHexDigest(row.digest); if (digest === undefined) return undefined;
+		const key = JSON.stringify([row.objectId, row.author, row.authorSequence, digest]); if (issued.has(key)) return undefined;
+		issued.set(key, lowerHexDigest(hashDomain("ts-drp/ordinary-app-cursor-signature/v1", row.signature))!);
+	}
+	const geometry = ObjectFreeze({sourceIdentity: identity,
+		graphVersion: runtime.graphVersion, rowCount: journal.length, widths: runtimeWidths,
+		prepared: captureCreatorOrdinaryPreparedAdmission(registration, journal, native, application)});
+	const cursor = ObjectFreeze({});
+	const cursorFacts = ObjectFreeze({registration, index: runtime.index, sourceIdentity: identity,
+		graphVersion: runtime.graphVersion, controlDigests: ObjectFreeze([...registration.controlVertices]),
+		journal: ObjectFreeze(journal.map(row => ObjectFreeze({digest: row.digest, sequence: row.journalSequence, sourceKind: row.sourceKind}))), issued});
+	let committed = false;
+	return ObjectFreeze({preparation: ObjectFreeze({current,
+		nativeCapacity: ObjectFreeze({receivedPreimages, preimage, vertex: vertexWidth, fencePreimage, runtimeWidths, issuance}), cursor}),
+		commit: (): boolean => {
+			// Private staging only: the caller owns the complete native/context
+			// bracket and must finish it before either original registry is changed.
+			// Repeating the whole census here did not add an independent boundary;
+			// it also enrolled geometry before the caller's final check could fail.
+			if (committed || facts.releasing || !runtime.live() || creatorOrdinaryIssuanceSourceIdentity(registration) !== identity ||
+				registration.blueprintMachine !== machine || registration.blueprintMachineIdentity !== machineIdentity) return false;
+			committed = true;
+			ordinaryRuntimeCapacityGeometry.set(registration, geometry);
+			ordinaryApplicationResourceCursors.set(cursor, cursorFacts);
+			return true;
+		}});
+}
+
+function captureOrdinaryIssuanceRuntimeApplicationControls(value: unknown,
+	accounting?: CreatorClosedRollbackProofAccounting, capture?: CreatorOrdinarySourceCapture): Promise<CreatorOrdinaryApplicationControlCapture | undefined> {
+	if (value === null || typeof value !== "object") return Promise.resolve(undefined);
+	const facts = fullRecoveryCloseHoldFacts(value as CreatorSnapshotRecoveryCloseHold);
+	if (facts === undefined || facts.registration === undefined || facts.retirementAllowed || facts.releasing) return Promise.resolve(undefined);
+	const registration = facts.registration;
+	const task = Promise.resolve().then(async () => {
+		const compound = capture === undefined ? undefined : resolveCreatorOrdinarySourceCapture(capture, value, accounting);
+		if (capture !== undefined && compound === undefined) return undefined;
+		if (compound === undefined) await facts.check(); else compound.checkAvailable();
+		const identity = creatorOrdinaryIssuanceSourceIdentity(registration);
+		const census = decodeCanonical(facts.exactCanonicalCensusBytes) as {nativeIssuance?: {rows: IssuanceRetirementRows; control?: DurableIssuanceRetirementControl}};
+		const native = census.nativeIssuance?.rows;
+		if (native === undefined) return undefined;
+		const controls: CreatorOrdinaryApplicationControlFact[] = [];
+		for (const outbox of native.outbox) {
+			const fact = creatorOrdinaryNativeControlApplicationFactForSizing(facts.context, native, outbox);
+			if (fact !== undefined) controls.push(fact);
+		}
+		const staged = accounting === undefined ? undefined :
+			await captureOrdinaryReadinessPreparationForSizing(facts, registration, identity, native, census.nativeIssuance?.control, accounting);
+		if (compound === undefined) await facts.check(); else compound.checkAvailable();
+		if (facts.releasing || fullRecoveryCloseHoldFacts(value as CreatorSnapshotRecoveryCloseHold) !== facts ||
+			creatorOrdinaryIssuanceSourceIdentity(registration) !== identity) return undefined;
+		// The compound source factory publishes both preparations synchronously
+		// only AFTER its final complete native/context check. Standalone callers
+		// still own the original complete checks above and commit here.
+		let preparation: CreatorOrdinaryApplicationControlCapture["preparation"];
+		if (staged !== undefined) {
+			const commit = (): boolean => !facts.releasing && fullRecoveryCloseHoldFacts(value as CreatorSnapshotRecoveryCloseHold) === facts &&
+				creatorOrdinaryIssuanceSourceIdentity(registration) === identity && staged.commit();
+			if (compound === undefined) {if (commit()) preparation = staged.preparation;}
+			else {compound.stage(commit); preparation = staged.preparation;}
+		}
+		return ObjectFreeze({identity, controls: ObjectFreeze(controls), ...(preparation === undefined ? {} : {preparation})});
+	});
+	facts.pending.add(task);
+	void task.then(() => facts.pending.delete(task), () => facts.pending.delete(task));
+	return task;
+}
+
+/**
+ * Birth the original issuer's bounded idle metadata before readiness captures it.
+ * This is not retirement, issuance or portable authority. Existing controls are
+ * read unchanged, and the subsequent cold capture authenticates and charges the
+ * actual native image. The caller's admitted readiness job owns the full join.
+ */
+async function prepareCreatorOrdinaryNativeMetadataForReadiness(registration: V3PlaneRegistration): Promise<void> {
+	const payload = registration.payload, authorization = registration.authorization;
+	const scope = ObjectFreeze({...registration.issuanceScope});
+	const store = creatorOriginalIssuanceStore(registration);
+	const available = (): boolean => currentRegistration(registration) && !registration.receiveOnly &&
+		registration.mode === "genesis-active" && registration.payload === payload &&
+		registration.authorization === authorization && authorization.kind === "latched-acl" &&
+		registration.terminalState === "active" && !registration.operationAdmissionHalted &&
+		!registration.blueprintClosing && !registration.blueprintFolded && registration.blueprintHandle !== undefined &&
+		!registration.terminalTransitionQueued && !registration.terminalPublicationEntered &&
+		registration.terminalBarrier === undefined && registration.receivedTransition !== true &&
+		creatorOriginalIssuanceStore(registration) === store && sameScope(registration.issuanceScope, scope) &&
+		scope.objectId === payload.trust.trust.objectId;
+	if (!available()) throw new TypeError("creator ordinary native readiness owner is unavailable");
+	const maintenance = durableIssuancePruningMaintenanceForStore(store);
+	if (maintenance?.acquireRetirementControl === undefined)
+		throw new TypeError("creator ordinary native readiness metadata is unsupported");
+	const read = await maintenance.acquireRetirementControl({objectId: scope.objectId});
+	// No transition methods, signatures, lineage changes, floors, or retained
+	// control views. Even a revoked readiness job joins its admitted native work.
+	await read.release();
+	if (!available()) throw new TypeError("creator ordinary native readiness owner changed");
+}
+
+/** Explicit quiescent readiness work in the ORIGINAL registration queue. The
+ * closing gate freezes active admission without folding a blueprint or creating
+ * a seal. Only this lexical entered gate can produce a full closed-consumer
+ * census; presign/received observations retain their original restrictions. */
+async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegistration, closePlane: V3PlaneHandle,
+	snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+	consume: (seal: () => Promise<CreatorSnapshotRecoveryCloseHold>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">): Promise<void> {
+	const payload = registration.payload, authorization = registration.authorization, trust = payload.trust.trust,
+		epoch = trust.currentEpoch, anchor = trust.currentAnchorDigest, profile = trust.profileId,
+		genesis = trust.genesisAnchorDigest, sourceBindings = creatorOrdinaryIssuanceRetainedSourceBindings(registration),
+		scope = ObjectFreeze({...registration.issuanceScope}), owners = [payload.input.store, registration.liveJournalStore,
+			registration.issuanceStore, payload.input.settlementFloor] as const;
+	const resumeControl = registration.retirementResumeControl, reconstruction = registration.retirementReconstruction;
+	// This stored decision is only a request to run the ORIGINAL reconstruction.
+	// It grants no admission and cannot discharge an active intent or a different
+	// recovery halt. The trusted close owner below must reach a terminal native
+	// reconciliation result; its admitted holds/releases must then join.
+	const completedRequestMatches = (): boolean => resumeControl?.active === null &&
+		resumeControl.objectId === payload.provenance.objectId && resumeControl.completed?.domains !== undefined &&
+		resumeControl.completed.throughEpoch + 1 === epoch &&
+		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
+			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
+	const completedResume = registration.operationAdmissionHalted && completedRequestMatches() ? resumeControl : undefined;
+	const admissionStateCurrent = (): boolean => registration.retirementResumeControl === resumeControl &&
+		registration.retirementReconstruction === reconstruction && (completedResume === undefined
+			? !registration.operationAdmissionHalted
+			: registration.operationAdmissionHalted && completedRequestMatches());
+	let entered = false, accepting = false, finished = false;
+	let enteredGraph: Readonly<{version: number; index: V3PlaneRegistration["index"]}> | undefined;
+	const available = (): boolean => !finished && currentRegistration(registration) && !registration.receiveOnly &&
+		registration.mode === "genesis-active" && registration.payload === payload && registration.authorization === authorization &&
+		authorization.kind === "latched-acl" && payload.trust.trust === trust && trust.currentEpoch === epoch && epoch >= 3 &&
+		trust.currentAnchorDigest === anchor && trust.profileId === profile && trust.genesisAnchorDigest === genesis &&
+		registration.payload.input.store === owners[0] && registration.liveJournalStore === owners[1] &&
+		registration.issuanceStore === owners[2] && registration.payload.input.settlementFloor === owners[3] &&
+		sameScope(registration.issuanceScope, scope) && registration.snapshotReadiness?.owner === snapshots &&
+		registration.terminalState === "active" && admissionStateCurrent() &&
+		registration.blueprintClosing === entered && !registration.blueprintFolded && registration.blueprintHandle !== undefined &&
+		!registration.terminalTransitionQueued && !registration.terminalPublicationEntered && registration.terminalBarrier === undefined &&
+		registration.receivedTransition !== true && !registration.retainedBootstrapHold && !registration.drainingPendingIngress &&
+		registration.currentReplacementCustody === undefined && !preparedMigrationTargetFloors.has(registration) &&
+		registration.pendingIngress.size === 0 && registration.pendingIngressBytes === 0 &&
+		(registration.rebaseSnapshot === undefined || registration.rebaseSnapshot.length === 0) && registration.rebaseCursor === undefined &&
+		(enteredGraph === undefined || registration.graphVersion === enteredGraph.version && registration.index === enteredGraph.index) &&
+		creatorOrdinaryIssuanceRetainedSourceBindings(registration).every((value, index) => value === sourceBindings[index]);
+	if (!available()) throw new TypeError("creator readiness maintenance boundary is unavailable");
+	await enqueueRegistrationTask(registration, () => async () => {
+		const lifetimes: CreatorSnapshotRecoveryCloseLifetime[] = [];
+		const pending: Promise<unknown>[] = [];
+		const track = <T>(task: Promise<T>): Promise<T> => {
+			pending.push(task); void task.catch(() => undefined); return task;
+		};
+		let primary: unknown, failed = false;
+		try {
+			if (!available()) throw new TypeError("creator readiness maintenance boundary changed before entry");
+			const runtime = captureCreatorRecoveryRuntime(registration, true, false, false);
+			if (!runtime.live() || !runtime.sourceBound || runtime.nativeBranchSource !== undefined || runtime.migrationSource !== undefined)
+				throw new TypeError("creator readiness maintenance source is unavailable");
+			enteredGraph = {version: registration.graphVersion, index: registration.index};
+			registration.blueprintClosing = true; entered = true;
+			const boundaryLive = (): boolean => entered && available();
+			const boundary = {available: boundaryLive, completeRetirement: (observation: object): Promise<void> => {
+				if (!accepting || !boundaryLive()) return Promise.reject(new TypeError("creator readiness retirement consumer is unavailable"));
+				return track((async () => {
+					// Validate and consume the ORIGINAL nominal completion once. These
+					// generations belong to this stable boundary, not a later sealed
+					// close's retiredSourceGenerations/adoption contribution.
+					await consumeCreatorRecoverySourceRetirement(observation, {plane: closePlane, store: owners[0],
+						snapshotStore: snapshots, liveJournalStore: owners[1], currentTrust: trust});
+					if (!boundaryLive()) throw new TypeError("creator readiness retirement consumer changed");
+				})());
+			}};
+			accepting = true;
+			const seal = (): Promise<CreatorSnapshotRecoveryCloseHold> => {
+				if (!accepting || !boundaryLive()) return Promise.reject(new TypeError("creator readiness maintenance boundary was revoked"));
+				return track((async () => {
+					const hold = await sealCreatorRecoveryDependencies(registration, true, undefined, closePlane,
+						undefined, undefined, undefined, undefined, boundary);
+					// Resolve this just-minted private hold for joined cleanup even if
+					// an owner changed while sealing. The original captured owners are
+					// still checked by boundaryLive BEFORE any hold is delivered.
+					const lifetime = hold === undefined ? undefined : resolveRecoveryCloseHold(hold,
+						{store: registration.payload.input.store, liveJournalStore: registration.liveJournalStore,
+							currentTrust: registration.payload.trust.trust});
+					if (lifetime !== undefined) lifetimes.push(lifetime);
+					if (hold === undefined || lifetime === undefined || !accepting || !boundaryLive())
+						throw new TypeError("creator readiness maintenance census is unavailable");
+					return hold;
+				})());
+			};
+			try {
+				// Internal execution handoff from the existing close/reconciliation
+				// owner, not a persisted status flag or caller-supplied wire receipt.
+				if (await consume(seal, completedResume !== undefined) !== "complete" || completedResume !== undefined && lifetimes.length === 0)
+					throw new TypeError("creator readiness maintenance did not complete reconstruction");
+			} finally { accepting = false; }
+			if (!available()) throw new TypeError("creator readiness maintenance boundary changed");
+		} catch (cause) { failed = true; primary = cause; }
+		// Original reconciliation joins each hold itself. Also join every issued
+		// lifetime on callback failure, before this queue slot can release admission.
+		const work = await Promise.allSettled(pending);
+		const outcomes = await Promise.allSettled(lifetimes.map(lifetime => lifetime.release()));
+		const failures = [...work, ...outcomes].flatMap(outcome => outcome.status === "rejected" ? [outcome.reason] : []);
+		if (failures.length !== 0) { primary = failed ? new AggregateError([primary, ...failures],
+			"creator readiness maintenance and joined release failed", {cause: primary}) :
+			new AggregateError(failures, "creator readiness maintenance release failed"); failed = true; }
+		if (failed || !available()) {
+			// An uncertain native result, stale owner or failed join is recovery
+			// work. Never reopen admission by clearing a halt in a finally block.
+			registration.operationAdmissionHalted = true;
+			finished = true;
+			throw failed ? primary : new TypeError("creator readiness maintenance boundary was revoked during release");
+		}
+		// Every original terminal native verification and admitted release has
+		// succeeded while this SAME private request still owns the halt. No await
+		// or public exposure separates its consumption from reopening this gate.
+		if (completedResume !== undefined) {
+			registration.retirementResumeControl = undefined;
+			registration.retirementReconstruction = undefined;
+			registration.operationAdmissionHalted = false;
+		}
+		finished = true; registration.blueprintClosing = false; entered = false;
+	});
+}
+
+function sealCreatorOrdinaryIssuanceRuntime(registration: V3PlaneRegistration, closePlane: V3PlaneHandle,
+	receivedReceipt?: object): CreatorOrdinaryIssuanceRuntimeHold | undefined {
+	let received: ReceivedAppendFacts | undefined;
+	try { received = receivedReceipt === undefined ? undefined : receivedAppendFacts(registration, receivedReceipt); }
+	catch { return undefined; }
+	const runtime = captureCreatorRecoveryRuntime(registration, true,
+		received !== undefined && registration.drainingPendingIngress, false);
+	const payload = registration.payload, authorization = registration.authorization;
+	if (authorization.kind !== "latched-acl") return undefined;
+	const historicalIssuance = registration.historicalIssuance;
+	const historyOwner = creatorOriginalIssuanceStore(registration);
+	const historicalCapability = historicalIssuance?.capability, historicalFilteredOwner = historicalIssuance?.filteredIssuanceStore;
+	const nativeOwners = [payload.input.store, registration.liveJournalStore, registration.issuanceStore, payload.input.settlementFloor] as const;
+	const blueprintMachine = registration.blueprintMachine, blueprintMachineIdentity = registration.blueprintMachineIdentity;
+	const snapshotReadiness = registration.snapshotReadiness;
+	const retainedSourceBindings = creatorOrdinaryIssuanceRetainedSourceBindings(registration);
+	const retainedSourceEligible = (): boolean => runtime.sourceBound && runtime.nativeBranchSource === undefined &&
+		runtime.migrationSource === undefined && registration.displacedSource === runtime.displacedSource &&
+		(runtime.displacedSource === undefined || runtime.sourceTrust === runtime.displacedSource.prepared.trust.trust) &&
+		creatorOrdinaryIssuanceRetainedSourceBindings(registration).every((value, index) => value === retainedSourceBindings[index]);
+	const currentReplacementCustody = registration.currentReplacementCustody;
+	const epochBytes = registration.epochBytes, closeVertexCount = registration.closeVertices.size;
+	const closeAuthorCount = registration.closeAuthors.size, closeChargeCount = registration.closeCharges.size;
+	const controlVertexCount = registration.controlVertices.size, latchedOperationCount = registration.latchedOperations.size;
+	const authorVertexCounts = [...registration.authorVertexCounts.entries()];
+	const eligible = (): boolean => runtime.live() && !registration.receiveOnly && registration.mode === "genesis-active" &&
+		registration.payload === payload && registration.authorization === authorization && authorization.kind === "latched-acl" &&
+		registration.historicalIssuance === historicalIssuance && creatorOriginalIssuanceStore(registration) === historyOwner &&
+		historicalIssuance?.capability === historicalCapability && historicalIssuance?.filteredIssuanceStore === historicalFilteredOwner &&
+		registration.payload.input.store === nativeOwners[0] && registration.liveJournalStore === nativeOwners[1] &&
+		registration.issuanceStore === nativeOwners[2] && registration.payload.input.settlementFloor === nativeOwners[3] &&
+		registration.blueprintMachine === blueprintMachine && blueprintMachine !== undefined &&
+		registration.blueprintMachineIdentity === blueprintMachineIdentity && registration.snapshotReadiness === snapshotReadiness &&
+		snapshotReadiness !== undefined && !registration.operationAdmissionHalted && !registration.terminalTransitionQueued &&
+		!registration.terminalPublicationEntered && registration.terminalBarrier === undefined &&
+		registration.receivedTransition !== true && retainedSourceEligible() &&
+		(registration.rebaseSnapshot?.length ?? 0) === 0 && registration.rebaseCursor === undefined &&
+		!preparedMigrationTargetFloors.has(registration) && registration.currentReplacementCustody === currentReplacementCustody &&
+		currentReplacementCustody === undefined && registration.epochBytes === epochBytes &&
+		registration.closeVertices.size === closeVertexCount && registration.closeAuthors.size === closeAuthorCount &&
+		registration.closeCharges.size === closeChargeCount && registration.controlVertices.size === controlVertexCount &&
+		registration.latchedOperations.size === latchedOperationCount && registration.authorVertexCounts.size === authorVertexCounts.length &&
+		authorVertexCounts.every(([author, count]) => registration.authorVertexCounts.get(author) === count) &&
+		(received === undefined ? runtime.pendingIngress.length === 0 && runtime.pendingIngressBytes === 0 :
+			receivedReceipt !== undefined && receivedAppendReceipts.get(receivedReceipt) === received &&
+			received.registration === registration && received.graphVersion === runtime.graphVersion && received.index === runtime.index &&
+			!registration.index.has(received.evidence.authenticated.digest) &&
+			received.evidence.authenticated.admitted.settlementSource === undefined && !received.sourceAuthorized &&
+			runtime.pendingIngress.every(([digest, pending]) => digest === received.evidence.authenticated.digest && pending.evidence === received.evidence));
+	if (!eligible()) {
+		// Existing isolated diagnostic hook only: predicate evidence cannot
+		// authorize a hold, relax a source guard or affect joined cleanup.
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind: "ordinary-runtime-seal-refused",
+				epoch: runtime.currentTrust.currentEpoch, received: received !== undefined,
+				ingress: {
+					count: runtime.pendingIngress.length, bytes: runtime.pendingIngressBytes,
+					draining: registration.drainingPendingIngress,
+					digest: received?.evidence.authenticated.digest,
+					pendingDigests: runtime.pendingIngress.slice(0, 8).map(([digest]) => digest),
+					receiptSame: received !== undefined && receivedReceipt !== undefined && receivedAppendReceipts.get(receivedReceipt) === received,
+					registrationSame: received?.registration === registration,
+					graphSame: received?.graphVersion === runtime.graphVersion,
+					indexSame: received?.index === runtime.index,
+					alreadyIndexed: received !== undefined && registration.index.has(received.evidence.authenticated.digest),
+					settlementSource: received?.evidence.authenticated.admitted.settlementSource !== undefined,
+					sourceAuthorized: received?.sourceAuthorized,
+					pendingMatches: received !== undefined && runtime.pendingIngress.every(([digest, pending]) =>
+						digest === received.evidence.authenticated.digest && pending.evidence === received.evidence),
+				},
+				predicates: {
+					runtimeLive: runtime.live(), sourceBound: runtime.sourceBound,
+					sourceTrustPresent: runtime.sourceTrust !== undefined,
+					nativeBranchSourceAbsent: runtime.nativeBranchSource === undefined,
+					migrationSourceAbsent: runtime.migrationSource === undefined,
+					notReceiveOnly: !registration.receiveOnly, activeMode: registration.mode === "genesis-active",
+					payloadAuthorizationSame: registration.payload === payload && registration.authorization === authorization,
+					historicalSame: registration.historicalIssuance === historicalIssuance && creatorOriginalIssuanceStore(registration) === historyOwner &&
+						historicalIssuance?.capability === historicalCapability && historicalIssuance?.filteredIssuanceStore === historicalFilteredOwner,
+					nativeOwnersSame: registration.payload.input.store === nativeOwners[0] && registration.liveJournalStore === nativeOwners[1] &&
+						registration.issuanceStore === nativeOwners[2] && registration.payload.input.settlementFloor === nativeOwners[3],
+					blueprintSameAndPresent: registration.blueprintMachine === blueprintMachine && blueprintMachine !== undefined &&
+						registration.blueprintMachineIdentity === blueprintMachineIdentity,
+					readinessSameAndPresent: registration.snapshotReadiness === snapshotReadiness && snapshotReadiness !== undefined,
+					admissionOpen: !registration.operationAdmissionHalted, terminalNotQueued: !registration.terminalTransitionQueued,
+					publicationNotEntered: !registration.terminalPublicationEntered, terminalBarrierAbsent: registration.terminalBarrier === undefined,
+					receivedTransitionAbsent: registration.receivedTransition !== true,
+					displacedSourceAbsent: registration.displacedSource === undefined,
+					retainedSourceEligible: retainedSourceEligible(),
+					rebaseEmpty: (registration.rebaseSnapshot?.length ?? 0) === 0, rebaseCursorAbsent: registration.rebaseCursor === undefined,
+					targetFloorAbsent: !preparedMigrationTargetFloors.has(registration),
+					replacementSame: registration.currentReplacementCustody === currentReplacementCustody,
+					replacementAbsent: currentReplacementCustody === undefined,
+					graphCountersSame: registration.epochBytes === epochBytes && registration.closeVertices.size === closeVertexCount &&
+						registration.closeAuthors.size === closeAuthorCount && registration.closeCharges.size === closeChargeCount &&
+						registration.controlVertices.size === controlVertexCount && registration.latchedOperations.size === latchedOperationCount &&
+						registration.authorVertexCounts.size === authorVertexCounts.length &&
+						authorVertexCounts.every(([author, count]) => registration.authorVertexCounts.get(author) === count),
+					ingressShape: received === undefined ? runtime.pendingIngress.length === 0 && runtime.pendingIngressBytes === 0 :
+						receivedReceipt !== undefined && receivedAppendReceipts.get(receivedReceipt) === received &&
+						received.registration === registration && received.graphVersion === runtime.graphVersion && received.index === runtime.index &&
+						!registration.index.has(received.evidence.authenticated.digest) &&
+						received.evidence.authenticated.admitted.settlementSource === undefined && !received.sourceAuthorized &&
+						runtime.pendingIngress.every(([digest, pending]) => digest === received.evidence.authenticated.digest && pending.evidence === received.evidence),
+				}});
+		} catch { /* Diagnostics cannot change the original refusal. */ }
+		return undefined;
+	}
+	const latchedAclBytes = encodeCanonical(authorization.value);
+	const trust = runtime.currentTrust;
+	const capability = ObjectFreeze({}) as CreatorOrdinaryIssuanceRuntimeHold;
+	const facts: OrdinaryIssuanceRuntimeHoldFacts = {
+		kind: "ordinary-runtime", registration, closePlane, runtime,
+		...(received === undefined ? {} : { receivedAppend: received }), pending: new Set(), readPhaseEnded: false, releasing: false,
+		check: (): void => {
+			if (facts.readPhaseEnded || facts.releasing || recoveryCloseHolds.get(capability) !== facts || !eligible())
+				throw new TypeError("creator ordinary runtime custody is stale or revoked");
+		},
+		readRuntime: (): CreatorOrdinaryIssuanceRuntimeReadout => {
+			facts.check();
+			return ObjectFreeze({ kind: received === undefined ? "local-issuance" as const : "received-append" as const,
+				objectId: trust.objectId, epoch: trust.currentEpoch, anchorDigest: trust.currentAnchorDigest,
+				genesisAnchorDigest: trust.genesisAnchorDigest, profileId: trust.profileId,
+				issuanceScope: ObjectFreeze({ ...registration.issuanceScope }), graphVersion: runtime.graphVersion,
+				epochBytes, vertexCount: closeVertexCount, controlVertexCount, latchedOperationCount,
+				pendingIngressCount: runtime.pendingIngress.length, pendingIngressBytes: runtime.pendingIngressBytes,
+				drainingPendingIngress: registration.drainingPendingIngress,
+				authorVertexCounts: ObjectFreeze(authorVertexCounts.map(([author, count]) => ObjectFreeze({ author, count }))),
+				exactCanonicalLatchedAclBytes: new Uint8ArrayConstructor(latchedAclBytes) });
+		},
+	};
+	recoveryCloseHolds.set(capability, facts);
+	return capability;
+}
+
+async function sealCreatorRecoveryDependencies(
+	registration: V3PlaneRegistration,
+	required = false,
+	activeSource?: ClassifiedRebaseRow,
+	closePlane: V3PlaneHandle = registration.handle,
+	observation?: "issuance-preview" | "received-replacement" | "received-append",
+	received?: Readonly<{ signing: CreatorSigningRecoveryOwner; completeRetirement(observation: object): Promise<void> }>,
+	ownedIssueCustody?: LocalReplacementCustody,
+	ownedReceivedAppend?: ReceivedAppendFacts,
+	quiescentBoundary?: Readonly<{available(): boolean; completeRetirement(observation: object): Promise<void>}>
+): Promise<CreatorSnapshotRecoveryCloseHold | undefined> {
+	// Observational presign capture shares the original census/held owners but
+	// can never authorize retirement of the unsigned prospective operation.
+	const activeObservation =
+		activeSource !== undefined || observation === "issuance-preview" || observation === "received-replacement" || observation === "received-append";
+	const drainingReceived = (observation === "received-replacement" || observation === "received-append") && registration.drainingPendingIngress;
+	// Only the entered terminal capability may obtain its original presign
+	// maintenance observation while the ordinary-issue barrier is held. This
+	// does not admit source callbacks, closing/retirement or a foreign preview.
+	const terminalIssuanceObservation =
+		observation === "issuance-preview" &&
+		registration.terminalState === "transition" &&
+		registration.terminalPublicationEntered;
+	let stage = "live";
+	const unavailable = (): undefined => {
+		if (required) throw new TypeError(`creator recovery dependency hold unavailable:${stage}`);
+		return undefined;
+	};
+	if (quiescentBoundary !== undefined && (activeObservation || received !== undefined || !quiescentBoundary.available()))
+		return unavailable();
+	const runtime = captureCreatorRecoveryRuntime(registration, activeObservation, drainingReceived, terminalIssuanceObservation,
+		quiescentBoundary?.available);
+	const { graphVersion, index, pendingIngress, pendingIngressBytes, pendingCurrent, currentTrust,
+		nativeBranchSource, migrationSource, sourceTrust, sourceBound, rebaseSnapshot, rebaseCursor } = runtime;
+	const live = (): boolean => runtime.live(received !== undefined);
+	if (!live()) {
+		stage = `live:${Number(currentRegistration(registration))}:${Number(registration.blueprintFolded)}:${Number(registration.blueprintClosing)}:${registration.terminalState}:${registration.pendingIngress.size}:${registration.pendingIngressBytes}:${Number(registration.drainingPendingIngress)}:${Number(registration.retainedBootstrapHold)}:${Number(registration.displacedSource !== undefined)}:${Number(registration.rebaseSnapshot !== undefined)}:${Number(registration.rebaseCursor !== undefined)}`;
+		return unavailable();
+	}
+	stage = "replay";
+	const replay = await sealCreatorDurableReplay(registration);
+	if (replay === undefined || !live()) return unavailable();
+	let dependencyAnchors: readonly Readonly<{ epoch: number; anchorDigest: string }>[] = ObjectFreeze([]);
+	let sourceDependencies: Awaited<ReturnType<typeof acquireCreatorDisplacedSourceDependencies>> | undefined;
+	let transferred = false;
+	let issuanceRead: CreatorHeldIssuanceCensusRead | undefined;
+	let journalCurrent: CreatorHeldRecoveryJournalCurrent | undefined;
+	const readJournalCurrent = (held: CreatorHeldIssuanceCensusRead): Promise<boolean | undefined> =>
+		live() ? checkCreatorHeldRecoveryJournal(journalCurrent, held, registration) : Promise.resolve(undefined);
+	const censusObservation = {
+		stage,
+		graphVersion,
+		currentTrust,
+		liveRegistration: registration,
+		sourceTrust,
+		sourceBound,
+		live,
+		replay,
+		...(activeObservation
+			? {
+					active: {
+						registration,
+						pendingIngress,
+						pendingIngressBytes,
+						pendingCurrent,
+						index,
+						activeSource,
+						...(ownedReceivedAppend === undefined ? {} : {enteredReceivedDigest: ownedReceivedAppend.evidence.authenticated.digest}),
+						rebaseSnapshot,
+						rebaseCursor,
+					},
+				}
+			: {}),
+	};
+	const captureCensus = async (heldIssuance?: CreatorHeldIssuanceCensusRead,
+		capturedInputs?: CreatorRecoveryCensusInputCapture): Promise<Uint8Array | undefined> => {
+		try {
+			const result = await readCreatorRecoveryDependencyCensus(registration, censusObservation, heldIssuance, capturedInputs);
+			if (result === undefined) return undefined;
+			dependencyAnchors = result.dependencyAnchors;
+			if (sourceDependencies === undefined) return result.exactCanonicalCensusBytes;
+			const migrationSource = await sourceDependencies.read();
+			if (!live()) return undefined;
+			if (migrationSource.activationVertexDigest !== undefined && registration.displacedSource !== undefined) {
+				const source = registration.displacedSource;
+				const targetCensus = decodeCanonical(result.exactCanonicalCensusBytes) as {
+					nativeIssuance: { rows: IssuanceRetirementRows };
+				};
+				const sourceCensus = migrationSource.nativeIssuance as { rows: IssuanceRetirementRows };
+				const targetJournal = await creatorReplayReads.get(replay)?.readVerified();
+				if (targetJournal === undefined || !live()) return undefined;
+				for (const plan of targetCensus.nativeIssuance.rows.plans)
+					for (const entry of plan.entries) {
+						if (entry.disposition !== "inherited" && entry.sourceObjectId === undefined) continue;
+						if (entry.sourceObjectId !== undefined && entry.sourceObjectId !== source.prepared.provenance.objectId) {
+							censusObservation.stage = "external-source-context";
+							return undefined;
+						}
+						const native = sourceCensus.rows.issued.find(
+							(row) =>
+								row.author === plan.scope.author &&
+								row.authorSequence === entry.sourceSequence &&
+								sameBytes(row.digest, entry.sourceDigest)
+						);
+						const outbox = sourceCensus.rows.outbox.find(
+							(row) => row.author === plan.scope.author && row.authorSequence === entry.sourceSequence
+						);
+						if (native === undefined || outbox === undefined || !sameBytes(native.digest, outbox.digest)) {
+							censusObservation.stage = "inheritance-source-native-pair";
+							return undefined;
+						}
+						const row: SnapshottedOutboxRow = ObjectFreeze({
+							scope: ObjectFreeze({ author: native.author, objectId: native.objectId }),
+							authorSequence: native.authorSequence,
+							canonicalPreimageBytes: native.canonicalPreimageBytes,
+							digest: native.digest,
+							signature: native.signature,
+							publishState: outbox.publishState,
+						});
+						const classified = classifyRebaseRow(
+							{
+								...registration,
+								payload: source.prepared,
+								authorization: source.authorization,
+								displacedSource: undefined,
+								historicalIssuance: source.historicalIssuance,
+							},
+							row
+						);
+						const reasons: string[] = [];
+						if (
+							classified === undefined ||
+							(entry.disposition === "inherited" &&
+								!authenticatedInheritedSettlement(registration, entry, classified, targetJournal, (reason) =>
+									reasons.push(reason)
+								))
+						) {
+							censusObservation.stage = `inheritance-source-target-membership:${Number(classified !== undefined)}:${reasons.join(";")}`;
+							return undefined;
+						}
+					}
+			}
+			return encodeCanonical({
+				...(decodeCanonical(result.exactCanonicalCensusBytes) as Record<string, unknown>),
+				migrationSource,
+			});
+		} finally {
+			stage = censusObservation.stage;
+		}
+	};
+	const census = (capturedInputs?: CreatorRecoveryCensusInputCapture): Promise<Uint8Array | undefined> => {
+		const held = issuanceRead;
+		return held === undefined ? captureCensus() : held.read(() => captureCensus(held, capturedInputs));
+	};
+	try {
+		if (migrationSource !== undefined)
+			sourceDependencies = await acquireCreatorDisplacedSourceDependencies(
+				migrationSource,
+				undefined,
+				ownedIssueCustody
+			);
+		else if (nativeBranchSource !== undefined)
+			sourceDependencies = await acquireCreatorDisplacedSourceDependencies(
+				nativeBranchSource,
+				registration.issuanceStore
+			);
+		const sealed = await census();
+		if (sealed === undefined) return unavailable();
+		let mayPrepareUnchanged = sourceDependencies === undefined && activeSource === undefined &&
+			runtime.nativeBranchSource === undefined && runtime.migrationSource === undefined;
+		let unchangedHeldCensus: ReturnType<typeof prepareCreatorUnchangedHeldCensusRead>;
+		const capability = ObjectFreeze({});
+		recoveryCloseHolds.set(capability, {
+			kind: "full-census",
+			...(ownedReceivedAppend === undefined ? {} : {receivedAppend: ownedReceivedAppend}),
+			context: registration,
+			registration,
+			closePlane,
+			borrowSigning: (trusts) =>
+				received === undefined
+					? borrowCreatorCloseSigningDependencies(closePlane, trusts)
+					: received.signing.acquireRecoveryDependencies(trusts),
+			captureSigning: () =>
+				received === undefined
+					? captureCreatorCloseSigningRetirementOwners(closePlane)
+					: received.signing.captureRetirementOwners(),
+			dependencyAnchors,
+			sourceTrust,
+			exactCanonicalCensusBytes: sealed,
+			pending: new Set(),
+			retirementAllowed: received !== undefined || !activeObservation,
+			...((ownedIssueCustody ?? registration.currentReplacementCustody) === undefined
+				? {}
+				: { replacementCustody: ownedIssueCustody ?? registration.currentReplacementCustody }),
+			...(received === undefined ? {} : { completeRetirement: received.completeRetirement }),
+			...(quiescentBoundary === undefined ? {} : {completeRetirement: quiescentBoundary.completeRetirement}),
+			...(sourceDependencies === undefined ? {} : { releaseSourceDependencies: sourceDependencies.release }),
+			releasing: false,
+			check: async (): Promise<void> => {
+				const held = issuanceRead;
+				const journalAtStart = journalCurrent;
+				const fast = unchangedHeldCensus;
+				// First check AFTER native enrollment is always the original full
+				// held walk, not the pre-enrollment seal. Only its exact input view can
+				// initialize reuse. Never carry a view into another lease/reopen.
+				const capturedInputs = mayPrepareUnchanged && held !== undefined && unchangedHeldCensus === undefined
+					? {pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false} : undefined;
+				const reopened = fast !== undefined && held !== undefined
+					? await held.read(async () => {
+						const unchanged = await fast(held);
+						return unchanged === undefined ? captureCensus(held) : unchanged ? sealed : undefined;
+					})
+					: await census(capturedInputs);
+				if (reopened === undefined || !sameBytes(sealed, reopened))
+					throw new TypeError("creator recovery dependency census is stale or unclassified");
+				if (capturedInputs !== undefined && held !== undefined) {
+					mayPrepareUnchanged = false;
+					unchangedHeldCensus = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, capturedInputs, held,
+						readJournalCurrent);
+				}
+				// Enrollment itself never skips validation. This exact check must
+				// first complete the original replay read/equality inside the same
+				// issuance/native journal holds; only subsequent checks may use its
+				// nominal native currency port plus the retained graph guards.
+				if (fast !== undefined && journalAtStart !== undefined && journalCurrent === journalAtStart && journalAtStart.held === held &&
+					held.available() && live()) journalAtStart.verified = true;
+			},
+			enrollCurrentJournalObservation: observation => {
+				const held = issuanceRead, owner = registration.liveJournalStore, producer = owner.readRetirementImage;
+				if (held === undefined || !held.available() || !live() || producer === undefined || !ObjectIsFrozen(producer)) return;
+				const method = ObjectGetOwnPropertyDescriptor(producer, "captureCurrentProbe");
+				if (method === undefined || !("value" in method) || typeof method.value !== "function") return;
+				try {
+					const probe = producer.captureCurrentProbe?.call(producer, observation);
+					if (probe !== undefined && held.available() && live())
+						journalCurrent = {held, owner, producer, probe, verified: false};
+				} catch { /* Optional enrollment cannot replace original validation/refusal. */ }
+			},
+			ownIssuanceReservation: (original: NativeReadReservation): NativeReadReservation => {
+				const facts = fullRecoveryCloseHoldFacts(capability);
+				if (facts === undefined || facts.releasing || issuanceRead !== undefined || !live())
+					throw new TypeError("creator held issuance census is unavailable");
+				let revoked = false;
+				let releaseTask: Promise<void> | undefined;
+				const pending = new Set<Promise<unknown>>();
+				const available = (): boolean =>
+					!revoked && !facts.releasing && recoveryCloseHolds.get(capability) === facts && live();
+				// The real native exclusion is owned by this exact close hold. Track
+				// complete census turns in both owners; a release revokes admission
+				// synchronously and joins them before releasing physical custody.
+				const admit = <T>(operation: () => Promise<T>): Promise<T> => {
+					if (!available()) return Promise.reject(new TypeError("creator held issuance census is unavailable"));
+					const task = Promise.resolve().then(async () => {
+						if (!available()) throw new TypeError("creator held issuance census is unavailable");
+						const result = await operation();
+						if (!available()) throw new TypeError("creator held issuance census is unavailable");
+						return result;
+					});
+					pending.add(task);
+					facts.pending.add(task);
+					void task.then(
+						() => { pending.delete(task); facts.pending.delete(task); },
+						() => { pending.delete(task); facts.pending.delete(task); }
+					);
+					return task;
+				};
+				const held: CreatorHeldIssuanceCensusRead = ObjectFreeze({
+					store: registration.issuanceStore,
+					objectId: currentTrust.objectId,
+					available,
+					read: (consume: () => Promise<Uint8Array | undefined>) => admit(async () => {
+						await original.check();
+						const result = await consume();
+						await original.check();
+						return result;
+					}),
+				});
+				const child: NativeReadReservation = ObjectFreeze({
+					check: function (this: NativeReadReservation): Promise<void> {
+						return this === child
+							? admit(() => original.check())
+							: Promise.reject(new TypeError("creator issuance custody is foreign"));
+					},
+					release: function (this: NativeReadReservation): Promise<void> {
+						if (this !== child) return Promise.reject(new TypeError("creator issuance custody is foreign"));
+						if (releaseTask !== undefined) return releaseTask;
+						revoked = true;
+						unchangedHeldCensus = undefined; mayPrepareUnchanged = false;
+						journalCurrent = undefined;
+						releaseTask = (async (): Promise<void> => {
+							try {
+								const outcomes = await Promise.allSettled([...pending]);
+								let cleanup: unknown;
+								let cleanupFailed = false;
+								try { await original.release(); }
+								catch (error) { cleanup = error; cleanupFailed = true; }
+								const errors = outcomes.flatMap((outcome) => outcome.status === "rejected" ? [outcome.reason] : []);
+								if (cleanupFailed) errors.push(cleanup);
+								if (errors.length !== 0)
+									throw new AggregateError(errors, "creator issuance custody release failed", {cause: errors[0]});
+							} finally {
+								// Keep the revoked owner as an admission sentinel while
+								// joining: fallback must not borrow its still-live loan.
+								if (issuanceRead === held) issuanceRead = undefined;
+							}
+						})();
+						return releaseTask;
+					},
+				});
+				issuanceRead = held;
+				return child;
+			},
+		});
+		transferred = true;
+		return capability;
+	} catch (error) {
+		if (required) throw error;
+		return undefined;
+	} finally {
+		if (!transferred) await sourceDependencies?.release();
+	}
+}
+
+/** The original queue admits a bounded read turn; native views end before settlement writes. */
+async function withActiveRebaseDependencies(
+	registration: V3PlaneRegistration,
+	selected: ClassifiedRebaseRow | undefined,
+	consume: (read: CreatorSnapshotRecoveryCloseDependencyRead, proofByteCharge: number) => Promise<void>,
+	ownedIssueCustody?: LocalReplacementCustody,
+	additionalProtectedBytes: readonly Uint8Array[] = []
+): Promise<void> {
+	if (typeof consume !== "function") throw new TypeError("active dependency consumer is invalid");
+	const reservations: NativeReadReservation[] = [];
+	let reader: AheBoundedActiveRead | undefined;
+	let lifetime: CreatorSnapshotRecoveryCloseLifetime | undefined;
+	let child: CreatorSnapshotRecoveryCloseDependencyRead | undefined;
+	let failed = false,
+		primary: unknown;
+	try {
+		if (!currentRegistration(registration)) throw new TypeError("active dependency owner is stale");
+		for (const owner of [registration.payload.input.store, registration.liveJournalStore, registration.issuanceStore]) {
+			if (ownedIssueCustody !== undefined && owner !== registration.issuanceStore) {
+				await ownedIssueCustody.check();
+				continue;
+			}
+			const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
+			if (typeof acquire !== "function") throw new TypeError("active native dependency exclusion is unsupported");
+			reservations.push(
+				(await ReflectApply(acquire, owner, [
+					{ objectId: registration.payload.provenance.objectId },
+				])) as NativeReadReservation
+			);
+		}
+		const objectId = parseStorageObjectId(registration.payload.provenance.objectId);
+		if (!objectId.ok) throw new TypeError("active dependency object is invalid");
+		const acquired = await registration.payload.input.store.acquireBoundedActiveRead({
+			objectId: objectId.value,
+			ancestorCount: registration.payload.provenance.epoch === 0 ? 0 : 2,
+			limits: AHE_BOUNDED_READ_LIMITS,
+		});
+		if (!acquired.ok || acquired.value.kind === "empty")
+			throw new TypeError("active native dependency image is unavailable");
+		reader = acquired.value.reader;
+		if (!sameHead(reader.head, registration.payload.trust.head))
+			throw new TypeError("active dependency native head differs from owning runtime");
+		const hold = await sealCreatorRecoveryDependencies(
+			registration,
+			true,
+			selected,
+			registration.handle,
+			selected === undefined ? "received-replacement" : undefined,
+			undefined,
+			ownedIssueCustody
+		);
+		lifetime = resolveRecoveryCloseHold(hold, {
+			store: registration.payload.input.store,
+			liveJournalStore: registration.liveJournalStore,
+			currentTrust: registration.payload.trust.trust,
+		});
+		if (lifetime === undefined) throw new TypeError("active dependency custody is unavailable");
+		child = await lifetime.borrowDependencies();
+		// This owner authenticates already-admitted historical settlement work,
+		// not a new ordinary operation. Use its existing maintenance entitlement;
+		// the native image and ordinary issuance allowances remain unchanged.
+		const accounting = createCreatorClosedRollbackProofAccounting(reader.blobs, true);
+		for (const bytes of additionalProtectedBytes)
+			if (!accounting.charge(bytes)) throw new TypeError("remote replacement full proof charge is exhausted");
+		const exactCensus = child.readExactCanonicalCensus();
+		if (!accounting.charge(exactCensus)) {
+			let censusFieldByteCharges: Readonly<Record<string, number>> | undefined;
+			try {
+				// Failure-only byte telemetry; it never supplies authority, refunds
+				// charges or substitutes for the complete canonical census above.
+				const decoded = decodeCanonical(exactCensus, {
+					maxBytes: exactCensus.byteLength,
+					maxDepth: 32,
+					maxItems: 65536,
+				});
+				if (isObject(decoded)) {
+					const charges: Record<string, number> = {};
+					for (const [key, value] of Object.entries(decoded)) charges[key] = encodeCanonical(value).byteLength;
+					for (const owner of ["nativeIssuance", "currentJournal"]) {
+						const fields = Reflect.get(decoded, owner);
+						if (!isObject(fields)) continue;
+						for (const [key, value] of Object.entries(fields))
+							charges[`${owner}.${key}`] = encodeCanonical(value).byteLength;
+					}
+					censusFieldByteCharges = ObjectFreeze(charges);
+				}
+			} catch {
+				/* Diagnostic encoding cannot replace the original refusal. */
+			}
+			throw new TypeError("active dependency proof budget exceeded", {
+				cause: ObjectFreeze({
+					priorProofByteCharge: accounting.chargedBytes,
+					censusByteCharge: exactCensus.byteLength,
+					maxProofByteCharge: accounting.maxBytes,
+					...(censusFieldByteCharges === undefined ? {} : { censusFieldByteCharges }),
+				}),
+			});
+		}
+		const dependencyRead = child,
+			activeReader = reader;
+		await dependencyRead.checkWhile(async () => {
+			const before = await activeReader.checkCurrent();
+			if (!before.ok) throw new TypeError("active dependency native image is stale");
+			for (const reservation of reservations) await reservation.check();
+			await ownedIssueCustody?.check();
+			await consume(dependencyRead, accounting.chargedBytes);
+			const after = await activeReader.checkCurrent();
+			if (!after.ok) throw new TypeError("active dependency native image is stale");
+			for (const reservation of reservations) await reservation.check();
+		});
+	} catch (error) {
+		failed = true;
+		primary = error;
+	}
+	const heldChild = child,
+		heldLifetime = lifetime,
+		heldReader = reader;
+	const released = await Promise.allSettled([
+		...(heldChild === undefined ? [] : [Promise.resolve().then(() => heldChild.release())]),
+		...(heldLifetime === undefined ? [] : [Promise.resolve().then(() => heldLifetime.release())]),
+		...(heldReader === undefined ? [] : [Promise.resolve().then(() => heldReader.release())]),
+	]);
+	const nativeReleased = await Promise.allSettled(
+		reservations.map((view) => Promise.resolve().then(() => view.release()))
+	);
+	const faults = [...released, ...nativeReleased].flatMap((result) =>
+		result.status === "rejected" ? [result.reason] : []
+	);
+	if (faults.length)
+		throw new AggregateError(
+			failed ? [primary, ...faults] : faults,
+			"active dependency joined release",
+			failed ? { cause: primary } : undefined
+		);
+	if (failed) throw primary;
 }
 
 function classifyPlaneVertex(
@@ -4828,7 +11961,8 @@ function classifyPlaneVertex(
 	expectedDigest: Uint8Array,
 	expectedAuthor: string,
 	expectedAuthorSequence: number,
-	settlementFrontier = settlementFrontierFromHistory(historicalIssuance)
+	settlementFrontier = settlementFrontierFromHistory(historicalIssuance),
+	vertexFacts?: CreatorCensusVertexFacts
 ): ClassifiedPlaneVertex | undefined {
 	const matches = (
 		authenticated: AuthenticatedRecoveryVertex | undefined
@@ -4837,16 +11971,58 @@ function classifyPlaneVertex(
 		authenticated.digest === lowerHexDigest(expectedDigest) &&
 		authenticated.author === expectedAuthor &&
 		authenticated.authorSequence === expectedAuthorSequence;
-	const current = authenticateRecoveryVertex(payload, authorization, canonicalPreimageBytes, signature);
+	const current = authenticateRecoveryVertex(payload, authorization, canonicalPreimageBytes, signature, vertexFacts);
 	if (matches(current)) return ObjectFreeze({ authenticated: current, kind: "current" as const });
 	if (displacedSource !== undefined) {
 		const displaced = authenticateRecoveryVertex(
 			displacedSource.prepared,
 			displacedSource.authorization,
 			canonicalPreimageBytes,
-			signature
+			signature,
+			vertexFacts
 		);
 		if (matches(displaced)) return ObjectFreeze({ authenticated: displaced, kind: "displaced" as const });
+		if (displacedSource.activationVertexDigest !== undefined && displacedSource.issuanceScope !== undefined) {
+			const sourceRow = ObjectFreeze({
+				authorSequence: expectedAuthorSequence,
+				canonicalPreimageBytes,
+				digest: expectedDigest,
+				publishState: "pending" as const,
+				scope: displacedSource.issuanceScope,
+				signature,
+			}) as SnapshottedOutboxRow;
+			const sourcePinned =
+				displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+					? undefined
+					: authenticatedPinnedGenesisOutboxRow(
+							sourceRow,
+							displacedSource.issuanceScope,
+							displacedSource.prepared,
+							displacedSource.pinnedGenesisAnchorDigest,
+						displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+						vertexFacts
+						);
+			if (matches(sourcePinned)) return ObjectFreeze({ authenticated: sourcePinned, kind: "pinned-genesis" as const });
+			const sourceHistorical =
+				authenticatedCoveredHistoricalOutboxRow(
+					sourceRow,
+					displacedSource.issuanceScope,
+					displacedSource.prepared,
+					displacedSource.historicalIssuance,
+					undefined,
+					vertexFacts
+				) ??
+				authenticatedCoveredHistoricalOutboxRow(
+					sourceRow,
+					displacedSource.issuanceScope,
+					displacedSource.prepared,
+					displacedSource.historicalIssuance,
+					"closed",
+					vertexFacts
+				);
+			if (matches(sourceHistorical))
+				return ObjectFreeze({ authenticated: sourceHistorical, kind: "covered-historical" as const });
+		}
 		if (settlementProfileFor(payload.trust.trust.profileId) === "v1") {
 			const reservedDisplaced = authenticatedSettlementSourceRow(
 				displacedSource.prepared,
@@ -4856,7 +12032,11 @@ function classifyPlaneVertex(
 				expectedDigest,
 				expectedAuthor,
 				expectedAuthorSequence,
-				undefined
+				// A migrated source may itself have rolled over. Its closed control
+				// rows are authenticated against its own retained frontier, never the
+				// fresh target's epoch or a caller-selected historical context.
+				settlementFrontierFromHistory(displacedSource.historicalIssuance),
+				vertexFacts
 			);
 			if (matches(reservedDisplaced)) {
 				return ObjectFreeze({ authenticated: reservedDisplaced, kind: "displaced" as const });
@@ -4872,7 +12052,8 @@ function classifyPlaneVertex(
 			expectedDigest,
 			expectedAuthor,
 			expectedAuthorSequence,
-			settlementFrontier
+			settlementFrontier,
+			vertexFacts
 		);
 		if (matches(older)) return ObjectFreeze({ authenticated: older, kind: "displaced" as const });
 	}
@@ -4892,10 +12073,11 @@ function classifyPlaneVertex(
 					row.scope,
 					payload,
 					pinnedGenesisAnchorDigest,
-					exactCanonicalPinnedGenesisBootstrapOperationBytes
+					exactCanonicalPinnedGenesisBootstrapOperationBytes,
+					vertexFacts
 				);
 	if (matches(pinned)) return ObjectFreeze({ authenticated: pinned, kind: "pinned-genesis" as const });
-	const historical = authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance);
+	const historical = authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance, undefined, vertexFacts);
 	return matches(historical)
 		? ObjectFreeze({ authenticated: historical, kind: "covered-historical" as const })
 		: undefined;
@@ -4909,12 +12091,13 @@ function authenticatedSettlementSourceRow(
 	expectedDigest: Uint8Array,
 	expectedAuthor: string,
 	expectedAuthorSequence: number,
-	settlementFrontier: SettlementFrontierContext | undefined
+	settlementFrontier: SettlementFrontierContext | undefined,
+	vertexFacts?: CreatorCensusVertexFacts
 ): AuthenticatedRecoveryVertex | undefined {
 	try {
 		if (typeof V3_VERTEX_SUITE_ID !== "string") return undefined;
 		const suiteId = V3_VERTEX_SUITE_ID;
-		const decoded = decodeCanonical(canonicalPreimageBytes);
+		const decoded = (vertexFacts?.decode ?? decodeCanonical)(canonicalPreimageBytes);
 		if (!isObject(decoded) || !sameBytes(encodeCanonical(decoded), canonicalPreimageBytes)) return undefined;
 		const anchor = Reflect.get(decoded, "anchor");
 		const candidateEpoch = Reflect.get(decoded, "epoch");
@@ -4949,7 +12132,7 @@ function authenticatedSettlementSourceRow(
 		) {
 			return undefined;
 		}
-		const verification = verifyReceivedVertex({
+		const verification = (vertexFacts?.verify ?? verifyReceivedVertex)({
 			domain: V3_VERTEX_DOMAIN,
 			expectedAnchor: anchor,
 			receivedCanonicalPreimageBytes: canonicalPreimageBytes,
@@ -4993,6 +12176,11 @@ function authenticatedSettlementSourceRow(
 			logicalTime: logicalTime as number,
 			objectId,
 			operation: detachedOperation,
+			...(Reflect.get(decoded, "settlementSource") === undefined
+				? {}
+				: {
+						settlementSource: Reflect.get(decoded, "settlementSource") as Readonly<Record<string, unknown>>,
+					}),
 			protocolMajor: 3 as const,
 		});
 		return authenticatedRecoveryVertex(admitted, canonicalPreimageBytes.byteLength);
@@ -5013,6 +12201,34 @@ function validSettlementFrontierContext(payload: PreparedV3LivePayload, frontier
 	);
 }
 
+/** SAME room constructor's finite sources=[] law. The result is preparation
+ * data, not a plan installation, signature, close or future deletion grant. */
+function previewCreatorOrdinarySuccessorSettlement(input: Readonly<{
+	scope: DurableIssueScope; epoch: number; priorPlan: SettlementPlan | null;
+	priorFenceEpoch: number | undefined; lastTime: number; sequence: number;
+	preview: CreatorRoomSettlementPreview;
+}>): Readonly<{plan: SettlementPlan; checkPreview(): boolean}> {
+	const {scope, epoch, priorPlan, priorFenceEpoch, lastTime, sequence, preview} = input;
+	if (!NumberIsSafeInteger(lastTime) || lastTime < 1 || !NumberIsSafeInteger(lastTime + 2) ||
+		!NumberIsSafeInteger(sequence) || sequence < 0 || !NumberIsSafeInteger(sequence + 2) ||
+		!NumberIsSafeInteger(epoch + 1))
+		throw new TypeError("prospective successor settlement clock or sequence is exhausted");
+	const previewPriorPlan = priorPlan === null ? null : copySettlementPlan(priorPlan, scope);
+	if (previewPriorPlan === undefined) throw new TypeError("prospective successor settlement prior plan is malformed");
+	const previewInput = ObjectFreeze({scope, successorEpoch: epoch + 1, priorPlan: previewPriorPlan,
+		priorFenceEpoch, minimumLogicalTime: lastTime + 2});
+	const readout = preview(previewInput), plan = copySettlementPlan(readout.plan, scope);
+	if (plan === undefined || plan.fenceSequence !== null || plan.entries.some(entry =>
+		entry.disposition === "manual-review" || entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null) ||
+		!NumberIsSafeInteger(readout.fenceLogicalTime) || readout.fenceLogicalTime < lastTime + 2)
+		throw new TypeError("prospective successor settlement requires unresolved room replacement");
+	if (plan.revision !== (priorPlan === null ? 0 : priorPlan.revision + (priorPlan.fenceSequence === null ? 0 : 1)) ||
+		!sameBytes(encodeCanonical(plan.entries), encodeCanonical(priorPlan?.entries ?? [])))
+		throw new TypeError("prospective successor settlement plan differs from original merge");
+	const previewBytes = encodeCanonical(readout);
+	return ObjectFreeze({plan, checkPreview: () => sameBytes(encodeCanonical(preview(previewInput)), previewBytes)});
+}
+
 function settlementOwnRowClass(
 	epoch: number,
 	currentEpoch: number,
@@ -5026,27 +12242,31 @@ function settlementOwnRowClass(
 	return "current";
 }
 
+const settlementSourceByVertex = new WeakMap<EpochVertex, Readonly<Record<string, unknown>>>();
+
 function authenticatedRecoveryVertex(
 	admitted: AdmittedReceivedVertexView,
 	byteCharge: number
 ): AuthenticatedRecoveryVertex | undefined {
 	const digest = lowerHexDigest(admitted.digest);
 	if (digest === undefined) return undefined;
+	const vertex: EpochVertex = ObjectFreeze(creatorAuthenticatedEpochVertexFields({
+		anchor: admitted.anchor,
+		dependencies: admitted.dependencies,
+		epoch: admitted.epoch,
+		hash: digest,
+		kind: admitted.kind,
+		objectId: admitted.objectId,
+		operation: admitted.operation as NonNullable<EpochVertex["operation"]>,
+	}));
+	if (admitted.settlementSource !== undefined) settlementSourceByVertex.set(vertex, admitted.settlementSource);
 	return ObjectFreeze({
 		admitted,
 		author: admitted.author,
 		authorSequence: admitted.authorSequence,
 		byteCharge,
 		digest,
-		vertex: ObjectFreeze({
-			anchor: admitted.anchor,
-			dependencies: [...admitted.dependencies],
-			epoch: admitted.epoch,
-			hash: digest,
-			kind: admitted.kind,
-			objectId: admitted.objectId,
-			operation: admitted.operation as NonNullable<EpochVertex["operation"]>,
-		}),
+		vertex,
 	});
 }
 
@@ -5065,7 +12285,8 @@ function authenticatedPinnedGenesisOutboxRow(
 	issuanceScope: DurableIssueScope,
 	filterPayload: PreparedV3LivePayload,
 	pinnedGenesisAnchorDigest: string,
-	exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array
+	exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array,
+	vertexFacts?: CreatorCensusVertexFacts
 ): AuthenticatedRecoveryVertex | undefined {
 	try {
 		if (
@@ -5076,7 +12297,7 @@ function authenticatedPinnedGenesisOutboxRow(
 		}
 		if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") return undefined;
 		const suiteId = V3_VERTEX_SUITE_ID;
-		const extracted = extractAdmittedReceivedVertex({
+		const extracted = (vertexFacts?.extract ?? extractAdmittedReceivedVertex)({
 			domain: V3_VERTEX_DOMAIN,
 			expectedAnchor: pinnedGenesisAnchorDigest,
 			preparedBlueprintAdmission: filterPayload.admission,
@@ -5117,11 +12338,13 @@ function authenticatedCoveredHistoricalOutboxRow(
 	row: SnapshottedOutboxRow,
 	issuanceScope: DurableIssueScope,
 	filterPayload: PreparedV3LivePayload,
-	historicalIssuance: HistoricalIssuanceContext | undefined
+	historicalIssuance: HistoricalIssuanceContext | undefined,
+	coverage: "historical" | "closed" = "historical",
+	vertexFacts?: CreatorCensusVertexFacts
 ): AuthenticatedRecoveryVertex | undefined {
 	try {
 		if (
-			row.authorSequence === 0 ||
+			(coverage === "historical" && row.authorSequence === 0) ||
 			historicalIssuance === undefined ||
 			V3_VERTEX_DOMAIN !== vertexRegistry.domain ||
 			typeof V3_VERTEX_SUITE_ID !== "string"
@@ -5140,14 +12363,27 @@ function authenticatedCoveredHistoricalOutboxRow(
 		) {
 			return undefined;
 		}
-		const decoded = decodeCanonical(row.canonicalPreimageBytes);
+		const decoded = (vertexFacts?.decode ?? decodeCanonical)(row.canonicalPreimageBytes);
 		if (!isObject(decoded) || !sameBytes(encodeCanonical(decoded), row.canonicalPreimageBytes)) return undefined;
 		const anchor = Reflect.get(decoded, "anchor");
 		const epoch = Reflect.get(decoded, "epoch");
-		if (!isDigestHex(anchor) || !NumberIsSafeInteger(epoch) || (epoch as number) < 0 || epoch >= identity.closedEpoch) {
+		if (
+			!isDigestHex(anchor) ||
+			!NumberIsSafeInteger(epoch) ||
+			(epoch as number) < 0 ||
+			(coverage === "historical"
+				? epoch >= identity.closedEpoch
+				: filterPayload.trust.trust.profileId !== "creator-trusted-v1" ||
+					identity.admissionEpoch !== undefined ||
+					epoch !== identity.closedEpoch ||
+					anchor !== identity.closedAnchorDigest ||
+					identity.closedEpoch + 1 !== identity.successorEpoch ||
+					identity.successorEpoch !== filterPayload.trust.trust.currentEpoch ||
+					identity.successorAnchorDigest !== filterPayload.trust.trust.currentAnchorDigest)
+		) {
 			return undefined;
 		}
-		const extracted = extractAdmittedReceivedVertex({
+		const extracted = (vertexFacts?.extract ?? extractAdmittedReceivedVertex)({
 			domain: V3_VERTEX_DOMAIN,
 			expectedAnchor: anchor,
 			preparedBlueprintAdmission: filterPayload.admission,
@@ -5161,7 +12397,7 @@ function authenticatedCoveredHistoricalOutboxRow(
 		});
 		if (
 			!extracted.ok ||
-			extracted.vertex.authorSequence === 0 ||
+			(coverage === "historical" && extracted.vertex.authorSequence === 0) ||
 			extracted.vertex.anchor !== anchor ||
 			extracted.vertex.epoch !== epoch ||
 			extracted.vertex.objectId !== issuanceScope.objectId ||
@@ -5187,7 +12423,20 @@ function creatorFilteredIssuanceStore(
 	exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array,
 	historicalIssuance?: HistoricalIssuanceContext
 ): DurableIssuanceStore {
+	if (
+		historicalIssuance !== undefined &&
+		(historicalIssuance.originalIssuanceStore !== issuanceStore ||
+			historicalIssuance.filteredIssuanceStore !== undefined)
+	)
+		throw new TypeError("filtered issuance original owner is unavailable");
+	const acquireNativeReadReservation: unknown = Reflect.get(issuanceStore, "acquireNativeReadReservation");
 	const filtered = ObjectFreeze({
+		...(typeof acquireNativeReadReservation !== "function"
+			? {}
+			: {
+					acquireNativeReadReservation: (input: Readonly<{ objectId: string }>): Promise<NativeReadReservation> =>
+						ReflectApply(acquireNativeReadReservation, issuanceStore, [input]) as Promise<NativeReadReservation>,
+				}),
 		close: () => issuanceStore.close(),
 		compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
 			issuanceStore.compareAndMarkOutboxPublished(input),
@@ -5199,118 +12448,126 @@ function creatorFilteredIssuanceStore(
 			if (!NumberIsSafeInteger(requestedLimit) || requestedLimit < 1) {
 				return issuanceStore.readOutboxPage(input);
 			}
+			const vertexFacts = historicalIssuance?.vertexFacts;
 			const visible: DurableIssuanceOutboxRecord[] = [];
 			let afterKey = input?.afterKey;
 			for (;;) {
-				const page = await issuanceStore.readOutboxPage({
+				const nativePage = await issuanceStore.readOutboxPage({
 					...(afterKey === undefined || afterKey === null ? {} : { afterKey }),
-					limit: 1,
+					limit: 64,
 					scope: issuanceScope,
 				});
-				if (page.length !== 1) return visible.length === 0 ? page : ObjectFreeze(visible);
-				const row = outboxRowSnapshot(page[0], issuanceScope);
-				if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
-					return page;
-				}
-				const settlementFrontier = settlementFrontierFromHistory(historicalIssuance);
-				if (settlementFrontier !== undefined) {
-					const source = authenticatedSettlementSourceRow(
+				const page = captureOutboxPage(nativePage, 64);
+				if (page === undefined || page.length === 0) return visible.length === 0 ? nativePage : ObjectFreeze(visible);
+				for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
+					const raw = page.read(pageIndex) as DurableIssuanceOutboxRecord;
+					const row = outboxRowSnapshot(raw, issuanceScope);
+					if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
+						return ObjectFreeze([raw]);
+					}
+					const settlementFrontier = settlementFrontierFromHistory(historicalIssuance);
+					if (settlementFrontier !== undefined) {
+						const source = authenticatedSettlementSourceRow(
+							filterPayload,
+							filterAuthorization,
+							row.canonicalPreimageBytes,
+							row.signature,
+							row.digest,
+							issuanceScope.author,
+							row.authorSequence,
+							settlementFrontier,
+							vertexFacts
+						);
+						if (
+							source !== undefined &&
+							(excludedAfterEpoch === undefined || source.admitted.epoch < excludedAfterEpoch)
+						) {
+							const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+							const issuedRow = outboxRowSnapshot(
+								ObjectFreeze({ commit: issued, publishState: row.publishState }),
+								issuanceScope
+							);
+							if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return ObjectFreeze([raw]);
+							if (!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence)) return ObjectFreeze([raw]);
+							afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence] as const);
+							continue;
+						}
+					}
+					const authenticated = authenticateRecoveryVertex(
 						filterPayload,
 						filterAuthorization,
 						row.canonicalPreimageBytes,
 						row.signature,
-						row.digest,
-						issuanceScope.author,
-						row.authorSequence,
-						settlementFrontier
+						vertexFacts
 					);
+					const candidateEpoch = authenticated?.vertex.epoch;
+					const authenticatedFilterRow =
+						authenticated !== undefined &&
+						authenticated.digest === lowerHexDigest(row.digest) &&
+						authenticated.author === issuanceScope.author &&
+						authenticated.authorSequence === row.authorSequence &&
+						typeof candidateEpoch === "number" &&
+						(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch);
+					const authenticatedGenesisRow =
+						pinnedGenesisAnchorDigest === undefined || exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+							? undefined
+							: authenticatedPinnedGenesisOutboxRow(
+									row,
+									issuanceScope,
+									filterPayload,
+									pinnedGenesisAnchorDigest,
+									exactCanonicalPinnedGenesisBootstrapOperationBytes,
+									vertexFacts
+								);
+					const historicalIdentity =
+						historicalIssuance === undefined
+							? undefined
+							: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+					const authenticatedHistoricalRow =
+						historicalIdentity === undefined
+							? undefined
+							: authenticatedCoveredHistoricalOutboxRow(row, issuanceScope, filterPayload, historicalIssuance, undefined, vertexFacts);
 					if (
-						source !== undefined &&
-						(excludedAfterEpoch === undefined || source.admitted.epoch < excludedAfterEpoch)
+						authenticatedFilterRow ||
+						authenticatedGenesisRow !== undefined ||
+						authenticatedHistoricalRow !== undefined
 					) {
-						const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+						const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
 						const issuedRow = outboxRowSnapshot(
-							ObjectFreeze({ commit: issued, publishState: row.publishState }),
+							ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
 							issuanceScope
 						);
-						if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
-						if (!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence)) return page;
-						afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence] as const);
-						continue;
-					}
-				}
-				const authenticated = authenticateRecoveryVertex(
-					filterPayload,
-					filterAuthorization,
-					row.canonicalPreimageBytes,
-					row.signature
-				);
-				const candidateEpoch = authenticated?.vertex.epoch;
-				const authenticatedFilterRow =
-					authenticated !== undefined &&
-					authenticated.digest === lowerHexDigest(row.digest) &&
-					authenticated.author === issuanceScope.author &&
-					authenticated.authorSequence === row.authorSequence &&
-					typeof candidateEpoch === "number" &&
-					(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch);
-				const authenticatedGenesisRow =
-					pinnedGenesisAnchorDigest === undefined || exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
-						? undefined
-						: authenticatedPinnedGenesisOutboxRow(
-								row,
-								issuanceScope,
-								filterPayload,
-								pinnedGenesisAnchorDigest,
-								exactCanonicalPinnedGenesisBootstrapOperationBytes
-							);
-				const historicalIdentity =
-					historicalIssuance === undefined
-						? undefined
-						: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
-				const authenticatedHistoricalRow =
-					historicalIdentity === undefined
-						? undefined
-						: authenticatedCoveredHistoricalOutboxRow(row, issuanceScope, filterPayload, historicalIssuance);
-				if (
-					authenticatedFilterRow ||
-					authenticatedGenesisRow !== undefined ||
-					authenticatedHistoricalRow !== undefined
-				) {
-					const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
-					const issuedRow = outboxRowSnapshot(
-						ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
-						issuanceScope
-					);
-					if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
-					if (!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence)) return page;
-					if (
-						!authenticatedFilterRow &&
-						row.publishState === "pending" &&
-						(authenticatedGenesisRow !== undefined || authenticatedHistoricalRow !== undefined)
-					) {
-						visible.push(page[0] as DurableIssuanceOutboxRecord);
+						if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return ObjectFreeze([raw]);
+						if (!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence)) return ObjectFreeze([raw]);
+						if (
+							!authenticatedFilterRow &&
+							row.publishState === "pending" &&
+							(authenticatedGenesisRow !== undefined || authenticatedHistoricalRow !== undefined)
+						) {
+							visible.push(raw);
+							afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
+								string,
+								string,
+								number,
+							];
+							if (visible.length >= requestedLimit) return ObjectFreeze(visible);
+							continue;
+						}
 						afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 							string,
 							string,
 							number,
 						];
-						if (visible.length >= requestedLimit) return ObjectFreeze(visible);
 						continue;
 					}
+					visible.push(raw);
 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 						string,
 						string,
 						number,
 					];
-					continue;
+					if (visible.length >= requestedLimit) return ObjectFreeze(visible);
 				}
-				visible.push(page[0] as DurableIssuanceOutboxRecord);
-				afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
-					string,
-					string,
-					number,
-				];
-				if (visible.length >= requestedLimit) return ObjectFreeze(visible);
 			}
 		},
 		transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
@@ -5322,6 +12579,7 @@ function creatorFilteredIssuanceStore(
 	if (maintenance !== undefined && !bindDurableIssuancePruningMaintenance(filtered, maintenance)) {
 		throw new TypeError("filtered issuance maintenance was already bound");
 	}
+	if (historicalIssuance !== undefined) historicalIssuance.filteredIssuanceStore = filtered;
 	return filtered;
 }
 
@@ -5379,6 +12637,9 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			snapshotRecoveryRecord(rawInput, LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS);
 		const input = legacyInput ?? latchedInput;
 		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
+		const receiveOnly = Reflect.get(input, "receiveOnly") === true;
+		if (Reflect.get(input, "receiveOnly") !== undefined && !receiveOnly)
+			return recoveryFailure("malformed-input", "v3 receive-only restriction is invalid");
 		const rawOperationAdmissionPolicy = Reflect.get(input, OPERATION_ADMISSION_POLICY_KEY);
 		const selectedOperationAdmissionPolicy = operationAdmissionPolicy(rawOperationAdmissionPolicy);
 		if (rawOperationAdmissionPolicy !== undefined && selectedOperationAdmissionPolicy === undefined) {
@@ -5419,6 +12680,13 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		}
 		const historicalIssuance = creatorHistoricalIssuanceHandoffs.get(input.capability as object);
 		if (historicalIssuance !== undefined) creatorHistoricalIssuanceHandoffs.delete(input.capability as object);
+		const vertexFacts = historicalIssuance?.vertexFacts;
+		if (
+			historicalIssuance !== undefined &&
+			input.issuanceStore !== historicalIssuance.originalIssuanceStore &&
+			input.issuanceStore !== historicalIssuance.filteredIssuanceStore
+		)
+			return recoveryFailure("authorization-rejected", "v3 historical issuance owner does not match");
 		const payload = consumePreparedV3Live(input.capability as PreparedV3Live);
 		if (payload === undefined) return recoveryFailure("capability-consumed", "v3 capability is unavailable");
 		if (!payloadIsUsable(payload) || selectedScope.objectId !== payload.provenance.objectId) {
@@ -5436,20 +12704,31 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			historicalIssuance === undefined
 				? undefined
 				: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
-		// This permits validation of a returning member's predecessor journal, not
-		// application admission under an ACL in which that member was absent.
+		// This permits validation of a newly admitted/returning member's predecessor
+		// journal, not application admission under an ACL in which it was absent.
 		const returningPredecessor =
-			historicalIdentity?.admissionEpoch === historicalIdentity?.successorEpoch &&
 			historicalIdentity !== undefined &&
+			(historicalIdentity.admissionEpoch === historicalIdentity.successorEpoch ||
+				(historicalIdentity.admissionEpoch === undefined && historicalIdentity.admittedAuthorSequence === null)) &&
 			historicalIdentity.author === selectedScope.author &&
 			historicalIdentity.objectId === selectedScope.objectId &&
 			historicalIdentity.closedEpoch === payload.provenance.epoch &&
 			historicalIdentity.closedAnchorDigest === payload.provenance.anchorDigest &&
-			historicalIdentity.successorEpoch === payload.provenance.epoch + 1 &&
-			settlementProfileFor(payload.trust.trust.profileId) === "v1";
-		if (resolveV3AuthorizedAuthor(authorization, selectedScope.author) === undefined && !returningPredecessor) {
+			historicalIdentity.successorEpoch === payload.provenance.epoch + 1;
+		if (
+			resolveV3AuthorizedAuthor(authorization, selectedScope.author) === undefined &&
+			!returningPredecessor &&
+			!receiveOnly
+		) {
 			return recoveryFailure("authorization-rejected", "v3 recovery author is not authorized");
 		}
+		if (
+			receiveOnly &&
+			(historicalIssuance !== undefined ||
+				predecessorRecoverySource !== undefined ||
+				Reflect.get(input, "displacedSource") !== undefined)
+		)
+			return recoveryFailure("authorization-rejected", "v3 receive-only recovery cannot own historical local issuance");
 
 		let displacedSource = predecessorRecoverySource;
 		const rawDisplacedSource = Reflect.get(input, "displacedSource");
@@ -5459,8 +12738,9 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			}
 			const legacySource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_LEGACY_SOURCE_KEYS);
 			const latchedSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_LATCHED_SOURCE_KEYS);
+			const nativeSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_NATIVE_SOURCE_KEYS);
 			const crossSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_CROSS_OBJECT_SOURCE_KEYS);
-			const source = legacySource ?? latchedSource ?? crossSource;
+			const source = legacySource ?? latchedSource ?? nativeSource ?? crossSource;
 			if (source === undefined) return recoveryFailure("malformed-input", "v3 displaced source input is invalid");
 			const sourceBytes = copyDetachedBytes(
 				legacySource === undefined
@@ -5471,6 +12751,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				return recoveryFailure("malformed-input", "v3 displaced source authorization is invalid");
 			}
 			const sourcePayload = consumePreparedV3Live(source.capability as PreparedV3Live);
+			const migrationHandoff = creatorTerminalMigrationSourceHandoffs.get(source.capability as object);
+			creatorTerminalMigrationSourceHandoffs.delete(source.capability as object);
 			if (
 				sourcePayload === undefined ||
 				!payloadIsUsable(sourcePayload) ||
@@ -5497,18 +12779,32 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 						historicalIdentity !== undefined &&
 						historicalIdentity.author === selectedScope.author &&
 						historicalIdentity.objectId === selectedScope.objectId &&
-						historicalIdentity.admissionEpoch === payload.provenance.epoch &&
+						(historicalIdentity.admissionEpoch === payload.provenance.epoch ||
+							(historicalIdentity.admissionEpoch === undefined &&
+								historicalIdentity.admittedAuthorSequence === null)) &&
 						historicalIdentity.successorEpoch === payload.provenance.epoch &&
 						historicalIdentity.successorAnchorDigest === payload.provenance.anchorDigest &&
 						historicalIdentity.closedEpoch === sourcePayload.provenance.epoch &&
-						historicalIdentity.closedAnchorDigest === sourcePayload.provenance.anchorDigest &&
-						settlementProfileFor(payload.trust.trust.profileId) === "v1"
+						historicalIdentity.closedAnchorDigest === sourcePayload.provenance.anchorDigest
 					))
 			) {
 				return recoveryFailure("authorization-rejected", "v3 displaced source authorization does not match");
 			}
 			if (crossSource !== undefined) {
 				const sourceScope = copiedScope(crossSource.issuanceScope);
+				const sourceHistory = migrationHandoff?.historicalIssuance;
+				const sourceIdentity =
+					sourceHistory === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(sourceHistory.capability);
+				if (
+					sourceHistory !== undefined &&
+					(sourceIdentity === undefined ||
+						sourceIdentity.objectId !== sourcePayload.provenance.objectId ||
+						sourceIdentity.author !== sourceScope?.author ||
+						sourceIdentity.successorEpoch !== sourcePayload.provenance.epoch ||
+						sourceIdentity.successorAnchorDigest !== sourcePayload.provenance.anchorDigest ||
+						sourceHistory.originalIssuanceStore !== crossSource.issuanceStore)
+				)
+					return recoveryFailure("authorization-rejected", "v3 migration historical source owner does not match");
 				if (
 					!isDigestHex(crossSource.activationVertexDigest) ||
 					sourceScope === undefined ||
@@ -5520,9 +12816,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("authorization-rejected", "v3 displaced source authority does not match");
 				}
 				displacedSource = ObjectFreeze({
+					...(migrationHandoff === undefined ? {} : { migrationTarget: migrationHandoff.migrationTarget }),
+					...(sourceHistory === undefined ? {} : { historicalIssuance: sourceHistory }),
 					activationVertexDigest: crossSource.activationVertexDigest,
 					authorization: sourceAuthorization,
 					exactCanonicalPinnedGenesisBootstrapOperationBytes:
+						migrationHandoff?.bootstrapOperationBytes ??
 						successorRecovery?.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 					issuanceScope: sourceScope,
 					issuanceStore: crossSource.issuanceStore as DurableIssuanceStore,
@@ -5530,6 +12829,50 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					pinnedGenesisAnchorDigest: sourcePayload.input.pinnedGenesisAnchorDigest,
 					prepared: sourcePayload,
 				});
+			} else if (nativeSource !== undefined) {
+				const sourceScope = copiedScope(nativeSource.issuanceScope);
+				if (
+					sourceScope === undefined ||
+					!sameScope(sourceScope, selectedScope) ||
+					nativeSource.issuanceStore !== input.issuanceStore ||
+					nativeSource.liveJournalStore === input.liveJournalStore ||
+					!isObject(nativeSource.liveJournalStore) ||
+					sourcePayload.input.store === payload.input.store ||
+					sourcePayload.input.settlementFloor === undefined ||
+					sourcePayload.trust.trust.currentEpoch !== 0 ||
+					payload.trust.trust.currentEpoch !== 0 ||
+					sourcePayload.trust.trust.genesisAnchorDigest === payload.trust.trust.genesisAnchorDigest
+				)
+					return recoveryFailure("authorization-rejected", "v3 original rebase source owners do not match");
+				displacedSource = ObjectFreeze({
+					authorization: sourceAuthorization,
+					exactCanonicalPinnedGenesisBootstrapOperationBytes: selectedBootstrapOperationBytes,
+					issuanceScope: sourceScope,
+					issuanceStore: input.issuanceStore as DurableIssuanceStore,
+					liveJournalStore: nativeSource.liveJournalStore as DurableLiveJournalStore,
+					pinnedGenesisAnchorDigest: sourcePayload.input.pinnedGenesisAnchorDigest,
+					prepared: sourcePayload,
+				});
+				// Authenticate the complete original native source before bootstrap
+				// repair can sign for the new root. Repeated runtime holds later check
+				// the same AHE/journal/whole-floor currency before dependent delivery.
+				const sourceRead = await acquireCreatorDisplacedSourceDependencies(
+					displacedSource,
+					input.issuanceStore as DurableIssuanceStore
+				);
+				try {
+					await sourceRead.read();
+				} catch (primary) {
+					try {
+						await sourceRead.release();
+					} catch (cleanup) {
+						throw new AggregateError([primary, cleanup], "original rebase source validation and release failed", {
+							cause: primary,
+						});
+					}
+					throw primary;
+				}
+				await sourceRead.release();
 			} else if (
 				successorRecovery !== undefined &&
 				latchedSource !== undefined &&
@@ -5557,7 +12900,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (historicalIssuance !== undefined) {
 			const identity = resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
 			const expectedClosedEpoch =
-				successorRecovery === undefined ? payload.provenance.epoch : displacedSource?.prepared.provenance.epoch;
+				successorRecovery === undefined ? payload.provenance.epoch : successorRecovery.predecessorEpoch;
 			if (
 				identity === undefined ||
 				expectedClosedEpoch === undefined ||
@@ -5575,6 +12918,142 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 
 		const journal = input.liveJournalStore as DurableLiveJournalStore;
 		const issuance = input.issuanceStore as DurableIssuanceStore;
+		if (receiveOnly) {
+			try {
+				await assertEmptyReceiveOnlyIssuance(issuance, selectedScope);
+			} catch {
+				return recoveryFailure("issuance-rejected", "v3 receive-only local issuance custody is not empty");
+			}
+		}
+		if (displacedSource?.activationVertexDigest !== undefined) {
+			const sourceScope = displacedSource.issuanceScope;
+			const sourceStore = displacedSource.issuanceStore;
+			const sourceJournal = displacedSource.liveJournalStore;
+			if (sourceScope === undefined || sourceStore === undefined || sourceJournal === undefined) {
+				return recoveryFailure("authorization-rejected", "v3 displaced source authority is incomplete");
+			}
+			let sourceReadiness;
+			try {
+				sourceReadiness = await sourceJournal.readiness({ scope: liveJournalScope(displacedSource.prepared) });
+			} catch {
+				return recoveryFailure("journal-rejected", "v3 displaced source journal readiness failed");
+			}
+			if (
+				!sourceReadiness.ok ||
+				!sourceReadiness.ready ||
+				!NumberIsSafeInteger(sourceReadiness.rowCount) ||
+				(sourceReadiness.rowCount as number) < 1 ||
+				(sourceReadiness.rowCount as number) > displacedSource.prepared.parameters.maxEpochVertices ||
+				!sameLiveJournalScope(sourceReadiness.scope, liveJournalScope(displacedSource.prepared))
+			) {
+				return recoveryFailure("journal-rejected", "v3 displaced source journal is invalid");
+			}
+			let foundActivation = false;
+			let sourceAfter: number | null = null;
+			for (let sequence = 0; sequence < sourceReadiness.rowCount; sequence += 1) {
+				let page;
+				try {
+					page = await sourceJournal.readPage({
+						afterSequence: sourceAfter,
+						limit: 1,
+						scope: liveJournalScope(displacedSource.prepared),
+						snapshot: sourceReadiness.snapshot,
+					});
+				} catch {
+					return recoveryFailure("journal-rejected", "v3 displaced source journal read failed");
+				}
+				if (!page.ok || page.rows.length !== 1) {
+					return recoveryFailure("journal-rejected", "v3 displaced source journal is incomplete");
+				}
+				const sourceRow = journalRowSnapshot(page.rows[0], liveJournalScope(displacedSource.prepared), sequence);
+				if (sourceRow === undefined) {
+					return recoveryFailure("journal-rejected", "v3 displaced source journal row is invalid");
+				}
+				let sourcePreimageBytes: Uint8Array;
+				let sourceSignature: Uint8Array;
+				let issued: SnapshottedOutboxRow | undefined;
+				if (sourceRow.sourceKind === "received") {
+					sourcePreimageBytes = sourceRow.exactCanonicalPreimageBytes;
+					sourceSignature = sourceRow.detachedSignature;
+				} else {
+					let sourceCommit: unknown;
+					try {
+						sourceCommit = await sourceStore.readIssued(sourceScope, sourceRow.authorSequence);
+					} catch {
+						return recoveryFailure("issuance-rejected", "v3 displaced source issued record read failed");
+					}
+					issued = outboxRowSnapshot(
+						ObjectFreeze({ commit: sourceCommit, publishState: "pending" as const }),
+						sourceScope
+					);
+					if (issued === undefined) {
+						return recoveryFailure("admission-rejected", "v3 displaced source vertex is not authenticated");
+					}
+					sourcePreimageBytes = issued.canonicalPreimageBytes;
+					sourceSignature = issued.signature;
+				}
+				const authenticated = authenticateRecoveryVertex(
+					displacedSource.prepared,
+					displacedSource.authorization,
+					sourcePreimageBytes,
+					sourceSignature,
+					vertexFacts
+				);
+				if (
+					authenticated === undefined ||
+					authenticated.digest !== sourceRow.vertexDigest ||
+					(sourceRow.sourceKind === "local-issued" && authenticated.author !== sourceScope.author)
+				) {
+					return recoveryFailure("admission-rejected", "v3 displaced source vertex is not authenticated");
+				}
+				if (authenticated.digest === displacedSource.activationVertexDigest) {
+					let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
+					try {
+						classification = (terminalClassifier as V3TerminalVertexClassifier)(
+							ObjectFreeze({
+								author: authenticated.author,
+								exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(sourcePreimageBytes),
+								signature: new Uint8ArrayConstructor(sourceSignature),
+								vertex: authenticated.admitted,
+							})
+						);
+					} catch {
+						classification = "reject";
+					}
+					if (classification !== "terminal-authorized" || sequence !== sourceReadiness.rowCount - 1) {
+						return recoveryFailure("authorization-rejected", "v3 displaced source activation is invalid");
+					}
+					const operation = snapshotClosedRecord(authenticated.admitted.operation, ["action", "decision"]);
+					const decision = operation?.decision as Readonly<Record<string, unknown>> | undefined;
+					if (
+						operation?.action !== "migrationActivation" ||
+						!isObject(decision) ||
+						decision.targetObjectId !== payload.provenance.objectId ||
+						payload.provenance.epoch !== 0 ||
+						decision.targetAnchorDigest !== payload.provenance.anchorDigest ||
+						decision.targetBlueprintDigest !== payload.provenance.blueprintDigest
+					)
+						return recoveryFailure("authorization-rejected", "v3 displaced source activation target differs");
+					// Cold recipient recovery has no transient handoff. Preserve the
+					// immutable target from the exact independently authenticated final
+					// source row, not from live target metadata or caller authority.
+					displacedSource = ObjectFreeze({
+						...displacedSource,
+						migrationTarget: ObjectFreeze({
+							objectId: decision.targetObjectId as string,
+							epoch: 0 as const,
+							anchorDigest: decision.targetAnchorDigest as string,
+							blueprintDigest: decision.targetBlueprintDigest as string,
+						}),
+					});
+					foundActivation = true;
+				}
+				sourceAfter = sequence;
+			}
+			if (!foundActivation) {
+				return recoveryFailure("authorization-rejected", "v3 displaced source activation is unavailable");
+			}
+		}
 		const scope = liveJournalScope(payload);
 		let installed;
 		try {
@@ -5675,6 +13154,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				}
 				const row = journalRowSnapshot(rawJournalPage.rows[0], scope, expectedSequence);
 				if (row === undefined) return recoveryFailure("journal-rejected", "v3 journal row is invalid");
+				if (receiveOnly && row.sourceKind !== "received")
+					return recoveryFailure("authorization-rejected", "v3 receive-only journal contains local issuance");
 				const expectedNext = expectedSequence + 1 < readiness.rowCount ? expectedSequence : null;
 				if (rawJournalPage.nextSequence !== expectedNext) {
 					return recoveryFailure("journal-rejected", "v3 journal cursor is invalid");
@@ -5683,6 +13164,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				let authenticated: AuthenticatedRecoveryVertex | undefined;
 				let recoveredPreimageBytes: Uint8Array | undefined;
 				let recoveredSignature: Uint8Array | undefined;
+				const retained: RetainedCloseSignedAdmissionCapture = {};
 				try {
 					if (row.sourceKind === "received") {
 						recoveredPreimageBytes = row.exactCanonicalPreimageBytes;
@@ -5691,7 +13173,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 							payload,
 							authorization,
 							row.exactCanonicalPreimageBytes,
-							row.detachedSignature
+							row.detachedSignature, vertexFacts, retained
 						);
 					} else {
 						const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
@@ -5707,7 +13189,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 								payload,
 								authorization,
 								issuedRow.canonicalPreimageBytes,
-								issuedRow.signature
+								issuedRow.signature, vertexFacts, retained
 							);
 							if (
 								authenticated?.author !== row.author ||
@@ -5781,7 +13263,34 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				const candidate = controlOperation
 					? null
 					: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-				if (!controlOperation && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
+				const sourceAuthorized =
+					authenticated.admitted.settlementSource === undefined
+						? false
+						: verifyPortableSettlementSource(
+								{ payload, authorization, displacedSource, historicalIssuance },
+								authenticated.admitted,
+								closeVertices
+							) ||
+							(row.sourceKind === "local-issued" &&
+								(await verifyLocalNativeSettlementSource(
+									{ payload, authorization, displacedSource, historicalIssuance, issuanceStore: issuance },
+									authenticated.admitted,
+									closeVertices
+								)));
+				if (authenticated.admitted.settlementSource !== undefined && !sourceAuthorized)
+					return recoveryFailure("authorization-rejected", "v3 journal settlement source is not authorized");
+				if (
+					!controlOperation &&
+					!validateLatchedOperation(
+						authorization,
+						latchedOperations,
+						candidate,
+						authenticated.author,
+						payload.trust.trust.profileId,
+						terminalClassification === "terminal-authorized",
+						sourceAuthorized
+					)
+				) {
 					return recoveryFailure("authorization-rejected", "v3 journal ACL operation is not authorized");
 				}
 				const updatedEpochBytes = nextEpochBytes(
@@ -5796,7 +13305,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					? undefined
 					: reserveOperation(
 							selectedOperationAdmissionPolicy,
-							authenticated.vertex.operation as Readonly<Record<string, unknown>>
+							authenticated.vertex.operation as Readonly<Record<string, unknown>>,
+							authenticated.author
 						);
 				if (reservation === null) {
 					return recoveryFailure("admission-rejected", "v3 journal replay operation was rejected");
@@ -5807,7 +13317,15 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
 				}
-				retainCloseVertex(closeVertices, closeAuthors, authorVertexCounts, authenticated, closeCharges);
+				retainCloseVertex(
+					closeVertices,
+					closeAuthors,
+					authorVertexCounts,
+					authenticated,
+					closeCharges,
+					sourceAuthorized,
+					retained.value
+				);
 				if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
 					controlVertices.add(authenticated.digest);
 				}
@@ -5843,349 +13361,304 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			let rawPage: unknown;
 			try {
 				rawPage = await issuance.readOutboxPage(
-					afterKey === undefined ? { limit: 1, scope: selectedScope } : { afterKey, limit: 1, scope: selectedScope }
+					afterKey === undefined ? { limit: 64, scope: selectedScope } : { afterKey, limit: 64, scope: selectedScope }
 				);
 			} catch {
 				return recoveryFailure("issuance-rejected", "v3 recovery outbox read failed");
 			}
-			const page = onePage(rawPage);
+			const page = captureOutboxPage(rawPage, 64);
 			if (page === undefined) return recoveryFailure("issuance-rejected", "v3 recovery outbox page is invalid");
-			if (page === null) break;
-			const row = outboxRowSnapshot(page, selectedScope);
-			if (row === undefined || (afterKey !== undefined && row.authorSequence <= afterKey[2])) {
-				return recoveryFailure("issuance-rejected", "v3 recovery outbox record is invalid");
-			}
-			let issuedCommit: unknown;
-			try {
-				issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
-			} catch {
-				return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
-			}
-			const issuedRow = outboxRowSnapshot(
-				ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
-				selectedScope
-			);
-			if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) {
-				return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
-			}
-			let classified: ClassifiedPlaneVertex | undefined;
-			try {
-				classified = classifyPlaneVertex(
-					payload,
-					authorization,
-					displacedSource,
-					historicalIssuance,
-					payload.input.pinnedGenesisAnchorDigest,
-					selectedBootstrapOperationBytes,
-					row.canonicalPreimageBytes,
-					row.signature,
-					row.digest,
-					selectedScope.author,
-					row.authorSequence
+			if (page.length === 0) break;
+			for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
+				const raw = page.read(pageIndex);
+				if (raw === undefined) return recoveryFailure("issuance-rejected", "v3 recovery outbox page is invalid");
+				const row = outboxRowSnapshot(raw, selectedScope);
+				if (row === undefined || (afterKey !== undefined && row.authorSequence <= afterKey[2])) {
+					return recoveryFailure("issuance-rejected", "v3 recovery outbox record is invalid");
+				}
+				let issuedCommit: unknown;
+				try {
+					issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
+				} catch {
+					return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
+				}
+				const issuedRow = outboxRowSnapshot(
+					ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+					selectedScope
 				);
-			} catch {
-				return recoveryFailure("admission-rejected", "v3 recovery admission failed");
-			}
-			const settlementFrontier = settlementFrontierFromHistory(historicalIssuance);
-			if (
-				classified !== undefined &&
-				settlementFrontier !== undefined &&
-				settlementFrontier.currentEpoch === payload.provenance.epoch
-			) {
-				const ownClass = settlementOwnRowClass(
-					classified.authenticated.admitted.epoch,
-					settlementFrontier.currentEpoch,
-					row.authorSequence,
-					settlementFrontier.admissionEpoch,
-					settlementFrontier.terminalThrough
-				);
-				if (ownClass === "terminal" || ownClass === "old-incarnation") {
+				if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) {
+					return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
+				}
+				let classified: ClassifiedPlaneVertex | undefined;
+				try {
+					classified = classifyPlaneVertex(
+						payload,
+						authorization,
+						displacedSource,
+						historicalIssuance,
+						payload.input.pinnedGenesisAnchorDigest,
+						selectedBootstrapOperationBytes,
+						row.canonicalPreimageBytes,
+						row.signature,
+						row.digest,
+						selectedScope.author,
+						row.authorSequence,
+						undefined,
+						vertexFacts
+					);
+				} catch {
+					return recoveryFailure("admission-rejected", "v3 recovery admission failed");
+				}
+				const settlementFrontier = settlementFrontierFromHistory(historicalIssuance);
+				if (
+					classified !== undefined &&
+					settlementFrontier !== undefined &&
+					settlementFrontier.currentEpoch === payload.provenance.epoch
+				) {
+					const ownClass = settlementOwnRowClass(
+						classified.authenticated.admitted.epoch,
+						settlementFrontier.currentEpoch,
+						row.authorSequence,
+						settlementFrontier.admissionEpoch,
+						settlementFrontier.terminalThrough
+					);
+					if (ownClass === "terminal" || ownClass === "old-incarnation") {
+						afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+						continue;
+					}
+				}
+				if (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {
+					if (
+						!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence) ||
+						!acceptedApplicationOperation(
+							payload,
+							classified.authenticated.vertex.operation,
+							classified.authenticated.admitted.logicalTime
+						)
+					) {
+						return recoveryFailure("admission-rejected", "v3 historical issuance row is not authenticated");
+					}
 					afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
 					continue;
 				}
-			}
-			if (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {
+				if (classified?.kind === "displaced") {
+					displacedRecordCount += 1;
+					displacedIssuanceBoundary = row.authorSequence;
+					const displacedPayload = displacedSource?.prepared ?? payload;
+					if (displacedRecordCount > displacedPayload.parameters.maxEpochVertices) {
+						return recoveryFailure("graph-rejected", "v3 displaced recovery graph is at capacity");
+					}
+					const displacedOperation = classified.authenticated.vertex.operation;
+					if (displacedOperation === undefined) {
+						return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
+					}
+					const displacedAction = Reflect.get(displacedOperation, "action");
+					const settlementSourceControl =
+						settlementProfileFor(payload.trust.trust.profileId) === "v1" &&
+						(isControlOperation(displacedOperation, payload.trust.trust.profileId) || displacedAction === "acl");
+					if (
+						(!settlementSourceControl &&
+							!acceptedApplicationOperation(
+								displacedPayload,
+								displacedOperation,
+								classified.authenticated.admitted.logicalTime
+							)) ||
+						!hasBoundedDependencies(displacedPayload, classified.authenticated)
+					) {
+						return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
+					}
+					afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+					continue;
+				}
+				if (classified?.kind !== "current") {
+					return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
+				}
+				currentRecordCount += 1;
+				if (currentRecordCount > payload.parameters.maxEpochVertices) {
+					return recoveryFailure("graph-rejected", "v3 current recovery graph is at capacity");
+				}
+				const authenticated = classified.authenticated;
+				const authorFence = isAuthorFenceOperation(authenticated.vertex.operation);
+				if (authorFence && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+					return recoveryFailure("admission-rejected", "v3 recovery fence profile is invalid");
+				}
+				const controlOperation = isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId);
 				if (
-					!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence) ||
-					!acceptedApplicationOperation(
-						payload,
-						classified.authenticated.vertex.operation,
-						classified.authenticated.admitted.logicalTime
+					(!controlOperation &&
+						!acceptedApplicationOperation(
+							payload,
+							authenticated.vertex.operation,
+							authenticated.admitted.logicalTime
+						)) ||
+					authenticated.vertex.dependencies.some(
+						(dependency) => ReflectApply(SetPrototypeHas, quarantinedDigests, [dependency]) === true
 					)
 				) {
-					return recoveryFailure("admission-rejected", "v3 historical issuance row is not authenticated");
+					ReflectApply(SetPrototypeAdd, quarantinedDigests, [authenticated.digest]);
+					afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+					continue;
 				}
-				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
-				continue;
-			}
-			if (classified?.kind === "displaced") {
-				displacedRecordCount += 1;
-				displacedIssuanceBoundary = row.authorSequence;
-				const displacedPayload = displacedSource?.prepared ?? payload;
-				if (displacedRecordCount > displacedPayload.parameters.maxEpochVertices) {
-					return recoveryFailure("graph-rejected", "v3 displaced recovery graph is at capacity");
+				if (!hasBoundedDependencies(payload, authenticated)) {
+					return recoveryFailure("admission-rejected", "v3 recovery vertex dependency bound is invalid");
 				}
-				const displacedOperation = classified.authenticated.vertex.operation;
-				if (displacedOperation === undefined) {
-					return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
-				}
-				const displacedAction = Reflect.get(displacedOperation, "action");
-				const settlementSourceControl =
-					settlementProfileFor(payload.trust.trust.profileId) === "v1" &&
-					(isControlOperation(displacedOperation, payload.trust.trust.profileId) || displacedAction === "acl");
-				if (
-					(!settlementSourceControl &&
-						!acceptedApplicationOperation(
-							displacedPayload,
-							displacedOperation,
-							classified.authenticated.admitted.logicalTime
-						)) ||
-					!hasBoundedDependencies(displacedPayload, classified.authenticated)
-				) {
-					return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
-				}
-				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
-				continue;
-			}
-			if (classified?.kind !== "current") {
-				return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
-			}
-			currentRecordCount += 1;
-			if (currentRecordCount > payload.parameters.maxEpochVertices) {
-				return recoveryFailure("graph-rejected", "v3 current recovery graph is at capacity");
-			}
-			const authenticated = classified.authenticated;
-			const authorFence = isAuthorFenceOperation(authenticated.vertex.operation);
-			if (authorFence && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
-				return recoveryFailure("admission-rejected", "v3 recovery fence profile is invalid");
-			}
-			const controlOperation = isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId);
-			if (
-				(!controlOperation &&
-					!acceptedApplicationOperation(payload, authenticated.vertex.operation, authenticated.admitted.logicalTime)) ||
-				authenticated.vertex.dependencies.some(
-					(dependency) => ReflectApply(SetPrototypeHas, quarantinedDigests, [dependency]) === true
-				)
-			) {
-				ReflectApply(SetPrototypeAdd, quarantinedDigests, [authenticated.digest]);
-				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
-				continue;
-			}
-			if (!hasBoundedDependencies(payload, authenticated)) {
-				return recoveryFailure("admission-rejected", "v3 recovery vertex dependency bound is invalid");
-			}
-			const alreadyRecovered = index.has(authenticated.digest);
-			let terminalClassification: ReturnType<V3TerminalVertexClassifier> = "ordinary";
-			if (!alreadyRecovered && typeof terminalClassifier === "function") {
-				try {
-					terminalClassification = (terminalClassifier as V3TerminalVertexClassifier)(
-						ObjectFreeze({
-							author: authenticated.author,
-							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(issuedRow.canonicalPreimageBytes),
-							signature: new Uint8ArrayConstructor(issuedRow.signature),
-							vertex: authenticated.admitted,
-						})
-					);
-				} catch {
-					terminalClassification = "reject";
-				}
-				if (
-					terminalClassification === "reject" ||
-					(recoveredTerminal && terminalClassification !== "terminal-authorized")
-				) {
-					return recoveryFailure("authorization-rejected", "v3 recovery terminal sequence is invalid");
-				}
-			}
-			const candidate = controlOperation
-				? null
-				: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-			if (
-				!alreadyRecovered &&
-				!controlOperation &&
-				!validateLatchedOperation(authorization, latchedOperations, candidate)
-			) {
-				return recoveryFailure("authorization-rejected", "v3 recovery ACL operation is not authorized");
-			}
-			let updatedEpochBytes = epochBytes;
-			if (!alreadyRecovered) {
-				if (!hasInstalledDependencies(index, authenticated)) {
-					return recoveryFailure("graph-rejected", "v3 recovery graph dependency is unavailable");
-				}
-				const nextBytes = nextEpochBytes(epochBytes, authenticated.byteCharge, payload.parameters.maxEpochBytes);
-				if (nextBytes === undefined || index.size >= payload.parameters.maxEpochVertices) {
-					return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
-				}
-				updatedEpochBytes = nextBytes;
-			}
-			const reservation =
-				alreadyRecovered || controlOperation
-					? undefined
-					: reserveOperation(
-							selectedOperationAdmissionPolicy,
-							authenticated.vertex.operation as Readonly<Record<string, unknown>>
-						);
-			if (reservation === null) {
-				return recoveryFailure("admission-rejected", "v3 recovery operation was rejected");
-			}
-			let appended;
-			try {
-				appended = await journal.appendAccepted({
-					author: selectedScope.author,
-					authorSequence: row.authorSequence,
-					scope,
-					sourceKind: "local-issued",
-					vertexDigest: authenticated.digest,
-				});
-			} catch {
-				return recoveryFailure("journal-rejected", "v3 recovery journal append failed");
-			}
-			if (
-				!appended.ok ||
-				appended.vertexDigest !== authenticated.digest ||
-				(alreadyRecovered ? !appended.idempotent : appended.idempotent || appended.sourceKind !== "local-issued")
-			) {
-				return recoveryFailure("journal-rejected", "v3 recovery journal append was rejected");
-			}
-			if (!alreadyRecovered) {
-				try {
-					const outcome = index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
-					if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
-				} catch {
-					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
-				}
-				retainCloseVertex(closeVertices, closeAuthors, authorVertexCounts, authenticated, closeCharges);
-				if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
-					controlVertices.add(authenticated.digest);
-				}
-				epochBytes = updatedEpochBytes;
-				recoveredCount += 1;
-				recoveredVertices.push(authenticated.admitted);
-				if (successorRecovery !== undefined && !controlOperation) {
-					recoveredDeliveries.push(
-						ObjectFreeze({
-							vertex: authenticated.admitted,
-							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
-							signature: new Uint8ArrayConstructor(row.signature),
-						})
-					);
-				}
-				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
-				if (!commitOperationReservation(reservation)) {
-					return recoveryFailure("admission-rejected", "v3 recovery policy commit failed");
-				}
-				if (terminalClassification === "terminal-authorized") recoveredTerminal = true;
-			}
-			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
-		}
-		if (displacedSource?.activationVertexDigest !== undefined) {
-			const sourceScope = displacedSource.issuanceScope;
-			const sourceStore = displacedSource.issuanceStore;
-			const sourceJournal = displacedSource.liveJournalStore;
-			if (sourceScope === undefined || sourceStore === undefined || sourceJournal === undefined) {
-				return recoveryFailure("authorization-rejected", "v3 displaced source authority is incomplete");
-			}
-			let sourceReadiness;
-			try {
-				sourceReadiness = await sourceJournal.readiness({ scope: liveJournalScope(displacedSource.prepared) });
-			} catch {
-				return recoveryFailure("journal-rejected", "v3 displaced source journal readiness failed");
-			}
-			if (
-				!sourceReadiness.ok ||
-				!sourceReadiness.ready ||
-				!NumberIsSafeInteger(sourceReadiness.rowCount) ||
-				(sourceReadiness.rowCount as number) < 1 ||
-				(sourceReadiness.rowCount as number) > displacedSource.prepared.parameters.maxEpochVertices ||
-				!sameLiveJournalScope(sourceReadiness.scope, liveJournalScope(displacedSource.prepared))
-			) {
-				return recoveryFailure("journal-rejected", "v3 displaced source journal is invalid");
-			}
-			let foundActivation = false;
-			let sourceAfter: number | null = null;
-			for (let sequence = 0; sequence < sourceReadiness.rowCount; sequence += 1) {
-				let page;
-				try {
-					page = await sourceJournal.readPage({
-						afterSequence: sourceAfter,
-						limit: 1,
-						scope: liveJournalScope(displacedSource.prepared),
-						snapshot: sourceReadiness.snapshot,
-					});
-				} catch {
-					return recoveryFailure("journal-rejected", "v3 displaced source journal read failed");
-				}
-				if (!page.ok || page.rows.length !== 1) {
-					return recoveryFailure("journal-rejected", "v3 displaced source journal is incomplete");
-				}
-				const sourceRow = journalRowSnapshot(page.rows[0], liveJournalScope(displacedSource.prepared), sequence);
-				if (sourceRow === undefined) {
-					return recoveryFailure("journal-rejected", "v3 displaced source journal row is invalid");
-				}
-				let sourcePreimageBytes: Uint8Array;
-				let sourceSignature: Uint8Array;
-				let issued: SnapshottedOutboxRow | undefined;
-				if (sourceRow.sourceKind === "received") {
-					sourcePreimageBytes = sourceRow.exactCanonicalPreimageBytes;
-					sourceSignature = sourceRow.detachedSignature;
-				} else {
-					let sourceCommit: unknown;
+				const alreadyRecovered = index.has(authenticated.digest);
+				let terminalClassification: ReturnType<V3TerminalVertexClassifier> = "ordinary";
+				if (!alreadyRecovered && typeof terminalClassifier === "function") {
 					try {
-						sourceCommit = await sourceStore.readIssued(sourceScope, sourceRow.authorSequence);
-					} catch {
-						return recoveryFailure("issuance-rejected", "v3 displaced source issued record read failed");
-					}
-					issued = outboxRowSnapshot(
-						ObjectFreeze({ commit: sourceCommit, publishState: "pending" as const }),
-						sourceScope
-					);
-					if (issued === undefined) {
-						return recoveryFailure("admission-rejected", "v3 displaced source vertex is not authenticated");
-					}
-					sourcePreimageBytes = issued.canonicalPreimageBytes;
-					sourceSignature = issued.signature;
-				}
-				const authenticated = authenticateRecoveryVertex(
-					displacedSource.prepared,
-					displacedSource.authorization,
-					sourcePreimageBytes,
-					sourceSignature
-				);
-				if (
-					authenticated === undefined ||
-					authenticated.digest !== sourceRow.vertexDigest ||
-					(sourceRow.sourceKind === "local-issued" && authenticated.author !== sourceScope.author)
-				) {
-					return recoveryFailure("admission-rejected", "v3 displaced source vertex is not authenticated");
-				}
-				if (authenticated.digest === displacedSource.activationVertexDigest) {
-					let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
-					try {
-						classification = (terminalClassifier as V3TerminalVertexClassifier)(
+						terminalClassification = (terminalClassifier as V3TerminalVertexClassifier)(
 							ObjectFreeze({
 								author: authenticated.author,
-								exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(sourcePreimageBytes),
-								signature: new Uint8ArrayConstructor(sourceSignature),
+								exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(issuedRow.canonicalPreimageBytes),
+								signature: new Uint8ArrayConstructor(issuedRow.signature),
 								vertex: authenticated.admitted,
 							})
 						);
 					} catch {
-						classification = "reject";
+						terminalClassification = "reject";
 					}
-					if (classification !== "terminal-authorized" || sequence !== sourceReadiness.rowCount - 1) {
-						return recoveryFailure("authorization-rejected", "v3 displaced source activation is invalid");
+					if (
+						terminalClassification === "reject" ||
+						(recoveredTerminal && terminalClassification !== "terminal-authorized")
+					) {
+						return recoveryFailure("authorization-rejected", "v3 recovery terminal sequence is invalid");
 					}
-					foundActivation = true;
 				}
-				sourceAfter = sequence;
-			}
-			if (!foundActivation) {
-				return recoveryFailure("authorization-rejected", "v3 displaced source activation is unavailable");
+				const candidate = controlOperation
+					? null
+					: aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+				const sourceAuthorized =
+					authenticated.admitted.settlementSource === undefined
+						? false
+						: alreadyRecovered ||
+							verifyPortableSettlementSource(
+								{ payload, authorization, displacedSource, historicalIssuance },
+								authenticated.admitted,
+								closeVertices
+							) ||
+							(await verifyLocalNativeSettlementSource(
+								{ payload, authorization, displacedSource, historicalIssuance, issuanceStore: issuance },
+								authenticated.admitted,
+								closeVertices
+							));
+				if (authenticated.admitted.settlementSource !== undefined && !sourceAuthorized)
+					return recoveryFailure("authorization-rejected", "v3 recovered settlement source is not authorized");
+				if (
+					!alreadyRecovered &&
+					!controlOperation &&
+					!validateLatchedOperation(
+						authorization,
+						latchedOperations,
+						candidate,
+						authenticated.author,
+						payload.trust.trust.profileId,
+						terminalClassification === "terminal-authorized",
+						sourceAuthorized
+					)
+				) {
+					return recoveryFailure("authorization-rejected", "v3 recovery ACL operation is not authorized");
+				}
+				let updatedEpochBytes = epochBytes;
+				if (!alreadyRecovered) {
+					if (!hasInstalledDependencies(index, authenticated)) {
+						return recoveryFailure("graph-rejected", "v3 recovery graph dependency is unavailable");
+					}
+					const nextBytes = nextEpochBytes(epochBytes, authenticated.byteCharge, payload.parameters.maxEpochBytes);
+					if (nextBytes === undefined || index.size >= payload.parameters.maxEpochVertices) {
+						return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
+					}
+					updatedEpochBytes = nextBytes;
+				}
+				const reservation =
+					alreadyRecovered || controlOperation
+						? undefined
+						: reserveOperation(
+								selectedOperationAdmissionPolicy,
+								authenticated.vertex.operation as Readonly<Record<string, unknown>>,
+								authenticated.author
+							);
+				if (reservation === null) {
+					return recoveryFailure("admission-rejected", "v3 recovery operation was rejected");
+				}
+				let appended;
+				try {
+					appended = await journal.appendAccepted({
+						author: selectedScope.author,
+						authorSequence: row.authorSequence,
+						scope,
+						sourceKind: "local-issued",
+						vertexDigest: authenticated.digest,
+					});
+				} catch {
+					return recoveryFailure("journal-rejected", "v3 recovery journal append failed");
+				}
+				if (
+					!appended.ok ||
+					appended.vertexDigest !== authenticated.digest ||
+					(alreadyRecovered ? !appended.idempotent : appended.idempotent || appended.sourceKind !== "local-issued")
+				) {
+					return recoveryFailure("journal-rejected", "v3 recovery journal append was rejected");
+				}
+				if (!alreadyRecovered) {
+					try {
+						const outcome = index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+						if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
+					} catch {
+						return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
+					}
+					retainCloseVertex(
+						closeVertices,
+						closeAuthors,
+						authorVertexCounts,
+						authenticated,
+						closeCharges,
+						sourceAuthorized
+					);
+					if (isControlOperation(authenticated.vertex.operation, payload.trust.trust.profileId)) {
+						controlVertices.add(authenticated.digest);
+					}
+					epochBytes = updatedEpochBytes;
+					recoveredCount += 1;
+					recoveredVertices.push(authenticated.admitted);
+					if (successorRecovery !== undefined && !controlOperation) {
+						recoveredDeliveries.push(
+							ObjectFreeze({
+								vertex: authenticated.admitted,
+								exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+								signature: new Uint8ArrayConstructor(row.signature),
+							})
+						);
+					}
+					if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
+					if (!commitOperationReservation(reservation)) {
+						return recoveryFailure("admission-rejected", "v3 recovery policy commit failed");
+					}
+					if (terminalClassification === "terminal-authorized") recoveredTerminal = true;
+				}
+				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
 			}
 		}
+		// A latched non-Writer may open an authenticated empty genesis and later
+		// exercise its independent ACL authority. Under the none profile the app
+		// bootstrap is ordinary Writer work: opening must not manufacture it for
+		// this member. This exception cannot hide any retained or displaced work,
+		// and leaves operation admission, projection and native charges unchanged.
+		const enrolledNonWriterRoot =
+			authorization.kind === "latched-acl" &&
+			resolveV3AuthorizedAuthor(authorization, selectedScope.author) !== undefined &&
+			!isV3ApplicationAuthorAuthorized(authorization, selectedScope.author) &&
+			settlementProfileFor(payload.trust.trust.profileId) === "none" &&
+			payload.provenance.epoch === 0 &&
+			payload.provenance.anchorDigest === payload.input.pinnedGenesisAnchorDigest &&
+			displacedSource === undefined &&
+			historicalIssuance === undefined &&
+			currentRecordCount === 0 &&
+			recoveredCount === 0;
 		if (
 			successorRecovery === undefined &&
+			!receiveOnly &&
 			!retainedBootstrapHold &&
 			!returningPredecessor &&
+			!enrolledNonWriterRoot &&
 			currentRecordCount === 0 &&
 			(historicalIssuance?.count ?? 0) === 0 &&
 			(recoveredCount === 0 || (displacedSource !== undefined && displacedSource.activationVertexDigest === undefined))
@@ -6195,7 +13668,11 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (
 			successorRecovery === undefined &&
 			!retainedBootstrapHold &&
-			((!returningPredecessor && recoveredCount === 0 && (historicalIssuance?.count ?? 0) === 0) ||
+			((!receiveOnly &&
+				!returningPredecessor &&
+				!enrolledNonWriterRoot &&
+				recoveredCount === 0 &&
+				(historicalIssuance?.count ?? 0) === 0) ||
 				index.size !== preparedVertexCount + recoveredCount)
 		) {
 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
@@ -6210,6 +13687,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		installRecoveredV3LiveAuthority(
 			capability,
 			ObjectFreeze({
+				receiveOnly,
 				authorVertexCounts,
 				closeAuthors,
 				closeCharges,
@@ -6263,7 +13741,213 @@ interface CapturedLocalIssueInput {
 		readonly operation: Readonly<Record<string, unknown>>;
 	}>[];
 	readonly planEffect?: NonNullable<DurableIssueCommit["planEffect"]>;
+	/** Present only in the private receiver-bound source turn, never captured from public input. */
+	readonly settlementSource?: ClassifiedRebaseRow;
+	readonly settlementCustody?: LocalReplacementCustody;
+	/** Captured only in the genuine source/native dependency turn. */
+	readonly settlementAuthorization?: Readonly<Record<string, unknown>>;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}
+
+interface LocalReplacementCustody {
+	borrow(owner: object): Promise<NativeReadReservation | undefined>;
+	check(): Promise<void>;
+	joinJournalReads(): Promise<Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>>;
+	resumeJournalReads(expected: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>): Promise<void>;
+	release(): Promise<void>;
+}
+
+async function acquireLocalReplacementCustody(
+	registration: V3PlaneRegistration,
+	expectedFloorBytes: Uint8Array
+): Promise<LocalReplacementCustody> {
+	const floor = registration.payload.input.settlementFloor;
+	if (floor === undefined) throw new TypeError("replacement whole-floor owner is unavailable");
+	const objectId = registration.payload.provenance.objectId;
+	const floorScope = ObjectFreeze({
+		objectId,
+		pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest,
+	});
+	const reservations: NativeReadReservation[] = [];
+	const byOwner = new Map<object, NativeReadReservation>();
+	const borrowed = new Set<NativeReadReservation>();
+	let journalReservation: NativeReadReservation | undefined,
+		released = false;
+	const externalSource =
+		registration.displacedSource?.prepared.provenance.objectId !== objectId ? registration.displacedSource : undefined;
+	let externalFloorBytes: Uint8Array | undefined;
+	const release = async (): Promise<void> => {
+		if (released) return;
+		released = true;
+		const borrowJoins = await Promise.allSettled([...borrowed].map((view) => view.release()));
+		const heldJournal = journalReservation;
+		const joined = await Promise.allSettled([
+			...reservations.map((value) => Promise.resolve().then(() => value.release())),
+			...(heldJournal === undefined ? [] : [Promise.resolve().then(() => heldJournal.release())]),
+		]);
+		const faults = [...borrowJoins, ...joined].flatMap((value) => (value.status === "rejected" ? [value.reason] : []));
+		if (faults.length) throw new AggregateError(faults, "replacement native custody joined release");
+	};
+	try {
+		if (externalSource !== undefined) {
+			const sourceObjectId = externalSource.prepared.provenance.objectId;
+			for (const owner of [
+				externalSource.prepared.input.store,
+				externalSource.liveJournalStore,
+				externalSource.issuanceStore,
+			]) {
+				if (owner === undefined) throw new TypeError("replacement external native owner is unavailable");
+				const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
+				if (typeof acquire !== "function") throw new TypeError("replacement external native custody is unsupported");
+				const reservation = (await ReflectApply(acquire, owner, [
+					{ objectId: sourceObjectId },
+				])) as NativeReadReservation;
+				reservations.push(reservation);
+				byOwner.set(owner, reservation);
+			}
+			const sourceFloor = externalSource.prepared.input.settlementFloor;
+			if (sourceFloor === undefined) throw new TypeError("replacement external floor is unavailable");
+			const scope = { objectId: sourceObjectId, pinnedGenesisAnchorDigest: externalSource.pinnedGenesisAnchorDigest };
+			const reservation = await sourceFloor.acquireNativeReadReservation({ scope });
+			reservations.push(reservation);
+			byOwner.set(sourceFloor, reservation);
+			externalFloorBytes = encodeCanonical(await sourceFloor.readRetirementImage({ scope }));
+		}
+		for (const owner of [registration.payload.input.store, registration.liveJournalStore]) {
+			const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
+			if (typeof acquire !== "function") throw new TypeError("replacement native custody is unsupported");
+			const reservation = (await ReflectApply(acquire, owner, [{ objectId }])) as NativeReadReservation;
+			byOwner.set(owner, reservation);
+			if (owner === registration.liveJournalStore) journalReservation = reservation;
+			else reservations.push(reservation);
+		}
+		const floorReservation = await floor.acquireNativeReadReservation({ scope: floorScope });
+		reservations.push(floorReservation);
+		byOwner.set(floor, floorReservation);
+		const parsed = parseStorageObjectId(objectId);
+		if (!parsed.ok) throw new TypeError("replacement object is invalid");
+		const check = async (): Promise<void> => {
+			if (released || !currentRegistration(registration)) throw new TypeError("replacement custody owner is stale");
+			// Complete dependency authentication remains the original bounded reader's
+			// job below. Retain its native all-store exclusion, not another blob copy.
+			const current = await registration.payload.input.store.readHead(parsed.value);
+			if (!current.ok || current.value.kind !== "present" || !sameHead(current.value, registration.payload.trust.head))
+				throw new TypeError("replacement native AHE is stale");
+			for (const reservation of reservations) await reservation.check();
+			await journalReservation?.check();
+			if (externalSource !== undefined) {
+				const sourceFloorOwner = externalSource.prepared.input.settlementFloor;
+				const expectedExternalFloorBytes = externalFloorBytes;
+				if (sourceFloorOwner === undefined || expectedExternalFloorBytes === undefined)
+					throw new TypeError("replacement external floor is unavailable");
+				const sourceObjectId = parseStorageObjectId(externalSource.prepared.provenance.objectId);
+				if (!sourceObjectId.ok) throw new TypeError("replacement external source is invalid");
+				const head = await externalSource.prepared.input.store.readHead(sourceObjectId.value);
+				const sourceFloor = await sourceFloorOwner.readRetirementImage({
+					scope: {
+						objectId: externalSource.prepared.provenance.objectId,
+						pinnedGenesisAnchorDigest: externalSource.pinnedGenesisAnchorDigest,
+					},
+				});
+				if (
+					!head.ok ||
+					head.value.kind !== "present" ||
+					!sameHead(head.value, externalSource.prepared.trust.head) ||
+					!sameBytes(encodeCanonical(sourceFloor), expectedExternalFloorBytes)
+				)
+					throw new TypeError("replacement external source currency changed");
+			}
+			const image = await floor.readRetirementImage({ scope: floorScope });
+			if (!sameBytes(encodeCanonical(image), expectedFloorBytes))
+				throw new TypeError("replacement whole-floor image is stale");
+		};
+		await check();
+		const readJournal = registration.liveJournalStore.readRetirementImage;
+		if (readJournal === undefined) throw new TypeError("replacement journal image is unavailable");
+		const journal = (await ReflectApply(readJournal, registration.liveJournalStore, [{ objectId }])) as Awaited<
+			ReturnType<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>
+		>;
+		if (!journal.ok) throw new TypeError("replacement journal source is unavailable");
+		let checkpoint = ObjectFreeze({
+			imageDigest: journal.value.image.imageDigest,
+			controlBytes: journal.value.control === null ? null : encodeJournalRetirementControl(journal.value.control),
+		});
+		return ObjectFreeze({
+			check,
+			release,
+			borrow: async (owner: object) => {
+				await check();
+				if (released || !currentRegistration(registration))
+					throw new TypeError("replacement native borrow owner is revoked");
+				if (!byOwner.has(owner)) return undefined;
+				let revoked = false,
+					joined: Promise<void> | undefined;
+				const work = new Set<Promise<void>>();
+				const view: NativeReadReservation = ObjectFreeze({
+					check: () => {
+						if (revoked) return Promise.reject(new TypeError("replacement native borrow is revoked"));
+						const task = check();
+						work.add(task);
+						void task.finally(() => work.delete(task)).catch(() => {});
+						return task;
+					},
+					release: () => {
+						if (joined !== undefined) return joined;
+						revoked = true;
+						joined = Promise.resolve().then(async () => {
+							const outcomes = await Promise.allSettled([...work]);
+							borrowed.delete(view);
+							const faults = outcomes.flatMap((outcome) => (outcome.status === "rejected" ? [outcome.reason] : []));
+							if (faults.length !== 0)
+								throw new AggregateError(faults, "replacement native borrow joined checks failed");
+						});
+						return joined;
+					},
+				});
+				borrowed.add(view);
+				return view;
+			},
+			resumeJournalReads: async (expected: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>) => {
+				const acquire: unknown = Reflect.get(registration.liveJournalStore, "acquireNativeReadReservation");
+				if (typeof acquire !== "function" || journalReservation !== undefined || released)
+					throw new TypeError("replacement journal reacquisition is invalid");
+				journalReservation = (await ReflectApply(acquire, registration.liveJournalStore, [
+					{ objectId },
+				])) as NativeReadReservation;
+				const actual = (await ReflectApply(readJournal, registration.liveJournalStore, [{ objectId }])) as Awaited<
+					ReturnType<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>
+				>;
+				if (!actual.ok) throw new TypeError("replacement journal readback is unavailable");
+				const actualControl =
+					actual.value.control === null ? null : encodeJournalRetirementControl(actual.value.control);
+				if (
+					actual.value.image.imageDigest !== expected.imageDigest ||
+					!sameBytes(encodeCanonical(actualControl), encodeCanonical(expected.controlBytes))
+				)
+					throw new TypeError("replacement journal postimage is stale");
+				checkpoint = ObjectFreeze({
+					imageDigest: expected.imageDigest,
+					controlBytes: expected.controlBytes === null ? null : new Uint8ArrayConstructor(expected.controlBytes),
+				});
+				await check();
+			},
+			joinJournalReads: async () => {
+				await check();
+				const selected = journalReservation;
+				if (selected === undefined) throw new TypeError("replacement journal custody already joined");
+				journalReservation = undefined;
+				await selected.release();
+				return checkpoint;
+			},
+		});
+	} catch (error) {
+		try {
+			await release();
+		} catch (cleanup) {
+			throw new AggregateError([error, cleanup], "replacement custody acquisition failed");
+		}
+		throw error;
+	}
 }
 
 type InternalLocalIssueResult = V3LocalIssueResult &
@@ -6304,11 +13988,12 @@ function canonicalRecord(value: unknown, keys: readonly string[]): Readonly<Reco
 	}
 }
 
-function denseArray(value: unknown): readonly unknown[] | undefined {
+function denseArray(value: unknown, maximumLength?: number): readonly unknown[] | undefined {
 	try {
 		if (!ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== ArrayPrototype) return undefined;
 		const length = value.length;
 		if (!NumberIsSafeInteger(length) || length < 0) return undefined;
+		if (maximumLength !== undefined && length > maximumLength) throw new InputCaptureCapacityError("entry");
 		const actual = ReflectOwnKeys(value);
 		if (actual.length !== length + 1 || actual[length] !== "length") return undefined;
 		for (let index = 0; index < length; index += 1) {
@@ -6317,17 +14002,30 @@ function denseArray(value: unknown): readonly unknown[] | undefined {
 			if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
 		}
 		return value;
-	} catch {
+	} catch (error) {
+		if (error instanceof InputCaptureCapacityError) throw error;
 		return undefined;
 	}
 }
 
-function detachedCanonicalOperation(value: unknown): Readonly<Record<string, unknown>> | undefined {
+function detachedCanonicalOperation(
+	value: unknown,
+	custody?: InputCaptureCustody
+): Readonly<Record<string, unknown>> | undefined {
 	try {
-		const cloned = decodeCanonical(encodeCanonical(value));
+		const bytes = encodeCanonical(value, custody === undefined ? {} : { maxBytes: custody.remainingBytes() });
+		const cloned = decodeCanonical(bytes);
 		if (!isObject(cloned) || ArrayIsArray(cloned) || ObjectGetPrototypeOf(cloned) !== null) return undefined;
+		custody?.chargeBytes(bytes.byteLength);
 		return ObjectFreeze({ ...(cloned as Record<string, unknown>) });
-	} catch {
+	} catch (error) {
+		if (error instanceof InputCaptureCapacityError) throw error;
+		if (
+			custody !== undefined &&
+			error instanceof CanonicalEncodingError &&
+			(error.message === "string exceeds byte limit" || error.message === "canonical value exceeds byte limit")
+		)
+			throw new InputCaptureCapacityError("byte");
 		return undefined;
 	}
 }
@@ -6425,7 +14123,8 @@ function applicationBatchFits(operation: Readonly<Record<string, unknown>>): boo
 
 function capturedLocalIssueInput(
 	payload: PreparedV3LivePayload,
-	rawInput: V3LocalIssueInput
+	rawInput: V3LocalIssueInput,
+	custody?: InputCaptureCustody
 ): CapturedLocalIssueInput | V3LocalIssueResult {
 	const input =
 		snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS) ??
@@ -6475,7 +14174,7 @@ function capturedLocalIssueInput(
 			return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
 		}
 	}
-	const values = denseArray(input.operations);
+	const values = denseArray(input.operations, custody?.entryLimit);
 	if (values === undefined || values.length === 0) {
 		return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
 	}
@@ -6498,7 +14197,7 @@ function capturedLocalIssueInput(
 			return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
 		}
 		sourceOperations.add(entry.operation);
-		const operation = detachedCanonicalOperation(entry.operation);
+		const operation = detachedCanonicalOperation(entry.operation, custody);
 		if (operation === undefined) {
 			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
 		}
@@ -6541,6 +14240,45 @@ function capturedLocalIssueInput(
 	});
 }
 
+/** Capture the genuine native reader once; subsequent bindings cannot retarget it. */
+function bindSnapshotReadinessOwner(
+	registration: V3PlaneRegistration,
+	store: SnapshotQuarantineStore<SnapshotVerificationReceipt>
+): boolean {
+	if (!currentRegistration(registration)) return false;
+	if (registration.snapshotReadiness !== undefined) return registration.snapshotReadiness.owner === store;
+	const reader = store.recoveryStatus;
+	if (typeof reader !== "function") return false;
+	registration.snapshotReadiness = ObjectFreeze({ owner: store, read: () => reader.call(store) });
+	return true;
+}
+
+/** A readiness preflight, not a substitute for native source/currentness custody. */
+async function localSnapshotAdmissionFailure(
+	registration: V3PlaneRegistration
+): Promise<ReturnType<typeof localIssueFailure> | undefined> {
+	const readiness = registration.snapshotReadiness;
+	let status: SnapshotRecoveryOwnerStatus | undefined;
+	// Genesis captures its native owner at genuine close binding. Successor
+	// activation captures it before any public exposure or replay.
+	if (readiness !== undefined) {
+		try {
+			status = await readiness.read();
+		} catch {
+			return localIssueFailure("admission-rejected", "v3 snapshot readiness is unavailable");
+		}
+	}
+	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+	if (registration.operationAdmissionHalted)
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	if (
+		status !== undefined &&
+		(status.migration !== "ready" || status.classificationIntent !== undefined || status.legacyUnclassifiedScopes !== 0)
+	)
+		return localIssueFailure("admission-rejected", "v3 snapshot inherited classification is required");
+	return undefined;
+}
+
 async function issueOneVertex(
 	registration: V3PlaneRegistration,
 	input: CapturedLocalIssueInput,
@@ -6548,12 +14286,16 @@ async function issueOneVertex(
 	logicalTime: number,
 	operation: Readonly<Record<string, unknown>>,
 	requireTerminalAuthorization = false,
-	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>
+	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>,
+	finishingSuffix?: CreatorOrdinaryIssuanceSuffixForSizing
 ): Promise<InternalLocalIssueResult> {
+	if (registration.receiveOnly) return localIssueFailure("authorization-rejected", "v3 plane is receive-only");
 	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
 	if (registration.operationAdmissionHalted) {
 		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
 	}
+	const readinessFailure = await localSnapshotAdmissionFailure(registration);
+	if (readinessFailure !== undefined) return readinessFailure;
 	if (registration.index.size >= registration.payload.parameters.maxEpochVertices) {
 		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
 	}
@@ -6572,283 +14314,443 @@ async function issueOneVertex(
 	const proposedAcl = controlOperation ? null : aclOperation(scope.author, "0".repeat(64), operation);
 	if (
 		!controlOperation &&
-		!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)
+		!validateLatchedOperation(
+			registration.authorization,
+			registration.latchedOperations,
+			proposedAcl,
+			scope.author,
+			registration.payload.trust.trust.profileId,
+			requireTerminalAuthorization,
+			input.settlementSource !== undefined && input.settlementAuthorization !== undefined
+		)
 	) {
 		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
 	}
-	const reservation = controlOperation ? undefined : reserveOperation(registration.operationAdmissionPolicy, operation);
+	const reservation = controlOperation
+		? undefined
+		: reserveOperation(registration.operationAdmissionPolicy, operation, scope.author);
 	if (reservation === null) {
 		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
 	}
 
 	let commit: unknown;
 	let capacityRejected = false;
+	let cryptoEntered = false;
 	let signerResolved = false;
 	let terminalTransactionStarted = false;
+	let maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined;
 	try {
-		const transactWithPlanEffect = async (
-			selectedScope: DurableIssueScope,
-			buildAndSign: DurableBuildAndSign
-		): Promise<DurableIssueCommit> => {
-			const protocolCommit = (committed: DurableIssueCommit): DurableIssueCommit => {
-				if (planEffect === undefined) return committed;
-				return ObjectFreeze({
-					authorSequence: committed.authorSequence,
-					envelope: committed.envelope,
-					issuedRecord: committed.issuedRecord,
-					outboxEntry: committed.outboxEntry,
-				});
-			};
-			const commitOutsideTransaction = async (authorSequence: number): Promise<DurableIssueCommit> => {
-				if (planEffect?.kind === "fence" && Reflect.get(operation, "fenceSequence") !== authorSequence) {
-					throw new TypeError("v3 author fence does not match the issuance lineage");
-				}
-				const builtCommit = await buildAndSign(authorSequence);
-				const candidateCommit = planEffect === undefined ? builtCommit : ObjectFreeze({ ...builtCommit, planEffect });
-				const candidateRow = outboxRowSnapshot(
-					ObjectFreeze({ commit: candidateCommit, publishState: "pending" as const }),
-					selectedScope
-				);
-				if (
-					candidateRow !== undefined &&
-					!hasGraphCapacity(registration, selectedScope.author, candidateRow.canonicalPreimageBytes.byteLength)
-				) {
-					capacityRejected = true;
-					throw new TypeError("v3 local issue graph is at capacity");
-				}
-				return candidateCommit;
-			};
-			if (requireTerminalAuthorization) {
-				const lineage = await registration.issuanceStore.readLineage(selectedScope);
-				if (!NumberIsSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
-					throw new TypeError("v3 terminal issuance lineage is unavailable");
-				}
-				const expectedSequence = lineage.next;
-				const candidate = await commitOutsideTransaction(expectedSequence);
-				terminalTransactionStarted = true;
-				const committed = await registration.issuanceStore.transactIssue(selectedScope, (authorSequence) => {
-					if (authorSequence !== expectedSequence) {
-						throw new TypeError("v3 terminal issuance lineage changed");
-					}
-					return Promise.resolve(candidate as never);
-				});
-				return protocolCommit(committed);
-			}
-			return protocolCommit(
-				await registration.issuanceStore.transactIssue(selectedScope, commitOutsideTransaction as never)
-			);
-		};
-		const issuer = createAdmissionBoundTransactionalVertexIssuer({
-			author: scope.author,
-			preparedBlueprintAdmission: registration.payload.admission,
-			publicKey: authorized,
-			signRegisteredVertexDigest: async (digest) => {
-				const signature = await input.signRegisteredVertexDigest(digest);
-				signerResolved = true;
-				return signature;
-			},
-			transactIssue: transactWithPlanEffect,
-		});
-		if (planEffect?.kind === "fence") {
-			commit = await transactWithPlanEffect(scope, async (authorSequence) => {
-				const canonicalPreimageBytes = encodeCanonical(
-					ObjectFreeze({
-						anchor: registration.payload.provenance.anchorDigest,
-						author: scope.author,
-						authorSequence,
-						dependencies: ObjectFreeze([...dependencies].sort()),
-						epoch: registration.payload.provenance.epoch,
-						kind: "drp-vertex",
-						logicalTime,
-						objectId: registration.payload.provenance.objectId,
-						operation,
-						protocolMajor: 3,
-					})
-				);
-				const digest = hashDomain(V3_VERTEX_DOMAIN, canonicalPreimageBytes);
-				const signed = await input.signRegisteredVertexDigest(new Uint8ArrayConstructor(digest));
-				signerResolved = true;
-				const signature = copyDetachedBytes(signed);
-				if (signature === undefined || signature.byteLength !== 64) {
-					throw new TypeError("v3 author fence signature is invalid");
-				}
-				const envelope = ObjectFreeze({ canonicalPreimageBytes, digest, signature });
-				return ObjectFreeze({
-					authorSequence,
-					envelope,
-					issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
-					outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
-				});
-			});
-		} else {
-			commit = await issuer.issue({
-				anchor: registration.payload.provenance.anchorDigest,
-				dependencies,
-				epoch: registration.payload.provenance.epoch,
-				logicalTime,
-				objectId: registration.payload.provenance.objectId,
-				operation,
-			});
-		}
-	} catch (error) {
-		const issuanceOutcomeUnknown =
-			error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
-		if ((!signerResolved && !terminalTransactionStarted) || capacityRejected) {
-			releaseOperationReservation(reservation);
-		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
-			registration.operationAdmissionHalted = true;
-		}
-		if (requireTerminalAuthorization && terminalTransactionStarted) {
-			return internalLocalIssueFailure(
-				"issuance-rejected",
-				"v3 terminal issue transaction outcome is unknown",
-				"outcome-unknown"
-			);
-		}
-		if (issuanceOutcomeUnknown && settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
-			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
-		}
-		return capacityRejected
-			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
-			: signerResolved
-				? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
-				: localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
-	}
-	const committedFailure = (
-		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
-		detail: string
-	): InternalLocalIssueResult => {
-		registration.operationAdmissionHalted = true;
-		return requireTerminalAuthorization
-			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
-			: localIssueFailure(kind, detail);
-	};
-	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
-	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
-
-	let authenticated: AuthenticatedRecoveryVertex | undefined;
-	try {
-		authenticated = authenticateRecoveryVertex(
-			registration.payload,
-			registration.authorization,
-			row.canonicalPreimageBytes,
-			row.signature
-		);
-	} catch {
-		return committedFailure("admission-rejected", "v3 local issue authentication failed");
-	}
-	if (
-		authenticated === undefined ||
-		authenticated.digest !== lowerHexDigest(row.digest) ||
-		authenticated.author !== scope.author ||
-		authenticated.authorSequence !== row.authorSequence ||
-		registration.index.has(authenticated.digest)
-	) {
-		return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
-	}
-	if (!hasBoundedDependencies(registration.payload, authenticated)) {
-		return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
-	}
-	if (requireTerminalAuthorization) {
-		let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
 		try {
-			classification =
-				registration.classifyTerminalVertex?.(
+			const quotedReplacementContext =
+				input.settlementSource === undefined ? undefined : await ownedReplacementSignContext(registration, input);
+			const replacementContext =
+				quotedReplacementContext === undefined
+					? undefined
+					: planEffect?.kind === "replacement"
+						? quotedReplacementContext
+						: ObjectFreeze({
+								expectedIssuanceImageDigest: quotedReplacementContext.expectedIssuanceImageDigest,
+								expectedIssuanceControlBytes: quotedReplacementContext.expectedIssuanceControlBytes,
+							});
+			const transactWithPlanEffect = async (
+				selectedScope: DurableIssueScope,
+				buildAndSign: DurableBuildAndSign
+			): Promise<DurableIssueCommit> => {
+				const protocolCommit = (committed: DurableIssueCommit): DurableIssueCommit => {
+					if (planEffect === undefined) return committed;
+					return ObjectFreeze({
+						authorSequence: committed.authorSequence,
+						envelope: committed.envelope,
+						issuedRecord: committed.issuedRecord,
+						outboxEntry: committed.outboxEntry,
+					});
+				};
+				const buildInNativeJob: DurableBuildAndSign = async (authorSequence, nativeSignAdmission) => {
+					if (replacementContext !== undefined && nativeSignAdmission === undefined)
+						throw new TypeError("source-bound replacement requires its original native job");
+					if (registration.creatorMaintenanceBound && nativeSignAdmission === undefined)
+						throw new TypeError("creator issuance maintenance requires its original native job");
+					if (planEffect?.kind === "fence" && Reflect.get(operation, "fenceSequence") !== authorSequence) {
+						throw new TypeError("v3 author fence does not match the issuance lineage");
+					}
+					// The lexical hook belongs to this exact native issuance job. A
+					// separately minted facade hook would release custody before commit.
+					const admittedSign =
+						nativeSignAdmission === undefined
+							? undefined
+							: async (bytes: Uint8Array, sign: () => Promise<Uint8Array>): Promise<Uint8Array> => {
+									const sourceSign =
+										replacementContext === undefined
+											? sign
+											: async (): Promise<Uint8Array> => {
+													const selectedSource = input.settlementSource;
+													if (selectedSource === undefined) throw new TypeError("replacement owning source was lost");
+													deriveOwnedReplacement(registration, selectedSource, input);
+													await input.settlementCustody?.check();
+													const decoded = decodeCanonical(bytes);
+													if (
+														!isObject(decoded) ||
+														!sameBytes(
+															encodeCanonical(Reflect.get(decoded, "operation")),
+															encodeCanonical(operation)
+														) ||
+														!sameBytes(
+															encodeCanonical(Reflect.get(decoded, "settlementSource") ?? null),
+															encodeCanonical(controlOperation ? null : (input.settlementAuthorization ?? null))
+														)
+													)
+														throw new TypeError("native replacement bytes differ from owned candidate");
+													return sign();
+												};
+									if (!hasGraphCapacity(registration, selectedScope.author, bytes.byteLength)) {
+										capacityRejected = true;
+										throw new TypeError("v3 local issue graph is at capacity");
+									}
+									if (registration.creatorMaintenanceBound) {
+										const consumer = registration.creatorMaintenanceAdmission;
+										if (consumer === undefined || maintenanceAdmission !== undefined)
+											throw new TypeError("creator issuance maintenance admission is unavailable");
+										maintenanceAdmission = await consumer({kind: "local-issuance", exactCanonicalUnsignedVertexBytes: bytes,
+											...(planEffect === undefined ? {} : {planEffect}),
+											...(finishingSuffix === undefined ? {} : {finishingSuffix})});
+										await maintenanceAdmission.beginWrite();
+										if (
+											replacementContext !== undefined &&
+											(maintenanceAdmission.context.expectedIssuanceImageDigest !==
+												replacementContext.expectedIssuanceImageDigest ||
+												!sameBytes(
+													encodeCanonical(maintenanceAdmission.context.expectedIssuanceControlBytes ?? null),
+													encodeCanonical(replacementContext.expectedIssuanceControlBytes ?? null)
+												))
+										)
+											throw new TypeError("replacement/maintenance native currency differs");
+										return nativeSignAdmission(bytes, sourceSign, maintenanceAdmission.context);
+									}
+									return nativeSignAdmission(
+										bytes,
+										sourceSign,
+										replacementContext ?? (planEffect === undefined ? undefined : { planEffect })
+									);
+								};
+					const builtCommit = await buildAndSign(authorSequence, admittedSign);
+					const candidateCommit = planEffect === undefined ? builtCommit : ObjectFreeze({ ...builtCommit, planEffect });
+					const candidateRow = outboxRowSnapshot(
+						ObjectFreeze({ commit: candidateCommit, publishState: "pending" as const }),
+						selectedScope
+					);
+					if (
+						candidateRow !== undefined &&
+						!hasGraphCapacity(registration, selectedScope.author, candidateRow.canonicalPreimageBytes.byteLength)
+					) {
+						capacityRejected = true;
+						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					return candidateCommit;
+				};
+				if (requireTerminalAuthorization) {
+					const lineage = await registration.issuanceStore.readLineage(selectedScope);
+					if (!NumberIsSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
+						throw new TypeError("v3 terminal issuance lineage is unavailable");
+					}
+					const expectedSequence = lineage.next;
+					terminalTransactionStarted = true;
+					const committed = await registration.issuanceStore.transactIssue(
+						selectedScope,
+						(authorSequence, nativeSignAdmission) => {
+							if (authorSequence !== expectedSequence) {
+								throw new TypeError("v3 terminal issuance lineage changed");
+							}
+							return buildInNativeJob(authorSequence, nativeSignAdmission);
+						}
+					);
+					await maintenanceAdmission?.endWrite();
+					return protocolCommit(committed);
+				}
+				const committed = await registration.issuanceStore.transactIssue(selectedScope, buildInNativeJob);
+				await maintenanceAdmission?.endWrite();
+				return protocolCommit(committed);
+			};
+			const issuer = createAdmissionBoundTransactionalVertexIssuer({
+				author: scope.author,
+				preparedBlueprintAdmission: registration.payload.admission,
+				publicKey: authorized,
+				signRegisteredVertexDigest: async (digest, request) => {
+					cryptoEntered = true;
+					const signature = await input.signRegisteredVertexDigest(digest, request);
+					signerResolved = true;
+					return signature;
+				},
+				transactIssue: transactWithPlanEffect,
+			});
+			if (planEffect?.kind === "fence") {
+				commit = await transactWithPlanEffect(scope, async (authorSequence, nativeSignAdmission) => {
+					const canonicalPreimageBytes = encodeCanonical(
+						ObjectFreeze({
+							anchor: registration.payload.provenance.anchorDigest,
+							author: scope.author,
+							authorSequence,
+							dependencies: ObjectFreeze([...dependencies].sort()),
+							epoch: registration.payload.provenance.epoch,
+							kind: "drp-vertex",
+							logicalTime,
+							objectId: registration.payload.provenance.objectId,
+							operation,
+							protocolMajor: 3,
+						})
+					);
+					const digest = hashDomain(V3_VERTEX_DOMAIN, canonicalPreimageBytes);
+					const sign = (): Promise<Uint8Array> => {
+						cryptoEntered = true;
+						return withAuthoredOperationSigningRequest(canonicalPreimageBytes, request => input.signRegisteredVertexDigest(new Uint8ArrayConstructor(digest), request));
+					};
+					const signed =
+						nativeSignAdmission === undefined
+							? await sign()
+							: await nativeSignAdmission(new Uint8ArrayConstructor(canonicalPreimageBytes), sign);
+					signerResolved = true;
+					const signature = copyDetachedBytes(signed);
+					if (signature === undefined || signature.byteLength !== 64) {
+						throw new TypeError("v3 author fence signature is invalid");
+					}
+					const envelope = ObjectFreeze({ canonicalPreimageBytes, digest, signature });
+					return ObjectFreeze({
+						authorSequence,
+						envelope,
+						issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
+						outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
+					});
+				});
+			} else {
+				commit = await issuer.issue({
+					anchor: registration.payload.provenance.anchorDigest,
+					dependencies,
+					epoch: registration.payload.provenance.epoch,
+					logicalTime,
+					objectId: registration.payload.provenance.objectId,
+					operation,
+					...(input.settlementAuthorization === undefined || controlOperation
+						? {}
+						: { settlementSource: input.settlementAuthorization }),
+				});
+			}
+		} catch (error) {
+			const issuanceOutcomeUnknown =
+				error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
+			if (issuanceOutcomeUnknown || cryptoEntered) {
+				// Durable entered debt is not disproved by this callback's entry count.
+				registration.operationAdmissionHalted = true;
+			} else if (!terminalTransactionStarted || capacityRejected) {
+				releaseOperationReservation(reservation);
+			} else if (reservation !== undefined) {
+				registration.operationAdmissionHalted = true;
+			}
+			if (requireTerminalAuthorization && terminalTransactionStarted) {
+				return internalLocalIssueFailure(
+					"issuance-rejected",
+					"v3 terminal issue transaction outcome is unknown",
+					"outcome-unknown"
+				);
+			}
+			if (issuanceOutcomeUnknown && settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
+				return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
+			}
+			return capacityRejected
+				? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+				: signerResolved
+					? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
+					: localIssueFailure(
+							"issuance-rejected",
+							`v3 local issue transaction failed: ${error instanceof Error ? error.message : String(error)}`
+						);
+		}
+		const committedFailure = (
+			kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+			detail: string
+		): InternalLocalIssueResult => {
+			registration.operationAdmissionHalted = true;
+			return requireTerminalAuthorization
+				? internalLocalIssueFailure(kind, detail, "outcome-unknown")
+				: localIssueFailure(kind, detail);
+		};
+		const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
+		if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
+
+		let authenticated: AuthenticatedRecoveryVertex | undefined;
+		const retained: RetainedCloseSignedAdmissionCapture = {};
+		try {
+			authenticated = authenticateRecoveryVertex(
+				registration.payload,
+				registration.authorization,
+				row.canonicalPreimageBytes,
+				row.signature, undefined, retained
+			);
+		} catch {
+			return committedFailure("admission-rejected", "v3 local issue authentication failed");
+		}
+		if (
+			authenticated === undefined ||
+			authenticated.digest !== lowerHexDigest(row.digest) ||
+			authenticated.author !== scope.author ||
+			authenticated.authorSequence !== row.authorSequence ||
+			registration.index.has(authenticated.digest)
+		) {
+			return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
+		}
+		if (!hasBoundedDependencies(registration.payload, authenticated)) {
+			return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+		}
+		if (requireTerminalAuthorization) {
+			let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
+			try {
+				classification =
+					registration.classifyTerminalVertex?.(
+						ObjectFreeze({
+							author: authenticated.author,
+							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+							signature: new Uint8ArrayConstructor(row.signature),
+							vertex: authenticated.admitted,
+						})
+					) ?? "reject";
+			} catch {
+				classification = "reject";
+			}
+			if (classification !== "terminal-authorized") {
+				return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
+			}
+		}
+		const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+		if (
+			!controlOperation &&
+			!validateLatchedOperation(
+				registration.authorization,
+				registration.latchedOperations,
+				acceptedAcl,
+				authenticated.author,
+				registration.payload.trust.trust.profileId,
+				requireTerminalAuthorization,
+				input.settlementSource !== undefined && input.settlementAuthorization !== undefined
+			)
+		) {
+			return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+		}
+		if (!hasGraphCapacity(registration, authenticated.author, authenticated.byteCharge)) {
+			return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+		}
+
+		let appended;
+		try {
+			const custodyImage = await input.settlementCustody?.joinJournalReads(), maintenanceImage = maintenanceAdmission?.journalContext;
+			if (custodyImage !== undefined && maintenanceImage !== undefined &&
+				(custodyImage.imageDigest !== maintenanceImage.imageDigest ||
+					!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
+				throw new TypeError("local journal contexts disagree");
+			const expectedNativeImage = custodyImage ?? maintenanceImage;
+			appended = await registration.liveJournalStore.appendAccepted({
+				author: scope.author,
+				authorSequence: row.authorSequence,
+				scope: liveJournalScope(registration.payload),
+				sourceKind: "local-issued",
+				vertexDigest: authenticated.digest,
+				...(expectedNativeImage === undefined ? {} : { expectedNativeImage }),
+			});
+			if (input.settlementCustody !== undefined) {
+				if (!appended.ok || appended.nativeImage === undefined)
+					throw new TypeError("replacement journal source-bound readback is unavailable");
+				await input.settlementCustody.resumeJournalReads(appended.nativeImage);
+			}
+			if (maintenanceImage !== undefined && (!appended.ok || appended.nativeImage === undefined))
+				throw new TypeError("ordinary local journal postimage is unavailable");
+		} catch {
+			return committedFailure("journal-rejected", "v3 local issue journal append failed");
+		}
+		if (
+			!appended.ok ||
+			appended.idempotent ||
+			appended.sourceKind !== "local-issued" ||
+			appended.vertexDigest !== authenticated.digest ||
+			!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
+		) {
+			return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
+		}
+
+		const updatedEpochBytes = nextEpochBytes(
+			registration.epochBytes,
+			authenticated.byteCharge,
+			registration.payload.parameters.maxEpochBytes
+		);
+		if (updatedEpochBytes === undefined) {
+			return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+		}
+		try {
+			const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+			if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+			registration.epochBytes = updatedEpochBytes;
+		} catch {
+			return committedFailure("graph-rejected", "v3 local issue graph append failed");
+		}
+		retainCloseVertex(
+			registration.closeVertices,
+			registration.closeAuthors,
+			registration.authorVertexCounts,
+			authenticated,
+			registration.closeCharges,
+			input.settlementSource !== undefined && input.settlementAuthorization !== undefined,
+			retained.value,
+			registration.vertexFacts
+		);
+		if (controlOperation) registration.controlVertices.add(authenticated.digest);
+		registration.graphVersion += 1;
+		if (acceptedAcl !== null && acceptedAcl !== undefined) {
+			registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
+		}
+		if (!commitOperationReservation(reservation)) {
+			registration.operationAdmissionHalted = true;
+			return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
+		}
+		const acceptedEffect = registration.closeAuthors.get(authenticated.digest)?.applicationEffect;
+		advanceCreatorOrdinaryRuntimeCapacityGeometry(registration, creatorLocalJournalCensusFields(
+			appended.journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), appended.nativeImage,
+			acceptedEffect === undefined ? undefined : {journalSequence: appended.journalSequence, sourceKind: "local-issued",
+				byteCharge: authenticated.byteCharge, digest: authenticated.digest, exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
+				detachedSignature: row.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes},
+			{objectId: scope.objectId, author: scope.author, authorSequence: row.authorSequence,
+				canonicalPreimageBytes: row.canonicalPreimageBytes, digest: row.digest, signature: row.signature});
+		maintenanceAdmission?.accepted?.(acceptedEffect === undefined ? undefined : {exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			detachedSignature: row.signature, exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(acceptedEffect.exactCanonicalEpochVertexBytes),
+			...(appended.nativeImage === undefined ? {} : {nativeJournal: appended.nativeImage})});
+		let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
+		try {
+			await input.settlementCustody?.check();
+		} catch {
+			return committedFailure("admission-rejected", "replacement currency changed before delivery");
+		}
+		if (currentRegistration(registration) && !controlOperation) {
+			try {
+				const disposition = await registration.onAdmittedVertex(
 					ObjectFreeze({
-						author: authenticated.author,
+						vertex: authenticated.admitted,
 						exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
 						signature: new Uint8ArrayConstructor(row.signature),
-						vertex: authenticated.admitted,
+						transportSender: registration.networkNode.peerId,
 					})
-				) ?? "reject";
-		} catch {
-			classification = "reject";
+				);
+				terminalDisposition = disposition?.kind;
+			} catch {
+				ingressFailureLog("sink-rejected");
+			}
 		}
-		if (classification !== "terminal-authorized") {
-			return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
-		}
-	}
-	const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, acceptedAcl)) {
-		return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
-	}
-	if (!hasGraphCapacity(registration, authenticated.author, authenticated.byteCharge)) {
-		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-	}
-
-	let appended;
-	try {
-		appended = await registration.liveJournalStore.appendAccepted({
-			author: scope.author,
-			authorSequence: row.authorSequence,
-			scope: liveJournalScope(registration.payload),
-			sourceKind: "local-issued",
-			vertexDigest: authenticated.digest,
-		});
-	} catch {
-		return committedFailure("journal-rejected", "v3 local issue journal append failed");
-	}
-	if (
-		!appended.ok ||
-		appended.idempotent ||
-		appended.sourceKind !== "local-issued" ||
-		appended.vertexDigest !== authenticated.digest ||
-		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
-	) {
-		return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
-	}
-
-	const updatedEpochBytes = nextEpochBytes(
-		registration.epochBytes,
-		authenticated.byteCharge,
-		registration.payload.parameters.maxEpochBytes
-	);
-	if (updatedEpochBytes === undefined) {
-		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-	}
-	try {
-		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
-		if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-		registration.epochBytes = updatedEpochBytes;
-	} catch {
-		return committedFailure("graph-rejected", "v3 local issue graph append failed");
-	}
-	retainCloseVertex(
-		registration.closeVertices,
-		registration.closeAuthors,
-		registration.authorVertexCounts,
-		authenticated,
-		registration.closeCharges
-	);
-	if (controlOperation) registration.controlVertices.add(authenticated.digest);
-	registration.graphVersion += 1;
-	if (acceptedAcl !== null && acceptedAcl !== undefined) {
-		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
-	}
-	if (!commitOperationReservation(reservation)) {
-		registration.operationAdmissionHalted = true;
-		return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
-	}
-	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
-	if (currentRegistration(registration) && !controlOperation) {
 		try {
-			const disposition = await registration.onAdmittedVertex(
-				ObjectFreeze({
-					vertex: authenticated.admitted,
-					exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
-					signature: new Uint8ArrayConstructor(row.signature),
-					transportSender: registration.networkNode.peerId,
-				})
-			);
-			terminalDisposition = disposition?.kind;
+			await input.settlementCustody?.check();
 		} catch {
-			ingressFailureLog("sink-rejected");
+			return committedFailure("admission-rejected", "replacement currency changed at delivery");
 		}
+		return ObjectFreeze({
+			...localIssueSuccess(row.authorSequence, authenticated.digest),
+			...(terminalDisposition === undefined ? {} : { terminalDisposition }),
+		});
+	} finally {
+		await maintenanceAdmission?.release();
 	}
-	return ObjectFreeze({
-		...localIssueSuccess(row.authorSequence, authenticated.digest),
-		...(terminalDisposition === undefined ? {} : { terminalDisposition }),
-	});
 }
 
 async function issueAuthorFence(
@@ -6884,11 +14786,42 @@ async function issueAuthorFence(
 	if (tips.length === 0 || tips.length > registration.payload.parameters.maxDependencies) {
 		return localIssueFailure("graph-rejected", "v3 author fence frontier is invalid");
 	}
+	let fenceLogicalTime = first.logicalTime;
+	const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration));
+	if (maintenance?.readBoundedRecoveryCensus !== undefined) {
+		const census = await maintenance.readBoundedRecoveryCensus({
+			objectId: registration.issuanceScope.objectId,
+			limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+		});
+		if (!currentRegistration(registration))
+			return localIssueFailure("not-active", "v3 author fence recovery owner is stale");
+		const pending = census.rows.lineages.find(
+			(row) => row.author === registration.issuanceScope.author && row.objectId === registration.issuanceScope.objectId
+		)?.pendingUnsigned;
+		if (pending !== undefined) {
+			const preimage = decodeCanonical(pending.canonicalPreimageBytes);
+			if (
+				pending.planEffect?.kind !== "fence" ||
+				pending.authorSequence !== first.operation.fenceSequence ||
+				pending.exactCanonicalPlanBytes === undefined ||
+				!sameBytes(pending.exactCanonicalPlanBytes, encodeCanonical(plan)) ||
+				!isObject(preimage) ||
+				!sameBytes(encodeCanonical(Reflect.get(preimage, "operation")), encodeCanonical(first.operation)) ||
+				!NumberIsSafeInteger(Reflect.get(preimage, "logicalTime")) ||
+				(Reflect.get(preimage, "logicalTime") as number) < 0
+			)
+				return localIssueFailure("issuance-rejected", "v3 pending author fence differs from its durable plan");
+			// Retain the exact entered candidate's clock. Native transactIssue still
+			// independently requires every reconstructed preimage/context byte to
+			// equal that candidate; this mechanical read grants no new authority.
+			fenceLogicalTime = Reflect.get(preimage, "logicalTime") as number;
+		}
+	}
 	const issued = await issueOneVertex(
 		registration,
 		input,
 		tips,
-		first.logicalTime,
+		fenceLogicalTime,
 		first.operation,
 		false,
 		ObjectFreeze({ kind: "fence" as const })
@@ -6901,6 +14834,7 @@ async function issueLocal(
 	registration: V3PlaneRegistration,
 	input: CapturedLocalIssueInput
 ): Promise<V3LocalIssueResult> {
+	if (registration.receiveOnly) return localIssueFailure("authorization-rejected", "v3 plane is receive-only");
 	if (
 		!currentRegistration(registration) ||
 		registration.blueprintClosing ||
@@ -6911,12 +14845,42 @@ async function issueLocal(
 	}
 	const first = input.operations[0];
 	if (first === undefined) return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
+	if (registration.operationAdmissionHalted)
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	const readinessFailure = await localSnapshotAdmissionFailure(registration);
+	if (readinessFailure !== undefined) return readinessFailure;
+	if (registration.blueprintClosing || registration.terminalState !== "active" || registration.retainedBootstrapHold)
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
 	if (isAuthorFenceOperation(first.operation)) return issueAuthorFence(registration, input);
+	// Plain local work has no historical source/effect binding. Use the existing
+	// NEW-operation owner before frontier joins can sign or mutate native state;
+	// settlement-profile membership alone does not grant current Writer rights.
+	// A halted native debt retains the original issuer's admission-rejected
+	// outcome; the public preflight's not-active result is not its substitute.
+	if (input.planEffect === undefined && !registration.operationAdmissionHalted) {
+		for (const { operation } of input.operations) {
+			const authorized = authorizeV3NewLocalOperation({ plane: registration.handle, operation });
+			if (!authorized.ok) return authorized;
+		}
+	}
 	if (
 		input.planEffect !== undefined &&
 		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
 	) {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+	}
+	if (input.planEffect?.kind === "replacement" && input.settlementSource === undefined) {
+		return localIssueFailure(
+			"authorization-rejected",
+			"v3 settlement replacement requires its owning authenticated source"
+		);
+	}
+	if (input.settlementSource !== undefined) {
+		try {
+			deriveOwnedReplacement(registration, input.settlementSource, input);
+		} catch {
+			return localIssueFailure("authorization-rejected", "v3 settlement replacement is not source authorized");
+		}
 	}
 	if (input.planEffect?.kind === "replacement" && "fromIntent" in input.planEffect) {
 		const effect = input.planEffect;
@@ -6941,6 +14905,22 @@ async function issueLocal(
 		) {
 			return localIssueFailure("issuance-rejected", "v3 settlement replacement progress changed");
 		}
+	}
+	// Authorize the requested work before frontier reduction can sign or journal
+	// internal joins. Final per-vertex checks still run at their effect boundary.
+	if (
+		!isControlOperation(first.operation, registration.payload.trust.trust.profileId) &&
+		!validateLatchedOperation(
+			registration.authorization,
+			registration.latchedOperations,
+			aclOperation(registration.issuanceScope.author, "0".repeat(64), first.operation),
+			registration.issuanceScope.author,
+			registration.payload.trust.trust.profileId,
+			false,
+			input.settlementSource !== undefined && input.settlementAuthorization !== undefined
+		)
+	) {
+		return localIssueFailure("authorization-rejected", "v3 local requested operation is not authorized");
 	}
 	let applicationOperation = first.operation;
 	if (input.operations.length > 1) {
@@ -6979,6 +14959,16 @@ async function issueLocal(
 	if (!hasGraphCapacity(registration, registration.issuanceScope.author, undefined, requiredJoins + 1)) {
 		return localIssueFailure("graph-rejected", "v3 local issue author share is at capacity");
 	}
+	let finishingSuffix: CreatorOrdinaryIssuanceSuffixForSizing | undefined;
+	if (requiredJoins !== 0 && registration.creatorMaintenanceBound && input.planEffect === undefined && input.settlementSource === undefined) {
+		try {
+			finishingSuffix = ObjectFreeze({additionalLocalVertices: requiredJoins + 1, graphVersion: registration.graphVersion,
+				applicationOperationCount: input.operations.length,
+				exactCanonicalApplicationOperationBytes: encodeCanonical(applicationOperation, APPLICATION_BATCH_LIMITS)});
+		} catch {
+			return localIssueFailure("admission-rejected", "requested suffix is outside prepared finishing capacity before any join");
+		}
+	}
 	for (;;) {
 		const tips = registration.index.tips();
 		if (tips.length <= maxDependencies) {
@@ -6999,9 +14989,10 @@ async function issueLocal(
 			input,
 			tips.slice(0, maxDependencies),
 			first.logicalTime,
-			ObjectFreeze({ action: "causalJoin" })
+			ObjectFreeze({ action: "causalJoin" }), false, undefined, finishingSuffix
 		);
 		if (!joined.ok) return joined;
+		finishingSuffix = undefined;
 	}
 }
 
@@ -7009,15 +15000,30 @@ function enqueueLocalIssue(
 	registration: V3PlaneRegistration,
 	rawInput: V3LocalIssueInput
 ): Promise<V3LocalIssueResult> {
+	if (registration.receiveOnly)
+		return Promise.resolve(localIssueFailure("authorization-rejected", "v3 plane is receive-only"));
+	if (!currentRegistration(registration))
+		return Promise.resolve(localIssueFailure("not-active", "v3 plane is not accepting local issues"));
 	const barrier = registration.terminalBarrier;
-	const enqueue = (): Promise<V3LocalIssueResult> =>
-		enqueueRegistrationTask(registration, () => {
-			const captured = capturedLocalIssueInput(registration.payload, rawInput);
+	return enqueueRegistrationTask(
+		registration,
+		(custody) => {
+			const captured = capturedLocalIssueInput(registration.payload, rawInput, custody);
 			return "ok" in captured
 				? (): Promise<V3LocalIssueResult> => Promise.resolve(captured)
 				: (): Promise<V3LocalIssueResult> => issueLocal(registration, captured);
-		});
-	return barrier === undefined ? enqueue() : barrier.then(enqueue);
+		},
+		{
+			refuse: () =>
+				localIssueFailure("admission-rejected", "v3 input task capacity exhausted; retry after admitted work joins"),
+			refuseCapture: (capacity) =>
+				localIssueFailure(
+					"admission-rejected",
+					`v3 input ${capacity} capacity exhausted; retry after admitted work joins`
+				),
+			...(barrier === undefined ? {} : { barrier }),
+		}
+	);
 }
 
 type ClassifiedRebaseRow = Readonly<{
@@ -7026,10 +15032,140 @@ type ClassifiedRebaseRow = Readonly<{
 	row: SnapshottedOutboxRow;
 }>;
 
-function classifyRebaseRow(
+const verifiedNestedNativeSources = new WeakSet<ClassifiedRebaseRow>();
+
+/** Protected native completion, not a portable source-membership grant. */
+async function authenticatedCompletedNativeReplacementSource(
 	registration: V3PlaneRegistration,
+	selected: ClassifiedRebaseRow,
+	plan: SettlementPlan | null,
+	vertexFacts?: CreatorCensusVertexFacts,
+	sharedAccounting?: CreatorClosedRollbackProofAccounting
+): Promise<boolean> {
+	const entry = plan?.entries.find((value) => value.sourceSequence === selected.row.authorSequence);
+	if (
+		entry === undefined ||
+		plan === null ||
+		entry.replacementSequence === null ||
+		(entry.disposition !== "rebase" && entry.disposition !== "transform") ||
+		!sameBytes(entry.sourceDigest, selected.row.digest)
+	)
+		return false;
+	const chunks = entry.replacementProgress?.chunks ?? [{ replacementSequence: entry.replacementSequence }];
+	if (chunks.length === 0 || chunks.length > registration.payload.parameters.maxEpochVertices) return false;
+	let throughIntent = 0;
+	const store = creatorOriginalIssuanceStore(registration);
+	for (const chunk of chunks) {
+		const commit = await store.readIssued(selected.row.scope, chunk.replacementSequence);
+		if (sharedAccounting !== undefined && !sharedAccounting.charge(encodeCanonical(commit))) return false;
+		const row = outboxRowSnapshot({ commit, publishState: "pending" }, selected.row.scope);
+		if (row === undefined || row.authorSequence <= selected.row.authorSequence) return false;
+		if (sharedAccounting !== undefined && (!sharedAccounting.charge(row.canonicalPreimageBytes) ||
+			!sharedAccounting.charge(row.signature))) return false;
+		const candidate = classifyRebaseRow(registration, row, undefined, vertexFacts);
+		if (candidate === undefined || !validRebaseRow(registration, candidate)) return false;
+		const proof = candidate.authenticated.admitted.settlementSource;
+		const record =
+			proof === undefined ? undefined : snapshotClosedRecord({ ...proof }, PORTABLE_SETTLEMENT_SOURCE_KEYS);
+		if (
+			record === undefined ||
+			record.sourceSequence !== selected.row.authorSequence ||
+			record.sourceAuthor !== selected.row.scope.author ||
+			record.sourceObjectId !== selected.row.scope.objectId ||
+			record.sourceDigest !== selected.authenticated.digest ||
+			!sameBytes(record.sourcePreimage as Uint8Array, selected.row.canonicalPreimageBytes) ||
+			!sameBytes(record.sourceSignature as Uint8Array, selected.row.signature) ||
+			record.fromIntent !== throughIntent ||
+			!NumberIsSafeInteger(record.throughIntent) ||
+			(record.throughIntent as number) <= throughIntent ||
+			(entry.replacementProgress !== undefined &&
+				(record.intentDigest !== lowerHexDigest(entry.replacementProgress.intentDigest) ||
+					record.throughIntent !==
+						("throughIntent" in chunk ? chunk.throughIntent : entry.replacementProgress.intentCount))) ||
+			(record.creatorSelectionSignature !== null &&
+				!verifyCreatorSettlementSourceSelection(
+					registration.payload.trust.trust,
+					creatorSettlementSelectionBytes(record),
+					record.creatorSelectionSignature as Uint8Array
+				)) ||
+			!(await verifyNestedNativeSource(registration, row, vertexFacts, sharedAccounting))
+		)
+			return false;
+		throughIntent = record.throughIntent as number;
+	}
+	return entry.replacementProgress === undefined || throughIntent === entry.replacementProgress.intentCount;
+}
+
+/** Bounded original native linked-source custody; never portable wire authority. */
+async function verifyNestedNativeSource(
+	registration: Pick<V3PlaneRegistration, "payload" | "historicalIssuance" | "issuanceStore">,
+	selected: SnapshottedOutboxRow,
+	vertexFacts?: CreatorCensusVertexFacts,
+	sharedAccounting?: CreatorClosedRollbackProofAccounting
+): Promise<boolean> {
+	const store = creatorOriginalIssuanceStore(registration);
+	const plan = await store.readSettlementPlan(selected.scope);
+	if (sharedAccounting !== undefined && !sharedAccounting.charge(encodeCanonical(plan))) return false;
+	const seen = new Set<number>();
+	let row = selected;
+	let bytes = 0;
+	for (let depth = 0; depth < registration.payload.parameters.maxEpochVertices; depth++) {
+		if (seen.has(row.authorSequence)) return false;
+		seen.add(row.authorSequence);
+		if (sharedAccounting !== undefined && (!sharedAccounting.charge(row.canonicalPreimageBytes) ||
+			!sharedAccounting.charge(row.signature))) return false;
+		bytes += row.canonicalPreimageBytes.byteLength + row.signature.byteLength;
+		if (
+			bytes > registration.payload.parameters.maxEpochBytes ||
+			seen.size > registration.payload.parameters.maxEpochVertices
+		)
+			return false;
+		const vertex = (vertexFacts?.decode ?? decodeCanonical)(row.canonicalPreimageBytes) as Record<string, unknown>;
+		const descriptor = vertex.settlementSource;
+		if (descriptor === undefined) return true;
+		const record = isObject(descriptor)
+			? snapshotClosedRecord({ ...descriptor }, PORTABLE_SETTLEMENT_SOURCE_KEYS)
+			: undefined;
+		if (
+			record === undefined ||
+			record.sourceObjectId !== row.scope.objectId ||
+			record.sourceAuthor !== row.scope.author ||
+			record.targetObjectId !== row.scope.objectId ||
+			record.targetAnchor !== vertex.anchor ||
+			record.targetEpoch !== vertex.epoch ||
+			record.targetBlueprintDigest !== registration.payload.provenance.blueprintDigest ||
+			!NumberIsSafeInteger(record.sourceSequence) ||
+			(record.sourceSequence as number) >= row.authorSequence
+		)
+			return false;
+		const entry = plan?.entries.find(
+			(value) =>
+				value.sourceSequence === record.sourceSequence &&
+				(value.replacementSequence === row.authorSequence ||
+					value.replacementProgress?.chunks.some((chunk) => chunk.replacementSequence === row.authorSequence))
+		);
+		const source = await store.readIssued(row.scope, record.sourceSequence as number);
+		if (sharedAccounting !== undefined && !sharedAccounting.charge(encodeCanonical(source))) return false;
+		const next = outboxRowSnapshot({ commit: source, publishState: "pending" }, row.scope);
+		if (
+			entry === undefined ||
+			next === undefined ||
+			!sameBytes(entry.sourceDigest, next.digest) ||
+			lowerHexDigest(next.digest) !== record.sourceDigest ||
+			!sameBytes(next.canonicalPreimageBytes, record.sourcePreimage as Uint8Array) ||
+			!sameBytes(next.signature, record.sourceSignature as Uint8Array)
+		)
+			return false;
+		row = next;
+	}
+	return false;
+}
+
+function classifyRebaseRow(
+	registration: CreatorRecoveryCensusContext,
 	row: SnapshottedOutboxRow,
-	settlementFrontier?: SettlementFrontierContext
+	settlementFrontier?: SettlementFrontierContext,
+	vertexFacts?: CreatorCensusVertexFacts
 ): ClassifiedRebaseRow | undefined {
 	const classified = classifyPlaneVertex(
 		registration.payload,
@@ -7043,18 +15179,21 @@ function classifyRebaseRow(
 		row.digest,
 		row.scope.author,
 		row.authorSequence,
-		settlementFrontier
+		settlementFrontier,
+		vertexFacts
 	);
 	return classified === undefined ? undefined : ObjectFreeze({ ...classified, row });
 }
 
-function validRebaseRow(registration: V3PlaneRegistration, classified: ClassifiedRebaseRow): boolean {
+function validRebaseRow(registration: CreatorRecoveryCensusContext, classified: ClassifiedRebaseRow): boolean {
 	const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
 	const source =
 		classified.kind === "current"
 			? registration.payload
 			: historical
-				? registration.payload
+				? classified.row.scope.objectId === registration.displacedSource?.prepared.provenance.objectId
+					? registration.displacedSource.prepared
+					: registration.payload
 				: (registration.displacedSource?.prepared ?? registration.payload);
 	if (source === undefined || !hasBoundedDependencies(source, classified.authenticated)) return false;
 	const operation = classified.authenticated.vertex.operation;
@@ -7110,19 +15249,251 @@ function rebaseIntents(
 			]);
 }
 
-async function authenticatedOutboxRow(
+/** The prepared local application and original authenticated source own semantics. */
+function deriveOwnedReplacement(
 	registration: V3PlaneRegistration,
+	selected: ClassifiedRebaseRow,
+	input: Pick<CapturedLocalIssueInput, "operations" | "planEffect">,
+	preparationOnly = false
+): NativeReplacementPreparation {
+	const policy = registration.payload.input.settlementPolicy;
+	const effect = input.planEffect;
+	if (
+		!currentRegistration(registration) ||
+		policy === undefined ||
+		policy.blueprintDigest !== registration.payload.provenance.blueprintDigest ||
+		effect?.kind !== "replacement" ||
+		effect.sourceSequence !== selected.row.authorSequence ||
+		selected.authenticated.author !== registration.issuanceScope.author
+	)
+		throw new TypeError("local replacement owning source/policy is unavailable");
+	const source = registration.displacedSource;
+	let original = selected.kind === "current" ? registration.payload : source?.prepared;
+	let authority = selected.kind === "current" ? registration.authorization : source?.authorization;
+	if (
+		original === undefined ||
+		selected.authenticated.admitted.epoch !== original.provenance.epoch ||
+		selected.authenticated.admitted.anchor !== original.provenance.anchorDigest
+	) {
+		const historical = registration.historicalIssuance;
+		const acl =
+			historical === undefined
+				? undefined
+				: resolveVerifiedHistoricalSourceAcl(historical.capability, {
+						epoch: selected.authenticated.admitted.epoch,
+						anchor: selected.authenticated.admitted.anchor,
+						objectId: selected.row.scope.objectId,
+					});
+		original = acl === undefined ? undefined : registration.payload;
+		authority =
+			acl === undefined ? undefined : ObjectFreeze({ kind: "latched-acl" as const, value: acl, writerCount: 0 });
+	}
+	if (
+		original === undefined ||
+		authority === undefined ||
+		(!isV3ApplicationAuthorAuthorized(authority, selected.authenticated.author) &&
+			!verifiedNestedNativeSources.has(selected))
+	)
+		throw new TypeError("original replacement source Writer authority is unavailable");
+	const sourceOperation = selected.authenticated.vertex.operation;
+	if (
+		sourceOperation === undefined ||
+		isControlOperation(sourceOperation, original.trust.trust.profileId) ||
+		Reflect.get(sourceOperation, "action") === "acl"
+	)
+		throw new TypeError("control source is not an application replacement grant");
+	const intents = rebaseIntents(original, selected.authenticated);
+	if (intents === undefined || intents.length === 0) throw new TypeError("replacement source intents are unavailable");
+	const operations = intents.map((intent) => detachedCanonicalOperation(intent.operation));
+	if (operations.some((operation) => operation === undefined))
+		throw new TypeError("replacement source operations are invalid");
+	const derive = (): ReturnType<V3LocalSettlementPolicy["derive"]> => {
+		const argument = operations.map((operation) => {
+			const copied = detachedCanonicalOperation(operation);
+			if (copied === undefined) throw new TypeError("replacement source operation copy is invalid");
+			return copied;
+		});
+		const raw = policy.derive(ObjectFreeze(argument));
+		const decoded = decodeCanonical(
+			encodeCanonical(raw, { maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 16, maxItems: 65536 })
+		);
+		const record = canonicalRecord(decoded, ["operations", "disposition"]);
+		if (
+			record === undefined ||
+			(record.disposition !== "rebase" && record.disposition !== "transform") ||
+			!ArrayIsArray(record.operations) ||
+			record.operations.length < 1 ||
+			record.operations.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS
+		)
+			throw new TypeError("replacement policy result is invalid");
+		return record as unknown as ReturnType<V3LocalSettlementPolicy["derive"]>;
+	};
+	let derived: NativeReplacementPreparation = derive();
+	if (!sameBytes(encodeCanonical(derived), encodeCanonical(derive())))
+		throw new TypeError("replacement policy is unstable");
+	if (derived.disposition === "transform" && registration.operationAdmissionPolicy !== undefined) {
+		const firstProposed = derived.operations[0];
+		if (firstProposed === undefined) throw new TypeError("replacement proposal is empty");
+		const proposal =
+			derived.operations.length === 1
+				? firstProposed
+				: ObjectFreeze({
+						action: "applicationBatch",
+						batch: ObjectFreeze({
+							version: 1,
+							entries: ObjectFreeze(
+								derived.operations.map((operation, index) => ObjectFreeze({ logicalTime: index, operation }))
+							),
+						}),
+					});
+		const reservation = registration.operationAdmissionPolicy.reserve(
+			proposal,
+			ObjectFreeze({ author: selected.authenticated.author })
+		);
+		if (reservation.kind === "fresh") {
+			try {
+				reservation.release();
+			} catch (error) {
+				registration.operationAdmissionHalted = true;
+				throw error;
+			}
+		} else {
+			const reason =
+				reservation.kind === "conflict"
+					? ("identity-conflict" as const)
+					: ownDataValue(reservation, "reason") === "capacity"
+						? ("capacity" as const)
+						: ("encoding" as const);
+			derived = ObjectFreeze({
+				disposition: "transform" as const,
+				operations: ObjectFreeze(operations as Readonly<Record<string, unknown>>[]),
+				transformRefusal: ObjectFreeze({
+					version: 1 as const,
+					kind: "admission-refused" as const,
+					reason,
+					proposedIntentDigest: hashDomain(
+						"ts-drp/settlement-transform-proposal/v1",
+						encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
+					),
+				}),
+			});
+		}
+	}
+	if (preparationOnly) return derived;
+	const start = "fromIntent" in effect ? effect.fromIntent : 0;
+	const end = "throughIntent" in effect ? effect.throughIntent : derived.operations.length;
+	if (
+		start < 0 ||
+		end > derived.operations.length ||
+		end - start !== input.operations.length ||
+		!sameBytes(
+			encodeCanonical(input.operations.map((entry) => entry.operation)),
+			encodeCanonical(derived.operations.slice(start, end))
+		)
+	)
+		throw new TypeError("replacement candidate differs from permitted source operations");
+	return derived;
+}
+
+/** Captures mechanical source/plan currency for the existing native reservation. */
+async function ownedReplacementSignContext(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput
+): Promise<DurableIssueSignContext> {
+	const selected = input.settlementSource;
+	if (selected === undefined) throw new TypeError("replacement owning source is unavailable");
+	const derived = deriveOwnedReplacement(registration, selected, input);
+	const nativeStore = creatorOriginalIssuanceStore(registration);
+	const sourceStore = registration.displacedSource?.issuanceStore ?? nativeStore;
+	const maintenance = durableIssuancePruningMaintenanceForStore(nativeStore);
+	const sourceMaintenance = durableIssuancePruningMaintenanceForStore(sourceStore);
+	const externalSource = selected.row.scope.objectId !== registration.issuanceScope.objectId;
+	if (
+		maintenance?.readBoundedRecoveryCensus === undefined ||
+		(externalSource
+			? sourceMaintenance?.readBoundedRecoveryCensus === undefined ||
+				input.settlementCustody === undefined ||
+				selected.row.scope.objectId !== registration.displacedSource?.prepared.provenance.objectId ||
+				registration.displacedSource?.activationVertexDigest === undefined
+			: sourceMaintenance !== maintenance)
+	)
+		throw new TypeError("replacement source is outside its native issuance custody");
+	const census = await maintenance.readBoundedRecoveryCensus({
+		objectId: registration.issuanceScope.objectId,
+		limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+	});
+	if (!currentRegistration(registration)) throw new TypeError("replacement source owner was revoked");
+	await input.settlementCustody?.check();
+	let sourceCensus = census;
+	if (externalSource) {
+		if (sourceMaintenance?.readBoundedRecoveryCensus === undefined)
+			throw new TypeError("replacement source is outside its native issuance custody");
+		sourceCensus = await sourceMaintenance.readBoundedRecoveryCensus({
+			objectId: selected.row.scope.objectId,
+			limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+		});
+	}
+	await input.settlementCustody?.check();
+	const row = sourceCensus.rows.issued.find(
+		(candidate) =>
+			candidate.author === selected.row.scope.author &&
+			candidate.objectId === selected.row.scope.objectId &&
+			candidate.authorSequence === selected.row.authorSequence
+	);
+	const plan = census.rows.plans.find((candidate) => sameScope(candidate.scope, registration.issuanceScope));
+	const effect = input.planEffect;
+	if (effect?.kind !== "replacement") throw new TypeError("replacement effect is unavailable");
+	const entry = plan?.entries.find((candidate) => candidate.sourceSequence === selected.row.authorSequence);
+	if (
+		row === undefined ||
+		!sameBytes(row.digest, selected.row.digest) ||
+		!sameBytes(row.canonicalPreimageBytes, selected.row.canonicalPreimageBytes) ||
+		!sameBytes(row.signature, selected.row.signature) ||
+		plan?.fenceSequence === null ||
+		plan === undefined ||
+		entry === undefined ||
+		entry.sourceObjectId !== (externalSource ? selected.row.scope.objectId : undefined) ||
+		entry.replacementSequence !== null ||
+		entry.disposition !== derived.disposition ||
+		!sameBytes(
+			encodeCanonical(entry.transformRefusal?.proposedIntentDigest ?? null),
+			encodeCanonical(derived.transformRefusal?.proposedIntentDigest ?? null)
+		) ||
+		!sameBytes(entry.sourceDigest, selected.row.digest)
+	)
+		throw new TypeError("replacement native source/plan currency differs");
+	if ("fromIntent" in effect) {
+		const digest = hashDomain("ts-drp/settlement-replacement-intents/v1", encodeCanonical(derived.operations));
+		if (
+			entry.replacementProgress === undefined ||
+			entry.replacementProgress.intentCount !== derived.operations.length ||
+			!sameBytes(entry.replacementProgress.intentDigest, digest) ||
+			!sameBytes(effect.intentDigest, digest) ||
+			(entry.replacementProgress.chunks.at(-1)?.throughIntent ?? 0) !== effect.fromIntent
+		)
+			throw new TypeError("replacement native interval differs");
+	} else if (entry.replacementProgress !== undefined) throw new TypeError("replacement native interval is not legacy");
+	return ObjectFreeze({
+		planEffect: effect,
+		expectedIssuanceImageDigest: census.image.imageDigest,
+		expectedIssuanceControlBytes: census.control == null ? null : encodeIssuanceRetirementControl(census.control),
+	});
+}
+
+async function authenticatedOutboxRow(
+	registration: CreatorRecoveryCensusContext,
 	rawRow: unknown,
 	issuanceStore: DurableIssuanceStore = registration.issuanceStore,
 	issuanceScope: DurableIssueScope = registration.issuanceScope,
-	settlementFrontier?: SettlementFrontierContext
+	settlementFrontier?: SettlementFrontierContext,
+	vertexFacts?: CreatorCensusVertexFacts
 ): Promise<ClassifiedRebaseRow | undefined> {
 	const row = outboxRowSnapshot(rawRow, issuanceScope);
 	if (row === undefined) return undefined;
 	const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
 	const issuedRow = outboxRowSnapshot(ObjectFreeze({ commit: issued, publishState: row.publishState }), issuanceScope);
 	return issuedRow !== undefined && matchingOutboxRows(row, issuedRow)
-		? classifyRebaseRow(registration, row, settlementFrontier)
+		? classifyRebaseRow(registration, row, settlementFrontier, vertexFacts)
 		: undefined;
 }
 
@@ -7151,12 +15522,13 @@ async function readRebaseOutbox(
 		let currentRecordCount = 0;
 		let displacedRecordCount = 0;
 		let afterKey: readonly [string, string, number] | undefined;
-		beginHistoricalIssuanceScan(registration.historicalIssuance);
+		const sourceHistory = crossSource?.historicalIssuance ?? registration.historicalIssuance;
+		beginHistoricalIssuanceScan(sourceHistory);
 		for (;;) {
 			let rawPage: unknown;
 			try {
 				rawPage = await selectedStore.readOutboxPage(
-					afterKey === undefined ? { limit: 1, scope: selectedScope } : { afterKey, limit: 1, scope: selectedScope }
+					afterKey === undefined ? { limit: 64, scope: selectedScope } : { afterKey, limit: 64, scope: selectedScope }
 				);
 			} catch {
 				return ObjectFreeze({
@@ -7165,7 +15537,7 @@ async function readRebaseOutbox(
 					ok: false as const,
 				});
 			}
-			const page = onePage(rawPage);
+			const page = captureOutboxPage(rawPage, 64);
 			if (page === undefined) {
 				return ObjectFreeze({
 					detail: "v3 rebase outbox page is invalid",
@@ -7173,99 +15545,144 @@ async function readRebaseOutbox(
 					ok: false as const,
 				});
 			}
-			if (page === null) break;
-			let classified: ClassifiedRebaseRow | undefined;
-			try {
-				classified = await authenticatedOutboxRow(registration, page, selectedStore, selectedScope, settlementFrontier);
-			} catch {
-				return ObjectFreeze({
-					detail: "v3 rebase outbox record read failed",
-					kind: "store-failed" as const,
-					ok: false as const,
-				});
-			}
-			if (classified === undefined || (afterKey !== undefined && classified.row.authorSequence <= afterKey[2])) {
-				return ObjectFreeze({
-					detail: "v3 rebase outbox record is invalid",
-					kind: "record-rejected" as const,
-					ok: false as const,
-				});
-			}
-			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, classified.row.authorSequence] as const);
-			if (settlementFrontier !== undefined) {
-				const ownRowClass = settlementOwnRowClass(
-					classified.authenticated.admitted.epoch,
-					settlementFrontier.currentEpoch,
-					classified.row.authorSequence,
-					settlementFrontier.admissionEpoch,
-					settlementFrontier.terminalThrough
-				);
-				if (
-					(ownRowClass === "terminal" || ownRowClass === "old-incarnation") &&
-					openProgressSources?.has(classified.row.authorSequence) !== true
-				) {
-					continue;
-				}
-			}
-			const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
-			if (historical && !countHistoricalIssuanceRow(registration.historicalIssuance, classified.row.authorSequence)) {
-				return ObjectFreeze({
-					detail: "v3 rebase historical plane is at capacity",
-					kind: "record-rejected" as const,
-					ok: false as const,
-				});
-			}
-			if (classified.kind === "current") {
-				currentRecordCount += 1;
-				if (currentRecordCount > registration.payload.parameters.maxEpochVertices) {
+			if (page.length === 0) break;
+			for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
+				const raw = page.read(pageIndex);
+				if (raw === undefined) {
 					return ObjectFreeze({
-						detail: "v3 rebase current plane is at capacity",
+						detail: "v3 rebase outbox page is invalid",
 						kind: "record-rejected" as const,
 						ok: false as const,
 					});
 				}
-				if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [classified.authenticated.digest]) === true)
-					continue;
-			}
-			if (!validRebaseRow(registration, classified)) {
-				return ObjectFreeze({
-					detail: "v3 rebase outbox record is invalid",
-					kind: "record-rejected" as const,
-					ok: false as const,
-				});
-			}
-			if (classified.kind === "displaced" || historical) {
-				if (!includePublishedSources && historical && classified.row.publishState === "published") continue;
-				if (!includePublishedSources && crossSource === undefined && classified.row.publishState !== "pending")
-					continue;
-				const displacedPayload = registration.displacedSource?.prepared ?? registration.payload;
-				const intents = rebaseIntents(historical ? registration.payload : displacedPayload, classified.authenticated);
-				if (intents === undefined) {
+				let classified: ClassifiedRebaseRow | undefined;
+				try {
+					classified = await authenticatedOutboxRow(
+						registration,
+						raw,
+						selectedStore,
+						selectedScope,
+						settlementFrontier
+					);
+				} catch {
 					return ObjectFreeze({
-						detail: "v3 rebase outbox intent is invalid",
+						detail: "v3 rebase outbox record read failed",
+						kind: "store-failed" as const,
+						ok: false as const,
+					});
+				}
+				if (classified === undefined || (afterKey !== undefined && classified.row.authorSequence <= afterKey[2])) {
+					const row = outboxRowSnapshot(raw, selectedScope);
+					let signed: Record<string, unknown> | undefined;
+					try {
+						signed =
+							row === undefined ? undefined : (decodeCanonical(row.canonicalPreimageBytes) as Record<string, unknown>);
+					} catch {
+						/* Preserve the original refusal. */
+					}
+					return ObjectFreeze({
+						detail: `v3 rebase outbox classification is invalid:${JSON.stringify({
+							sequence: row?.authorSequence,
+							epoch: signed?.epoch,
+							action: (signed?.operation as Record<string, unknown> | undefined)?.action,
+							targetEpoch: registration.payload.provenance.epoch,
+							sourceEpoch: crossSource?.prepared.provenance.epoch,
+							classified: classified !== undefined,
+							sourceHistory: crossSource?.historicalIssuance !== undefined,
+							sourceBootstrap: crossSource?.exactCanonicalPinnedGenesisBootstrapOperationBytes !== undefined,
+						})}`,
 						kind: "record-rejected" as const,
 						ok: false as const,
 					});
 				}
-				if (
-					!historical &&
-					((crossSource !== undefined && classified.row.authorSequence === 0) ||
-						classified.authenticated.digest === registration.displacedSource?.activationVertexDigest)
-				) {
-					continue;
+				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, classified.row.authorSequence] as const);
+				if (settlementFrontier !== undefined) {
+					const ownRowClass = settlementOwnRowClass(
+						classified.authenticated.admitted.epoch,
+						settlementFrontier.currentEpoch,
+						classified.row.authorSequence,
+						settlementFrontier.admissionEpoch,
+						settlementFrontier.terminalThrough
+					);
+					if (
+						(ownRowClass === "terminal" || ownRowClass === "old-incarnation") &&
+						openProgressSources?.has(classified.row.authorSequence) !== true
+					) {
+						continue;
+					}
 				}
-				displacedRecordCount += 1;
-				const displacedLimit = historical
-					? registration.payload.parameters.maxEpochVertices
-					: displacedPayload.parameters.maxEpochVertices;
-				if (displacedRecordCount > displacedLimit) {
+				const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
+				if (historical && !countHistoricalIssuanceRow(sourceHistory, classified.row.authorSequence)) {
 					return ObjectFreeze({
-						detail: "v3 rebase displaced plane is at capacity",
+						detail: "v3 rebase historical plane is at capacity",
 						kind: "record-rejected" as const,
 						ok: false as const,
 					});
 				}
-				displaced.push(classified);
+				if (classified.kind === "current") {
+					currentRecordCount += 1;
+					if (currentRecordCount > registration.payload.parameters.maxEpochVertices) {
+						return ObjectFreeze({
+							detail: "v3 rebase current plane is at capacity",
+							kind: "record-rejected" as const,
+							ok: false as const,
+						});
+					}
+					if (
+						ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [classified.authenticated.digest]) === true
+					)
+						continue;
+				}
+				if (!validRebaseRow(registration, classified)) {
+					return ObjectFreeze({
+						detail: `v3 rebase outbox application is invalid:${JSON.stringify({
+							sequence: classified.row.authorSequence,
+							epoch: classified.authenticated.vertex.epoch,
+							action: classified.authenticated.vertex.operation?.action,
+							kind: classified.kind,
+						})}`,
+						kind: "record-rejected" as const,
+						ok: false as const,
+					});
+				}
+				if (classified.kind === "displaced" || historical) {
+					if (!includePublishedSources && historical && classified.row.publishState === "published") continue;
+					if (!includePublishedSources && crossSource === undefined && classified.row.publishState !== "pending")
+						continue;
+					const displacedPayload = registration.displacedSource?.prepared ?? registration.payload;
+					const intents = rebaseIntents(
+						historical && crossSource === undefined ? registration.payload : displacedPayload,
+						classified.authenticated
+					);
+					if (intents === undefined) {
+						return ObjectFreeze({
+							detail: "v3 rebase outbox intent is invalid",
+							kind: "record-rejected" as const,
+							ok: false as const,
+						});
+					}
+					if (
+						// Source genesis remains fully authenticated/charged by the held
+						// source census and archive. Rollover changes its classification,
+						// not its bootstrap owner or publication debt.
+						(crossSource !== undefined && classified.row.authorSequence === 0) ||
+						(!historical && classified.authenticated.digest === registration.displacedSource?.activationVertexDigest)
+					) {
+						continue;
+					}
+					displacedRecordCount += 1;
+					const displacedLimit = historical
+						? registration.payload.parameters.maxEpochVertices
+						: displacedPayload.parameters.maxEpochVertices;
+					if (displacedRecordCount > displacedLimit) {
+						return ObjectFreeze({
+							detail: "v3 rebase displaced plane is at capacity",
+							kind: "record-rejected" as const,
+							ok: false as const,
+						});
+					}
+					displaced.push(classified);
+				}
 			}
 		}
 		registration.rebaseSnapshot = ObjectFreeze(displaced);
@@ -7274,7 +15691,15 @@ async function readRebaseOutbox(
 	const selected = snapshot.find(
 		({ row }) => registration.rebaseCursor === undefined || row.authorSequence > registration.rebaseCursor
 	);
-	if (selected === undefined) return ObjectFreeze({ kind: "empty" as const, ok: true as const });
+	if (selected === undefined) {
+		// The original serialized scan has delivered every selected source. Keep
+		// its empty sentinel rather than rescanning, but retire its consumed cache
+		// and cursor. This does not discharge native settlement/publication debt:
+		// the room joins that work and the close hold authenticates its whole census.
+		registration.rebaseSnapshot = ObjectFreeze([]);
+		registration.rebaseCursor = undefined;
+		return ObjectFreeze({ kind: "empty" as const, ok: true as const });
+	}
 	registration.rebaseCursor = selected.row.authorSequence;
 	const source = registration.displacedSource;
 	const historical = selected.kind === "covered-historical" || selected.kind === "pinned-genesis";
@@ -7295,17 +15720,287 @@ async function readRebaseOutbox(
 		intents: ObjectFreeze(intents),
 		vertexDigest: selected.authenticated.digest,
 	};
-	return source?.issuanceStore === undefined
-		? ObjectFreeze({
-				kind: "displaced" as const,
-				ok: true as const,
-				source: ObjectFreeze(commonSource),
-			})
-		: ObjectFreeze({
-				kind: "displaced" as const,
-				ok: true as const,
-				source: ObjectFreeze({ ...commonSource, publishState: selected.row.publishState }),
+	const heldSource = selected;
+	if (selected.authenticated.admitted.settlementSource !== undefined) {
+		if (!(await verifyNestedNativeSource(registration, selected.row)))
+			return ObjectFreeze({
+				kind: "record-rejected" as const,
+				ok: false as const,
+				detail: "nested replacement lacks exact bounded native source lineage",
 			});
+		verifiedNestedNativeSources.add(selected);
+	}
+	let creatorSelection: Readonly<{ digest: Uint8Array; signature: Uint8Array }> | undefined;
+	let expectedFloorBytes: Uint8Array | undefined;
+	const floor = registration.payload.input.settlementFloor;
+	if (floor !== undefined) {
+		try {
+			const image = await floor.readRetirementImage({
+				scope: {
+					objectId: registration.payload.provenance.objectId,
+					pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest,
+				},
+			});
+			if (
+				image.state.pending === null &&
+				image.state.stable.objectId === registration.payload.provenance.objectId &&
+				image.state.stable.epoch === registration.payload.provenance.epoch &&
+				image.state.stable.currentAnchorDigest === registration.payload.provenance.anchorDigest
+			)
+				expectedFloorBytes = encodeCanonical(image);
+		} catch {
+			/* Read-only source inspection remains available; issuance fails closed without genuine floor custody. */
+		}
+	}
+	function issueReplacement(
+		this: V3RebaseSource,
+		rawInput: V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>
+	): Promise<V3LocalIssueResult> {
+		if (this !== resultSource)
+			return Promise.resolve(localIssueFailure("authorization-rejected", "active replacement source is foreign"));
+		if (!currentRegistration(registration))
+			return Promise.resolve(localIssueFailure("not-active", "active replacement source is revoked"));
+		return enqueueRegistrationTask(
+			registration,
+			(custody) => {
+				const captured = capturedLocalIssueInput(registration.payload, rawInput, custody);
+				if ("ok" in captured) return () => Promise.resolve(captured);
+				const owned = ObjectFreeze({ ...captured, settlementSource: heldSource });
+				return async () => {
+					let custody: LocalReplacementCustody | undefined;
+					let outcome: V3LocalIssueResult;
+					let releaseFailed = false;
+					try {
+						deriveOwnedReplacement(registration, heldSource, owned);
+						if (expectedFloorBytes === undefined)
+							throw new TypeError("replacement whole-floor checkpoint is unavailable");
+						custody = await acquireLocalReplacementCustody(registration, expectedFloorBytes);
+						if (registration.currentReplacementCustody !== undefined)
+							throw new TypeError("replacement native custody is already entered");
+						registration.currentReplacementCustody = custody;
+						// The existing dependency read is fully joined before entering write custody.
+						let settlementAuthorization: Readonly<Record<string, unknown>> | undefined;
+						await withActiveRebaseDependencies(
+							registration,
+							heldSource,
+							(read) =>
+								read.checkWhile(() => {
+									settlementAuthorization = preparePortableSettlementSource(
+										registration,
+										heldSource,
+										owned,
+										read.readExactCanonicalCensus()
+									);
+									return Promise.resolve();
+								}),
+							custody
+						);
+						if (settlementAuthorization === undefined)
+							throw new TypeError("portable replacement source preparation is unavailable");
+						const selectionBytes = creatorSettlementSelectionBytes(settlementAuthorization);
+						const selectionDigest = hashDomain("ts-drp/settlement-source-selection/v1", selectionBytes);
+						const creator = resolveCreatorSettlementAuthor(registration.payload.trust.trust);
+						let selectionSignature =
+							creatorSelection !== undefined && sameBytes(creatorSelection.digest, selectionDigest)
+								? creatorSelection.signature
+								: undefined;
+						if (selectionSignature === undefined && creator === registration.issuanceScope.author) {
+							await withActiveRebaseDependencies(registration, heldSource, read => read.checkWhile(async () => {
+								const exact = preparePortableSettlementSource(registration, heldSource, owned, read.readExactCanonicalCensus());
+								if (!sameBytes(creatorSettlementSelectionBytes(exact), selectionBytes)) throw new TypeError("creator selection native source changed");
+								const target = creatorSelectionProposalTarget(registration, selectionBytes);
+								const valid = (): boolean => currentRegistration(registration) && verifyPortableSettlementSource(registration, target, registration.closeVertices, false, new Set(), true);
+								selectionSignature = await withOwnedCreatorSelectionRequest(registration, custody!, read, selectionBytes, valid,
+									request => owned.signRegisteredVertexDigest(new Uint8ArrayConstructor(selectionDigest), request));
+							}), custody, [selectionBytes, new Uint8ArrayConstructor(64)]);
+						}
+						if (
+							selectionSignature !== undefined &&
+							!verifyCreatorSettlementSourceSelection(
+								registration.payload.trust.trust,
+								selectionBytes,
+								selectionSignature
+							)
+						)
+							throw new TypeError("explicit creator selection differs from exact source/target");
+						// Null is explicitly nonportable. Exact native source/plan ownership still
+						// permits original local recovery, but never a foreign-recipient exception.
+						settlementAuthorization =
+							selectionSignature === undefined &&
+							isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author)
+								? undefined
+								: ObjectFreeze({
+										...settlementAuthorization,
+										creatorSelectionSignature:
+											selectionSignature === undefined ? null : new Uint8ArrayConstructor(selectionSignature),
+									});
+						outcome = await issueLocal(
+							registration,
+							ObjectFreeze({ ...owned, settlementCustody: custody, settlementAuthorization })
+						);
+					} catch (error) {
+						outcome = localIssueFailure(
+							"authorization-rejected",
+							`active replacement source custody refused: ${error instanceof Error ? error.message : "unknown"}`
+						);
+					} finally {
+						if (registration.currentReplacementCustody === custody) registration.currentReplacementCustody = undefined;
+						try {
+							await custody?.release();
+						} catch {
+							// Joined custody failure cannot erase already committed native debt
+							// or allow another issue against an uncertain native lifetime.
+							registration.operationAdmissionHalted = true;
+							releaseFailed = true;
+						}
+					}
+					return releaseFailed
+						? localIssueFailure("admission-rejected", "replacement native custody joined release failed")
+						: outcome;
+				};
+			},
+			{
+				refuse: () =>
+					localIssueFailure("admission-rejected", "v3 input task capacity exhausted; retry after admitted work joins"),
+				refuseCapture: (capacity) =>
+					localIssueFailure(
+						"admission-rejected",
+						`v3 input ${capacity} capacity exhausted; retry after admitted work joins`
+					),
+			}
+		);
+	}
+	function withDependencies(
+		this: V3RebaseSource,
+		consume: (read: CreatorSnapshotRecoveryCloseDependencyRead, proofByteCharge: number) => Promise<void>
+	): Promise<void> {
+		if (this !== resultSource) return Promise.reject(new TypeError("active rebase source is foreign"));
+		if (!currentRegistration(registration)) return Promise.reject(new TypeError("active dependency owner is stale"));
+		if (typeof consume !== "function") return Promise.reject(new TypeError("active dependency consumer is invalid"));
+		return enqueueRegistrationTask(
+			registration,
+			() => () => withActiveRebaseDependencies(registration, heldSource, consume),
+			{
+				pool: "read-control",
+				refuse: (): never => {
+					throw new TypeError("v3 read control task capacity exhausted; retry after admitted work joins");
+				},
+			}
+		);
+	}
+	function prepareReplacement(this: V3RebaseSource): Promise<NativeReplacementPreparation> {
+		if (this !== resultSource || !currentRegistration(registration))
+			return Promise.reject(new TypeError("replacement preparation owner is stale or foreign"));
+		return enqueueRegistrationTask(
+			registration,
+			() => async () => {
+				let decision: NativeReplacementPreparation | undefined;
+				await withActiveRebaseDependencies(registration, heldSource, async (read) => {
+					await read.checkWhile(async () => {
+						decision = deriveOwnedReplacement(
+							registration,
+							heldSource,
+							{ planEffect: { kind: "replacement", sourceSequence: heldSource.row.authorSequence }, operations: [] },
+							true
+						);
+						await Promise.resolve();
+					});
+				});
+				if (decision === undefined) throw new TypeError("replacement preparation source check failed");
+				return decision;
+			},
+			{
+				pool: "read-control",
+				refuse: (): never => {
+					throw new TypeError("replacement preparation admission capacity exhausted");
+				},
+			}
+		);
+	}
+	function authorizeReplacement(
+		this: V3RebaseSource,
+		sign: (request: Readonly<{ exactCanonicalSelectionBytes: Uint8Array; digest: Uint8Array }>) => Promise<Uint8Array>
+	): Promise<void> {
+		if (this !== resultSource || !currentRegistration(registration) || typeof sign !== "function")
+			return Promise.reject(new TypeError("creator selection source is foreign, stale or malformed"));
+		return enqueueRegistrationTask(
+			registration,
+			() => async () => {
+				await withActiveRebaseDependencies(registration, heldSource, (read) =>
+					read.checkWhile(async () => {
+						const effect = { kind: "replacement" as const, sourceSequence: heldSource.row.authorSequence };
+						const decision = deriveOwnedReplacement(
+							registration,
+							heldSource,
+							{ planEffect: effect, operations: [] },
+							true
+						);
+						const input = {
+							planEffect: effect,
+							operations: decision.operations.map((operation, index) => ({ operation, logicalTime: index + 1 })),
+						};
+						const selection = preparePortableSettlementSource(
+							registration,
+							heldSource,
+							input,
+							read.readExactCanonicalCensus()
+						);
+						const bytes = creatorSettlementSelectionBytes(selection),
+							digest = hashDomain("ts-drp/settlement-source-selection/v1", bytes);
+						const signature = await sign(
+							ObjectFreeze({
+								exactCanonicalSelectionBytes: new Uint8ArrayConstructor(bytes),
+								digest: new Uint8ArrayConstructor(digest),
+							})
+						);
+						if (
+							!(signature instanceof Uint8ArrayConstructor) ||
+							!verifyCreatorSettlementSourceSelection(registration.payload.trust.trust, bytes, signature)
+						)
+							throw new TypeError("creator selection signature is foreign or altered");
+						creatorSelection = ObjectFreeze({
+							digest: new Uint8ArrayConstructor(digest),
+							signature: new Uint8ArrayConstructor(signature),
+						});
+					})
+				);
+			},
+			{
+				pool: "read-control",
+				refuse: (): never => {
+					throw new TypeError("creator selection admission capacity exhausted");
+				},
+			}
+		);
+	}
+	const resultSource =
+		// The native source owns this bounded reversible decision; the DTO alone is not authority.
+		// prepareReplacement closes over exactly the same held source and registration.
+		source?.issuanceStore === undefined
+			? ObjectFreeze({
+					...commonSource,
+					requiresCreatorSelection:
+						selected.row.scope.objectId !== registration.payload.provenance.objectId ||
+						(!isV3ApplicationAuthorAuthorized(registration.authorization, commonSource.author) &&
+							resolveCreatorSettlementAuthor(registration.payload.trust.trust) !== commonSource.author),
+					withDependencies,
+					issueReplacement,
+					prepareReplacement,
+					authorizeReplacement,
+				})
+			: ObjectFreeze({
+					...commonSource,
+					requiresCreatorSelection:
+						selected.row.scope.objectId !== registration.payload.provenance.objectId ||
+						(!isV3ApplicationAuthorAuthorized(registration.authorization, commonSource.author) &&
+							resolveCreatorSettlementAuthor(registration.payload.trust.trust) !== commonSource.author),
+					publishState: selected.row.publishState,
+					withDependencies,
+					issueReplacement,
+					prepareReplacement,
+					authorizeReplacement,
+				});
+	return ObjectFreeze({ kind: "displaced" as const, ok: true as const, source: resultSource });
 }
 
 async function publishPending(
@@ -7466,6 +16161,42 @@ async function completeRebaseSource(
 		}
 		if (row === undefined) return egressFailure("record-rejected", "v3 displaced source completion does not match");
 		if (crossSource !== undefined) {
+			const targetJournal = await readCreatorReplayRows(registration);
+			if (targetJournal === undefined)
+				return egressFailure("record-rejected", "v3 inheritance target replay is unavailable");
+			const inheritedRecord = targetJournal.find((candidate) => {
+				const vertex = decodeCanonical(candidate.exactCanonicalVertexBytes) as Record<string, unknown>;
+				const operation = vertex.operation as Readonly<Record<string, unknown>>;
+				return operation.action === "migrationRecord" && Reflect.get(operation.record as object, "version") === 2;
+			});
+			if (inheritedRecord !== undefined) {
+				const target = decodeCanonical(inheritedRecord.exactCanonicalPreimageBytes) as Record<string, unknown>;
+				const entry: SettlementPlan["entries"][number] = {
+					disposition: "inherited",
+					sourceSequence: row.authorSequence,
+					sourceDigest: row.digest,
+					replacementSequence: null,
+					inheritance: {
+						sourceObjectId: crossSource.prepared.provenance.objectId,
+						targetObjectId: registration.payload.provenance.objectId,
+						targetAuthor: target.author as string,
+						targetAuthorSequence: target.authorSequence as number,
+						targetVertexDigest: hashDomain(V3_VERTEX_DOMAIN, inheritedRecord.exactCanonicalPreimageBytes),
+					},
+				};
+				await withActiveRebaseDependencies(registration, classified, async () => {
+					const fresh = await readCreatorReplayRows(registration);
+					if (fresh === undefined || !authenticatedInheritedSettlement(registration, entry, classified, fresh))
+						throw new TypeError("v3 inherited completion source or target membership differs");
+					await selectedStore.compareAndMarkOutboxPublished({
+						authorSequence: row.authorSequence,
+						digest: new Uint8ArrayConstructor(row.digest),
+						scope: selectedScope,
+					});
+				});
+				registration.rebaseSnapshot = undefined;
+				return egressSuccess("published");
+			}
 			await selectedStore.compareAndMarkOutboxPublished({
 				authorSequence: row.authorSequence,
 				digest: new Uint8ArrayConstructor(row.digest),
@@ -7481,19 +16212,31 @@ async function completeRebaseSource(
 }
 
 function enqueuePendingPublication(registration: V3PlaneRegistration): Promise<V3EgressResult> {
+	const admission = {
+		pool: "pending-publication" as const,
+		refuse: (): V3EgressResult =>
+			egressFailure(
+				"admission-rejected",
+				"v3 pending publication task capacity exhausted; retry after admitted work joins"
+			),
+	};
 	if (registration.terminalState === "terminal") {
-		return enqueueRegistrationTask(registration, () => async () => {
-			let published = false;
-			for (let count = 0; count <= registration.payload.parameters.maxEpochVertices; count += 1) {
-				const result = await publishPending(registration);
-				if (!result.ok) return result;
-				if (result.kind === "empty") return published ? egressSuccess("published") : result;
-				published = true;
-			}
-			return egressFailure("record-rejected", "v3 terminal publication traversal exceeded the epoch bound");
-		});
+		return enqueueRegistrationTask(
+			registration,
+			() => async () => {
+				let published = false;
+				for (let count = 0; count <= registration.payload.parameters.maxEpochVertices; count += 1) {
+					const result = await publishPending(registration);
+					if (!result.ok) return result;
+					if (result.kind === "empty") return published ? egressSuccess("published") : result;
+					published = true;
+				}
+				return egressFailure("record-rejected", "v3 terminal publication traversal exceeded the epoch bound");
+			},
+			admission
+		);
 	}
-	return enqueueRegistrationTask(registration, () => () => publishPending(registration));
+	return enqueueRegistrationTask(registration, () => () => publishPending(registration), admission);
 }
 
 async function republishRetained(registration: V3PlaneRegistration, targetPeerId?: string): Promise<V3EgressResult> {
@@ -7556,38 +16299,16 @@ async function republishRetained(registration: V3PlaneRegistration, targetPeerId
 			return egressFailure("record-rejected", "v3 retained journal row is invalid");
 		}
 
-		let canonicalPreimageBytes: Uint8Array;
-		let signature: Uint8Array;
-		if (row.sourceKind === "received") {
-			canonicalPreimageBytes = row.exactCanonicalPreimageBytes;
-			signature = row.detachedSignature;
-		} else {
-			const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
-			let issuedCommit: unknown;
-			try {
-				issuedCommit = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
-			} catch {
-				return egressFailure("store-failed", "v3 retained issued record read failed");
-			}
-			const issuedRow = outboxRowSnapshot(
-				ObjectFreeze({ commit: issuedCommit, publishState: "published" as const }),
-				localScope
-			);
-			if (issuedRow === undefined || lowerHexDigest(issuedRow.digest) !== row.vertexDigest) {
-				return egressFailure("record-rejected", "v3 retained issued record is invalid");
-			}
-			canonicalPreimageBytes = issuedRow.canonicalPreimageBytes;
-			signature = issuedRow.signature;
+		let authenticated;
+		try {
+			authenticated = await authenticateRetainedJournalRow(registration, row);
+		} catch {
+			return egressFailure("store-failed", "v3 retained issued record read failed");
 		}
-		const authenticated = authenticateRecoveryVertex(
-			registration.payload,
-			registration.authorization,
-			canonicalPreimageBytes,
-			signature
-		);
-		if (authenticated === undefined || authenticated.digest !== row.vertexDigest) {
+		if (authenticated === undefined) {
 			return egressFailure("record-rejected", "v3 retained vertex is not authenticated");
 		}
+		const { canonicalPreimageBytes, signature } = authenticated;
 		if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [authenticated.digest]) === true) {
 			afterSequence = expectedSequence;
 			continue;
@@ -7623,15 +16344,104 @@ async function republishRetained(registration: V3PlaneRegistration, targetPeerId
 	return egressSuccess("published");
 }
 
+function enqueueReplayableEgress(
+	registration: V3PlaneRegistration,
+	capture: () => Readonly<{ selector: string; run(): Promise<V3EgressResult> }> | Readonly<{ refusal: V3EgressResult }>
+): Promise<V3EgressResult> {
+	const queued = registration.queuedReplayableEgress;
+	const predecessor = registration.gate;
+	let entered = false;
+	let joined = false;
+	let ownsTail = false;
+	let selector: string | undefined;
+	let joinedResult: Promise<V3EgressResult> | undefined;
+	let demand: V3PlaneRegistration["queuedReplayableEgress"];
+	const result = enqueueRegistrationTask<V3EgressResult>(
+		registration,
+		() => {
+			const reservation = registration.gate;
+			const request = capture();
+			ownsTail = registration.gate === reservation;
+			if ("refusal" in request) {
+				joined = true;
+				return { join: Promise.resolve(request.refusal) };
+			}
+			selector = request.selector;
+			if (ownsTail && queued !== undefined && queued.gate === predecessor && queued.selector === selector) {
+				joined = true;
+				joinedResult = queued.result;
+				return { join: queued.result };
+			}
+			return (): Promise<V3EgressResult> => {
+				entered = true;
+				if (demand !== undefined && registration.queuedReplayableEgress === demand) {
+					registration.queuedReplayableEgress = undefined;
+				}
+				return request.run();
+			};
+		},
+		{
+			pool: "egress-control",
+			refuse: () =>
+				egressFailure(
+					"admission-rejected",
+					"v3 retained/completion admission is full; retry after admitted work joins"
+				),
+		}
+	);
+	if (!entered && !joined && ownsTail && selector !== undefined) {
+		demand = ObjectFreeze({ gate: registration.gate, result, selector });
+		registration.queuedReplayableEgress = demand;
+	}
+	return joinedResult ?? result;
+}
+
 function enqueueRetainedPublication(registration: V3PlaneRegistration): Promise<V3EgressResult> {
-	return enqueueRegistrationTask(registration, () => () => republishRetained(registration));
+	return enqueueReplayableEgress(registration, () => ({
+		selector: "retained",
+		run: () => republishRetained(registration),
+	}));
+}
+
+function enqueueRebaseCompletion(
+	registration: V3PlaneRegistration,
+	input: Readonly<{ authorSequence: number; digest: string }>
+): Promise<V3EgressResult> {
+	return enqueueReplayableEgress(registration, () => {
+		if (!currentRegistration(registration)) return { refusal: egressFailure("not-active", "v3 plane is not active") };
+		if (settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
+			return { refusal: egressFailure("not-active", "v3 displaced source completion is unavailable under settlement") };
+		}
+		// Preserve the original selector contract: unrelated caller properties
+		// are ignored. Read each selected scalar once, inside the reserved cut.
+		let authorSequence: unknown;
+		let digest: unknown;
+		try {
+			authorSequence = input.authorSequence;
+			digest = input.digest;
+		} catch {
+			return { refusal: egressFailure("record-rejected", "v3 displaced source completion is invalid") };
+		}
+		if (!NumberIsSafeInteger(authorSequence) || (authorSequence as number) < 0 || !isDigestHex(digest)) {
+			return { refusal: egressFailure("record-rejected", "v3 displaced source completion is invalid") };
+		}
+		const captured = ObjectFreeze({ authorSequence: authorSequence as number, digest });
+		return {
+			selector: `completion:${captured.authorSequence}:${digest}`,
+			run: () => completeRebaseSource(registration, captured),
+		};
+	});
 }
 
 function enqueueTargetedRetainedPublication(
 	registration: V3PlaneRegistration,
 	targetPeerId: string
 ): Promise<V3EgressResult> {
-	return enqueueRegistrationTask(registration, () => () => republishRetained(registration, targetPeerId));
+	return enqueueRegistrationTask(registration, () => () => republishRetained(registration, targetPeerId), {
+		pool: "egress-control",
+		refuse: () =>
+			egressFailure("admission-rejected", "v3 retained/completion admission is full; retry after admitted work joins"),
+	});
 }
 
 function terminalFailure(
@@ -7652,7 +16462,7 @@ function terminalIssueFailure(result: Exclude<V3LocalIssueResult, { readonly ok:
 
 async function publishTerminalIssue(
 	registration: V3PlaneRegistration,
-	rawInput: V3LocalIssueInput
+	captured: CapturedLocalIssueInput
 ): Promise<V3TerminalPublishResult> {
 	if (
 		!currentRegistration(registration) ||
@@ -7662,17 +16472,14 @@ async function publishTerminalIssue(
 	) {
 		return terminalFailure("not-active", "v3 terminal transition is not active");
 	}
-	const rawRecord = snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS);
-	const rawOperations = denseArray(rawRecord?.operations);
-	const rawFirst = rawOperations?.[0];
-	const rawEntry = snapshotClosedRecord(rawFirst, LOCAL_ISSUE_ENTRY_KEYS);
+	const first = captured.operations[0];
 	const tips = registration.index.tips();
 	if (tips.length === 0 || tips.length > registration.payload.parameters.maxDependencies) {
 		return terminalFailure("graph-rejected", "v3 terminal issue frontier is invalid");
 	}
-	if (rawEntry !== undefined) {
+	if (first !== undefined) {
 		try {
-			const operationBytes = encodeCanonical(rawEntry.operation).byteLength;
+			const operationBytes = encodeCanonical(first.operation).byteLength;
 			const remainingBytes = registration.payload.parameters.maxEpochBytes - registration.epochBytes;
 			if (remainingBytes < operationBytes + 256) {
 				return terminalFailure("graph-rejected", "v3 terminal issue graph is at capacity");
@@ -7681,11 +16488,6 @@ async function publishTerminalIssue(
 			// The closed semantic capture below owns malformed-input classification.
 		}
 	}
-	const captured = capturedLocalIssueInput(registration.payload, rawInput);
-	if ("ok" in captured) {
-		return terminalIssueFailure(captured as Exclude<V3LocalIssueResult, { readonly ok: true }>);
-	}
-	const first = captured.operations[0];
 	if (
 		captured.operations.length !== 1 ||
 		first === undefined ||
@@ -7717,11 +16519,39 @@ async function publishTerminalIssue(
 }
 
 function beginTerminalTransition(registration: V3PlaneRegistration): Promise<V3TerminalTransitionResult> {
-	if (registration.mode === "snapshot-closed" || registration.blueprintClosing || registration.blueprintFolded) {
+	if (registration.receiveOnly)
+		return Promise.resolve(
+			ObjectFreeze({ ok: false as const, kind: "not-active" as const, detail: "v3 plane is receive-only" })
+		);
+	if (
+		registration.mode === "snapshot-closed" ||
+		registration.blueprintClosing ||
+		registration.blueprintFolded ||
+		!currentRegistration(registration)
+	) {
 		return Promise.resolve(
 			ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const })
 		);
 	}
+	if (registration.terminalTransitionQueued || registration.terminalState === "transition")
+		return Promise.resolve(
+			ObjectFreeze({
+				detail: "v3 terminal transition is already active",
+				kind: "transition-active" as const,
+				ok: false as const,
+			})
+		);
+	if (registration.terminalState === "terminal")
+		return Promise.resolve(
+			ObjectFreeze({
+				detail: "v3 plane already has a terminal transition",
+				kind: "already-terminal" as const,
+				ok: false as const,
+			})
+		);
+	// One mandatory transition can queue independently of the read/input pools.
+	// Other calls receive the original transition-active result, not shared authority.
+	registration.terminalTransitionQueued = true;
 	if (
 		registration.terminalState === "active" &&
 		registration.terminalBarrier === undefined &&
@@ -7762,23 +16592,85 @@ function beginTerminalTransition(registration: V3PlaneRegistration): Promise<V3T
 		}
 		registration.terminalState = "transition";
 		let used = false;
+		let publicationPending = false;
 		const capability: Extract<V3TerminalTransitionResult, { readonly ok: true }>["capability"] = ObjectFreeze({
 			publishTerminal(this: unknown, input: V3LocalIssueInput): Promise<V3TerminalPublishResult> {
 				if (this !== capability) {
 					return Promise.reject(new TypeError("v3 terminal capability receiver is invalid"));
 				}
-				if (used) return Promise.resolve(terminalFailure("not-active", "v3 terminal capability is not active"));
+				if (used || !currentRegistration(registration) || registration.terminalState !== "transition")
+					return Promise.resolve(terminalFailure("not-active", "v3 terminal capability is not active"));
+				if (publicationPending)
+					return Promise.resolve(terminalFailure("admission-rejected", "v3 terminal publication is already pending"));
+				// The capability owns one publication from queue admission through
+				// actual native join. Do not release its barrier or retain another
+				// caller input while that publication can still have effects.
+				publicationPending = true;
+				// Required terminal work has its own one-operation reservation, so
+				// full ordinary input pools cannot prevent it. The unchanged signed
+				// pending/remaining-epoch allowances bound copied operation bytes;
+				// this is neither cumulative proof credit nor a hard heap guarantee.
+				const byteLimit = Math.max(
+					0,
+					Math.min(
+						registration.payload.parameters.maxPendingBytes,
+						registration.payload.parameters.maxEpochBytes - registration.epochBytes
+					)
+				);
+				let captured: CapturedLocalIssueInput | V3LocalIssueResult;
+				try {
+					captured = capturedLocalIssueInput(registration.payload, input, {
+						entryLimit: 1,
+						remainingBytes: () => byteLimit - registration.terminalPublicationInputBytes,
+						chargeBytes: (bytes) => {
+							if (bytes > byteLimit - registration.terminalPublicationInputBytes)
+								throw new InputCaptureCapacityError("byte");
+							registration.terminalPublicationInputBytes += bytes;
+						},
+					});
+				} catch (error) {
+					publicationPending = false;
+					registration.terminalPublicationInputBytes = 0;
+					return error instanceof InputCaptureCapacityError
+						? Promise.resolve(
+								terminalFailure(
+									error.capacity === "byte" ? "graph-rejected" : "malformed-input",
+									"v3 terminal input exceeds its capture allowance"
+								)
+							)
+						: Promise.reject(error);
+				}
+				if ("ok" in captured) {
+					publicationPending = false;
+					registration.terminalPublicationInputBytes = 0;
+					return Promise.resolve(terminalIssueFailure(captured as Exclude<V3LocalIssueResult, { readonly ok: true }>));
+				}
+				// No caller graph is retained by the queued closure.
 				return enqueueRegistrationTask(registration, () => async () => {
-					const result = await publishTerminalIssue(registration, input);
-					if (result.ok || result.terminalIntent === "outcome-unknown") {
-						used = true;
-						releaseBarrier();
+					registration.terminalPublicationEntered = true;
+					try {
+						const result = await publishTerminalIssue(registration, captured);
+						if (result.ok || result.terminalIntent === "outcome-unknown") {
+							used = true;
+							releaseBarrier();
+						}
+						return result;
+					} finally {
+						registration.terminalPublicationEntered = false;
 					}
-					return result;
+				}).finally(() => {
+					publicationPending = false;
+					registration.terminalPublicationInputBytes = 0;
 				});
 			},
 			resume(this: unknown) {
-				if (this !== capability || used || registration.terminalState !== "transition") {
+				if (
+					this !== capability ||
+					used ||
+					publicationPending ||
+					!currentRegistration(registration) ||
+					registration.terminalState !== "transition"
+				) {
 					return ObjectFreeze({
 						detail: "v3 terminal capability is not active",
 						kind: "invalid-state" as const,
@@ -7792,7 +16684,14 @@ function beginTerminalTransition(registration: V3PlaneRegistration): Promise<V3T
 			},
 		});
 		return ObjectFreeze({ capability, ok: true as const });
-	});
+	})
+		.catch((error: unknown) => {
+			releaseBarrier();
+			throw error;
+		})
+		.finally(() => {
+			registration.terminalTransitionQueued = false;
+		});
 }
 
 function blueprintFoldFailure(
@@ -7937,11 +16836,22 @@ export function readV3ApplicationProjectionOrder(
 	}
 }
 
-function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3BlueprintFoldResult {
+function stageClosedBlueprintEpoch(
+	registration: V3PlaneRegistration,
+	resumeSource?: AheRetirementControl | CreatorSnapshotRetirementReconstructionRequest
+): V3BlueprintFoldResult {
 	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
 		return blueprintFoldFailure("not-active", "v3 blueprint fold is not active");
 	}
-	if (registration.operationAdmissionHalted) {
+	if (
+		registration.operationAdmissionHalted &&
+		!(
+			resumeSource !== undefined &&
+			(resumeSource === registration.retirementResumeControl ||
+				resumeSource === registration.retirementReconstruction) &&
+			creatorRetirementResumeRequested(registration)
+		)
+	) {
 		return blueprintFoldFailure("not-active", "v3 blueprint fold requires live recovery");
 	}
 	if (registration.blueprintFolded) {
@@ -7963,7 +16873,15 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 				const identity = ReflectApply(MapPrototypeGet, registration.closeAuthors, [hash]) as
 					| CloseVertexIdentity
 					| undefined;
-				return identity !== undefined && isV3ApplicationAuthorAuthorized(registration.authorization, identity.author);
+				return (
+					identity !== undefined &&
+					(identity.sourceAuthorized === true ||
+						isV3OperationAuthorAuthorized(
+							registration.authorization,
+							identity.author,
+							registration.latchedOperations.get(hash) ?? null
+						))
+				);
 			},
 			executionContext: ({ hash }) => {
 				const identity = ReflectApply(MapPrototypeGet, registration.closeAuthors, [hash]) as
@@ -7975,8 +16893,11 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 			machine: registration.blueprintMachine,
 			vertices: projection.vertices,
 		});
-	} catch {
-		return blueprintFoldFailure("fold-rejected", "v3 blueprint epoch fold was rejected");
+	} catch (error) {
+		return blueprintFoldFailure(
+			"fold-rejected",
+			`v3 blueprint epoch fold was rejected: ${error instanceof Error ? error.message : "unknown failure"}`
+		);
 	}
 	let used = false;
 	return ObjectFreeze({
@@ -8005,9 +16926,13 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 	});
 }
 
-function stageBlueprintEpoch(registration: V3PlaneRegistration): Promise<V3BlueprintFoldResult> {
+function stageBlueprintEpoch(
+	registration: V3PlaneRegistration,
+	resumeSource?: AheRetirementControl | CreatorSnapshotRetirementReconstructionRequest
+): Promise<V3BlueprintFoldResult> {
 	if (
 		!currentRegistration(registration) ||
+		registration.receiveOnly ||
 		registration.blueprintMachine === undefined ||
 		registration.terminalState !== "active"
 	) {
@@ -8019,7 +16944,10 @@ function stageBlueprintEpoch(registration: V3PlaneRegistration): Promise<V3Bluep
 	// Close application admission synchronously, then wait behind every task that
 	// already owned the registration gate before copying the fixed epoch graph.
 	registration.blueprintClosing = true;
-	return enqueueRegistrationTask(registration, () => () => Promise.resolve(stageClosedBlueprintEpoch(registration)));
+	return enqueueRegistrationTask(
+		registration,
+		() => () => Promise.resolve(stageClosedBlueprintEpoch(registration, resumeSource))
+	);
 }
 
 interface LiveSnapshotMetadata {
@@ -8051,6 +16979,1842 @@ function snapshotExportFailure(
 	detail: string
 ): Extract<V3BlueprintSnapshotExportResult, { readonly ok: false }> {
 	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+/**
+ * Narrows original decoded canonical records for length-only field projection.
+ * @param value - Decoded canonical value.
+ * @returns Whether the value is a record.
+ */
+function prospectiveCensusRecord(value: unknown): value is Record<string, unknown> {
+	return isObject(value) && !ArrayIsArray(value);
+}
+
+/**
+ * @param value - Canonical nonnegative collection count.
+ * @returns Original canonical varuint width.
+ */
+function prospectiveCensusCountWidth(value: number): number {
+	if (!NumberIsSafeInteger(value) || value < 0) throw new TypeError("prospective census count is invalid");
+	let width = 1;
+	while (value >= 128) {
+		value = Math.floor(value / 128);
+		width++;
+	}
+	return width;
+}
+
+/**
+ * @param known - Known canonical fields, not future authority.
+ * @param unknown - Widths of leaves whose bytes do not yet exist.
+ * @returns Full record width without encoding unknown values.
+ */
+function prospectiveCensusRecordWidth(
+	known: Readonly<Record<string, unknown>>,
+	unknown: Readonly<Record<string, number>>
+): number {
+	const keys = Object.keys(known),
+		added = Object.keys(unknown);
+	if (added.some((key) => Object.hasOwn(known, key))) throw new TypeError("prospective census fields overlap");
+	let width =
+		encodeCanonical(known).byteLength -
+		prospectiveCensusCountWidth(keys.length) +
+		prospectiveCensusCountWidth(keys.length + added.length);
+	for (const key of added) {
+		const length = unknown[key];
+		if (length === undefined || !NumberIsSafeInteger(length) || length < 1)
+			throw new TypeError("prospective census field width is invalid");
+		width += encodeCanonical(key).byteLength + length;
+		if (!NumberIsSafeInteger(width)) throw new TypeError("prospective census width overflow");
+	}
+	return width;
+}
+
+/** Resource declarations only, never native/source validity or a paid proof book.
+ * Counts describe the complete source BEFORE candidate/fence phase overlap.
+ * The original proof owner must enforce them against genuine fresh observations. */
+/** Detached numerical window geometry, never authenticated rows or admission.
+ * Aggregate payloads are RAW bytes; each received leaf is independently bounded
+ * by the enclosing input's maximum PRE/vertex length. */
+export interface CreatorOrdinaryRuntimeFutureRowGeometry {
+	readonly localCount: number;
+	readonly receivedCount: number;
+	readonly receivedPreimageBytes: number;
+	readonly receivedEpochVertexBytes: number;
+	/** Every future local-issued row adds one issuer descriptor; received rows
+	 * add none. Explicit zero avoids the legacy candidate's implicit +1. */
+	readonly issuerDescriptorGrowth: number;
+}
+export interface CreatorOrdinaryRuntimeCapacityWidthInput {
+	readonly scope: DurableIssueScope;
+	readonly currentScope: LiveJournalScope;
+	readonly maxIssuerDescriptors: number;
+	readonly maxDebtDescriptors: number;
+	readonly maxCurrentJournalRows: number;
+	/** Resource-only suffix geometry. Every old row stays heterogeneous; only
+	 * genuinely prospective rows use the complete local/received rectangle. */
+	readonly maxAdditionalCurrentJournalRows?: number;
+	/** Precise mixed-source alternative to the legacy uniform rectangle.
+	 * maxIssuerDescriptors denotes the BASELINE count in this domain. */
+	readonly futureRows?: CreatorOrdinaryRuntimeFutureRowGeometry;
+	readonly maxDependencyAnchors: number;
+	readonly canonicalPreimageByteLength: number;
+	readonly canonicalEpochVertexByteLength: number;
+	readonly successorFencePreimageByteLength: number;
+	/** NONE has no successor fence. Existing one-fence callers default to one;
+	 * the genuine runtime owner separately checks the authenticated profile. */
+	readonly successorFenceCount?: 0 | 1;
+	/** Whole source-owned encoded pendingIngress VALUE, including every leaf.
+	 * Presence is retained; absence supports only the no-pending local route. */
+	readonly receivedPendingIngressByteLength?: number;
+}
+/** Original proof-tree node accounting, including record keys. Encoded BYTES
+ * is one scalar; a separately counted native VALUE is not another node here. */
+export interface CreatorOrdinaryRuntimeCapacityShape {
+	readonly items: number;
+	readonly maxDepth: number;
+}
+interface CreatorOrdinaryRuntimeJournalGeometry {
+	readonly rowCount: number; readonly byteLength: number; readonly items: number; readonly maxDepth: number;
+}
+export interface CreatorOrdinaryRuntimeCapacityWidths {
+	readonly currentClose: number; readonly successorReserved: number; readonly successorEntered: number; readonly successorFinal: number;
+	readonly runtimeCensusOverheadShape: Readonly<Record<"currentClose" | "successorReserved" | "successorEntered" | "successorFinal",
+		CreatorOrdinaryRuntimeCapacityShape>>;
+	/** Pure original-owner geometry only. No native/read/registration capability
+	 * or immutable PRE bytes are retained by this scalar projection. */
+	readonly project?: (input: Readonly<Pick<CreatorOrdinaryRuntimeCapacityWidthInput, "maxIssuerDescriptors" |
+		"maxAdditionalCurrentJournalRows" | "canonicalPreimageByteLength" | "canonicalEpochVertexByteLength" |
+		"successorFencePreimageByteLength" | "receivedPendingIngressByteLength" | "futureRows">> & Readonly<{maxDebtDescriptors?: number}>) => CreatorOrdinaryRuntimeCapacityWidths;
+	/** Only the original accepted runtime owner advances this DATA projection. */
+	readonly advance?: (acceptedRow: unknown) => CreatorOrdinaryRuntimeCapacityWidths;
+}
+function prospectiveCensusArrayShape(count: number, child: CreatorOrdinaryRuntimeCapacityShape): CreatorOrdinaryRuntimeCapacityShape {
+	const items = 1 + count * (1 + child.items), maxDepth = count === 0 ? 0 : 1 + child.maxDepth;
+	if (!NumberIsSafeInteger(items) || items > 65_536 || maxDepth > 128)
+		throw new TypeError("ordinary runtime carrier shape exceeds original proof bounds");
+	return ObjectFreeze({items, maxDepth});
+}
+function prospectiveCensusCanonicalShape(value: unknown): CreatorOrdinaryRuntimeCapacityShape {
+	if (ArrayIsArray(value)) {
+		const children = value.map(prospectiveCensusCanonicalShape);
+		return ObjectFreeze({items: 1 + children.length + children.reduce((sum, child) => sum + child.items, 0),
+			maxDepth: children.length === 0 ? 0 : 1 + Math.max(...children.map(child => child.maxDepth))});
+	}
+	if (value !== null && typeof value === "object" && !(value instanceof Uint8ArrayConstructor))
+		return prospectiveCensusRecordShape(value as Readonly<Record<string, unknown>>, {});
+	return ObjectFreeze({items: 1, maxDepth: 0});
+}
+function prospectiveCensusRecordShape(known: Readonly<Record<string, unknown>>,
+	unknown: Readonly<Record<string, CreatorOrdinaryRuntimeCapacityShape>>): CreatorOrdinaryRuntimeCapacityShape {
+	if (Object.keys(unknown).some(key => Object.hasOwn(known, key))) throw new TypeError("ordinary runtime shape fields overlap");
+	const children = [...Object.values(known).map(prospectiveCensusCanonicalShape), ...Object.values(unknown)];
+	const items = 1 + children.reduce((sum, child) => sum + 3 + child.items, 0);
+	const maxDepth = children.length === 0 ? 0 : 1 + Math.max(...children.map(child => child.maxDepth));
+	if (!NumberIsSafeInteger(items) || items > 65_536 || maxDepth > 128)
+		throw new TypeError("ordinary runtime carrier shape exceeds original proof bounds");
+	return ObjectFreeze({items, maxDepth});
+}
+
+/** Original row geometry, detached primitive DATA only. Both complete source
+ * preparation and one accepted-row advancement use this SAME validator. */
+function creatorOrdinaryRuntimeJournalGeometryForSizing(scope: Readonly<{objectId: string; author: string}>,
+	currentJournalRows: readonly unknown[] | undefined, expectedCount: number): CreatorOrdinaryRuntimeJournalGeometry | undefined {
+	const hex = encodeCanonical("0".repeat(64)).byteLength;
+	const bytesWidth = (length: number) => 1 + prospectiveCensusCountWidth(length) + length;
+	const existingWidths: number[] = [], existingShapes: CreatorOrdinaryRuntimeCapacityShape[] = [];
+	if (currentJournalRows !== undefined) {
+		if (!ArrayIsArray(currentJournalRows) || currentJournalRows.length !== expectedCount)
+			throw new TypeError("ordinary runtime journal geometry count differs from complete source");
+		const leafShape = ObjectFreeze({items: 1, maxDepth: 0});
+		for (let index = 0; index < currentJournalRows.length; index++) {
+			const slot = ObjectGetOwnPropertyDescriptor(currentJournalRows, String(index));
+			if (slot === undefined || !("value" in slot)) throw new TypeError("ordinary runtime journal geometry is not dense data");
+			const value = slot.value;
+			const local = snapshotClosedRecord(value, ["journalSequence", "sourceKind", "nativeIssued", "byteCharge", "digest"]);
+			const received = local === undefined ? snapshotClosedRecord(value, ["journalSequence", "sourceKind", "byteCharge", "digest",
+				"exactCanonicalPreimageBytes", "detachedSignature", "exactCanonicalVertexBytes"]) : undefined;
+			const row = local ?? received;
+			if (row === undefined || typeof row.journalSequence !== "number" || !NumberIsSafeInteger(row.journalSequence) || row.journalSequence < 0 ||
+				typeof row.byteCharge !== "number" || !NumberIsSafeInteger(row.byteCharge) || row.byteCharge < 1 ||
+				typeof row.digest !== "string" || !isDigestHex(row.digest))
+				throw new TypeError("ordinary runtime journal geometry row is invalid");
+			if (local !== undefined) {
+				const issued = snapshotClosedRecord(local.nativeIssued, ["scope", "authorSequence"]);
+				const owner = issued === undefined ? undefined : snapshotClosedRecord(issued.scope, ["objectId", "author"]);
+				if (local.sourceKind !== "local-issued" || issued === undefined || owner === undefined || owner.objectId !== scope.objectId ||
+					typeof owner.author !== "string" || !isDigestHex(owner.author) || typeof issued.authorSequence !== "number" ||
+					!NumberIsSafeInteger(issued.authorSequence) || issued.authorSequence < 0)
+					throw new TypeError("ordinary runtime journal geometry local source is invalid");
+				const fields = creatorLocalJournalCensusFields(Number.MAX_SAFE_INTEGER,
+					{objectId: scope.objectId, author: owner.author}, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+				existingWidths.push(prospectiveCensusRecordWidth(fields, {digest: hex}));
+				existingShapes.push(prospectiveCensusRecordShape(fields, {digest: leafShape}));
+			} else {
+				if (received!.sourceKind !== "received" || !(received!.exactCanonicalPreimageBytes instanceof Uint8ArrayConstructor) ||
+					!(received!.exactCanonicalVertexBytes instanceof Uint8ArrayConstructor) || !(received!.detachedSignature instanceof Uint8ArrayConstructor) ||
+					received!.detachedSignature.byteLength !== 64 || received!.byteCharge !== received!.exactCanonicalPreimageBytes.byteLength ||
+					[received!.exactCanonicalPreimageBytes.byteLength, received!.exactCanonicalVertexBytes.byteLength]
+						.some(length => length < 1 || length > AHE_BOUNDED_READ_LIMITS.maxBlobBytes))
+					throw new TypeError("ordinary runtime journal geometry received source is invalid");
+				const fields = creatorReceivedJournalCensusCarrierFields({journalSequence: Number.MAX_SAFE_INTEGER, byteCharge: Number.MAX_SAFE_INTEGER});
+				existingWidths.push(prospectiveCensusRecordWidth(fields, {digest: hex,
+					exactCanonicalPreimageBytes: bytesWidth(received!.exactCanonicalPreimageBytes.byteLength), detachedSignature: bytesWidth(64),
+					exactCanonicalVertexBytes: bytesWidth(received!.exactCanonicalVertexBytes.byteLength)}));
+				existingShapes.push(prospectiveCensusRecordShape(fields, {digest: leafShape,
+					exactCanonicalPreimageBytes: leafShape, detachedSignature: leafShape, exactCanonicalVertexBytes: leafShape}));
+			}
+		}
+	}
+	return currentJournalRows === undefined ? undefined : ObjectFreeze({rowCount: currentJournalRows.length,
+		byteLength: existingWidths.reduce((sum, width) => sum + width, 0),
+		items: existingShapes.reduce((sum, shape) => sum + shape.items, 0),
+		maxDepth: Math.max(0, ...existingShapes.map(shape => shape.maxDepth))});
+}
+
+/** Complete current/successor runtime wrapper widths through the same census
+ * field owners and canonical container composer. No future bytes/digests are
+ * constructed. The WHOLE nativeIssuance value remains separately charged by
+ * its original {rows,image,control} owner, exactly as the existing exact path.
+ * Migration/target-floor fields are unsupported here, not guessed absent. */
+export function creatorOrdinaryRuntimeCapacityWidths(input: CreatorOrdinaryRuntimeCapacityWidthInput,
+	currentJournalRows?: readonly unknown[], currentGeometry?: CreatorOrdinaryRuntimeJournalGeometry,
+	prepareProjection = false): CreatorOrdinaryRuntimeCapacityWidths {
+	const scope = snapshotClosedRecord(input.scope, ["objectId", "author"]);
+	const currentScope = snapshotClosedRecord(input.currentScope, ["objectId", "epoch", "anchorDigest"]);
+	const successorFenceCount = input.successorFenceCount === undefined ? 1 : input.successorFenceCount;
+	const futureDescriptor = ObjectGetOwnPropertyDescriptor(input, "futureRows");
+	if (futureDescriptor !== undefined && (!("value" in futureDescriptor) || !futureDescriptor.enumerable))
+		throw new TypeError("ordinary runtime mixed row geometry is not data");
+	const futureData = futureDescriptor?.value;
+	const capturedFuture = futureData === undefined ? undefined : snapshotClosedRecord(futureData,
+		["localCount", "receivedCount", "receivedPreimageBytes", "receivedEpochVertexBytes", "issuerDescriptorGrowth"]);
+	if (futureData !== undefined && (capturedFuture === undefined || Object.values(capturedFuture).some(value =>
+		typeof value !== "number" || !NumberIsSafeInteger(value) || value < 0)))
+		throw new TypeError("ordinary runtime mixed row geometry is invalid");
+	const futureRows = capturedFuture === undefined ? undefined : ObjectFreeze({localCount: capturedFuture.localCount as number,
+		receivedCount: capturedFuture.receivedCount as number, receivedPreimageBytes: capturedFuture.receivedPreimageBytes as number,
+		receivedEpochVertexBytes: capturedFuture.receivedEpochVertexBytes as number, issuerDescriptorGrowth: capturedFuture.issuerDescriptorGrowth as number});
+	const futureCount = futureRows === undefined ? undefined : futureRows.localCount + futureRows.receivedCount;
+	const additionalRows = input.maxAdditionalCurrentJournalRows ?? futureCount ?? 1;
+	if (!NumberIsSafeInteger(additionalRows) || additionalRows < (futureRows === undefined ? 1 : 0) ||
+		additionalRows > LIVE_JOURNAL_RETIREMENT_LIMITS.maxRows || futureCount !== undefined &&
+		(!NumberIsSafeInteger(futureCount) || futureCount !== additionalRows || futureRows!.issuerDescriptorGrowth !== futureRows!.localCount))
+		throw new TypeError("ordinary runtime suffix geometry count is invalid");
+	const issuerCount = input.maxIssuerDescriptors + (futureRows?.issuerDescriptorGrowth ?? 1);
+	if (successorFenceCount !== 0 && successorFenceCount !== 1)
+		throw new TypeError("ordinary runtime successor fence count is invalid");
+	if (scope === undefined || currentScope === undefined || typeof scope.objectId !== "string" ||
+		scope.objectId.length === 0 || scope.objectId.length > 256 || typeof scope.author !== "string" || !isDigestHex(scope.author) ||
+		currentScope.objectId !== scope.objectId || typeof currentScope.anchorDigest !== "string" || !isDigestHex(currentScope.anchorDigest) ||
+		typeof currentScope.epoch !== "number" || !NumberIsSafeInteger(currentScope.epoch) ||
+		currentScope.epoch < 0 || currentScope.epoch === Number.MAX_SAFE_INTEGER)
+		throw new TypeError("ordinary runtime width context is invalid");
+	const counts = [input.maxIssuerDescriptors, input.maxDebtDescriptors, input.maxCurrentJournalRows, input.maxDependencyAnchors];
+	if (counts.some(count => !NumberIsSafeInteger(count) || count < 0) ||
+		!NumberIsSafeInteger(issuerCount) || issuerCount + successorFenceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+		input.maxDebtDescriptors + 1 > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+		input.maxCurrentJournalRows + additionalRows > LIVE_JOURNAL_RETIREMENT_LIMITS.maxRows ||
+		input.maxDependencyAnchors < 1 || input.maxDependencyAnchors > 7)
+		throw new TypeError("ordinary runtime width counts exceed the original owner bounds");
+	const lengths = [input.canonicalPreimageByteLength, input.canonicalEpochVertexByteLength,
+		...(successorFenceCount === 0 ? [] : [input.successorFencePreimageByteLength])];
+	if (lengths.some(length => !NumberIsSafeInteger(length) || length < 1 || length > AHE_BOUNDED_READ_LIMITS.maxBlobBytes) ||
+		(successorFenceCount === 0 && input.successorFencePreimageByteLength !== 0) ||
+		(input.receivedPendingIngressByteLength !== undefined && (!NumberIsSafeInteger(input.receivedPendingIngressByteLength) ||
+			input.receivedPendingIngressByteLength < 1 || input.receivedPendingIngressByteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes)))
+		throw new TypeError("ordinary runtime width leaves exceed the original bounded source domain");
+	if (futureRows !== undefined && [
+		[futureRows.receivedPreimageBytes, input.canonicalPreimageByteLength],
+		[futureRows.receivedEpochVertexBytes, input.canonicalEpochVertexByteLength],
+	].some(([total, maximum]) => !NumberIsSafeInteger(futureRows.receivedCount * maximum!) ||
+		total! < futureRows.receivedCount || total! > futureRows.receivedCount * maximum!))
+		throw new TypeError("ordinary runtime mixed row payload totals exceed leaf bounds");
+	const atom = encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength;
+	const hex = encodeCanonical(currentScope.anchorDigest).byteLength;
+	const emptyArrayWidth = encodeCanonical([]).byteLength;
+	const arrayWidth = (count: number, rowWidth: number): number => {
+		const width = emptyArrayWidth - prospectiveCensusCountWidth(0) + prospectiveCensusCountWidth(count) + count * rowWidth;
+		if (!NumberIsSafeInteger(width)) throw new TypeError("ordinary runtime array width overflow");
+		return width;
+	};
+	const bytesWidth = (length: number): number => encodeCanonical(new Uint8ArrayConstructor()).byteLength -
+		prospectiveCensusCountWidth(0) + prospectiveCensusCountWidth(length) + length;
+	const actualScope = {objectId: scope.objectId, author: scope.author};
+	const active = creatorRuntimeActiveCensusFields({pendingRoots: [], wireByteCharge: 0,
+		unsettledSources: [], cursor: null, cacheSourceSequences: [], epoch: currentScope.epoch + 1});
+	const {pendingIngress, ...activeFields} = active;
+	const emptyPendingIngressWidth = encodeCanonical(pendingIngress).byteLength;
+	if (input.receivedPendingIngressByteLength !== undefined && input.receivedPendingIngressByteLength < emptyPendingIngressWidth)
+		throw new TypeError("ordinary runtime pending field cannot undercut its complete empty schema");
+	const journalScopeWidth = prospectiveCensusRecordWidth({objectId: scope.objectId}, {epoch: atom, anchorDigest: hex});
+	const anchorWidth = prospectiveCensusRecordWidth({}, {epoch: atom, anchorDigest: hex});
+	const anchorArrayWidth = arrayWidth(input.maxDependencyAnchors, anchorWidth);
+	// These longest spellings belong to the existing complete classifiers. They
+	// bound bytes only; choosing a width does not classify a retained native row.
+	const longestDependencyKind = CREATOR_ISSUANCE_CENSUS_DEPENDENCY_KINDS.reduce((longest, value) =>
+		encodeCanonical(value).byteLength > encodeCanonical(longest).byteLength ? value : longest);
+	const longestClassification = CREATOR_ISSUANCE_CENSUS_CLASSIFICATIONS.reduce((longest, value) =>
+		encodeCanonical(value).byteLength > encodeCanonical(longest).byteLength ? value : longest);
+	const issuerWidth = prospectiveCensusRecordWidth(creatorIssuanceCensusFields(
+		longestDependencyKind, actualScope, Number.MAX_SAFE_INTEGER, undefined,
+		longestClassification), {digest: bytesWidth(32)});
+	const fenceDescriptorWidth = prospectiveCensusRecordWidth(creatorIssuanceCensusFields(
+		"current-issuance", actualScope, Number.MAX_SAFE_INTEGER, undefined, "current"), {digest: bytesWidth(32)});
+	const debtWidth = prospectiveCensusRecordWidth({scope: actualScope}, {lineageIndex: atom, planIndex: atom});
+	const debtArrayWidth = arrayWidth(input.maxDebtDescriptors + 1, debtWidth);
+	const localJournalWidth = prospectiveCensusRecordWidth(creatorLocalJournalCensusFields(Number.MAX_SAFE_INTEGER,
+		actualScope, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER), {digest: hex});
+	const receivedJournalWidth = prospectiveCensusRecordWidth(creatorReceivedJournalCensusCarrierFields({
+		journalSequence: Number.MAX_SAFE_INTEGER, byteCharge: Number.MAX_SAFE_INTEGER}), {
+		digest: hex, exactCanonicalPreimageBytes: bytesWidth(input.canonicalPreimageByteLength),
+		detachedSignature: bytesWidth(64), exactCanonicalVertexBytes: bytesWidth(input.canonicalEpochVertexByteLength)});
+	// The exact current-close producer keeps every existing descriptor unchanged
+	// and appends ONE candidate. The genuine lifetime above supplies its complete
+	// authenticated/native-corresponding vector; scalar-only callers retain the
+	// uniform rectangle. Neither a numerical vector nor these widths grants auth.
+	// Widen all numeric counters, but never replace unchanged complete PRE/vertex
+	// BYTES with the largest bootstrap's geometry at every old journal address.
+	if (currentGeometry !== undefined && (currentJournalRows !== undefined ||
+		!NumberIsSafeInteger(currentGeometry.rowCount) || currentGeometry.rowCount !== input.maxCurrentJournalRows ||
+		![currentGeometry.byteLength, currentGeometry.items, currentGeometry.maxDepth].every(value => NumberIsSafeInteger(value) && value >= 0) ||
+		currentGeometry.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes || currentGeometry.items > 65_536 || currentGeometry.maxDepth > 128))
+		throw new TypeError("ordinary runtime prepared row geometry is invalid");
+	const geometry: CreatorOrdinaryRuntimeJournalGeometry | undefined = currentGeometry === undefined
+		? creatorOrdinaryRuntimeJournalGeometryForSizing({objectId: scope.objectId, author: scope.author}, currentJournalRows, input.maxCurrentJournalRows)
+		: ObjectFreeze({rowCount: currentGeometry.rowCount, byteLength: currentGeometry.byteLength,
+			items: currentGeometry.items, maxDepth: currentGeometry.maxDepth});
+	// Every received BYTES occurrence keeps its own tag/count framing. Only RAW
+	// contents use the aggregate budget; no equality/dedup or per-byte shape guess.
+	const futureRowsWidth = futureRows === undefined ? additionalRows * Math.max(localJournalWidth, receivedJournalWidth) :
+		futureRows.localCount * localJournalWidth + futureRows.receivedCount *
+			(receivedJournalWidth - input.canonicalPreimageByteLength - input.canonicalEpochVertexByteLength) +
+		futureRows.receivedPreimageBytes + futureRows.receivedEpochVertexBytes;
+	const currentRowsWidth = arrayWidth(input.maxCurrentJournalRows + additionalRows, 0) +
+		(geometry?.byteLength ?? input.maxCurrentJournalRows * Math.max(localJournalWidth, receivedJournalWidth)) + futureRowsWidth;
+	if (!NumberIsSafeInteger(currentRowsWidth)) throw new TypeError("ordinary runtime journal geometry width overflow");
+	const currentJournalWidth = prospectiveCensusRecordWidth({dependencyKind: "current-journal"}, {
+		scope: journalScopeWidth, rows: currentRowsWidth});
+	const successorEmptyJournalWidth = prospectiveCensusRecordWidth({dependencyKind: "current-journal"}, {
+		scope: journalScopeWidth, rows: emptyArrayWidth});
+	const successorFenceJournalWidth = prospectiveCensusRecordWidth(creatorLocalJournalCensusFields(Number.MAX_SAFE_INTEGER,
+		actualScope, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER), {digest: hex});
+	const successorFinalJournalWidth = prospectiveCensusRecordWidth({dependencyKind: "current-journal"}, {
+		scope: journalScopeWidth, rows: arrayWidth(successorFenceCount, successorFenceJournalWidth)});
+	const {currentJournal: _journal, rows: _rows, debt: _debt, dependencyAnchors: _anchors, ...runtimeFields} =
+		creatorRuntimeCensusFields({}, [], [], Number.MAX_SAFE_INTEGER, []);
+	const optionalPending: Readonly<Record<string, number>> = input.receivedPendingIngressByteLength === undefined ? {} :
+		{pendingIngress: input.receivedPendingIngressByteLength};
+	const sourceRowsWidth = arrayWidth(issuerCount, issuerWidth);
+	const nonActiveCurrent = prospectiveCensusRecordWidth(runtimeFields, {currentJournal: currentJournalWidth,
+		rows: sourceRowsWidth, debt: debtArrayWidth, dependencyAnchors: anchorArrayWidth, nativeIssuance: 1, ...optionalPending}) - 1;
+	const activeCurrent = prospectiveCensusRecordWidth({...runtimeFields, ...activeFields}, {currentJournal: currentJournalWidth,
+		rows: sourceRowsWidth, debt: debtArrayWidth, dependencyAnchors: anchorArrayWidth, nativeIssuance: 1,
+		pendingIngress: input.receivedPendingIngressByteLength ?? emptyPendingIngressWidth}) - 1;
+	const currentClose = Math.max(nonActiveCurrent, activeCurrent);
+	const precursor = prospectiveCensusRecordWidth({...runtimeFields, ...activeFields}, {currentJournal: successorEmptyJournalWidth,
+		rows: sourceRowsWidth, debt: debtArrayWidth, dependencyAnchors: anchorArrayWidth, nativeIssuance: 1,
+		pendingIngress: input.receivedPendingIngressByteLength ?? emptyPendingIngressWidth}) - 1;
+	const finalRowsWidth = emptyArrayWidth - prospectiveCensusCountWidth(0) +
+		prospectiveCensusCountWidth(issuerCount + successorFenceCount) +
+		issuerCount * issuerWidth + successorFenceCount * fenceDescriptorWidth;
+	const successorFinal = prospectiveCensusRecordWidth(runtimeFields, {currentJournal: successorFinalJournalWidth,
+		rows: finalRowsWidth, debt: debtArrayWidth, dependencyAnchors: anchorArrayWidth, nativeIssuance: 1, ...optionalPending}) - 1;
+	const leaf = ObjectFreeze({items: 1, maxDepth: 0});
+	const excludedNativeValue = ObjectFreeze({items: 0, maxDepth: 0});
+	const issuerShape = prospectiveCensusRecordShape(creatorIssuanceCensusFields(
+		longestDependencyKind, actualScope, Number.MAX_SAFE_INTEGER, undefined,
+		longestClassification), {digest: leaf});
+	const sourceRowsShape = prospectiveCensusArrayShape(issuerCount, issuerShape);
+	const finalRowsShape = ObjectFreeze({items: sourceRowsShape.items + successorFenceCount * (1 + issuerShape.items),
+		maxDepth: successorFenceCount === 0 ? sourceRowsShape.maxDepth : Math.max(sourceRowsShape.maxDepth, 1 + issuerShape.maxDepth)});
+	const debtShape = prospectiveCensusArrayShape(input.maxDebtDescriptors + 1,
+		prospectiveCensusRecordShape({scope: actualScope}, {lineageIndex: leaf, planIndex: leaf}));
+	const anchorsShape = prospectiveCensusArrayShape(input.maxDependencyAnchors,
+		prospectiveCensusRecordShape({}, {epoch: leaf, anchorDigest: leaf}));
+	const localRowShape = prospectiveCensusRecordShape(creatorLocalJournalCensusFields(Number.MAX_SAFE_INTEGER,
+		actualScope, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER), {digest: leaf});
+	const receivedRowShape = prospectiveCensusRecordShape(creatorReceivedJournalCensusCarrierFields({
+		journalSequence: Number.MAX_SAFE_INTEGER, byteCharge: Number.MAX_SAFE_INTEGER}), {
+		digest: leaf, exactCanonicalPreimageBytes: leaf, detachedSignature: leaf, exactCanonicalVertexBytes: leaf});
+	const currentRowShape = ObjectFreeze({items: Math.max(localRowShape.items, receivedRowShape.items),
+		maxDepth: Math.max(localRowShape.maxDepth, receivedRowShape.maxDepth)});
+	const journalScopeShape = prospectiveCensusRecordShape({objectId: scope.objectId}, {epoch: leaf, anchorDigest: leaf});
+	const journalShape = (rows: CreatorOrdinaryRuntimeCapacityShape) =>
+		prospectiveCensusRecordShape({dependencyKind: "current-journal"}, {scope: journalScopeShape, rows});
+	// A single original entered receipt: seven-field root, at most sixteen
+	// missing-parent strings, wrapped by the original four-field pending owner.
+	const pendingShape = input.receivedPendingIngressByteLength === undefined ? prospectiveCensusCanonicalShape(pendingIngress) :
+		ObjectFreeze({items: 91, maxDepth: 4});
+	const sharedShapes = {rows: sourceRowsShape, debt: debtShape, dependencyAnchors: anchorsShape, nativeIssuance: excludedNativeValue};
+	const optionalPendingShape: Readonly<Record<string, CreatorOrdinaryRuntimeCapacityShape>> =
+		input.receivedPendingIngressByteLength === undefined ? {} : {pendingIngress: pendingShape};
+	const futureRowItems = futureRows === undefined ? additionalRows * currentRowShape.items :
+		futureRows.localCount * localRowShape.items + futureRows.receivedCount * receivedRowShape.items;
+	const futureRowDepth = futureRows === undefined ? currentRowShape.maxDepth : Math.max(
+		futureRows.localCount === 0 ? 0 : localRowShape.maxDepth, futureRows.receivedCount === 0 ? 0 : receivedRowShape.maxDepth);
+	const currentRowsShape = ObjectFreeze({items: 1 + input.maxCurrentJournalRows + additionalRows +
+		(geometry?.items ?? input.maxCurrentJournalRows * currentRowShape.items) + futureRowItems,
+		maxDepth: input.maxCurrentJournalRows + additionalRows === 0 ? 0 : 1 + Math.max(futureRowDepth,
+			geometry?.maxDepth ?? (input.maxCurrentJournalRows === 0 ? 0 : currentRowShape.maxDepth))});
+	const currentJournalShape = journalShape(currentRowsShape);
+	const nonActiveCurrentShape = prospectiveCensusRecordShape(runtimeFields,
+		{...sharedShapes, currentJournal: currentJournalShape, ...optionalPendingShape});
+	const activeCurrentShape = prospectiveCensusRecordShape({...runtimeFields, ...activeFields},
+		{...sharedShapes, currentJournal: currentJournalShape, pendingIngress: pendingShape});
+	const currentCloseShape = ObjectFreeze({items: Math.max(nonActiveCurrentShape.items, activeCurrentShape.items),
+		maxDepth: Math.max(nonActiveCurrentShape.maxDepth, activeCurrentShape.maxDepth)});
+	const precursorShape = prospectiveCensusRecordShape({...runtimeFields, ...activeFields},
+		{...sharedShapes, currentJournal: journalShape(prospectiveCensusArrayShape(0, localRowShape)), pendingIngress: pendingShape});
+	const finalShape = prospectiveCensusRecordShape(runtimeFields, {...sharedShapes, rows: finalRowsShape,
+		currentJournal: journalShape(prospectiveCensusArrayShape(successorFenceCount, localRowShape)), ...optionalPendingShape});
+	// NONE has no reserved/entered native fence job; these generic numerical
+	// cells bound the same zero-fence successor, not invented active work.
+	const successorBeforeFinal = successorFenceCount === 0 ? successorFinal : precursor;
+	const successorBeforeFinalShape = successorFenceCount === 0 ? finalShape : precursorShape;
+	// Copy every input scalar; the returned function cannot observe mutations of
+	// the caller's input/vector or retain the native producer that supplied it.
+	const baseline: CreatorOrdinaryRuntimeCapacityWidthInput = ObjectFreeze({scope: ObjectFreeze({...actualScope}),
+		currentScope: ObjectFreeze({objectId: scope.objectId, epoch: currentScope.epoch as number,
+			anchorDigest: currentScope.anchorDigest as string}),
+		maxIssuerDescriptors: input.maxIssuerDescriptors, maxDebtDescriptors: input.maxDebtDescriptors,
+		maxCurrentJournalRows: input.maxCurrentJournalRows, maxDependencyAnchors: input.maxDependencyAnchors,
+		canonicalPreimageByteLength: input.canonicalPreimageByteLength, canonicalEpochVertexByteLength: input.canonicalEpochVertexByteLength,
+		successorFencePreimageByteLength: input.successorFencePreimageByteLength, successorFenceCount,
+		...(futureRows === undefined ? {} : {futureRows}),
+		...(input.receivedPendingIngressByteLength === undefined ? {} : {receivedPendingIngressByteLength: input.receivedPendingIngressByteLength})});
+	const project = !prepareProjection || geometry === undefined ? undefined : (next: Parameters<NonNullable<CreatorOrdinaryRuntimeCapacityWidths["project"]>>[0]) => {
+		const captured = snapshotClosedRecord(next, ["maxIssuerDescriptors", "maxAdditionalCurrentJournalRows", "canonicalPreimageByteLength",
+			"canonicalEpochVertexByteLength", "successorFencePreimageByteLength",
+			...(Object.hasOwn(next, "futureRows") ? ["futureRows"] : []),
+			...(Object.hasOwn(next, "maxDebtDescriptors") ? ["maxDebtDescriptors"] : []),
+			...(Object.hasOwn(next, "receivedPendingIngressByteLength") ? ["receivedPendingIngressByteLength"] : [])]);
+		if (captured === undefined || Object.entries(captured).some(([key, value]) => key !== "futureRows" && typeof value !== "number"))
+			throw new TypeError("ordinary runtime suffix projection is not closed numerical data");
+		return creatorOrdinaryRuntimeCapacityWidths({...baseline,
+			maxIssuerDescriptors: captured.maxIssuerDescriptors as number,
+			maxDebtDescriptors: captured.maxDebtDescriptors === undefined ? baseline.maxDebtDescriptors : captured.maxDebtDescriptors as number,
+			maxAdditionalCurrentJournalRows: captured.maxAdditionalCurrentJournalRows as number,
+			futureRows: captured.futureRows as CreatorOrdinaryRuntimeFutureRowGeometry | undefined,
+			canonicalPreimageByteLength: captured.canonicalPreimageByteLength as number,
+			canonicalEpochVertexByteLength: captured.canonicalEpochVertexByteLength as number,
+			successorFencePreimageByteLength: captured.successorFencePreimageByteLength as number,
+			...(captured.receivedPendingIngressByteLength === undefined ? {} : {receivedPendingIngressByteLength: captured.receivedPendingIngressByteLength as number})}, undefined, geometry, true);
+	};
+	const advance = project === undefined || geometry === undefined ? undefined : (acceptedRow: unknown) => {
+		const added = creatorOrdinaryRuntimeJournalGeometryForSizing(actualScope, [acceptedRow], 1)!;
+		return creatorOrdinaryRuntimeCapacityWidths({...baseline, maxCurrentJournalRows: geometry.rowCount + 1}, undefined,
+			{rowCount: geometry.rowCount + 1, byteLength: geometry.byteLength + added.byteLength,
+				items: geometry.items + added.items, maxDepth: Math.max(geometry.maxDepth, added.maxDepth)}, true);
+	};
+	return ObjectFreeze({currentClose, successorReserved: successorBeforeFinal, successorEntered: successorBeforeFinal, successorFinal,
+		...(project === undefined ? {} : {project, advance}),
+		runtimeCensusOverheadShape: ObjectFreeze({currentClose: currentCloseShape, successorReserved: successorBeforeFinalShape,
+			successorEntered: successorBeforeFinalShape, successorFinal: finalShape})});
+}
+
+/** Exact pure replacement preparation under the original complete source hold. */
+function prepareCreatorSettlementContinuation(
+	registration: V3PlaneRegistration,
+	hold: CreatorSnapshotRecoveryCloseHold,
+	unsignedBytes: Uint8Array,
+	planEffect: NonNullable<DurableIssueCommit["planEffect"]> | undefined,
+	preview: CreatorRoomSettlementPreview | undefined
+): void {
+	const facts = fullRecoveryCloseHoldFacts(hold);
+	if (
+		facts?.registration !== registration ||
+		facts.releasing ||
+		facts.retirementAllowed ||
+		!currentRegistration(registration)
+	)
+		throw new TypeError("prospective continuation source is unavailable");
+	const census = decodeCanonical(facts.exactCanonicalCensusBytes);
+	if (
+		!prospectiveCensusRecord(census) ||
+		!prospectiveCensusRecord(census.nativeIssuance) ||
+		!prospectiveCensusRecord(census.nativeIssuance.rows) ||
+		!prospectiveCensusRecord(census.activeUnsettled) ||
+		!ArrayIsArray(census.activeUnsettled.sources)
+	)
+		throw new TypeError("prospective continuation census is incomplete");
+	if (census.activeUnsettled.sources.length === 0) return;
+	if (preview === undefined) throw new TypeError("prospective continuation room clock is unavailable");
+	const candidate = prospectiveIssuerBasis(registration, hold, unsignedBytes);
+	const receivedAppend = facts.receivedAppend !== undefined;
+	const unsigned = decodeCanonical(candidate.bytes);
+	if (!prospectiveCensusRecord(unsigned)) throw new TypeError("prospective continuation vertex is malformed");
+	const rows = census.nativeIssuance.rows as unknown as IssuanceRetirementRows;
+	const control = census.nativeIssuance.control as DurableIssuanceRetirementControl | null;
+	const prior = rows.plans.find((row) => sameScope(row.scope, candidate.scope));
+	if (prior === undefined) throw new TypeError("prospective continuation plan is missing");
+	// The original complete census, not a convenient subset of plan entries,
+	// owns every already-selected mandatory source. Foreign sourceObjectId is
+	// allowed; its original creator selection still belongs to this issuer's
+	// source-bound plan. Do not promise only one Writer if another custody owner
+	// still has admitted unfinished work in this same native source inventory.
+	const unresolvedEntries = prior.entries.filter(entry => entry.disposition !== "expire" &&
+		entry.disposition !== "inherited" && entry.replacementSequence === null);
+	const coveredSources = census.activeUnsettled.sources.map(source => {
+		if (!prospectiveCensusRecord(source) || !prospectiveCensusRecord(source.scope) ||
+			!sameScope(source.scope as unknown as DurableIssueScope,candidate.scope) ||
+			!(source.sourceDigest instanceof Uint8ArrayConstructor))
+			throw new TypeError("prospective continuation has an uncovered admitted source owner");
+		const entry = unresolvedEntries.find(entry => entry.sourceSequence === source.sourceSequence &&
+			sameBytes(entry.sourceDigest,source.sourceDigest as Uint8Array) &&
+			(entry.sourceObjectId ?? null) === (source.sourceObjectId ?? null));
+		if (entry === undefined) throw new TypeError("prospective continuation source differs from the complete native plan");
+		return entry;
+	});
+	if (new IntrinsicSet(coveredSources).size !== coveredSources.length ||
+		unresolvedEntries.some(entry => !coveredSources.includes(entry)))
+		throw new TypeError("prospective continuation omits admitted protected source work");
+	const first = receivedAppend ? undefined : {
+		kind: "v3-issuance-pending-unsigned-1" as const,
+		authorSequence: candidate.sequence,
+		canonicalPreimageBytes: candidate.bytes,
+		digest: candidate.digest,
+		...(planEffect === undefined ? {} : { planEffect, exactCanonicalPlanBytes: encodeCanonical(prior) }),
+	};
+	let widths = issuanceUnsignedContinuationWidths(rows, candidate.scope, first, control, []);
+	let plan = widths.finalRows.plans.find((row) => sameScope(row.scope, candidate.scope));
+	const lastTime = settlementReplacementLastLogicalTimeFromPreimage(candidate.bytes);
+	if (plan === undefined || lastTime === undefined || !NumberIsSafeInteger(lastTime + 2))
+		throw new TypeError("prospective continuation clock or plan is exhausted");
+	const previewInput = ObjectFreeze({
+		scope: candidate.scope,
+		successorEpoch: registration.payload.provenance.epoch + 1,
+		priorPlan: plan,
+		priorFenceEpoch: registration.payload.provenance.epoch,
+		minimumLogicalTime: lastTime + 2,
+	});
+	const clockPreview = preview(previewInput),
+		previewBytes = encodeCanonical(clockPreview);
+	if (!NumberIsSafeInteger(clockPreview.continuationLogicalTime) || clockPreview.continuationLogicalTime < lastTime + 2)
+		throw new TypeError("prospective continuation room clock is invalid");
+	let logicalTime = planEffect?.kind === "replacement" ? lastTime + 2 : clockPreview.continuationLogicalTime;
+	let sequence = candidate.sequence + 1,
+		dependency = lowerHexDigest(candidate.digest);
+	const jobs: IssuanceUnsignedContinuationJob[] = [];
+	for (const originalEntry of plan.entries) {
+		if (
+			originalEntry.disposition === "expire" ||
+			originalEntry.disposition === "inherited" ||
+			originalEntry.replacementSequence !== null
+		)
+			continue;
+		const entry = plan.entries.find((row) => row.sourceSequence === originalEntry.sourceSequence);
+		const issued = rows.issued.find(
+			(row) => row.author === candidate.scope.author && row.authorSequence === originalEntry.sourceSequence
+		);
+		const outbox = rows.outbox.find(
+			(row) => row.author === candidate.scope.author && row.authorSequence === originalEntry.sourceSequence
+		);
+		const sourceRow =
+			issued === undefined || outbox === undefined || !sameBytes(issued.digest, outbox.digest)
+				? undefined
+				: ObjectFreeze({
+						authorSequence: issued.authorSequence,
+						scope: candidate.scope,
+						canonicalPreimageBytes: issued.canonicalPreimageBytes,
+						digest: issued.digest,
+						signature: issued.signature,
+						publishState: outbox.publishState,
+					});
+		const source = sourceRow === undefined ? undefined : classifyRebaseRow(registration, sourceRow);
+		const original = source?.kind === "current" ? registration.payload : registration.displacedSource?.prepared;
+		const intents =
+			source === undefined || original === undefined ? undefined : rebaseIntents(original, source.authenticated);
+		const policy = registration.payload.input.settlementPolicy;
+		if (
+			entry === undefined ||
+			source === undefined ||
+			!validRebaseRow(registration, source) ||
+			intents === undefined ||
+			policy === undefined ||
+			entry.disposition === "manual-review" ||
+			!sameBytes(entry.sourceDigest, source.row.digest)
+		)
+			throw new TypeError("prospective continuation authenticated source is unavailable");
+		const derived = deriveOwnedReplacement(
+			registration,
+			source,
+			{ planEffect: { kind: "replacement", sourceSequence: entry.sourceSequence }, operations: [] },
+			true
+		);
+		if (
+			!sameBytes(
+				encodeCanonical(entry.transformRefusal?.proposedIntentDigest ?? null),
+				encodeCanonical(derived.transformRefusal?.proposedIntentDigest ?? null)
+			)
+		)
+			throw new TypeError("prospective continuation transform refusal differs");
+		if (derived.disposition !== entry.disposition)
+			throw new TypeError("prospective continuation policy differs from native plan");
+		const digest = hashDomain(
+			"ts-drp/settlement-replacement-intents/v1",
+			encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
+		);
+		const progress = entry.replacementProgress;
+		if (
+			progress !== undefined &&
+			(progress.intentCount !== derived.operations.length || !sameBytes(progress.intentDigest, digest))
+		)
+			throw new TypeError("prospective continuation replacement digest differs");
+		let consumed = progress?.chunks.at(-1)?.throughIntent ?? 0;
+		const operations = derived.operations.slice(consumed).map((operation) => {
+			const value = { operation, logicalTime };
+			logicalTime += 2;
+			if (!NumberIsSafeInteger(logicalTime)) throw new TypeError("prospective continuation clock exhausted");
+			return value;
+		});
+		let offset = 0,
+			initialized = progress !== undefined;
+		while (offset < operations.length) {
+			let count = Math.min(operations.length - offset, APPLICATION_BATCH_MAX_ENTRIES);
+			while (count > 1 && !applicationBatchFits(applicationBatchOperation(operations.slice(offset, offset + count))))
+				count--;
+			const selected = operations.slice(offset, offset + count);
+			const operation = selected.length === 1 ? selected[0].operation : applicationBatchOperation(selected);
+			const preimage = encodeCanonical({
+				...unsigned,
+				authorSequence: sequence,
+				dependencies: [dependency],
+				logicalTime: selected[0].logicalTime,
+				operation,
+			});
+			const captured = captureIssuanceNativeSignInput({
+				scope: candidate.scope,
+				exactCanonicalUnsignedVertexBytes: preimage,
+			});
+			const split = initialized || count < operations.length;
+			const effect = split
+				? {
+						kind: "replacement" as const,
+						sourceSequence: entry.sourceSequence,
+						fromIntent: consumed,
+						throughIntent: consumed + count,
+						intentDigest: digest,
+					}
+				: { kind: "replacement" as const, sourceSequence: entry.sourceSequence };
+			let initializeProgress: IssuanceUnsignedContinuationJob["initializeProgress"];
+			if (split && !initialized) {
+				initializeProgress = {
+					sourceSequence: entry.sourceSequence,
+					intentCount: derived.operations.length,
+					intentDigest: digest,
+				};
+				plan = copySettlementPlan(
+					{
+						...plan,
+						revision: plan.revision + 1,
+						entries: plan.entries.map((row) =>
+							row.sourceSequence === entry.sourceSequence
+								? {
+										...row,
+										replacementProgress: {
+											version: 1,
+											intentCount: derived.operations.length,
+											intentDigest: digest,
+											chunks: [],
+										},
+									}
+								: row
+						),
+					},
+					candidate.scope
+				);
+				if (plan === undefined) throw new TypeError("prospective continuation plan is malformed");
+				initialized = true;
+			}
+			jobs.push({
+				intent: {
+					kind: "v3-issuance-pending-unsigned-1",
+					authorSequence: sequence,
+					canonicalPreimageBytes: captured.bytes,
+					digest: captured.digest,
+					planEffect: effect,
+					exactCanonicalPlanBytes: encodeCanonical(plan),
+				},
+				...(initializeProgress === undefined ? {} : { initializeProgress }),
+			});
+			widths = issuanceUnsignedContinuationWidths(rows, candidate.scope, first, control, jobs);
+			plan = widths.finalRows.plans.find((row) => sameScope(row.scope, candidate.scope));
+			if (plan === undefined) throw new TypeError("prospective continuation plan is missing");
+			dependency = lowerHexDigest(captured.digest);
+			sequence++;
+			offset += count;
+			consumed += count;
+		}
+		logicalTime = Math.max(logicalTime, clockPreview.continuationLogicalTime);
+	}
+	if (
+		plan.entries.some(
+			(entry) =>
+				entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null
+		)
+	)
+		throw new TypeError("prospective continuation does not complete every native plan entry");
+	facts.continuation = ObjectFreeze({
+		unsignedBytes: new Uint8ArrayConstructor(candidate.bytes),
+		jobs: ObjectFreeze(jobs),
+		widths,
+		checkPreview: () => sameBytes(encodeCanonical(preview(previewInput)), previewBytes),
+	});
+}
+
+/**
+ * Length-only future runtime wrapper, resolved from the original sealed hold.
+ * @param registration - Original registration under its admitted runtime gate.
+ * @param hold - Original authenticated complete census hold.
+ * @param exactCanonicalUnsignedVertexBytes - Exact original prepared issuer bytes.
+ * @param currentCloseSource - Omit only the original active-observation fields for current-floor close capture.
+ * @returns Future runtime wrapper width excluding the separately charged native leaf.
+ */
+function prospectiveCreatorRuntimeCensusOverhead(
+	registration: V3PlaneRegistration,
+	hold: CreatorSnapshotRecoveryCloseHold,
+	exactCanonicalUnsignedVertexBytes: Uint8Array,
+	currentCloseSource = false
+): number {
+	const facts = fullRecoveryCloseHoldFacts(hold);
+	if (
+		facts === undefined ||
+		facts.registration !== registration ||
+		facts.releasing ||
+		facts.retirementAllowed ||
+		!currentRegistration(registration) ||
+		(facts.receivedAppend === undefined && (registration.pendingIngress.size !== 0 ||
+		registration.pendingIngressBytes !== 0 || registration.drainingPendingIngress)) ||
+		(registration.rebaseSnapshot?.length ?? 0) !== 0 ||
+		registration.rebaseCursor !== undefined
+	)
+		throw new TypeError("prospective runtime census has unresolved ingress or rebase dependencies");
+	const census = decodeCanonical(facts.exactCanonicalCensusBytes);
+	if (
+		!prospectiveCensusRecord(census) ||
+		!prospectiveCensusRecord(census.currentJournal) ||
+		!ArrayIsArray(census.currentJournal.rows) ||
+		!ArrayIsArray(census.rows) ||
+		!ArrayIsArray(census.debt) ||
+		!prospectiveCensusRecord(census.nativeIssuance) ||
+		!prospectiveCensusRecord(census.nativeIssuance.rows) ||
+		!ArrayIsArray(census.nativeIssuance.rows.lineages) ||
+		!ArrayIsArray(census.nativeIssuance.rows.plans) ||
+		!prospectiveCensusRecord(census.pendingIngress) ||
+		!ArrayIsArray(census.pendingIngress.roots) ||
+		(facts.receivedAppend === undefined && census.pendingIngress.roots.length !== 0) ||
+		!prospectiveCensusRecord(census.activeUnsettled) ||
+		!ArrayIsArray(census.activeUnsettled.sources) ||
+		census.activeUnsettled.cursor !== null ||
+		!ArrayIsArray(census.activeUnsettled.cacheSourceSequences) ||
+		census.activeUnsettled.cacheSourceSequences.length !== 0 ||
+		census.graphVersion !== registration.graphVersion ||
+		!NumberIsSafeInteger(registration.graphVersion + 1)
+	)
+		throw new TypeError("prospective runtime census is incomplete or unsupported");
+	// The held census has already authenticated every unresolved plan/source.
+	// Its descriptors remain in `activeUnsettled` below: an ordinary append
+	// does not settle or discard them. Future close/adoption sizing separately
+	// requires a complete representable continuation before signing is admitted.
+	const continuation = facts.continuation;
+	if (
+		continuation !== undefined &&
+		(!sameBytes(continuation.unsignedBytes, exactCanonicalUnsignedVertexBytes) || !continuation.checkPreview())
+	)
+		throw new TypeError("prospective continuation source is stale");
+	if (currentCloseSource && census.activeUnsettled.sources.length !== 0 && continuation === undefined)
+		throw new TypeError("prospective current close has unresolved settlement sources");
+	const candidate = prospectiveAppendCandidate(registration, exactCanonicalUnsignedVertexBytes, hold);
+	const unsigned = decodeCanonical(candidate.bytes);
+	if (
+		!prospectiveCensusRecord(unsigned) ||
+		unsigned.epoch !== registration.payload.provenance.epoch ||
+		unsigned.anchor !== registration.payload.provenance.anchorDigest ||
+		!ArrayIsArray(unsigned.dependencies) ||
+		!prospectiveCensusRecord(unsigned.operation)
+	)
+		throw new TypeError("prospective runtime vertex is outside current authority");
+	const digest = lowerHexDigest(candidate.digest);
+	if (digest === undefined || registration.index.has(digest))
+		throw new TypeError("prospective runtime vertex is already present");
+	const journalRows = [
+		...census.currentJournal.rows,
+		...(facts.receivedAppend === undefined ? [creatorLocalJournalCensusFields(
+			census.currentJournal.rows.length,
+			candidate.scope,
+			candidate.sequence,
+			candidate.bytes.byteLength,
+			digest
+		)] : [creatorReceivedJournalCensusFields(facts.receivedAppend, census.currentJournal.rows.length)]),
+	];
+	const continuedRows: unknown[] = [];
+	if (currentCloseSource && continuation !== undefined)
+		for (const job of continuation.jobs) {
+			journalRows.push(
+				creatorLocalJournalCensusFields(
+					journalRows.length,
+					registration.issuanceScope,
+					job.intent.authorSequence,
+					job.intent.canonicalPreimageBytes.byteLength,
+					lowerHexDigest(job.intent.digest)
+				)
+			);
+			continuedRows.push({
+				dependencyKind: "current-issuance",
+				scope: registration.issuanceScope,
+				authorSequence: job.intent.authorSequence,
+				digest: job.intent.digest,
+				classification: "current",
+			});
+		}
+	const journalArrayWidth = encodeCanonical(journalRows).byteLength;
+	const { rows: _journalRows, ...journalFacts } = census.currentJournal;
+	const currentJournalWidth = prospectiveCensusRecordWidth(journalFacts, { rows: journalArrayWidth });
+	const rows = [
+		...census.rows,
+		...(facts.receivedAppend === undefined ? [{
+			dependencyKind: "current-issuance",
+			scope: candidate.scope,
+			authorSequence: candidate.sequence,
+			digest: candidate.digest,
+			classification: "current",
+		}] : []),
+		...continuedRows,
+	];
+	// Native author-lineage birth shifts every later debt index.
+	const authors = census.nativeIssuance.rows.lineages.map((row) => {
+		if (!prospectiveCensusRecord(row) || typeof row.author !== "string")
+			throw new TypeError("prospective native lineage is malformed");
+		return row.author;
+	});
+	if (facts.receivedAppend === undefined && !authors.includes(candidate.scope.author)) authors.push(candidate.scope.author);
+	authors.sort();
+	const debt = census.debt.map((row) => {
+		if (!prospectiveCensusRecord(row) || !prospectiveCensusRecord(row.scope) || typeof row.scope.author !== "string")
+			throw new TypeError("prospective runtime debt descriptor is malformed");
+		return { ...row, scope: row.scope, lineageIndex: authors.indexOf(row.scope.author) };
+	});
+	if (facts.receivedAppend === undefined && !debt.some((row) => prospectiveCensusRecord(row.scope) && row.scope.author === candidate.scope.author))
+		throw new TypeError("prospective runtime selected debt descriptor is missing");
+	const { nativeIssuance: _native, currentJournal: _journal, pendingIngress: capturedPending, activeUnsettled, ...rest } = census;
+	const pendingRoots = (capturedPending.roots as Record<string, unknown>[]).filter(root => root.digest !== digest);
+	const pendingIngress = facts.receivedAppend === undefined ? capturedPending : {
+		...capturedPending, roots: pendingRoots,
+		wireByteCharge: pendingRoots.reduce((sum, root) => sum + Number(root.wireByteCharge), 0),
+		graphClosure: pendingRoots.length === 0 ? "no-pending-roots" : "incomplete"};
+	// Exclude the separately charged native leaf, not its enclosing key/map entry.
+	return (
+		prospectiveCensusRecordWidth(
+			{
+				...rest,
+				...(currentCloseSource ? (facts.receivedAppend === undefined ? {} : {pendingIngress}) : { pendingIngress, activeUnsettled }),
+				rows,
+				debt,
+				graphVersion: registration.graphVersion + 1 + (currentCloseSource ? (continuation?.jobs.length ?? 0) : 0),
+			},
+			{ currentJournal: currentJournalWidth, nativeIssuance: 1 }
+		) - 1
+	);
+}
+
+/**
+ * Sizes original non-active successor census branches without making successor custody.
+ * Existing source verification, settlement, publication and retirement guards still run.
+ * @param registration - Original held runtime registration.
+ * @param hold - Its sealed complete observational census.
+ * @param unsignedBytes - Original unsigned issuer preimage.
+ * @param genuinePreparedClose - Original nominal close used only for its sizing readout.
+ * @param projectionBytes - Original ordinary successor projection constructor output.
+ * @param settlement - Original derived frontier and room-owned pure plan preview, when v1 applies.
+ * @returns Complete raw/filter field-width alternatives; no future authentication is implied.
+ */
+function prospectiveCreatorPostAdoptionCensusSizing(
+	registration: V3PlaneRegistration,
+	hold: CreatorSnapshotRecoveryCloseHold | undefined,
+	unsignedBytes: Uint8Array,
+	genuinePreparedClose: object,
+	projectionBytes: Uint8Array,
+	settlement?: CreatorPostAdoptionSettlementSizing,
+	ordinarySource?: Readonly<{hold: CreatorOrdinaryIssuanceRuntimeHold;
+		native: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensus;
+		journalRows: readonly unknown[]; runtime: CreatorOrdinaryIssuanceRuntimeLifetime}>
+): readonly CreatorPostAdoptionCensusSizing[] {
+	// Reuse the original lifetime/graph/ingress/rebase guards rather than treating
+	// a copied census or caller-supplied label as source authority.
+	const ordinaryFacts = ordinarySource === undefined ? undefined : recoveryCloseHolds.get(ordinarySource.hold);
+	if (ordinarySource === undefined) {
+		if (hold === undefined) throw new TypeError("prospective successor source is unavailable");
+		prospectiveCreatorRuntimeCensusOverhead(registration, hold, unsignedBytes);
+	} else {
+		if (hold !== undefined || ordinaryFacts?.kind !== "ordinary-runtime" || ordinaryFacts.registration !== registration ||
+			ordinaryFacts.lifetime !== ordinarySource.runtime) throw new TypeError("ordinary successor numerical source is foreign");
+		ordinaryFacts.check();
+	}
+	const settlementProfile = settlementProfileFor(registration.payload.trust.trust.profileId);
+	if (settlementProfile !== "v1" && registration.payload.trust.trust.profileId !== "creator-trusted-v1")
+		throw new TypeError("prospective successor settlement census requires original room policy preview");
+	const facts = hold === undefined ? undefined : fullRecoveryCloseHoldFacts(hold);
+	const census = facts === undefined ? undefined : decodeCanonical(facts.exactCanonicalCensusBytes) as Readonly<Record<string, unknown>>;
+	const anchorRead = readPreparedCreatorSuccessorAnchorForSizing({ close: genuinePreparedClose });
+	const projection = decodeCanonical(projectionBytes);
+	const native = ordinarySource?.native ?? (prospectiveCensusRecord(census) && prospectiveCensusRecord(census.nativeIssuance)
+		? census.nativeIssuance : undefined);
+	const currentJournal = ordinarySource === undefined ? census?.currentJournal :
+		{dependencyKind: "current-journal", scope: liveJournalScope(registration.payload), rows: ordinarySource.journalRows};
+	const receivedAppend = facts?.receivedAppend !== undefined || ordinaryFacts?.kind === "ordinary-runtime" && ordinaryFacts.receivedAppend !== undefined;
+	const candidate = ordinarySource === undefined ? prospectiveIssuerBasis(registration, hold!, unsignedBytes) : (() => {
+		const append = ordinaryPreviewAppendCandidate(registration, unsignedBytes, ordinarySource.hold);
+		if (!receivedAppend) return append;
+		const lineage = ordinarySource.native.rows.lineages.find(row => sameScope(row, registration.issuanceScope));
+		if (lineage === undefined || lineage.exhausted || lineage.pendingUnsigned !== undefined || lineage.next < 1)
+			throw new TypeError("ordinary successor local issuer basis is unavailable");
+		return {...append, scope: registration.issuanceScope, sequence: lineage.next - 1};
+	})();
+	if (
+		!anchorRead.ok ||
+		!prospectiveCensusRecord(projection) ||
+		!prospectiveCensusRecord(native) || !prospectiveCensusRecord(native.rows) ||
+		!prospectiveCensusRecord(currentJournal) || !ArrayIsArray(currentJournal.rows) ||
+		(ordinarySource === undefined && (!prospectiveCensusRecord(census) || !ArrayIsArray(census.rows))) ||
+		!Object.hasOwn(native, "control")
+	)
+		throw new TypeError("prospective successor census material is unavailable");
+	const anchor = decodeCanonical(anchorRead.exactCanonicalAnchorPreimageBytes);
+	const epoch = registration.payload.provenance.epoch;
+	if (
+		!prospectiveCensusRecord(anchor) ||
+		anchor.objectId !== candidate.scope.objectId ||
+		anchor.epoch !== epoch + 1 ||
+		anchor.previousAnchor !== registration.payload.provenance.anchorDigest ||
+		projection.kind !== "v3-live-generation-2" ||
+		projection.objectId !== candidate.scope.objectId ||
+		projection.epoch !== epoch + 1 ||
+		projection.anchorDigest !== anchorRead.anchorDigest ||
+		projection.vertexCount !== 1 ||
+		projection.promotedSnapshotSource !== undefined
+	)
+		throw new TypeError("prospective successor census differs from ordinary prepared close");
+	const nativeRows = native.rows as unknown as IssuanceRetirementRows;
+	const control = native.control as DurableIssuanceRetirementControl | null;
+	const migrationSource = census?.migrationSource;
+	const pendingIngress = ordinaryFacts?.kind === "ordinary-runtime" ? ordinaryRuntimePendingIngress(ordinaryFacts) : census?.pendingIngress;
+	const currentJournalRows = currentJournal.rows as unknown[];
+	const continuation = facts?.continuation;
+	const futureJobs = continuation?.jobs ?? [];
+	const preparedPreimages = new Map([
+		...(receivedAppend ? nativeRows.issued.map(row => [row.authorSequence, row.canonicalPreimageBytes] as [number, Uint8Array]) :
+			[[candidate.sequence, candidate.bytes] as [number, Uint8Array]]),
+		...futureJobs.map((job) => [job.intent.authorSequence, job.intent.canonicalPreimageBytes] as [number, Uint8Array]),
+	]);
+	if (
+		(settlementProfile === "none" && nativeRows.plans.length !== 0) ||
+		nativeRows.lineages.some((row) => row.author !== candidate.scope.author && row.pendingUnsigned !== undefined)
+	)
+		throw new TypeError("prospective successor census has unresolved plan or unsigned intent");
+	const candidatePlan = nativeRows.plans.find((row) => row.scope.author === candidate.scope.author);
+	if (settlement?.planEffect !== undefined && candidatePlan === undefined)
+		throw new TypeError("prospective successor settlement effect has no original plan");
+	const immediateIntent = receivedAppend ? undefined : {
+		kind: "v3-issuance-pending-unsigned-1" as const,
+		authorSequence: candidate.sequence,
+		canonicalPreimageBytes: candidate.bytes,
+		digest: candidate.digest,
+		...(settlement?.planEffect === undefined
+			? {}
+			: {
+					planEffect: settlement.planEffect,
+					exactCanonicalPlanBytes: encodeCanonical(candidatePlan),
+				}),
+	};
+	const final = immediateIntent === undefined ? issuanceUnsignedContinuationWidths(nativeRows, candidate.scope, undefined, control, []).final :
+		issuanceUnsignedPostimageWidths(nativeRows, candidate.scope, immediateIntent, control).final;
+	// Current close maintenance happens before snapshot/Q-L staging. Original
+	// publication changes only addressed outbox status/control, not graph/debt.
+	const currentAcknowledgementCount =
+		nativeRows.outbox.filter(
+			(row) =>
+				row.objectId === candidate.scope.objectId &&
+				row.author === candidate.scope.author &&
+				row.publishState === "pending"
+		).length + Number(!receivedAppend);
+	const currentNativeRowsByteLength =
+		(continuation?.widths.final.canonicalRowsBytes ?? final.canonicalRowsBytes) +
+		(continuation === undefined
+			? currentAcknowledgementCount * (encodeCanonical("published").byteLength - encodeCanonical("pending").byteLength)
+			: 0);
+	if (currentNativeRowsByteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
+		throw new TypeError("prospective current published census exceeds original native bound");
+	const currentRuntimeOverhead = ordinarySource === undefined ? prospectiveCreatorRuntimeCensusOverhead(registration, hold!, unsignedBytes, true) : (() => {
+		const unsigned = decodeCanonical(candidate.bytes) as Readonly<Record<string, unknown>>;
+		const vertexBytes = encodeCanonical({anchor: unsigned.anchor, dependencies: unsigned.dependencies, epoch: unsigned.epoch,
+			hash: lowerHexDigest(candidate.digest), kind: "drp-vertex", objectId: unsigned.objectId, operation: unsigned.operation});
+		const priorRows = ordinarySource.journalRows as readonly Readonly<{exactCanonicalPreimageBytes?: Uint8Array; exactCanonicalVertexBytes?: Uint8Array}>[];
+		const debtScopes = new Set([registration.issuanceScope, ...nativeRows.lineages, ...nativeRows.issued, ...nativeRows.outbox,
+			...nativeRows.plans.map(plan => plan.scope)].map(scope => JSON.stringify([scope.objectId, scope.author])));
+		return ordinarySource.runtime.readCapacityWidths({scope: registration.issuanceScope, currentScope: liveJournalScope(registration.payload),
+			maxIssuerDescriptors: nativeRows.outbox.length, maxDebtDescriptors: debtScopes.size,
+			maxCurrentJournalRows: ordinarySource.journalRows.length, maxDependencyAnchors: 7,
+			canonicalPreimageByteLength: Math.max(candidate.bytes.byteLength, ...priorRows.map(row => row.exactCanonicalPreimageBytes?.byteLength ?? 0)),
+			canonicalEpochVertexByteLength: Math.max(vertexBytes.byteLength, ...priorRows.map(row => row.exactCanonicalVertexBytes?.byteLength ?? 0)),
+			successorFenceCount: settlementProfile === "v1" ? 1 : 0,
+			successorFencePreimageByteLength: settlementProfile === "v1" ? candidate.bytes.byteLength : 0}).currentClose;
+	})();
+	const currentPublishedCensusSizing = ObjectFreeze({
+		runtimeCensusOverheadByteLength: currentRuntimeOverhead,
+		nativeRowsByteLength: currentNativeRowsByteLength,
+		nativeImageByteLength: prospectiveCensusRecordWidth(
+			{
+				logicalBytes: currentNativeRowsByteLength,
+				lineageCount:
+					nativeRows.lineages.length +
+					Number(!nativeRows.lineages.some((row) => row.author === candidate.scope.author)),
+				issuedCount: nativeRows.issued.length + Number(!receivedAppend) + futureJobs.length,
+				outboxCount: nativeRows.outbox.length + Number(!receivedAppend) + futureJobs.length,
+				planCount: nativeRows.plans.length,
+			},
+			{ imageDigest: 1 + prospectiveCensusCountWidth(64) + 64 }
+		),
+		nativeControlRevisionDelta: continuation?.widths.final.controlRevisionDelta ?? currentAcknowledgementCount,
+	});
+	const currentContinuation =
+		continuation === undefined || futureJobs.length === 0
+			? undefined
+			: ObjectFreeze({
+					journalAppends: ObjectFreeze(
+						futureJobs.map((job) => {
+							const vertexDigest = lowerHexDigest(job.intent.digest);
+							if (vertexDigest === undefined) throw new TypeError("prospective continuation digest is malformed");
+							return ObjectFreeze({
+								scope: ObjectFreeze({
+									objectId: candidate.scope.objectId,
+									epoch,
+									anchorDigest: registration.payload.provenance.anchorDigest,
+								}),
+								sourceKind: "local-issued" as const,
+								vertexDigest,
+								author: candidate.scope.author,
+								authorSequence: job.intent.authorSequence,
+							});
+						})
+					),
+					nativeJobPhases: ObjectFreeze(
+						continuation.widths.phases.map((phase) => {
+							const index = futureJobs.findIndex((job) => job.intent.authorSequence === phase.authorSequence);
+							const job = futureJobs[index];
+							if (job === undefined) throw new TypeError("prospective continuation phase has no original job");
+							const priorWidths = issuanceUnsignedContinuationWidths(
+								nativeRows,
+								candidate.scope,
+								immediateIntent,
+								control,
+								futureJobs.slice(0, index)
+							);
+							let plan = priorWidths.finalRows.plans.find((row) => sameScope(row.scope, candidate.scope));
+							if (plan === undefined) throw new TypeError("prospective continuation phase plan is missing");
+							if (job.initializeProgress !== undefined) {
+								const progress = job.initializeProgress;
+								plan = copySettlementPlan(
+									{
+										...plan,
+										revision: plan.revision + 1,
+										entries: plan.entries.map((entry) =>
+											entry.sourceSequence === progress.sourceSequence
+												? {
+														...entry,
+														replacementProgress: {
+															version: 1,
+															intentCount: progress.intentCount,
+															intentDigest: progress.intentDigest,
+															chunks: [],
+														},
+													}
+												: entry
+										),
+									},
+									candidate.scope
+								);
+								if (plan === undefined) throw new TypeError("prospective continuation phase plan is malformed");
+							}
+							const sourceSequence =
+								job.intent.planEffect?.kind === "replacement" ? job.intent.planEffect.sourceSequence : undefined;
+							const sourceEntry = plan.entries.find((entry) => entry.sourceSequence === sourceSequence);
+							if (sourceEntry === undefined) throw new TypeError("prospective continuation phase source is missing");
+							const previous = [...(immediateIntent === undefined ? [] : [immediateIntent]), ...futureJobs.slice(0, index).map((job) => job.intent)];
+							const journalRows = [
+								...currentJournalRows,
+								...(facts?.receivedAppend === undefined ? [] : [creatorReceivedJournalCensusFields(facts.receivedAppend, currentJournalRows.length)]),
+								...previous.map((intent, i) =>
+									creatorLocalJournalCensusFields(
+										currentJournalRows.length + Number(receivedAppend) + i,
+										candidate.scope,
+										intent.authorSequence,
+										intent.canonicalPreimageBytes.byteLength,
+										lowerHexDigest(intent.digest)
+									)
+								),
+							];
+							const runtimeRows = [
+								...(census!.rows as unknown[]),
+								...previous.map((intent) => ({
+									dependencyKind: "current-issuance",
+									scope: candidate.scope,
+									authorSequence: intent.authorSequence,
+									digest: intent.digest,
+									classification: "current",
+								})),
+							];
+							const unsettledSources = plan.entries
+								.filter(
+									(entry) =>
+										entry.disposition !== "expire" &&
+										entry.disposition !== "inherited" &&
+										entry.replacementSequence === null
+								)
+								.map((entry) => ({
+									scope: candidate.scope,
+									sourceSequence: entry.sourceSequence,
+									sourceDigest: entry.sourceDigest,
+									disposition: entry.disposition,
+									replacementProgress: entry.replacementProgress ?? null,
+								}));
+							const {
+								nativeIssuance: _native,
+								currentJournal: _journal,
+								pendingIngress: _pending,
+								activeUnsettled: _active,
+								...rest
+							} = census!;
+							const runtimeWidth =
+								prospectiveCensusRecordWidth(
+									{
+										...rest,
+										rows: runtimeRows,
+										graphVersion: registration.graphVersion + Number(receivedAppend) + previous.length,
+										...creatorRuntimeActiveCensusFields({
+											pendingRoots: [],
+											wireByteCharge: 0,
+											activeSource: {
+												sourceSequence: sourceEntry.sourceSequence,
+												sourceDigest: sourceEntry.sourceDigest,
+											},
+											unsettledSources,
+											cursor: null,
+											cacheSourceSequences: [],
+											epoch,
+										}),
+										...(receivedAppend ? {pendingIngress} : {}),
+									},
+									{
+										currentJournal: encodeCanonical({ ...currentJournal, rows: journalRows }).byteLength,
+										nativeIssuance: 1,
+									}
+								) - 1;
+							return ObjectFreeze({
+								authorSequence: phase.authorSequence,
+								phase: phase.phase,
+								canonicalUnsignedVertexByteLength: job.intent.canonicalPreimageBytes.byteLength,
+								runtimeCensusOverheadByteLength: runtimeWidth,
+								nativeRowsByteLength: phase.widths.canonicalRowsBytes,
+								nativeImageByteLength: phase.widths.nativeImageBytes,
+								nativeControlRevisionDelta: phase.widths.controlRevisionDelta,
+							});
+						})
+					),
+				});
+	const issued = nativeRows.issued.map((row) => {
+		const preimage = decodeCanonical(row.canonicalPreimageBytes);
+		if (
+			!prospectiveCensusRecord(preimage) ||
+			row.author !== candidate.scope.author ||
+			row.objectId !== candidate.scope.objectId ||
+			!NumberIsSafeInteger(preimage.epoch) ||
+			(preimage.epoch as number) < 0 ||
+			(preimage.epoch as number) > epoch ||
+			!isDigestHex(preimage.anchor)
+		)
+			throw new TypeError("prospective successor census has unrepresented original issuance");
+		return {
+			scope: candidate.scope,
+			authorSequence: row.authorSequence,
+			digest: row.digest,
+			epoch: preimage.epoch as number,
+			anchorDigest: preimage.anchor,
+		};
+	});
+	const unsigned = decodeCanonical(candidate.bytes);
+	if (
+		!prospectiveCensusRecord(unsigned) ||
+		unsigned.epoch !== epoch ||
+		unsigned.anchor !== registration.payload.provenance.anchorDigest
+	)
+		throw new TypeError("prospective successor census unsigned scope is invalid");
+	if (!receivedAppend) issued.push({
+		scope: candidate.scope,
+		authorSequence: candidate.sequence,
+		digest: candidate.digest,
+		epoch,
+		anchorDigest: registration.payload.provenance.anchorDigest,
+	});
+	for (const job of futureJobs)
+		issued.push({
+			scope: candidate.scope,
+			authorSequence: job.intent.authorSequence,
+			digest: job.intent.digest,
+			epoch,
+			anchorDigest: registration.payload.provenance.anchorDigest,
+		});
+	if (settlementProfile === "v1") {
+		if (settlement === undefined || facts === undefined && ordinarySource === undefined)
+			throw new TypeError("prospective successor settlement owner is unavailable");
+		const frontier = settlement.frontiers.find(([author]) => author === candidate.scope.author);
+		if (
+			frontier === undefined ||
+			settlement.frontiers.filter(([author]) => author === candidate.scope.author).length !== 1
+		)
+			throw new TypeError("prospective successor settlement frontier is unavailable");
+		for (const row of issued) {
+			const kind = settlementOwnRowClass(row.epoch, epoch + 1, row.authorSequence, frontier[1], frontier[2]);
+			const original = nativeRows.issued.find((value) => value.authorSequence === row.authorSequence);
+			const preimageBytes = original?.canonicalPreimageBytes ?? preparedPreimages.get(row.authorSequence);
+			if (preimageBytes === undefined) throw new TypeError("prospective successor settlement preimage is unavailable");
+			const preimage = decodeCanonical(preimageBytes);
+			const operation =
+				prospectiveCensusRecord(preimage) && prospectiveCensusRecord(preimage.operation)
+					? preimage.operation
+					: undefined;
+			const adjacentFence =
+				row.epoch === epoch &&
+				operation?.action === AUTHOR_FENCE_ACTION &&
+				operation.version === 1 &&
+				operation.fenceSequence === row.authorSequence;
+			if (kind !== "terminal" && kind !== "old-incarnation" && !adjacentFence)
+				throw new TypeError("prospective successor settlement replacement policy requires original room preview");
+		}
+		const priorPlan =
+			continuation?.widths.finalRows.plans.find((row) => sameScope(row.scope, candidate.scope)) ??
+			(candidatePlan === undefined
+				? null
+				: settlement.planEffect === undefined
+					? candidatePlan
+					: applySettlementPlanEffect(
+							candidatePlan,
+							settlement.planEffect,
+							candidate.sequence,
+							settlementReplacementLastLogicalTimeFromPreimage(candidate.bytes)
+						));
+		const priorFence =
+			priorPlan?.fenceSequence == null
+				? undefined
+				: nativeRows.issued.find(
+						(row) => row.author === candidate.scope.author && row.authorSequence === priorPlan.fenceSequence
+					);
+		const priorFencePreimage =
+			!receivedAppend && priorPlan?.fenceSequence === candidate.sequence
+				? unsigned
+				: priorFence === undefined
+					? undefined
+					: decodeCanonical(priorFence.canonicalPreimageBytes);
+		const priorFenceEpoch =
+			prospectiveCensusRecord(priorFencePreimage) && NumberIsSafeInteger(priorFencePreimage.epoch)
+				? (priorFencePreimage.epoch as number)
+				: undefined;
+		const horizonSequence = futureJobs.at(-1)?.intent.authorSequence ?? candidate.sequence;
+		const lastPreimage = preparedPreimages.get(horizonSequence);
+		if (lastPreimage === undefined)
+			throw new TypeError("prospective successor settlement clock or sequence is exhausted");
+		const ownLastTime = settlementReplacementLastLogicalTimeFromPreimage(lastPreimage);
+		const receivedTime = receivedAppend ? settlementReplacementLastLogicalTimeFromPreimage(candidate.bytes) : undefined;
+		const lastTime = ownLastTime === undefined ? undefined : Math.max(ownLastTime, receivedTime ?? ownLastTime);
+		if (lastTime === undefined) throw new TypeError("prospective successor settlement clock or sequence is exhausted");
+		const successorSettlement = previewCreatorOrdinarySuccessorSettlement({scope: candidate.scope, epoch,
+			priorPlan, priorFenceEpoch, lastTime, sequence: candidate.sequence, preview: settlement.preview});
+		const {plan, checkPreview: checkSettlementPreview} = successorSettlement;
+		const fenceSequence = horizonSequence + 1;
+		const fenceOperation = ObjectFreeze({ action: AUTHOR_FENCE_ACTION, fenceSequence, version: 1 });
+		// The later room clock may advance after this quote. Charge its complete
+		// original nonnegative-safe-integer domain, not a guessed time or digest.
+		const { logicalTime: _clock, ...unsignedFields } = unsigned;
+		if (receivedAppend) delete unsignedFields.settlementSource;
+		const fencePreimageByteLength = prospectiveCensusRecordWidth(
+			{
+				...unsignedFields,
+				author: candidate.scope.author,
+				authorSequence: fenceSequence,
+				epoch: epoch + 1,
+				anchor: anchorRead.anchorDigest,
+				dependencies: [anchorRead.anchorDigest],
+				operation: fenceOperation,
+			},
+			{ logicalTime: encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength }
+		);
+		const unknownFencePreimageWidth =
+			1 + prospectiveCensusCountWidth(fencePreimageByteLength) + fencePreimageByteLength;
+		const fenceJobWidths = issuanceUnsignedSuccessorFenceWidths(nativeRows, candidate.scope, immediateIntent, control, {
+			plan,
+			canonicalPreimageByteLength: fencePreimageByteLength,
+			...(continuation === undefined ? {} : { continuation: futureJobs }),
+		});
+		const unknownDigest32 = 1 + prospectiveCensusCountWidth(32) + 32;
+		const finalPlan = applySettlementPlanEffect(plan, { kind: "fence" }, fenceSequence);
+		const plans =
+			candidatePlan === undefined
+				? [...nativeRows.plans, finalPlan]
+				: nativeRows.plans.map((row) => (row === candidatePlan ? finalPlan : row));
+		const unknown64 = 1 + prospectiveCensusCountWidth(64) + 64;
+		const arrayWidth = (widths: readonly number[]): number =>
+			1 + prospectiveCensusCountWidth(widths.length) + widths.reduce((sum, width) => sum + width, 0);
+		const authors = nativeRows.lineages.map((row) => row.author);
+		if (!authors.includes(candidate.scope.author)) authors.push(candidate.scope.author);
+		authors.sort();
+		const lineageWidths = authors.map((author) => {
+			const original = nativeRows.lineages.find((row) => row.author === author);
+			if (author !== candidate.scope.author) return encodeCanonical(original).byteLength;
+			const { pendingUnsigned: _pending, ...fields } = original ?? {
+				...candidate.scope,
+				next: 0,
+				exhausted: false,
+				prunedThroughAuthorSequence: null,
+			};
+			return encodeCanonical({ ...fields, next: fenceSequence + 1, exhausted: false }).byteLength;
+		});
+		const issuedWidths = nativeRows.issued.map((row) => encodeCanonical(row).byteLength);
+		if (!receivedAppend) issuedWidths.push(
+			prospectiveCensusRecordWidth(
+				{
+					...candidate.scope,
+					authorSequence: candidate.sequence,
+					canonicalPreimageBytes: candidate.bytes,
+					digest: candidate.digest,
+				},
+				{ signature: unknown64 }
+			)
+		);
+		for (const job of futureJobs)
+			issuedWidths.push(
+				prospectiveCensusRecordWidth(
+					{
+						...candidate.scope,
+						authorSequence: job.intent.authorSequence,
+						canonicalPreimageBytes: job.intent.canonicalPreimageBytes,
+						digest: job.intent.digest,
+					},
+					{ signature: unknown64 }
+				)
+			);
+		issuedWidths.push(
+			prospectiveCensusRecordWidth(
+				{ ...candidate.scope, authorSequence: fenceSequence },
+				{ canonicalPreimageBytes: unknownFencePreimageWidth, digest: unknownDigest32, signature: unknown64 }
+			)
+		);
+		const outboxWidths = nativeRows.outbox.map(
+			(row) =>
+				encodeCanonical(
+					row.objectId === candidate.scope.objectId && row.author === candidate.scope.author
+						? { ...row, publishState: "published" }
+						: row
+				).byteLength
+		);
+		if (!receivedAppend) outboxWidths.push(
+			encodeCanonical({
+				...candidate.scope,
+				authorSequence: candidate.sequence,
+				digest: candidate.digest,
+				publishState: "published",
+			}).byteLength
+		);
+		for (const job of futureJobs)
+			outboxWidths.push(
+				encodeCanonical({
+					...candidate.scope,
+					authorSequence: job.intent.authorSequence,
+					digest: job.intent.digest,
+					publishState: "published",
+				}).byteLength
+			);
+		outboxWidths.push(
+			prospectiveCensusRecordWidth(
+				{ ...candidate.scope, authorSequence: fenceSequence, publishState: "published" },
+				{ digest: unknownDigest32 }
+			)
+		);
+		const nativeRowsByteLength = prospectiveCensusRecordWidth(
+			{},
+			{
+				lineages: arrayWidth(lineageWidths),
+				issued: arrayWidth(issuedWidths),
+				outbox: arrayWidth(outboxWidths),
+				plans: arrayWidth(plans.map((row) => encodeCanonical(row).byteLength)),
+			}
+		);
+		if (
+			lineageWidths.length + issuedWidths.length + outboxWidths.length + plans.length >
+				ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+			nativeRowsByteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes
+		)
+			throw new TypeError("prospective successor settlement native image exceeds original bound");
+		const nativeImageByteLength = prospectiveCensusRecordWidth(
+			{
+				logicalBytes: nativeRowsByteLength,
+				lineageCount: authors.length,
+				issuedCount: issuedWidths.length,
+				outboxCount: outboxWidths.length,
+				planCount: plans.length,
+			},
+			{ imageDigest: unknown64 }
+		);
+		const planOrder = [...plans].sort((left, right) => left.scope.author.localeCompare(right.scope.author));
+		const debt = authors.map((author, lineageIndex) => ({
+			scope: { objectId: candidate.scope.objectId, author },
+			lineageIndex,
+			planIndex: planOrder.findIndex((row) => row.scope.author === author),
+		}));
+		const results: CreatorPostAdoptionCensusSizing[] = [];
+		// An original signed settlement frontier selects the raw successor
+		// store (installCreatorSuccessorLive); unlike the no-settlement branch
+		// there is no filtered-facade alternative to relabel these native rows.
+		{
+			const anchors = new Map<number, string>([
+				[epoch, registration.payload.provenance.anchorDigest],
+				[epoch + 1, anchorRead.anchorDigest],
+			]);
+			const rows = issued.map((row) => {
+				const branch = nativeBranchDisplacedSource(registration);
+				const separate =
+					branch !== undefined &&
+					row.epoch === branch.prepared.provenance.epoch &&
+					row.anchorDigest === branch.prepared.provenance.anchorDigest;
+				const previous = anchors.get(row.epoch);
+				if (!separate && previous !== undefined && previous !== row.anchorDigest)
+					throw new TypeError("prospective successor settlement anchors conflict");
+				if (!separate) anchors.set(row.epoch, row.anchorDigest);
+				const original = nativeRows.issued.find((value) => value.authorSequence === row.authorSequence);
+				const preimageBytes = original?.canonicalPreimageBytes ?? preparedPreimages.get(row.authorSequence);
+				if (preimageBytes === undefined)
+					throw new TypeError("prospective successor settlement preimage is unavailable");
+				const preimage = decodeCanonical(preimageBytes);
+				const operation =
+					prospectiveCensusRecord(preimage) && prospectiveCensusRecord(preimage.operation)
+						? preimage.operation
+						: undefined;
+				const adjacentFence =
+					row.epoch === epoch &&
+					operation?.action === AUTHOR_FENCE_ACTION &&
+					operation.version === 1 &&
+					operation.fenceSequence === row.authorSequence;
+				return creatorIssuanceCensusFields(
+					adjacentFence ? "adjacent-author-fence" : "signed-settled-issuance",
+					row.scope,
+					row.authorSequence,
+					row.digest,
+					"displaced"
+				);
+			});
+			if (anchors.size > 7) throw new TypeError("prospective successor settlement anchor count exceeds original bound");
+			const fenceDescriptorWidth = prospectiveCensusRecordWidth(
+				{
+					dependencyKind: "current-issuance",
+					scope: candidate.scope,
+					authorSequence: fenceSequence,
+					classification: "current",
+				},
+				{ digest: unknownDigest32 }
+			);
+			const journalRowWidth = prospectiveCensusRecordWidth(
+				creatorLocalJournalCensusFields(0, candidate.scope, fenceSequence, fencePreimageByteLength),
+				{ digest: unknown64 }
+			);
+			const currentJournalWidth = prospectiveCensusRecordWidth(
+				{
+					dependencyKind: "current-journal",
+					scope: { objectId: candidate.scope.objectId, epoch: epoch + 1, anchorDigest: anchorRead.anchorDigest },
+				},
+				{ rows: arrayWidth([journalRowWidth]) }
+			);
+			const dependencyAnchors = [...anchors]
+				.sort(([left], [right]) => left - right)
+				.map(([value, anchorDigest]) => ({ epoch: value, anchorDigest }));
+			// Before the pair, the successor graph/journal remain empty and the
+			// merged plan is not yet fenced. Pending native intent is retained in
+			// the complete native phase widths, not relabelled as settled runtime.
+			const precursorRuntime = {
+				...creatorRuntimeCensusFields(
+					{
+						dependencyKind: "current-journal",
+						scope: { objectId: candidate.scope.objectId, epoch: epoch + 1, anchorDigest: anchorRead.anchorDigest },
+						rows: [],
+					},
+					rows,
+					debt,
+					0,
+					dependencyAnchors,
+					migrationSource
+				),
+				...creatorRuntimeActiveCensusFields({
+					// This supported terminal-plan path exhausts the original room's
+					// rebase scan before issuing the fence. Open replacements still refuse.
+					pendingRoots: [],
+					wireByteCharge: 0,
+					unsettledSources: [],
+					cursor: null,
+					cacheSourceSequences: [],
+					epoch: epoch + 1,
+				}),
+				...(receivedAppend ? {pendingIngress} : {}),
+			};
+			const precursorRuntimeWidth = prospectiveCensusRecordWidth(precursorRuntime, { nativeIssuance: 1 }) - 1;
+			const nativeJobPhases = ObjectFreeze(
+				(["reserved", "entered"] as const).map((phase) => {
+					const widths = fenceJobWidths[phase];
+					return ObjectFreeze({
+						phase,
+						canonicalUnsignedVertexByteLength: fencePreimageByteLength,
+						runtimeCensusOverheadByteLength: precursorRuntimeWidth,
+						nativeRowsByteLength: widths.canonicalRowsBytes,
+						nativeImageByteLength: widths.nativeImageBytes,
+						nativeControlRevisionDelta: widths.controlRevisionDelta,
+					});
+				})
+			);
+			const runtime: Readonly<Record<string, unknown>> = {...creatorRuntimeCensusFields({}, rows, debt, 1, dependencyAnchors, migrationSource),
+				...(receivedAppend ? {pendingIngress} : {})};
+			const { currentJournal: _journal, nativeIssuance: _native, rows: _rows, ...runtimeFields } = runtime;
+			results.push(
+				ObjectFreeze({
+					runtimeCensusOverheadByteLength:
+						prospectiveCensusRecordWidth(runtimeFields, {
+							currentJournal: currentJournalWidth,
+							nativeIssuance: 1,
+							rows: arrayWidth([...rows.map((row) => encodeCanonical(row).byteLength), fenceDescriptorWidth]),
+						}) - 1,
+					nativeRowsByteLength,
+					nativeImageByteLength,
+					nativeControlRevisionDelta:
+						(continuation?.widths.final.controlRevisionDelta ??
+							nativeRows.outbox.filter(
+								(row) =>
+									row.objectId === candidate.scope.objectId &&
+									row.author === candidate.scope.author &&
+									row.publishState === "pending"
+							).length + Number(!receivedAppend)) +
+						(priorPlan === null || plan.revision !== priorPlan.revision ? 1 : 0) +
+						4,
+					successorJournalAppendForSizing: ObjectFreeze({
+						author: candidate.scope.author,
+						authorSequence: fenceSequence,
+					}),
+					nativeJobPhases,
+					archiveContinuationPreimageByteLengths:ObjectFreeze([fencePreimageByteLength]),
+					currentPublishedCensusSizing,
+					...(currentContinuation === undefined ? {} : { currentContinuation }),
+				})
+			);
+		}
+		if (results.length === 0)
+			throw new TypeError("prospective successor settlement has no representable original branch");
+		const variants = ObjectFreeze(results);
+		if (facts !== undefined) facts.postAdoptionSizing = ObjectFreeze({
+			unsignedBytes: new Uint8ArrayConstructor(candidate.bytes),
+			preparedClose: genuinePreparedClose,
+			projectionBytes: new Uint8ArrayConstructor(projectionBytes),
+			variants,
+			checkSettlementPreview,
+		});
+		if (ordinaryFacts?.kind === "ordinary-runtime") ordinaryFacts.postAdoptionSizing = ObjectFreeze({
+			unsignedBytes: new Uint8ArrayConstructor(candidate.bytes), preparedClose: genuinePreparedClose,
+			projectionBytes: new Uint8ArrayConstructor(projectionBytes), variants, exactVariantBytes: encodeCanonical(variants),
+			checkSettlementPreview,
+		});
+		return variants;
+	}
+	// A later non-current census requires published pairs (including hidden
+	// facade rows). Each original ACK changes pending STRING7 to published STRING9
+	// and advances the original control once. No new pair or intent is invented.
+	const acknowledgementCount =
+		nativeRows.outbox.filter(
+			(row) =>
+				row.objectId === candidate.scope.objectId &&
+				row.author === candidate.scope.author &&
+				row.publishState === "pending"
+		).length + Number(!receivedAppend);
+	const publicationWidthDelta = encodeCanonical("published").byteLength - encodeCanonical("pending").byteLength;
+	const nativeRowsByteLength = final.canonicalRowsBytes + acknowledgementCount * publicationWidthDelta;
+	const authors = nativeRows.lineages.map((row) => row.author);
+	if (!authors.includes(candidate.scope.author)) authors.push(candidate.scope.author);
+	authors.sort();
+	const nativeImageByteLength = prospectiveCensusRecordWidth(
+		{
+			logicalBytes: nativeRowsByteLength,
+			lineageCount: authors.length,
+			issuedCount: nativeRows.issued.length + Number(!receivedAppend),
+			outboxCount: nativeRows.outbox.length + Number(!receivedAppend),
+			planCount: 0,
+		},
+		{ imageDigest: 1 + prospectiveCensusCountWidth(64) + 64 }
+	);
+	const debt = authors.map((author, lineageIndex) => ({
+		scope: { objectId: candidate.scope.objectId, author },
+		lineageIndex,
+		planIndex: -1,
+	}));
+	const successorJournal = {
+		dependencyKind: "current-journal",
+		scope: { objectId: candidate.scope.objectId, epoch: epoch + 1, anchorDigest: anchorRead.anchorDigest },
+		rows: [],
+	};
+	const results: CreatorPostAdoptionCensusSizing[] = [];
+	// These are arithmetic encodings of the original raw/facade constructors,
+	// not native-looking signed rows or a claim their future guards have passed.
+	// All whole native material is counted in BOTH alternatives. The composer
+	// selects one complete maximum, never mixes independent component maxima.
+	for (const filtered of [false, true]) {
+		const anchors = new Map<number, string>([
+			[epoch, registration.payload.provenance.anchorDigest],
+			[epoch + 1, anchorRead.anchorDigest],
+		]);
+		const rows = issued.map((row) => {
+			const hidden = filtered && (row.authorSequence === 0 || row.epoch < epoch);
+			if (!hidden) {
+				const previous = anchors.get(row.epoch);
+				if (previous !== undefined && previous !== row.anchorDigest)
+					throw new TypeError("prospective successor census anchors conflict");
+				anchors.set(row.epoch, row.anchorDigest);
+			}
+			return creatorIssuanceCensusFields(
+				hidden
+					? "authenticated-covered-native-issuance"
+					: row.epoch === epoch && row.authorSequence !== 0
+						? "authenticated-closed-issuance"
+						: "signed-settled-issuance",
+				row.scope,
+				row.authorSequence,
+				row.digest,
+				hidden
+					? row.authorSequence === 0
+						? "pinned-genesis"
+						: "covered-historical"
+					: row.epoch === epoch
+						? "displaced"
+						: row.authorSequence === 0
+							? "pinned-genesis"
+							: "covered-historical"
+			);
+		});
+		// Preserve the existing source's seven-anchor guard. A raw branch with
+		// more anchors cannot supply a successful census; its physical rows are
+		// still fully counted by the legal filtered branch, never silently lost.
+		if (anchors.size > 7) continue;
+		const dependencyAnchors = [...anchors]
+			.sort(([left], [right]) => left - right)
+			.map(([value, anchorDigest]) => ({ epoch: value, anchorDigest }));
+		// The ordinary constructor emits one anchor and no admitted author
+		// vertices. The original recovery creates closeAuthors empty, so the
+		// source's graphVersion is zero before any successor replay/new issue.
+		const runtime = {...creatorRuntimeCensusFields(
+			successorJournal,
+			rows,
+			debt,
+			Number(projection.vertexCount) - 1,
+			dependencyAnchors,
+			migrationSource
+		), ...(receivedAppend ? {pendingIngress} : {})};
+		const runtimeCensusOverheadByteLength = prospectiveCensusRecordWidth(runtime, { nativeIssuance: 1 }) - 1;
+		results.push(
+			ObjectFreeze({
+				runtimeCensusOverheadByteLength,
+				nativeRowsByteLength,
+				nativeImageByteLength,
+				nativeControlRevisionDelta: acknowledgementCount,
+				currentPublishedCensusSizing,
+			})
+		);
+	}
+	if (results.length === 0 || (facts === undefined && ordinaryFacts?.kind !== "ordinary-runtime"))
+		throw new TypeError("prospective successor census has no representable original branch");
+	const variants = ObjectFreeze(results);
+	if (facts !== undefined) facts.postAdoptionSizing = ObjectFreeze({
+		unsignedBytes: new Uint8ArrayConstructor(candidate.bytes),
+		preparedClose: genuinePreparedClose,
+		projectionBytes: new Uint8ArrayConstructor(projectionBytes),
+		variants,
+	});
+	// NONE uses this original zero-fence branch. Enroll its exact complete
+	// variants without inventing an append, job, plan or policy-preview callback.
+	if (ordinaryFacts?.kind === "ordinary-runtime") {
+		ordinaryFacts.check();
+		ordinaryFacts.postAdoptionSizing = ObjectFreeze({
+			unsignedBytes: new Uint8ArrayConstructor(candidate.bytes), preparedClose: genuinePreparedClose,
+			projectionBytes: new Uint8ArrayConstructor(projectionBytes), variants, exactVariantBytes: encodeCanonical(variants),
+		});
+	}
+	return variants;
+}
+
+/**
+ * Resolves only the original live hold's last detached sizing result.
+ * @param hold - Original nominal observational hold.
+ * @param readout - Exact owner-produced variant array, not copied dimensions.
+ * @param unsignedBytes - Original preimage used by the sizing constructor.
+ * @param preparedClose - Same original nominal prepared close.
+ * @param projectionBytes - Exact original successor projection bytes.
+ * @returns Original variants, or undefined when ownership or currentness changed.
+ */
+function resolvePostAdoptionCensusSizing(
+	hold: unknown,
+	readout: unknown,
+	unsignedBytes: Uint8Array,
+	preparedClose: object,
+	projectionBytes: Uint8Array
+): readonly CreatorPostAdoptionCensusSizing[] | undefined {
+	if (hold === null || typeof hold !== "object") return undefined;
+	const facts = fullRecoveryCloseHoldFacts(hold);
+	const sizing = facts?.postAdoptionSizing;
+	if (
+		facts === undefined ||
+		sizing === undefined ||
+		facts.releasing ||
+		sizing.variants !== readout ||
+		sizing.preparedClose !== preparedClose ||
+		!sameBytes(sizing.unsignedBytes, unsignedBytes) ||
+		!sameBytes(sizing.projectionBytes, projectionBytes)
+	)
+		return undefined;
+	try {
+		if (facts.registration === undefined) return undefined;
+		prospectiveCreatorRuntimeCensusOverhead(facts.registration, hold, unsignedBytes);
+		if (sizing.checkSettlementPreview !== undefined && !sizing.checkSettlementPreview()) return undefined;
+		return sizing.variants;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Pure sizing data from the original prepared issuer, never an admitted vertex.
+ * @param registration - Original captured registration facts.
+ * @param exactCanonicalUnsignedVertexBytes - Original captured unsigned facts.
+ * @returns Original owner-derived bytes; no authority is minted.
+ */
+function previewCreatorIssuanceClose(
+	registration: V3PlaneRegistration,
+	exactCanonicalUnsignedVertexBytes: Uint8Array,
+	continuation: readonly Uint8Array[] = [],
+	hold?: CreatorSnapshotRecoveryCloseHold,
+	ordinaryHold?: CreatorOrdinaryIssuanceRuntimeHold
+): CreatorIssuanceClosePreview {
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintMachine === undefined ||
+		registration.blueprintClosing ||
+		registration.blueprintFolded ||
+		registration.operationAdmissionHalted ||
+		registration.authorization.kind !== "latched-acl"
+	)
+		throw new TypeError("creator issuance close preview is unavailable");
+	const vertices = copyCloseVertices(registration.closeVertices);
+	const authors = copyCloseAuthors(registration.closeAuthors);
+	if (vertices === undefined || authors === undefined)
+		throw new TypeError("creator issuance close preview graph is invalid");
+	const charges = new IntrinsicMap(registration.closeCharges);
+	const controls = new IntrinsicSet(registration.controlVertices);
+	const operations = new IntrinsicMap(registration.latchedOperations);
+	for (const preimage of [exactCanonicalUnsignedVertexBytes, ...continuation]) {
+		const candidate = ordinaryHold !== undefined && preimage === exactCanonicalUnsignedVertexBytes
+			? ordinaryPreviewAppendCandidate(registration, preimage, ordinaryHold)
+			: prospectiveAppendCandidate(registration, preimage,
+				preimage === exactCanonicalUnsignedVertexBytes ? hold : undefined);
+		const unsigned = decodeCanonical(candidate.bytes);
+		const epoch = ownDataValue(unsigned, "epoch");
+		const anchor = ownDataValue(unsigned, "anchor");
+		const dependencies = ownDataValue(unsigned, "dependencies");
+		const unsignedOperation = ownDataValue(unsigned, "operation");
+		if (
+			!isObject(unsigned) ||
+			epoch !== registration.payload.provenance.epoch ||
+			anchor !== registration.payload.provenance.anchorDigest ||
+			!ArrayIsArray(dependencies) ||
+			!isObject(unsignedOperation)
+		)
+			throw new TypeError("creator issuance close preview is outside the current authority");
+		const digest = lowerHexDigest(candidate.digest);
+		if (digest === undefined || vertices.has(digest))
+			throw new TypeError("creator issuance close preview graph is invalid");
+		const operation = detachedCanonicalOperation(unsignedOperation);
+		if (operation === undefined) throw new TypeError("creator issuance close preview operation is invalid");
+		const control = isControlOperation(operation, registration.payload.trust.trust.profileId);
+		const acl = control ? null : aclOperation(candidate.scope.author, digest, operation);
+		if (
+			(!control && !(hold !== undefined && fullRecoveryCloseHoldFacts(hold)?.receivedAppend?.sourceAuthorized === true &&
+				preimage === exactCanonicalUnsignedVertexBytes) && !isV3OperationAuthorAuthorized(registration.authorization, candidate.scope.author, acl)) ||
+			resolveV3AuthorizedAuthor(registration.authorization, candidate.scope.author) === undefined
+		)
+			throw new TypeError("creator issuance close preview operation is unauthorized");
+		if (acl !== null && acl !== undefined) operations.set(digest, acl);
+		if (control) controls.add(digest);
+		vertices.set(
+			digest,
+			ObjectFreeze({
+				hash: digest,
+				kind: "drp-vertex",
+				objectId: candidate.scope.objectId,
+				epoch: registration.payload.provenance.epoch,
+				anchor: registration.payload.provenance.anchorDigest,
+				dependencies: [...dependencies] as string[],
+				operation: operation as NonNullable<EpochVertex["operation"]>,
+			})
+		);
+		authors.set(digest, ObjectFreeze({ author: candidate.scope.author, authorSequence: candidate.sequence,
+			...(hold !== undefined && fullRecoveryCloseHoldFacts(hold)?.receivedAppend?.sourceAuthorized === true &&
+				preimage === exactCanonicalUnsignedVertexBytes ? {sourceAuthorized: true as const} : {}) }));
+		charges.set(digest, candidate.bytes.byteLength);
+	}
+	const index = new CausalityIndex(vertices, topologicalOrder(vertices, registration.payload.provenance.anchorDigest), {
+		initialByteCharges: charges,
+		maxEpochBytes: registration.payload.parameters.maxEpochBytes,
+		maxEpochVertices: registration.payload.parameters.maxEpochVertices,
+	});
+	const projection = deriveApplicationProjectionOrder(registration.payload, vertices, controls, index);
+	const aclPreview = latchedAclPreview(registration.authorization, operations);
+	const metadata = liveSnapshotMetadata(registration.payload);
+	if (projection === undefined || aclPreview === undefined || metadata === undefined)
+		throw new TypeError("creator issuance close preview projection is invalid");
+	const machine = registration.blueprintMachine.fork();
+	foldBlueprintEpoch({
+		anchorHash: registration.payload.provenance.anchorDigest,
+		machine,
+		vertices: projection.vertices,
+		authorize: ({ hash }) => {
+			const identity = authors.get(hash);
+			return (
+				identity !== undefined &&
+				(identity.sourceAuthorized === true ||
+					isV3OperationAuthorAuthorized(registration.authorization, identity.author, operations.get(hash) ?? null))
+			);
+		},
+		executionContext: ({ hash }) => {
+			const identity = authors.get(hash);
+			if (identity === undefined) throw new TypeError("creator issuance close preview author is unavailable");
+			return ObjectFreeze({ author: identity.author });
+		},
+	}).adopt();
+	const exactCanonicalSuccessorAclBytes = encodeCanonical(aclPreview.next, {
+		maxBytes: registration.payload.parameters.maxSnapshotBytes,
+	});
+	const exported = exportBlueprintSnapshotPayload({
+		...metadata,
+		exactCanonicalAclBytes: exactCanonicalSuccessorAclBytes,
+		machine,
+		maxSnapshotBytes: registration.payload.parameters.maxSnapshotBytes,
+		schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+	});
+	charges.delete(registration.payload.provenance.anchorDigest);
+	return ObjectFreeze({
+		graph: ObjectFreeze({ vertices, authors, charges, frontier: index.tips() }),
+		exactCanonicalPayloadBytes: exported.exactCanonicalPayloadBytes,
+		exactCanonicalSuccessorAclBytes,
+		applicationStateDigest: exported.applicationStateDigest,
+	});
 }
 
 function exportLiveSnapshotPayload(registration: V3PlaneRegistration): V3BlueprintSnapshotExportResult {
@@ -8153,6 +18917,7 @@ function importCreatorSuccessorInitialMachine(
 			return undefined;
 		}
 		return new BlueprintStateMachine({
+			maxApplicationStateBytes: recovered.prepared.parameters.maxSnapshotBytes,
 			exactCanonicalInitialStateBytes,
 			expectedBlueprintDigest: recovered.prepared.provenance.blueprintDigest,
 			expectedInitialStateDigest: input.expectedApplicationStateDigest,
@@ -8192,11 +18957,15 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 			const registration = v3HandleRegistrations.get(projectionBase.plane as V3PlaneHandle);
 			const machine = registration?.blueprintMachine;
 			const identity = registration?.blueprintMachineIdentity;
+			// This returns only a detached, already authenticated successor base.
+			// Terminal recovery needs it to reconstruct the redirect; it does not
+			// grant a fold handle, new admission, issue or retirement permission.
+			// A transition in flight still cannot supply a stable reconstruction.
 			if (
 				registration === undefined ||
 				!currentRegistration(registration) ||
 				registration.mode !== "genesis-active" ||
-				registration.terminalState !== "active" ||
+				registration.terminalState === "transition" ||
 				registration.blueprintClosing ||
 				registration.blueprintFolded ||
 				registration.blueprintHandle === undefined ||
@@ -8244,6 +19013,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		let machine: BlueprintStateMachine;
 		try {
 			machine = new BlueprintStateMachine({
+				maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes,
 				exactCanonicalInitialStateBytes: initialStateBytes,
 				expectedBlueprintDigest: registration.payload.provenance.blueprintDigest,
 				expectedInitialStateDigest: initialStateDigest,
@@ -8330,16 +19100,134 @@ function creatorClosePreviousHistorySnapshot(payload: PreparedV3LivePayload): Ac
 /**
  * Claims the close-only state of one genuine active v3 registration.
  * @param registration - Private genuine live registration.
+ * @param purpose
+ * @param closePlane - Exact genuine handle bound to the creator-close owner.
  * @returns A close registration backed by the private live registry, or undefined.
  */
-function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorCloseRegistration | undefined {
+/** A private request for original authenticated reconstruction, never a grant
+ * to issue, admit, retire or replace the addressed durable decision. */
+function creatorRetirementResumeRequested(registration: V3PlaneRegistration): boolean {
+	const control = registration.retirementResumeControl;
+	const receipt = registration.retirementReconstruction;
+	return (
+		(receipt !== undefined &&
+			sameHead(receipt.head, registration.payload.trust.head) &&
+			sameCreatorRoomHead(receipt.roomHead, registration.payload.trust.trust)) ||
+		(control !== undefined &&
+			control.objectId === registration.payload.provenance.objectId &&
+			(control.active !== null
+				? control.active.preparation.head.kind === "present" &&
+					sameHead(control.active.preparation.head, registration.payload.trust.head)
+				: control.completed?.domains !== undefined &&
+					control.completed.throughEpoch + 1 === registration.payload.trust.trust.currentEpoch))
+	);
+}
+
+/** The existing closed-fold owner supplies one exact graph; never a caller-selected witness graph. */
+function captureCreatorCloseGraph(registration: V3PlaneRegistration): CreatorCloseGraph | undefined {
+	if (!currentRegistration(registration) || !registration.blueprintFolded ||
+		registration.index.size > registration.payload.parameters.maxEpochVertices) return undefined;
+	const vertices = copyCloseVertices(registration.closeVertices);
+	const authors = copyCloseAuthors(registration.closeAuthors);
+	const charges = new IntrinsicMap<string, number>(registration.closeCharges);
+	ReflectApply(MapPrototypeDelete, charges, [registration.payload.provenance.anchorDigest]);
+	if (vertices === undefined || authors === undefined || vertices.size !== charges.size + 1 ||
+		vertices.size !== authors.size + 1 || vertices.size !== registration.index.size ||
+		ReflectApply(MapPrototypeHas, authors, [registration.payload.provenance.anchorDigest])) return undefined;
+	for (const digest of authors.keys()) {
+		if (!ReflectApply(MapPrototypeHas, vertices, [digest]) || !ReflectApply(MapPrototypeHas, charges, [digest])) return undefined;
+	}
+	return ObjectFreeze({ authors, charges, frontier: registration.index.tips(), vertices });
+}
+
+/**
+ * Complete freshly authenticated source bytes, BEFORE original issuance/journal retirement.
+ * Arrival journalSequence is not an archive ordinal. The existing closed graph/producer
+ * owns deterministic history ordering; returned rows confer no portable authority.
+ */
+async function readCreatorClosedArchiveSource(registration: V3PlaneRegistration, sharedAccounting?: CreatorClosedRollbackProofAccounting): Promise<
+	Readonly<{ graph: CreatorCloseGraph; rows: readonly CreatorReplayRow[] }> | undefined
+> {
+	const graph = captureCreatorCloseGraph(registration);
+	if (graph === undefined || !registration.blueprintClosing || registration.terminalState !== "active") return undefined;
+	const graphVersion = registration.graphVersion;
+	const index = registration.index;
+	const rows = await readCreatorReplayRows(registration, undefined, sharedAccounting);
+	if (rows === undefined || !currentRegistration(registration) || !registration.blueprintClosing ||
+		!registration.blueprintFolded || registration.terminalState !== "active" ||
+		registration.graphVersion !== graphVersion || registration.index !== index ||
+		rows.length !== graph.charges.size || rows.length !== graph.authors.size) return undefined;
+	const identities = new IntrinsicMap<string, Set<number>>();
+	const digests = new Set<string>();
+	for (const row of rows) {
+		const identity = graph.authors.get(row.digest);
+		const original = decodeCanonical(row.exactCanonicalPreimageBytes) as Readonly<Record<string, unknown>>;
+		if (digests.has(row.digest) || identity === undefined || original.author !== identity.author ||
+			original.authorSequence !== identity.authorSequence || graph.charges.get(row.digest) !== row.byteCharge ||
+			row.byteCharge !== row.exactCanonicalPreimageBytes.byteLength) return undefined;
+		const sequences = identities.get(identity.author) ?? new Set<number>();
+		if (sequences.has(identity.authorSequence)) return undefined;
+		sequences.add(identity.authorSequence); identities.set(identity.author, sequences); digests.add(row.digest);
+	}
+	return ObjectFreeze({ graph, rows });
+}
+
+/** Non-durable byte preparation, admitted/joined under the SAME genuine close hold. */
+function prepareCreatorClosedArchive(
+	registration: V3PlaneRegistration,
+	closePlane: V3PlaneHandle,
+	previousHistorySnapshot: AccumulatorSnapshot,
+	hold: CreatorSnapshotRecoveryCloseHold,
+	limits: ArchiveLimits,
+	sharedAccounting?: CreatorClosedRollbackProofAccounting
+): Promise<ClosedEpochArchive | undefined> {
+	const facts = fullRecoveryCloseHoldFacts(hold);
+	if (facts?.registration !== registration || facts.closePlane !== closePlane || facts.releasing ||
+		!currentRegistration(registration)) return Promise.resolve(undefined);
+	// Fixed-size declaration capture before any asynchronous read; no detached callback policy.
+	const capturedLimits = decodeCanonical(encodeCanonical(limits, { maxBytes: 1024, maxDepth: 4, maxItems: 32 })) as unknown as ArchiveLimits;
+	const available = (): boolean => recoveryCloseHolds.get(hold) === facts && !facts.releasing &&
+		currentRegistration(registration) && registration.blueprintClosing && registration.blueprintFolded &&
+		registration.terminalState === "active";
+	const task = Promise.resolve().then(async (): Promise<ClosedEpochArchive | undefined> => {
+		if (!available()) return undefined;
+		await facts.check();
+		if (!available()) return undefined;
+		const source = await readCreatorClosedArchiveSource(registration, sharedAccounting);
+		if (source === undefined || !available()) return undefined;
+		const archive = await produceClosedEpochArchive({
+			close: { authenticatedCanonicalPreimageByteLengths: source.graph.charges,
+				exactCanonicalEpochAnchorPreimageBytes: new Uint8ArrayConstructor(registration.payload.input.exactCanonicalAnchorPreimageBytes),
+				frontier: source.graph.frontier, maxEpochBytes: registration.payload.parameters.maxEpochBytes,
+				maxEpochVertices: registration.payload.parameters.maxEpochVertices, previousHistorySnapshot,
+				vertices: source.graph.vertices },
+			sourceRecords: source.rows.map(row => ObjectFreeze({ vertexDigest: row.digest,
+				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+				detachedSignature: new Uint8ArrayConstructor(row.detachedSignature) })),
+			limits: capturedLimits,
+		});
+		await facts.check();
+		return available() ? archive : undefined;
+	});
+	facts.pending.add(task);
+	void task.then(() => facts.pending.delete(task), () => facts.pending.delete(task));
+	return task;
+}
+
+function creatorCloseRegistration(
+	registration: V3PlaneRegistration,
+	purpose: "close" | "recipient" = "close",
+	closePlane: V3PlaneHandle = registration.handle
+): V3CreatorCloseRegistration | undefined {
 	if (
 		!currentRegistration(registration) ||
-		registration.operationAdmissionHalted ||
+		(purpose === "close" && registration.receiveOnly) ||
+		(registration.operationAdmissionHalted &&
+			!(purpose === "close" && creatorRetirementResumeRequested(registration))) ||
 		registration.mode !== "genesis-active" ||
 		registration.authorization.kind !== "latched-acl" ||
 		registration.terminalState !== "active" ||
-		registration.blueprintHandle === undefined ||
+		(purpose === "close" && registration.blueprintHandle === undefined) ||
 		registration.payload.input.store.capabilities.durability !== "strict" ||
 		registration.payload.input.store.capabilities.signingEligibility !== "backend-capability-required"
 	)
@@ -8347,41 +19235,93 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 	const previousHistorySnapshot = creatorClosePreviousHistorySnapshot(registration.payload);
 	if (previousHistorySnapshot === undefined) return undefined;
 	return ObjectFreeze({
+		...(registration.receiveOnly ? { receiveOnly: true as const } : {}),
+		beginReceived: (): Promise<boolean> => {
+			if (
+				!currentRegistration(registration) ||
+				registration.blueprintClosing ||
+				registration.terminalState !== "active"
+			)
+				return Promise.resolve(false);
+			registration.blueprintClosing = true;
+			return enqueueRegistrationTask(registration, () => () => {
+				const current = currentRegistration(registration);
+				if (current) registration.receivedTransition = true;
+				return Promise.resolve(current);
+			});
+		},
+		terminalizeReceived: (): boolean => {
+			if (registration.receivedTransition !== true || registration.terminalState !== "active") return false;
+			registration.receivedTransition = false;
+			// The replacement may already be registered; the captured predecessor still owns its gate.
+			registration.blueprintClosing = true;
+			registration.operationAdmissionHalted = true;
+			registration.terminalState = "terminal";
+			return true;
+		},
 		abortSnapshotStage: (): boolean => {
 			if (!currentRegistration(registration) || registration.blueprintFolded || registration.terminalState !== "active")
 				return false;
 			registration.blueprintClosing = false;
 			return true;
 		},
-		captureCloseGraph: () => {
-			if (!currentRegistration(registration) || !registration.blueprintFolded) return undefined;
-			const vertices = copyCloseVertices(registration.closeVertices);
-			const authors = copyCloseAuthors(registration.closeAuthors);
-			const charges = new IntrinsicMap<string, number>(registration.closeCharges);
-			ReflectApply(MapPrototypeDelete, charges, [registration.payload.provenance.anchorDigest]);
-			if (
-				vertices === undefined ||
-				authors === undefined ||
-				vertices.size !== charges.size + 1 ||
-				vertices.size !== authors.size + 1 ||
-				vertices.size !== registration.index.size ||
-				ReflectApply(MapPrototypeHas, authors, [registration.payload.provenance.anchorDigest])
-			) {
-				return undefined;
-			}
-			for (const digest of authors.keys()) {
-				if (!ReflectApply(MapPrototypeHas, vertices, [digest]) || !ReflectApply(MapPrototypeHas, charges, [digest])) {
-					return undefined;
-				}
-			}
-			return ObjectFreeze({
-				authors,
-				charges,
-				frontier: registration.index.tips(),
-				vertices,
+		captureCloseGraph: () => captureCreatorCloseGraph(registration),
+		prepareClosedEpochArchive: (hold: Parameters<V3CreatorCloseRegistration["prepareClosedEpochArchive"]>[0],
+			limits: Parameters<V3CreatorCloseRegistration["prepareClosedEpochArchive"]>[1],
+			sharedAccounting?: CreatorClosedRollbackProofAccounting) =>
+			prepareCreatorClosedArchive(registration, closePlane, previousHistorySnapshot, hold, limits, sharedAccounting),
+		readArchiveCloseContinuationPreimageByteLengths: async (hold: CreatorSnapshotRecoveryCloseHold,book: CreatorClosedRollbackProofAccounting) => {
+			const facts = fullRecoveryCloseHoldFacts(hold);
+			if (facts?.registration !== registration || facts.closePlane !== closePlane || facts.releasing ||
+				!currentRegistration(registration) || !registration.blueprintClosing || !registration.blueprintFolded)
+				throw new TypeError("archive closed continuation source is unavailable");
+			const task = Promise.resolve().then(async () => {
+				await facts.check();
+				const profile = settlementProfileFor(registration.payload.trust.trust.profileId);
+				if (profile === "none") return ObjectFreeze([]);
+				if (profile !== "v1") throw new TypeError("archive closed continuation policy is unsupported");
+				const census = decodeCanonical(facts.exactCanonicalCensusBytes);
+				if (!prospectiveCensusRecord(census) || !prospectiveCensusRecord(census.nativeIssuance) ||
+					!prospectiveCensusRecord(census.nativeIssuance.rows) || !ArrayIsArray(census.nativeIssuance.rows.lineages) ||
+					!ArrayIsArray(census.nativeIssuance.rows.plans))
+					throw new TypeError("archive closed continuation native source is unavailable");
+				// SAME original closed-census contract: all retained source plans
+				// (including selected/shared/foreign provenance) have completed their
+				// original replacement/inheritance and fence before this close hold
+				// can exist. A local fence-only width must never stand for unfinished
+				// admitted replacement debt; active admission funds those complete
+				// jobs through prepareCreatorSettlementContinuation first.
+				if ((census.nativeIssuance.rows.plans as unknown as IssuanceRetirementRows["plans"])
+					.some(plan => !settlementPlanPermitsAuthenticatedPruning(plan)))
+					throw new TypeError("archive closed continuation requires the original complete settlement discharge");
+				const nativeLineages = census.nativeIssuance.rows.lineages as unknown as IssuanceRetirementRows["lineages"];
+				const original = nativeLineages.find(row => sameScope(row,registration.issuanceScope));
+				if (nativeLineages.some(row => row.pendingUnsigned !== undefined))
+					throw new TypeError("archive closed continuation awaits original unsigned recovery");
+				const lineage = await registration.issuanceStore.readLineage(registration.issuanceScope);
+				if (!book.charge(encodeCanonical(lineage)) || lineage.exhausted || original === undefined ||
+					original.next !== lineage.next || original.exhausted !== lineage.exhausted)
+					throw new TypeError("archive closed continuation lineage is unavailable");
+				const sequence = lineage.next;
+				if (!NumberIsSafeInteger(sequence) || sequence < 0) throw new TypeError("archive closed continuation sequence is exhausted");
+				// The SAME ordinary native issuer's author-fence schema. Anchor and
+				// clock are scalar unknown widths, never a fabricated target preimage.
+				const hexWidth = encodeCanonical("0".repeat(64)).byteLength;
+				const width = prospectiveCensusRecordWidth({author:registration.issuanceScope.author,authorSequence:sequence,
+					epoch:registration.payload.provenance.epoch + 1,kind:"drp-vertex",objectId:registration.payload.provenance.objectId,
+					operation:{action:AUTHOR_FENCE_ACTION,fenceSequence:sequence,version:1},protocolMajor:3}, {
+					anchor:hexWidth,dependencies:1 + prospectiveCensusCountWidth(1) + hexWidth,
+					logicalTime:encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength});
+				await facts.check();
+				return ObjectFreeze([width]);
 			});
+			facts.pending.add(task);void task.then(() => facts.pending.delete(task),() => facts.pending.delete(task));
+			return task;
 		},
 		currentTrust: registration.payload.trust.trust,
+		...(registration.retirementReconstruction === undefined
+			? {}
+			: { retirementReconstruction: registration.retirementReconstruction }),
 		exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(
 			registration.payload.input.exactCanonicalAnchorPreimageBytes
 		),
@@ -8402,13 +19342,133 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 		previousHistorySnapshot,
 		stageSnapshot: async (): Promise<V3BlueprintSnapshotExportResult> => {
 			if (registration.blueprintFolded) return exportLiveSnapshotPayload(registration);
-			const staged = await stageBlueprintEpoch(registration);
+			const staged = await stageBlueprintEpoch(
+				registration,
+				registration.retirementResumeControl ?? registration.retirementReconstruction
+			);
 			if (!staged.ok) return snapshotExportFailure("not-active", staged.detail);
 			const adopted = staged.adopt();
 			if (!adopted.ok) return snapshotExportFailure("not-adopted", adopted.detail);
 			return exportLiveSnapshotPayload(registration);
 		},
 		sealDurableReplay: () => sealCreatorDurableReplay(registration),
+		captureClosedMembershipLocalWitnesses: async () => {
+			// Reopen through the original replay authenticator while native issuance
+			// bytes are still held. A later journal pointer is not this evidence.
+			const source = await readCreatorClosedArchiveSource(registration);
+			return source === undefined ? undefined : ObjectFreeze(source.rows
+				.filter((row) => row.sourceKind === "local-issued")
+				.map((row) => ObjectFreeze({
+					vertexDigest: row.digest,
+					exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+					detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
+				})));
+		},
+		// The genuine claim may use a successor alias; the close owner is keyed
+		// by that exact handle, not the registration's underlying raw handle.
+		sealRecoveryDependencies: (required?: boolean) =>
+			sealCreatorRecoveryDependencies(registration, required, undefined, closePlane),
+		sealReceivedRecoveryDependencies: async (
+			signing: CreatorSigningRecoveryOwner,
+			snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>
+		) => {
+			const original = resolveCreatorSigningRecoveryOwner(signing, registration.payload.trust.trust);
+			if (original === undefined) throw new TypeError("creator received signing custody is foreign or unavailable");
+			// This is the original received queue gate, not a synthesized fold or
+			// signer. The same closed census refuses pending ingress or unfinished
+			// rebase; the existing protected planner decides every native effect.
+			let retired: readonly GenerationRecord[] = ObjectFreeze([]);
+			const hold = await sealCreatorRecoveryDependencies(registration, true, undefined, closePlane, undefined, {
+				signing: original,
+				completeRetirement: async (observation) => {
+					if (retired.length !== 0) throw new TypeError("creator received retirement already consumed");
+					retired = await consumeCreatorRecoverySourceRetirement(observation, {
+						plane: closePlane,
+						store: registration.payload.input.store,
+						snapshotStore: snapshots,
+						liveJournalStore: registration.liveJournalStore,
+						currentTrust: registration.payload.trust.trust,
+					});
+				},
+			});
+			return hold === undefined
+				? undefined
+				: ObjectFreeze({
+						hold,
+						readRetiredGenerations: () => {
+							if (
+								!currentRegistration(registration) ||
+								registration.receivedTransition !== true ||
+								!registration.blueprintClosing ||
+								registration.terminalState !== "active"
+							)
+								throw new TypeError("creator received retirement owner is unavailable");
+							return retired;
+						},
+					});
+		},
+		sealIssuanceMaintenanceDependencies: (receipt?: object) => {
+			const received = receipt === undefined ? undefined : receivedAppendFacts(registration, receipt);
+			return sealCreatorRecoveryDependencies(registration, true, undefined, closePlane,
+				received === undefined ? "issuance-preview" : "received-append", undefined, received?.custody, received);
+		},
+		prepareOrdinaryNativeMetadataForReadiness: () => prepareCreatorOrdinaryNativeMetadataForReadiness(registration),
+		needsOrdinaryReadinessRecovery: (): boolean => {
+			if (!currentRegistration(registration)) throw new TypeError("creator ordinary readiness owner is unavailable");
+			return registration.operationAdmissionHalted || creatorRetirementResumeRequested(registration);
+		},
+		runOrdinaryReadinessMaintenance: (
+			snapshots: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[0],
+			consume: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[1]
+		) =>
+			runCreatorOrdinaryReadinessMaintenance(registration, closePlane, snapshots, consume),
+		sealOrdinaryIssuanceMaintenanceRuntime: (receipt?: object): Promise<CreatorOrdinaryIssuanceRuntimeHold | undefined> =>
+			Promise.resolve(sealCreatorOrdinaryIssuanceRuntime(registration, closePlane, receipt)),
+		readOrdinaryRuntimeCapacityWidths: (input: CreatorOrdinaryRuntimeCapacityWidthInput) =>
+			creatorOrdinaryRuntimeCapacityWidths(input),
+		readReceivedAppendCandidate: (receipt: object) => {
+			const received = receivedAppendFacts(registration, receipt);
+			return ObjectFreeze({bytes: new Uint8ArrayConstructor(received.evidence.exactCanonicalPreimageBytes),
+				signature: new Uint8ArrayConstructor(received.evidence.signature),
+				protectedContinuation: received.sourceAuthorized || received.evidence.authenticated.admitted.settlementSource !== undefined});
+		},
+		prepareIssuanceContinuation: (
+			hold: CreatorSnapshotRecoveryCloseHold,
+			bytes: Uint8Array,
+			effect: NonNullable<DurableIssueCommit["planEffect"]> | undefined,
+			preview: CreatorRoomSettlementPreview | undefined
+		) => prepareCreatorSettlementContinuation(registration, hold, bytes, effect, preview),
+		previewIssuanceClose: (bytes: Uint8Array, hold?: CreatorSnapshotRecoveryCloseHold) =>
+			previewCreatorIssuanceClose(
+				registration,
+				bytes,
+				hold === undefined
+					? []
+					: (fullRecoveryCloseHoldFacts(hold)?.continuation?.jobs.map((job) => job.intent.canonicalPreimageBytes) ?? []),
+				hold
+			),
+		previewOrdinaryIssuanceClose: (bytes: Uint8Array, hold: CreatorOrdinaryIssuanceRuntimeHold) =>
+			previewCreatorIssuanceClose(registration, bytes, [], undefined, hold),
+		readProspectiveRuntimeCensusOverhead: (hold: CreatorSnapshotRecoveryCloseHold, bytes: Uint8Array) =>
+			prospectiveCreatorRuntimeCensusOverhead(registration, hold, bytes),
+		readProspectivePostAdoptionCensusSizing: (
+			hold: CreatorSnapshotRecoveryCloseHold,
+			bytes: Uint8Array,
+			close: object,
+			projection: Uint8Array,
+			settlement?: CreatorPostAdoptionSettlementSizing
+		) => prospectiveCreatorPostAdoptionCensusSizing(registration, hold, bytes, close, projection, settlement),
+		installIssuanceMaintenanceConsumer: (consumer: CreatorIssuanceMaintenanceConsumer): (() => void) | undefined => {
+			if (!currentRegistration(registration) || registration.creatorMaintenanceBound || typeof consumer !== "function")
+				return undefined;
+			registration.creatorMaintenanceBound = true;
+			registration.creatorMaintenanceAdmission = consumer;
+			return () => {
+				if (registration.creatorMaintenanceAdmission === consumer) registration.creatorMaintenanceAdmission = undefined;
+			};
+		},
+		bindSnapshotReadinessOwner: (store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): boolean =>
+			bindSnapshotReadinessOwner(registration, store),
 		store: registration.payload.input.store,
 		terminalize: (): boolean => {
 			if (!currentRegistration(registration) || !registration.blueprintFolded) return false;
@@ -8433,6 +19493,9 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 			anchorDigest: registration.payload.provenance.anchorDigest,
 			epoch: registration.payload.provenance.epoch,
 			objectId: registration.payload.provenance.objectId,
+			isCurrentMember: (author: string): boolean =>
+				currentRegistration(registration) &&
+				resolveV3AuthorizedAuthor(registration.authorization, author) !== undefined,
 			isCurrentWriter: (author: string): boolean => {
 				if (!currentRegistration(registration)) return false;
 				const authority = authorizeLatchedApplicationWrite({
@@ -8451,12 +19514,15 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 		currentEphemeralAuthority: (): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> =>
 			currentRegistration(registration) ? ephemeralAuthority : undefined,
 		beginTerminalTransition: (): Promise<V3TerminalTransitionResult> => beginTerminalTransition(registration),
+		authorizeSettlementSourceSelection: (
+			input: Parameters<NonNullable<V3PlaneHandle["authorizeSettlementSourceSelection"]>>[0]
+		): Promise<Uint8Array> => authorizeCreatorSettlementSelection(registration, input),
 		issueLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> =>
-			registration.mode === "snapshot-closed"
+			registration.receiveOnly || registration.mode === "snapshot-closed"
 				? Promise.resolve(localIssueFailure("not-active", "v3 plane is not accepting local issues"))
 				: enqueueLocalIssue(registration, input),
 		readRebaseOutbox: (): Promise<V3RebaseOutboxResult> =>
-			registration.mode === "snapshot-closed"
+			registration.receiveOnly || registration.mode === "snapshot-closed" || !currentRegistration(registration)
 				? Promise.resolve(
 						ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const })
 					)
@@ -8465,18 +19531,22 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 						() => () =>
 							settlementProfileFor(registration.payload.trust.trust.profileId) === "v1"
 								? readSettlementSources(registration, settlementFrontierFromHistory(registration.historicalIssuance))
-								: readRebaseOutbox(registration)
+								: readRebaseOutbox(registration),
+						{
+							pool: "read-control",
+							refuse: () => ObjectFreeze({ kind: "admission-rejected" as const, ok: false as const }),
+						}
 					),
 		completeRebaseSource: (
 			input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
 		): Promise<V3EgressResult> =>
-			registration.mode === "snapshot-closed"
+			registration.receiveOnly || registration.mode === "snapshot-closed"
 				? Promise.resolve(egressFailure("not-active", "v3 plane is not active"))
-				: enqueueRegistrationTask(registration, () => () => completeRebaseSource(registration, input)),
+				: enqueueRebaseCompletion(registration, input),
 		previewLatchedAcl: (): Readonly<Record<string, unknown>> | undefined =>
 			latchedAclPreview(registration.authorization, registration.latchedOperations),
 		publishPending: (): Promise<V3EgressResult> =>
-			registration.mode === "snapshot-closed"
+			registration.receiveOnly || registration.mode === "snapshot-closed"
 				? Promise.resolve(egressFailure("not-active", "v3 plane is not active"))
 				: enqueuePendingPublication(registration),
 		republishRetained: (): Promise<V3EgressResult> =>
@@ -8657,6 +19727,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				);
 			}
 			registration = {
+				receiveOnly: recovered.receiveOnly,
 				active: true,
 				authorVertexCounts: recovered.authorVertexCounts,
 				closeAuthors: recovered.closeAuthors,
@@ -8680,6 +19751,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				handle: undefined as unknown as V3PlaneHandle,
 				hotPredecessor: undefined,
 				historicalIssuance: recovered.historicalIssuance,
+				vertexFacts: recovered.historicalIssuance?.vertexFacts ?? createCreatorCensusVertexFacts(),
 				index: recovered.index,
 				issuanceScope: selectedScope,
 				issuanceStore: boundIssuanceStore,
@@ -8707,7 +19779,18 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				topic,
 				terminalBarrier: undefined,
 				terminalState: recovered.terminal ? "terminal" : "active",
+				terminalTransitionQueued: false,
+				terminalPublicationEntered: false,
+				terminalPublicationInputBytes: 0,
 				gate: undefined,
+				joinedWork: new IntrinsicSet<Promise<void>>(),
+				admittedInputJobs: 0,
+				admittedInputBytes: 0,
+				admittedReadControlJobs: 0,
+				admittedPendingPublicationJobs: 0,
+				admittedEgressControlJobs: 0,
+				admittedGossipQueueJobs: 0,
+				admittedGossipQueueBytes: 0,
 			};
 			registration.handle = makeV3PlaneHandle(registration);
 			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
@@ -8715,6 +19798,11 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
 			if (reusesTransport) {
 				existing.active = false;
+				// This hot handoff deliberately keeps the transport subscription,
+				// so normal deactivateRegistration is not called. End optional
+				// immutable-fact retention here even if an old handle stays alive;
+				// admitted native work retains its original independent joins.
+				existing.vertexFacts.release();
 				existing.pendingIngress.clear();
 				existing.pendingIngressBytes = 0;
 				registration.hotPredecessor = new WeakRefConstructor(existing);
@@ -8742,13 +19830,49 @@ async function cleanupCreatorSettlementSuccessor(
 	material: CreatorSuccessorLiveMaterial,
 	payload: PreparedV3LivePayload,
 	authorization: V3LiveAuthorization,
-	historical: HistoricalIssuanceContext
+	historical: HistoricalIssuanceContext | undefined
 ): Promise<void> {
+	// The original close owner must resume this authenticated turnover before
+	// any independent legacy cleanup, even when certified source rows exist.
+	if (material.retirementReconstruction !== undefined) return;
 	const frontier = settlementFrontierFromHistory(historical);
-	if (frontier === undefined) return;
 	const ahe = aheReclamationMaintenanceForStore(material.store);
 	const issuance = durableIssuancePruningMaintenanceForStore(material.issuanceStore);
-	if (ahe === undefined || issuance === undefined) return;
+	if (ahe === undefined || (frontier !== undefined && issuance === undefined)) return;
+	const native = material.store as AheBoundedRecoveryRoleStore;
+	let coordinatedIssuance: readonly Readonly<{author: string; authorSequence: number; digest: string}>[] | undefined;
+	if (native.readRetirementControl !== undefined) {
+		const observed = await native.readRetirementControl(material.successor.head.objectId);
+		if (!observed.ok) throw new TypeError(`creator cleanup retirement control is unavailable: ${observed.reason}`);
+		const control = observed.value;
+		if ((control?.active !== null && control?.active !== undefined) || control?.nominee != null) {
+			// This helper has no authority to resolve a different owner's active
+			// checkpoint. Activation remains quarantined until original close resume.
+			return;
+		}
+		if (control?.completed !== null && control?.completed !== undefined) {
+			if (
+				control.active !== null ||
+				control.nominee != null ||
+				control.completed.throughEpoch >= material.successor.trust.currentEpoch
+			)
+				throw new TypeError("creator cleanup retirement ownership is unresolved or successor is retired");
+			// The original coordinator still owns generation reclamation. Its
+			// positively classified permanent issuance holes remain native guards;
+			// the existing authenticated pruner may drain ONLY outside those holes.
+			// Do not disable that independent original owner forever after the first P.
+			const observed = await issuance?.acquireRetirementControl?.({objectId: material.successor.head.objectId});
+			if (observed === undefined) return;
+			try {
+				if (observed.control.active !== null || observed.control.completed === null ||
+					observed.control.completed.throughEpoch !== control.completed.throughEpoch ||
+					observed.control.completed.decisionDigest !== control.completed.decisionDigest ||
+					observed.control.completed.sourceProofDigest !== control.completed.sourceProofDigest ||
+					control.completed.generationDrain?.phase === "pending") return;
+				coordinatedIssuance = observed.control.completed.protectedRecords;
+			} finally {await observed.release();}
+		}
+	}
 	const candidate = (kind: string, epoch?: number): CreatorSuccessorGenerationMaterial["candidates"][number] => {
 		const matches = material.successor.candidates.filter(({ bytes }) => {
 			const value = decodeCanonical(bytes);
@@ -8767,6 +19891,148 @@ async function cleanupCreatorSettlementSuccessor(
 	const cut = candidate("drp-hard-epoch-cut", closedEpoch);
 	const qc = candidate("drp-seal-qc", closedEpoch);
 	const cutRecord = decodeCanonical(cut.bytes) as Record<string, unknown>;
+	// Cold material has no producer-private semantic role grant. Keep every
+	// existing source until the next close reacquires its complete native proof;
+	// signed role spelling alone must never authorize reclamation.
+	if (
+		(Object.hasOwn(cutRecord, "recoveryRoles") || Object.hasOwn(cutRecord, "forwardPromotion")) &&
+		material.certifiedRecoverySourceGenerations === undefined
+	)
+		return;
+	const retainedSourceRefs = new Map<string, GenerationRef>();
+	const forward = Reflect.get(cutRecord, "forwardPromotion") as
+		| {
+				source?: {
+					cutRef: GenerationRef;
+					commitQcRef: GenerationRef;
+					checkpointRefs: readonly (readonly [string, GenerationRef])[];
+				};
+				roles?: {
+					retainedSources: readonly {
+						cutRef: GenerationRef;
+						commitQcRef: GenerationRef;
+						checkpointRefs: readonly (readonly [string, GenerationRef])[];
+					}[];
+				};
+		  }
+		| undefined;
+	if (forward !== undefined) {
+		// This material is minted only after the complete signed promotion decision
+		// has passed the owning verifier. Retain its actual source/control closures.
+		for (const source of [forward.source, ...(forward.roles?.retainedSources ?? [])]) {
+			if (source === undefined) throw new TypeError("creator cleanup source roles are unavailable");
+			for (const ref of [source.cutRef, source.commitQcRef, ...source.checkpointRefs.map(([, ref]) => ref)]) {
+				const existing = retainedSourceRefs.get(ref.digest);
+				if (existing !== undefined && existing.byteLength !== ref.byteLength)
+					throw new TypeError("creator cleanup source references conflict");
+				retainedSourceRefs.set(ref.digest, ref);
+			}
+		}
+	}
+	if (Object.prototype.hasOwnProperty.call(cutRecord, "recoveryRoles")) {
+		// The close owner has verified this exact semantic transfer before signing
+		// and publication. Its predecessor's original promotion support remains a
+		// required native dependency until the later joined turnover decision.
+		const priorCut = material.predecessor.candidates.filter(({ bytes }) => {
+			const value = decodeCanonical(bytes);
+			return (
+				isObject(value) &&
+				Reflect.get(value, "kind") === "drp-hard-epoch-cut" &&
+				Reflect.get(value, "epoch") === closedEpoch - 1
+			);
+		});
+		const priorCandidate = priorCut[0];
+		if (priorCut.length !== 1 || priorCandidate === undefined)
+			throw new TypeError("creator cleanup prior role proof is unavailable");
+		const prior = decodeCanonical(priorCandidate.bytes) as Record<string, unknown>;
+		const original = prior.forwardPromotion as typeof forward;
+		if (original !== undefined)
+			for (const source of [original.source, ...(original.roles?.retainedSources ?? [])]) {
+				if (source === undefined) throw new TypeError("creator cleanup prior source is unavailable");
+				for (const ref of [source.cutRef, source.commitQcRef, ...source.checkpointRefs.map(([, ref]) => ref)]) {
+					const existing = retainedSourceRefs.get(ref.digest);
+					if (existing !== undefined && existing.byteLength !== ref.byteLength)
+						throw new TypeError("creator cleanup source references conflict");
+					retainedSourceRefs.set(ref.digest, ref);
+				}
+			}
+	}
+	const enumerateGenerations = async (): Promise<GenerationRecord[]> => {
+		const page = await material.store.readGenerationPage({ objectId: material.successor.head.objectId, limit: 64 });
+		if (!page.ok || page.value.nextCursor !== null)
+			throw new TypeError("creator cleanup generation enumeration exceeded bounded lineage");
+		return [...page.value.generations];
+	};
+	const sourceRetention = (generations: readonly GenerationRecord[]): Readonly<Record<string, unknown>> => {
+		if (material.certifiedRecoverySourceGenerations === undefined)
+			return retainedSourceRefs.size === 0 ? {} : { retainedSourceRefs: [...retainedSourceRefs.values()] };
+		const current = generations.find((row) => row.generationId === material.successor.head.generationId);
+		const firstHead = current?.baseExpectedHead;
+		const first =
+			firstHead?.kind === "present"
+				? generations.find((row) => row.generationId === firstHead.generationId)
+				: undefined;
+		const secondHead = first?.baseExpectedHead;
+		const second =
+			secondHead?.kind === "present"
+				? generations.find((row) => row.generationId === secondHead.generationId)
+				: undefined;
+		if (current === undefined || first === undefined || second === undefined)
+			throw new TypeError("creator cleanup current rollback chain is unavailable");
+		const top = new Set([current.generationId, first.generationId, second.generationId]);
+		if (material.classifiedRecoverySourceGenerations === undefined)
+			throw new TypeError("creator cleanup source classification custody is unavailable");
+		// A fully verified promotion can share the prior certificate's privately
+		// authenticated native support. Every required signed source reference must
+		// occur in the exact current/rollback/support union, not a detached list.
+		const support = material.certifiedRecoverySourceGenerations.filter((row) => !top.has(row.generationId));
+		for (const row of support) {
+			const actual = generations.find((candidate) => candidate.generationId === row.generationId);
+			if (actual === undefined || compareBytes(encodeCanonical(actual), encodeCanonical(row)) !== 0)
+				throw new TypeError("creator cleanup source generation custody changed");
+		}
+		if (
+			[...retainedSourceRefs.values()].some(
+				(ref) =>
+					![current, first, second, ...support].some((row) =>
+						row.closure.some((actual) => actual.digest === ref.digest && actual.byteLength === ref.byteLength)
+					)
+			)
+		)
+			throw new TypeError("creator cleanup source references exceed authenticated native custody");
+		return {
+			retainedIndependentSourceGenerations: material.certifiedRecoverySourceGenerations.filter(
+				(row) => !top.has(row.generationId)
+			),
+			classifiedSourceGenerations: material.classifiedRecoverySourceGenerations.filter(
+				(row) => !top.has(row.generationId)
+			),
+		};
+	};
+	if (frontier === undefined) {
+		if (coordinatedIssuance !== undefined) return;
+		const head = await material.store.readHead(material.successor.head.objectId);
+		if (!head.ok) throw new TypeError("creator cleanup head is unavailable");
+		const generations = await enumerateGenerations();
+		const planned = planClosedEpochRoleCleanup({
+			adoption: { adopted: true, activeHead: material.successor.head },
+			availabilityPolicyDigest: cutRecord.availabilityPolicyDigest,
+			close: { closedEpoch, commitQcRef: qc.ref, objectId: material.successor.head.objectId, verified: true },
+			expectedHead: head.value,
+			generations,
+			issuance: {},
+			snapshot: { adopted: true, manifestDigest: cutRecord.snapshotManifestDigest },
+			...sourceRetention(generations),
+		});
+		if (!planned.ok) {
+			if (planned.reason === "D109A_ROLLBACK_INSUFFICIENT" || planned.reason === "D109A_POLICY_UNSUPPORTED") return;
+			throw new TypeError(`creator cleanup refused: ${planned.reason}`);
+		}
+		const { issuance: _unused, ...reclamation } = planned.plan;
+		await ahe.reclaimClosedEpoch(reclamation);
+		return;
+	}
+	if (issuance === undefined) throw new TypeError("creator issuance pruning owner is unavailable");
 	const opened = openCreatorAuthorSettlement({
 		exactCanonicalRecordBytes: candidate("drp-creator-author-settlement-state").bytes,
 		expectedCommitQcRef: qc.ref,
@@ -8788,18 +20054,7 @@ async function cleanupCreatorSettlementSuccessor(
 	) {
 		throw new TypeError("creator cleanup checkpoint proof is invalid");
 	}
-	const generations: GenerationRecord[] = [];
-	let cursor: Parameters<AheDurableStore["readGenerationPage"]>[0]["cursor"];
-	do {
-		const page = await material.store.readGenerationPage({
-			objectId: material.successor.head.objectId,
-			limit: 64,
-			...(cursor === undefined ? {} : { cursor }),
-		});
-		if (!page.ok) throw new TypeError("creator cleanup generation enumeration failed");
-		generations.push(...page.value.generations);
-		cursor = page.value.nextCursor ?? undefined;
-	} while (cursor !== undefined);
+	const generations = await enumerateGenerations();
 	const state = await issuance.inspectPruningState(material.issuanceScope);
 	const plan = await material.issuanceStore.readSettlementPlan(material.issuanceScope);
 	const rows: {
@@ -8822,6 +20077,10 @@ async function cleanupCreatorSettlementSuccessor(
 			for (const raw of page) {
 				const row = outboxRowSnapshot(raw, material.issuanceScope);
 				if (row === undefined) throw new TypeError("creator cleanup issuance row is invalid");
+				if (coordinatedIssuance?.some(hole => hole.author === row.scope.author && hole.authorSequence === row.authorSequence)) {
+					done = true;
+					break;
+				}
 				const source = authenticatedSettlementSourceRow(
 					payload,
 					authorization,
@@ -8863,6 +20122,18 @@ async function cleanupCreatorSettlementSuccessor(
 	}
 	const head = await material.store.readHead(material.successor.head.objectId);
 	if (!head.ok) throw new TypeError("creator cleanup head is unavailable");
+	if (coordinatedIssuance !== undefined) {
+		if (throughAuthorSequence === null) return;
+		if (head.value.kind !== "present" || !sameHead(head.value, material.successor.head))
+			throw new TypeError("creator coordinated issuance cleanup head changed");
+		// Original signature/frontier, rollback-depth and exact issued/outbox
+		// validation above; original atomic lineage/plan/protected-hole checks
+		// inside the native pruner. No generation effect or new permission here.
+		await issuance.pruneAuthenticatedSettledPrefix({closedEpoch, commitQcRef: checkpoint.commitQcRef,
+			expectedLineage: state.lineage, expectedPrunedThroughAuthorSequence: state.prunedThroughAuthorSequence,
+			scope: material.issuanceScope, snapshotManifestDigest: checkpoint.snapshotManifestDigest, throughAuthorSequence});
+		return;
+	}
 	const planned = planClosedEpochCleanup({
 		settlement: { admissionEpoch: frontier.admissionEpoch, terminalThrough: frontier.terminalThrough },
 		adoption: { adopted: true, activeHead: material.successor.head },
@@ -8875,6 +20146,7 @@ async function cleanupCreatorSettlementSuccessor(
 		},
 		expectedHead: head.value,
 		generations,
+		...sourceRetention(generations),
 		issuance: {
 			complete: true,
 			lineage: state.lineage,
@@ -8912,21 +20184,53 @@ async function activateCreatorSuccessorLive(
 ): Promise<
 	Readonly<
 		| { readonly handle: object; readonly ok: true }
-		| { readonly detail: string; readonly kind: string; readonly ok: false }
+		| { readonly cause?: unknown; readonly detail: string; readonly kind: string; readonly ok: false }
 	>
 > {
 	const rejected = (
 		kind: string,
-		detail: string
-	): Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }> =>
-		ObjectFreeze({ detail, kind, ok: false as const });
+		detail: string,
+		cause?: unknown
+	): Readonly<{ readonly cause?: unknown; readonly detail: string; readonly kind: string; readonly ok: false }> =>
+		ObjectFreeze({ ...(cause === undefined ? {} : { cause }), detail, kind, ok: false as const });
+	let replacement: Readonly<{ deactivate(): void | Promise<void> }> | undefined;
+	let deactivation: Promise<void> | undefined;
+	let ownedVertexFacts: CreatorCensusVertexFacts | undefined;
+	let transferredVertexFacts = false;
+	const rejectReplacement = async (
+		kind: string,
+		detail: string,
+		primary?: unknown
+	): Promise<
+		Readonly<{ readonly cause?: unknown; readonly detail: string; readonly kind: string; readonly ok: false }>
+	> => {
+		try {
+			if (replacement !== undefined) {
+				const owned = replacement;
+				deactivation ??= Promise.resolve().then((): void | Promise<void> => owned.deactivate());
+				await deactivation;
+			}
+		} catch (cleanup) {
+			return rejected(kind, detail, primary === undefined ? cleanup : new AggregateError([primary, cleanup], detail));
+		}
+		return rejected(kind, detail, primary);
+	};
 	try {
 		const transportHandoff = creatorSuccessorTransportHandoff(material, bindings);
+		// Only the genuine live source handoff may carry these pure facts. A
+		// reopen or foreign/local lookalike starts cold; no old ABI is admitted.
+		const vertexFacts = ownedVertexFacts = transportHandoff?.vertexFacts.forkVerification() ?? createCreatorCensusVertexFacts();
+		const receiveOnly = material.receiveOnly === true;
+		if (transportHandoff !== undefined && transportHandoff.receiveOnly !== receiveOnly)
+			return rejected("preparation-rejected", "creator successor local restriction differs from its source");
+		if (receiveOnly) await assertEmptyReceiveOnlyIssuance(material.issuanceStore, material.issuanceScope);
+		const settlementPolicy = transportHandoff?.payload.input.settlementPolicy ?? material.settlementPolicy;
+		const settlementFloor = transportHandoff?.payload.input.settlementFloor ?? material.settlementFloor;
 		const [predecessorValidation, predecessorSource, successor, successorIssuanceAuthority] = await Promise.all([
-			prepareExistingCreatorGeneration(material.predecessor, material),
-			prepareExistingCreatorGeneration(material.predecessor, material),
-			prepareExistingCreatorGeneration(material.successor, material),
-			prepareExistingCreatorGeneration(material.successor, material),
+			prepareExistingCreatorGeneration(material.predecessor, material, settlementPolicy, settlementFloor),
+			prepareExistingCreatorGeneration(material.predecessor, material, settlementPolicy, settlementFloor),
+			prepareExistingCreatorGeneration(material.successor, material, settlementPolicy, settlementFloor),
+			prepareExistingCreatorGeneration(material.successor, material, settlementPolicy, settlementFloor),
 		]);
 		if (
 			predecessorValidation === undefined ||
@@ -8952,6 +20256,7 @@ async function activateCreatorSuccessorLive(
 					closure: material.successor.references,
 				}),
 				floorTrust: material.successor.trust,
+				sourceTrust: material.predecessor.trust,
 			});
 			const identity = capability === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(capability);
 			return capability === undefined ||
@@ -8964,32 +20269,77 @@ async function activateCreatorSuccessorLive(
 				? undefined
 				: {
 						capability,
+						originalIssuanceStore: material.issuanceStore,
+						vertexFacts,
 						count: 0,
 						countedSequences: new IntrinsicSet<number>(),
 						maxEpochVertices: successorPayload.parameters.maxEpochVertices,
 						scopeAuthorMatches: identity.author === material.issuanceScope.author,
 					};
 		};
-		const predecessorHistoricalIssuance = openHistoricalIssuance();
-		const successorHistoricalIssuance = openHistoricalIssuance();
-		if (predecessorHistoricalIssuance === undefined || successorHistoricalIssuance === undefined) {
+		const predecessorHistoricalIssuance = receiveOnly ? undefined : openHistoricalIssuance();
+		const successorHistoricalIssuance = receiveOnly ? undefined : openHistoricalIssuance();
+		if (!receiveOnly && (predecessorHistoricalIssuance === undefined || successorHistoricalIssuance === undefined)) {
 			return rejected("preparation-rejected", "creator historical issuance authority preparation failed");
 		}
-		const predecessorIssuanceStore = creatorFilteredIssuanceStore(
-			material.issuanceStore,
-			material.issuanceScope,
-			successorPayload,
-			successorAuthorization,
-			material.predecessor.trust.currentEpoch,
-			material.predecessor.trust.currentEpoch > 0 ? material.pinnedGenesisAnchorDigest : undefined,
-			material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
-			predecessorHistoricalIssuance
-		);
-		creatorHistoricalIssuanceHandoffs.set(predecessorValidation, predecessorHistoricalIssuance);
+		const predecessorIssuanceStore = receiveOnly
+			? material.issuanceStore
+			: creatorFilteredIssuanceStore(
+					material.issuanceStore,
+					material.issuanceScope,
+					successorPayload,
+					successorAuthorization,
+					material.predecessor.trust.currentEpoch,
+					material.predecessor.trust.currentEpoch > 0 ? material.pinnedGenesisAnchorDigest : undefined,
+					material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+					predecessorHistoricalIssuance
+				);
+		if (predecessorHistoricalIssuance !== undefined)
+			creatorHistoricalIssuanceHandoffs.set(predecessorValidation, predecessorHistoricalIssuance);
 		if (transportHandoff?.displacedSource !== undefined) {
 			creatorPredecessorRecoverySource.set(predecessorValidation, transportHandoff.displacedSource);
 		}
+		const policySnapshot = decodeCanonical(material.exactCanonicalSnapshotPayloadBytes);
+		if (
+			!isObject(policySnapshot) ||
+			bytesToLowerHex(hashDomain("ts-drp/snapshot-payload/v3", material.exactCanonicalSnapshotPayloadBytes)) !==
+				material.snapshotPayloadDigest
+		)
+			return rejected("snapshot-invalid", "creator successor policy snapshot is invalid");
+		const policyStateBytes = encodeCanonical(Reflect.get(policySnapshot, "application"));
+		if (bytesToLowerHex(hashDomain("ts-drp/state/v3", policyStateBytes)) !== material.stateDigest)
+			return rejected("snapshot-invalid", "creator successor policy state is invalid");
+		// Both predecessor validation and successor recovery install their exact
+		// journal header. The adoption material has already been independently
+		// authenticated; join source custody before either native write boundary.
+		const headerSource = material.sourceRuntimeHandle?.deref();
+		if (headerSource !== undefined) await releaseCreatorCloseHeaderCustody(headerSource);
+		await material.promotionDependencies?.release();
 		const validatedPredecessor = await recoverV3LiveReplica({
+			...(receiveOnly ? { receiveOnly: true as const } : {}),
+			...((bindings.classifyTerminalVertex ?? transportHandoff?.classifyTerminalVertex) === undefined
+				? {}
+				: {
+						classifyTerminalVertex: bindings.classifyTerminalVertex ?? transportHandoff?.classifyTerminalVertex,
+					}),
+			...(bindings.createOperationAdmissionPolicy === undefined
+				? {}
+				: {
+						operationAdmissionPolicy: bindings.createOperationAdmissionPolicy(
+							ObjectFreeze({
+								aclDigest: bytesToLowerHex(
+									hashDomain("ts-drp/latched-acl/v3", material.predecessorExactCanonicalLatchedAclBytes)
+								),
+								exactCanonicalLatchedAclBytes: new Uint8ArrayConstructor(
+									material.predecessorExactCanonicalLatchedAclBytes
+								),
+								anchorDigest: material.predecessor.trust.currentAnchorDigest,
+								authenticatedClosedApplicationStateBytes: new Uint8ArrayConstructor(policyStateBytes),
+								epoch: material.predecessor.trust.currentEpoch,
+								objectId: material.predecessor.trust.objectId,
+							})
+						),
+					}),
 			capability: predecessorValidation,
 			exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
 			...(material.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
@@ -9003,7 +20353,10 @@ async function activateCreatorSuccessorLive(
 			liveJournalStore: material.liveJournalStore,
 		});
 		if (!validatedPredecessor.ok) {
-			return rejected("recovery-rejected", `creator predecessor recovery failed: ${validatedPredecessor.kind}`);
+			return rejected(
+				"recovery-rejected",
+				`creator predecessor recovery failed: ${validatedPredecessor.kind}: ${validatedPredecessor.detail}`
+			);
 		}
 		if (consumeRecoveredV3Live(validatedPredecessor.capability) === undefined) {
 			return rejected("internal-invariant", "creator predecessor recovery custody failed");
@@ -9019,12 +20372,18 @@ async function activateCreatorSuccessorLive(
 				issuanceStore: material.issuanceStore,
 				liveJournalStore: material.liveJournalStore,
 				sourceCapability: predecessorSource,
+				predecessorEpoch: material.predecessor.trust.currentEpoch,
 			})
 		);
+		const originalNativeBranch = transportHandoff?.displacedSource;
+		const filtersOriginalNativeBranch =
+			originalNativeBranch !== undefined &&
+			originalNativeBranch.prepared.provenance.objectId === material.issuanceScope.objectId &&
+			originalNativeBranch.issuanceStore === material.issuanceStore;
 		const successorIssuanceStore =
-			settlementFrontierFromHistory(successorHistoricalIssuance) !== undefined
+			receiveOnly || settlementFrontierFromHistory(successorHistoricalIssuance) !== undefined
 				? material.issuanceStore
-				: transportHandoff?.displacedSource === undefined
+				: !filtersOriginalNativeBranch
 					? material.predecessor.trust.currentEpoch > 0
 						? creatorFilteredIssuanceStore(
 								material.issuanceStore,
@@ -9040,20 +20399,101 @@ async function activateCreatorSuccessorLive(
 					: creatorFilteredIssuanceStore(
 							material.issuanceStore,
 							material.issuanceScope,
-							transportHandoff.displacedSource.prepared,
-							transportHandoff.displacedSource.authorization,
+							originalNativeBranch.prepared,
+							originalNativeBranch.authorization,
 							undefined,
-							transportHandoff.displacedSource.pinnedGenesisAnchorDigest,
-							transportHandoff.displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+							originalNativeBranch.pinnedGenesisAnchorDigest,
+							originalNativeBranch.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 							successorHistoricalIssuance
 						);
-		creatorHistoricalIssuanceHandoffs.set(successor, successorHistoricalIssuance);
+		if (successorHistoricalIssuance !== undefined)
+			creatorHistoricalIssuanceHandoffs.set(successor, successorHistoricalIssuance);
+		const retainedBranch = transportHandoff?.displacedSource;
+		const retainsNativeBranch =
+			retainedBranch !== undefined &&
+			retainedBranch.activationVertexDigest === undefined &&
+			retainedBranch.prepared.trust.trust.currentEpoch === 0 &&
+			retainedBranch.prepared.trust.trust.genesisAnchorDigest !== material.predecessor.trust.genesisAnchorDigest &&
+			retainedBranch.prepared.provenance.objectId === material.issuanceScope.objectId &&
+			retainedBranch.issuanceStore === material.issuanceStore;
+		if (retainsNativeBranch) {
+			creatorRetainedNativeBranches.add(retainedBranch);
+			creatorPredecessorRecoverySource.set(successor, retainedBranch);
+		}
 		const recovered = await recoverV3LiveReplica({
+			...(receiveOnly ? { receiveOnly: true as const } : {}),
+			...(bindings.createOperationAdmissionPolicy === undefined
+				? {}
+				: {
+						operationAdmissionPolicy: bindings.createOperationAdmissionPolicy(
+							ObjectFreeze({
+								aclDigest: bytesToLowerHex(hashDomain("ts-drp/latched-acl/v3", material.exactCanonicalLatchedAclBytes)),
+								exactCanonicalLatchedAclBytes: new Uint8ArrayConstructor(material.exactCanonicalLatchedAclBytes),
+								authenticatedSettlementFrontiers: ObjectFreeze(
+									// NONE historical identities cannot have admissionEpoch.
+									// This is the same empty policy input, not an authentication
+									// exemption: source/ACL/snapshot and native history above stay fresh.
+									settlementProfileFor(material.successor.trust.profileId) !== "v1" ? [] :
+									// The original successor historical owner already authenticated
+									// this complete signed settlement. Select member scalars from
+									// that same nominal source/target; do not reopen its closure once
+									// per member. Unsupported custody keeps the original cold path.
+									(successorHistoricalIssuance === undefined ? undefined :
+										resolveVerifiedHistoricalSettlementFrontiers(successorHistoricalIssuance.capability,
+											{epoch: material.predecessor.trust.currentEpoch,
+											 anchor: material.predecessor.trust.currentAnchorDigest,
+											 objectId: material.predecessor.trust.objectId},
+										{epoch: material.successor.trust.currentEpoch,
+											 anchor: material.successor.trust.currentAnchorDigest,
+											 objectId: material.successor.trust.objectId,
+											 profileId: material.successor.trust.profileId},
+										(successorAuthorization.kind === "latched-acl" ? successorAuthorization.value.members : [])
+											.map(member => member.author))) ??
+									(successorAuthorization.kind === "latched-acl" ? successorAuthorization.value.members : []).flatMap(
+										(member) => {
+											const capability = openVerifiedCreatorHistoricalIssuance({
+												author: member.author,
+												closure: ObjectFreeze({
+													candidates: material.successor.candidates,
+													closure: material.successor.references,
+												}),
+												floorTrust: material.successor.trust,
+											});
+											const identity =
+												capability === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(capability);
+											return identity?.admissionEpoch === undefined
+												? []
+												: [
+														ObjectFreeze([
+															identity.author,
+															identity.admissionEpoch,
+															identity.admittedAuthorSequence,
+														] as const),
+													];
+										}
+									)
+								),
+								anchorDigest: material.successor.trust.currentAnchorDigest,
+								epoch: material.successor.trust.currentEpoch,
+								objectId: material.successor.trust.objectId,
+								authenticatedApplicationStateBytes: policyStateBytes,
+							})
+						),
+					}),
 			capability: successor,
-			displacedSource: ObjectFreeze({
-				capability: predecessorSource,
-				exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
-			}),
+			...((bindings.classifyTerminalVertex ?? transportHandoff?.classifyTerminalVertex) === undefined
+				? {}
+				: {
+						classifyTerminalVertex: bindings.classifyTerminalVertex ?? transportHandoff?.classifyTerminalVertex,
+					}),
+			...(receiveOnly || retainsNativeBranch
+				? {}
+				: {
+						displacedSource: ObjectFreeze({
+							capability: predecessorSource,
+							exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
+						}),
+					}),
 			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
 			...(material.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
 				? {}
@@ -9065,7 +20505,8 @@ async function activateCreatorSuccessorLive(
 			issuanceStore: successorIssuanceStore,
 			liveJournalStore: material.liveJournalStore,
 		});
-		if (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);
+		if (!recovered.ok)
+			return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}: ${recovered.detail}`);
 		creatorSuccessorInitialState.set(
 			recovered.capability,
 			ObjectFreeze({
@@ -9081,12 +20522,62 @@ async function activateCreatorSuccessorLive(
 		creatorSuccessorRecoveredDeliveries.delete(recovered.capability);
 		if (deliveries === undefined)
 			return rejected("recovery-rejected", "creator successor recovered deliveries are unavailable");
-		const activated = activateV3LivePlane({ capability: recovered.capability, ...bindings });
+		const retirementReader = (material.store as AheBoundedRecoveryRoleStore).readRetirementControl;
+		const retirementObserved =
+			retirementReader === undefined
+				? undefined
+				: await retirementReader.call(material.store, material.successor.head.objectId);
+		if (retirementObserved !== undefined && !retirementObserved.ok)
+			return rejected("recovery-rejected", "creator successor retirement control is unavailable", retirementObserved);
+		const retirementControl = retirementObserved?.ok === true ? retirementObserved.value : null;
+		if (
+			retirementControl?.active !== null &&
+			retirementControl?.active !== undefined &&
+			(retirementControl.active.preparation.head.kind !== "present" ||
+				!sameHead(retirementControl.active.preparation.head, material.successor.head))
+		)
+			return rejected("recovery-rejected", "creator successor is not the addressed retirement source");
+		if (retirementControl?.nominee != null && retirementControl.active !== null)
+			return rejected("recovery-rejected", "creator successor retirement source has an unresolved nominee");
+		const receipt = material.retirementReconstruction;
+		if (
+			receipt !== undefined &&
+			(material.origin !== "durable-reopen" ||
+				!sameHead(receipt.head, material.successor.head) ||
+				!sameCreatorRoomHead(receipt.roomHead, material.successor.trust))
+		)
+			return rejected("recovery-rejected", "creator successor turnover receipt differs from its original source");
+		const activated = activateV3LivePlane({
+			capability: recovered.capability,
+			messageQueueManager: bindings.messageQueueManager,
+			networkNode: bindings.networkNode,
+			onAdmittedVertex: bindings.onAdmittedVertex,
+		});
 		if (!activated.ok) return rejected("activation-rejected", `creator successor activation failed: ${activated.kind}`);
+		replacement = activated.handle;
 		const activatedRegistration = v3HandleRegistrations.get(activated.handle);
 		if (activatedRegistration === undefined) {
-			activated.handle.deactivate();
-			return rejected("internal-invariant", "creator successor runtime registration is unavailable");
+			return await rejectReplacement("internal-invariant", "creator successor runtime registration is unavailable");
+		}
+		// No await, replay, terminalization or public exposure occurs between the
+		// actual activation and this gate on the SAME private registration.
+		if (!bindSnapshotReadinessOwner(activatedRegistration, material.snapshotStore))
+			return await rejectReplacement("recovery-rejected", "creator successor snapshot readiness owner is unavailable");
+		const resumeCheckpoint =
+			(retirementControl?.active !== null && retirementControl?.active !== undefined) ||
+			// First-successor classification fences retain every byte and have no
+			// mature retirement transfer to resume. Active and reconstructed debt
+			// still halt independently; completed retirement begins at epoch two.
+			(material.successor.trust.currentEpoch >= 2 &&
+				retirementControl?.completed?.domains !== undefined &&
+				retirementControl.completed.throughEpoch + 1 === material.successor.trust.currentEpoch);
+		if (retirementControl !== null && resumeCheckpoint) {
+			activatedRegistration.operationAdmissionHalted = true;
+			activatedRegistration.retirementResumeControl = retirementControl;
+		}
+		if (receipt !== undefined) {
+			activatedRegistration.operationAdmissionHalted = true;
+			activatedRegistration.retirementReconstruction = receipt;
 		}
 		activatedRegistration.sourceRuntimeHandle = material.sourceRuntimeHandle;
 		try {
@@ -9094,13 +20585,15 @@ async function activateCreatorSuccessorLive(
 				await bindings.onAdmittedVertex(ObjectFreeze({ ...delivery, transportSender: bindings.networkNode.peerId }));
 				if (!currentRegistration(activatedRegistration)) throw new TypeError("creator successor replay was retired");
 			}
-		} catch {
-			await Promise.resolve(activated.handle.deactivate());
-			return rejected("recovery-rejected", "creator successor recovered delivery was rejected");
+		} catch (cause) {
+			return await rejectReplacement("recovery-rejected", "creator successor recovered delivery was rejected", cause);
 		}
-		if (!material.terminalizeSource()) {
-			activated.handle.deactivate();
-			return rejected("source-unavailable", "creator predecessor could not be terminalized");
+		try {
+			if (!(await material.terminalizeSource())) {
+				return await rejectReplacement("source-unavailable", "creator predecessor could not be terminalized");
+			}
+		} catch (cause) {
+			return await rejectReplacement("source-unavailable", "creator predecessor could not be terminalized", cause);
 		}
 		try {
 			await cleanupCreatorSettlementSuccessor(
@@ -9109,13 +20602,20 @@ async function activateCreatorSuccessorLive(
 				successorAuthorization,
 				successorHistoricalIssuance
 			);
-		} catch {
-			await Promise.resolve(activated.handle.deactivate());
-			return rejected("recovery-rejected", "creator authenticated cleanup failed");
+		} catch (cause) {
+			return await rejectReplacement("recovery-rejected", "creator authenticated cleanup failed", cause);
 		}
+		replacement = undefined;
+		transferredVertexFacts = true;
 		return ObjectFreeze({ handle: activated.handle, ok: true as const });
-	} catch {
-		return rejected("internal-invariant", "creator successor activation failed unexpectedly");
+	} catch (cause) {
+		return rejectReplacement("internal-invariant", "creator successor activation failed unexpectedly", cause);
+	} finally {
+		// On success the TWO original historical contexts (predecessor validation
+		// and successor runtime) share one bounded object. Only the successor is
+		// activated, so retiring the OLD predecessor cannot revoke these facts.
+		// Close-child release never clears a different admitted consumer's facts.
+		if (!transferredVertexFacts) ownedVertexFacts?.release();
 	}
 }
 
@@ -9127,7 +20627,20 @@ if (!installCreatorSuccessorLive(activateCreatorSuccessorLive)) {
 	throw new TypeError("creator successor live owner was already installed");
 }
 
-if (!installV3RuntimeReclamationKernel(reclaimV3RuntimeKernel)) {
+if (
+	!installV3RuntimeReclamationKernel(
+		Object.assign(reclaimV3RuntimeKernel, {
+			resolveRecoveryCloseHold,
+			resolveOrdinaryIssuanceRuntimeHold,
+			captureOrdinaryIssuanceRuntimeSourceIdentity,
+			captureOrdinaryIssuanceRuntimeApplicationControls,
+			releaseOrdinaryIssuanceRuntimeHold,
+			acquirePendingClassificationCustody: sealCreatorPendingClassificationDependencies,
+			resolvePostAdoptionCensusSizing,
+			resolveReceivedAppendSizing: resolveCreatorReceivedAppendSizing,
+		})
+	)
+) {
 	throw new TypeError("v3 runtime reclamation kernel was already installed");
 }
 
@@ -9153,9 +20666,34 @@ export function routeV3Ingress(networkNode: DRPNetworkNode, message: Message): b
 			return true;
 		}
 		if (registration.mode === "snapshot-closed") return true;
-		void registration.messageQueueManager
-			.enqueue(registration.queueId, message)
-			.catch(() => ingressFailureLog("queue-rejected"));
+		const byteLength = typedArrayByteLength(message.data);
+		if (byteLength === undefined || byteLength === 0 || typeof message.sender !== "string") return true;
+		// The native carrier owns an exclusive payload and its private provenance
+		// copy. Metadata is bounded by native peer identity and this signed topic.
+		const bytes =
+			byteLength * 2 +
+			encodeCanonical({ sender: message.sender, objectId: message.objectId, type: message.type }).byteLength;
+		if (
+			registration.admittedGossipQueueJobs >= MAX_ADMITTED_INPUT_JOBS ||
+			bytes > registration.payload.parameters.maxPendingBytes - registration.admittedGossipQueueBytes
+		) {
+			ingressFailureLog("admission-rejected");
+			return true;
+		}
+		registration.admittedGossipQueueJobs++;
+		registration.admittedGossipQueueBytes += bytes;
+		const release = (): void => {
+			registration.admittedGossipQueueJobs--;
+			registration.admittedGossipQueueBytes -= bytes;
+		};
+		// Buffered completion is insufficient: an entered handler may still be
+		// waiting behind publication, a terminal barrier or native storage work.
+		void trackRegistrationJoinedWork(registration, () =>
+			registration.messageQueueManager
+				.enqueueJoined(registration.queueId, message)
+				.catch(() => ingressFailureLog("queue-rejected"))
+				.finally(release)
+		);
 		return true;
 	} catch {
 		return message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE;
@@ -9205,6 +20743,347 @@ export function republishV3RetainedTo(handle: V3PlaneHandle, targetPeerId: strin
 		return Promise.resolve(egressFailure("not-active", "v3 retained target is unavailable"));
 	}
 	return enqueueTargetedRetainedPublication(registration, targetPeerId);
+}
+
+/** Position metadata, not portable authorization or a native reservation. */
+export interface V3RetainedHashCursor {
+	readonly objectId: string;
+	readonly epoch: number;
+	readonly anchorDigest: string;
+	readonly snapshotDigest: string;
+	readonly graphVersion: number;
+	readonly afterSequence: number;
+}
+
+export interface V3RetainedHashQuery {
+	/** The existing native journal page bound is 1–128 rows, including excluded rows. */
+	readonly limit: number;
+	readonly cursor?: V3RetainedHashCursor;
+}
+
+export interface V3RetainedHashPage {
+	readonly scope: LiveJournalScope;
+	readonly coverage: "current-epoch-retained-accepted-window";
+	/** Includes retained quarantined rows, which are never returned as accepted hashes. */
+	readonly retainedRowCount: number;
+	readonly snapshotDigest: string;
+	readonly entries: readonly Readonly<{ journalSequence: number; vertexDigest: string }>[];
+	readonly continuation: V3RetainedHashCursor | null;
+}
+
+function captureRetainedHashQuery(input: V3RetainedHashQuery): V3RetainedHashQuery {
+	const keys = input !== null && typeof input === "object" ? Reflect.ownKeys(input) : [];
+	if (
+		keys.length < 1 ||
+		keys.length > 2 ||
+		!keys.includes("limit") ||
+		keys.some((key) => key !== "limit" && key !== "cursor")
+	)
+		throw new TypeError("v3 retained query is invalid");
+	const limit = Object.getOwnPropertyDescriptor(input, "limit");
+	const cursor = Object.getOwnPropertyDescriptor(input, "cursor");
+	if (
+		limit === undefined ||
+		!("value" in limit) ||
+		!NumberIsSafeInteger(limit.value) ||
+		limit.value < 1 ||
+		limit.value > 128 ||
+		(cursor !== undefined && !("value" in cursor))
+	)
+		throw new TypeError("v3 retained query is invalid");
+	if (cursor === undefined || cursor.value === undefined) return ObjectFreeze({ limit: limit.value as number });
+	const saved = snapshotClosedRecord(cursor.value, [
+		"objectId",
+		"epoch",
+		"anchorDigest",
+		"snapshotDigest",
+		"graphVersion",
+		"afterSequence",
+	]);
+	if (
+		saved === undefined ||
+		typeof saved.objectId !== "string" ||
+		!parseStorageObjectId(saved.objectId).ok ||
+		!NumberIsSafeInteger(saved.epoch) ||
+		(saved.epoch as number) < 0 ||
+		!isDigestHex(saved.anchorDigest) ||
+		!isDigestHex(saved.snapshotDigest) ||
+		!NumberIsSafeInteger(saved.graphVersion) ||
+		(saved.graphVersion as number) < 0 ||
+		!NumberIsSafeInteger(saved.afterSequence) ||
+		(saved.afterSequence as number) < 0
+	)
+		throw new TypeError("v3 retained query cursor is invalid");
+	return ObjectFreeze({ limit: limit.value as number, cursor: ObjectFreeze(saved) as unknown as V3RetainedHashCursor });
+}
+
+/** Native journal and issuance evidence use the same signature/ACL owner as retained publication. */
+async function authenticateRetainedJournalRow(
+	registration: V3PlaneRegistration,
+	row: SnapshottedJournalRow
+): Promise<Readonly<{ canonicalPreimageBytes: Uint8Array; signature: Uint8Array; digest: string }> | undefined> {
+	let canonicalPreimageBytes: Uint8Array, signature: Uint8Array;
+	if (row.sourceKind === "received") {
+		canonicalPreimageBytes = row.exactCanonicalPreimageBytes;
+		signature = row.detachedSignature;
+	} else {
+		const localScope = ObjectFreeze({ author: row.author, objectId: registration.payload.provenance.objectId });
+		const commit = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
+		const issued = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "published" as const }), localScope);
+		if (issued === undefined || lowerHexDigest(issued.digest) !== row.vertexDigest) return undefined;
+		canonicalPreimageBytes = issued.canonicalPreimageBytes;
+		signature = issued.signature;
+	}
+	const authenticated = authenticateRecoveryVertex(
+		registration.payload,
+		registration.authorization,
+		canonicalPreimageBytes,
+		signature
+	);
+	if (authenticated === undefined || authenticated.digest !== row.vertexDigest) return undefined;
+	return { canonicalPreimageBytes, signature, digest: authenticated.digest };
+}
+
+async function withCurrentRetainedRead<T>(
+	registration: V3PlaneRegistration,
+	consume: (context: Readonly<{ scope: LiveJournalScope; graphVersion: number; check(): Promise<void> }>) => Promise<T>
+): Promise<T> {
+	const scope = liveJournalScope(registration.payload),
+		floor = registration.payload.input.settlementFloor;
+	const parsed = parseStorageObjectId(scope.objectId);
+	if (!parsed.ok || floor === undefined) throw new TypeError("v3 retained query native custody is unavailable");
+	const floorScope = ObjectFreeze({
+		objectId: scope.objectId,
+		pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest,
+	});
+	const reservations: NativeReadReservation[] = [];
+	let outcome: Readonly<{ ok: true; value: T }> | Readonly<{ ok: false; error: unknown }>;
+	try {
+		for (const owner of [registration.payload.input.store, registration.liveJournalStore, registration.issuanceStore]) {
+			if (!currentRegistration(registration)) throw new TypeError("v3 retained query owner is stale");
+			const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
+			if (typeof acquire !== "function") throw new TypeError("v3 retained query native custody is unsupported");
+			reservations.push((await ReflectApply(acquire, owner, [{ objectId: scope.objectId }])) as NativeReadReservation);
+		}
+		reservations.push(await floor.acquireNativeReadReservation({ scope: floorScope }));
+		const graphVersion = registration.graphVersion;
+		let expectedFloorBytes: Uint8Array | undefined;
+		const check = async (): Promise<void> => {
+			for (const reservation of reservations) await reservation.check();
+			const head = await registration.payload.input.store.readHead(parsed.value);
+			const image = await floor.readRetirementImage({ scope: floorScope });
+			if (
+				!currentRegistration(registration) ||
+				registration.graphVersion !== graphVersion ||
+				!head.ok ||
+				head.value.kind !== "present" ||
+				!sameHead(head.value, registration.payload.trust.head) ||
+				image.state.pending !== null ||
+				!sameCreatorRoomHead(image.state.stable, registration.payload.trust.trust)
+			)
+				throw new TypeError("v3 retained query head or floor is stale");
+			const floorBytes = encodeCanonical(image);
+			if (expectedFloorBytes !== undefined && !sameBytes(expectedFloorBytes, floorBytes))
+				throw new TypeError("v3 retained query whole-floor changed");
+			expectedFloorBytes = floorBytes;
+		};
+		await check();
+		outcome = { ok: true, value: await consume({ scope, graphVersion, check }) };
+	} catch (error) {
+		outcome = { ok: false, error };
+	}
+	const outcomes = await Promise.allSettled(reservations.map((value) => Promise.resolve().then(() => value.release())));
+	const errors = outcomes.flatMap((value) => (value.status === "rejected" ? [value.reason] : []));
+	if (errors.length)
+		throw new AggregateError(
+			outcome.ok ? errors : [outcome.error, ...errors],
+			"v3 retained query custody release failed"
+		);
+	if (!outcome.ok) throw outcome.error;
+	// Release itself can await native join. Revocation during that join must not
+	// turn an earlier valid observation into a successfully delivered result.
+	if (!currentRegistration(registration)) throw new TypeError("v3 retained query owner is stale");
+	return outcome.value;
+}
+
+async function queryRetainedHashPage(
+	registration: V3PlaneRegistration,
+	input: V3RetainedHashQuery
+): Promise<V3RetainedHashPage> {
+	return withCurrentRetainedRead(registration, async ({ scope, graphVersion, check }) => {
+		const readiness = await registration.liveJournalStore.readiness({ scope });
+		if (
+			!readiness.ok ||
+			!readiness.ready ||
+			!sameLiveJournalScope(readiness.scope, scope) ||
+			!NumberIsSafeInteger(readiness.rowCount) ||
+			readiness.rowCount < 0 ||
+			readiness.rowCount > registration.payload.parameters.maxEpochVertices ||
+			!isDigestHex(readiness.snapshot.snapshotDigest)
+		)
+			throw new TypeError("v3 retained query readiness is invalid");
+		const cursor = input.cursor;
+		if (
+			cursor !== undefined &&
+			(cursor.objectId !== scope.objectId ||
+				cursor.epoch !== scope.epoch ||
+				cursor.anchorDigest !== scope.anchorDigest ||
+				cursor.snapshotDigest !== readiness.snapshot.snapshotDigest ||
+				cursor.graphVersion !== graphVersion ||
+				cursor.afterSequence >= readiness.rowCount)
+		)
+			throw new TypeError("v3 retained query cursor is stale");
+		const start = cursor === undefined ? 0 : cursor.afterSequence + 1;
+		const count = Math.min(input.limit, readiness.rowCount - start);
+		const page = await registration.liveJournalStore.readPage({
+			scope,
+			snapshot: readiness.snapshot,
+			afterSequence: cursor?.afterSequence ?? null,
+			limit: input.limit,
+		});
+		const expectedNext = start + count < readiness.rowCount ? start + count - 1 : null;
+		if (
+			!page.ok ||
+			!sameLiveJournalScope(page.scope, scope) ||
+			page.snapshot.snapshotDigest !== readiness.snapshot.snapshotDigest ||
+			page.rows.length !== count ||
+			page.nextSequence !== expectedNext
+		)
+			throw new TypeError("v3 retained query page is incomplete or stale");
+		const entries: { journalSequence: number; vertexDigest: string }[] = [];
+		for (let i = 0; i < count; i++) {
+			const row = journalRowSnapshot(page.rows[i], scope, start + i);
+			if (row === undefined) throw new TypeError("v3 retained query row is invalid");
+			const authenticated = await authenticateRetainedJournalRow(registration, row);
+			if (authenticated === undefined) throw new TypeError("v3 retained query row is not authenticated");
+			if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [authenticated.digest]) !== true)
+				entries.push(ObjectFreeze({ journalSequence: start + i, vertexDigest: authenticated.digest }));
+		}
+		// A cross-handle append can preserve the old prefix token. Refuse instead of
+		// silently mixing a newer retained window into this continuation.
+		const current = await registration.liveJournalStore.readiness({ scope });
+		if (
+			!current.ok ||
+			!current.ready ||
+			current.snapshot.snapshotDigest !== readiness.snapshot.snapshotDigest ||
+			current.rowCount !== readiness.rowCount
+		)
+			throw new TypeError("v3 retained query snapshot is stale");
+		await check();
+		return ObjectFreeze({
+			scope,
+			coverage: "current-epoch-retained-accepted-window" as const,
+			retainedRowCount: readiness.rowCount,
+			snapshotDigest: readiness.snapshot.snapshotDigest,
+			entries: ObjectFreeze(entries),
+			continuation:
+				expectedNext === null
+					? null
+					: ObjectFreeze({
+							...scope,
+							snapshotDigest: readiness.snapshot.snapshotDigest,
+							graphVersion,
+							afterSequence: expectedNext,
+						}),
+		});
+	});
+}
+
+/** Bounded authenticated current-epoch inspection; no archive or all-history claim. */
+export function queryV3RetainedHashes(handle: V3PlaneHandle, input: V3RetainedHashQuery): Promise<V3RetainedHashPage> {
+	const registration = v3HandleRegistrations.get(handle);
+	if (registration === undefined || !currentRegistration(registration) || registration.mode === "snapshot-closed")
+		return Promise.reject(new TypeError("v3 retained query owner is unavailable"));
+	return enqueueRegistrationTask(
+		registration,
+		() => {
+			const captured = captureRetainedHashQuery(input);
+			return () => queryRetainedHashPage(registration, captured);
+		},
+		{
+			pool: "read-control",
+			refuse: (): never => {
+				throw new TypeError("v3 read control task capacity exhausted; retry after admitted work joins");
+			},
+		}
+	);
+}
+
+/** Schedule genuine retained repair; transport reachability never grants operation authority. */
+export function requestV3RetainedRepair(
+	handle: V3PlaneHandle,
+	request: () => void,
+	targetPeerId?: string
+): Promise<Readonly<{ kind: "scheduled" }>> {
+	const registration = v3HandleRegistrations.get(handle);
+	if (registration === undefined || !currentRegistration(registration) || registration.mode === "snapshot-closed")
+		return Promise.reject(new TypeError("v3 retained repair owner is unavailable"));
+	return enqueueRegistrationTask(
+		registration,
+		() => {
+			if (
+				typeof request !== "function" ||
+				(targetPeerId !== undefined &&
+					(typeof targetPeerId !== "string" || targetPeerId.length === 0 || targetPeerId.length > 4096))
+			)
+				throw new TypeError("v3 retained repair target is invalid");
+			return () =>
+				withCurrentRetainedRead(registration, async ({ check }) => {
+					if (
+						targetPeerId !== undefined &&
+						(targetPeerId === registration.networkNode.peerId ||
+							!registration.networkNode.getAllPeers().includes(targetPeerId))
+					)
+						throw new TypeError("v3 retained repair target is unavailable");
+					await check();
+					request();
+					if (targetPeerId !== undefined) {
+						const result = await republishRetained(registration, targetPeerId);
+						if (!result.ok) throw new TypeError(`v3 retained repair publication failed: ${result.kind}`);
+					}
+					await check();
+					return ObjectFreeze({ kind: "scheduled" as const });
+				});
+		},
+		{
+			pool: "read-control",
+			refuse: (): never => {
+				throw new TypeError("v3 read control task capacity exhausted; retry after admitted work joins");
+			},
+		}
+	);
+}
+
+/**
+ * Revokes new plane admission synchronously, then joins admitted runtime and fanout work.
+ * Native store/custody owners must await this before releasing their backing stores.
+ * @param handle - Exact original or registered successor alias.
+ * @returns Completion after all work admitted at revocation has joined.
+ */
+export async function deactivateV3LivePlaneJoined(handle: V3PlaneHandle): Promise<void> {
+	const registration = v3HandleRegistrations.get(handle);
+	if (registration === undefined) throw new TypeError("v3 plane deactivation owner is unavailable");
+	const revoked = !registration.active || deactivateRegistration(registration);
+	const joined: Promise<void>[] = [];
+	const iterator = ReflectApply(SetPrototypeValues, registration.joinedWork, []);
+	for (;;) {
+		const next = ReflectApply(SetIteratorNext, iterator, []) as IteratorResult<Promise<void>>;
+		if (next.done) break;
+		joined.push(next.value);
+	}
+	// Join every admitted task even when one fails: a registered successor
+	// wrapper owns the writer lease and must not release it while a sibling
+	// still uses the underlying plane. Its deactivation is idempotent and
+	// releases only its own current owner after the raw plane has joined.
+	const failures: unknown[] = [];
+	for (const outcome of await Promise.allSettled(joined))
+		if (outcome.status === "rejected") failures.push(outcome.reason);
+	if (handle !== registration.handle) {
+		try { await handle.deactivate(); } catch (cause) { failures.push(cause); }
+	}
+	if (!revoked) failures.push(new TypeError("v3 plane admission revocation failed"));
+	if (failures.length === 1) throw failures[0];
+	if (failures.length > 1) throw new AggregateError(failures, "v3 plane joined deactivation failed");
 }
 
 async function readSettlementSources(

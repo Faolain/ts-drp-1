@@ -8,6 +8,7 @@ import {
 	hashDomain,
 } from "@ts-drp/canonical";
 import { DRPError } from "@ts-drp/errors";
+import { withAuthoredOperationSigningRequest, type OwnedSigningRequest } from "./internal/owned-signing-request.js";
 import { init as initializeModuleLexer, parse as parseModule } from "es-module-lexer";
 
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
@@ -17,6 +18,7 @@ import {
 	creatorAnchorTrustCheckpointPredecessorMinter,
 	type CreatorAnchorTrustMaterial,
 	creatorAnchorTrustResolver,
+	creatorAnchorTrustSourceContextMinter,
 	creatorAnchorTrustSuccessorMinter,
 } from "./internal/seal-authority-custody.js";
 import blueprintArtifactProfileJson from "../supplements/blueprint-artifact-profile-v1/profile.json" with { type: "json" };
@@ -387,6 +389,9 @@ interface AnchorTrustApi {
 		detachedPredecessorAnchorSignature: Uint8Array
 	): CurrentAnchorTrust | undefined;
 	[creatorAnchorTrustResolver](trust: CurrentAnchorTrust): CreatorAnchorTrustMaterial | undefined;
+	[creatorAnchorTrustSourceContextMinter](
+		currentTrust: CurrentAnchorTrust, exactCanonicalAnchorPreimageBytes: Uint8Array, detachedAnchorSignature: Uint8Array
+	): CurrentAnchorTrust | undefined;
 	[creatorAnchorTrustSuccessorMinter](
 		currentTrust: CurrentAnchorTrust,
 		exactCanonicalSuccessorAnchorPreimageBytes: Uint8Array,
@@ -1798,6 +1803,28 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		}
 	};
 
+	const mintCreatorSourceContext = (
+		currentTrust: CurrentAnchorTrust, preimage: Uint8Array, detachedSignature: Uint8Array
+	): CurrentAnchorTrust | undefined => {
+		try {
+			const currentState = registry.get(currentTrust);
+			if (currentState === undefined) return undefined;
+			const bytes = new intrinsicUint8Array(preimage), signature = new intrinsicUint8Array(detachedSignature);
+			const decoded = decodeExact(bytes);
+			if (!decoded.ok || !isAnchorRecord(decoded.value)) return undefined;
+			const anchor = decoded.value, digestBytes = hashDomain(ANCHOR_DIGEST_DOMAIN, bytes), digest = bytesToHex(digestBytes);
+			if (anchor.cryptoSuiteId !== ACTIVE_ANCHOR_SUITE || anchor.objectId !== currentTrust.objectId ||
+				anchor.epoch > currentTrust.currentEpoch ||
+				(anchor.epoch === currentTrust.currentEpoch && digest !== currentTrust.currentAnchorDigest) ||
+				(anchor.epoch === 0 && digest !== currentTrust.genesisAnchorDigest) ||
+				anchor.profileDigest !== currentState.profileDigest || anchor.signerSetDigest !== currentState.signerSetDigest ||
+				!verifyStrictSignature(signature, digestBytes, currentState.publicKey)) return undefined;
+			return mintAnchorTrust(registry, {currentAnchorDigest: digest, currentEpoch: anchor.epoch,
+				genesisAnchorDigest: currentTrust.genesisAnchorDigest, objectId: currentTrust.objectId, profileId: currentTrust.profileId},
+				{...currentState, exactCanonicalCurrentAnchorPreimageBytes: bytes, detachedCurrentAnchorSignature: signature});
+		} catch { return undefined; }
+	};
+
 	return Object.freeze({
 		authenticateCurrentEpochAnchor,
 		installCertifiedAnchorTrustRoot,
@@ -1810,6 +1837,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		[certifiedSealAuthorityResolver]: resolveCertifiedSealMaterial,
 		[creatorAnchorTrustCheckpointPredecessorMinter]: mintCreatorAnchorTrustCheckpointPredecessor,
 		[creatorAnchorTrustResolver]: resolveCreatorAnchorTrustMaterial,
+		[creatorAnchorTrustSourceContextMinter]: mintCreatorSourceContext,
 		[creatorAnchorTrustSuccessorMinter]: mintCreatorAnchorTrustSuccessor,
 	});
 }
@@ -2020,6 +2048,8 @@ export interface LocalVertexInput {
 	readonly logicalTime: number;
 	readonly objectId: string;
 	readonly operation: Readonly<Record<string, unknown>>;
+	/** Signed historical source evidence; the shared settlement owner authorizes it. */
+	readonly settlementSource?: Readonly<Record<string, unknown>>;
 }
 
 export interface SignedVertexEnvelope {
@@ -2047,11 +2077,18 @@ export interface IssueCommit {
 	readonly outboxEntry: IssuanceOutboxEntry;
 }
 
-export type BuildAndSign = (authorSequence: number) => Promise<IssueCommit>;
+export type UnsignedVertexSignAdmission = (
+	exactCanonicalUnsignedVertexBytes: Uint8Array,
+	sign: () => Promise<Uint8Array>
+) => Promise<Uint8Array>;
+export type BuildAndSign = (
+	authorSequence: number,
+	nativeSignAdmission?: UnsignedVertexSignAdmission
+) => Promise<IssueCommit>;
 
 export type TransactIssue = (scope: IssueScope, buildAndSign: BuildAndSign) => Promise<IssueCommit>;
 
-export type SignRegisteredVertexDigest = (registeredDigest: Uint8Array) => Promise<Uint8Array>;
+export type SignRegisteredVertexDigest = (registeredDigest: Uint8Array, ownedRequest?: OwnedSigningRequest) => Promise<Uint8Array>;
 
 export interface TransactionalVertexIssuer {
 	issue(input: LocalVertexInput): Promise<IssueCommit>;
@@ -2095,6 +2132,7 @@ export interface AdmittedReceivedVertexView {
 	readonly dependencies: readonly string[];
 	readonly operation: Readonly<Record<string, unknown>>;
 	readonly digest: Uint8Array;
+	readonly settlementSource?: Readonly<Record<string, unknown>>;
 }
 
 export type ExtractAdmittedReceivedVertexResult =
@@ -2562,6 +2600,7 @@ function registeredVertex(
 
 	const output: Record<string, unknown> = {};
 	for (const field of vertexFields) {
+		if (!field.required && Object.getOwnPropertyDescriptor(input, field.name) === undefined) continue;
 		const value = ownDataValue(input, field, options.allowConstantDefaults);
 		validateField(field, value, options.requireRegisteredOrder);
 		output[field.name] =
@@ -3173,13 +3212,18 @@ export function applyPreparedBlueprintOperation(
 	let detachedOperation: Readonly<Record<string, unknown>>;
 	try {
 		operationSchema = operationSchemaForPreparedAdmission(operation, runtimeState.admission);
-		if (
-			operationSchema === undefined ||
-			!operationWithinCanonicalByteBudget(operation as Readonly<Record<string, unknown>>, operationSchema)
-		) {
+		if (operationSchema === undefined) {
 			return applicationFailure("BLUEPRINT_OPERATION_INVALID", "operation does not match the prepared schema");
 		}
-		detachedOperation = deepCloneCanonical(operation as Readonly<Record<string, unknown>>);
+		// Capture the operation once. These same fresh bytes establish the encoded
+		// operation budget and the detached reducer input; there is no retained
+		// parsing or admission authority across calls.
+		const operationBytes = encodeCanonical(operation);
+		if (operationSchema.maxCanonicalOperationBytes !== undefined &&
+			operationBytes.byteLength > operationSchema.maxCanonicalOperationBytes) {
+			return applicationFailure("BLUEPRINT_OPERATION_INVALID", "operation does not match the prepared schema");
+		}
+		detachedOperation = decodeCanonical(operationBytes) as Readonly<Record<string, unknown>>;
 	} catch (error) {
 		if (error instanceof DRPError) throw error;
 		return applicationFailure("BLUEPRINT_OPERATION_INVALID", "operation is outside the canonical domain", error);
@@ -3430,10 +3474,11 @@ function createTransactionalVertexIssuerCore(
 				logicalTime: input.logicalTime,
 				objectId: input.objectId,
 				operation,
+				...(input.settlementSource === undefined ? {} : { settlementSource: detachCanonicalRecord(input.settlementSource) }),
 			};
 			const scope: IssueScope = { author, objectId: detachedInput.objectId };
 
-			return transactIssue(scope, async (authorSequence) => {
+			return transactIssue(scope, async (authorSequence, nativeSignAdmission) => {
 				const canonicalPreimageBytes = vertexCanonicalBytes({
 					kind: "drp-vertex",
 					protocolMajor: 3,
@@ -3445,22 +3490,29 @@ function createTransactionalVertexIssuerCore(
 					logicalTime: detachedInput.logicalTime,
 					dependencies: detachedInput.dependencies,
 					operation: detachedInput.operation,
+					...(detachedInput.settlementSource === undefined ? {} : { settlementSource: detachedInput.settlementSource }),
 				});
 				const digest = digestReceivedVertexPreimage(canonicalPreimageBytes);
+				const sign = async (): Promise<Uint8Array> => {
 				let signature: Uint8Array;
 				if (signingState.kind === "private-key-seed") {
 					signature = ed25519.sign(digest, signingState.privateKeySeed);
 				} else {
 					const retainedDigest = new intrinsicUint8Array(digest);
 					const callbackDigest = new intrinsicUint8Array(digest);
-					const callbackResult = await intrinsicReflectApply(signingState.signRegisteredVertexDigest, undefined, [
-						callbackDigest,
-					]);
+					const callbackResult = await withAuthoredOperationSigningRequest(canonicalPreimageBytes, request =>
+						intrinsicReflectApply(signingState.signRegisteredVertexDigest, undefined, [callbackDigest, request]) as Promise<Uint8Array>);
 					signature = copyExactRegisteredDigestSignature(callbackResult);
 					if (!verifyEd25519RegisteredDigest(signature, retainedDigest, publicKeyBytes)) {
 						throw new VertexValidationError("signRegisteredVertexDigest returned an invalid signature");
 					}
 				}
+					return signature;
+				};
+				const signature =
+					nativeSignAdmission === undefined
+						? await sign()
+						: await nativeSignAdmission(new intrinsicUint8Array(canonicalPreimageBytes), sign);
 				const envelope: SignedVertexEnvelope = {
 					canonicalPreimageBytes,
 					digest,
@@ -4841,7 +4893,7 @@ function extractFailure(
 	return intrinsicObjectFreeze({ ok: false as const, reason });
 }
 
-function copyCanonicalForAdmittedView(value: unknown): unknown {
+export function copyCanonicalForAdmittedView(value: unknown, preserveRecordPrototype = false): unknown {
 	if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
 		return value;
 	}
@@ -4862,7 +4914,7 @@ function copyCanonicalForAdmittedView(value: unknown): unknown {
 			intrinsicObjectDefineProperty(output, key, {
 				configurable: true,
 				enumerable: true,
-				value: copyCanonicalForAdmittedView(descriptor.value),
+				value: copyCanonicalForAdmittedView(descriptor.value, preserveRecordPrototype),
 				writable: true,
 			});
 		}
@@ -4877,8 +4929,8 @@ function copyCanonicalForAdmittedView(value: unknown): unknown {
 			if (step.done === true) break;
 			const entry = step.value as [unknown, unknown];
 			intrinsicReflectApply(intrinsicMapSet, output, [
-				copyCanonicalForAdmittedView(entry[0]),
-				copyCanonicalForAdmittedView(entry[1]),
+				copyCanonicalForAdmittedView(entry[0], preserveRecordPrototype),
+				copyCanonicalForAdmittedView(entry[1], preserveRecordPrototype),
 			]);
 		}
 		return intrinsicObjectFreeze(output);
@@ -4890,7 +4942,7 @@ function copyCanonicalForAdmittedView(value: unknown): unknown {
 		for (;;) {
 			const step = intrinsicReflectApply(intrinsicSetIteratorNext, iterator, []);
 			if (step.done === true) break;
-			intrinsicReflectApply(intrinsicSetAdd, output, [copyCanonicalForAdmittedView(step.value)]);
+			intrinsicReflectApply(intrinsicSetAdd, output, [copyCanonicalForAdmittedView(step.value, preserveRecordPrototype)]);
 		}
 		return intrinsicObjectFreeze(output);
 	}
@@ -4902,7 +4954,7 @@ function copyCanonicalForAdmittedView(value: unknown): unknown {
 	if (prototype !== intrinsicObjectPrototype && prototype !== null) {
 		throw new TypeError("canonical record must be plain");
 	}
-	const output = intrinsicObjectCreate(intrinsicObjectPrototype) as Record<string, unknown>;
+	const output = intrinsicObjectCreate(preserveRecordPrototype ? prototype : intrinsicObjectPrototype) as Record<string, unknown>;
 	const keys = intrinsicReflectOwnKeys(value);
 	for (let index = 0; index < keys.length; index++) {
 		const key = keys[index];
@@ -4914,7 +4966,7 @@ function copyCanonicalForAdmittedView(value: unknown): unknown {
 		intrinsicObjectDefineProperty(output, key, {
 			configurable: true,
 			enumerable: true,
-			value: copyCanonicalForAdmittedView(descriptor.value),
+			value: copyCanonicalForAdmittedView(descriptor.value, preserveRecordPrototype),
 			writable: true,
 		});
 	}
@@ -4994,6 +5046,8 @@ function admittedVertexView(authenticated: AuthenticatedReceivedVertex): Admitte
 	}
 	const dependencies = copyCanonicalForAdmittedView(sourceDependencies) as readonly string[];
 	const operation = copyCanonicalForAdmittedView(sourceOperation) as Readonly<Record<string, unknown>>;
+	const sourceSettlement = read("settlementSource");
+	if (sourceSettlement !== undefined && !isCapturedPlainRecord(sourceSettlement)) return undefined;
 	const digest = new intrinsicUint8Array(authenticated.digest);
 	return intrinsicObjectFreeze({
 		kind,
@@ -5007,6 +5061,7 @@ function admittedVertexView(authenticated: AuthenticatedReceivedVertex): Admitte
 		dependencies,
 		operation,
 		digest,
+		...(sourceSettlement === undefined ? {} : { settlementSource: copyCanonicalForAdmittedView(sourceSettlement) as Readonly<Record<string, unknown>> }),
 	});
 }
 

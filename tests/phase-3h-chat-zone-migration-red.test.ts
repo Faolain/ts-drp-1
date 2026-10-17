@@ -1,4 +1,7 @@
-import { decodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { openTrustedBlueprintCatalogBytes } from "@ts-drp/blueprint-catalog/bytes";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -15,6 +18,86 @@ vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) 
 }));
 
 describe("Phase 3h chat and zone migration composition RED", () => {
+	it("retains the exact predecessor catalog and executes its genuine isolated kernel", async () => {
+		const material = JSON.parse(
+			readFileSync(new URL("../examples/grid/src/zone-catalog-predecessor-material.json", import.meta.url), "utf8")
+		) as {
+			catalogBytes: string;
+			assets: Record<string, string>;
+		};
+		const catalog = openTrustedBlueprintCatalogBytes({
+			catalogBytes: new Uint8Array(Buffer.from(material.catalogBytes, "hex")),
+			assets: Object.fromEntries(
+				Object.entries(material.assets).map(([name, value]) => [name, new Uint8Array(Buffer.from(value, "hex"))])
+			),
+		});
+		const predecessorDigest = "f9bfacb0c2a26815aff3d36122e0ddfdb5459b45ed6fa76e75712b762787c557";
+		expect(catalog.blueprintDigests).toEqual([predecessorDigest]);
+		const exactArtifact = readFileSync(
+			new URL("../examples/grid/src/zone-state-predecessor-artifact.mjs", import.meta.url)
+		);
+		expect(createHash("sha256").update(exactArtifact).digest("hex")).toBe(
+			"8134d30e8769f21f65ce34efc008a44fc72e9f60e4d729eee2ca0286f1e60fc2"
+		);
+		expect(catalog.resolve(predecessorDigest).exactArtifactBytes).toEqual(new Uint8Array(exactArtifact));
+		const { createZoneStateKernel } = await import("../examples/grid/src/zone-state.js");
+		const creator = "a".repeat(64),
+			peer = "retained-creator";
+		const predecessor = createZoneStateKernel(creator, peer, "predecessor");
+		const installed = predecessor.apply(
+			predecessor.emptyState(),
+			{
+				action: "installRoster",
+				roster: {
+					entries: [{ author: creator, order: 0, peerId: peer }],
+				},
+			},
+			creator
+		).state;
+		const placed = predecessor.apply(
+			installed,
+			{ action: "placeBlock", id: "retained", kind: "stone", x: 1, y: 2 },
+			creator
+		).state;
+		expect(placed.blocks).toEqual([{ id: "retained", kind: "stone", x: 1, y: 2 }]);
+		const continued = predecessor.apply(
+			predecessor.captureState(decodeCanonical(encodeCanonical(placed))),
+			{ action: "placeBlock", id: "continued", kind: "wood", x: 3, y: 4 },
+			creator
+		).state;
+		expect(continued.blocks).toHaveLength(2);
+		// The old executable is not silently replaced by the candidate's v2 inheritance reducer.
+		const inheritedV2 = {
+			action: "migrationRecord",
+			record: {
+				applicationStateDigest: "a".repeat(64),
+				archivePolicy: "retain-source",
+				authorityKind: "creator-ed25519-registered-vertex-v1",
+				applicationState: continued,
+				kind: "ts-drp-v3-room-migration-record",
+				rehearsalNonce: new Uint8Array(32),
+				sourceAcceptedOperationCount: 2,
+				sourceAcceptedOperationsDigest: "b".repeat(64),
+				sourceAnchorDigest: "c".repeat(64),
+				sourceBlueprintDigest: predecessorDigest,
+				sourceCreatorAuthor: creator,
+				sourceObjectId: "grid:source",
+				targetAnchorDigest: "d".repeat(64),
+				targetBlueprintDigest: "e".repeat(64),
+				targetCreatorAuthor: creator,
+				targetImportOperationCount: 2,
+				targetImportOperationsDigest: "f".repeat(64),
+				targetObjectId: "grid:target",
+				targetAclDigest: "0".repeat(64),
+				targetEpoch: 0,
+				version: 2,
+			},
+		};
+		// Pure execution control, not a signed admission/authentication claim.
+		expect(() => predecessor.apply(continued, inheritedV2, creator)).toThrow("invalid migration record");
+		expect(createZoneStateKernel(creator, peer).apply(continued, inheritedV2, creator).state).toEqual(continued);
+		expect(() => Reflect.apply(createZoneStateKernel, undefined, [creator, peer, "unknown"])).toThrow();
+	});
 	it("adds one non-batchable neutral migration record to the genuine chat blueprint", async () => {
 		const chat = await import("../examples/v3-chat/src/index.js");
 		const application = Reflect.apply(
@@ -170,7 +253,9 @@ describe("Phase 3h chat and zone migration composition RED", () => {
 		const current = migrationCapability(application).prepare(accepted);
 		expect(current.importOperations).toEqual(historical.importOperations);
 		expect(decodeCanonical(current.exactCanonicalApplicationStateBytes)).toEqual({
-			version: 1,
+			version: 2,
+			creatorAuthor: "a".repeat(64),
+			creatorPeerId: "creator",
 			blocks: decodeCanonical(historical.exactCanonicalApplicationStateBytes),
 			outcomes: [],
 			roster: [],
@@ -195,7 +280,9 @@ describe("Phase 3h chat and zone migration composition RED", () => {
 		]);
 		expect(withRoster.importOperations).toEqual(historical.importOperations);
 		expect(decodeCanonical(withRoster.exactCanonicalApplicationStateBytes)).toEqual({
-			version: 1,
+			version: 2,
+			creatorAuthor: "a".repeat(64),
+			creatorPeerId: "creator",
 			blocks: decodeCanonical(historical.exactCanonicalApplicationStateBytes),
 			outcomes: [],
 			roster,
@@ -208,6 +295,44 @@ describe("Phase 3h chat and zone migration composition RED", () => {
 					logicalTime: 2,
 				}),
 			])
+		).toThrow();
+	});
+
+	it("prepares the complete inherited chat snapshot rather than only current rows", async () => {
+		const { createV3ChatApplication } = await import("../examples/v3-chat/src/index.js");
+		const application = createV3ChatApplication("alice");
+		const source = encodeCanonical([
+			{ clientOperationId: "inherited", text: "before rollover" },
+			{ clientOperationId: "current", text: "after rollover" },
+		]);
+		const rows = [acceptedOperation({ action: "message", clientOperationId: "current", text: "after rollover" })];
+		const prepared = migrationCapability(application).prepare(rows, source);
+		expect(prepared.exactCanonicalApplicationStateBytes).toEqual(source);
+		expect(prepared.importOperations).toEqual([
+			{ action: "message", clientOperationId: "inherited", text: "before rollover" },
+			{ action: "message", clientOperationId: "current", text: "after rollover" },
+		]);
+	});
+
+	it("prepares inherited Grid blocks and refuses a foreign snapshot creator seed", async () => {
+		const { createV3ZoneApplication } = await import("../examples/grid/src/v3-zone.js");
+		const author = "a".repeat(64);
+		const roster = [{ author, order: 0, peerId: "creator" }];
+		const application = createV3ZoneApplication(roster, "creator", author);
+		const state = {
+			version: 2,
+			creatorAuthor: author,
+			creatorPeerId: "creator",
+			blocks: [{ id: "inherited", kind: "stone", x: 1, y: 2 }],
+			outcomes: [],
+			roster,
+		};
+		const source = encodeCanonical(state);
+		const prepared = migrationCapability(application).prepare([], source);
+		expect(prepared.exactCanonicalApplicationStateBytes).toEqual(source);
+		expect(prepared.importOperations).toEqual([{ action: "placeBlock", ...state.blocks[0] }]);
+		expect(() =>
+			migrationCapability(application).prepare([], encodeCanonical({ ...state, creatorAuthor: "b".repeat(64) }))
 		).toThrow();
 	});
 });

@@ -3,10 +3,21 @@ import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-s
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import type { CurrentAnchorTrust, SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
-import type { AheDurableStore, GenerationRef, PresentHead } from "@ts-drp/storage";
-import type { SnapshotRecoveryStore, SnapshotVerificationReceipt } from "@ts-drp/storage/snapshot-transfer";
+import type { AheDurableStore, GenerationRecord, GenerationRef, PresentHead } from "@ts-drp/storage";
+import type {
+	SnapshotQuarantineStore,
+	SnapshotRecoveryStore,
+	SnapshotVerificationReceipt,
+} from "@ts-drp/storage/snapshot-transfer";
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
+import type {
+	V3LocalSettlementFloor,
+	V3LocalSettlementPolicy,
+	V3OperationAdmissionPolicyFactory,
+	V3TerminalVertexClassifier,
+} from "../v3-live.js";
+import type { CreatorSnapshotRetirementReconstructionRequest } from "./creator-closed-rollback-data.js";
 import type { CreatorExpectedRoomHead } from "./creator-room-head.js";
 
 export interface CreatorSuccessorGenerationMaterial {
@@ -21,6 +32,19 @@ export interface CreatorSuccessorGenerationMaterial {
 }
 
 export interface CreatorSuccessorLiveMaterial {
+	/** Local authoring restriction inherited from genuine custody, never a wire authority. */
+	readonly receiveOnly?: true;
+	/** Trusted local application input, never obtained from the received proof. */
+	readonly settlementPolicy?: V3LocalSettlementPolicy;
+	readonly settlementFloor?: V3LocalSettlementFloor;
+	/**
+	 * Copied original proof-owner receipt, only a request to reconstruct the
+	 * same close before ordinary admissions; never retirement permission.
+	 */
+	readonly retirementReconstruction?: CreatorSnapshotRetirementReconstructionRequest;
+	/** Native historical readers handed to the activation owner, never a wire capability. */
+	readonly promotionDependencies?: Readonly<{ checkSnapshots(): Promise<void>; release(): Promise<void> }>;
+	readonly origin: "local-close" | "received" | "durable-reopen";
 	readonly catalog: TrustedBlueprintCatalog;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
@@ -29,7 +53,11 @@ export interface CreatorSuccessorLiveMaterial {
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly liveJournalStore: DurableLiveJournalStore;
+	/** Original native readiness owner, never supplied by received wire material. */
+	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
 	readonly pinnedGenesisAnchorDigest: string;
+	readonly certifiedRecoverySourceGenerations?: readonly GenerationRecord[];
+	readonly classifiedRecoverySourceGenerations?: readonly GenerationRecord[];
 	readonly predecessor: CreatorSuccessorGenerationMaterial;
 	readonly predecessorExactCanonicalLatchedAclBytes: Uint8Array;
 	readonly snapshotPayloadDigest: string;
@@ -37,7 +65,7 @@ export interface CreatorSuccessorLiveMaterial {
 	readonly stateDigest: string;
 	readonly store: AheDurableStore;
 	readonly successor: CreatorSuccessorGenerationMaterial;
-	terminalizeSource(): boolean;
+	terminalizeSource(): Promise<boolean>;
 }
 
 export type CreatorSuccessorLiveSeed = Omit<CreatorSuccessorLiveMaterial, "successor"> &
@@ -60,6 +88,8 @@ export function completeCreatorSuccessorLiveMaterial(
 }
 
 export interface CreatorSuccessorRuntimeBindings {
+	readonly createOperationAdmissionPolicy?: V3OperationAdmissionPolicyFactory;
+	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
 	readonly messageQueueManager: MessageQueueManager<Message>;
 	readonly networkNode: DRPNetworkNode;
 	onAdmittedVertex(input: Readonly<Record<string, unknown>>): Promise<void> | void;
@@ -67,7 +97,7 @@ export interface CreatorSuccessorRuntimeBindings {
 
 export type CreatorSuccessorLiveResult =
 	| Readonly<{ readonly handle: object; readonly ok: true }>
-	| Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }>;
+	| Readonly<{ readonly cause?: unknown; readonly detail: string; readonly kind: string; readonly ok: false }>;
 
 type CreatorSuccessorLiveKernel = (
 	material: CreatorSuccessorLiveMaterial,
@@ -80,6 +110,9 @@ let kernel: CreatorSuccessorLiveKernel | undefined;
 let handleAliasKernel: CreatorSuccessorHandleAliasKernel | undefined;
 
 export interface CreatorSuccessorReopenInput {
+	readonly receiveOnly?: true;
+	readonly settlementPolicy?: V3LocalSettlementPolicy;
+	readonly settlementFloor?: V3LocalSettlementFloor;
 	readonly authenticationProfile: "creator-only";
 	readonly author: string;
 	readonly catalog: TrustedBlueprintCatalog;
@@ -103,6 +136,31 @@ export type CreatorSuccessorReopenResult =
 type CreatorSuccessorReopenOwner = (input: CreatorSuccessorReopenInput) => Promise<CreatorSuccessorReopenResult>;
 
 let reopenOwner: CreatorSuccessorReopenOwner | undefined;
+
+/**
+ * Refuses narrowing existing local issuance into observer custody.
+ * Native lineage atomicity remains the issuance owner's premise; this grants no signing authority.
+ * @param store Existing native issuance owner.
+ * @param scope Exact local identity and room.
+ */
+export async function assertEmptyReceiveOnlyIssuance(
+	store: DurableIssuanceStore,
+	scope: DurableIssueScope
+): Promise<void> {
+	const before = await store.readLineage(scope);
+	if (
+		before.next !== 0 ||
+		before.exhausted !== false ||
+		(await store.readIssued(scope, 0)) !== null ||
+		(await store.readOutboxPage({ scope, limit: 1 })).length !== 0 ||
+		(await store.readSettlementPlan(scope)) !== null
+	) {
+		throw new TypeError("v3 receive-only local issuance custody is not empty");
+	}
+	const after = await store.readLineage(scope);
+	if (after.next !== 0 || after.exhausted !== false)
+		throw new TypeError("v3 receive-only local issuance custody changed");
+}
 
 /**
  * Installs the sole private v3 successor-live owner.

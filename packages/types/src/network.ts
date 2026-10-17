@@ -419,6 +419,25 @@ export interface DRPNetworkNodeConfig {
 	};
 	/** Whether this node is a forward-only fixed rendezvous seed. */
 	seed?: boolean;
+	/**
+	 * Local ICE configuration shared by libp2p WebRTC and the separate unreliable
+	 * peer connection. Omitted: libp2p retains its installed defaults; the raw
+	 * connection uses Google STUN. Explicit [] disables ICE servers in both.
+	 * STUN is discovery, not a relay guarantee. TURN requires operator-supplied
+	 * servers and credentials; Circuit Relay v2 is not a TURN server.
+	 */
+	webrtc?: {
+		/** At most 8 servers, each with at most 8 STUN/TURN URLs (2048 characters each). */
+		ice_servers?: ReadonlyArray<{
+			readonly urls: string | readonly string[];
+			/** At most 1024 characters. Required with credential for TURN. */
+			readonly username?: string;
+			/** At most 1024 characters; never included in network telemetry. */
+			readonly credential?: string;
+		}>;
+		/** Defaults to all; relay requires an explicitly configured TURN server. */
+		ice_transport_policy?: "all" | "relay";
+	};
 }
 
 /** Minimal structural membership verifier exposed without importing the membership package. */

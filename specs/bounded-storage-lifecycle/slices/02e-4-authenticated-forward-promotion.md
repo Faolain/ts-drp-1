@@ -1,11 +1,15 @@
 # Authenticated forward historical promotion
 
-Status: authority law and corrected frozen RED accepted by
+Status: CLOSED, 2026-10-06, as the pure authenticated authority seam.
+The [closure audit](../closure-audit-2e-2f.md) binds every original acceptance
+group to accepted evidence. Authority law and corrected frozen RED are accepted by
 [focused independent review](../../../.logs/bounded-storage-lifecycle/forward-promotion-red-correction-review-01/root-disposition.md).
 Distinct HIGH GREEN implemented the pure authority seam; the capture correction
 has [separate XHIGH acceptance](../../../.logs/bounded-storage-lifecycle/forward-promotion-capture-correction-review-01/root-disposition.md)
 and [MAIN integration acceptance](../../../.logs/bounded-storage-lifecycle/forward-promotion-main-01/root-disposition.md).
-Native installation and continued-write acceptance remain open.
+Native installation and continued-write acceptance belong to
+[2e-5](02e-5-room-forward-promotion.md), which remains OPEN; they do not reopen
+this expressly pure slice.
 
 ## Why a forward decision exists
 

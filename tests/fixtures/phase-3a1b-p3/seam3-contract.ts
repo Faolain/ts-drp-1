@@ -82,6 +82,7 @@ export const EGRESS_FAILURE_KINDS = Object.freeze([
 	"record-rejected",
 	"publish-failed",
 	"publication-state-unknown",
+	"admission-rejected",
 ] as const);
 
 export const PHASE_3H_MIGRATION_RECORD_KEYS = Object.freeze([

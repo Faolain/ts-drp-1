@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Test-owned executable oracle, not a product API. */
 import { encodeCanonical } from "../../../packages/canonical/dist/src/index.js";
 import {
+	AHE_BOUNDED_READ_LIMITS,
 	type AheDurableStore,
 	decodeGenerationRecordV1,
 	decodeHeadRecordV1,
@@ -17,14 +18,7 @@ import {
 	type PresentHead,
 } from "../../../packages/storage/dist/src/index.js";
 
-export const LIMITS = Object.freeze({
-	maxObjectGenerations: 7,
-	maxHeadBytes: 3326,
-	maxGenerationBytes: 7307,
-	maxClosureReferences: 7,
-	maxBlobBytes: 65536,
-	maxUnionBytes: 262144,
-} as const);
+export const LIMITS = AHE_BOUNDED_READ_LIMITS;
 export const OBJECT = must(parseStorageObjectId(`creator:${"a".repeat(32)}`));
 export const OTHER = must(parseStorageObjectId(`creator:${"b".repeat(32)}`));
 export const id = (n: number): GenerationId => must(parseGenerationId(n.toString(16).padStart(64, "0")));
@@ -271,20 +265,32 @@ async function changeRecord(env: Environment, n: number, changes: Partial<Genera
 	const next = { ...record(await env.image(), n), ...changes };
 	await env.edit({ kind: "generation", generationId: id(n), record: encodeGenerationRecordV1(next) });
 }
+function unionBoundaryUsesAncestors(name: Case): boolean {
+	return (name === "union-U+1" || name === "B-U-boundary") &&
+		Math.ceil((LIMITS.maxUnionBytes + (name === "union-U+1" ? 1 : 0)) / LIMITS.maxBlobBytes) > LIMITS.maxClosureReferences;
+}
 export async function setup(name: Case, env: Environment, close = true): Promise<void> {
 	const store = await env.open();
 	try {
 		let current: ExpectedHead = { kind: "none", objectId: OBJECT };
 		const large = name === "declared-B+1" || name === "union-U+1" || name === "B-U-boundary";
-		const count = name === "empty-debt" ? 0 : name === "selected-F+1" || name === "F-boundary" || large ? 1 : 3;
+		const boundaryBlobs = name === "union-U+1" || name === "B-U-boundary"
+			? Array.from({ length: Math.ceil((LIMITS.maxUnionBytes + (name === "union-U+1" ? 1 : 0)) / LIMITS.maxBlobBytes) }, (_, index) =>
+				payload(index + 10, Math.min(LIMITS.maxBlobBytes, LIMITS.maxUnionBytes + (name === "union-U+1" ? 1 : 0) - index * LIMITS.maxBlobBytes)))
+			: undefined;
+		// U bounds the selected DISTINCT union. Once U/B exceeds F, a legal
+		// positive boundary needs ancestors, not an oversized single closure.
+		const useBoundaryAncestors = unionBoundaryUsesAncestors(name);
+		const count = name === "empty-debt" ? 0 : name === "selected-F+1" || name === "F-boundary" || (large && !useBoundaryAncestors) ? 1 : 3;
 		for (let n = 1; n <= count; n++) {
 			const blobs =
 				name === "selected-F+1" || name === "F-boundary"
 					? Array.from({ length: name === "F-boundary" ? 7 : 8 }, (_, j) => payload(j + 10))
-					: large
-						? Array.from({ length: name === "declared-B+1" ? 1 : name === "union-U+1" ? 5 : 4 }, (_, j) =>
-								payload(j + 10, name === "declared-B+1" ? 65537 : 65536)
-							)
+					: boundaryBlobs !== undefined
+						? !useBoundaryAncestors ? boundaryBlobs : n === 1 ? boundaryBlobs.slice(0, LIMITS.maxClosureReferences)
+							: n === 2 ? boundaryBlobs.slice(LIMITS.maxClosureReferences) : boundaryBlobs.slice(0, 1)
+						: name === "declared-B+1"
+							? [payload(10, LIMITS.maxBlobBytes + 1)]
 						: [payload(n), payload(90)]; // Arbitrary generic bytes must not be silently excluded.
 			current = await stage(store, n, current, blobs);
 		}
@@ -435,11 +441,16 @@ export async function precondition(name: Case, env: Environment): Promise<Record
 			active?.closure.some((r) => r.byteLength === 65537),
 			"actual valid declared B+1"
 		);
-	if (name === "union-U+1" || name === "B-U-boundary")
+	if (name === "union-U+1" || name === "B-U-boundary") {
+		const selected = unionBoundaryUsesAncestors(name) ? decoded : active === undefined ? [] : [active];
+		const union = new Map(selected.flatMap(g => g.closure.map(r => [r.digest, r] as const)));
 		check(
-			active?.closure.reduce((sum, r) => sum + r.byteLength, 0) === (name === "union-U+1" ? 327680 : 262144),
+			[...union.values()].reduce((sum, r) => sum + r.byteLength, 0) === LIMITS.maxUnionBytes + (name === "union-U+1" ? 1 : 0),
 			"actual distinct selected U boundary"
 		);
+		check(selected.every(g => g.closure.length <= LIMITS.maxClosureReferences && g.closure.every(r => r.byteLength <= LIMITS.maxBlobBytes)),
+			"union boundary preserves independent F/B limits");
+	}
 	if (name === "unselected-corruption")
 		check(
 			image.generations.some((g) => g.generationId === id(9) && stable(g.record) === stable(Uint8Array.of(255))),
@@ -615,7 +626,7 @@ function acquire(store: AheDurableStore, input: unknown): Promise<Result<Acquisi
 function input(name: Case): { objectId: typeof OBJECT; ancestorCount: 0 | 2; limits: typeof LIMITS } {
 	return {
 		objectId: OBJECT,
-		ancestorCount: [
+		ancestorCount: unionBoundaryUsesAncestors(name) || [
 			"active-two",
 			"generic-union",
 			"missing-parent",
@@ -969,7 +980,7 @@ export async function run(name: Case, env: Environment): Promise<Record<string, 
 					{ ...input(name), ancestorCount: 1 },
 					{ ...input(name), objectId: "" },
 					{ ...input(name), extra: true },
-					{ ...input(name), limits: { ...LIMITS, maxUnionBytes: 262145 } },
+					{ ...input(name), limits: { ...LIMITS, maxUnionBytes: LIMITS.maxUnionBytes + 1 } },
 					{ ...input(name), limits: { ...LIMITS, extra: 1 } },
 				]) {
 					const rejected = await env.observe(() => acquire(store, invalid));

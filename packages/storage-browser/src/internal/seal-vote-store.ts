@@ -1,46 +1,87 @@
-import { compareBytes, decodeCanonical } from "@ts-drp/canonical";
+import {openSigningBackend, type SigningBackend} from "./signing-backend.js";
+import { compareBytes, decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import {
+	copyStoredSealCarrier as copiedCarrier,
+	copyStoredPendingVoteRow as copiedPendingRow,
+	storedSealExactBytes as exactBytes,
+	storedSealPlainRecord as plainRecord,
+	storedSealSafeNonnegative as safeNonnegative,
+	storedSealVoteKey as voteKey,
+	storedSealQcContainsVote,
+	type StoredSealCarrier,
+	type PendingVoteRow,
+	type SealDetailRetirementIntentData,
+	type SealDetailRetirementResult,
+	SIGNING_DETAIL_RETIREMENT_BATCH_ROWS,
+	type SigningDependencyObservation,
+	type SigningNativeRead,
+	type SigningRetirementObservation,
+} from "@ts-drp/seal/internal/storage-port";
+import { AHE_BOUNDED_READ_LIMITS } from "@ts-drp/storage";
 
 import {
-	openPhase2dInternalDatabase,
+	nativeReadonlyTransaction,
+	nativeReadReservationCheck,
+	nativeReadReservationTransaction,
+	needsNativeReadReservationTurn,
+	runNativeReservedRead,
+} from "./native-read-reservation.js";
+import {
+	CURRENT_BROWSER_SCHEMA_VERSION,
 	PHASE_5C_SIGNER_STATE_STORE,
 	PHASE_5C_STORAGE_META_STORE,
 	PHASE_5C_VOTE_OUTBOX_STORE,
 	PHASE_5C_VOTE_SLOTS_STORE,
+	PHASE_5E_SEAL_EVIDENCE_STORE,
+	SIGNING_FRONTIER_SCHEMA_AUTHORITY,
 } from "./schema-idb.js";
+import {
+	assertSigningCurrency,
+	readSigningFrontier,
+	readSigningNativeImage,
+	type SigningFrontierScope,
+	signingMutationRefusal,
+	signingNativeTransactionComplete,
+} from "./signing-retirement.js";
 
-export const VOTE_TRANSACTION_STORES = Object.freeze([
-	PHASE_5C_SIGNER_STATE_STORE,
-	PHASE_5C_STORAGE_META_STORE,
-	PHASE_5C_VOTE_OUTBOX_STORE,
-	PHASE_5C_VOTE_SLOTS_STORE,
-] as const);
+export { readSigningFrontier, type SigningFrontierScope } from "./signing-retirement.js";
+export type { StoredSealCarrier, PendingVoteRow } from "@ts-drp/seal/internal/storage-port";
 
-export interface StoredSealCarrier {
-	readonly exactCanonicalPreimageBytes: Uint8Array;
-	readonly signature: Uint8Array;
+// Schema checks inspect the whole actual primary catalog in the SAME native
+// transaction. This is not a cross-database reservation or a protocol grant.
+export const VOTE_TRANSACTION_STORES = Object.freeze(
+	SIGNING_FRONTIER_SCHEMA_AUTHORITY.stores.map((store) => store.name)
+);
+
+export interface AdvanceSigningFrontierInput extends SigningFrontierScope {
+	readonly anchor: string;
+	readonly expectedIncarnation: string;
+	readonly expectedRevision: number;
+	readonly retiredBeforeRound: number;
 }
 
-export interface PendingVoteRow {
-	readonly carrier: StoredSealCarrier;
-	readonly epoch: number;
-	readonly objectId: string;
-	readonly phase: "commit" | "prepare" | "round-change";
-	readonly round: number;
-	readonly signerId: string;
-	readonly dispatched: boolean;
-}
+export type AdvanceSigningFrontierResult = Readonly<
+	{ ok: true; revision: number; retiredBeforeRound: number } | { ok: false; reason: string }
+>;
 
 export interface InternalSealVoteStore {
+	acquireSigningDependencyObservation(input: Readonly<{ objectId: string }>): Promise<SigningDependencyObservation>;
 	readonly incarnation: string;
 	readonly schema: Readonly<{ stores: readonly string[]; version: number }>;
+	advanceRetirementFloor(input: AdvanceSigningFrontierInput): Promise<AdvanceSigningFrontierResult>;
+	acquireRetirementObservation(input: Readonly<{ objectId: string }>): Promise<SigningRetirementObservation>;
+	acquireRecoveryRetirementObservation(input: Readonly<{ objectId: string }>): Promise<SigningRetirementObservation>;
+	acquireSigningAdmission(input: Readonly<{ objectId: string }>): Promise<SigningNativeRead>;
 	commitQc(input: unknown): Promise<unknown>;
 	commitRound(input: unknown): Promise<unknown>;
 	commitRoundChange(input: unknown): Promise<unknown>;
 	commitVote(input: unknown): Promise<unknown>;
-	close(): void;
+	close(): Promise<void>;
 	markDispatched(key: readonly [string, number, number, "commit" | "prepare" | "round-change", string]): Promise<void>;
 	openSnapshot(scope: unknown): Promise<unknown>;
 	readPending(maxRows?: number): Promise<readonly PendingVoteRow[]>;
+	readPublicationCandidate(row: PendingVoteRow): Promise<PendingVoteRow | undefined>;
+	retireDetails(input: SealDetailRetirementIntentData): Promise<SealDetailRetirementResult>;
 }
 
 interface OpenInternalSealVoteStoreInput {
@@ -49,55 +90,7 @@ interface OpenInternalSealVoteStoreInput {
 	onVersionChange?(): void;
 }
 
-const arrayBufferByteLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength")?.get as (
-	this: ArrayBuffer
-) => number;
-const arrayBufferResizable = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, "resizable")?.get as
-	| ((this: ArrayBuffer) => boolean)
-	| undefined;
-const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype) as object;
-const typedArrayBuffer = Object.getOwnPropertyDescriptor(typedArrayPrototype, "buffer")?.get as (
-	this: Uint8Array
-) => ArrayBufferLike;
-const typedArrayByteLength = Object.getOwnPropertyDescriptor(typedArrayPrototype, "byteLength")?.get as (
-	this: Uint8Array
-) => number;
-const typedArrayByteOffset = Object.getOwnPropertyDescriptor(typedArrayPrototype, "byteOffset")?.get as (
-	this: Uint8Array
-) => number;
 const digestHex = /^[0-9a-f]{64}$/u;
-
-function exactBytes(value: unknown, expectedLength?: number, maximumLength = 65_536): Uint8Array {
-	try {
-		if (Object.getPrototypeOf(value) !== Uint8Array.prototype) throw new TypeError("invalid byte carrier");
-		const bytes = value as Uint8Array;
-		const length = Reflect.apply(typedArrayByteLength, bytes, []) as number;
-		if (length > maximumLength || (expectedLength !== undefined && length !== expectedLength)) {
-			throw new TypeError("invalid byte length");
-		}
-		if ((Reflect.apply(typedArrayByteOffset, bytes, []) as number) !== 0) throw new TypeError("invalid byte offset");
-		const buffer = Reflect.apply(typedArrayBuffer, bytes, []) as ArrayBufferLike;
-		if (Object.getPrototypeOf(buffer) !== ArrayBuffer.prototype) throw new TypeError("invalid backing buffer");
-		if ((Reflect.apply(arrayBufferByteLength, buffer, []) as number) !== length)
-			throw new TypeError("invalid buffer length");
-		if (arrayBufferResizable !== undefined && (Reflect.apply(arrayBufferResizable, buffer, []) as boolean)) {
-			throw new TypeError("resizable buffer is unsupported");
-		}
-		return Uint8Array.from(bytes);
-	} catch {
-		throw new TypeError("invalid exact byte carrier");
-	}
-}
-
-function plainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-	const prototype = Object.getPrototypeOf(value) as object | null;
-	return prototype === Object.prototype || prototype === null;
-}
-
-function safeNonnegative(value: unknown): value is number {
-	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-}
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 	return new Promise((resolve, reject) => {
@@ -126,18 +119,6 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
 	return completion;
 }
 
-function copiedCarrier(value: unknown): StoredSealCarrier | undefined {
-	if (!plainRecord(value)) return undefined;
-	try {
-		return Object.freeze({
-			exactCanonicalPreimageBytes: exactBytes(value.exactCanonicalPreimageBytes),
-			signature: exactBytes(value.signature, 64, 64),
-		});
-	} catch {
-		return undefined;
-	}
-}
-
 function abort(transaction: IDBTransaction): void {
 	try {
 		transaction.abort();
@@ -154,61 +135,165 @@ async function settleAbort(transaction: IDBTransaction): Promise<void> {
 	}
 }
 
-function voteKey(input: {
-	readonly epoch: number;
-	readonly objectId: string;
-	readonly round: number;
-	readonly phase: "commit" | "prepare" | "round-change";
-	readonly signerId: string;
-}): [string, number, number, "commit" | "prepare" | "round-change", string] {
-	return [input.objectId, input.epoch, input.round, input.phase, input.signerId];
-}
-
-function copiedPendingRow(value: unknown): PendingVoteRow | undefined {
-	if (!plainRecord(value)) return undefined;
-	const carrier = copiedCarrier(value.carrier);
-	if (
-		carrier === undefined ||
-		typeof value.objectId !== "string" ||
-		!safeNonnegative(value.epoch) ||
-		!safeNonnegative(value.round) ||
-		(value.phase !== "prepare" && value.phase !== "commit" && value.phase !== "round-change") ||
-		typeof value.signerId !== "string" ||
-		typeof value.dispatched !== "boolean"
-	) {
-		return undefined;
-	}
-	return Object.freeze({
-		carrier,
-		dispatched: value.dispatched,
-		epoch: value.epoch,
-		objectId: value.objectId,
-		phase: value.phase,
-		round: value.round,
-		signerId: value.signerId,
-	});
-}
-
 /**
  * Opens the package-internal strict four-store vote adapter.
  * @param input - Primary database identity and optional causal test observers.
  * @returns Validated internal vote-store capability.
  */
 export async function openInternalSealVoteStore(input: OpenInternalSealVoteStoreInput): Promise<InternalSealVoteStore> {
-	const connection = { database: undefined as IDBDatabase | undefined };
-	const opened = (await openPhase2dInternalDatabase({ databaseName: input.databaseName }, () => {
-		connection.database?.close();
-		input.onVersionChange?.();
-	})) as IDBDatabase;
-	connection.database = opened;
-	const metaTransaction = opened.transaction(PHASE_5C_STORAGE_META_STORE, "readonly");
-	const meta = await requestResult(metaTransaction.objectStore(PHASE_5C_STORAGE_META_STORE).get("incarnation"));
-	await transactionComplete(metaTransaction);
-	if (!plainRecord(meta) || meta.key !== "incarnation" || typeof meta.value !== "string" || meta.value.length < 32) {
-		opened.close();
-		throw new Error("invalid storage incarnation row");
-	}
-	const incarnation = meta.value;
+	return createInternalSealVoteStore(await openSigningBackend(input), input);
+}
+
+/** Builds only mechanical storage methods over the original private backend. */
+export function createInternalSealVoteStore(backend: SigningBackend, input: OpenInternalSealVoteStoreInput, sharedDependencies = false): InternalSealVoteStore {
+	const {database: opened, incarnation, participant} = backend;
+
+	const advanceRetirementFloor = async (value: AdvanceSigningFrontierInput): Promise<AdvanceSigningFrontierResult> => {
+		if (!plainRecord(value)) return Object.freeze({ ok: false, reason: "MALFORMED_INPUT" });
+		const keys = [
+			"anchor",
+			"epoch",
+			"expectedIncarnation",
+			"expectedRevision",
+			"objectId",
+			"retiredBeforeRound",
+			"signerId",
+		] as const;
+		const descriptors = Object.getOwnPropertyDescriptors(value);
+		if (
+			Reflect.ownKeys(descriptors).length !== keys.length ||
+			keys.some((key) => descriptors[key] === undefined || !("value" in descriptors[key]))
+		)
+			return Object.freeze({ ok: false, reason: "MALFORMED_INPUT" });
+		const raw = Object.fromEntries(
+			keys.map((key) => [key, descriptors[key].value])
+		) as unknown as AdvanceSigningFrontierInput;
+		if (
+			typeof raw.anchor !== "string" ||
+			typeof raw.objectId !== "string" ||
+			typeof raw.signerId !== "string" ||
+			typeof raw.expectedIncarnation !== "string" ||
+			!safeNonnegative(raw.epoch) ||
+			!safeNonnegative(raw.expectedRevision) ||
+			!safeNonnegative(raw.retiredBeforeRound)
+		)
+			return Object.freeze({ ok: false, reason: "MALFORMED_INPUT" });
+		const transaction = opened.transaction([...VOTE_TRANSACTION_STORES], "readwrite", { durability: "strict" });
+		const completion = transactionComplete(transaction);
+		const refuse = async (reason: string): Promise<AdvanceSigningFrontierResult> => {
+			abort(transaction);
+			try {
+				await completion;
+			} catch {
+				/* The original native abort is joined before typed delivery. */
+			}
+			return Object.freeze({ ok: false, reason });
+		};
+		try {
+			if (transaction.durability !== "strict") throw new Error("strict IndexedDB durability is unavailable");
+			const floor = await readSigningFrontier(transaction, raw, raw.expectedIncarnation);
+			const refusal = await signingMutationRefusal(transaction, raw.objectId, raw.epoch, raw.expectedIncarnation);
+			if (refusal !== undefined) {
+				abort(transaction);
+				await settleAbort(transaction);
+				return { ok: false, reason: refusal };
+			}
+			const store = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
+			const state = await requestResult(store.get([raw.objectId, raw.epoch, raw.signerId]));
+			// Native row eligibility is not authentication or all-owner retirement.
+			if (
+				!plainRecord(state) ||
+				state.anchor !== raw.anchor ||
+				state.revision !== raw.expectedRevision ||
+				!safeNonnegative(state.revision) ||
+				state.revision === Number.MAX_SAFE_INTEGER
+			)
+				return await refuse("REVALIDATION_REQUIRED");
+			if (raw.retiredBeforeRound < floor || raw.retiredBeforeRound > (state.enteredRound as number))
+				return await refuse("INVALID_RETIREMENT_FRONTIER");
+			for (const summary of [state.highestPrepareQC, state.finalizedCommitQC]) {
+				if (
+					summary !== null &&
+					summary !== undefined &&
+					(!plainRecord(summary) || !safeNonnegative(summary.round) || summary.round < raw.retiredBeforeRound)
+				)
+					return await refuse("CURRENT_QC_PROTECTED");
+			}
+			if (
+				state.lockRound !== null &&
+				state.lockRound !== undefined &&
+				(!safeNonnegative(state.lockRound) || state.lockRound < raw.retiredBeforeRound)
+			)
+				return await refuse("CURRENT_LOCK_PROTECTED");
+			if (raw.retiredBeforeRound === floor) {
+				await completion;
+				return Object.freeze({ ok: true, revision: state.revision, retiredBeforeRound: floor });
+			}
+			const evidence = await requestResult(
+				transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE).get([raw.objectId, raw.epoch, raw.signerId])
+			);
+			if (evidence !== undefined) {
+				const bytes =
+					plainRecord(evidence) && plainRecord(evidence.peerEvidence)
+						? evidence.peerEvidence.exactCanonicalCommitQcBytes
+						: plainRecord(evidence)
+							? evidence.exactCanonicalCommitQcBytes
+							: undefined;
+				if (
+					!plainRecord(state.finalizedCommitQC) ||
+					!(bytes instanceof Uint8Array) ||
+					!(state.finalizedCommitQC.exactCanonicalQcBytes instanceof Uint8Array) ||
+					compareBytes(bytes, state.finalizedCommitQC.exactCanonicalQcBytes) !== 0
+				)
+					return await refuse("EVIDENCE_DEBT_HELD");
+			}
+			// Existing outbox debt is genuine custody of publication/ACK work. The
+			// adapter's existing 65536-row ceiling bounds this prerequisite scan.
+			const debt = await new Promise<boolean>((resolve, reject) => {
+				let count = 0;
+				const cursor = transaction
+					.objectStore(PHASE_5C_VOTE_OUTBOX_STORE)
+					.openCursor(
+						IDBKeyRange.bound([raw.objectId, raw.epoch], [raw.objectId, raw.epoch, raw.retiredBeforeRound], false, true)
+					);
+				cursor.addEventListener("error", () => reject(cursor.error));
+				cursor.addEventListener("success", () => {
+					const row = cursor.result;
+					if (row === null) {
+						resolve(false);
+						return;
+					}
+					if (++count > 65_536) {
+						reject(new Error("SIGNING_FRONTIER_SCAN_BUDGET"));
+						return;
+					}
+					const captured = copiedPendingRow(row.value);
+					if (captured === undefined) {
+						reject(new Error("INVALID_SIGNING_OUTBOX"));
+						return;
+					}
+					if (captured.signerId === raw.signerId && !captured.dispatched) {
+						resolve(true);
+						return;
+					}
+					row.continue();
+				});
+			});
+			if (debt) return await refuse("PUBLICATION_DEBT_HELD");
+			const revision = state.revision + 1;
+			await requestResult(store.put({ ...state, retiredBeforeRound: raw.retiredBeforeRound, revision }));
+			await completion;
+			return Object.freeze({ ok: true, revision, retiredBeforeRound: raw.retiredBeforeRound });
+		} catch (cause) {
+			abort(transaction);
+			try {
+				await completion;
+			} catch {
+				/* Preserve the initiating cause. */
+			}
+			throw cause;
+		}
+	};
 
 	const commitVote = async (raw: unknown): Promise<unknown> => {
 		if (!plainRecord(raw)) return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
@@ -277,6 +362,18 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			abort(transaction);
 			await settleAbort(transaction);
 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS", writes: 0 });
+		}
+
+		const retiredBeforeRound = await readSigningFrontier(
+			transaction,
+			raw as unknown as SigningFrontierScope,
+			raw.expectedIncarnation
+		);
+		const refusal = await signingMutationRefusal(transaction, raw.objectId, raw.epoch, raw.expectedIncarnation);
+		if (refusal !== undefined || raw.round < retiredBeforeRound) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: refusal ?? "SIGNING_RETIRED", writes: 0 });
 		}
 		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
 		const existingState = await requestResult(transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get(stateKey));
@@ -378,6 +475,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			raw.round
 		);
 		const stateRow = {
+			retiredBeforeRound,
 			anchor: raw.anchor,
 			committedValueDigest:
 				raw.phase === "commit"
@@ -462,7 +560,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		) {
 			return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
 		}
-		const transaction = opened.transaction([PHASE_5C_SIGNER_STATE_STORE, PHASE_5C_STORAGE_META_STORE], "readwrite", {
+		const transaction = opened.transaction([...VOTE_TRANSACTION_STORES], "readwrite", {
 			durability: "strict",
 		});
 		if (transaction.durability !== "strict") {
@@ -476,6 +574,23 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			abort(transaction);
 			await settleAbort(transaction);
 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
+		}
+
+		const floor = await readSigningFrontier(
+			transaction,
+			raw as unknown as SigningFrontierScope,
+			raw.expectedIncarnation
+		);
+		const refusal = await signingMutationRefusal(
+			transaction,
+			raw.objectId as string,
+			raw.epoch as number,
+			raw.expectedIncarnation as string
+		);
+		if (refusal !== undefined || (raw.round as number) < floor) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: refusal ?? "SIGNING_RETIRED" });
 		}
 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
 		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
@@ -521,6 +636,18 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			round: raw.round,
 			valueDigest: raw.valueDigest,
 		});
+		const completeQc = async <T>(result: T): Promise<T> => {
+			// Same successful QC transaction, not a best-effort later dispatcher.
+			// An absent/unmatched carrier remains pending; duplicate QC retries may
+			// complete this exact receipt without changing the signer revision.
+			const outbox = transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE);
+			const key = voteKey(raw as unknown as PendingVoteRow);
+			const pending = await requestResult(outbox.get(key));
+			if (plainRecord(pending) && pending.dispatched === false && storedSealQcContainsVote(decoded, pending))
+				await requestResult(outbox.put({...pending, dispatched: true}));
+			await completion;
+			return result;
+		};
 		if (raw.phase === "prepare") {
 			const highest = plainRecord(state.highestPrepareQC) ? state.highestPrepareQC : null;
 			if (highest !== null && highest.round === raw.round) {
@@ -535,8 +662,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 						await settleAbort(transaction);
 						return Object.freeze({ ok: false as const, reason: "PREPARE_QC_CONFLICT" });
 					}
-					await completion;
-					return Object.freeze({ advanced: false, duplicate: true, ok: true as const, revision: state.revision });
+					return completeQc(Object.freeze({ advanced: false, duplicate: true, ok: true as const, revision: state.revision }));
 				}
 				if (typeof highest.digest !== "string") {
 					abort(transaction);
@@ -544,8 +670,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 					return Object.freeze({ ok: false as const, reason: "PREPARE_QC_CONFLICT" });
 				}
 				if (raw.qcDigest > highest.digest) {
-					await completion;
-					return Object.freeze({ advanced: false, duplicate: false, ok: true as const, revision: state.revision });
+					return completeQc(Object.freeze({ advanced: false, duplicate: false, ok: true as const, revision: state.revision }));
 				}
 			}
 			if (highest !== null && safeNonnegative(highest.round) && highest.round > raw.round) {
@@ -574,8 +699,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			const existingFinal = plainRecord(state.finalizedCommitQC) ? state.finalizedCommitQC : null;
 			if (existingFinal !== null) {
 				if (compareBytes(exactBytes(existingFinal.exactCanonicalQcBytes), exactCanonicalQcBytes) === 0) {
-					await completion;
-					return Object.freeze({ duplicate: true, ok: true as const, revision: state.revision });
+					return completeQc(Object.freeze({ duplicate: true, ok: true as const, revision: state.revision }));
 				}
 				abort(transaction);
 				await settleAbort(transaction);
@@ -591,8 +715,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 				})
 			);
 		}
-		await completion;
-		return Object.freeze({ advanced: true, duplicate: false, ok: true as const, revision: raw.expectedRevision + 1 });
+		return completeQc(Object.freeze({ advanced: true, duplicate: false, ok: true as const, revision: raw.expectedRevision + 1 }));
 	};
 
 	const commitRoundChange = async (raw: unknown): Promise<unknown> => {
@@ -636,6 +759,23 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			abort(transaction);
 			await settleAbort(transaction);
 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
+		}
+
+		const floor = await readSigningFrontier(
+			transaction,
+			raw as unknown as SigningFrontierScope,
+			raw.expectedIncarnation
+		);
+		const refusal = await signingMutationRefusal(
+			transaction,
+			raw.objectId as string,
+			raw.epoch as number,
+			raw.expectedIncarnation as string
+		);
+		if (refusal !== undefined || (raw.round as number) < floor) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: refusal ?? "SIGNING_RETIRED" });
 		}
 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
 		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
@@ -730,31 +870,63 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 
 	const readPending = async (maxRows = Number.MAX_SAFE_INTEGER): Promise<readonly PendingVoteRow[]> => {
 		if (!safeNonnegative(maxRows) || maxRows === 0) return Object.freeze([]);
-		const transaction = opened.transaction(PHASE_5C_VOTE_OUTBOX_STORE, "readonly");
+		const transaction = opened.transaction([...VOTE_TRANSACTION_STORES], "readonly");
+		const completion = transactionComplete(transaction);
+		try {
+			await assertSigningCurrency(transaction, incarnation);
+		} catch (cause) {
+			abort(transaction);
+			try {
+				await completion;
+			} catch {
+				/* Preserve currency failure. */
+			}
+			throw cause;
+		}
 		const rows: PendingVoteRow[] = [];
 		const limit = Math.min(maxRows, 65_536);
 		const cursor = transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE).openCursor();
-		await new Promise<void>((resolve, reject) => {
-			cursor.addEventListener(
-				"success",
-				() => {
-					const selected = cursor.result;
-					if (selected === null || rows.length >= limit) {
-						resolve();
-						return;
-					}
-					const row = copiedPendingRow(selected.value);
-					if (row !== undefined && !row.dispatched) rows.push(row);
-					if (rows.length >= limit) resolve();
-					else selected.continue();
-				},
-				{ once: false }
-			);
-			cursor.addEventListener("error", () => reject(cursor.error ?? new Error("vote outbox cursor failed")), {
-				once: true,
+		try {
+			await new Promise<void>((resolve, reject) => {
+				cursor.addEventListener(
+					"success",
+					() => {
+						const selected = cursor.result;
+						if (selected === null || rows.length >= limit) {
+							resolve();
+							return;
+						}
+						const row = copiedPendingRow(selected.value);
+						void (async (): Promise<void> => {
+							if (row !== undefined && !row.dispatched) {
+								const floor = await readSigningFrontier(transaction, row, incarnation);
+								const refusal = await signingMutationRefusal(transaction, row.objectId, row.epoch, incarnation);
+								if (refusal !== undefined || row.round < floor) throw new Error(refusal ?? "SIGNING_RETIRED");
+								rows.push(row);
+							}
+							if (rows.length >= limit) resolve();
+							else selected.continue();
+						})().catch((cause) => {
+							abort(transaction);
+							reject(cause);
+						});
+					},
+					{ once: false }
+				);
+				cursor.addEventListener("error", () => reject(cursor.error ?? new Error("vote outbox cursor failed")), {
+					once: true,
+				});
 			});
-		});
-		await transactionComplete(transaction);
+			await completion;
+		} catch (cause) {
+			abort(transaction);
+			try {
+				await completion;
+			} catch {
+				/* Preserve the selected failure after native settlement. */
+			}
+			throw cause;
+		}
 		return Object.freeze(
 			rows.sort((left, right) => JSON.stringify(voteKey(left)).localeCompare(JSON.stringify(voteKey(right))))
 		);
@@ -773,7 +945,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		) {
 			return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
 		}
-		const transaction = opened.transaction([PHASE_5C_SIGNER_STATE_STORE, PHASE_5C_STORAGE_META_STORE], "readwrite", {
+		const transaction = opened.transaction([...VOTE_TRANSACTION_STORES], "readwrite", {
 			durability: "strict",
 		});
 		if (transaction.durability !== "strict") {
@@ -787,6 +959,23 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			abort(transaction);
 			await settleAbort(transaction);
 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
+		}
+
+		const floor = await readSigningFrontier(
+			transaction,
+			raw as unknown as SigningFrontierScope,
+			raw.expectedIncarnation
+		);
+		const refusal = await signingMutationRefusal(
+			transaction,
+			raw.objectId as string,
+			raw.epoch as number,
+			raw.expectedIncarnation as string
+		);
+		if (refusal !== undefined || (raw.round as number) < floor) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: refusal ?? "SIGNING_RETIRED" });
 		}
 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
 		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
@@ -831,20 +1020,49 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 	};
 
 	return Object.freeze({
+		advanceRetirementFloor,
+		acquireSigningDependencyObservation: (input: Readonly<{ objectId: string }>) =>
+			sharedDependencies ? participant.acquireSharedDependency(input, "vote") : participant.acquireDependency(input),
+		acquireRetirementObservation: (input: Readonly<{ objectId: string }>) =>
+			sharedDependencies ? participant.acquireSharedRetirement(input, "vote") : participant.acquire(input),
+		acquireRecoveryRetirementObservation: (input: Readonly<{ objectId: string }>) =>
+			sharedDependencies ? participant.acquireSharedRetirement(input, "vote", true) : participant.acquireRecovery(input),
+		acquireSigningAdmission: (input: Readonly<{ objectId: string }>) => participant.acquireSigningAdmission(input),
 		commitQc,
 		commitRound,
 		commitRoundChange,
 		commitVote,
-		close: () => opened.close(),
+		close: () => participant.close(),
 		incarnation,
 		markDispatched: async (key: readonly [string, number, number, "commit" | "prepare" | "round-change", string]) => {
-			const transaction = opened.transaction(PHASE_5C_VOTE_OUTBOX_STORE, "readwrite", { durability: "strict" });
+			if (
+				!Array.isArray(key) ||
+				key.length !== 5 ||
+				typeof key[0] !== "string" ||
+				!safeNonnegative(key[1]) ||
+				!safeNonnegative(key[2]) ||
+				typeof key[4] !== "string" ||
+				(key[3] !== "prepare" && key[3] !== "commit" && key[3] !== "round-change")
+			)
+				throw new TypeError("invalid dispatched vote key");
+			const transaction = opened.transaction([...VOTE_TRANSACTION_STORES], "readwrite", { durability: "strict" });
 			if (transaction.durability !== "strict") {
 				abort(transaction);
 				await settleAbort(transaction);
 				throw new Error("strict IndexedDB durability is unavailable");
 			}
 			const store = transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE);
+			const floor = await readSigningFrontier(
+				transaction,
+				{ objectId: key[0], epoch: key[1], signerId: key[4] },
+				incarnation
+			);
+			const refusal = await signingMutationRefusal(transaction, key[0], key[1], incarnation);
+			if (refusal !== undefined || key[2] < floor) {
+				abort(transaction);
+				await settleAbort(transaction);
+				throw new Error(refusal ?? "SIGNING_RETIRED");
+			}
 			const row = await requestResult(store.get([...key]));
 			if (!plainRecord(row)) {
 				abort(transaction);
@@ -854,7 +1072,11 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			await requestResult(store.put({ ...row, dispatched: true }));
 			await transactionComplete(transaction);
 		},
-		openSnapshot: async (scope: unknown) => {
+		openSnapshot: async function openSnapshot(scope: unknown): Promise<unknown> {
+			// A genuine voter may already hold the whole native signing image.
+			// Borrow that SAME RO turn: a fresh RO could queue behind a foreign
+			// writer which is itself waiting for the held image to be released.
+			if (needsNativeReadReservationTurn(opened)) return runNativeReservedRead(opened, () => openSnapshot(scope));
 			if (
 				!plainRecord(scope) ||
 				typeof scope.expectedIncarnation !== "string" ||
@@ -867,20 +1089,62 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			if (scope.expectedIncarnation !== incarnation) {
 				return Object.freeze({ enteredRound: 0, incarnation, revision: 0, storageLoss: true });
 			}
-			const transaction = opened.transaction([PHASE_5C_SIGNER_STATE_STORE, PHASE_5C_VOTE_OUTBOX_STORE], "readonly");
+			const transaction = nativeReadonlyTransaction(opened, [...VOTE_TRANSACTION_STORES]);
+			const retiredBeforeRound = await readSigningFrontier(
+				transaction,
+				scope as unknown as SigningFrontierScope,
+				incarnation
+			);
 			const state = await requestResult(
 				transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get([scope.objectId, scope.epoch, scope.signerId])
 			);
-			const pendingRows = await requestResult(transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE).getAll());
-			await transactionComplete(transaction);
-			const pendingRoundChangeCount = pendingRows.filter(
-				(row) =>
-					plainRecord(row) &&
-					row.objectId === scope.objectId &&
-					row.epoch === scope.epoch &&
-					row.signerId === scope.signerId &&
-					row.phase === "round-change"
-			).length;
+			const outbox = transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE);
+			// The native compound key binds object/epoch/phase/signer. Walk only
+			// this epoch's keys and materialize matching rows for the existing
+			// plain-record check, not every historical carrier in the database.
+			const pendingRoundChangeCount = await new Promise<number>((resolve, reject) => {
+				let count = 0;
+				const cursorRequest = outbox.openKeyCursor(
+					// A next-epoch prefix includes every native round-key type,
+					// including arrays. MAX_SAFE_INTEGER + 1 is still a finite,
+					// strictly larger IDB boundary, not an admitted protocol epoch.
+					IDBKeyRange.bound([scope.objectId, scope.epoch], [scope.objectId, (scope.epoch as number) + 1], false, true)
+				);
+				cursorRequest.addEventListener("error", () =>
+					reject(cursorRequest.error ?? new Error("vote outbox cursor failed"))
+				);
+				cursorRequest.addEventListener("success", () => {
+					const cursor = cursorRequest.result;
+					if (cursor === null) {
+						resolve(count);
+						return;
+					}
+					const key = cursor.key;
+					if (
+						!Array.isArray(key) ||
+						key[0] !== scope.objectId ||
+						key[1] !== scope.epoch ||
+						key[3] !== "round-change" ||
+						key[4] !== scope.signerId
+					) {
+						cursor.continue();
+						return;
+					}
+					const rowRequest = outbox.get(key);
+					rowRequest.addEventListener("error", () => reject(rowRequest.error ?? new Error("vote outbox read failed")), {
+						once: true,
+					});
+					rowRequest.addEventListener(
+						"success",
+						() => {
+							if (plainRecord(rowRequest.result)) count++;
+							cursor.continue();
+						},
+						{ once: true }
+					);
+				});
+			});
+			await (nativeReadReservationCheck(transaction) ?? transactionComplete(transaction));
 			if (state === undefined) {
 				return Object.freeze({
 					durableCommitQcCount: 0,
@@ -894,6 +1158,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 					lockedValueDigest: null,
 					pendingRoundChangeCount,
 					revision: 0,
+					retiredBeforeRound,
 				});
 			}
 			if (!plainRecord(state) || state.anchor !== scope.anchor || state.epoch !== scope.epoch) {
@@ -903,6 +1168,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			const finalized = plainRecord(state.finalizedCommitQC) ? state.finalizedCommitQC : null;
 			return Object.freeze({
 				durableCommitQcCount: safeNonnegative(state.durableCommitQcCount) ? state.durableCommitQcCount : 0,
+				retiredBeforeRound,
 				durablePrepareQcCount: safeNonnegative(state.durablePrepareQcCount) ? state.durablePrepareQcCount : 0,
 				enteredRound: state.enteredRound,
 				finalizedCommitQcBytes: finalized === null ? null : exactBytes(finalized.exactCanonicalQcBytes),
@@ -916,6 +1182,212 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			});
 		},
 		readPending,
-		schema: Object.freeze({ stores: Object.freeze(Array.from(opened.objectStoreNames)), version: 3 as const }),
+		readPublicationCandidate: async function readPublicationCandidate(
+			candidate: PendingVoteRow
+		): Promise<PendingVoteRow | undefined> {
+			if (needsNativeReadReservationTurn(opened))
+				return runNativeReservedRead(opened, () => readPublicationCandidate(candidate));
+			const transaction = nativeReadReservationTransaction(opened);
+			if (transaction === undefined) throw new Error("PUBLICATION_ADMISSION_REQUIRED");
+			const key = voteKey(candidate);
+			const floor = await readSigningFrontier(transaction, candidate, incarnation);
+			const refusal = await signingMutationRefusal(transaction, candidate.objectId, candidate.epoch, incarnation);
+			if (refusal !== undefined || candidate.round < floor) throw new Error(refusal ?? "SIGNING_RETIRED");
+			const value: unknown = await requestResult(transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE).get(key));
+			await nativeReadReservationCheck(transaction);
+			if (value === undefined) return undefined;
+			const row = copiedPendingRow(value);
+			if (
+				row === undefined ||
+				JSON.stringify(voteKey(row)) !== JSON.stringify(key) ||
+				compareBytes(row.carrier.exactCanonicalPreimageBytes, candidate.carrier.exactCanonicalPreimageBytes) !== 0 ||
+				compareBytes(row.carrier.signature, candidate.carrier.signature) !== 0
+			)
+				throw new Error("PUBLICATION_CANDIDATE_CHANGED");
+			return row.dispatched ? undefined : row;
+		},
+		retireDetails: async (raw: SealDetailRetirementIntentData): Promise<SealDetailRetirementResult> => {
+			// Only the public adapter's consumed genuine-voter intent grants the
+			// authenticated selection. This original store enforces native CAS,
+			// bounded detail-only mutation and permanent mechanical admission.
+			if (
+				!plainRecord(raw) ||
+				Reflect.ownKeys(raw).length !== 10 ||
+				typeof raw.anchor !== "string" ||
+				typeof raw.objectId !== "string" ||
+				typeof raw.signerId !== "string" ||
+				typeof raw.imageDigest !== "string" ||
+				!digestHex.test(raw.imageDigest) ||
+				!safeNonnegative(raw.epoch) ||
+				!safeNonnegative(raw.expectedRevision) ||
+				!safeNonnegative(raw.retiredBeforeRound) ||
+				raw.retiredBeforeRound === 0 ||
+				!(raw.highestPrepareQcBytes instanceof Uint8Array) ||
+				(raw.finalizedCommitQcBytes !== null && !(raw.finalizedCommitQcBytes instanceof Uint8Array))
+			)
+				return Object.freeze({ ok: false, reason: "MALFORMED_INPUT" });
+			if (raw.expectedIncarnation !== incarnation) return Object.freeze({ ok: false, reason: "STORAGE_LOSS" });
+			if (nativeReadReservationTransaction(opened) !== undefined) throw new Error("SIGNING_READ_NOT_JOINED");
+			const transaction = opened.transaction([...VOTE_TRANSACTION_STORES], "readwrite", { durability: "strict" });
+			const completion = signingNativeTransactionComplete(transaction);
+			const refuse = async (reason: string): Promise<SealDetailRetirementResult> => {
+				abort(transaction);
+				try {
+					await completion;
+				} catch {
+					/* Definite refusal joins its native abort. */
+				}
+				return Object.freeze({ ok: false, reason });
+			};
+			try {
+				if (transaction.durability !== "strict") throw new Error("strict IndexedDB durability is unavailable");
+				const captured = await readSigningNativeImage(transaction, raw.objectId, incarnation);
+				if (captured.digest !== raw.imageDigest) return await refuse("REVALIDATION_REQUIRED");
+				const floor = await readSigningFrontier(transaction, raw, incarnation);
+				const refusal = await signingMutationRefusal(transaction, raw.objectId, raw.epoch, incarnation);
+				if (refusal !== undefined) return await refuse(refusal);
+				const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
+				const stateKey = [raw.objectId, raw.epoch, raw.signerId];
+				const state: unknown = await requestResult(stateStore.get(stateKey));
+				if (
+					!plainRecord(state) ||
+					state.anchor !== raw.anchor ||
+					state.epoch !== raw.epoch ||
+					state.revision !== raw.expectedRevision ||
+					!safeNonnegative(state.revision) ||
+					state.revision === Number.MAX_SAFE_INTEGER ||
+					!safeNonnegative(state.enteredRound)
+				)
+					return await refuse("REVALIDATION_REQUIRED");
+				if (raw.retiredBeforeRound < floor || raw.retiredBeforeRound > state.enteredRound)
+					return await refuse("INVALID_RETIREMENT_FRONTIER");
+				const highest = state.highestPrepareQC,
+					finalized = state.finalizedCommitQC;
+				if (
+					!plainRecord(highest) ||
+					!safeNonnegative(highest.round) ||
+					highest.round < raw.retiredBeforeRound ||
+					!(highest.exactCanonicalQcBytes instanceof Uint8Array) ||
+					compareBytes(highest.exactCanonicalQcBytes, raw.highestPrepareQcBytes) !== 0 ||
+					!safeNonnegative(state.lockRound) ||
+					state.lockRound < raw.retiredBeforeRound
+				)
+					return await refuse("CURRENT_QC_PROTECTED");
+				if (raw.finalizedCommitQcBytes === null) {
+					if (finalized !== null && finalized !== undefined) return await refuse("CURRENT_QC_PROTECTED");
+				} else if (
+					!plainRecord(finalized) ||
+					!safeNonnegative(finalized.round) ||
+					finalized.round < raw.retiredBeforeRound ||
+					!(finalized.exactCanonicalQcBytes instanceof Uint8Array) ||
+					compareBytes(finalized.exactCanonicalQcBytes, raw.finalizedCommitQcBytes) !== 0
+				)
+					return await refuse("CURRENT_QC_PROTECTED");
+				const evidence: unknown = await requestResult(
+					transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE).get(stateKey)
+				);
+				if (evidence !== undefined) {
+					const bytes =
+						plainRecord(evidence) && plainRecord(evidence.peerEvidence)
+							? evidence.peerEvidence.exactCanonicalCommitQcBytes
+							: plainRecord(evidence)
+								? evidence.exactCanonicalCommitQcBytes
+								: undefined;
+					if (
+						!plainRecord(finalized) ||
+						!(bytes instanceof Uint8Array) ||
+						!(finalized.exactCanonicalQcBytes instanceof Uint8Array) ||
+						compareBytes(bytes, finalized.exactCanonicalQcBytes) !== 0
+					)
+						return await refuse("EVIDENCE_DEBT_HELD");
+				}
+				// Reuse the original addressed, union-byte-bounded native census.
+				// Never scan/materialize a second unbounded collection to select GC.
+				const detail: Array<Readonly<{ table: string; key: IDBValidKey }>> = [];
+				const decoded = captured.frames.map((bytes) => {
+					const frame = decodeCanonical(bytes, { maxBytes: bytes.byteLength, maxItems: 65_536, maxDepth: 128 });
+					if (!Array.isArray(frame) || frame.length !== 3) throw new Error("INVALID_SIGNING_FRAME");
+					return { bytes, table: frame[0] as string, key: frame[1] as IDBValidKey, row: frame[2] };
+				});
+				for (const { table, key, row } of decoded) {
+					if (table !== PHASE_5C_VOTE_SLOTS_STORE && table !== PHASE_5C_VOTE_OUTBOX_STORE) continue;
+					if (!Array.isArray(key) || !plainRecord(row)) throw new Error("INVALID_SIGNING_FRAME");
+					if (key[0] !== raw.objectId || key[1] !== raw.epoch || key[4] !== raw.signerId) continue;
+					if (!safeNonnegative(key[2]) || key[2] >= raw.retiredBeforeRound) continue;
+					// The opaque original-voter intent authenticates lower RC carriers
+					// and their inline QCs under the same image CAS. Native currency
+					// already requires floor <= enteredRound; no old RC is a current
+					// proposal dependency. Unknown phases never grant eligibility.
+					if (key[3] !== "prepare" && key[3] !== "commit" && key[3] !== "round-change")
+						return await refuse("DURABLE_CARRIER_INVALID");
+					if (table === PHASE_5C_VOTE_OUTBOX_STORE && row.dispatched !== true)
+						return await refuse("PUBLICATION_DEBT_HELD");
+					detail.push({ table, key });
+				}
+				const selected = detail.slice(0, SIGNING_DETAIL_RETIREMENT_BATCH_ROWS);
+				const changed = selected.length > 0 || floor !== raw.retiredBeforeRound;
+				const revision = changed ? state.revision + 1 : state.revision;
+				const next = { ...state, retiredBeforeRound: raw.retiredBeforeRound, revision };
+				for (const { table, key } of selected) await requestResult(transaction.objectStore(table).delete(key));
+				if (changed) await requestResult(stateStore.put(next));
+				// Same-transaction exact framing/readback before commit: every other
+				// captured native row survives byte-for-byte, only summary floor/rev
+				// may change. This is not a source-authentication or heap-size proof.
+				const after = await readSigningNativeImage(transaction, raw.objectId, incarnation);
+				const identity = (table: string, key: IDBValidKey): string => JSON.stringify([table, key]);
+				const removed = new Set(selected.map(({ table, key }) => identity(table, key)));
+				const actual = new Map(
+					after.frames.map((bytes) => {
+						const frame = decodeCanonical(bytes, {
+							maxBytes: bytes.byteLength,
+							maxItems: 65_536,
+							maxDepth: 128,
+						}) as unknown[];
+						return [identity(frame[0] as string, frame[1] as IDBValidKey), bytes] as const;
+					})
+				);
+				if (actual.size !== decoded.length - selected.length) throw new Error("SIGNING_DETAIL_READBACK_MISMATCH");
+				for (const original of decoded) {
+					const id = identity(original.table, original.key);
+					if (removed.has(id)) {
+						if (actual.has(id)) throw new Error("SIGNING_DETAIL_READBACK_MISMATCH");
+						continue;
+					}
+					const expected =
+						changed &&
+						original.table === PHASE_5C_SIGNER_STATE_STORE &&
+						JSON.stringify(original.key) === JSON.stringify(stateKey)
+							? encodeCanonical([original.table, original.key, next], {
+									maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes,
+									maxItems: 65_536,
+									maxDepth: 128,
+								})
+							: original.bytes;
+					const bytes = actual.get(id);
+					if (bytes === undefined || compareBytes(bytes, expected) !== 0)
+						throw new Error("SIGNING_DETAIL_READBACK_MISMATCH");
+				}
+				await completion;
+				return Object.freeze({
+					ok: true,
+					revision,
+					retiredBeforeRound: raw.retiredBeforeRound,
+					deletedRows: selected.length,
+					remaining: detail.length > selected.length,
+				});
+			} catch (primary) {
+				abort(transaction);
+				try {
+					await completion;
+				} catch {
+					/* Preserve original native failure after settlement. */
+				}
+				throw primary;
+			}
+		},
+		schema: Object.freeze({
+			stores: Object.freeze(Array.from(opened.objectStoreNames)),
+			version: CURRENT_BROWSER_SCHEMA_VERSION,
+		}),
 	});
 }

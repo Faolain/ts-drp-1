@@ -2,6 +2,7 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import { parseStorageObjectId } from "@ts-drp/storage";
 
 import { LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES, LIVE_JOURNAL_DOMAINS } from "./types.js";
+import { decodeJournalRetirementControl, LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, LIVE_JOURNAL_RETIREMENT_LIMITS } from "./retirement.js";
 import type {
 	LiveJournalAcceptedRow,
 	LiveJournalAnchorReadFailureKind,
@@ -437,6 +438,62 @@ function validateInstallMaterial(
 	parametersBytes: Uint8Array,
 	genesisOnly: boolean
 ): Captured<CapturedInstall> {
+	const captured = validateUnsignedInstallMaterial(objectId, anchorBytes, parametersBytes, genesisOnly);
+	if (!captured.ok) return captured;
+	return objectFreeze({
+		ok: true,
+		value: objectFreeze({
+			parametersDigest: captured.value.parametersDigest,
+			stored: objectFreeze({
+				detachedAnchorSignature: signature,
+				exactCanonicalAnchorPreimageBytes: captured.value.stored.exactCanonicalAnchorPreimageBytes,
+				exactCanonicalParametersCarrierBytes: captured.value.stored.exactCanonicalParametersCarrierBytes,
+				nextJournalSequence: captured.value.stored.nextJournalSequence,
+				parametersDigest: captured.value.stored.parametersDigest,
+				scope: captured.value.stored.scope,
+			}),
+		}),
+	});
+}
+
+/**
+ * Captures genuine unsigned successor material for lengths only. No signature,
+ * installation permission or invented digest is supplied by this readout.
+ * @param input - Original install fields excluding its not-yet-created signature.
+ * @returns Detached original unsigned anchor fields, or the original refusal.
+ */
+export function captureLiveJournalUnsignedSuccessorInput(input: unknown): Captured<{
+	readonly parametersDigest: string;
+	readonly stored: Omit<LiveJournalStoredScope, "detachedAnchorSignature">;
+}> {
+	const r = snapshotRecord(input, [
+		"objectId",
+		"exactCanonicalAnchorPreimageBytes",
+		"exactCanonicalParametersCarrierBytes",
+	]);
+	if (r === undefined) return failure("malformed-input");
+	const objectId = r.objectId,
+		anchorBytes = copyBytes(r.exactCanonicalAnchorPreimageBytes),
+		parametersBytes = copyBytes(r.exactCanonicalParametersCarrierBytes);
+	if (
+		typeof objectId !== "string" ||
+		!parseStorageObjectId(objectId).ok ||
+		anchorBytes === undefined ||
+		parametersBytes === undefined
+	)
+		return failure("malformed-input");
+	return validateUnsignedInstallMaterial(objectId, anchorBytes, parametersBytes, false);
+}
+
+function validateUnsignedInstallMaterial(
+	objectId: string,
+	anchorBytes: Uint8Array,
+	parametersBytes: Uint8Array,
+	genesisOnly: boolean
+): Captured<{
+	readonly parametersDigest: string;
+	readonly stored: Omit<LiveJournalStoredScope, "detachedAnchorSignature">;
+}> {
 	const anchor = exactDecoded(anchorBytes, ANCHOR_KEYS);
 	const parameters = exactDecoded(parametersBytes, PARAMETER_KEYS, ["authorShareMultiplier"]);
 	if (anchor === undefined || parameters === undefined || !validateAnchor(anchor) || !validateParameters(parameters)) {
@@ -460,7 +517,6 @@ function validateInstallMaterial(
 		value: objectFreeze({
 			parametersDigest,
 			stored: objectFreeze({
-				detachedAnchorSignature: signature,
 				exactCanonicalAnchorPreimageBytes: anchorBytes,
 				exactCanonicalParametersCarrierBytes: parametersBytes,
 				nextJournalSequence: 0,
@@ -650,10 +706,44 @@ function captureAppend(input: unknown): Captured<LiveJournalPendingRow> {
 	}
 }
 
+/** Captures an optional exact native currency restriction using the original row/control owners. */
+export function captureSourceBoundJournalAppendInput(input:unknown):Captured<Readonly<{
+	row:LiveJournalPendingRow;
+	expectedNativeImage:Readonly<{imageDigest:string;controlBytes:Uint8Array|null}>;
+}>> {
+	try {
+		const sourceKind=typeof input==="object" && input!==null ? getOwnPropertyDescriptor(input,"sourceKind") : undefined;
+		const keys=sourceKind!==undefined && "value" in sourceKind ? sourceKind.value==="received" ? RECEIVED_KEYS : sourceKind.value==="local-issued" ? LOCAL_KEYS : undefined : undefined;
+		if(keys===undefined)return failure("malformed-input");
+		const record=snapshotRecord(input,[...keys,"expectedNativeImage"]);
+		if(record===undefined)return failure("malformed-input");
+		const expected=snapshotRecord(record.expectedNativeImage,["imageDigest","controlBytes"]);
+		if(expected===undefined||!isDigest(expected.imageDigest))return failure("malformed-input");
+		let controlBytes:Uint8Array|null=null;
+		if(expected.controlBytes!==null) {
+			const carrier=expected.controlBytes,length=intrinsicByteLength.call(carrier) as number,buffer=intrinsicBuffer.call(carrier) as ArrayBuffer,offset=intrinsicByteOffset.call(carrier) as number;
+			intrinsicArrayBufferLength.call(buffer);
+			if(length===0||length>LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES)return failure("malformed-input");
+			controlBytes=new Uint8Array(new Uint8Array(buffer,offset,length));
+			decodeJournalRetirementControl(controlBytes);
+		}
+		const {expectedNativeImage:_expected,...row}=record;
+		const captured=captureAppend(row);
+		if(!captured.ok)return captured;
+		if(controlBytes!==null&&decodeJournalRetirementControl(controlBytes).objectId!==captured.value.scope.objectId)return failure("malformed-input");
+		return objectFreeze({ok:true,value:objectFreeze({row:captured.value,expectedNativeImage:objectFreeze({imageDigest:expected.imageDigest,controlBytes})})});
+	}catch{return failure("malformed-input");}
+}
+
 function validateReceived(candidate: LiveJournalPendingRow): Captured<LiveJournalPendingRow> {
 	if (candidate.sourceKind !== "received") return objectFreeze({ ok: true, value: candidate });
-	const vertex = exactDecoded(candidate.exactCanonicalPreimageBytes, VERTEX_KEYS);
+	const vertex = exactDecoded(candidate.exactCanonicalPreimageBytes, VERTEX_KEYS,["settlementSource"]);
 	if (vertex === undefined || !validateVertex(vertex)) return failure("noncanonical-preimage");
+	if(Object.prototype.hasOwnProperty.call(vertex,"settlementSource")){
+		const value=vertex.settlementSource;
+		if(value===null || typeof value!=="object" || arrayIsArray(value) ||
+			(getPrototypeOf(value)!==Object.prototype && getPrototypeOf(value)!==null))return failure("noncanonical-preimage");
+	}
 	if (
 		vertex.objectId !== candidate.scope.objectId ||
 		vertex.epoch !== candidate.scope.epoch ||
@@ -1129,13 +1219,104 @@ function rowCommitment(row: LiveJournalStoredRow): string {
 	return lowerHex(hashDomain(LIVE_JOURNAL_DOMAINS.row, encodeCanonical(preimage)));
 }
 
-function deriveToken(snapshot: LiveJournalDurableSnapshot): LiveJournalSnapshotToken | undefined {
+/** Optional syntax/hash facts owned by one native-store facade. No native
+ * image, snapshot token, signature authority or paid allowance is retained. */
+export interface LiveJournalSnapshotValidation {
+	release(): void;
+}
+interface SnapshotValidationFacts {
+	row(row: LiveJournalStoredRow): string | undefined;
+	install(stored: LiveJournalStoredScope): boolean;
+}
+const snapshotValidationOwners = new WeakMap<object, SnapshotValidationFacts>();
+
+/**
+ * Reuses only original successful leaf validation after exact detached byte
+ * AND metadata comparison. The caller must still acquire/capture fresh native
+ * contents and run every sequence/duplicate/context/control/currency check.
+ * Retention is bounded by existing journal image bytes/row counts; overflow
+ * validates normally, never refuses work. This owner is not shared by stores.
+ */
+export function createLiveJournalSnapshotValidation(): LiveJournalSnapshotValidation {
+	const rows = new Map<string, {row: LiveJournalStoredRow; digest: string; bytes: number}>();
+	const installs = new Map<string, {stored: LiveJournalStoredScope; bytes: number}>();
+	let retainedBytes = 0;
+	const rowKey = (row: LiveJournalStoredRow) => JSON.stringify([
+		row.scope.objectId, row.scope.epoch, row.scope.anchorDigest, row.journalSequence,
+	]);
+	const room = (bytes: number): boolean => {
+		if (bytes > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) return false;
+		while (bytes > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes - retainedBytes ||
+			rows.size + installs.size >= LIVE_JOURNAL_RETIREMENT_LIMITS.maxRows) {
+			const first = rows.keys().next().value;
+			if (first !== undefined) { retainedBytes -= rows.get(first)!.bytes; rows.delete(first); continue; }
+			const header = installs.keys().next().value;
+			if (header === undefined) return false;
+			retainedBytes -= installs.get(header)!.bytes; installs.delete(header);
+		}
+		return true;
+	};
+	const facts: SnapshotValidationFacts = {
+		row: row => {
+			const key = rowKey(row), prior = rows.get(key);
+			if (prior !== undefined && sameStoredRow(prior.row, row)) {
+				rows.delete(key); rows.set(key, prior); return prior.digest;
+			}
+			if (!validateReceived(row).ok) return undefined;
+			const digest = rowCommitment(row);
+			// These are private captureDurableSnapshot rows. Public replay rows
+			// are separately cloned; neither input nor output can mutate a fact.
+			let bytes: number;
+			try { bytes = encodeCanonical(row).byteLength; } catch { return digest; }
+			if (prior !== undefined) { retainedBytes -= prior.bytes; rows.delete(key); }
+			if (room(bytes)) { rows.set(key, {row, digest, bytes}); retainedBytes += bytes; }
+			return digest;
+		},
+		install: stored => {
+			const key = JSON.stringify([stored.scope.objectId, stored.scope.epoch, stored.scope.anchorDigest]);
+			const prior = installs.get(key);
+			if (prior !== undefined && sameInstalledScope(prior.stored, stored)) return true;
+			if (!validateSnapshotInstall(stored)) return false;
+			let bytes: number;
+			try { bytes = encodeCanonical(stored).byteLength; } catch { return true; }
+			if (prior !== undefined) { retainedBytes -= prior.bytes; installs.delete(key); }
+			if (installs.size >= LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes) {
+				const first = installs.keys().next().value;
+				if (first !== undefined) { retainedBytes -= installs.get(first)!.bytes; installs.delete(first); }
+			}
+			if (room(bytes)) { installs.set(key, {stored, bytes}); retainedBytes += bytes; }
+			return true;
+		},
+	};
+	const owner = objectFreeze({release: () => {
+		snapshotValidationOwners.delete(owner); rows.clear(); installs.clear(); retainedBytes = 0;
+	}});
+	snapshotValidationOwners.set(owner, facts);
+	return owner;
+}
+
+function validateSnapshotInstall(stored: LiveJournalStoredScope): boolean {
+	const captured = captureInstall({
+		detachedAnchorSignature: stored.detachedAnchorSignature,
+		exactCanonicalAnchorPreimageBytes: stored.exactCanonicalAnchorPreimageBytes,
+		exactCanonicalParametersCarrierBytes: stored.exactCanonicalParametersCarrierBytes,
+		objectId: stored.scope.objectId,
+	}, stored.scope.epoch === 0);
+	return captured.ok && captured.value.parametersDigest === stored.parametersDigest &&
+		sameScope(captured.value.stored.scope, stored.scope);
+}
+
+// Preserve the original defensive recapture: a public input's Array.map can
+// return rows other than those visited by the first capture. Only this private
+// recapture may enroll leaf facts; no caller supplies a "validated" row/token.
+function deriveToken(snapshot: LiveJournalDurableSnapshot, validation?: SnapshotValidationFacts): LiveJournalSnapshotToken | undefined {
 	const captured = captureDurableSnapshot(snapshot);
 	if (captured === undefined) return undefined;
 	const stored = captured.scope;
 	const exactRows = captured.rows;
 	const digests = new Set<string>();
 	const references = new Set<string>();
+	const rowCommitmentDigests: string[] = [];
 	for (let index = 0; index < exactRows.length; index++) {
 		const row = exactRows[index];
 		if (row === undefined || row.journalSequence !== index || !sameScope(row.scope, stored.scope)) return undefined;
@@ -1145,28 +1326,15 @@ function deriveToken(snapshot: LiveJournalDurableSnapshot): LiveJournalSnapshotT
 			const reference = `${row.author.length}:${row.author}:${row.authorSequence}`;
 			if (references.has(reference)) return undefined;
 			references.add(reference);
-		} else {
+		} else if (validation === undefined) {
 			const captured = validateReceived(row);
 			if (!captured.ok) return undefined;
 		}
+		const commitment = validation === undefined ? rowCommitment(row) : validation.row(row);
+		if (commitment === undefined) return undefined;
+		rowCommitmentDigests.push(commitment);
 	}
-	const capturedInstall = captureInstall(
-		{
-			detachedAnchorSignature: stored.detachedAnchorSignature,
-			exactCanonicalAnchorPreimageBytes: stored.exactCanonicalAnchorPreimageBytes,
-			exactCanonicalParametersCarrierBytes: stored.exactCanonicalParametersCarrierBytes,
-			objectId: stored.scope.objectId,
-		},
-		stored.scope.epoch === 0
-	);
-	if (
-		!capturedInstall.ok ||
-		capturedInstall.value.parametersDigest !== stored.parametersDigest ||
-		!sameScope(capturedInstall.value.stored.scope, stored.scope)
-	) {
-		return undefined;
-	}
-	const rowCommitmentDigests = exactRows.map(rowCommitment);
+	if (!(validation === undefined ? validateSnapshotInstall(stored) : validation.install(stored))) return undefined;
 	const highWatermark = stored.nextJournalSequence;
 	const orderedRowDigest = lowerHex(
 		hashDomain(
@@ -1224,6 +1392,7 @@ type SnapshotDerivationInput = Readonly<{
 	readonly durable: LiveJournalDurableSnapshot;
 	readonly highWatermark?: number;
 	readonly supplied?: LiveJournalSnapshotToken;
+	readonly validation?: LiveJournalSnapshotValidation;
 }>;
 
 type SnapshotDerivation =
@@ -1234,16 +1403,15 @@ type SnapshotDerivation =
 	  }>
 	| Readonly<{ readonly ok: false; readonly kind: "digest-mismatch" | "stale-snapshot" | "store-poisoned" }>;
 
-/**
- * Validates one durable prefix and derives its exact immutable replay commitment.
- * @param input - Durable closure and optional page/snapshot constraints.
- * @returns The exact immutable replay prefix and token, or a closed failure.
- */
-export function deriveLiveJournalSnapshot(input: SnapshotDerivationInput): SnapshotDerivation {
+// Internal captured rows never escape without the public detached-row projection.
+// Readiness still validates the complete closure, including rows after an older
+// requested prefix; it only omits the final copies that its caller discards.
+function deriveCapturedSnapshot(input: SnapshotDerivationInput): SnapshotDerivation {
 	try {
 		const complete = captureDurableSnapshot(input.durable);
 		if (complete === undefined) return objectFreeze({ kind: "store-poisoned", ok: false });
-		const completeToken = deriveToken(complete);
+		const validation = input.validation === undefined ? undefined : snapshotValidationOwners.get(input.validation);
+		const completeToken = deriveToken(complete, validation);
 		if (completeToken === undefined) return objectFreeze({ kind: "store-poisoned", ok: false });
 		const available = complete.scope.nextJournalSequence;
 		const highWatermark = input.highWatermark ?? available;
@@ -1256,13 +1424,38 @@ export function deriveLiveJournalSnapshot(input: SnapshotDerivationInput): Snaps
 						rows: complete.rows.filter((row) => row.journalSequence < highWatermark),
 						scope: { ...complete.scope, nextJournalSequence: highWatermark },
 					};
-		const token = highWatermark === available ? completeToken : deriveToken(durable);
+		const token = highWatermark === available ? completeToken : deriveToken(durable, validation);
 		if (token === undefined) return objectFreeze({ kind: "store-poisoned", ok: false });
 		if (input.supplied !== undefined && !tokenEqual(input.supplied, token)) {
 			return objectFreeze({ kind: "digest-mismatch", ok: false });
 		}
-		return objectFreeze({ ok: true, rows: objectFreeze(durable.rows.map(cloneRow)), token });
+		return objectFreeze({ ok: true, rows: durable.rows, token });
 	} catch {
 		return objectFreeze({ kind: "store-poisoned", ok: false });
 	}
+}
+
+/**
+ * Validates one durable prefix and derives its exact immutable replay commitment.
+ * @param input - Durable closure and optional page/snapshot constraints.
+ * @returns The exact immutable replay prefix and token, or a closed failure.
+ */
+export function deriveLiveJournalSnapshot(input: SnapshotDerivationInput): SnapshotDerivation {
+	const derived = deriveCapturedSnapshot(input);
+	if (!derived.ok) return derived;
+	try {
+		return objectFreeze({ ok: true, rows: objectFreeze(derived.rows.map(cloneRow)), token: derived.token });
+	} catch {
+		return objectFreeze({ kind: "store-poisoned", ok: false });
+	}
+}
+
+/** Validates the same complete closure without allocating unused replay output rows. */
+export function deriveLiveJournalSnapshotReadiness(input: SnapshotDerivationInput):
+	| Readonly<{ readonly ok: true; readonly rowCount: number; readonly token: LiveJournalSnapshotToken }>
+	| Extract<SnapshotDerivation, { readonly ok: false }> {
+	const derived = deriveCapturedSnapshot(input);
+	return derived.ok
+		? objectFreeze({ ok: true, rowCount: derived.rows.length, token: derived.token })
+		: derived;
 }

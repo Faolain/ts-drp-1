@@ -367,6 +367,13 @@ describe("Phase 3a-1B Seam 3 network and generated-wire RED", () => {
 		await waitFor(() => received.length === 1, "authenticated Seam3 ingress");
 		const exact = received[0];
 		if (exact === undefined) throw new TypeError("missing decoded message");
+		expect(Object.isFrozen(exact)).toBe(true);
+		expect(Object.isExtensible(exact.data)).toBe(false);
+		expect(Object.isExtensible(exact.data.buffer)).toBe(false);
+		expect(exact.data.byteOffset).toBe(0);
+		expect(exact.data.buffer.byteLength).toBe(exact.data.byteLength);
+		expect(Reflect.set(exact, "data", new Uint8Array(1_000_000))).toBe(false);
+		expect(Reflect.set(exact.data, "opaqueCallerGraph", {})).toBe(false);
 		expect(surface.gossipTopicFor(exact)).toBe(TOPIC);
 		expect(surface.gossipTopicFor({ ...exact, data: new Uint8Array(exact.data) })).toBeUndefined();
 		expect(surface.gossipTopicFor(wire)).toBeUndefined();
@@ -411,6 +418,93 @@ describe("Phase 3a-1B Seam 3 network and generated-wire RED", () => {
 		mutated.data[0] = 6;
 		expect(surface.claimIngressEvidence(mutated)).toBeUndefined();
 	});
+
+	it.each(["count", "bytes", "close"] as const)(
+		"bounds native outer gossip custody through joined fanout %s",
+		async (mode) => {
+			const { node } = await makeStartedReceiver();
+			running.push(node);
+			let release!: () => void, enter!: () => void;
+			const gate = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			const entered = new Promise<void>((resolve) => {
+				enter = resolve;
+			});
+			const received: Message[] = [];
+			node.subscribeToMessageQueue(async (message) => {
+				received.push(message);
+				enter();
+				await gate;
+			});
+			const joined: Message[] = [];
+			node.subscribeToMessageQueue((message) => {
+				joined.push(message);
+			});
+			const jobs = (): number => Number(Reflect.get(node, "_admittedV3GossipJobs"));
+			const bytes = (): number => Number(Reflect.get(node, "_admittedV3GossipBytes"));
+			const receive = Reflect.get(node, "handleSignedGossipsubMessage") as (message: SignedMessage) => Promise<void>;
+			const payload = new Uint8Array(mode === "bytes" ? 600_000 : 2).fill(3);
+			const wire = Message.create({
+				data: payload,
+				objectId: TOPIC,
+				sender: "ignored",
+				type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+			});
+			const charge = payload.byteLength * 2 + new TextEncoder().encode(TOPIC + signerId.toString() + TOPIC).byteLength;
+			const attempts = mode === "count" ? 40 : mode === "bytes" ? 20 : 3;
+			const admitted = Math.min(attempts, 32, Math.floor((16 * 1024 * 1024) / charge));
+			try {
+				// Await the existing signed native entrypoint, not its void event
+				// adapter, so every overflow decision is observed deterministically.
+				for (let index = 0; index < attempts; index++) await Reflect.apply(receive, node, [await signedIngress(wire)]);
+				await entered;
+				expect(jobs()).toBe(admitted);
+				expect(bytes()).toBe(admitted * charge);
+				expect(received).toHaveLength(1);
+				expect(joined).toHaveLength(0);
+				const exact = received[0];
+				if (exact === undefined) throw new TypeError("missing native entered carrier");
+				expect(Object.isFrozen(exact)).toBe(true);
+				expect(exact.data.buffer.byteLength).toBe(payload.byteLength);
+				expect(Reflect.set(exact, "data", new Uint8Array(1_000_000))).toBe(false);
+				expect(Reflect.set(exact.data.buffer, "opaqueCallerGraph", {})).toBe(false);
+				if (mode === "close") {
+					await node.stop();
+					await waitFor(() => jobs() === 1, "unentered native gossip discard");
+					expect(bytes()).toBe(charge);
+					expect(joined).toHaveLength(0);
+					await Reflect.apply(receive, node, [await signedIngress(wire)]);
+					expect(jobs()).toBe(1);
+					expect(bytes()).toBe(charge);
+				}
+				release();
+				await waitFor(() => jobs() === 0, "all native gossip handlers joined");
+				expect(bytes()).toBe(0);
+				expect(joined).toHaveLength(mode === "close" ? 1 : admitted);
+				if (mode !== "close") {
+					await Reflect.apply(receive, node, [await signedIngress(wire)]);
+					await waitFor(() => joined.length === admitted + 1 && jobs() === 0, "native gossip credit retry");
+				}
+				console.info(
+					JSON.stringify({
+						site: "native-outer-gossip-joined",
+						mode,
+						attempts,
+						admitted,
+						refused: attempts - admitted,
+						charge,
+						joined: joined.length,
+						jobs: jobs(),
+						bytes: bytes(),
+					})
+				);
+			} finally {
+				release();
+				await waitFor(() => jobs() === 0, "native gossip cleanup join");
+			}
+		}
+	);
 
 	it("pins tag 11 and the strict two-field V3Envelope through authoritative generation", async () => {
 		const proto = source("packages/types/src/proto/drp/v1/messages.proto");

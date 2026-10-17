@@ -2,12 +2,12 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { DurableIssuanceOutboxRecord, DurableIssuanceStore, DurableIssueCommit } from "@ts-drp/issuance-store";
+import { bindDurableIssuancePruningMaintenance, durableIssuancePruningMaintenanceForStore, ISSUANCE_RETIREMENT_LIMITS } from "@ts-drp/issuance-store/maintenance";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { type AheDurableStore, parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdtempSync, removeFixtureDirectory, tmpdir, createFixtureAheStore, createFixtureIssuanceStore, createFixtureJournalStore } from "./native-backend.js";
 import path from "node:path";
 
 import { createV3ChatApplication } from "../../../examples/v3-chat/src/index.js";
@@ -20,9 +20,6 @@ import {
 	routeV3RetainedIngress,
 	type V3LocalIssueResult,
 } from "../../../packages/node/src/v3-live.js";
-import { createSqliteAheDurableStore } from "../../../packages/storage-node/src/index.js";
-import { createNodeDurableIssuanceStore } from "../../../packages/storage-node/src/issuance.js";
-import { createNodeDurableLiveJournalStore } from "../../../packages/storage-node/src/live-journal.js";
 import {
 	bytesHex,
 	contract,
@@ -147,6 +144,7 @@ export type CrossObjectMutation = "activation-closure" | "source-scope" | "sourc
 export interface CrossObjectScenarioResult {
 	readonly activationVertexDigest: string;
 	readonly completion?: unknown;
+	readonly stalledCompletion?: unknown;
 	readonly recovery: Readonly<Record<string, unknown>>;
 	readonly rebaseOutboxes: readonly unknown[];
 	readonly reopenRecovery?: Readonly<Record<string, unknown>>;
@@ -204,6 +202,7 @@ export interface TerminalCommitScenarioResult {
 	readonly publishedDigests: readonly string[];
 	readonly publishTerminal: unknown;
 	readonly rejectedSignerTerminal: unknown;
+	readonly rejectedSignerRecovery: TerminalPreEffectScenarioResult;
 	readonly reopenedBegin: unknown;
 	readonly resume: unknown;
 	readonly reusedPublish: unknown;
@@ -218,6 +217,13 @@ export interface TerminalPreEffectScenarioResult {
 	readonly recovery: Readonly<Record<string, unknown>>;
 	readonly signerCalls: number;
 	readonly terminalCandidateByteCharge?: number;
+	readonly resumeAfterRejectedSigner?: unknown;
+	readonly warmBeginAfterRejectedSigner?: unknown;
+	readonly coldRecovery?: unknown;
+	readonly coldBegin?: unknown;
+	readonly sameIntentRetry?: unknown;
+	readonly nativeImagePreservedAcrossCold?: boolean;
+	readonly signerCallsAfterRetry?: number;
 }
 
 export interface TerminalSinkDispositionScenarioResult {
@@ -278,7 +284,7 @@ async function preparePlane(
 	}> = {}
 ): Promise<PreparedPlane> {
 	const directory = mkdtempSync(path.join(tmpdir(), `drp-phase-3g-${label}-`));
-	const store: AheDurableStore = createSqliteAheDurableStore({ filename: path.join(directory, "trust.sqlite") });
+	const store: AheDurableStore = await createFixtureAheStore({ filename: path.join(directory, "trust.sqlite") });
 	try {
 		const selectedCatalog =
 			options.terminalCatalog === true ? terminalBatchCatalog() : counterBatchCatalog(options.blueprintVariant);
@@ -378,12 +384,12 @@ async function preparePlane(
 			prepareAgain: (signature = detachedAnchorSignature) => prepare(signature),
 			async close() {
 				await store.close();
-				rmSync(directory, { force: true, recursive: true });
+				await removeFixtureDirectory(directory);
 			},
 		});
 	} catch (error) {
 		await store.close();
-		rmSync(directory, { force: true, recursive: true });
+		await removeFixtureDirectory(directory);
 		throw error;
 	}
 }
@@ -547,7 +553,7 @@ export async function runTerminalOutcomeUnknownScenario(): Promise<TerminalOutco
 	let journal: DurableLiveJournalStore | undefined;
 	try {
 		const scope = Object.freeze({ author: plane.author, objectId });
-		store = createNodeDurableIssuanceStore({ primaryFilename: path.join(directory, "issuance") });
+		store = await createFixtureIssuanceStore({ primaryFilename: path.join(directory, "issuance") });
 		journal = await installJournal(plane);
 		const bootstrap = await store.transactIssue(scope, (authorSequence) =>
 			Promise.resolve(commitFor(plane, authorSequence, terminalMessage("outcome-unknown-bootstrap")))
@@ -632,7 +638,7 @@ export async function runTerminalOutcomeUnknownScenario(): Promise<TerminalOutco
 		await journal?.close();
 		await store?.close();
 		await plane.close();
-		rmSync(directory, { force: true, recursive: true });
+		await removeFixtureDirectory(directory);
 	}
 }
 
@@ -649,7 +655,7 @@ function messageForCommit(commit: DurableIssueCommit, topic: string): Message {
 }
 
 async function installJournal(plane: PreparedPlane): Promise<DurableLiveJournalStore> {
-	const journal = createNodeDurableLiveJournalStore({ primaryFilename: plane.journalFilename });
+	const journal = await createFixtureJournalStore({ primaryFilename: plane.journalFilename });
 	const installed = await journal.installGenesis({
 		detachedAnchorSignature: plane.detachedAnchorSignature,
 		exactCanonicalAnchorPreimageBytes: plane.exactCanonicalAnchorPreimageBytes,
@@ -758,7 +764,7 @@ export async function runSharedPlaneScenario(
 	let targetJournal: Awaited<ReturnType<typeof installJournal>> | undefined;
 	try {
 		const scope = Object.freeze({ author: source.author, objectId });
-		sourceStore = createNodeDurableIssuanceStore({ primaryFilename: lineageFilename });
+		sourceStore = await createFixtureIssuanceStore({ primaryFilename: lineageFilename });
 		const sourceBootstrap = await sourceStore.transactIssue(scope, (authorSequence) =>
 			Promise.resolve(
 				commitFor(
@@ -859,7 +865,7 @@ export async function runSharedPlaneScenario(
 		sourceStore = undefined;
 
 		const sourceSessionClosedBeforeTargetOpen = true;
-		targetStore = createNodeDurableIssuanceStore({ primaryFilename: lineageFilename });
+		targetStore = await createFixtureIssuanceStore({ primaryFilename: lineageFilename });
 		const targetCommit =
 			options.omitTargetBootstrap === true
 				? undefined
@@ -1078,7 +1084,7 @@ export async function runSharedPlaneScenario(
 					const closingTargetStore = targetStore;
 					targetStore = undefined;
 					await closingTargetStore.close();
-					targetStore = createNodeDurableIssuanceStore({ primaryFilename: lineageFilename });
+					targetStore = await createFixtureIssuanceStore({ primaryFilename: lineageFilename });
 					targetJournal = await installJournal(target);
 					const restartedTargetCapability = await target.prepareAgain();
 					const restartedSourceCapability = await source.prepareAgain();
@@ -1163,7 +1169,7 @@ export async function runSharedPlaneScenario(
 			const closingTargetStore = targetStore;
 			targetStore = undefined;
 			await closingTargetStore.close();
-			const reopenedStore = createNodeDurableIssuanceStore({ primaryFilename: lineageFilename });
+			const reopenedStore = await createFixtureIssuanceStore({ primaryFilename: lineageFilename });
 			const reopenedJournal = await installJournal(target);
 			try {
 				const reopenedCapability = await target.prepareAgain();
@@ -1186,7 +1192,7 @@ export async function runSharedPlaneScenario(
 				await reopenedStore.close();
 			}
 		}
-		const snapshotStore = targetStore ?? createNodeDurableIssuanceStore({ primaryFilename: lineageFilename });
+		const snapshotStore = targetStore ?? await createFixtureIssuanceStore({ primaryFilename: lineageFilename });
 		try {
 			const lineage = await snapshotStore.readLineage(scope);
 			return Object.freeze({
@@ -1226,7 +1232,7 @@ export async function runSharedPlaneScenario(
 		await targetJournal?.close();
 		await targetStore?.close();
 		await Promise.all([source.close(), target.close(), mismatchedSource?.close()]);
-		rmSync(lineageDirectory, { force: true, recursive: true });
+		await removeFixtureDirectory(lineageDirectory);
 	}
 }
 
@@ -1265,7 +1271,7 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 	let journal: DurableLiveJournalStore | undefined;
 	try {
 		const scope = Object.freeze({ author: plane.author, objectId });
-		store = createNodeDurableIssuanceStore({ primaryFilename: issuanceFilename });
+		store = await createFixtureIssuanceStore({ primaryFilename: issuanceFilename });
 		journal = await installJournal(plane);
 		const bootstrap = await store.transactIssue(scope, (authorSequence) =>
 			Promise.resolve(commitFor(plane, authorSequence, terminalMessage("terminal-bootstrap")))
@@ -1368,6 +1374,7 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 		let postTerminalRemoteRouted = false;
 		let publishTerminal: unknown;
 		let rejectedSignerTerminal: unknown;
+		let rejectedSignerRecovery: TerminalPreEffectScenarioResult;
 		let resume: unknown;
 		let reusedPublish: unknown;
 		let reusedResume: unknown;
@@ -1377,7 +1384,9 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 				signRegisteredVertexDigest: (digest) =>
 					Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(plane.privateKeySeedHex))),
 			});
-			await earlierSinkStarted;
+			await Promise.race([earlierSinkStarted, earlierIssuePromise.then(result => {
+				if (!result.ok) throw new TypeError(`terminal earlier issue refused before sink: ${JSON.stringify(result)}`);
+			})]);
 			const beginPromise = Promise.resolve(
 				Reflect.apply(Reflect.get(activated.handle, "beginTerminalTransition") as () => unknown, activated.handle, [])
 			);
@@ -1524,28 +1533,11 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 			);
 			Reflect.apply(Reflect.get(malformedCapability as object, "resume") as () => unknown, malformedCapability, []);
 
-			const signerBegin = await Reflect.apply(
-				Reflect.get(activated.handle, "beginTerminalTransition") as () => unknown,
-				activated.handle,
-				[]
-			);
-			const signerCapability = Reflect.get(signerBegin as object, "capability");
-			rejectedSignerTerminal = await Reflect.apply(
-				Reflect.get(signerCapability as object, "publishTerminal") as (input: unknown) => unknown,
-				signerCapability,
-				[
-					Object.freeze({
-						operations: Object.freeze([
-							Object.freeze({
-								logicalTime: 7,
-								operation: Object.freeze({ action: "migrationActivation", decision: Object.freeze({ version: 1 }) }),
-							}),
-						]),
-						signRegisteredVertexDigest: () => Promise.reject(new TypeError("controlled terminal signer rejection")),
-					}),
-				]
-			);
-			Reflect.apply(Reflect.get(signerCapability as object, "resume") as () => unknown, signerCapability, []);
+			// An entered signer failure is uncertain, not a resumable pre-effect
+			// failure. Exercise its original native recovery separately so it cannot
+			// poison the independent healthy gate/commit assertions below.
+			rejectedSignerRecovery = await runTerminalPreEffectScenario("signer-rejection");
+			rejectedSignerTerminal = rejectedSignerRecovery.publication;
 
 			begunAgain = await Reflect.apply(
 				Reflect.get(activated.handle, "beginTerminalTransition") as () => unknown,
@@ -1635,7 +1627,7 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 		journal = undefined;
 		await store.close();
 		store = undefined;
-		store = createNodeDurableIssuanceStore({ primaryFilename: issuanceFilename });
+		store = await createFixtureIssuanceStore({ primaryFilename: issuanceFilename });
 		journal = await installJournal(plane);
 		const reopenedCapability = await plane.prepareAgain();
 		if (reopenedCapability === undefined) throw new TypeError("Phase 3h terminal reopen authority is unavailable");
@@ -1700,6 +1692,7 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 			publishedDigests: Object.freeze(publishedDigests),
 			publishTerminal,
 			rejectedSignerTerminal,
+			rejectedSignerRecovery,
 			reopenedBegin,
 			resume,
 			reusedPublish,
@@ -1709,7 +1702,7 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 		await journal?.close();
 		await store?.close();
 		await plane.close();
-		rmSync(directory, { force: true, recursive: true });
+		await removeFixtureDirectory(directory);
 	}
 }
 
@@ -1731,7 +1724,7 @@ export async function runTerminalSinkDispositionScenarios(): Promise<readonly Te
 		let journal: DurableLiveJournalStore | undefined;
 		try {
 			const scope = Object.freeze({ author: plane.author, objectId });
-			store = createNodeDurableIssuanceStore({ primaryFilename: issuanceFilename });
+			store = await createFixtureIssuanceStore({ primaryFilename: issuanceFilename });
 			journal = await installJournal(plane);
 			const bootstrap = await store.transactIssue(scope, (authorSequence) =>
 				Promise.resolve(commitFor(plane, authorSequence, terminalMessage(`sink-${disposition}-bootstrap`)))
@@ -1830,7 +1823,7 @@ export async function runTerminalSinkDispositionScenarios(): Promise<readonly Te
 			journal = undefined;
 			await store.close();
 			store = undefined;
-			store = createNodeDurableIssuanceStore({ primaryFilename: issuanceFilename });
+			store = await createFixtureIssuanceStore({ primaryFilename: issuanceFilename });
 			journal = await installJournal(plane);
 			const reopenedCapability = await plane.prepareAgain();
 			if (reopenedCapability === undefined) throw new TypeError("Phase 3h sink reopen authority is unavailable");
@@ -1868,19 +1861,20 @@ export async function runTerminalSinkDispositionScenarios(): Promise<readonly Te
 			await journal?.close();
 			await store?.close();
 			await plane.close();
-			rmSync(directory, { force: true, recursive: true });
+			await removeFixtureDirectory(directory);
 		}
 	}
 	return Object.freeze(results);
 }
 
 /**
- * Proves terminal publication rejects capacity and irreducible-frontier failures before signing or transacting.
- * @param kind The genuine graph constraint exercised by the recovered plane.
- * @returns Recovery, terminal result, and pre-effect counters.
+ * Exercises genuine terminal refusal boundaries and, for entered signer
+ * uncertainty, native close/reopen and exact same-intent continuation.
+ * @param kind The original graph constraint or controlled signer failure.
+ * @returns Refusal/recovery results and original native/signing counters.
  */
 export async function runTerminalPreEffectScenario(
-	kind: "multi-tip" | "oversized"
+	kind: "multi-tip" | "oversized" | "signer-rejection"
 ): Promise<TerminalPreEffectScenarioResult> {
 	const objectId = `creator:${(kind === "oversized" ? "e" : "f").repeat(32)}`;
 	const creatorAuthor = bytesHex(ed25519.getPublicKey(hexBytes(contract.privateKeySeedHex)));
@@ -1896,7 +1890,7 @@ export async function runTerminalPreEffectScenario(
 	let journal: DurableLiveJournalStore | undefined;
 	try {
 		const scope = Object.freeze({ author: plane.author, objectId });
-		store = createNodeDurableIssuanceStore({ primaryFilename: path.join(directory, "issuance") });
+		store = await createFixtureIssuanceStore({ primaryFilename: path.join(directory, "issuance") });
 		journal = await installJournal(plane);
 		const bootstrap = await store.transactIssue(scope, (authorSequence) =>
 			Promise.resolve(commitFor(plane, authorSequence, terminalMessage(`${kind}-bootstrap`)))
@@ -2016,6 +2010,11 @@ export async function runTerminalPreEffectScenario(
 				return store.transactIssue(selectedScope, buildAndSign);
 			},
 		});
+		if (kind === "signer-rejection") {
+			const maintenance = durableIssuancePruningMaintenanceForStore(store);
+			if (maintenance === undefined || !bindDurableIssuancePruningMaintenance(observedStore, maintenance))
+				throw new TypeError("genuine terminal native sign owner is unavailable");
+		}
 		const capability = await plane.prepareAgain();
 		if (capability === undefined || plane.exactCanonicalLatchedAclBytes === undefined) {
 			throw new TypeError("Phase 3h terminal pre-effect authority is unavailable");
@@ -2032,6 +2031,9 @@ export async function runTerminalPreEffectScenario(
 		let begun: unknown;
 		let publication: unknown;
 		let signerCalls = 0;
+		let resumeAfterRejectedSigner: unknown, warmBeginAfterRejectedSigner: unknown;
+		let coldRecovery: unknown, coldBegin: unknown, sameIntentRetry: unknown;
+		let nativeImagePreservedAcrossCold: boolean | undefined, signerCallsAfterRetry: number | undefined;
 		if (Reflect.get(recovery, "ok") === true) {
 			const activated = activateV3LivePlane({
 				capability: Reflect.get(recovery, "capability") as never,
@@ -2064,11 +2066,45 @@ export async function runTerminalPreEffectScenario(
 								]),
 								signRegisteredVertexDigest: (digest: Uint8Array) => {
 									signerCalls += 1;
+									if (kind === "signer-rejection") return Promise.reject(new TypeError("controlled terminal signer rejection"));
 									return Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(plane.privateKeySeedHex)));
 								},
 							}),
 						]
 					);
+					if (kind === "signer-rejection") {
+						resumeAfterRejectedSigner = Reflect.apply(Reflect.get(terminalCapability as object, "resume") as () => unknown, terminalCapability, []);
+						warmBeginAfterRejectedSigner = await Reflect.apply(Reflect.get(activated.handle, "beginTerminalTransition") as () => unknown, activated.handle, []);
+						activated.handle.deactivate();
+						const native = durableIssuancePruningMaintenanceForStore(store);
+						if (native?.readBoundedRecoveryCensus === undefined) throw new TypeError("terminal native recovery census is unavailable");
+						const before = encodeCanonical(await native.readBoundedRecoveryCensus({objectId, limits: ISSUANCE_RETIREMENT_LIMITS}));
+						await journal.close(); await store.close();
+						journal = await installJournal(plane);
+						store = await createFixtureIssuanceStore({primaryFilename: path.join(directory,"issuance")});
+						const coldCapability = await plane.prepareAgain();
+						coldRecovery = await recoverV3LiveReplica({capability: coldCapability,
+							classifyTerminalVertex: (input: never) => terminalClassifier(plane.author,input),
+							exactCanonicalLatchedAclBytes: plane.exactCanonicalLatchedAclBytes,
+							issuanceScope: scope, issuanceStore: store, liveJournalStore: journal} as never);
+						if (Reflect.get(coldRecovery as object,"ok") !== true) throw new TypeError("terminal uncertain cold recovery failed");
+						const reopenedNative = durableIssuancePruningMaintenanceForStore(store);
+						if (reopenedNative?.readBoundedRecoveryCensus === undefined) throw new TypeError("terminal cold native census is unavailable");
+						const after = encodeCanonical(await reopenedNative.readBoundedRecoveryCensus({objectId,limits:ISSUANCE_RETIREMENT_LIMITS}));
+						nativeImagePreservedAcrossCold = bytesHex(before) === bytesHex(after);
+						const cold = activateV3LivePlane({capability: Reflect.get(coldRecovery as object,"capability") as never,
+							messageQueueManager: new MessageQueueManager<Message>({logConfig:{level:"silent"}}),
+							networkNode: network("terminal-signer-cold",[]),onAdmittedVertex:()=>Object.freeze({kind:"terminal-accepted" as const})});
+						if (!cold.ok) throw new TypeError("terminal uncertain cold activation failed");
+						try {
+							coldBegin = await Reflect.apply(Reflect.get(cold.handle,"beginTerminalTransition") as () => unknown,cold.handle,[]);
+							const retryCapability = Reflect.get(coldBegin as object,"capability");
+							sameIntentRetry = await Reflect.apply(Reflect.get(retryCapability as object,"publishTerminal") as (input:unknown)=>unknown,retryCapability,[{
+								operations:[{logicalTime:9,operation:{action:"migrationActivation",decision:{version:1}}}],
+								signRegisteredVertexDigest:(digest:Uint8Array)=>{signerCalls+=1;return Promise.resolve(ed25519.sign(new Uint8Array(digest),hexBytes(plane.privateKeySeedHex)));}}]);
+							signerCallsAfterRetry = signerCalls;
+						} finally {cold.handle.deactivate();}
+					}
 				}
 			} finally {
 				activated.handle.deactivate();
@@ -2082,12 +2118,14 @@ export async function runTerminalPreEffectScenario(
 			recovery,
 			signerCalls,
 			terminalCandidateByteCharge,
+			resumeAfterRejectedSigner, warmBeginAfterRejectedSigner, coldRecovery, coldBegin, sameIntentRetry,
+			nativeImagePreservedAcrossCold, signerCallsAfterRetry,
 		});
 	} finally {
 		await journal?.close();
 		await store?.close();
 		await plane.close();
-		rmSync(directory, { force: true, recursive: true });
+		await removeFixtureDirectory(directory);
 	}
 }
 
@@ -2117,8 +2155,8 @@ export async function runRetainedBootstrapHoldScenario(
 	try {
 		const sourceScope = Object.freeze({ author: source.author, objectId: sourceObjectId });
 		const targetScope = Object.freeze({ author: target.author, objectId: targetObjectId });
-		sourceStore = createNodeDurableIssuanceStore({ primaryFilename: path.join(directory, "source-issuance") });
-		targetStore = createNodeDurableIssuanceStore({ primaryFilename: path.join(directory, "target-issuance") });
+		sourceStore = await createFixtureIssuanceStore({ primaryFilename: path.join(directory, "source-issuance") });
+		targetStore = await createFixtureIssuanceStore({ primaryFilename: path.join(directory, "target-issuance") });
 		sourceJournal = await installJournal(source);
 		targetJournal = await installJournal(target);
 		const sourceBootstrap = await sourceStore.transactIssue(sourceScope, (authorSequence) =>
@@ -2285,7 +2323,7 @@ export async function runRetainedBootstrapHoldScenario(
 		await sourceStore?.close();
 		await targetStore?.close();
 		await Promise.all([source.close(), target.close()]);
-		rmSync(directory, { force: true, recursive: true });
+		await removeFixtureDirectory(directory);
 	}
 }
 
@@ -2296,7 +2334,8 @@ export async function runRetainedBootstrapHoldScenario(
  * @returns Cross-object recovery, enumeration, completion, and reopen evidence.
  */
 export async function runCrossObjectActivationScenario(
-	mutation?: CrossObjectMutation
+	mutation?: CrossObjectMutation,
+	completionMode?: "stalled"
 ): Promise<CrossObjectScenarioResult> {
 	const sourceObjectId = `creator:${"a".repeat(32)}`;
 	const targetObjectId = `creator:${"b".repeat(32)}`;
@@ -2318,8 +2357,8 @@ export async function runCrossObjectActivationScenario(
 	try {
 		const sourceScope = Object.freeze({ author: source.author, objectId: sourceObjectId });
 		const targetScope = Object.freeze({ author: target.author, objectId: targetObjectId });
-		sourceStore = createNodeDurableIssuanceStore({ primaryFilename: sourceFilename });
-		targetStore = createNodeDurableIssuanceStore({ primaryFilename: targetFilename });
+		sourceStore = await createFixtureIssuanceStore({ primaryFilename: sourceFilename });
+		targetStore = await createFixtureIssuanceStore({ primaryFilename: targetFilename });
 		sourceJournal = await installJournal(source);
 		targetJournal = await installJournal(target);
 
@@ -2412,11 +2451,16 @@ export async function runCrossObjectActivationScenario(
 		const targetPublishedDigests: string[] = [];
 		let targetPublication: unknown;
 		let targetReplacement: unknown;
+		let stalledCompletion: unknown;
 		if (Reflect.get(recovery, "ok") === true) {
+			let pausePublication: (() => Promise<void>) | undefined;
+			const targetNetwork = network("cross-target", targetPublishedDigests);
 			const activated = activateV3LivePlane({
 				capability: Reflect.get(recovery, "capability") as never,
 				messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
-				networkNode: network("cross-target", targetPublishedDigests),
+				networkNode: {...targetNetwork, publishMessage: async (...args: Parameters<typeof targetNetwork.publishMessage>) => {
+					await pausePublication?.(); return targetNetwork.publishMessage(...args);
+				}},
 				onAdmittedVertex: () => Object.freeze({ kind: "continue" as const }),
 			});
 			if (!activated.ok) throw new TypeError(`Phase 3h cross-object activation failed: ${activated.kind}`);
@@ -2435,11 +2479,49 @@ export async function runCrossObjectActivationScenario(
 							signRegisteredVertexDigest: (digest) =>
 								Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(target.privateKeySeedHex))),
 						});
-						targetPublication = await activated.handle.publishPending();
-						completion = await activated.handle.completeRebaseSource({
+						const completionInput = {
 							authorSequence: Reflect.get(selected as object, "authorSequence") as number,
 							digest: Reflect.get(selected as object, "vertexDigest") as string,
-						});
+							// The original scalar selector permits unrelated properties.
+							ignoredCallerMetadata: {mustNotBecomeProtocolInput:true},
+						};
+						if (completionMode === "stalled") {
+							let unblock!: () => void, entered!: () => void;
+							const gate = new Promise<void>(resolve => {unblock=resolve;}), began = new Promise<void>(resolve => {entered=resolve;});
+							const pending: Promise<unknown>[] = [];
+							try {
+								pausePublication = async () => {entered();await gate;};
+								const publication = activated.handle.publishPending(); pending.push(publication);
+								await Promise.race([began,publication.then(() => {throw new Error("original native target publisher did not enter");})]);
+								const originalInput = {...completionInput};
+								const firstCut = Array.from({length:40}, () => activated.handle.completeRebaseSource(completionInput)); pending.push(...firstCut);
+								const wrong = activated.handle.completeRebaseSource({...originalInput,digest:"0".repeat(64)}); pending.push(wrong);
+								const secondCut = Array.from({length:40}, () => activated.handle.completeRebaseSource(completionInput)); pending.push(...secondCut);
+								let reenteredPublication: ReturnType<typeof activated.handle.republishRetained> | undefined;
+								const reentrantInput = new Proxy({...originalInput}, {get(target,key,receiver) {
+									if(key==="authorSequence")reenteredPublication=activated.handle.republishRetained();return Reflect.get(target,key,receiver);
+								}});
+								const reentrantCompletion=activated.handle.completeRebaseSource(reentrantInput);pending.push(reentrantCompletion);
+								if(reenteredPublication===undefined)throw new Error("original completion capture did not inspect its input before waiting");
+								pending.push(reenteredPublication);
+								const afterReentry=Array.from({length:40},()=>activated.handle.completeRebaseSource(originalInput));pending.push(...afterReentry);
+								completionInput.digest="0".repeat(64);
+								const before = await sourceStore.readOutboxPage({scope:sourceScope,limit:16});
+								const beforeRelease = {firstCutFlights:new Set(firstCut).size,secondCutFlights:new Set(secondCut).size,
+									distinctCuts:firstCut[0]!==secondCut[0],reentrantCompletionIsFresh:reentrantCompletion!==secondCut[0],
+									afterReentryFlights:new Set(afterReentry).size,afterReentryIsFresh:afterReentry[0]!==reentrantCompletion,
+									sourceStates:before.map(row => ({authorSequence:row.commit.authorSequence,state:row.publishState}))};
+								unblock(); await Promise.all(pending);pausePublication=undefined;
+								targetPublication=await publication; completion=await firstCut[0];
+								const after=await sourceStore.readOutboxPage({scope:sourceScope,limit:16});
+								stalledCompletion={beforeRelease,firstCut:await Promise.all(firstCut),secondCut:await Promise.all(secondCut),wrong:await wrong,
+									reentrantCompletion:await reentrantCompletion,reenteredPublication:await reenteredPublication,afterReentry:await Promise.all(afterReentry),
+									afterSourceStates:after.map(row => ({authorSequence:row.commit.authorSequence,state:row.publishState})),sourceSequence:originalInput.authorSequence};
+							} finally {unblock();await Promise.allSettled(pending);pausePublication=undefined;}
+						} else {
+							targetPublication = await activated.handle.publishPending();
+							completion = await activated.handle.completeRebaseSource(completionInput);
+						}
 					}
 				}
 			} finally {
@@ -2479,6 +2561,7 @@ export async function runCrossObjectActivationScenario(
 		return Object.freeze({
 			activationVertexDigest: lowerHex(activation.envelope.digest),
 			completion,
+			stalledCompletion,
 			rebaseOutboxes: Object.freeze(rebaseOutboxes),
 			recovery,
 			reopenRecovery,
@@ -2499,6 +2582,6 @@ export async function runCrossObjectActivationScenario(
 		await sourceStore?.close();
 		await targetStore?.close();
 		await Promise.all([source.close(), target.close()]);
-		rmSync(directory, { force: true, recursive: true });
+		await removeFixtureDirectory(directory);
 	}
 }

@@ -1,12 +1,15 @@
 import {
+	AHE_BOUNDED_READ_LIMITS,
 	type AheDurableStore,
 	decodeGenerationRecordV1,
 	decodeHeadRecordV1,
+	encodeAheRetirementControl,
 	encodeGenerationRecordV1,
 	type ExpectedHead,
 	type GenerationRecord,
 	parseStorageObjectId,
 } from "@ts-drp/storage";
+import { BoundedReadBudgetError, isBoundedReadCorruption, PersistedStorageError } from "@ts-drp/storage/adapter";
 import {
 	AheReclamationError,
 	type AheReclamationMaintenance,
@@ -22,6 +25,12 @@ import {
 
 import { runInternalPrimaryDispatch } from "./primary-dispatch.js";
 import {
+	admitBrowserRetirementControl,
+	advanceBrowserRetirementControl,
+	readBrowserRetirementControl,
+} from "./retirement-control.js";
+import {
+	browserAheControlStores,
 	PHASE_2D_BLOBS_STORE,
 	PHASE_2D_GENERATIONS_STORE,
 	PHASE_2D_OBJECTS_STORE,
@@ -123,7 +132,11 @@ async function expectKey(
 	}
 }
 
-async function loadSnapshot(transaction: IDBTransaction, objectId: string): Promise<AheReclamationSnapshot> {
+async function loadSnapshot(
+	transaction: IDBTransaction,
+	objectId: string,
+	bounded = false
+): Promise<AheReclamationSnapshot> {
 	const parsedObjectId = parseStorageObjectId(objectId);
 	if (!parsedObjectId.ok) throw createAheReclamationError("AHE_RECLAMATION_INVALID_ARGUMENT", "object ID invalid");
 	const objectRow = await requestValue(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(objectId));
@@ -148,9 +161,23 @@ async function loadSnapshot(transaction: IDBTransaction, objectId: string): Prom
 		) {
 			throw createAheReclamationError("AHE_RECLAMATION_CORRUPT", "generation row was malformed or misbound");
 		}
+		if (
+			bounded &&
+			decoded.value.objectId === objectId &&
+			decoded.value.closure.length > AHE_BOUNDED_READ_LIMITS.maxClosureReferences
+		)
+			throw createAheReclamationError("AHE_RECLAMATION_RETRY_REQUIRED", "shared native closure exceeds bound");
 		generations.push(decoded.value);
 	}
 
+	if (
+		bounded &&
+		generations.filter((row) => row.objectId === objectId).length > AHE_BOUNDED_READ_LIMITS.maxObjectGenerations
+	)
+		throw createAheReclamationError(
+			"AHE_RECLAMATION_RETRY_REQUIRED",
+			"addressed native generation census exceeds bound"
+		);
 	const promotionRows = await requestValue(transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).getAll());
 	const promotions = promotionRows.map(
 		(row) =>
@@ -165,7 +192,10 @@ async function loadSnapshot(transaction: IDBTransaction, objectId: string): Prom
 	const blobs = [];
 	for (const digest of digests) {
 		const row = await requestValue(blobStore.get(digest));
-		if (row !== undefined) blobs.push({ bytes: bytes(rowProperty(row, "bytes")), digest });
+		if (row !== undefined) {
+			const capturedBytes = bytes(rowProperty(row, "bytes"));
+			blobs.push({ bytes: capturedBytes, digest });
+		}
 	}
 	return { blobs, generations, head, promotions } as AheReclamationSnapshot;
 }
@@ -205,64 +235,39 @@ class BrowserAheReclamationMaintenance implements AheReclamationMaintenance {
 			if (this.lifecycle.isPoisoned()) {
 				throw createAheReclamationError("AHE_RECLAMATION_STORE_POISONED", "store is poisoned");
 			}
-			transaction = database.transaction(
-				[PHASE_2D_BLOBS_STORE, PHASE_2D_GENERATIONS_STORE, PHASE_2D_OBJECTS_STORE, PHASE_2D_PROMOTIONS_STORE],
-				"readwrite",
-				{ durability: "strict" }
-			);
+			transaction = database.transaction(browserAheControlStores(), "readwrite", { durability: "strict" });
 			completion = transactionOutcome(transaction);
 			if (transaction.durability !== "strict") {
 				throw createAheReclamationError("AHE_RECLAMATION_SUBSTRATE_FAILURE", "strict durability unavailable");
 			}
-			const decision = classifyAheReclamation(captured, await loadSnapshot(transaction, captured.objectId));
-			const observer = crashObserverByStore.get(this.store);
-			if (decision.floor.normalizedThisCall) {
-				const generationStore = transaction.objectStore(PHASE_2D_GENERATIONS_STORE);
-				const floorKey = [captured.objectId, captured.lineageFloor.generationId];
-				await expectKey(this.store, generationStore, floorKey, "present", "floor rewrite");
-				await requestValue(
-					generationStore.put({
-						generationId: captured.lineageFloor.generationId,
-						objectId: captured.objectId,
-						record: encodeGenerationRecordV1(decision.floor.rewrittenGeneration),
-					})
+			const control = await readBrowserRetirementControl(transaction, captured.objectId);
+			if (control !== null && (control.active !== null || control.completed !== null))
+				throw createAheReclamationError(
+					"AHE_RECLAMATION_RETRY_REQUIRED",
+					"native AHE retirement reservation prevents reclamation"
 				);
-				await expectKey(this.store, generationStore, floorKey, "present", "floor rewrite");
-				observer?.("after-floor-rewrite", transaction);
+			if (control?.revision === Number.MAX_SAFE_INTEGER)
+				throw createAheReclamationError("AHE_RECLAMATION_RETRY_REQUIRED", "native control revision exhausted");
+			if (control !== null) {
+				const admitted = await admitBrowserRetirementControl(
+					transaction,
+					captured.objectId,
+					encodeAheRetirementControl(control)
+				);
+				if (!admitted.ok)
+					throw createAheReclamationError(
+						isBoundedReadCorruption(admitted) ? "AHE_RECLAMATION_CORRUPT" : "AHE_RECLAMATION_RETRY_REQUIRED",
+						`native control admission refused: ${admitted.reason}`
+					);
 			}
-			const promotionStore = transaction.objectStore(PHASE_2D_PROMOTIONS_STORE);
-			for (const promotion of decision.deletePromotions) {
-				const key = [promotion.objectId, promotion.generationId, promotion.digest];
-				await expectKey(this.store, promotionStore, key, "present", "promotion delete");
-				await requestValue(promotionStore.delete(key));
-				await expectKey(this.store, promotionStore, key, "absent", "promotion delete");
-			}
-			if (decision.floor.normalizedThisCall) observer?.("after-promotion-delete", transaction);
-			const generationStore = transaction.objectStore(PHASE_2D_GENERATIONS_STORE);
-			for (const generationId of decision.deleteGenerationIds) {
-				const key = [captured.objectId, generationId];
-				await expectKey(this.store, generationStore, key, "present", "generation delete");
-				await requestValue(generationStore.delete(key));
-				await expectKey(this.store, generationStore, key, "absent", "generation delete");
-			}
-			if (decision.floor.normalizedThisCall) observer?.("after-generation-delete", transaction);
-			const blobStore = transaction.objectStore(PHASE_2D_BLOBS_STORE);
-			for (const digest of decision.deleteBlobDigests) {
-				await expectKey(this.store, blobStore, digest, "present", "blob delete");
-				await requestValue(blobStore.delete(digest));
-				await expectKey(this.store, blobStore, digest, "absent", "blob delete");
-			}
-			if (decision.floor.normalizedThisCall) observer?.("after-blob-delete", transaction);
-
-			const post = classifyAheReclamation(captured, await loadSnapshot(transaction, captured.objectId));
-			if (
-				post.floor.normalizedThisCall ||
-				post.deleteGenerationIds.length !== 0 ||
-				post.deletePromotions.length !== 0 ||
-				post.deleteBlobDigests.length !== 0
-			) {
-				throw createAheReclamationError("AHE_RECLAMATION_CORRUPT", "post-state was not a complete replay");
-			}
+			const decision = await applyBrowserBoundedAheReclamation(transaction, this.store, captured);
+			const observer = crashObserverByStore.get(this.store);
+			const advanced = await advanceBrowserRetirementControl(transaction, control);
+			if (!advanced.ok)
+				throw createAheReclamationError(
+					isBoundedReadCorruption(advanced) ? "AHE_RECLAMATION_CORRUPT" : "AHE_RECLAMATION_RETRY_REQUIRED",
+					`native post-control admission refused: ${advanced.reason}`
+				);
 			observer?.("before-commit", transaction);
 			transaction.commit();
 			const outcome = await completion;
@@ -273,6 +278,20 @@ class BrowserAheReclamationMaintenance implements AheReclamationMaintenance {
 		} catch (error) {
 			if (!committed && transaction !== undefined) abortIfActive(transaction);
 			if (!committed && completion !== undefined) await completion;
+			if (error instanceof BoundedReadBudgetError)
+				throw createAheReclamationError(
+					"AHE_RECLAMATION_RETRY_REQUIRED",
+					"native local-control census budget exceeded",
+					error
+				);
+			if (error instanceof PersistedStorageError) {
+				this.lifecycle.latchPoison("NON_CANONICAL_RECORD");
+				throw createAheReclamationError(
+					"AHE_RECLAMATION_CORRUPT",
+					"native local-control metadata or census invalid",
+					error
+				);
+			}
 			if (error instanceof AheReclamationError) {
 				if (error.code === "AHE_RECLAMATION_CORRUPT") this.lifecycle.latchPoison("NON_CANONICAL_RECORD");
 				throw error;
@@ -283,6 +302,94 @@ class BrowserAheReclamationMaintenance implements AheReclamationMaintenance {
 			this.lifecycle.finishOperation();
 		}
 	}
+}
+
+/**
+ * Applies the original classified OLD/NEW rewrite in its caller-owned native
+ * transaction. Bounded retirement is mechanical CAS enforcement, not eligibility.
+ * @param transaction Original native transaction/connection.
+ * @param store Exact maintenance facade.
+ * @param captured Original detached reclamation input.
+ * @param bounded Whether the existing seven-row admission and fixed16 deletes apply.
+ * @returns The original exact reclamation decision; caller still joins COMMIT.
+ */
+export async function applyBrowserBoundedAheReclamation(
+	transaction: IDBTransaction,
+	store: AheDurableStore,
+	captured: ReturnType<typeof captureAheReclamationInput>,
+	bounded = false
+): Promise<ReturnType<typeof classifyAheReclamation>> {
+	const decision = classifyAheReclamation(captured, await loadSnapshot(transaction, captured.objectId, bounded));
+	if (
+		bounded &&
+		(decision.deleteGenerationIds.length > 1 ||
+			decision.deleteGenerationIds.length + decision.deletePromotions.length + decision.deleteBlobDigests.length > 16)
+	)
+		throw createAheReclamationError("AHE_RECLAMATION_RETRY_REQUIRED", "bounded native reclamation exceeds fixed batch");
+	const observer = crashObserverByStore.get(store);
+	for (const source of decision.independentSourceFloors ?? [])
+		if (source.normalizedThisCall) {
+			const generationStore = transaction.objectStore(PHASE_2D_GENERATIONS_STORE),
+				key = [captured.objectId, source.generation.generationId];
+			await expectKey(store, generationStore, key, "present", "floor rewrite");
+			await requestValue(
+				generationStore.put({
+					generationId: source.generation.generationId,
+					objectId: captured.objectId,
+					record: encodeGenerationRecordV1(source.rewrittenGeneration),
+				})
+			);
+			await expectKey(store, generationStore, key, "present", "floor rewrite");
+		}
+	if (decision.floor.normalizedThisCall) {
+		const generationStore = transaction.objectStore(PHASE_2D_GENERATIONS_STORE);
+		const floorKey = [captured.objectId, captured.lineageFloor.generationId];
+		await expectKey(store, generationStore, floorKey, "present", "floor rewrite");
+		await requestValue(
+			generationStore.put({
+				generationId: captured.lineageFloor.generationId,
+				objectId: captured.objectId,
+				record: encodeGenerationRecordV1(decision.floor.rewrittenGeneration),
+			})
+		);
+		await expectKey(store, generationStore, floorKey, "present", "floor rewrite");
+		observer?.("after-floor-rewrite", transaction);
+	}
+	const promotionStore = transaction.objectStore(PHASE_2D_PROMOTIONS_STORE);
+	for (const promotion of decision.deletePromotions) {
+		const key = [promotion.objectId, promotion.generationId, promotion.digest];
+		await expectKey(store, promotionStore, key, "present", "promotion delete");
+		await requestValue(promotionStore.delete(key));
+		await expectKey(store, promotionStore, key, "absent", "promotion delete");
+	}
+	if (decision.floor.normalizedThisCall) observer?.("after-promotion-delete", transaction);
+	const generationStore = transaction.objectStore(PHASE_2D_GENERATIONS_STORE);
+	for (const generationId of decision.deleteGenerationIds) {
+		const key = [captured.objectId, generationId];
+		await expectKey(store, generationStore, key, "present", "generation delete");
+		await requestValue(generationStore.delete(key));
+		await expectKey(store, generationStore, key, "absent", "generation delete");
+	}
+	if (decision.floor.normalizedThisCall) observer?.("after-generation-delete", transaction);
+	const blobStore = transaction.objectStore(PHASE_2D_BLOBS_STORE);
+	for (const digest of decision.deleteBlobDigests) {
+		await expectKey(store, blobStore, digest, "present", "blob delete");
+		await requestValue(blobStore.delete(digest));
+		await expectKey(store, blobStore, digest, "absent", "blob delete");
+	}
+	if (decision.floor.normalizedThisCall) observer?.("after-blob-delete", transaction);
+
+	const post = classifyAheReclamation(captured, await loadSnapshot(transaction, captured.objectId, bounded));
+	if (
+		post.floor.normalizedThisCall ||
+		post.independentSourceFloors?.some((source) => source.normalizedThisCall) ||
+		post.deleteGenerationIds.length !== 0 ||
+		post.deletePromotions.length !== 0 ||
+		post.deleteBlobDigests.length !== 0
+	) {
+		throw createAheReclamationError("AHE_RECLAMATION_CORRUPT", "post-state was not a complete replay");
+	}
+	return decision;
 }
 
 /**
